@@ -21,7 +21,7 @@ namespace Trecs
 
         internal NativeDenseDictionary<Group, NativeList<EntityHandle>> _entityIndexToReferenceMap;
 
-        // (SVKJ) notes
+        // (svermeulen) notes
         // This method is designed to work safely across threads
         // It does not cause _entityHandleMap to be re-allocated,
         // even though it does return indices into this array that exceed
