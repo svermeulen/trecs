@@ -13,3 +13,6 @@ Thumbs.db
 obj/
 bin/
 *.nupkg
+
+# MkDocs
+site/
