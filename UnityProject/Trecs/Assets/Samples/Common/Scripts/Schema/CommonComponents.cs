@@ -6,8 +6,6 @@ namespace Trecs.Samples
     public partial struct GameObjectId : IEntityComponent
     {
         public int Value;
-
-        public static readonly GameObjectId Default = default;
     }
 
     [Unwrap]
@@ -28,7 +26,6 @@ namespace Trecs.Samples
     public partial struct UniformScale : IEntityComponent
     {
         public float Value;
-        public static readonly UniformScale Default = new(1f);
     }
 
     [Unwrap]
@@ -57,6 +54,5 @@ namespace Trecs.Samples
     public partial struct ColorComponent : IEntityComponent
     {
         public UnityEngine.Color Value;
-        public static readonly ColorComponent Default = new(UnityEngine.Color.white);
     }
 }

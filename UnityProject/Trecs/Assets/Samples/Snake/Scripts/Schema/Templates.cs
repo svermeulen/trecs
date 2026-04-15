@@ -9,30 +9,30 @@ namespace Trecs.Samples.Snake
             // persist until the next tick to be processed. RetainCurrent
             // keeps the last requested direction in place across frames.
             [Input(MissingInputFrameBehaviour.RetainCurrent)]
-            public MoveInput MoveInput = MoveInput.Default;
+            public MoveInput MoveInput = default;
 
             public SnakeLength SnakeLength = SnakeLength.Default;
-            public Score Score = Score.Default;
-            public MoveTickCounter MoveTickCounter = MoveTickCounter.Default;
+            public Score Score = default;
+            public MoveTickCounter MoveTickCounter = default;
         }
 
         public partial class SnakeHeadEntity : ITemplate, IHasTags<SnakeTags.SnakeHead>
         {
-            public GridPos GridPos = GridPos.Default;
+            public GridPos GridPos = default;
             public Direction Direction = Direction.Default;
             public GameObjectId GameObjectId;
         }
 
         public partial class SnakeSegmentEntity : ITemplate, IHasTags<SnakeTags.SnakeSegment>
         {
-            public GridPos GridPos = GridPos.Default;
-            public SegmentAge SegmentAge = SegmentAge.Default;
+            public GridPos GridPos = default;
+            public SegmentAge SegmentAge = default;
             public GameObjectId GameObjectId;
         }
 
         public partial class SnakeFoodEntity : ITemplate, IHasTags<SnakeTags.SnakeFood>
         {
-            public GridPos GridPos = GridPos.Default;
+            public GridPos GridPos = default;
             public GameObjectId GameObjectId;
         }
     }

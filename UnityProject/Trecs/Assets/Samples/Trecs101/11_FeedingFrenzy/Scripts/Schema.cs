@@ -89,7 +89,7 @@ namespace Trecs.Samples.FeedingFrenzy101
             public Position Position;
             public Rotation Rotation;
             public UniformScale Scale;
-            public ColorComponent Color = ColorComponent.Default;
+            public ColorComponent Color = new(UnityEngine.Color.white);
         }
 
         /// <summary>

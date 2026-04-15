@@ -1,10 +1,11 @@
 using System;
+using Trecs.Internal;
 using Unity.Burst;
 using Unity.Jobs;
 using EditorBrowsable = System.ComponentModel.EditorBrowsableAttribute;
 using EditorBrowsableState = System.ComponentModel.EditorBrowsableState;
 
-namespace Trecs.Internal
+namespace Trecs
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
     public class InterpolatedPreviousSaver<T> : IInterpolatedPreviousSaver

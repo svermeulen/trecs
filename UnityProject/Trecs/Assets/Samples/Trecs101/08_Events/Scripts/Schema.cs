@@ -22,7 +22,7 @@ namespace Trecs.Samples.Events
                 IHasState<CubeTags.Shrinking>
         {
             public Position Position;
-            public UniformScale Scale = UniformScale.Default;
+            public UniformScale Scale = new(1f);
             public GameObjectId GameObjectId;
         }
     }

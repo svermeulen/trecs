@@ -24,8 +24,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
     public partial struct Speed : IEntityComponent
     {
         public float Value;
-
-        public static readonly Speed Default = default;
     }
 
     [Unwrap]

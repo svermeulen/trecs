@@ -6,7 +6,6 @@ namespace Trecs.Samples.Snake
     public partial struct GridPos : IEntityComponent
     {
         public int2 Value;
-        public static readonly GridPos Default = default;
     }
 
     [Unwrap]
@@ -24,7 +23,6 @@ namespace Trecs.Samples.Snake
         // requested direction. Stored as int2 so it serializes via the
         // existing core int2 blit serializer with no custom registration.
         public int2 RequestedDirection;
-        public static readonly MoveInput Default = default;
     }
 
     [Unwrap]
@@ -33,7 +31,6 @@ namespace Trecs.Samples.Snake
         // Fixed frame at which this segment was spawned. Used by
         // SegmentTrimSystem to find and remove the oldest segments first.
         public int FrameSpawned;
-        public static readonly SegmentAge Default = default;
     }
 
     [Unwrap]
@@ -49,7 +46,6 @@ namespace Trecs.Samples.Snake
     public partial struct Score : IEntityComponent
     {
         public int Value;
-        public static readonly Score Default = default;
     }
 
     [Unwrap]
@@ -58,6 +54,5 @@ namespace Trecs.Samples.Snake
         // Counts down each fixed frame. When it reaches 0 the snake takes
         // one grid step and the counter resets to FramesPerMove.
         public int FramesUntilNextMove;
-        public static readonly MoveTickCounter Default = default;
     }
 }

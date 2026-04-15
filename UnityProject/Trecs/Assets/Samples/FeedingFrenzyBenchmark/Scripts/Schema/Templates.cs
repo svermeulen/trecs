@@ -30,7 +30,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             public Position Position;
             public Rotation Rotation;
             public UniformScale Scale;
-            public ColorComponent Color = ColorComponent.Default;
+            public ColorComponent Color = new(UnityEngine.Color.white);
         }
 
         public partial class FishEntity : ITemplate, IExtends<Renderable>, IHasTags<FrenzyTags.Fish>
