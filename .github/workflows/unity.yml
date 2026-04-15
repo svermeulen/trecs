@@ -1,0 +1,38 @@
+name: Unity
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  checks: write
+  contents: read
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - uses: actions/cache@v4
+        with:
+          path: UnityProject/Trecs/Library
+          key: Library-${{ hashFiles('UnityProject/Trecs/Packages/manifest.json', 'UnityProject/Trecs/Packages/packages-lock.json') }}
+          restore-keys: |
+            Library-
+
+      - uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: UnityProject/Trecs
+          testMode: editmode
+          unityVersion: 6000.3.10f1
+          githubToken: ${{ secrets.GITHUB_TOKEN }}

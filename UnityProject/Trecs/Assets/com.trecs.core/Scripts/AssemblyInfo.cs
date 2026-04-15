@@ -1,0 +1,5 @@
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Trecs.Tests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Trecs.Serialization.Tests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Trecs.GameObjects")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Trecs.Profiling")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Trecs.Serialization")]

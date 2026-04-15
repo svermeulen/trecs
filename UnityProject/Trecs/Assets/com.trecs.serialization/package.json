@@ -1,0 +1,8 @@
+{
+  "name": "com.trecs.serialization",
+  "version": "0.0.1",
+  "description": "tbd",
+  "dependencies": {
+    "com.trecs.core": "<local>"
+  }
+}

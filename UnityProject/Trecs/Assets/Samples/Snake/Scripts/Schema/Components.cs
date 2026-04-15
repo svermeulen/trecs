@@ -1,0 +1,63 @@
+using Unity.Mathematics;
+
+namespace Trecs.Samples.Snake
+{
+    [Unwrap]
+    public partial struct GridPos : IEntityComponent
+    {
+        public int2 Value;
+        public static readonly GridPos Default = default;
+    }
+
+    [Unwrap]
+    public partial struct Direction : IEntityComponent
+    {
+        // Unit vector on the grid: (1,0), (-1,0), (0,1), or (0,-1).
+        public int2 Value;
+        public static Direction Default => new(new int2(1, 0));
+    }
+
+    [Unwrap]
+    public partial struct MoveInput : IEntityComponent
+    {
+        // (0,0) means "no turn requested this frame". Otherwise the
+        // requested direction. Stored as int2 so it serializes via the
+        // existing core int2 blit serializer with no custom registration.
+        public int2 RequestedDirection;
+        public static readonly MoveInput Default = default;
+    }
+
+    [Unwrap]
+    public partial struct SegmentAge : IEntityComponent
+    {
+        // Fixed frame at which this segment was spawned. Used by
+        // SegmentTrimSystem to find and remove the oldest segments first.
+        public int FrameSpawned;
+        public static readonly SegmentAge Default = default;
+    }
+
+    [Unwrap]
+    public partial struct SnakeLength : IEntityComponent
+    {
+        // Target body length, including the head. The trim system removes
+        // segments until the segment count reaches Value-1 (head + segments).
+        public int Value;
+        public static SnakeLength Default => new(4);
+    }
+
+    [Unwrap]
+    public partial struct Score : IEntityComponent
+    {
+        public int Value;
+        public static readonly Score Default = default;
+    }
+
+    [Unwrap]
+    public partial struct MoveTickCounter : IEntityComponent
+    {
+        // Counts down each fixed frame. When it reaches 0 the snake takes
+        // one grid step and the counter resets to FramesPerMove.
+        public int FramesUntilNextMove;
+        public static readonly MoveTickCounter Default = default;
+    }
+}

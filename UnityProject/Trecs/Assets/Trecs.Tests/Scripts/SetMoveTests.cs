@@ -1,0 +1,335 @@
+using System.Collections.Generic;
+using NUnit.Framework;
+using NAssert = NUnit.Framework.Assert;
+
+namespace Trecs.Tests
+{
+    // Template with states for set+move testing
+    public struct FMTag : ITag { }
+
+    public struct FMStateA : ITag { }
+
+    public struct FMStateB : ITag { }
+
+    public partial class FMTestEntity
+        : ITemplate,
+            IHasTags<FMTag>,
+            IHasState<FMStateA>,
+            IHasState<FMStateB>
+    {
+        public TestInt TestInt;
+        public TestFloat TestFloat;
+    }
+
+    // Set scoped to the FMTag (valid for both state groups)
+    public struct FMSet : IEntitySet<FMTag> { }
+
+    [TestFixture]
+    public class SetMoveTests
+    {
+        static readonly TagSet FMStateASet = TagSet.FromTags(Tag<FMTag>.Value, Tag<FMStateA>.Value);
+        static readonly TagSet FMStateBSet = TagSet.FromTags(Tag<FMTag>.Value, Tag<FMStateB>.Value);
+
+        TestEnvironment CreateEnv()
+        {
+            var builder = new WorldBuilder()
+                .SetSettings(new WorldSettings())
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(FMTestEntity.Template)
+                .AddSet<FMSet>()
+                .AddBlobStore(CreateBlobStore());
+
+            return new TestEnvironment(builder.BuildAndInitialize());
+        }
+
+        static BlobStoreInMemory CreateBlobStore()
+        {
+            var blobStoreCommon = new BlobStoreCommon(null);
+            return new BlobStoreInMemory(
+                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
+                blobStoreCommon
+            );
+        }
+
+        #region Set Tracks Entity Through Move
+
+        [Test]
+        public void FilterMove_EntityMovedToNewState_StillInSet()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var init = a.AddEntity(FMStateASet)
+                .Set(new TestInt { Value = 42 })
+                .Set(new TestFloat { Value = 1.0f })
+                .AssertComplete();
+            var entityHandle = init.Handle;
+            a.SubmitEntities();
+
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(FMStateASet);
+            var set = a.Set<FMSet>();
+
+            set.Write.AddImmediate(new EntityIndex(0, groupA));
+            a.SubmitEntities();
+
+            NAssert.AreEqual(1, set.Read.Count);
+
+            // Move entity to StateB
+            a.MoveTo(entityHandle.ToIndex(a), FMStateBSet);
+            a.SubmitEntities();
+
+            // Entity should still be in the set, but now under the StateB group
+            NAssert.AreEqual(
+                1,
+                set.Read.Count,
+                "Entity should remain in set after move between states"
+            );
+        }
+
+        [Test]
+        public void FilterMove_EntityMovedToNewState_QueryThroughSetFindsIt()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var init = a.AddEntity(FMStateASet)
+                .Set(new TestInt { Value = 99 })
+                .Set(new TestFloat())
+                .AssertComplete();
+            var entityHandle = init.Handle;
+            a.SubmitEntities();
+
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(FMStateASet);
+            var set = a.Set<FMSet>();
+
+            set.Write.AddImmediate(new EntityIndex(0, groupA));
+            a.SubmitEntities();
+
+            // Move to StateB
+            a.MoveTo(entityHandle.ToIndex(a), FMStateBSet);
+            a.SubmitEntities();
+
+            // Query through set should find the entity
+            int queryCount = a.Query().InSet<FMSet>().Count();
+            NAssert.AreEqual(1, queryCount, "Query through set should find moved entity");
+
+            // Verify data is correct
+            var results = new List<int>();
+            foreach (var ei in a.Query().InSet<FMSet>().EntityIndices())
+            {
+                results.Add(a.Component<TestInt>(ei).Read.Value);
+            }
+            NAssert.AreEqual(1, results.Count);
+            NAssert.AreEqual(99, results[0]);
+        }
+
+        [Test]
+        public void FilterMove_EntityNotInSet_StaysOutAfterMove()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            // Add 2 entities, only put entity 0 in set
+            var init0 = a.AddEntity(FMStateASet)
+                .Set(new TestInt { Value = 10 })
+                .Set(new TestFloat())
+                .AssertComplete();
+            var init1 = a.AddEntity(FMStateASet)
+                .Set(new TestInt { Value = 20 })
+                .Set(new TestFloat())
+                .AssertComplete();
+            a.SubmitEntities();
+
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(FMStateASet);
+            var set = a.Set<FMSet>();
+
+            set.Write.AddImmediate(new EntityIndex(0, groupA));
+            a.SubmitEntities();
+
+            // Move entity 1 (NOT in set) to StateB
+            a.MoveTo(init1.Handle.ToIndex(a), FMStateBSet);
+            a.SubmitEntities();
+
+            // Set should still have exactly 1 entity
+            NAssert.AreEqual(1, set.Read.Count);
+            NAssert.AreEqual(1, a.Query().InSet<FMSet>().Count());
+        }
+
+        [Test]
+        public void FilterMove_MoveMultiple_SetCountPreserved()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var refs = new EntityHandle[6];
+            for (int i = 0; i < 6; i++)
+            {
+                var init = a.AddEntity(FMStateASet)
+                    .Set(new TestInt { Value = i * 10 })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+                refs[i] = init.Handle;
+            }
+            a.SubmitEntities();
+
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(FMStateASet);
+            var set = a.Set<FMSet>();
+
+            // Add entities 0, 2, 4 to set
+            var write = set.Write;
+            write.AddImmediate(new EntityIndex(0, groupA));
+            write.AddImmediate(new EntityIndex(2, groupA));
+            write.AddImmediate(new EntityIndex(4, groupA));
+            a.SubmitEntities();
+            NAssert.AreEqual(3, set.Read.Count);
+
+            // Move entities 0 and 2 (in set) plus entity 1 (not in set) to StateB
+            a.MoveTo(refs[0].ToIndex(a), FMStateBSet);
+            a.MoveTo(refs[1].ToIndex(a), FMStateBSet);
+            a.MoveTo(refs[2].ToIndex(a), FMStateBSet);
+            a.SubmitEntities();
+
+            // Set should still have 3 entities (0 and 2 moved but still tracked, 4 stayed)
+            NAssert.AreEqual(3, set.Read.Count, "All 3 set entities should be tracked after moves");
+
+            // Verify query through set gets correct values
+            var values = new List<int>();
+            foreach (var ei in a.Query().InSet<FMSet>().EntityIndices())
+            {
+                values.Add(a.Component<TestInt>(ei).Read.Value);
+            }
+            values.Sort();
+            NAssert.AreEqual(3, values.Count);
+            NAssert.Contains(0, values);
+            NAssert.Contains(20, values);
+            NAssert.Contains(40, values);
+        }
+
+        #endregion
+
+        #region Set + Move + Remove Combined
+
+        [Test]
+        public void FilterMoveRemove_MoveOneRemoveAnother_SetCorrect()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var refs = new EntityHandle[3];
+            for (int i = 0; i < 3; i++)
+            {
+                var init = a.AddEntity(FMStateASet)
+                    .Set(new TestInt { Value = i * 10 })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+                refs[i] = init.Handle;
+            }
+            a.SubmitEntities();
+
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(FMStateASet);
+            var set = a.Set<FMSet>();
+
+            // Add all 3 to set
+            var write = set.Write;
+            write.AddImmediate(new EntityIndex(0, groupA));
+            write.AddImmediate(new EntityIndex(1, groupA));
+            write.AddImmediate(new EntityIndex(2, groupA));
+            a.SubmitEntities();
+            NAssert.AreEqual(3, set.Read.Count);
+
+            // Move entity 0 to StateB, remove entity 1
+            a.MoveTo(refs[0].ToIndex(a), FMStateBSet);
+            a.RemoveEntity(refs[1]);
+            a.SubmitEntities();
+
+            // Entity 0: moved (still in set at new group)
+            // Entity 1: removed (gone from set)
+            // Entity 2: stayed (still in set at possibly new index due to swap-back)
+            NAssert.AreEqual(2, set.Read.Count, "Should have 2 entities in set after move+remove");
+            NAssert.AreEqual(2, a.Query().InSet<FMSet>().Count());
+        }
+
+        [Test]
+        public void FilterMoveRemove_RemoveSetMoveUnfiltered_SetCorrect()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var refs = new EntityHandle[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var init = a.AddEntity(FMStateASet)
+                    .Set(new TestInt { Value = i * 10 })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+                refs[i] = init.Handle;
+            }
+            a.SubmitEntities();
+
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(FMStateASet);
+            var set = a.Set<FMSet>();
+
+            // Only entity 0 and 2 in set
+            var write = set.Write;
+            write.AddImmediate(new EntityIndex(0, groupA));
+            write.AddImmediate(new EntityIndex(2, groupA));
+            a.SubmitEntities();
+
+            // Remove entity 0 (in set), move entity 1 (NOT in set) to StateB
+            a.RemoveEntity(refs[0]);
+            a.MoveTo(refs[1].ToIndex(a), FMStateBSet);
+            a.SubmitEntities();
+
+            // Entity 0 removed -> set loses it
+            // Entity 1 moved but wasn't in set -> set unchanged for it
+            // Entity 2 still in set (at possibly new index)
+            NAssert.AreEqual(1, set.Read.Count, "Only entity 2 should remain in set");
+        }
+
+        #endregion
+
+        #region Set + Move Back and Forth
+
+        [Test]
+        public void FilterMoveBackForth_EntityTrackedThroughMultipleMoves()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var init = a.AddEntity(FMStateASet)
+                .Set(new TestInt { Value = 77 })
+                .Set(new TestFloat())
+                .AssertComplete();
+            var entityHandle = init.Handle;
+            a.SubmitEntities();
+
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(FMStateASet);
+            var set = a.Set<FMSet>();
+
+            set.Write.AddImmediate(new EntityIndex(0, groupA));
+            a.SubmitEntities();
+            NAssert.AreEqual(1, set.Read.Count);
+
+            // Move A -> B
+            a.MoveTo(entityHandle.ToIndex(a), FMStateBSet);
+            a.SubmitEntities();
+            NAssert.AreEqual(1, set.Read.Count, "After A->B");
+
+            // Move B -> A
+            a.MoveTo(entityHandle.ToIndex(a), FMStateASet);
+            a.SubmitEntities();
+            NAssert.AreEqual(1, set.Read.Count, "After B->A");
+
+            // Move A -> B again
+            a.MoveTo(entityHandle.ToIndex(a), FMStateBSet);
+            a.SubmitEntities();
+            NAssert.AreEqual(1, set.Read.Count, "After A->B again");
+
+            // Verify data is still correct
+            var comp = a.Component<TestInt>(entityHandle);
+            NAssert.AreEqual(77, comp.Read.Value);
+        }
+
+        #endregion
+    }
+}

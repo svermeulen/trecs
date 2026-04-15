@@ -1,0 +1,139 @@
+using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Trecs.Internal;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
+
+namespace Trecs
+{
+    // Save ourselves 4 bytes by disabling default alignment
+    // Note that some code assumes this is 12 bytes (RigidBody.cs in dots physics)
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    public readonly unsafe struct NativeSharedPtr<T> : IEquatable<NativeSharedPtr<T>>
+        where T : unmanaged
+    {
+        public readonly PtrHandle Handle;
+        public readonly BlobId BlobId;
+
+        public NativeSharedPtr(PtrHandle handle, BlobId blobId)
+        {
+            Handle = handle;
+            BlobId = blobId;
+        }
+
+        public readonly unsafe void* GetUnsafePtr(in NativeSharedPtrResolver nativePtrResolver)
+        {
+            return nativePtrResolver.ResolveUnsafePtr<T>(BlobId);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly unsafe void* GetUnsafePtr(in NativeWorldAccessor accessor)
+        {
+            return GetUnsafePtr(accessor.SharedPtrResolver);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly unsafe void* GetUnsafePtr(HeapAccessor heap)
+        {
+            return heap.ResolveUnsafePtr<T>(BlobId);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly unsafe void* GetUnsafePtr(WorldAccessor ecs)
+        {
+            return GetUnsafePtr(ecs.Heap);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly unsafe ref T Get(in NativeSharedPtrResolver nativePtrResolver)
+        {
+            return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(nativePtrResolver));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly unsafe ref T Get(in NativeWorldAccessor accessor)
+        {
+            return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(accessor.SharedPtrResolver));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly unsafe ref T Get(HeapAccessor heap)
+        {
+            return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(heap));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly unsafe ref T Get(WorldAccessor ecs)
+        {
+            return ref Get(ecs.Heap);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public NativeSharedPtr<T> Clone(HeapAccessor heap)
+        {
+            if (IsNull)
+            {
+                return default;
+            }
+
+            if (heap.NativeSharedHeap.TryClone<T>(Handle, out var result))
+            {
+                return result;
+            }
+
+            // Frame-scoped: clone into persistent heap
+            var blobId = heap.FrameScopedNativeSharedHeap.GetBlobId(heap.FixedFrame, Handle.Value);
+            return heap.NativeSharedHeap.GetBlob<T>(blobId);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public NativeSharedPtr<T> Clone(WorldAccessor ecs) => Clone(ecs.Heap);
+
+        public readonly void Dispose(HeapAccessor heap)
+        {
+            Assert.That(
+                !heap.FrameScopedNativeSharedHeap.ContainsEntry(Handle.Value),
+                "Frame-scoped NativeSharedPtr must not be manually disposed"
+            );
+            heap.NativeSharedHeap.DisposeHandle(Handle);
+        }
+
+        public readonly void Dispose(WorldAccessor ecs) => Dispose(ecs.Heap);
+
+        public readonly bool IsNull
+        {
+            get { return BlobId.IsNull; }
+        }
+
+        public readonly bool IsCreated
+        {
+            get { return !IsNull; }
+        }
+
+        public bool Equals(NativeSharedPtr<T> other)
+        {
+            return Handle.Equals(other.Handle) && BlobId.Equals(other.BlobId);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is NativeSharedPtr<T> other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return unchecked((int)math.hash(new int2(Handle.GetHashCode(), BlobId.GetHashCode())));
+        }
+
+        public static bool operator ==(NativeSharedPtr<T> left, NativeSharedPtr<T> right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(NativeSharedPtr<T> left, NativeSharedPtr<T> right)
+        {
+            return !left.Equals(right);
+        }
+    }
+}

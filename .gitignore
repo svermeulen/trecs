@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vs/
+*.user
+*.suo
+*.userprefs
+
+# .NET
+obj/
+bin/
+*.nupkg

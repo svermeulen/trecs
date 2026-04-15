@@ -1,0 +1,1076 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Trecs.Collections;
+using Trecs.Internal;
+
+namespace Trecs
+{
+    // Note that we use FastList here just to ensure we can iterate over things without allocations
+    public class WorldInfo
+    {
+        static readonly TrecsLog _log = new(nameof(WorldInfo));
+
+        readonly ReadOnlyDenseDictionary<Group, GroupInfo> _groupInfos;
+        readonly Dictionary<Template, FastList<Group>> _templateGroupsMap;
+        readonly ReadOnlyFastList<Group> _allGroups;
+        readonly ReadOnlyFastList<ResolvedTemplate> _resolvedTemplates;
+        readonly HashSet<Template> _resolvedTemplateSet = new();
+        readonly HashSet<Template> _allTemplatesSet = new();
+        readonly ReadOnlyFastList<Template> _allTemplates;
+        readonly ResolvedTemplate _globalTemplate;
+        readonly WorldQueryEngine _queryEngine;
+
+        const int _globalEntitySlotIndex = 0;
+
+        readonly Group _globalGroup;
+        readonly EntityIndex _globalEntityIndex;
+        readonly ReadOnlyFastList<Group> _globalGroups;
+
+        public WorldInfo(IReadOnlyList<Template> templatesList)
+        {
+            if (!HasGlobalsTemplate(templatesList))
+            {
+                templatesList = new List<Template>(templatesList)
+                {
+                    TrecsTemplates.Globals.Template,
+                };
+            }
+
+            var resolvedTemplatesList = new FastList<ResolvedTemplate>(templatesList.Count);
+
+            foreach (var template in templatesList)
+            {
+                resolvedTemplatesList.Add(ResolveTemplate(template));
+            }
+
+            var groupTemplateMap = new DenseDictionary<Group, GroupInfo>();
+            var templateGroupsMap = new Dictionary<Template, FastList<Group>>();
+            var allGroups = new FastList<Group>();
+            var allTemplates = new FastList<Template>();
+
+            void AddGroupToTemplate(Template template, Group group)
+            {
+                if (templateGroupsMap.TryGetValue(template, out var existingGroups))
+                {
+                    existingGroups.Add(group);
+                }
+                else
+                {
+                    templateGroupsMap.Add(template, new FastList<Group> { group });
+                }
+            }
+
+            ResolvedTemplate globalTemplate = null;
+            Group? globalGroup = null;
+
+            foreach (var resolvedTemplate in resolvedTemplatesList)
+            {
+                Assert.That(
+                    resolvedTemplate.AllTags.Tags.Count > 0,
+                    "Template {} must have at least one tag",
+                    resolvedTemplate.DebugName
+                );
+
+                if (
+                    resolvedTemplate.Template == TrecsTemplates.Globals.Template
+                    || resolvedTemplate.AllBaseTemplates.Contains(TrecsTemplates.Globals.Template)
+                )
+                {
+                    Assert.That(
+                        globalTemplate == null,
+                        "Found multiple global entity types.  There can only be one."
+                    );
+                    globalTemplate = resolvedTemplate;
+
+                    Assert.That(
+                        resolvedTemplate.Groups.Count == 1,
+                        "Global entity type must only be in one group"
+                    );
+                    Assert.That(!globalGroup.HasValue);
+                    globalGroup = resolvedTemplate.Groups[0];
+                }
+
+                var templateGroupsSvList = new FastList<Group>();
+
+                foreach (var group in resolvedTemplate.Groups)
+                {
+                    Assert.That(
+                        !groupTemplateMap.ContainsKey(group),
+                        "Found same group {} added multiple times.  Groups must be unique.",
+                        group
+                    );
+
+                    groupTemplateMap.Add(group, new GroupInfo(group, resolvedTemplate));
+
+                    AddGroupToTemplate(resolvedTemplate.Template, group);
+
+                    foreach (var baseTemplate in resolvedTemplate.AllBaseTemplates)
+                    {
+                        AddGroupToTemplate(baseTemplate, group);
+                    }
+
+                    allGroups.Add(group);
+                    templateGroupsSvList.Add(group);
+                }
+
+                var wasAdded = _resolvedTemplateSet.Add(resolvedTemplate.Template);
+                Assert.That(wasAdded);
+            }
+
+            foreach (var resolvedTemplate in resolvedTemplatesList)
+            {
+                if (_allTemplatesSet.Add(resolvedTemplate.Template))
+                {
+                    allTemplates.Add(resolvedTemplate.Template);
+                }
+
+                foreach (var baseType in resolvedTemplate.AllBaseTemplates)
+                {
+                    // entities must always be placed in groups that are directly associated with their concrete type
+                    // this is important so that we can reliably query by abstract entity types, which only works when we
+                    // can assume that the entity type associated with each group is not abstract
+                    Assert.That(
+                        !_resolvedTemplateSet.Contains(baseType),
+                        "Provided entity types must not be base types of other provided entity types.  Found {} as a base type of {}",
+                        baseType,
+                        resolvedTemplate
+                    );
+
+                    if (_allTemplatesSet.Add(baseType))
+                    {
+                        allTemplates.Add(baseType);
+                    }
+                }
+            }
+
+            Assert.IsNotNull(globalTemplate);
+
+            _globalTemplate = globalTemplate;
+            _globalGroup = globalGroup.Value;
+            _globalGroups = new FastList<Group>(new[] { globalGroup.Value });
+            _globalEntityIndex = new(_globalEntitySlotIndex, _globalGroup);
+
+            _groupInfos = new(groupTemplateMap);
+            _templateGroupsMap = templateGroupsMap;
+            _allGroups = allGroups;
+            _resolvedTemplates = resolvedTemplatesList;
+            _allTemplates = allTemplates;
+
+            _queryEngine = new WorldQueryEngine(_allGroups, _groupInfos, this);
+        }
+
+        static bool HasGlobalsTemplate(IReadOnlyList<Template> templates)
+        {
+            HashSet<Template> seen = new();
+            foreach (var template in templates)
+            {
+                seen.Clear();
+
+                if (IsOrInheritsFrom(template, TrecsTemplates.Globals.Template, seen))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static bool IsOrInheritsFrom(
+            Template template,
+            Template target,
+            HashSet<Template> visited = null
+        )
+        {
+            if (template == target)
+            {
+                return true;
+            }
+
+            visited ??= new HashSet<Template>();
+
+            if (!visited.Add(template))
+            {
+                return false;
+            }
+
+            foreach (var baseTemplate in template.LocalBaseTemplates)
+            {
+                if (IsOrInheritsFrom(baseTemplate, target, visited))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static ResolvedTemplate ResolveTemplate(Template template)
+        {
+            _log.Trace("Building entity with name {}", template.DebugName);
+
+            var enqueuedBaseTypes = new HashSet<Template>();
+            var allBaseTypesList = new List<Template>();
+            var baseTypeProcessQueue = new Queue<Template>();
+
+            foreach (var baseType in template.LocalBaseTemplates)
+            {
+                baseTypeProcessQueue.Enqueue(baseType);
+                enqueuedBaseTypes.Add(baseType);
+            }
+
+            while (!baseTypeProcessQueue.IsEmpty())
+            {
+                var baseType = baseTypeProcessQueue.Dequeue();
+                Assert.That(enqueuedBaseTypes.Contains(baseType));
+                allBaseTypesList.Add(baseType);
+                _log.Trace(
+                    "Added base type {} to entity {}",
+                    baseType.DebugName,
+                    template.DebugName
+                );
+
+                foreach (var baseBaseType in baseType.LocalBaseTemplates)
+                {
+                    if (enqueuedBaseTypes.Add(baseBaseType))
+                    {
+                        baseTypeProcessQueue.Enqueue(baseBaseType);
+                    }
+                }
+            }
+
+            var allComponentDecMap = new DenseDictionary<Type, List<IComponentDeclaration>>();
+
+            void ProcessComponentDec(IComponentDeclaration componentDec)
+            {
+                var componentType = componentDec.ComponentType;
+
+                if (!allComponentDecMap.TryGetValue(componentType, out var decs))
+                {
+                    decs = new();
+                    allComponentDecMap.Add(componentType, decs);
+                }
+
+                decs.Add(componentDec);
+            }
+
+            foreach (var componentDec in template.LocalComponentDeclarations)
+            {
+                ProcessComponentDec(componentDec);
+            }
+
+            foreach (var baseType in allBaseTypesList)
+            {
+                foreach (var componentDec in baseType.LocalComponentDeclarations)
+                {
+                    ProcessComponentDec(componentDec);
+                }
+            }
+
+            var allComponentDecs = new List<IResolvedComponentDeclaration>();
+            var componentBuilders = new List<IComponentBuilder>();
+            var allResolvedComponentDecMap =
+                new DenseDictionary<Type, IResolvedComponentDeclaration>();
+
+            foreach (var (componentType, componentDecs) in allComponentDecMap)
+            {
+                Assert.That(componentDecs.Count > 0);
+
+                var resolvedDecs = componentDecs[0]
+                    .MergeAsConcrete(componentDecs, template.DebugName);
+
+                foreach (var resolvedDec in resolvedDecs)
+                {
+                    allComponentDecs.Add(resolvedDec);
+                    componentBuilders.Add(resolvedDec.Builder);
+                    allResolvedComponentDecMap.Add(resolvedDec.ComponentType, resolvedDec);
+                }
+            }
+
+            foreach (var baseType in template.LocalBaseTemplates)
+            {
+                Assert.That(
+                    baseType.States.IsEmpty(),
+                    "Entity type states must only be specified in the concrete entity type"
+                );
+            }
+
+            var allTags = new List<Tag>();
+            var allStates = new List<TagSet>();
+
+            allStates.AddRange(template.States);
+            allTags.AddRange(template.LocalTags);
+
+            foreach (var baseType in allBaseTypesList)
+            {
+                allTags.AddRange(baseType.LocalTags);
+                allStates.AddRange(baseType.States);
+            }
+
+            var tagset = TagSet.FromTags(allTags);
+
+            return new(
+                template: template,
+                groups: CalculateTemplateGroups(tagset, allStates),
+                allBaseTemplates: allBaseTypesList,
+                states: allStates,
+                componentDeclarations: allComponentDecs,
+                componentDeclarationMap: new(allResolvedComponentDecMap),
+                componentBuilders: componentBuilders.ToArray(),
+                tagset: tagset
+            );
+
+            static IReadOnlyList<Group> CalculateTemplateGroups(
+                TagSet tags,
+                IReadOnlyList<TagSet> states
+            )
+            {
+                var groups = new List<Group>();
+
+                var groupTags = states.Select(x => x.Tags.ToList()).ToList();
+
+                if (groupTags.IsEmpty())
+                {
+                    groupTags.Add(new List<Tag>());
+                }
+
+                foreach (var tagList in groupTags)
+                {
+                    tagList.AddRange(tags.Tags);
+                    groups.Add(new Group(TagSet.FromTags(tagList).Id));
+                }
+
+                return groups;
+            }
+        }
+
+        public WorldQueryEngine QueryEngine => _queryEngine;
+
+        public ReadOnlyFastList<ResolvedTemplate> ResolvedTemplates
+        {
+            get { return _resolvedTemplates; }
+        }
+
+        public Group GlobalGroup
+        {
+            get { return _globalGroup; }
+        }
+
+        public ReadOnlyFastList<Group> GlobalGroups
+        {
+            get { return _globalGroups; }
+        }
+
+        public ReadOnlyFastList<Group> AllGroups
+        {
+            get { return _allGroups; }
+        }
+
+        public ReadOnlyFastList<Template> AllTemplates
+        {
+            get { return _allTemplates; }
+        }
+
+        public EntityIndex GlobalEntityIndex
+        {
+            get { return _globalEntityIndex; }
+        }
+
+        public ResolvedTemplate GlobalTemplate
+        {
+            get { return _globalTemplate; }
+        }
+
+        public ReadOnlyFastList<Group> GetTemplateGroups(Template template)
+        {
+            if (_templateGroupsMap.TryGetValue(template, out var groups))
+            {
+                return groups;
+            }
+
+            throw Assert.CreateException("No groups found for template {}", template);
+        }
+
+        public ReadOnlyDenseHashSet<Tag> GetGroupTags(Group group)
+        {
+            if (_groupInfos.TryGetValue(group, out var groupInfo))
+            {
+                return groupInfo.Tags;
+            }
+
+            throw Assert.CreateException("Unrecognized group {}", group);
+        }
+
+        public Template GetSingleTemplateForTags(TagSet tags) =>
+            _queryEngine.GetSingleTemplateForTags(tags);
+
+        public ResolvedTemplate GetResolvedTemplateForGroup(Group group)
+        {
+            if (_groupInfos.TryGetValue(group, out var info))
+            {
+                return info.ResolvedTemplate;
+            }
+
+            throw Assert.CreateException("No entity type found for group {}", group);
+        }
+
+        public ResolvedTemplate GetResolvedTemplateForTags(TagSet tags) =>
+            _queryEngine.GetResolvedTemplateForTags(tags);
+
+        public bool IsResolvedTemplate(Template template)
+        {
+            return _resolvedTemplateSet.Contains(template);
+        }
+
+        public bool GroupIsTemplate(Group group, Template template)
+        {
+            var resolvedTemplate = GetResolvedTemplateForGroup(group);
+            return resolvedTemplate.Template == template
+                || resolvedTemplate.AllBaseTemplates.Contains(template);
+        }
+
+        public ReadOnlyFastList<Group> CommonGetTaggedGroupsWithComponents(
+            TagSet tagset,
+            List<Type> componentTypes
+        ) => _queryEngine.CommonGetTaggedGroupsWithComponents(tagset, componentTypes);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1>(TagSet tagset)
+            where T1 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<T1>(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2>(TagSet tagset)
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<T1, T2>(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2, T3>(TagSet tagset)
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3>(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2, T3, T4>(TagSet tagset)
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4>(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5>(
+            TagSet tagset
+        )
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5>(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6>(
+            TagSet tagset
+        )
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6>(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6, T7>(
+            TagSet tagset
+        )
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6, T7>(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8
+        >(TagSet tagset)
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent
+            where T8 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6, T7, T8>(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9
+        >(TagSet tagset)
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent
+            where T8 : unmanaged, IEntityComponent
+            where T9 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9>(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9,
+            T10
+        >(TagSet tagset)
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent
+            where T8 : unmanaged, IEntityComponent
+            where T9 : unmanaged, IEntityComponent
+            where T10 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(
+                tagset
+            );
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9,
+            T10,
+            T11
+        >(TagSet tagset)
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent
+            where T8 : unmanaged, IEntityComponent
+            where T9 : unmanaged, IEntityComponent
+            where T10 : unmanaged, IEntityComponent
+            where T11 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<
+                T1,
+                T2,
+                T3,
+                T4,
+                T5,
+                T6,
+                T7,
+                T8,
+                T9,
+                T10,
+                T11
+            >(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9,
+            T10,
+            T11,
+            T12
+        >(TagSet tagset)
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent
+            where T8 : unmanaged, IEntityComponent
+            where T9 : unmanaged, IEntityComponent
+            where T10 : unmanaged, IEntityComponent
+            where T11 : unmanaged, IEntityComponent
+            where T12 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithTagsAndComponents<
+                T1,
+                T2,
+                T3,
+                T4,
+                T5,
+                T6,
+                T7,
+                T8,
+                T9,
+                T10,
+                T11,
+                T12
+            >(tagset);
+
+        public Group GetSingleGroupWithTags(TagSet tagset) =>
+            _queryEngine.GetSingleGroupWithTags(tagset);
+
+        public Group GetSingleGroupWithTags<T1>()
+            where T1 : struct, ITag => _queryEngine.GetSingleGroupWithTags<T1>();
+
+        public Group GetSingleGroupWithTags<T1, T2>()
+            where T1 : struct, ITag
+            where T2 : struct, ITag => _queryEngine.GetSingleGroupWithTags<T1, T2>();
+
+        public Group GetSingleGroupWithTags<T1, T2, T3>()
+            where T1 : struct, ITag
+            where T2 : struct, ITag
+            where T3 : struct, ITag => _queryEngine.GetSingleGroupWithTags<T1, T2, T3>();
+
+        public Group GetSingleGroupWithTags<T1, T2, T3, T4>()
+            where T1 : struct, ITag
+            where T2 : struct, ITag
+            where T3 : struct, ITag
+            where T4 : struct, ITag => _queryEngine.GetSingleGroupWithTags<T1, T2, T3, T4>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithTags(TagSet tagset) =>
+            _queryEngine.GetGroupsWithTags(tagset);
+
+        public ReadOnlyFastList<Group> GetGroupsWithTags<T1>()
+            where T1 : struct, ITag => _queryEngine.GetGroupsWithTags<T1>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithTags<T1, T2>()
+            where T1 : struct, ITag
+            where T2 : struct, ITag => _queryEngine.GetGroupsWithTags<T1, T2>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithTags<T1, T2, T3>()
+            where T1 : struct, ITag
+            where T2 : struct, ITag
+            where T3 : struct, ITag => _queryEngine.GetGroupsWithTags<T1, T2, T3>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithTags<T1, T2, T3, T4>()
+            where T1 : struct, ITag
+            where T2 : struct, ITag
+            where T3 : struct, ITag
+            where T4 : struct, ITag => _queryEngine.GetGroupsWithTags<T1, T2, T3, T4>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(Type componentType) =>
+            _queryEngine.GetGroupsWithComponents(componentType);
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2
+        ) => _queryEngine.GetGroupsWithComponents(componentType1, componentType2);
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2,
+            Type componentType3
+        ) => _queryEngine.GetGroupsWithComponents(componentType1, componentType2, componentType3);
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2,
+            Type componentType3,
+            Type componentType4
+        ) =>
+            _queryEngine.GetGroupsWithComponents(
+                componentType1,
+                componentType2,
+                componentType3,
+                componentType4
+            );
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2,
+            Type componentType3,
+            Type componentType4,
+            Type componentType5
+        ) =>
+            _queryEngine.GetGroupsWithComponents(
+                componentType1,
+                componentType2,
+                componentType3,
+                componentType4,
+                componentType5
+            );
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2,
+            Type componentType3,
+            Type componentType4,
+            Type componentType5,
+            Type componentType6
+        ) =>
+            _queryEngine.GetGroupsWithComponents(
+                componentType1,
+                componentType2,
+                componentType3,
+                componentType4,
+                componentType5,
+                componentType6
+            );
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2,
+            Type componentType3,
+            Type componentType4,
+            Type componentType5,
+            Type componentType6,
+            Type componentType7
+        ) =>
+            _queryEngine.GetGroupsWithComponents(
+                componentType1,
+                componentType2,
+                componentType3,
+                componentType4,
+                componentType5,
+                componentType6,
+                componentType7
+            );
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2,
+            Type componentType3,
+            Type componentType4,
+            Type componentType5,
+            Type componentType6,
+            Type componentType7,
+            Type componentType8
+        ) =>
+            _queryEngine.GetGroupsWithComponents(
+                componentType1,
+                componentType2,
+                componentType3,
+                componentType4,
+                componentType5,
+                componentType6,
+                componentType7,
+                componentType8
+            );
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2,
+            Type componentType3,
+            Type componentType4,
+            Type componentType5,
+            Type componentType6,
+            Type componentType7,
+            Type componentType8,
+            Type componentType9
+        ) =>
+            _queryEngine.GetGroupsWithComponents(
+                componentType1,
+                componentType2,
+                componentType3,
+                componentType4,
+                componentType5,
+                componentType6,
+                componentType7,
+                componentType8,
+                componentType9
+            );
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2,
+            Type componentType3,
+            Type componentType4,
+            Type componentType5,
+            Type componentType6,
+            Type componentType7,
+            Type componentType8,
+            Type componentType9,
+            Type componentType10
+        ) =>
+            _queryEngine.GetGroupsWithComponents(
+                componentType1,
+                componentType2,
+                componentType3,
+                componentType4,
+                componentType5,
+                componentType6,
+                componentType7,
+                componentType8,
+                componentType9,
+                componentType10
+            );
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2,
+            Type componentType3,
+            Type componentType4,
+            Type componentType5,
+            Type componentType6,
+            Type componentType7,
+            Type componentType8,
+            Type componentType9,
+            Type componentType10,
+            Type componentType11
+        ) =>
+            _queryEngine.GetGroupsWithComponents(
+                componentType1,
+                componentType2,
+                componentType3,
+                componentType4,
+                componentType5,
+                componentType6,
+                componentType7,
+                componentType8,
+                componentType9,
+                componentType10,
+                componentType11
+            );
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+            Type componentType1,
+            Type componentType2,
+            Type componentType3,
+            Type componentType4,
+            Type componentType5,
+            Type componentType6,
+            Type componentType7,
+            Type componentType8,
+            Type componentType9,
+            Type componentType10,
+            Type componentType11,
+            Type componentType12
+        ) =>
+            _queryEngine.GetGroupsWithComponents(
+                componentType1,
+                componentType2,
+                componentType3,
+                componentType4,
+                componentType5,
+                componentType6,
+                componentType7,
+                componentType8,
+                componentType9,
+                componentType10,
+                componentType11,
+                componentType12
+            );
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1>()
+            where T1 : unmanaged, IEntityComponent => _queryEngine.GetGroupsWithComponents<T1>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2>()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<T1, T2>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3>()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<T1, T2, T3>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4>()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4, T5>()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4, T5, T6>()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7>()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8>()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent
+            where T8 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9>()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent
+            where T8 : unmanaged, IEntityComponent
+            where T9 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9,
+            T10
+        >()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent
+            where T8 : unmanaged, IEntityComponent
+            where T9 : unmanaged, IEntityComponent
+            where T10 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9,
+            T10,
+            T11
+        >()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent
+            where T8 : unmanaged, IEntityComponent
+            where T9 : unmanaged, IEntityComponent
+            where T10 : unmanaged, IEntityComponent
+            where T11 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>();
+
+        public ReadOnlyFastList<Group> GetGroupsWithComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9,
+            T10,
+            T11,
+            T12
+        >()
+            where T1 : unmanaged, IEntityComponent
+            where T2 : unmanaged, IEntityComponent
+            where T3 : unmanaged, IEntityComponent
+            where T4 : unmanaged, IEntityComponent
+            where T5 : unmanaged, IEntityComponent
+            where T6 : unmanaged, IEntityComponent
+            where T7 : unmanaged, IEntityComponent
+            where T8 : unmanaged, IEntityComponent
+            where T9 : unmanaged, IEntityComponent
+            where T10 : unmanaged, IEntityComponent
+            where T11 : unmanaged, IEntityComponent
+            where T12 : unmanaged, IEntityComponent =>
+            _queryEngine.GetGroupsWithComponents<
+                T1,
+                T2,
+                T3,
+                T4,
+                T5,
+                T6,
+                T7,
+                T8,
+                T9,
+                T10,
+                T11,
+                T12
+            >();
+
+        public bool GroupHasComponent<T>(Group group)
+            where T : IEntityComponent
+        {
+            var template = GetResolvedTemplateForGroup(group);
+            return template.HasComponent<T>();
+        }
+
+        internal class GroupInfo
+        {
+            public GroupInfo(Group group, ResolvedTemplate resolvedTemplate)
+            {
+                Group = group;
+                ResolvedTemplate = resolvedTemplate;
+
+                var tags = group.AsTagSet().Tags;
+                var tagsSet = new DenseHashSet<Tag>((uint)tags.Count);
+
+                foreach (var tag in tags)
+                {
+                    tagsSet.Add(tag);
+                }
+
+                Tags = tagsSet;
+            }
+
+            public DenseHashSet<Tag> Tags { get; }
+            public ResolvedTemplate ResolvedTemplate { get; }
+            public Group Group { get; }
+        }
+    }
+}
