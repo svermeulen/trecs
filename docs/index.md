@@ -9,6 +9,7 @@ A high-performance Entity Component System framework for Unity.
 - **Burst & Jobs** — first-class support for Unity's job system and Burst compiler
 - **Deterministic simulation** — designed for networking and replay
 - **Template system** — composable entity archetypes with tags and states
+- **Recording & Playback** — full simulation recording with desync detection
 - **Interpolation** — built-in fixed-to-variable timestep interpolation
 
 ## Quick Start
@@ -42,14 +43,3 @@ public partial class MoveSystem : ISystem
 ```
 
 See [Getting Started](getting-started.md) for a complete walkthrough.
-
-## Documentation
-
-<div class="grid cards" markdown>
-
-- :material-rocket-launch: **[Getting Started](getting-started.md)** — Installation and your first project
-- :material-book-open-variant: **[Concepts](concepts/index.md)** — Core ECS concepts
-- :material-map: **[Guides](guides/aspects-and-source-generation.md)** — In-depth topic guides
-- :material-cog: **[Architecture](architecture/system-execution-model.md)** — How Trecs works under the hood
-
-</div>

@@ -35,27 +35,34 @@ theme:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
-  - Concepts:
-      - Overview: concepts/index.md
-      - Components: concepts/components.md
-      - Templates & Tags: concepts/templates-and-tags.md
-      - Systems: concepts/systems.md
-      - Queries & Iteration: concepts/queries-and-iteration.md
-  - Guides:
-      - Aspects & Source Generation: guides/aspects-and-source-generation.md
-      - Jobs & Scheduling: guides/jobs-and-scheduling.md
-      - Entity Subset Patterns: guides/entity-subset-patterns.md
-      - Structural Changes: guides/structural-changes.md
-      - Blobs & Heaps: guides/blobs-and-heaps.md
-      - OOP Abstraction Layer: guides/oop-abstraction-layer.md
-      - Serialization: guides/serialization.md
-  - Architecture:
-      - System Execution Model: architecture/system-execution-model.md
-      - Thread Safety: architecture/thread-safety.md
-      - Design Rules: architecture/design-rules.md
-      - ECS Architecture Comparison: architecture/ecs-architecture-comparison.md
-  - Reference:
-      - Trecs vs Unity ECS: reference/trecs-vs-unity-ecs.md
+  - Core:
+      - World Setup: core/world-setup.md
+      - Entities: core/entities.md
+      - Components: core/components.md
+      - Templates: core/templates.md
+      - Tags & Groups: core/tags-and-groups.md
+      - Systems: core/systems.md
+  - Data Access:
+      - Queries & Iteration: data-access/queries-and-iteration.md
+      - Aspects: data-access/aspects.md
+  - Entity Management:
+      - Structural Changes: entity-management/structural-changes.md
+      - Sets: entity-management/sets.md
+      - Entity Events: entity-management/entity-events.md
+  - Performance:
+      - Jobs & Burst: performance/jobs-and-burst.md
+  - Advanced:
+      - Heap: advanced/heap.md
+      - Interpolation: advanced/interpolation.md
+      - Serialization: advanced/serialization.md
+      - Recording & Playback: advanced/recording-and-playback.md
+      - Input System: advanced/input-system.md
+      - Time & RNG: advanced/time-and-rng.md
+  - Recipes:
+      - OOP Integration: recipes/oop-integration.md
+      - Entity Subset Patterns: recipes/entity-subset-patterns.md
+      - Design Rules: recipes/design-rules.md
+      - Trecs vs Unity ECS: recipes/trecs-vs-unity-ecs.md
 
 markdown_extensions:
   - admonition
