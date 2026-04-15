@@ -140,7 +140,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## Acknowledgments
 
-Trecs was originally inspired by [Svelto.ECS](https://github.com/sebas77/Svelto.ECS) by Sebastiano Mandala and has since evolved into a distinct framework with its own architecture and feature set.
+Trecs was originally based on [Svelto.ECS](https://github.com/sebas77/Svelto.ECS) by Sebastiano Mandala
 
 ## License
 
