@@ -1,3 +1,132 @@
 # Entities
 
-*EntityHandle vs EntityIndex, creating entities, removing entities, handle/index conversion, entity existence checks.*
+Entities are lightweight identifiers that group components together. Trecs provides two types of entity references for different use cases.
+
+## EntityHandle vs EntityIndex
+
+| | EntityHandle | EntityIndex |
+|---|---|---|
+| **Stability** | Stable across structural changes | Invalidated by structural changes |
+| **Use case** | Long-lived references (store in components) | Immediate access within a system tick |
+| **Fields** | `UniqueId`, `Version` | `Index`, `Group` |
+| **Performance** | Requires lookup to access components | Direct buffer access |
+
+```csharp
+// EntityHandle — stable reference
+EntityHandle handle = entity.Handle;  // Store this in components or across frames
+
+// EntityIndex — fast but transient
+EntityIndex index = handle.ToIndex(ecs);  // Convert for immediate use
+```
+
+## Creating Entities
+
+Entities are created via `WorldAccessor.AddEntity()`, which returns an `EntityInitializer` for setting component values:
+
+```csharp
+// Create with a single tag
+ecs.AddEntity<SampleTags.Spinner>()
+    .Set(new Rotation(quaternion.identity))
+    .Set(new GameObjectId(42))
+    .AssertComplete();
+
+// Create with multiple tags
+ecs.AddEntity<BallTags.Ball, BallTags.Active>()
+    .Set(new Position(float3.zero))
+    .Set(new Velocity(new float3(0, 5, 0)))
+    .AssertComplete();
+
+// Create with a dynamic TagSet
+ecs.AddEntity(TagSet.FromTags(Tag<MyTag1>.Value, Tag<MyTag2>.Value))
+    .Set(new Position(float3.zero))
+    .AssertComplete();
+```
+
+### EntityInitializer
+
+The initializer is a `ref struct` — it must be used immediately, not stored:
+
+```csharp
+var initializer = ecs.AddEntity<MyTag>();
+initializer.Set(new Position(float3.zero));
+initializer.Set(new Velocity(float3.zero));
+initializer.AssertComplete();  // Validates all required components are set
+```
+
+The `Handle` property provides the entity's stable reference:
+
+```csharp
+var init = ecs.AddEntity<MyTag>();
+EntityHandle handle = init.Handle;  // Available immediately
+init.Set(new Position(float3.zero))
+    .AssertComplete();
+```
+
+!!! warning
+    `AssertComplete()` verifies that all components declared by the entity's template have been initialized. Always call it to catch missing component initialization at development time.
+
+## Removing Entities
+
+```csharp
+// Remove a single entity
+ecs.RemoveEntity(entityIndex);
+ecs.RemoveEntity(entityHandle);
+
+// Remove all entities with specific tags
+ecs.RemoveEntitiesWithTags<SampleTags.Sphere>();
+ecs.RemoveEntitiesWithTags<BallTags.Ball, BallTags.Active>();
+```
+
+!!! note
+    Entity removal is deferred — the entity is not immediately destroyed. It is removed during the next entity submission phase. See [Structural Changes](../entity-management/structural-changes.md).
+
+## Handle/Index Conversion
+
+```csharp
+// Handle → Index
+EntityIndex index = handle.ToIndex(ecs);
+
+// Index → Handle
+EntityHandle handle = index.ToHandle(ecs);
+
+// Safe conversion (returns false if entity no longer exists)
+if (handle.TryToIndex(ecs, out EntityIndex index))
+{
+    // Entity still alive
+}
+
+// Check existence
+if (handle.Exists(ecs))
+{
+    // Entity still alive
+}
+```
+
+## Accessing Entity Data
+
+Use `EntityAccessor` for convenient component access on a single entity:
+
+```csharp
+// From EntityIndex
+var entity = index.ToEntity(ecs);
+ref Position pos = ref entity.Get<Position>().Write;
+
+// From EntityHandle
+var entity = handle.ToEntity(ecs);
+ref readonly Velocity vel = ref entity.Get<Velocity>().Read;
+
+// Safe access
+if (entity.TryGet<Velocity>(out var velAccessor))
+{
+    // Entity has Velocity component
+}
+```
+
+## Counting Entities
+
+```csharp
+int total = ecs.CountAllEntities();
+int spinners = ecs.CountEntitiesWithTags<SampleTags.Spinner>();
+int activeBalls = ecs.CountEntitiesWithTags<BallTags.Ball, BallTags.Active>();
+int inGroup = ecs.CountEntitiesInGroup(group);
+```
