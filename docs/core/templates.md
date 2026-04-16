@@ -132,7 +132,7 @@ public partial class BallEntity : ITemplate,
 }
 ```
 
-Each `IHasPartition` declares a valid partition. The entity always has the base tags (`BallTags.Ball`) plus exactly one partition tag.
+Each `IHasPartition` declares a valid partition. The entity always has the base tags (`BallTags.Ball`) plus one of the partition tag sets.
 
 ### Partition Transitions
 
@@ -180,7 +180,7 @@ world.AddEntity<SampleTags.Spinner>()
     .Set(new GameObjectId(42));
 ```
 
-The tag type arguments determine which template (and therefore which components) are required.
+The tag type arguments determine which template (and therefore which components) are required, based on what templates were provided via the WorldBuilder.AddEntityType method
 
 ## Global Entity Template
 

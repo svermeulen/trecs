@@ -3,7 +3,7 @@
 Tags are zero-cost markers that classify entities. Entities with the same tag combination are stored together in a **group** — a contiguous memory layout optimized for cache-friendly iteration.
 
 !!! tip
-    Most of the time, you interact with groups indirectly through `[ForEachEntity]` and [aspects](../data-access/aspects.md). Direct group access is a low-level API useful for advanced scenarios like custom job scheduling or tooling.
+    Most of the time, you interact with groups indirectly through tags. Direct group access is a low-level API useful for advanced scenarios like custom job scheduling, heavy optimization, or tooling.
 
 ## Defining Tags
 
@@ -18,7 +18,7 @@ public static class GameTags
 }
 ```
 
-Tags carry no data — they exist purely to categorize entities and determine their group membership.
+Tags carry no data — they exist purely to categorize entities and determine their group membership, for use in queries.
 
 ## TagSet
 
