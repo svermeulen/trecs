@@ -7,6 +7,8 @@
 
 A high-performance Entity Component System framework for Unity, designed for deterministic simulation, recording/playback, and Burst/Jobs integration.
 
+> **Preview** — Trecs is under active development. The API may change before the 1.0 release.
+
 ## Features
 
 - **High-performance storage** — components are stored in contiguous arrays (structure-of-arrays), grouped by explicit tags for cache-friendly iteration
