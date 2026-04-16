@@ -16,8 +16,10 @@ namespace Trecs.SourceGen.Shared
     internal static class SourceGenLogger
     {
 #if SOURCEGEN_LOGGING || SOURCEGEN_TIMING || SOURCEGEN_DUMP
-        static readonly string TempDebugDir =
-            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "TrecsSourceGen");
+        static readonly string TempDebugDir = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            "TrecsSourceGen"
+        );
 
         static readonly string LogFilePath = System.IO.Path.Combine(
             TempDebugDir,
