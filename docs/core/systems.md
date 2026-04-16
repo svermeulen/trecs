@@ -26,7 +26,7 @@ public partial class SpinnerSystem : ISystem
 Key points:
 
 - Systems are `partial class` (source generation fills in boilerplate)
-- Constructor injection works — pass dependencies when adding to the builder
+- Systems are not created by Trecs. Instantiate them however you like and register with the world builder.
 - `World` is a source-generated property providing the `WorldAccessor`
 - `[ForEachEntity]` marks methods that iterate over entities
 

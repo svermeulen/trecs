@@ -42,6 +42,21 @@ void Execute(ref Rotation rotation) { ... }
 void Execute(in ActiveBall ball) { ... }
 ```
 
+Tags can also be used with `World.Query()` for manual iteration:
+
+```csharp
+// Iterate with an aspect
+foreach (var player in PlayerView.Query(World).WithTags<GameTags.Player>())
+{
+    player.Position += player.Velocity * World.DeltaTime;
+}
+
+// Get a single entity
+var boss = BossView.Query(World).WithTags<GameTags.Boss>().Single();
+```
+
+See [Queries & Iteration](../data-access/queries-and-iteration.md) for the full query API.
+
 ## Tags in Queries
 
 ```csharp
