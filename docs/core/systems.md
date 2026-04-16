@@ -17,7 +17,7 @@ public partial class SpinnerSystem : ISystem
     [ForEachEntity(MatchByComponents = true)]
     void Execute(ref Rotation rotation)
     {
-        float angle = World.FixedDeltaTime * _rotationSpeed;
+        float angle = World.DeltaTime * _rotationSpeed;
         rotation.Value = math.mul(rotation.Value, quaternion.RotateY(angle));
     }
 }
@@ -54,7 +54,7 @@ When you don't want to target specific tags, use `MatchByComponents` to iterate 
 [ForEachEntity(MatchByComponents = true)]
 void Execute(ref Position position, in Velocity velocity)
 {
-    position.Value += velocity.Value * World.FixedDeltaTime;
+    position.Value += velocity.Value * World.DeltaTime;
 }
 ```
 
@@ -67,12 +67,16 @@ void Execute(in ParticleView particle) { ... }
 
 ### Parameters
 
-`[ForEachEntity]` methods can receive:
+`[ForEachEntity]` methods can receive any combination of these parameter types — the source generator wires them automatically:
 
 - **Component refs** — `ref T` (read-write) or `in T` (read-only) for `IEntityComponent` types
 - **Aspects** — `in MyAspect` for bundled component access (see [Aspects](../data-access/aspects.md))
 - **`EntityIndex`** — the current entity's transient index
-- **`WorldAccessor`** — access to the full world API
+- **`EntityHandle`** — the current entity's stable handle
+- **`Group`** — the group the current entity belongs to
+- **`NativeWorldAccessor`** — job-safe world access (see [Jobs & Burst](../performance/jobs-and-burst.md))
+- **`[PassThroughArgument]` parameters** — custom values you pass in when calling the generated method
+- **`[GlobalIndex] int`** — a global 0-based index across all matched groups
 
 ### Multiple ForEachEntity Methods
 
@@ -190,7 +194,7 @@ public partial class SpawnSystem : ISystem
         World.MoveTo<BallTags.Ball, BallTags.Resting>(ball.EntityIndex);
 
         // Access time and RNG
-        float dt = World.FixedDeltaTime;
+        float dt = World.DeltaTime;
         float random = World.Rng.Next();
     }
 }

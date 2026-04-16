@@ -4,27 +4,42 @@ Entity events let you react to structural changes — when entities are added to
 
 ## Subscribing to Events
 
-Use `World.Events` to build event subscriptions:
+The recommended pattern is to use `[ForEachEntity]` on your event callback method. The source generator handles iterating over the affected entities with proper component access:
 
 ```csharp
-World.Events
-    .InGroupsWithTags<GameTags.Enemy>()
-    .OnAdded((group, range, world) =>
+public partial class RemoveCleanupHandler : IDisposable
+{
+    readonly DisposeCollection _disposables = new();
+
+    public RemoveCleanupHandler(World world)
     {
-        for (int i = range.Start; i < range.End; i++)
-        {
-            var entityIndex = new EntityIndex(i, group);
-            // Initialize newly added enemy
-        }
-    })
-    .OnRemoved((group, range, world) =>
+        World = world.CreateAccessor();
+
+        World.Events
+            .InGroupsWithTags<FrenzyTags.Fish>()
+            .OnRemoved(OnFishRemoved)
+            .AddTo(_disposables);
+    }
+
+    WorldAccessor World { get; }
+
+    [ForEachEntity]
+    void OnFishRemoved(in TargetMeal targetMeal)
     {
-        for (int i = range.Start; i < range.End; i++)
+        if (targetMeal.Value.Exists(World))
         {
-            // Clean up removed enemy
+            World.RemoveEntity(targetMeal.Value);
         }
-    });
+    }
+
+    public void Dispose()
+    {
+        _disposables.Dispose();
+    }
+}
 ```
+
+The `[ForEachEntity]` attribute generates the iteration code — your callback receives component access for each affected entity, just like in a system.
 
 ## Event Types
 
@@ -34,15 +49,44 @@ World.Events
 | `OnRemoved` | Entities removed from a matching group |
 | `OnMoved` | Entities moved from one group to another |
 
-### OnMoved
+## Using Aspects in Event Callbacks
+
+You can use aspects for bundled component access, just like in systems:
 
 ```csharp
-World.Events
-    .InGroupsWithTags<BallTags.Ball>()
-    .OnMoved((fromGroup, toGroup, range, world) =>
+public partial class CleanupHandlers : IDisposable
+{
+    readonly GameObjectRegistry _gameObjectRegistry;
+    readonly DisposeCollection _disposables = new();
+
+    public CleanupHandlers(World world, GameObjectRegistry gameObjectRegistry)
     {
-        // Ball transitioned between Active/Resting states
-    });
+        World = world.CreateAccessor();
+        _gameObjectRegistry = gameObjectRegistry;
+
+        World.Events
+            .InGroupsWithTags<SampleTags.Prey>()
+            .OnRemoved(OnPreyRemoved)
+            .AddTo(_disposables);
+    }
+
+    WorldAccessor World { get; }
+
+    [ForEachEntity]
+    void OnPreyRemoved(in Prey prey)
+    {
+        var go = _gameObjectRegistry.Resolve(prey.GameObjectId);
+        GameObject.Destroy(go);
+        _gameObjectRegistry.Unregister(prey.GameObjectId);
+    }
+
+    public void Dispose()
+    {
+        _disposables.Dispose();
+    }
+
+    partial struct Prey : IAspect, IRead<GameObjectId, ApproachingPredator> { }
+}
 ```
 
 ## Scoping Events
@@ -64,36 +108,6 @@ World.Events.InGroup(specificGroup)
 
 // All groups
 World.Events.InAllGroups()
-```
-
-## EntityRange
-
-Event callbacks receive an `EntityRange` describing the contiguous range of affected entity indices:
-
-```csharp
-.OnAdded((group, range, world) =>
-{
-    // range.Start — first affected index (inclusive)
-    // range.End   — last affected index (exclusive)
-    // range.Count — number of affected entities
-
-    for (int i = range.Start; i < range.End; i++)
-    {
-        var entityIndex = new EntityIndex(i, group);
-        ref readonly Position pos = ref world.Component<Position>(entityIndex).Read;
-    }
-})
-```
-
-## Priority
-
-Control the order in which event handlers fire:
-
-```csharp
-World.Events
-    .InGroupsWithTags<GameTags.Enemy>()
-    .WithPriority(10)  // Higher priority = fires first
-    .OnAdded((group, range, world) => { ... });
 ```
 
 ## Frame Events
@@ -124,15 +138,18 @@ World.Events.OnVariableUpdateStarted(() =>
 
 ## Disposing Subscriptions
 
-Event subscriptions are `IDisposable` — dispose them to unsubscribe:
+Use `AddTo` with a `DisposeCollection` to manage subscription lifetimes:
 
 ```csharp
-var subscription = World.Events
-    .InGroupsWithTags<GameTags.Enemy>()
-    .OnAdded((group, range, world) => { ... });
+readonly DisposeCollection _disposables = new();
 
-// Later:
-subscription.Dispose();
+World.Events
+    .InGroupsWithTags<GameTags.Enemy>()
+    .OnRemoved(OnEnemyRemoved)
+    .AddTo(_disposables);
+
+// Clean up all subscriptions
+_disposables.Dispose();
 ```
 
 Frame event subscriptions return an `IDisposable` directly:

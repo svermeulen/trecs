@@ -67,7 +67,7 @@ A comparison for developers familiar with Unity's built-in ECS (Entities package
 |---|---|
 | Full world state serialization | Subscene baking (edit-time) |
 | Runtime save/load | Limited runtime serialization |
-| `[TypeId]` for stable IDs | `TypeIndex` (auto-generated) |
+| Stable type IDs (auto-generated from type name) | `TypeIndex` (auto-generated) |
 | Delta serialization support | No built-in equivalent |
 
 ### Editor Tooling

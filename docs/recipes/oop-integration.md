@@ -54,7 +54,7 @@ public partial class MovementSystem : ISystem
     [ForEachEntity(Tags = new[] { typeof(GameTags.Player) })]
     void Execute(in PlayerView player)
     {
-        player.Position += player.Velocity * World.FixedDeltaTime;
+        player.Position += player.Velocity * World.DeltaTime;
     }
 }
 ```
@@ -83,31 +83,36 @@ public partial class GameObjectSyncSystem : ISystem
 
 ### Spawning and Despawning GameObjects
 
-Use [entity events](../entity-management/entity-events.md) to manage GameObject lifecycle:
+Use [entity events](../entity-management/entity-events.md) with `[ForEachEntity]` to manage GameObject lifecycle:
 
 ```csharp
-World.Events.InGroupsWithTags<GameTags.Enemy>()
-    .OnAdded((group, range, world) =>
+public partial class EnemyGameObjectManager : IDisposable
+{
+    readonly GameObjectRegistry _registry;
+    readonly DisposeCollection _disposables = new();
+
+    public EnemyGameObjectManager(World world, GameObjectRegistry registry)
     {
-        for (int i = range.Start; i < range.End; i++)
-        {
-            var go = Instantiate(enemyPrefab);
-            var entityIndex = new EntityIndex(i, group);
-            ref GameObjectId id = ref world.Component<GameObjectId>(entityIndex).Write;
-            id = registry.Register(go);
-        }
-    })
-    .OnRemoved((group, range, world) =>
+        World = world.CreateAccessor();
+        _registry = registry;
+
+        World.Events.InGroupsWithTags<GameTags.Enemy>()
+            .OnRemoved(OnEnemyRemoved)
+            .AddTo(_disposables);
+    }
+
+    WorldAccessor World { get; }
+
+    [ForEachEntity]
+    void OnEnemyRemoved(in GameObjectId id)
     {
-        for (int i = range.Start; i < range.End; i++)
-        {
-            var entityIndex = new EntityIndex(i, group);
-            var id = world.Component<GameObjectId>(entityIndex).Read;
-            var go = registry.Resolve(id);
-            Destroy(go);
-            registry.Unregister(id);
-        }
-    });
+        var go = _registry.Resolve(id);
+        GameObject.Destroy(go);
+        _registry.Unregister(id);
+    }
+
+    public void Dispose() => _disposables.Dispose();
+}
 ```
 
 ## Referencing Managed Objects

@@ -78,13 +78,13 @@ var world = new WorldBuilder()
 world.Initialize();
 
 // 3. Create an accessor for interacting with the world
-var ecs = world.CreateAccessor<MyGame>();
+var ecs = world.CreateAccessor();
 
 // 4. Game loop
 while (running)
 {
-    world.Tick();       // Runs input + fixed update systems, submits entities
-    world.LateTick();   // Runs variable + late variable update systems
+    world.Tick();       // Runs input, fixed, and variable update systems
+    world.LateTick();   // Runs late variable update systems
 }
 
 // 5. Cleanup
@@ -92,18 +92,14 @@ world.Dispose();
 ```
 
 !!! note
-    `BuildAndInitialize()` combines steps 1 and 2. Use `Build()` separately when you need to do additional setup between building and initializing.
+    `BuildAndInitialize()` combines steps 1 and 2. Use `Build()` separately when you need to do additional setup between building and initializing.  For example, if a system constructor dependency needs access to World in its constructor, you'll need to do this after Build and before Initialize
 
 ## WorldAccessor
 
-`WorldAccessor` is the primary API for interacting with the world at runtime. Systems receive it automatically, but you can also create one manually:
+`WorldAccessor` is the primary API for interacting with the world at runtime. Systems receive it automatically via source generation, but you can also create one manually:
 
 ```csharp
-// Create by type (for debug naming)
-var ecs = world.CreateAccessor<MyGame>();
-
-// Create with explicit name
-var ecs = world.CreateAccessor("MyGame");
+var ecs = world.CreateAccessor();
 ```
 
 `WorldAccessor` provides access to:

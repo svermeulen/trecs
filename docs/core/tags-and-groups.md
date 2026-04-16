@@ -17,15 +17,6 @@ public static class GameTags
 
 Tags carry no data — they exist purely to categorize entities and determine their group membership.
 
-### Explicit Tag IDs
-
-By default, tag IDs are auto-generated from the type name hash. Use `[TagId]` to assign an explicit ID for serialization stability:
-
-```csharp
-[TagId(12345)]
-public struct Player : ITag { }
-```
-
 ## TagSet
 
 A `TagSet` is an immutable combination of tags. Tag sets are cached and compared by ID for fast equality checks.

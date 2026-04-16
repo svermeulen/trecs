@@ -35,11 +35,6 @@ ecs.AddEntity<BallTags.Ball, BallTags.Active>()
     .Set(new Position(float3.zero))
     .Set(new Velocity(new float3(0, 5, 0)))
     .AssertComplete();
-
-// Create with a dynamic TagSet
-ecs.AddEntity(TagSet.FromTags(Tag<MyTag1>.Value, Tag<MyTag2>.Value))
-    .Set(new Position(float3.zero))
-    .AssertComplete();
 ```
 
 ### EntityInitializer
@@ -121,6 +116,8 @@ if (entity.TryGet<Velocity>(out var velAccessor))
     // Entity has Velocity component
 }
 ```
+
+However note that in many cases using the [aspects](../data-access/aspects.md) feature is better practice
 
 ## Counting Entities
 

@@ -1,6 +1,6 @@
 # Recording & Playback
 
-Trecs supports full simulation recording and deterministic playback — a key feature for networking, debugging, and QA.
+Trecs supports bookmarks (full state snapshots), deterministic recording/playback, and checksum-based desync detection — key features for networking, rollbacks, debugging, and QA.
 
 ## Overview
 

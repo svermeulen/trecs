@@ -63,7 +63,7 @@ public void Execute()
 {
     if (isJobsEnabled)
     {
-        new MoveJob { DeltaTime = World.FixedDeltaTime }.ScheduleParallel(World);
+        new MoveJob { DeltaTime = World.DeltaTime }.ScheduleParallel(World);
     }
     else
     {
@@ -74,7 +74,7 @@ public void Execute()
 [ForEachEntity(Tag = typeof(SampleTags.Particle))]
 void MoveMainThread(in Velocity velocity, ref Position position)
 {
-    position.Value += World.FixedDeltaTime * velocity.Value;
+    position.Value += World.DeltaTime * velocity.Value;
 }
 ```
 

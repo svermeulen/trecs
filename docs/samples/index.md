@@ -8,7 +8,7 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 |---|--------|----------|
 | 01 | [Hello Entity](01-hello-entity.md) | Components, tags, templates, systems, world setup |
 | 02 | [Spawn & Destroy](02-spawn-and-destroy.md) | Entity lifecycle, dynamic spawning, timed destruction |
-| 03 | [Aspects](03-aspects.md) | Aspects for type-safe component access |
+| 03 | [Aspects](03-aspects.md) | Bundled component access for clean iteration |
 | 04 | [Predator Prey](04-predator-prey.md) | Cross-entity references, template inheritance, event cleanup |
 | 05 | [Job System](05-job-system.md) | Burst compilation, parallel jobs, WrapAsJob |
 | 06 | [States](06-states.md) | Template states, state transitions, group-based iteration |

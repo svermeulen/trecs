@@ -5,7 +5,6 @@ Components are plain data containers attached to entities. In Trecs, components 
 ## Defining Components
 
 ```csharp
-[TypeId(12345)]
 public struct Health : IEntityComponent
 {
     public float Current;
@@ -17,7 +16,6 @@ Every component must:
 
 1. Be an **unmanaged struct** (no reference types, strings, or arrays)
 2. Implement **`IEntityComponent`**
-3. Have a **`[TypeId]`** attribute with a unique integer ID (required for serialization)
 
 ### The `[Unwrap]` Shorthand
 

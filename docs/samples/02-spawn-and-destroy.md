@@ -62,7 +62,7 @@ public partial class LifetimeSystem : ISystem
     [ForEachEntity(Tags = new[] { typeof(SampleTags.Sphere) })]
     void Execute(in SphereView sphere)
     {
-        sphere.Lifetime -= World.FixedDeltaTime;
+        sphere.Lifetime -= World.DeltaTime;
 
         if (sphere.Lifetime <= 0)
         {

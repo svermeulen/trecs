@@ -1,6 +1,6 @@
 # 06 — States
 
-Template states for efficient state machines. Entities in different states are stored in separate groups for cache-friendly, targeted iteration.
+Built-in state transitions via template states. Entities in different states are stored in separate groups for cache-friendly, targeted iteration.
 
 **Source:** `Samples/06_States/`
 

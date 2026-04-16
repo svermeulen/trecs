@@ -23,7 +23,7 @@ public partial class ParticleJobSystem : ISystem
 
     public void Execute()
     {
-        new MoveJob { DeltaTime = World.FixedDeltaTime }.ScheduleParallel(World);
+        new MoveJob { DeltaTime = World.DeltaTime }.ScheduleParallel(World);
     }
 }
 ```

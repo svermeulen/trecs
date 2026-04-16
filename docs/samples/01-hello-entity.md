@@ -57,7 +57,7 @@ public partial class SpinnerSystem : ISystem
     [ForEachEntity(MatchByComponents = true)]
     void Execute(ref Rotation rotation)
     {
-        float angle = World.FixedDeltaTime * _rotationSpeed;
+        float angle = World.DeltaTime * _rotationSpeed;
         rotation.Value = math.mul(rotation.Value, quaternion.RotateY(angle));
     }
 }

@@ -54,21 +54,6 @@ Trecs includes serializers for:
 - **Blitting** — `BlitSerializer` for unmanaged structs (copies raw bytes)
 - **Special** — `DeprecatedSerializer` (skips data), `SkipSerializer`, `DefaultValueSerializer`
 
-### TypeId
-
-Components and other serialized types need a `[TypeId]` for stable identification:
-
-```csharp
-[TypeId(12345)]
-public struct Health : IEntityComponent
-{
-    public float Current;
-    public float Max;
-}
-```
-
-Type IDs must be unique and stable across versions. Changing a type ID breaks deserialization of saved data.
-
 ## EcsStateSerializer
 
 Serializes the complete world state — all entities, components, sets, and heap data:

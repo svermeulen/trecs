@@ -80,7 +80,7 @@ public partial class ComplexEntity : ITemplate,
 
 ## States
 
-Templates can declare multiple **states** — mutually exclusive tag combinations that define which group the entity belongs to. This enables efficient state machines where entities in different states are stored in separate contiguous arrays.
+Templates can declare multiple **states** — mutually exclusive tag combinations that define which group the entity belongs to. Entities in different states are stored in separate contiguous arrays, enabling efficient state transitions and targeted iteration.
 
 ```csharp
 public partial class BallEntity : ITemplate,

@@ -1,6 +1,6 @@
 # 03 — Aspects
 
-Type-safe component access bundles. Instead of declaring individual component parameters, aspects group related read/write access into a single struct.
+Bundled component access via aspects. Instead of declaring individual component parameters, aspects group related read/write operations into a single reusable struct.
 
 **Source:** `Samples/03_Aspects/`
 
@@ -40,7 +40,7 @@ public partial class BoidMovementSystem : ISystem
     [ForEachEntity(MatchByComponents = true)]
     void Execute(in Boid boid)
     {
-        boid.Position += World.FixedDeltaTime * boid.Speed * boid.Velocity;
+        boid.Position += World.DeltaTime * boid.Speed * boid.Velocity;
     }
 
     partial struct Boid : IAspect, IRead<Velocity, Speed>, IWrite<Position> { }

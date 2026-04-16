@@ -19,7 +19,6 @@ This walkthrough creates a spinning cube — the "Hello World" of Trecs.
 Components are unmanaged structs that hold data:
 
 ```csharp
-[TypeId(1001)]
 [Unwrap]
 public partial struct Rotation : IEntityComponent
 {
@@ -61,7 +60,7 @@ public partial class SpinnerSystem : ISystem
     [ForEachEntity(MatchByComponents = true)]
     void Execute(ref Rotation rotation)
     {
-        float angle = World.FixedDeltaTime * _speed;
+        float angle = World.DeltaTime * _speed;
         rotation.Value = math.mul(rotation.Value, quaternion.RotateY(angle));
     }
 }
@@ -80,7 +79,7 @@ var world = new WorldBuilder()
     .BuildAndInitialize();
 
 // Create accessor
-var ecs = world.CreateAccessor<MyGame>();
+var ecs = world.CreateAccessor();
 
 // Create an entity
 ecs.AddEntity<Spinner>()
@@ -94,8 +93,12 @@ ecs.AddEntity<Spinner>()
 ```csharp
 void Update()
 {
-    world.Tick();      // Fixed update systems
-    world.LateTick();  // Variable update systems
+    world.Tick();
+}
+
+void LateUpdate()
+{
+    world.LateTick();
 }
 
 void OnDestroy()

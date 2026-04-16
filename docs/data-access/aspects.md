@@ -1,6 +1,6 @@
 # Aspects
 
-Aspects bundle component access into a single type-safe struct. Instead of declaring individual component parameters, you declare which components you read and write, and the source generator creates the access properties.
+Aspects bundle related component access into a single reusable struct. Instead of declaring individual component parameters, you declare which components you read and write, and the source generator creates the access properties.
 
 ## Defining an Aspect
 
@@ -8,12 +8,12 @@ Aspects bundle component access into a single type-safe struct. Instead of decla
 partial struct Boid : IAspect, IRead<Velocity, Speed>, IWrite<Position> { }
 ```
 
-This generates:
+This generates properties:
 
 - `ref readonly float3 Velocity` (read-only, unwrapped)
 - `ref readonly float Speed` (read-only, unwrapped)
 - `ref float3 Position` (read-write, unwrapped)
-- `EntityIndex EntityIndex` property
+- `EntityIndex EntityIndex`
 
 !!! note
     Components marked with `[Unwrap]` expose their inner field type directly (e.g., `float3` instead of `Position`). Non-unwrapped components expose the struct itself.
@@ -26,7 +26,7 @@ public partial class BoidMovementSystem : ISystem
     [ForEachEntity(MatchByComponents = true)]
     void Execute(in Boid boid)
     {
-        boid.Position += World.FixedDeltaTime * boid.Speed * boid.Velocity;
+        boid.Position += World.DeltaTime * boid.Speed * boid.Velocity;
     }
 
     partial struct Boid : IAspect, IRead<Velocity, Speed>, IWrite<Position> { }

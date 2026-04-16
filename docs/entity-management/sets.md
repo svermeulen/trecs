@@ -104,6 +104,6 @@ public partial class HighlightSystem : ISystem
 | **Changes group?** | Yes — entity moves between groups | No — entity stays in same group |
 | **Storage** | Dense (all entities in group) | Sparse (tracked subset) |
 | **Cost of change** | Component data copied to new group | Add/remove from index |
-| **Best for** | Core identity, state machines | Dynamic membership, filtering |
+| **Best for** | Core identity, state transitions | Dynamic membership, filtering |
 
 See [Entity Subset Patterns](../recipes/entity-subset-patterns.md) for a deeper comparison.

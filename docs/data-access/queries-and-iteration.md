@@ -117,7 +117,7 @@ if (World.Query().WithTags<GameTags.Player>().TrySingle(out var player))
 
 ## Aspect-Based Queries
 
-Aspects provide a generated `Query()` method for manual iteration with type-safe component access:
+Aspects provide a generated `Query()` method for manual iteration with bundled component access:
 
 ```csharp
 partial struct PlayerView : IAspect, IRead<Position>, IWrite<Health> { }

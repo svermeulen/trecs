@@ -96,7 +96,7 @@ void Execute(in FollowerView follower)
     PatrolRoute route = follower.Route.Get(World.Heap);
 
     // Advance along waypoints
-    follower.Progress += route.Speed * World.FixedDeltaTime;
+    follower.Progress += route.Speed * World.DeltaTime;
     follower.Position = InterpolateWaypoints(route.Waypoints, follower.Progress);
 
     // Write to unique trail
