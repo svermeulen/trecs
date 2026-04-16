@@ -19,7 +19,6 @@ This walkthrough creates a spinning cube — the "Hello World" of Trecs.
 Components are unmanaged structs that hold data:
 
 ```csharp
-[Unwrap]
 public partial struct Rotation : IEntityComponent
 {
     public quaternion Value;
@@ -28,7 +27,7 @@ public partial struct Rotation : IEntityComponent
 
 ### 2. Define a Tag
 
-Tags classify entities into groups:
+Tags classify entities into different queryable groups:
 
 ```csharp
 public struct Spinner : ITag { }
@@ -41,8 +40,7 @@ Templates declare which components and tags an entity has:
 ```csharp
 public partial class SpinnerEntity : ITemplate, IHasTags<Spinner>
 {
-    public Rotation Rotation = new(quaternion.identity);
-    public GameObjectId GameObjectId;
+    public Rotation Rotation;
 }
 ```
 
@@ -55,7 +53,10 @@ public partial class SpinnerSystem : ISystem
 {
     readonly float _speed;
 
-    public SpinnerSystem(float speed) { _speed = speed; }
+    public SpinnerSystem(float speed) 
+    { 
+      _speed = speed; 
+    }
 
     [ForEachEntity(MatchByComponents = true)]
     void Execute(ref Rotation rotation)
@@ -76,7 +77,7 @@ var world = new WorldBuilder()
     .AddEntityType(SpinnerEntity.Template)
     .Build();
 
-// Add systems (between Build and Initialize)
+// Add systems
 world.AddSystems(new ISystem[]
 {
     new SpinnerSystem(speed: 2f),
@@ -87,12 +88,11 @@ world.AddSystems(new ISystem[]
 world.Initialize();
 
 // Create accessor
-var ecs = world.CreateAccessor();
+var worldAccessor = world.CreateAccessor();
 
 // Create an entity
-ecs.AddEntity<Spinner>()
-    .Set(gameObjectRegistry.Register(cubeGameObject))
-    .AssertComplete();
+worldAccessor.AddEntity<Spinner>()
+    .Set(new Rotation { Value = quaternion.identity });
 ```
 
 ### 6. Run the Game Loop
@@ -114,9 +114,3 @@ void OnDestroy()
 }
 ```
 
-## What's Next
-
-- [Components](core/components.md) — defining and accessing entity data
-- [Templates](core/templates.md) — entity blueprints with tags and states
-- [Systems](core/systems.md) — writing game logic
-- [Queries & Iteration](data-access/queries-and-iteration.md) — finding and processing entities
