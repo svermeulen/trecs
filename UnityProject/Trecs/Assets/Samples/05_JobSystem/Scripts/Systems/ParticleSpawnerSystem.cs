@@ -100,8 +100,7 @@ namespace Trecs.Samples.JobSystem
                     .Set(new Rotation(quaternion.identity))
                     .Set(new Velocity(velocity))
                     .Set(new UniformScale(_particleSize))
-                    .Set(new ColorComponent(HsvToRgb(rng.Next(), 0.8f, 1f)))
-                    .AssertComplete();
+                    .Set(new ColorComponent(HsvToRgb(rng.Next(), 0.8f, 1f)));
             }
         }
 

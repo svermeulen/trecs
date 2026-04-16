@@ -80,8 +80,7 @@ Smooth entities use `SetInterpolated` to initialize all three components at once
 ```csharp
 world.AddEntity<OrbitTags.Smooth>()
     .SetInterpolated(new Position(startPos))
-    .Set(new OrbitParams { ... })
-    .AssertComplete();
+    .Set(new OrbitParams { ... });
 ```
 
 ## Rendering

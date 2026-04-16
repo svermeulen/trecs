@@ -45,8 +45,7 @@ Spawns a new sphere every 0.5 seconds at a random position with a random color:
 World.AddEntity<SampleTags.Sphere>()
     .Set(new Position(position))
     .Set(new Lifetime(_lifetime))
-    .Set(_gameObjectRegistry.Register(go))
-    .AssertComplete();
+    .Set(_gameObjectRegistry.Register(go));
 ```
 
 Uses `World.Rng` for deterministic random placement.

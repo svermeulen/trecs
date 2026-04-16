@@ -60,14 +60,12 @@ SharedPtr<PatrolRoute> routePtr = world.Heap.AllocShared(new PatrolRoute
 // First entity gets the original
 world.AddEntity<PatrolTags.Follower>()
     .Set(new CRoute { Value = routePtr })
-    .Set(new CTrail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) })
-    .AssertComplete();
+    .Set(new CTrail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) });
 
 // Second entity clones (increments ref count, shares same data)
 world.AddEntity<PatrolTags.Follower>()
     .Set(new CRoute { Value = routePtr.Clone(world.Heap) })
-    .Set(new CTrail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) })
-    .AssertComplete();
+    .Set(new CTrail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) });
 ```
 
 ### UniquePtr — Per-Entity Trail

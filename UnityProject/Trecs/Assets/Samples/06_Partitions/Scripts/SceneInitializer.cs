@@ -46,8 +46,7 @@ namespace Trecs.Samples.Partitions
                     .Set(new Position(position))
                     .Set(new Velocity(float3.zero))
                     .Set(new RestTimer(0f))
-                    .Set(_gameObjectRegistry.Register(go))
-                    .AssertComplete();
+                    .Set(_gameObjectRegistry.Register(go));
             }
         }
     }

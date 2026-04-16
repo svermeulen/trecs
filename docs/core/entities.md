@@ -33,14 +33,12 @@ Entities are created via `WorldAccessor.AddEntity()`, which returns an `EntityIn
 // Create with a single tag
 world.AddEntity<SampleTags.Spinner>()
     .Set(new Rotation(quaternion.identity))
-    .Set(new GameObjectId(42))
-    .AssertComplete();
+    .Set(new GameObjectId(42));
 
 // Create with multiple tags
 world.AddEntity<BallTags.Ball, BallTags.Active>()
     .Set(new Position(float3.zero))
-    .Set(new Velocity(new float3(0, 5, 0)))
-    .AssertComplete();
+    .Set(new Velocity(new float3(0, 5, 0)));
 ```
 
 ### EntityInitializer
@@ -51,7 +49,6 @@ The initializer is a `ref struct` — it must be used immediately, not stored:
 var initializer = world.AddEntity<MyTag>();
 initializer.Set(new Position(float3.zero));
 initializer.Set(new Velocity(float3.zero));
-initializer.AssertComplete();  // Validates all required components are set
 ```
 
 The `Handle` property provides the entity's stable reference:
@@ -59,12 +56,11 @@ The `Handle` property provides the entity's stable reference:
 ```csharp
 var init = world.AddEntity<MyTag>();
 EntityHandle handle = init.Handle;  // Available immediately
-init.Set(new Position(float3.zero))
-    .AssertComplete();
+init.Set(new Position(float3.zero));
 ```
 
-!!! warning
-    `AssertComplete()` verifies that all components declared by the entity's template have been initialized. Always call it to catch missing component initialization at development time.
+!!! tip
+    You can optionally call `AssertComplete()` on the initializer to verify that all components declared by the template have been set. This check also runs automatically during entity submission, so `AssertComplete()` is only useful for catching mistakes earlier at the call site.
 
 ## Removing Entities
 

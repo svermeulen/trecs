@@ -120,8 +120,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                         )
                     )
                     .Set(new Position(pos))
-                    .Set(new UniformScale(scale))
-                    .AssertComplete();
+                    .Set(new UniformScale(scale));
             }
         }
 

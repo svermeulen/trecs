@@ -93,8 +93,7 @@ namespace Trecs.Samples.Interpolation
                         CenterX = centerX,
                     }
                 )
-                .Set(_gameObjectRegistry.Register(go))
-                .AssertComplete();
+                .Set(_gameObjectRegistry.Register(go));
         }
     }
 }

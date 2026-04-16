@@ -44,8 +44,7 @@ namespace Trecs.Samples.PredatorPrey
                         )
                     )
                     .Set(new Speed(_settings.PreySpeed))
-                    .Set(_gameObjectRegistry.Register(go))
-                    .AssertComplete();
+                    .Set(_gameObjectRegistry.Register(go));
             }
         }
     }

@@ -109,8 +109,7 @@ world.AddSystems(new ISystem[]
 var world = world.CreateAccessor();
 
 world.AddEntity<SampleTags.Spinner>()
-    .Set(gameObjectRegistry.Register(cube.gameObject))
-    .AssertComplete();
+    .Set(gameObjectRegistry.Register(cube.gameObject));
 ```
 
 ## Concepts Introduced

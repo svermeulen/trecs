@@ -62,8 +62,7 @@ world.AddSystem(new InterpolatedUpdater<Position>(InterpolatePosition));
 ```csharp
 world.AddEntity<OrbitTags.Smooth>()
     .SetInterpolated(new Position(startPos))  // Sets all three components
-    .Set(new OrbitParams { ... })
-    .AssertComplete();
+    .Set(new OrbitParams { ... });
 ```
 
 ### 6. Read Interpolated Values for Rendering

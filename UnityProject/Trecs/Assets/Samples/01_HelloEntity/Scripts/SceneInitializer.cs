@@ -21,8 +21,7 @@ namespace Trecs.Samples.HelloEntity
             cube.name = "SpinnerCube";
 
             world.AddEntity<SampleTags.Spinner>()
-                .Set(_gameObjectRegistry.Register(cube.gameObject))
-                .AssertComplete();
+                .Set(_gameObjectRegistry.Register(cube.gameObject));
         }
     }
 }

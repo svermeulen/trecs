@@ -33,8 +33,7 @@ Structural changes are applied:
 ```csharp
 World.AddEntity<GameTags.Bullet>()
     .Set(new Position(pos))
-    .Set(new Velocity(vel))
-    .AssertComplete();
+    .Set(new Velocity(vel));
 ```
 
 The entity is buffered and added to its group at the next submission.

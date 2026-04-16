@@ -43,8 +43,7 @@ namespace Trecs.Samples.Sets
                     _world
                         .AddEntity<SampleTags.Particle>()
                         .Set(new Position(position))
-                        .Set(_gameObjectRegistry.Register(go))
-                        .AssertComplete();
+                        .Set(_gameObjectRegistry.Register(go));
                 }
             }
         }

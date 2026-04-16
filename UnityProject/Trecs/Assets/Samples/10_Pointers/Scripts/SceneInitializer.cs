@@ -111,8 +111,7 @@ namespace Trecs.Samples.Pointers
                     .Set(new Position((float3)pos))
                     .Set(new CRoute { Value = routeClone, Progress = progress })
                     .Set(new CTrail { Value = trailPtr })
-                    .Set(_gameObjectRegistry.Register(go))
-                    .AssertComplete();
+                    .Set(_gameObjectRegistry.Register(go));
             }
         }
 

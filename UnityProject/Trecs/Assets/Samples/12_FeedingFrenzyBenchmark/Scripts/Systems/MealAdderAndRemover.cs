@@ -73,8 +73,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                                 _settings.MealYOffset
                             )
                         )
-                    )
-                    .AssertComplete();
+                    );
             }
         }
 

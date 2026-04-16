@@ -140,11 +140,10 @@ Creating an entity from a template:
 ```csharp
 world.AddEntity<SampleTags.Spinner>()
     .Set(new Rotation(quaternion.identity))
-    .Set(new GameObjectId(42))
-    .AssertComplete();
+    .Set(new GameObjectId(42));
 ```
 
-The tag type arguments determine which template (and therefore which components) are required. `AssertComplete()` verifies that all required components have been set.
+The tag type arguments determine which template (and therefore which components) are required.
 
 ## Global Entity Template
 

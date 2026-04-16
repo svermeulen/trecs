@@ -102,8 +102,7 @@ nativeWorld.AddEntity<SampleTags.Particle>(
     sortKey: (uint)index,
     reservedRef: reservedHandles[index])
     .Set(new Position(pos))
-    .Set(new Velocity(vel))
-    .AssertComplete();
+    .Set(new Velocity(vel));
 ```
 
 ## Concepts Introduced

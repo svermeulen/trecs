@@ -51,8 +51,7 @@ namespace Trecs.Samples.FeedingFrenzy101
                     .AddEntity<FrenzyTags.Meal, FrenzyTags.NotEating>()
                     .Set(new Position(pos))
                     .Set(new MealNutrition(nutrition))
-                    .Set(new UniformScale(0.5f))
-                    .AssertComplete();
+                    .Set(new UniformScale(0.5f));
             }
         }
 

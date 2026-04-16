@@ -184,8 +184,7 @@ public partial class SpawnSystem : ISystem
         // Create entities
         World.AddEntity<SampleTags.Sphere>()
             .Set(new Position(float3.zero))
-            .Set(new Lifetime(5f))
-            .AssertComplete();
+            .Set(new Lifetime(5f));
 
         // Remove entities
         World.RemoveEntity(entityIndex);
