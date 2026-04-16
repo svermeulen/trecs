@@ -99,14 +99,20 @@ Each `IHasState` declares a valid state. The entity always has the base tags (`B
 
 ### State Transitions
 
-Move entities between states with `MoveTo`:
+Move entities between states with `MoveTo`. In aspects, use the generated extension method:
 
 ```csharp
 // Ball hits the ground → transition to Resting
-World.MoveTo<BallTags.Ball, BallTags.Resting>(ball.EntityIndex);
+ball.MoveTo<BallTags.Ball, BallTags.Resting>(World);
 
 // Rest timer expires → transition to Active
-World.MoveTo<BallTags.Ball, BallTags.Active>(ball.EntityIndex);
+ball.MoveTo<BallTags.Ball, BallTags.Active>(World);
+```
+
+Or call `MoveTo` directly on the `WorldAccessor` with an `EntityIndex`:
+
+```csharp
+World.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
 ```
 
 Systems can target specific states:

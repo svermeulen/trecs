@@ -15,11 +15,11 @@ Classic Snake — a head moves on a grid, eats food to grow, and leaves a trail 
 ```csharp
 public struct GridPos : IEntityComponent { public int2 Value; }
 public struct Direction : IEntityComponent { public int2 Value; }
-public struct MoveInput : IEntityComponent { public int2 Value; }
+public struct MoveInput : IEntityComponent { public int2 RequestedDirection; }
 public struct SegmentAge : IEntityComponent { public int Value; }
 public struct SnakeLength : IEntityComponent { public int Value; }
 public struct Score : IEntityComponent { public int Value; }
-public struct MoveTickCounter : IEntityComponent { public int Value; }
+public struct MoveTickCounter : IEntityComponent { public int FramesUntilNextMove; }
 ```
 
 ### Tags
@@ -37,7 +37,7 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
     [Input(MissingInputFrameBehaviour.RetainCurrent)]
     public MoveInput MoveInput;
-    public SnakeLength SnakeLength = SnakeLength.Default;
+    public SnakeLength SnakeLength = new(4);
     public Score Score;
     public MoveTickCounter MoveTickCounter;
 }
@@ -67,9 +67,9 @@ public partial class SnakeInputSystem : ISystem
 
     public void Execute()
     {
-        if (!_pendingDirection.Equals(int2.zero))
+        if (_pendingDirection.x != 0 || _pendingDirection.y != 0)
         {
-            World.AddInput(World.GlobalEntityHandle, new MoveInput { Value = _pendingDirection });
+            World.AddInput(World.GlobalEntityHandle, new MoveInput { RequestedDirection = _pendingDirection });
             _pendingDirection = int2.zero;
         }
     }

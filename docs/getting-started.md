@@ -74,16 +74,23 @@ Wire everything together:
 // Build world
 var world = new WorldBuilder()
     .AddEntityType(SpinnerEntity.Template)
-    .AddSystem(new SpinnerSystem(speed: 2f))
-    .AddSystem(new SpinnerGameObjectUpdater(gameObjectRegistry))
-    .BuildAndInitialize();
+    .Build();
+
+// Add systems (between Build and Initialize)
+world.AddSystems(new ISystem[]
+{
+    new SpinnerSystem(speed: 2f),
+    new SpinnerGameObjectUpdater(gameObjectRegistry),
+});
+
+// Initialize (allocates groups, initializes systems)
+world.Initialize();
 
 // Create accessor
 var ecs = world.CreateAccessor();
 
 // Create an entity
 ecs.AddEntity<Spinner>()
-    .Set(new Rotation(quaternion.identity))
     .Set(gameObjectRegistry.Register(cubeGameObject))
     .AssertComplete();
 ```

@@ -1,5 +1,8 @@
 # Serialization
 
+!!! note
+    Serialization types live in the `com.trecs.serialization` package, which must be installed separately from `com.trecs.core`.
+
 Trecs provides a full serialization framework for saving and restoring world state. This is the foundation for [Recording & Playback](recording-and-playback.md).
 
 ## Overview
@@ -30,17 +33,14 @@ public class MyDataSerializer : ISerializer<MyData>
 {
     public void Serialize(in MyData value, ISerializationWriter writer)
     {
-        writer.WriteInt(value.X);
-        writer.WriteFloat(value.Y);
+        writer.Write("X", value.X);
+        writer.Write("Y", value.Y);
     }
 
-    public MyData Deserialize(ISerializationReader reader)
+    public void Deserialize(ref MyData value, ISerializationReader reader)
     {
-        return new MyData
-        {
-            X = reader.ReadInt(),
-            Y = reader.ReadFloat(),
-        };
+        reader.Read("X", ref value.X);
+        reader.Read("Y", ref value.Y);
     }
 }
 ```
@@ -76,10 +76,10 @@ For types that benefit from delta compression, implement `ISerializerDelta<T>`:
 ```csharp
 public class MyDeltaSerializer : ISerializerDelta<MyData>
 {
-    public void SerializeDelta(in MyData current, in MyData baseline,
+    public void SerializeDelta(in MyData value, in MyData baseValue,
         ISerializationWriter writer) { ... }
 
-    public MyData DeserializeDelta(in MyData baseline,
+    public void DeserializeDelta(ref MyData value, in MyData baseValue,
         ISerializationReader reader) { ... }
 }
 ```

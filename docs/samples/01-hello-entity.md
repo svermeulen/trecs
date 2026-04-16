@@ -96,14 +96,19 @@ Marked `[VariableUpdate]` because it touches Unity GameObjects — rendering sho
 ```csharp
 var world = new WorldBuilder()
     .AddEntityType(SampleTemplates.SpinnerEntity.Template)
-    .AddSystem(new SpinnerSystem(rotationSpeed: 2f))
-    .AddSystem(new SpinnerGameObjectUpdater(gameObjectRegistry))
-    .BuildAndInitialize();
+    .Build();
 
+world.AddSystems(new ISystem[]
+{
+    new SpinnerSystem(rotationSpeed: 2f),
+    new SpinnerGameObjectUpdater(gameObjectRegistry),
+});
+
+// Initialize is called separately (via the initializables list)
+// Entity creation happens in SceneInitializer.Initialize:
 var ecs = world.CreateAccessor();
 
 ecs.AddEntity<SampleTags.Spinner>()
-    .Set(new Rotation(quaternion.identity))
     .Set(gameObjectRegistry.Register(cube.gameObject))
     .AssertComplete();
 ```

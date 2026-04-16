@@ -32,15 +32,15 @@ These contain `List<T>` — managed types that can't be stored directly in compo
 ### Components
 
 ```csharp
-public struct CRoute : IEntityComponent
+public partial struct CRoute : IEntityComponent
 {
-    public SharedPtr<PatrolRoute> Route;  // Shared across entities
+    public SharedPtr<PatrolRoute> Value;  // Shared across entities
     public float Progress;
 }
 
-public struct CTrail : IEntityComponent
+public partial struct CTrail : IEntityComponent
 {
-    public UniquePtr<TrailHistory> Trail;  // Unique per entity
+    public UniquePtr<TrailHistory> Value;  // Unique per entity
 }
 ```
 
@@ -50,7 +50,7 @@ public struct CTrail : IEntityComponent
 
 ```csharp
 // Allocate once
-SharedPtr<PatrolRoute> routePtr = World.Heap.AllocShared(new PatrolRoute
+SharedPtr<PatrolRoute> routePtr = ecs.Heap.AllocShared(new PatrolRoute
 {
     Waypoints = waypoints,
     Color = Color.red,
@@ -58,22 +58,22 @@ SharedPtr<PatrolRoute> routePtr = World.Heap.AllocShared(new PatrolRoute
 });
 
 // First entity gets the original
-ecs.AddEntity<FollowerTag>()
-    .Set(new CRoute { Route = routePtr })
-    .Set(new CTrail { Trail = World.Heap.AllocUnique(new TrailHistory { ... }) })
+ecs.AddEntity<PatrolTags.Follower>()
+    .Set(new CRoute { Value = routePtr })
+    .Set(new CTrail { Value = ecs.Heap.AllocUnique(new TrailHistory { ... }) })
     .AssertComplete();
 
 // Second entity clones (increments ref count, shares same data)
-ecs.AddEntity<FollowerTag>()
-    .Set(new CRoute { Route = routePtr.Clone(World.Heap) })
-    .Set(new CTrail { Trail = World.Heap.AllocUnique(new TrailHistory { ... }) })
+ecs.AddEntity<PatrolTags.Follower>()
+    .Set(new CRoute { Value = routePtr.Clone(ecs.Heap) })
+    .Set(new CTrail { Value = ecs.Heap.AllocUnique(new TrailHistory { ... }) })
     .AssertComplete();
 ```
 
 ### UniquePtr — Per-Entity Trail
 
 ```csharp
-UniquePtr<TrailHistory> trailPtr = World.Heap.AllocUnique(new TrailHistory
+UniquePtr<TrailHistory> trailPtr = ecs.Heap.AllocUnique(new TrailHistory
 {
     Positions = new List<Vector3>(),
     MaxLength = 100
@@ -89,21 +89,21 @@ Each entity gets its own `UniquePtr` — the data is not shared.
 Reads the shared route and unique trail:
 
 ```csharp
-[ForEachEntity(Tag = typeof(FollowerTag))]
-void Execute(in FollowerView follower)
+[ForEachEntity(MatchByComponents = true)]
+void Execute(ref Position position, in CRoute route, in CTrail trail)
 {
     // Read shared route data
-    PatrolRoute route = follower.Route.Get(World.Heap);
+    var patrolRoute = route.Value.Get(World);
 
-    // Advance along waypoints
-    follower.Progress += route.Speed * World.DeltaTime;
-    follower.Position = InterpolateWaypoints(route.Waypoints, follower.Progress);
+    // Compute position along waypoints
+    float totalProgress = route.Progress + World.ElapsedTime * patrolRoute.Speed;
+    position.Value = InterpolateWaypoints(patrolRoute.Waypoints, totalProgress);
 
     // Write to unique trail
-    TrailHistory trail = follower.Trail.Get(World.Heap);
-    trail.Positions.Add(follower.Position);
-    if (trail.Positions.Count > trail.MaxLength)
-        trail.Positions.RemoveAt(0);
+    var trailHistory = trail.Value.Get(World);
+    trailHistory.Positions.Add(position.Value);
+    while (trailHistory.Positions.Count > trailHistory.MaxLength)
+        trailHistory.Positions.RemoveAt(0);
 }
 ```
 
@@ -112,16 +112,21 @@ void Execute(in FollowerView follower)
 Pointers must be disposed when entities are removed:
 
 ```csharp
-World.Events.InGroupsWithTags<FollowerTag>()
-    .OnRemoved((group, range, world) =>
+ecs.Events.InGroupsWithTags<PatrolTags.Follower>()
+    .OnRemoved((Group group, EntityRange indices) =>
     {
-        for (int i = range.Start; i < range.End; i++)
+        for (int i = indices.Start; i < indices.End; i++)
         {
-            var idx = new EntityIndex(i, group);
-            world.Component<CRoute>(idx).Read.Route.Dispose(world.Heap);
-            world.Component<CTrail>(idx).Read.Trail.Dispose(world.Heap);
+            var entityIndex = new EntityIndex(i, group);
+
+            var route = ecs.Component<CRoute>(entityIndex).Read;
+            route.Value.Dispose(ecs);
+
+            var trail = ecs.Component<CTrail>(entityIndex).Read;
+            trail.Value.Dispose(ecs);
         }
-    });
+    })
+    .AddTo(_eventDisposables);
 ```
 
 ## Concepts Introduced
@@ -130,5 +135,5 @@ World.Events.InGroupsWithTags<FollowerTag>()
 - **`UniquePtr<T>`** — single-owner pointer for per-entity managed data
 - **`Clone()`** — increments ref count on shared pointers
 - **`Dispose()`** — decrements ref count (shared) or frees (unique)
-- **`Get(World.Heap)`** — dereferences a pointer to access the data
+- **`Get(World)`** — dereferences a pointer to access the data
 - **Cleanup handlers** — dispose pointers when entities are removed to prevent leaks

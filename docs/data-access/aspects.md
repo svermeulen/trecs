@@ -58,6 +58,12 @@ foreach (var particle in ParticleView.Query(World).WithTags<SampleTags.Particle>
     float3 pos = particle.Position;
     particle.Lifetime -= World.DeltaTime;
 }
+
+// Iterate all entities that have the aspect's components (regardless of tags)
+foreach (var boid in Boid.Query(World).MatchByComponents())
+{
+    boid.Position += World.DeltaTime * boid.Speed * boid.Velocity;
+}
 ```
 
 This is useful when you need iteration logic in `Execute()` beyond what `[ForEachEntity]` supports (e.g., nested loops, conditional queries).

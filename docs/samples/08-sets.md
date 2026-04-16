@@ -13,18 +13,27 @@ A grid of particles is affected by two overlapping wave effects — a warm (oran
 ### Components
 
 ```csharp
-public struct WarmIntensity : IEntityComponent { public float Value; }
-public struct CoolIntensity : IEntityComponent { public float Value; }
+[Unwrap]
+public partial struct WarmIntensity : IEntityComponent
+{
+    public float Value;
+}
+
+[Unwrap]
+public partial struct CoolIntensity : IEntityComponent
+{
+    public float Value;
+}
 ```
 
 ### Sets
 
 ```csharp
-public struct WaveX : IEntitySet<SampleTags.Particle> { }
-public struct WaveZ : IEntitySet<SampleTags.Particle> { }
+public struct WaveX : IEntitySet { }
+public struct WaveZ : IEntitySet { }
 ```
 
-Both sets are scoped to entities with the `Particle` tag.
+Sets define sparse subsets of entities. Membership is managed at runtime via `SetAdd`/`SetRemove`.
 
 ### Registration
 
@@ -97,7 +106,7 @@ With sets, each wave is independent. A particle can be in zero, one, or both set
 
 ## Concepts Introduced
 
-- **`IEntitySet<T>`** — defines a sparse subset scoped to a tag
+- **`IEntitySet`** — defines a sparse entity subset
 - **`SetAdd` / `SetRemove`** — deferred membership changes
 - **`[ForEachEntity(Set = typeof(...))]`** — iterate only set members
 - **Overlapping membership** — entities can be in multiple sets

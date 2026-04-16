@@ -55,7 +55,7 @@ playback.Start(recordingData, new PlaybackStartParams { ... });
 // Each tick:
 PlaybackTickResult result = playback.OnTick(world);
 
-if (result.IsDesync)
+if (result.DesyncDetected)
 {
     // Simulation diverged from recording
 }
@@ -65,15 +65,15 @@ if (result.IsDesync)
 
 ```csharp
 // Check if playback detected a desync
-if (result.IsDesync)
+if (result.DesyncDetected)
 {
-    Debug.LogError("Desync detected at frame " + result.Frame);
+    Debug.LogError($"Desync: expected checksum {result.ExpectedChecksum}, got {result.ActualChecksum}");
 }
 
-// Check if playback is complete
-if (result.IsComplete)
+// Check if a checksum was verified this tick
+if (result.ChecksumVerified)
 {
-    Debug.Log("Playback finished");
+    Debug.Log("Checksum matched");
 }
 ```
 

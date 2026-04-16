@@ -79,7 +79,7 @@ When declaring components in a [template](templates.md), fields can be annotated
 public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 {
     [Interpolated]
-    public Position Position = Position.Default;      // Smoothed between fixed frames
+    public Position Position = default;               // Smoothed between fixed frames
 
     [FixedUpdateOnly]
     public Velocity Velocity;                          // Only writable in fixed update

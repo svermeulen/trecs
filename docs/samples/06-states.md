@@ -54,7 +54,7 @@ void Execute(in ActiveBall ball)
     if (math.lengthsq(ball.Velocity) < RestThreshold * RestThreshold)
     {
         ball.Velocity = float3.zero;
-        World.MoveTo<BallTags.Ball, BallTags.Resting>(ball.EntityIndex);
+        ball.MoveTo<BallTags.Ball, BallTags.Resting>(World);
     }
 }
 
@@ -76,7 +76,7 @@ public partial class WakeUpSystem : ISystem
         {
             float angle = World.Rng.Next() * 2f * math.PI;
             ball.Velocity = new float3(math.cos(angle) * 2f, LaunchSpeed, math.sin(angle) * 2f);
-            World.MoveTo<BallTags.Ball, BallTags.Active>(ball.EntityIndex);
+            ball.MoveTo<BallTags.Ball, BallTags.Active>(World);
         }
     }
 

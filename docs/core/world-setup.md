@@ -14,9 +14,15 @@ var world = new WorldBuilder()
         RandomSeed = 42,
     })
     .AddEntityType(SampleTemplates.SpinnerEntity.Template)
-    .AddSystem(new SpinnerSystem(rotationSpeed: 2f))
-    .AddSystem(new SpinnerGameObjectUpdater(gameObjectRegistry))
-    .BuildAndInitialize();
+    .Build();
+
+world.AddSystems(new ISystem[]
+{
+    new SpinnerSystem(rotationSpeed: 2f),
+    new SpinnerGameObjectUpdater(gameObjectRegistry),
+});
+
+world.Initialize();
 ```
 
 ### Builder Methods
@@ -26,14 +32,31 @@ var world = new WorldBuilder()
 | `SetSettings(WorldSettings)` | Configure timing, determinism, and debug options |
 | `AddEntityType(Template)` | Register an entity template |
 | `AddEntityTypes(IEnumerable<Template>)` | Register multiple templates |
-| `AddSystem(ISystem)` | Register a system |
-| `AddSystems(IEnumerable<ISystem>)` | Register multiple systems |
 | `AddSet<T>()` | Register an entity set for filtering |
 | `AddBlobStore(IBlobStore)` | Register a blob store for heap data |
 | `SetBlobCacheSettings(BlobCacheSettings)` | Configure blob caching |
 | `AddSystemOrderConstraint(params Type[])` | Define system execution order |
-| `Build()` | Build the world without initializing |
+| `Build()` | Build the world (returns `World`) |
 | `BuildAndInitialize()` | Build and immediately initialize |
+
+### Adding Systems
+
+Systems are added to the world after `Build()` and before `Initialize()`:
+
+```csharp
+world.AddSystems(new ISystem[]
+{
+    new PhysicsSystem(),
+    new RenderSystem(gameObjectRegistry),
+});
+```
+
+This is the standard pattern used throughout Trecs. Adding systems post-Build allows system constructors to receive dependencies that require a built `World` instance.
+
+| Method | Description |
+|--------|-------------|
+| `World.AddSystem(ISystem)` | Register a single system |
+| `World.AddSystems(IEnumerable<ISystem>)` | Register multiple systems |
 
 ## WorldSettings
 
@@ -71,28 +94,30 @@ var settings = new WorldSettings
 // 1. Build
 var world = new WorldBuilder()
     .AddEntityType(...)
-    .AddSystem(...)
     .Build();
 
-// 2. Initialize (allocates groups, initializes systems)
+// 2. Add systems (between Build and Initialize)
+world.AddSystems(new ISystem[] { ... });
+
+// 3. Initialize (allocates groups, initializes systems)
 world.Initialize();
 
-// 3. Create an accessor for interacting with the world
+// 4. Create an accessor for interacting with the world
 var ecs = world.CreateAccessor();
 
-// 4. Game loop
+// 5. Game loop
 while (running)
 {
     world.Tick();       // Runs input, fixed, and variable update systems
     world.LateTick();   // Runs late variable update systems
 }
 
-// 5. Cleanup
+// 6. Cleanup
 world.Dispose();
 ```
 
 !!! note
-    `BuildAndInitialize()` combines steps 1 and 2. Use `Build()` separately when you need to do additional setup between building and initializing.  For example, if a system constructor dependency needs access to World in its constructor, you'll need to do this after Build and before Initialize
+    `BuildAndInitialize()` combines steps 1 and 3, skipping step 2. Use this only when no systems need to be added post-Build.
 
 ## WorldAccessor
 

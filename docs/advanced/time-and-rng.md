@@ -61,7 +61,7 @@ Trecs provides a deterministic `Rng` type seeded from `WorldSettings.RandomSeed`
 ```csharp
 // Phase-aware (recommended)
 float value = World.Rng.Next();          // [0, 1)
-float range = World.Rng.Next(0f, 10f);  // [min, max)
+float range = World.Rng.NextFloat(0f, 10f);  // [min, max)
 
 // Phase-specific
 float fixedRand = World.FixedRng.Next();

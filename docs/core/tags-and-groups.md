@@ -2,6 +2,9 @@
 
 Tags are zero-cost markers that classify entities. Entities with the same tag combination are stored together in a **group** — a contiguous memory layout optimized for cache-friendly iteration.
 
+!!! tip
+    Most of the time, you interact with groups indirectly through `[ForEachEntity]` and [aspects](../data-access/aspects.md). Direct group access is a low-level API useful for advanced scenarios like custom job scheduling or tooling.
+
 ## Defining Tags
 
 Tags are empty structs implementing `ITag`:

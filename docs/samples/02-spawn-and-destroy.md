@@ -29,7 +29,7 @@ public struct Sphere : ITag { }
 
 public partial class SphereEntity : ITemplate, IHasTags<SampleTags.Sphere>
 {
-    public Position Position = Position.Default;
+    public Position Position = default;
     public Lifetime Lifetime;
     public GameObjectId GameObjectId;
 }
@@ -53,24 +53,32 @@ Uses `World.Rng` for deterministic random placement.
 
 ### LifetimeSystem
 
-Counts down lifetime and removes expired entities:
+Counts down lifetime and removes expired entities, cleaning up their GameObjects inline:
 
 ```csharp
 [ExecutesAfter(typeof(SpawnSystem))]
 public partial class LifetimeSystem : ISystem
 {
-    [ForEachEntity(Tags = new[] { typeof(SampleTags.Sphere) })]
-    void Execute(in SphereView sphere)
-    {
-        sphere.Lifetime -= World.DeltaTime;
+    readonly GameObjectRegistry _gameObjectRegistry;
 
-        if (sphere.Lifetime <= 0)
-        {
-            World.RemoveEntity(sphere.EntityIndex);
-        }
+    public LifetimeSystem(GameObjectRegistry gameObjectRegistry)
+    {
+        _gameObjectRegistry = gameObjectRegistry;
     }
 
-    partial struct SphereView : IAspect, IRead<GameObjectId>, IWrite<Lifetime> { }
+    [ForEachEntity(Tags = new[] { typeof(SampleTags.Sphere) })]
+    void Execute(in GameObjectId gameObjectId, ref Lifetime lifetime, EntityIndex entityIndex)
+    {
+        lifetime.Value -= World.DeltaTime;
+
+        if (lifetime.Value <= 0)
+        {
+            var go = _gameObjectRegistry.Resolve(gameObjectId);
+            Object.Destroy(go);
+            _gameObjectRegistry.Unregister(gameObjectId);
+            World.RemoveEntity(entityIndex);
+        }
+    }
 }
 ```
 
@@ -84,5 +92,5 @@ Syncs position to GameObjects each visual frame.
 - **Entity removal** with `RemoveEntity` (deferred until submission)
 - **`[ExecutesAfter]`** for explicit system ordering
 - **`World.Rng`** for deterministic random numbers
-- **Aspects** for bundling read/write access (`IRead<GameObjectId>, IWrite<Lifetime>`)
-- **Event handlers** for cleanup when entities are removed (destroying GameObjects)
+- **Individual component parameters** — `[ForEachEntity]` can receive components directly, not just aspects
+- **Inline cleanup** — destroying GameObjects at removal time inside the system

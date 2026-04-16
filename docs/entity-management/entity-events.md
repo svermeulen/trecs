@@ -138,7 +138,7 @@ World.Events.OnVariableUpdateStarted(() =>
 
 ## Disposing Subscriptions
 
-Use `AddTo` with a `DisposeCollection` to manage subscription lifetimes:
+Use `AddTo` with a disposable collection to manage subscription lifetimes. Trecs does not include a `DisposeCollection` type — you can use a simple wrapper like the one in the samples, or any `IDisposable` container of your choice:
 
 ```csharp
 readonly DisposeCollection _disposables = new();

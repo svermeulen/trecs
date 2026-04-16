@@ -40,7 +40,7 @@ Template inheritance shares common movement components:
 // Base template
 public partial class Movable : ITemplate, IHasTags<SampleTags.Movable>
 {
-    public Position Position = Position.Default;
+    public Position Position = default;
     public MoveDirection MoveDirection;
     public Speed Speed;
     public GameObjectId GameObjectId;
@@ -109,24 +109,37 @@ Maintains the prey population by spawning replacements.
 
 ### Cleanup Handler
 
-When prey are removed, clear the predator's `ChosenPrey` reference to prevent dangling handles:
+When prey are removed, clean up their GameObjects using a `[ForEachEntity]`-based event handler with an aspect:
 
 ```csharp
-World.Events.InGroupsWithTags<SampleTags.Prey>()
-    .OnRemoved((group, range, world) =>
-    {
-        for (int i = range.Start; i < range.End; i++)
-        {
-            var preyIndex = new EntityIndex(i, group);
-            var approachingPredator = world.Component<ApproachingPredator>(preyIndex).Read;
+public partial class CleanupHandlers
+{
+    readonly GameObjectRegistry _gameObjectRegistry;
+    readonly DisposeCollection _disposables = new();
 
-            if (!approachingPredator.Value.IsNull &&
-                approachingPredator.Value.TryToIndex(world, out var predatorIndex))
-            {
-                world.Component<ChosenPrey>(predatorIndex).Write = default;
-            }
-        }
-    });
+    public CleanupHandlers(World world, GameObjectRegistry gameObjectRegistry)
+    {
+        World = world.CreateAccessor();
+        _gameObjectRegistry = gameObjectRegistry;
+
+        World.Events
+            .InGroupsWithTags<SampleTags.Prey>()
+            .OnRemoved(OnPreyRemoved)
+            .AddTo(_disposables);
+    }
+
+    WorldAccessor World { get; }
+
+    [ForEachEntity]
+    void OnPreyRemoved(in Prey prey)
+    {
+        var go = _gameObjectRegistry.Resolve(prey.GameObjectId);
+        GameObject.Destroy(go);
+        _gameObjectRegistry.Unregister(prey.GameObjectId);
+    }
+
+    partial struct Prey : IAspect, IRead<GameObjectId, ApproachingPredator> { }
+}
 ```
 
 ## Concepts Introduced
