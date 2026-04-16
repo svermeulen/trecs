@@ -22,44 +22,16 @@ This is tracked at **per-(component, group)** granularity. A job writing `Positi
 | Reads `Position` (Fish) | Writes `Position` (Fish) | No — writer waits for reader |
 | Writes `Position` (Fish) | Writes `Position` (Fish) | No — writer waits for writer |
 
-The same model applies to [sets](../entity-management/sets.md) — `NativeSetRead` and `NativeSetWrite` are tracked independently per set type.
+The same model applies to immediate operations on [sets](../entity-management/sets.md) — `NativeSetRead` and `NativeSetWrite` are tracked independently per set type. Note that deferred set operations via `WorldAccessor` or `NativeWorldAccessor` do not require synchronization, since they are applied at submission boundaries when all jobs are guaranteed complete.
 
 ## How Dependencies Are Declared
 
-### Source-Generated Jobs
+When you use `[WrapAsJob]` or a manual job struct with `[ForEachEntity]`, the source generator inspects your component access (which parameters are `ref` vs `in`, which native fields/parameters use `Read` vs `Write` types) and emits dependency wiring automatically at schedule time. The generated code:
 
-When you use `[FromWorld]` fields on a job struct, the source generator emits all dependency wiring automatically at schedule time. The `Read` vs `Write` distinction in the field type is what declares your access intent:
-
-| Field Type | Access |
-|-----------|--------|
-| `NativeComponentBufferRead<T>` | Read |
-| `NativeComponentBufferWrite<T>` | Write |
-| `NativeComponentLookupRead<T>` | Read |
-| `NativeComponentLookupWrite<T>` | Write |
-| `NativeSetRead<T>` | Read |
-| `NativeSetWrite<T>` | Write |
-
-Behind the scenes, the generated scheduling code:
-
-1. **Before scheduling** — calls `IncludeReadDep` or `IncludeWriteDep` for each field, accumulating a `JobHandle` that waits on all conflicting outstanding jobs
-2. **Schedules the job** with that combined dependency
-3. **After scheduling** — calls `TrackJobRead` or `TrackJobWrite` to register the new job's access, so future jobs will depend on it correctly
+1. Waits on all conflicting outstanding jobs before scheduling your job
+2. Registers your job's access after scheduling, so future jobs will depend on it correctly
 
 This all happens inside the generated `ScheduleParallel(World)` method — you just call it and the rest is handled.
-
-### External Jobs
-
-When scheduling jobs manually (without source generation), register them explicitly so the dependency tracker knows about them:
-
-```csharp
-JobHandle handle = myJob.Schedule(count, batchSize);
-
-World.TrackExternalJob(handle)
-    .Writes<Position>(TagSet<GameTags.Player>.Value)
-    .Reads<Velocity>(TagSet<GameTags.Player>.Value);
-```
-
-See [Jobs & Burst — External Job Tracking](jobs-and-burst.md#external-job-tracking) for more details.
 
 ## Main-Thread Sync
 
@@ -96,8 +68,7 @@ This means:
 
 | Mechanism | When it happens | What it syncs |
 |-----------|----------------|---------------|
-| `IncludeReadDep` / `IncludeWriteDep` | Job scheduling (generated) | Computes input dependencies from outstanding jobs |
-| `TrackJobRead` / `TrackJobWrite` | After job scheduled (generated) | Registers the new job's access for future tracking |
+| Job scheduling | Generated `ScheduleParallel` call | Waits on conflicting jobs, registers new access |
 | `.Read` property | Main-thread component access | Completes outstanding writers |
 | `.Write` property | Main-thread component access | Completes outstanding writers + all readers |
 | Phase boundary | Between update phases | Completes everything |

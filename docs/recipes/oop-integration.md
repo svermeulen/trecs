@@ -6,9 +6,9 @@ Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours,
 
 ```
 ┌─────────────────────────────────────────┐
-│  Layer 1: Non-ECS → ECS (Input)        │
+│  Layer 1: Non-ECS → ECS (Input)         │
 │  MonoBehaviours, services, Unity APIs   │
-│  → Queues input into ECS               │
+│  → Queues input into ECS                │
 └─────────────┬───────────────────────────┘
               │ AddInput()
 ┌─────────────▼───────────────────────────┐

@@ -1,0 +1,134 @@
+# Advanced Job Features
+
+This page covers advanced job APIs for manual job scheduling and low-level component access. For the basics of running jobs with `[WrapAsJob]` and manual job structs, see [Jobs & Burst](../performance/jobs-and-burst.md).
+
+## FromWorld — Auto-Wiring Job Fields
+
+The `[FromWorld]` attribute marks fields on a job struct to be automatically populated from the world before scheduling:
+
+```csharp
+[BurstCompile]
+partial struct MyJob : IJobFor
+{
+    [FromWorld(Tag = typeof(GameTags.Player))]
+    public NativeComponentBufferRead<Position> Positions;
+
+    [FromWorld(Tag = typeof(GameTags.Player))]
+    public NativeComponentBufferWrite<Velocity> Velocities;
+
+    [FromWorld]
+    public NativeWorldAccessor NativeWorld;
+
+    public void Execute(int index)
+    {
+        Velocities[index].Value += new float3(0, -9.8f, 0) * NativeWorld.DeltaTime;
+    }
+}
+```
+
+### Supported Field Types
+
+| Field Type | Purpose | Requires Tag? |
+|-----------|---------|---------------|
+| `NativeComponentBufferRead<T>` | Read-only component buffer for a group | Yes |
+| `NativeComponentBufferWrite<T>` | Writable component buffer for a group | Yes |
+| `NativeComponentLookupRead<T>` | Read-only lookup across multiple groups | Yes |
+| `NativeComponentLookupWrite<T>` | Writable lookup across multiple groups | Yes |
+| `NativeSetRead<TSet>` | Read-only set access | No |
+| `NativeSetWrite<TSet>` | Writable set access | No |
+| `NativeWorldAccessor` | Job-safe world operations | No |
+| `Group` | Group identifier | Yes |
+
+### Tag Resolution
+
+Fields that require a tag scope (buffers, lookups, `Group`) can get their tags in two ways:
+
+- **Inline** — specify `Tag` or `Tags` directly on the attribute: `[FromWorld(Tag = typeof(GameTags.Player))]`. The tag is baked into the generated code.
+- **At schedule time** — omit `Tag`/`Tags`, and the generated `ScheduleParallel` method will include a `TagSet` parameter that the caller must provide:
+
+```csharp
+[BurstCompile]
+partial struct FlexibleJob : IJobFor
+{
+    [FromWorld]  // No inline tag — becomes a schedule parameter
+    public NativeComponentBufferWrite<Position> Positions;
+
+    public void Execute(int index) { ... }
+}
+
+// Caller provides the tag at schedule time
+new FlexibleJob().ScheduleParallel(World, TagSet<GameTags.Player>.Value);
+```
+
+This is useful when the same job struct needs to operate on different groups.
+
+Fields that don't require tags (`NativeSetRead`, `NativeSetWrite`, `NativeWorldAccessor`) are populated automatically and never generate schedule parameters.
+
+## Native Component Access
+
+### Buffers — Single Group
+
+For iterating all entities in one group:
+
+```csharp
+NativeComponentBufferRead<Position> positions;   // Read-only
+NativeComponentBufferWrite<Velocity> velocities;  // Read-write
+
+// Access by index
+ref readonly Position pos = ref positions[i];
+ref Velocity vel = ref velocities[i];
+```
+
+### Lookups — Cross-Group
+
+For accessing components on arbitrary entities across groups:
+
+```csharp
+NativeComponentLookupRead<Health> healthLookup;
+NativeComponentLookupWrite<Damage> damageLookup;
+
+// Access by EntityIndex
+ref readonly Health hp = ref healthLookup[entityIndex];
+ref Damage dmg = ref damageLookup[entityIndex];
+
+// Check existence
+if (healthLookup.Exists(entityIndex)) { ... }
+if (healthLookup.TryGet(entityIndex, out Health hp)) { ... }
+```
+
+## Native Set Operations
+
+Sets can be read and modified from jobs:
+
+```csharp
+[FromWorld]
+NativeSetRead<HighlightedParticle> highlightedRead;
+
+[FromWorld]
+NativeSetWrite<HighlightedParticle> highlightedWrite;
+
+// Check membership
+bool isHighlighted = highlightedRead.Exists(entityIndex);
+
+// Modify (thread-safe, immediate within job)
+highlightedWrite.AddImmediate(entityIndex);
+highlightedWrite.RemoveImmediate(entityIndex);
+```
+
+## External Job Tracking
+
+When scheduling Unity jobs manually (without Trecs source generation), register them so the [dependency tracker](../performance/dependency-tracking.md) knows about them:
+
+```csharp
+JobHandle handle = myJob.Schedule(count, batchSize);
+
+World.TrackExternalJob(handle)
+    .Writes<Position>(TagSet<GameTags.Player>.Value)
+    .Reads<Velocity>(TagSet<GameTags.Player>.Value);
+```
+
+To force-complete jobs before main-thread access:
+
+```csharp
+World.SyncMainThread<Position>(group);
+```

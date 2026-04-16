@@ -53,6 +53,7 @@ nav:
       - Jobs & Burst: performance/jobs-and-burst.md
       - Dependency Tracking: performance/dependency-tracking.md
   - Advanced:
+      - Advanced Job Features: advanced/advanced-jobs.md
       - Groups & TagSets: advanced/groups-and-tagsets.md
       - Heap: advanced/heap.md
       - Interpolation: advanced/interpolation.md

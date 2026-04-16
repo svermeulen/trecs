@@ -1,17 +1,17 @@
 # Sets
 
-Sets provide efficient sparse tracking of entity subsets within groups. Unlike tags (which define groups), sets let you dynamically mark entities without changing their group membership.
+Sets let you dynamically mark entities as belonging to a subset, without affecting how they are stored or what components they have. You can think of them like lightweight boolean flags — an entity is either in a set or it isn't — but with efficient iteration over just the members.
 
 ## Defining a Set
 
 ```csharp
-public struct HighlightedParticle : IEntitySet<SampleTags.Particle> { }
+public struct HighlightedParticle : IEntitySet { }
 ```
 
-The generic parameter scopes the set to entities with the `Particle` tag. Global sets (no tag scope) implement `IEntitySet` directly:
+Optionally, you can scope a set to entities with specific tags. Adding an entity without the required tags will result in an error:
 
 ```csharp
-public struct SelectedEntities : IEntitySet { }
+public struct EatingFish : IEntitySet<FrenzyTags.Fish> { }
 ```
 
 ## Registering Sets
@@ -27,17 +27,28 @@ new WorldBuilder()
 
 ## Adding and Removing Entities
 
-Use the deferred API during system execution:
+### Deferred
+
+The standard API queues changes that take effect at the next submission. Safe to call during iteration:
 
 ```csharp
-// Add entity to set (deferred)
 World.SetAdd<HighlightedParticle>(particle.EntityIndex);
-
-// Remove entity from set (deferred)
 World.SetRemove<HighlightedParticle>(particle.EntityIndex);
 ```
 
-These changes are safe to call during iteration — they take effect at the next submission.
+### Immediate
+
+`AddImmediate` / `RemoveImmediate` take effect right away. These are thread-safe and can be used from both the main thread and jobs:
+
+```csharp
+// Main thread
+World.Set<HighlightedParticle>().Write.AddImmediate(entityIndex);
+World.Set<HighlightedParticle>().Write.RemoveImmediate(entityIndex);
+
+// In a job (via NativeSetWrite)
+highlighted.AddImmediate(entityIndex);
+highlighted.RemoveImmediate(entityIndex);
+```
 
 ## Querying by Set
 
@@ -51,17 +62,12 @@ void Execute(in ParticleView particle)
 }
 ```
 
-### With Manual Queries
+### With Aspect Queries
 
 ```csharp
-// Sparse iteration — only visits set members
-foreach (var slice in World.Query().InSet<HighlightedParticle>().GroupSlices())
+foreach (var particle in ParticleView.Query(World).InSet<HighlightedParticle>())
 {
-    var colors = World.ComponentBuffer<ColorComponent>(slice.Group);
-    foreach (int idx in slice.Indices)
-    {
-        colors[idx].Value = Color.yellow;
-    }
+    particle.Color = Color.yellow;
 }
 ```
 
@@ -71,39 +77,12 @@ foreach (var slice in World.Query().InSet<HighlightedParticle>().GroupSlices())
 int highlighted = World.Query().InSet<HighlightedParticle>().Count();
 ```
 
-## Example: Wave Highlight
-
-From the Sets sample — dynamically highlight particles near a moving wave:
-
-```csharp
-public partial class HighlightSystem : ISystem
-{
-    public void Execute()
-    {
-        float waveCenter = math.sin(World.ElapsedTime * 2f) * _gridSize * 0.6f;
-
-        foreach (var particle in ParticleView.Query(World).WithTags<SampleTags.Particle>())
-        {
-            float dist = math.abs(particle.Position.x - waveCenter);
-
-            if (dist < waveBandWidth)
-                World.SetAdd<SampleSets.HighlightedParticle>(particle.EntityIndex);
-            else
-                World.SetRemove<SampleSets.HighlightedParticle>(particle.EntityIndex);
-        }
-    }
-
-    partial struct ParticleView : IAspect, IRead<Position>, IWrite<Lifetime> { }
-}
-```
-
 ## When to Use Sets vs Tags
 
 | | Tags | Sets |
 |---|---|---|
-| **Changes group?** | Yes — entity moves between groups | No — entity stays in same group |
-| **Storage** | Dense (all entities in group) | Sparse (tracked subset) |
-| **Cost of change** | Component data copied to new group | Add/remove from index |
-| **Best for** | Core identity, partition transitions | Dynamic membership, filtering |
+| **Cost of change** | Structural change (deferred, moves data) | Lightweight add/remove from index |
+| **Iteration** | All entities with that tag are contiguous in memory | Sparse — only set members are visited |
+| **Best for** | Core identity, maximum cache locality | Dynamic membership, temporary flags, filtering |
 
-See [Entity Subset Patterns](../recipes/entity-subset-patterns.md) for a deeper comparison.
+Both tags (via [partitions](../core/templates.md#partitions)) and sets can represent state, but the trade-offs differ. Tag changes move entity data in memory, giving you dense iteration. Set changes are cheap but iteration is sparse. See [Entity Subset Patterns](../recipes/entity-subset-patterns.md) for a deeper comparison.

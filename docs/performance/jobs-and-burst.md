@@ -7,6 +7,24 @@ Trecs integrates with Unity's job system and Burst compiler for parallel, high-p
 Mark a static `[ForEachEntity]` method with `[WrapAsJob]` to generate a Burst-compiled parallel job:
 
 ```csharp
+public partial class ParticleMoveSystem : ISystem
+{
+    [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+    [WrapAsJob]
+    static void Execute(in Velocity velocity, ref Position position, in NativeWorldAccessor world)
+    {
+        position.Value += world.DeltaTime * velocity.Value;
+    }
+}
+```
+
+The source generator creates the job struct, scheduling method, and [dependency tracking](dependency-tracking.md) automatically. The method must be `static` because it is called from inside a job and must use `NativeWorldAccessor` instead of `WorldAccessor`
+
+## Manual Job Structs
+
+For more control, define a job struct yourself with a `[ForEachEntity]` Execute method:
+
+```csharp
 public partial class ParticleJobSystem : ISystem
 {
     [BurstCompile]
@@ -28,46 +46,11 @@ public partial class ParticleJobSystem : ISystem
 }
 ```
 
-The source generator creates the job struct, scheduling method, and [dependency tracking](dependency-tracking.md) automatically.
+The Trecs Source Generator will add a ScheduleParallel extension method for your job struct that handles the iteration and component access.
 
-## FromWorld — Auto-Wiring Job Fields
+This gives you control over the job struct fields (e.g., passing precomputed values like `DeltaTime`), while the source generator still handles scheduling and dependency tracking.
 
-The `[FromWorld]` attribute marks fields on a job struct to be automatically populated from the world before scheduling:
-
-```csharp
-[BurstCompile]
-partial struct MyJob : IJobFor
-{
-    [FromWorld(Tag = typeof(GameTags.Player))]
-    public NativeComponentBufferRead<Position> Positions;
-
-    [FromWorld(Tag = typeof(GameTags.Player))]
-    public NativeComponentBufferWrite<Velocity> Velocities;
-
-    [FromWorld]
-    public NativeWorldAccessor NativeWorld;
-
-    public void Execute(int index)
-    {
-        Velocities[index].Value += new float3(0, -9.8f, 0) * NativeWorld.DeltaTime;
-    }
-}
-```
-
-`[FromWorld]` supports:
-
-| Field Type | Purpose |
-|-----------|---------|
-| `NativeComponentBufferRead<T>` | Read-only component buffer for a group |
-| `NativeComponentBufferWrite<T>` | Writable component buffer for a group |
-| `NativeComponentLookupRead<T>` | Read-only lookup across multiple groups |
-| `NativeComponentLookupWrite<T>` | Writable lookup across multiple groups |
-| `NativeSetRead<TSet>` | Read-only set access |
-| `NativeSetWrite<TSet>` | Writable set access |
-| `NativeWorldAccessor` | Job-safe world operations |
-| `Group` | Group identifier |
-
-Use `Tag` or `Tags` to scope buffer/lookup fields to specific tag groups.
+However note that you can also use `[PassThroughArgument]` on fields of a `[WrapAsJob]` method to achieve the same effect without defining a job struct.
 
 ## NativeWorldAccessor
 
@@ -86,57 +69,6 @@ nativeWorld.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
 
 When `RequireDeterministicSubmission` is enabled, sort keys determine the order structural operations are applied. Use entity IDs or loop indices as sort keys for reproducible results.
 
-## Native Component Access
-
-### Buffers — Single Group
-
-For iterating all entities in one group:
-
-```csharp
-NativeComponentBufferRead<Position> positions;   // Read-only
-NativeComponentBufferWrite<Velocity> velocities;  // Read-write
-
-// Access by index
-ref readonly Position pos = ref positions[i];
-ref Velocity vel = ref velocities[i];
-```
-
-### Lookups — Cross-Group
-
-For accessing components on arbitrary entities across groups:
-
-```csharp
-NativeComponentLookupRead<Health> healthLookup;
-NativeComponentLookupWrite<Damage> damageLookup;
-
-// Access by EntityIndex
-ref readonly Health hp = ref healthLookup[entityIndex];
-ref Damage dmg = ref damageLookup[entityIndex];
-
-// Check existence
-if (healthLookup.Exists(entityIndex)) { ... }
-if (healthLookup.TryGet(entityIndex, out Health hp)) { ... }
-```
-
-## Native Set Operations
-
-Sets can be read and modified from jobs:
-
-```csharp
-[FromWorld]
-NativeSetRead<HighlightedParticle> highlightedRead;
-
-[FromWorld]
-NativeSetWrite<HighlightedParticle> highlightedWrite;
-
-// Check membership
-bool isHighlighted = highlightedRead.Exists(entityIndex);
-
-// Modify (thread-safe, immediate within job)
-highlightedWrite.AddImmediate(entityIndex);
-highlightedWrite.RemoveImmediate(entityIndex);
-```
-
 ## Thread Safety Rules
 
 | Operation | Main Thread | Jobs |
@@ -151,20 +83,4 @@ highlightedWrite.RemoveImmediate(entityIndex);
 !!! warning
     `WorldAccessor` is **main-thread only**. Always use `NativeWorldAccessor` and native component types inside jobs.
 
-## External Job Tracking
-
-When scheduling jobs manually (without source generation), register them for dependency tracking:
-
-```csharp
-JobHandle handle = myJob.Schedule(count, batchSize);
-
-World.TrackExternalJob(handle)
-    .Writes<Position>(TagSet<GameTags.Player>.Value)
-    .Reads<Velocity>(TagSet<GameTags.Player>.Value);
-```
-
-To force-complete jobs before main-thread access:
-
-```csharp
-World.SyncMainThread<Position>(group);
-```
+For advanced job features — `[FromWorld]` auto-wiring, native component access types, native set operations, and external job tracking — see [Advanced Job Features](../advanced/advanced-jobs.md).

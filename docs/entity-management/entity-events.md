@@ -1,6 +1,6 @@
 # Entity Events
 
-Entity events let you react to structural changes — when entities are added to a group, removed from a group, or moved between groups.
+Entity events let you react to structural changes — when entities are added, removed, or moved between partitions. Callbacks are invoked during [submission](structural-changes.md#when-submission-happens), after the queued structural changes have been applied.
 
 ## Subscribing to Events
 
