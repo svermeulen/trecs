@@ -74,7 +74,7 @@ Wire everything together:
 ```csharp
 // Build world
 var world = new WorldBuilder()
-    .AddTemplate(SpinnerEntity.Template)
+    .AddEntityType(SpinnerEntity.Template)
     .AddSystem(new SpinnerSystem(speed: 2f))
     .AddSystem(new SpinnerGameObjectUpdater(gameObjectRegistry))
     .BuildAndInitialize();

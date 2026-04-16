@@ -13,7 +13,7 @@ var world = new WorldBuilder()
         FixedTimeStep = 1f / 60f,
         RandomSeed = 42,
     })
-    .AddTemplate(SampleTemplates.SpinnerEntity.Template)
+    .AddEntityType(SampleTemplates.SpinnerEntity.Template)
     .AddSystem(new SpinnerSystem(rotationSpeed: 2f))
     .AddSystem(new SpinnerGameObjectUpdater(gameObjectRegistry))
     .BuildAndInitialize();
@@ -24,8 +24,8 @@ var world = new WorldBuilder()
 | Method | Description |
 |--------|-------------|
 | `SetSettings(WorldSettings)` | Configure timing, determinism, and debug options |
-| `AddTemplate(Template)` | Register an entity template |
-| `AddTemplates(IEnumerable<Template>)` | Register multiple templates |
+| `AddEntityType(Template)` | Register an entity template |
+| `AddEntityTypes(IEnumerable<Template>)` | Register multiple templates |
 | `AddSystem(ISystem)` | Register a system |
 | `AddSystems(IEnumerable<ISystem>)` | Register multiple systems |
 | `AddSet<T>()` | Register an entity set for filtering |
@@ -70,7 +70,7 @@ var settings = new WorldSettings
 ```csharp
 // 1. Build
 var world = new WorldBuilder()
-    .AddTemplate(...)
+    .AddEntityType(...)
     .AddSystem(...)
     .Build();
 

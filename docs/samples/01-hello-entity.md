@@ -95,7 +95,7 @@ Marked `[VariableUpdate]` because it touches Unity GameObjects — rendering sho
 
 ```csharp
 var world = new WorldBuilder()
-    .AddTemplate(SampleTemplates.SpinnerEntity.Template)
+    .AddEntityType(SampleTemplates.SpinnerEntity.Template)
     .AddSystem(new SpinnerSystem(rotationSpeed: 2f))
     .AddSystem(new SpinnerGameObjectUpdater(gameObjectRegistry))
     .BuildAndInitialize();

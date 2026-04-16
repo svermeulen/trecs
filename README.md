@@ -20,34 +20,71 @@ A high-performance Entity Component System framework for Unity, designed for det
 ## Quick Start
 
 ```csharp
-// Define a component
+// Step 1: Define components
+[Unwrap] // <- Indicates that it is a single value component, so that Aspects can unwrap values directly
 public partial struct Position : IEntityComponent
 {
     public float3 Value;
 }
 
-// Define a template
+// Step 2: Define entity tags
+public struct PlayerTag : ITag { }
+
+// Step 3: Define entity types
+// Note that this class is never actually instantiated
+// It is only used to declare the components and tags that entities of this type will have
 public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 {
-    public Position Position = Position.Default;
+    public Position Position;
     public Velocity Velocity;
 }
 
-// Define a system
+// Step 4: Define systems to operate on entities
 public partial class MovementSystem : ISystem
 {
     [ForEachEntity(MatchByComponents = true)]
     void Execute(ref Position pos, in Velocity vel)
     {
-        pos.Value += vel.Value * World.FixedDeltaTime;
+        pos.Value += vel.Value * World.DeltaTime;
     }
 }
 
-// Build and run
+// Or alternatively, match by tag instead of components:
+public partial class MovementSystem : ISystem
+{
+    [ForEachEntity(Tag = typeof(PlayerTag))]
+    void Execute(ref Position pos, in Velocity vel)
+    {
+        pos.Value += vel.Value * World.DeltaTime;
+    }
+}
+
+// Can also define an IAspect to group together components
+// and unwrap the single value components for direct access:
+public partial class MovementSystem : ISystem
+{
+    [ForEachEntity(Tag = typeof(PlayerTag))]
+    void Execute(in Player player)
+    {
+        player.Position += player.Velocity * World.DeltaTime;
+    }
+
+    partial struct Player : IAspect, IRead<ApproachingFish>, IWrite<Position> { }
+}
+
+// Step 5: Define, initialize, and run the world
 var world = new WorldBuilder()
-    .AddTemplate(PlayerEntity.Template)
+    .AddEntityType(PlayerEntity.Template)
     .AddSystem(new MovementSystem())
-    .BuildAndInitialize();
+    .Build();
+    
+world.Initialize();
+
+// Call this from a MonoBehaviour Update
+world.Tick();
+
+// Call this on MonoBehaviour OnDestroy or when complete
+world.Dispose();
 ```
 
 ## Installation

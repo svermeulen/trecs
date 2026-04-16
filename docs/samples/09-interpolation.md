@@ -51,8 +51,8 @@ The `[Interpolated]` attribute on `Position` automatically generates `Interpolat
 
 ```csharp
 var world = new WorldBuilder()
-    .AddTemplate(SampleTemplates.SmoothOrbitEntity.Template)
-    .AddTemplate(SampleTemplates.RawOrbitEntity.Template)
+    .AddEntityType(SampleTemplates.SmoothOrbitEntity.Template)
+    .AddEntityType(SampleTemplates.RawOrbitEntity.Template)
     .AddInterpolatedPreviousSaver(new InterpolatedPreviousSaver<Position>())
     .Build();
 

@@ -32,7 +32,7 @@ This generates three components: `Position`, `Interpolated<Position>`, and `Inte
 
 ```csharp
 var world = new WorldBuilder()
-    .AddTemplate(SampleTemplates.SmoothOrbitEntity.Template)
+    .AddEntityType(SampleTemplates.SmoothOrbitEntity.Template)
     .AddInterpolatedPreviousSaver(new InterpolatedPreviousSaver<Position>())
     .Build();
 ```
