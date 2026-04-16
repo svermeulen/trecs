@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using Trecs.Collections;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 namespace Trecs.Internal
@@ -869,61 +868,12 @@ namespace Trecs.Internal
 
             public void SerializeValues(ITrecsSerializationWriter writer)
             {
-                int count = Values.Count;
-                writer.Write("count", count);
-                if (count > 0)
-                {
-                    unsafe
-                    {
-                        writer.BlitWriteRawBytes(
-                            "keys",
-                            NativeListUnsafeUtility.GetUnsafeReadOnlyPtr(Values._keys),
-                            count * UnsafeUtility.SizeOf<FrameEntityHandlePair>()
-                        );
-                        writer.BlitWriteRawBytes(
-                            "values",
-                            NativeListUnsafeUtility.GetUnsafeReadOnlyPtr(Values._values),
-                            count * UnsafeUtility.SizeOf<T>()
-                        );
-                    }
-                }
+                Values.SerializeValues(writer);
             }
 
             public void DeserializeValues(ITrecsSerializationReader reader)
             {
-                int count = default;
-                reader.Read("count", ref count);
-
-                Values._keyToIndex.Clear();
-                Values._values.Clear();
-                Values._keys.Clear();
-
-                if (count > 0)
-                {
-                    Values.EnsureCapacity((uint)count);
-                    Values._keys.Resize(count, NativeArrayOptions.UninitializedMemory);
-                    Values._values.Resize(count, NativeArrayOptions.UninitializedMemory);
-
-                    unsafe
-                    {
-                        reader.BlitReadRawBytes(
-                            "keys",
-                            NativeListUnsafeUtility.GetUnsafePtr(Values._keys),
-                            count * UnsafeUtility.SizeOf<FrameEntityHandlePair>()
-                        );
-                        reader.BlitReadRawBytes(
-                            "values",
-                            NativeListUnsafeUtility.GetUnsafePtr(Values._values),
-                            count * UnsafeUtility.SizeOf<T>()
-                        );
-                    }
-
-                    // Rebuild hash map from keys
-                    for (int i = 0; i < count; i++)
-                    {
-                        Values._keyToIndex.Add(Values._keys[i], i);
-                    }
-                }
+                Values.DeserializeValues(reader);
             }
         }
 

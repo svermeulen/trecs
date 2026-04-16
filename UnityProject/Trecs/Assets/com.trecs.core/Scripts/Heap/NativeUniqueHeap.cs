@@ -189,7 +189,7 @@ namespace Trecs
 
             if (_pendingAdds.Count > 0)
             {
-                _allEntries.EnsureCapacity((uint)(_allEntries.Count + _pendingAdds.Count));
+                _allEntries.EnsureCapacity(_allEntries.Count + _pendingAdds.Count);
                 foreach (var (address, box) in _pendingAdds)
                 {
                     _allEntries.Add(
@@ -285,7 +285,7 @@ namespace Trecs
             _idCounter.Value = reader.Read<uint>("IdCounter");
             var numEntries = reader.Read<int>("NumEntries");
 
-            _allEntries.EnsureCapacity((uint)numEntries);
+            _allEntries.EnsureCapacity(numEntries);
 
             for (int i = 0; i < numEntries; i++)
             {

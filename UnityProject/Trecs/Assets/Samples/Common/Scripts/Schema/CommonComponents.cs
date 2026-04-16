@@ -2,7 +2,6 @@ using Unity.Mathematics;
 
 namespace Trecs.Samples
 {
-    [Unwrap]
     public partial struct GameObjectId : IEntityComponent
     {
         public int Value;
@@ -12,8 +11,6 @@ namespace Trecs.Samples
     public partial struct Position : IEntityComponent
     {
         public float3 Value;
-
-        public static Position Default => new(float3.zero);
     }
 
     [Unwrap]
@@ -24,24 +21,6 @@ namespace Trecs.Samples
 
     [Unwrap]
     public partial struct UniformScale : IEntityComponent
-    {
-        public float Value;
-    }
-
-    [Unwrap]
-    public partial struct Lifetime : IEntityComponent
-    {
-        public float Value;
-    }
-
-    [Unwrap]
-    public partial struct Velocity : IEntityComponent
-    {
-        public float3 Value;
-    }
-
-    [Unwrap]
-    public partial struct Speed : IEntityComponent
     {
         public float Value;
     }

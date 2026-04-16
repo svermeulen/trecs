@@ -104,9 +104,6 @@ namespace Trecs.Internal
 #else
             var id = DenseHashUtil.StableStringHash(type.FullName);
 
-            // This would work too, but is a bit more brittle since it uses assembly qualified name
-            // var id = Unity.Burst.BurstRuntime.GetHashCode32(type);
-
             if (id == 0)
             {
                 // reserve 0 to mean uninitialized

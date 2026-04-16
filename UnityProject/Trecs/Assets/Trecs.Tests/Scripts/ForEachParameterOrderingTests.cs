@@ -13,22 +13,7 @@ namespace Trecs.Tests
     [TestFixture]
     public partial class ForEachParameterOrderingTests
     {
-        TestEnvironment CreateEnv()
-        {
-            var blobStoreCommon = new BlobStoreCommon(null);
-            var blobStore = new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                blobStoreCommon
-            );
-
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(QTestEntityA.Template)
-                .AddBlobStore(blobStore);
-
-            return new TestEnvironment(builder.BuildAndInitialize());
-        }
+        TestEnvironment CreateEnv() => EcsTestHelper.CreateEnvironment(QTestEntityA.Template);
 
         // ─── 1. Custom args (primitives) interspersed with components ────────────
 

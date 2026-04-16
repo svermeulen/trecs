@@ -224,6 +224,15 @@ namespace Trecs
         }
 
         /// <summary>
+        /// Returns true if this entity has been submitted and currently exists in the world.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Exists(NativeWorldAccessor accessor)
+        {
+            return accessor.EntityExists(this);
+        }
+
+        /// <summary>
         /// Returns true if this is the null sentinel value.
         /// </summary>
         public bool IsNull

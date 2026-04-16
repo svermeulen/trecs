@@ -42,9 +42,13 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Registers an entity template with the world.
+        /// Registers a concrete entity type with the world. Each entity type
+        /// determines a group (contiguous memory layout) for its component
+        /// arrays. Only register entity types that will be instantiated
+        /// directly — base templates used via <c>IExtends</c> are discovered
+        /// automatically and should not be registered here.
         /// </summary>
-        public WorldBuilder AddTemplate(Template template)
+        public WorldBuilder AddEntityType(Template template)
         {
             Assert.IsNotNull(template);
             _templates.Add(template);
@@ -76,14 +80,14 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Registers multiple entity templates with the world.
+        /// Registers multiple concrete entity types with the world.
         /// </summary>
-        public WorldBuilder AddTemplates(IEnumerable<Template> templates)
+        public WorldBuilder AddEntityTypes(IEnumerable<Template> templates)
         {
             Assert.IsNotNull(templates);
             foreach (var template in templates)
             {
-                AddTemplate(template);
+                AddEntityType(template);
             }
             return this;
         }

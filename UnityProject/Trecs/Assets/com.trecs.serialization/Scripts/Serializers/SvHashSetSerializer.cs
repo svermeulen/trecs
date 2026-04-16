@@ -11,7 +11,7 @@ namespace Trecs.Serialization
 
         public void Deserialize(ref DenseHashSet<T> dict, ISerializationReader reader)
         {
-            var numItems = reader.Read<uint>("count");
+            var numItems = reader.Read<int>("count");
 
             if (dict == null)
             {
@@ -35,7 +35,7 @@ namespace Trecs.Serialization
 
         public void Serialize(in DenseHashSet<T> value, ISerializationWriter writer)
         {
-            writer.Write<uint>("count", (uint)value.Count);
+            writer.Write<int>("count", value.Count);
 
             foreach (var item in value)
             {

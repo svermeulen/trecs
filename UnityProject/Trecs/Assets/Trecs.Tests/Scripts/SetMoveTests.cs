@@ -30,26 +30,8 @@ namespace Trecs.Tests
         static readonly TagSet FMStateASet = TagSet.FromTags(Tag<FMTag>.Value, Tag<FMStateA>.Value);
         static readonly TagSet FMStateBSet = TagSet.FromTags(Tag<FMTag>.Value, Tag<FMStateB>.Value);
 
-        TestEnvironment CreateEnv()
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(FMTestEntity.Template)
-                .AddSet<FMSet>()
-                .AddBlobStore(CreateBlobStore());
-
-            return new TestEnvironment(builder.BuildAndInitialize());
-        }
-
-        static BlobStoreInMemory CreateBlobStore()
-        {
-            var blobStoreCommon = new BlobStoreCommon(null);
-            return new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                blobStoreCommon
-            );
-        }
+        TestEnvironment CreateEnv() =>
+            EcsTestHelper.CreateEnvironment(b => b.AddSet<FMSet>(), FMTestEntity.Template);
 
         #region Set Tracks Entity Through Move
 

@@ -40,7 +40,7 @@ namespace Trecs.Internal
         {
             _setId = setId;
             _entriesPerGroup = new NativeDenseDictionary<Group, SetGroupEntry>(
-                (uint)validGroups.Count,
+                validGroups.Count,
                 Allocator.Persistent
             );
             _jobAddQueue = AtomicNativeBags.Create();
@@ -132,7 +132,7 @@ namespace Trecs.Internal
         /// </summary>
         internal void FlushJobWrites()
         {
-            for (int i = 0; i < _jobRemoveQueue.count; i++)
+            for (int i = 0; i < _jobRemoveQueue.Count; i++)
             {
                 ref var bag = ref _jobRemoveQueue.GetBag(i);
                 while (!bag.IsEmpty())
@@ -142,7 +142,7 @@ namespace Trecs.Internal
                 }
             }
 
-            for (int i = 0; i < _jobAddQueue.count; i++)
+            for (int i = 0; i < _jobAddQueue.Count; i++)
             {
                 ref var bag = ref _jobAddQueue.GetBag(i);
                 while (!bag.IsEmpty())
@@ -174,7 +174,7 @@ namespace Trecs.Internal
 
         static void DrainBags(AtomicNativeBags bags)
         {
-            for (int i = 0; i < bags.count; i++)
+            for (int i = 0; i < bags.Count; i++)
             {
                 ref var bag = ref bags.GetBag(i);
                 while (!bag.IsEmpty())

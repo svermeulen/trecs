@@ -13,7 +13,7 @@ namespace Trecs.Samples
         {
             var id = _idCounter++;
             _registry.Add(id, obj);
-            return new(id);
+            return new GameObjectId { Value = id };
         }
 
         public GameObject Resolve(GameObjectId id)

@@ -16,20 +16,22 @@ namespace Trecs.Internal
         where TValue : unmanaged
     {
         [NativeDisableContainerSafetyRestriction]
-        public NativeHashMap<TKey, int> _keyToIndex;
+        NativeHashMap<TKey, int> _keyToIndex;
 
         [NativeDisableContainerSafetyRestriction]
-        public NativeList<TValue> _values;
+        NativeList<TValue> _values;
 
         [NativeDisableContainerSafetyRestriction]
-        public NativeList<TKey> _keys;
+        NativeList<TKey> _keys;
 
-        public NativeDenseDictionary(uint size, Allocator allocator)
+        public NativeDenseDictionary(int size, Allocator allocator)
             : this()
         {
-            _keyToIndex = new NativeHashMap<TKey, int>((int)size, allocator);
-            _values = new NativeList<TValue>((int)size, allocator);
-            _keys = new NativeList<TKey>((int)size, allocator);
+            Assert.That(size >= 0, "NativeDenseDictionary size must be non-negative");
+
+            _keyToIndex = new NativeHashMap<TKey, int>(size, allocator);
+            _values = new NativeList<TValue>(size, allocator);
+            _keys = new NativeList<TKey>(size, allocator);
         }
 
         public readonly bool IsCreated
@@ -42,6 +44,69 @@ namespace Trecs.Internal
         public readonly bool IsEmpty()
         {
             return Count == 0;
+        }
+
+        internal readonly void SerializeValues(ITrecsSerializationWriter writer)
+        {
+            // Note that this method can be very hot
+            // eg. can be called per frame in some multiplayer enrivonments
+            // This is why we directly use BlitWrite / BlitRead
+
+            int count = Count;
+            writer.Write("count", count);
+            if (count > 0)
+            {
+                unsafe
+                {
+                    writer.BlitWriteRawBytes(
+                        "keys",
+                        NativeListUnsafeUtility.GetUnsafeReadOnlyPtr(_keys),
+                        count * UnsafeUtility.SizeOf<TKey>()
+                    );
+                    writer.BlitWriteRawBytes(
+                        "values",
+                        NativeListUnsafeUtility.GetUnsafeReadOnlyPtr(_values),
+                        count * UnsafeUtility.SizeOf<TValue>()
+                    );
+                }
+            }
+        }
+
+        internal void DeserializeValues(ITrecsSerializationReader reader)
+        {
+            int count = default;
+            reader.Read("count", ref count);
+
+            _keyToIndex.Clear();
+            _values.Clear();
+            _keys.Clear();
+
+            if (count > 0)
+            {
+                EnsureCapacity(count);
+                _keys.Resize(count, NativeArrayOptions.UninitializedMemory);
+                _values.Resize(count, NativeArrayOptions.UninitializedMemory);
+
+                unsafe
+                {
+                    reader.BlitReadRawBytes(
+                        "keys",
+                        NativeListUnsafeUtility.GetUnsafePtr(_keys),
+                        count * UnsafeUtility.SizeOf<TKey>()
+                    );
+                    reader.BlitReadRawBytes(
+                        "values",
+                        NativeListUnsafeUtility.GetUnsafePtr(_values),
+                        count * UnsafeUtility.SizeOf<TValue>()
+                    );
+                }
+
+                // Rebuild hash map from keys
+                for (int i = 0; i < count; i++)
+                {
+                    _keyToIndex.Add(_keys[i], i);
+                }
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -92,16 +157,16 @@ namespace Trecs.Internal
 #if TRECS_INTERNAL_CHECKS && DEBUG
             Assert.That(itemAdded, "Key {} already present", key);
 #endif
-            _values[(int)index] = value;
+            _values[index] = value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryAdd(TKey key, in TValue value, out uint index)
+        public bool TryAdd(TKey key, in TValue value, out int index)
         {
             var itemAdded = AddValue(key, out index);
 
             if (itemAdded)
-                _values[(int)index] = value;
+                _values[index] = value;
 
             return itemAdded;
         }
@@ -116,7 +181,7 @@ namespace Trecs.Internal
                 throw new KeyNotFoundException("trying to set a value on a not existing key");
 #endif
 
-            _values[(int)index] = value;
+            _values[index] = value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -161,7 +226,7 @@ namespace Trecs.Internal
 
             AddValue(key, out var newIndex);
 
-            return ref GetRefAt((int)newIndex);
+            return ref GetRefAt(newIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -174,23 +239,23 @@ namespace Trecs.Internal
 
             AddValue(key, out var newIndex);
 
-            _values[(int)newIndex] = builder();
+            _values[newIndex] = builder();
 
-            return ref GetRefAt((int)newIndex);
+            return ref GetRefAt(newIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref TValue GetOrAdd(TKey key, out uint index)
+        public ref TValue GetOrAdd(TKey key, out int index)
         {
             if (_keyToIndex.TryGetValue(key, out int findIndex))
             {
-                index = (uint)findIndex;
+                index = findIndex;
                 return ref GetRefAt(findIndex);
             }
 
             AddValue(key, out index);
 
-            return ref GetRefAt((int)index);
+            return ref GetRefAt(index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -203,17 +268,17 @@ namespace Trecs.Internal
 
             AddValue(key, out var newIndex);
 
-            _values[(int)newIndex] = builder(ref parameter);
+            _values[newIndex] = builder(ref parameter);
 
-            return ref GetRefAt((int)newIndex);
+            return ref GetRefAt(newIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         //WARNING this method must stay stateless (not relying on states that can change, it's ok to read
         //constant states) because it will be used in multithreaded parallel code
-        public ref TValue GetValueAtIndexByRef(uint index)
+        public ref TValue GetValueAtIndexByRef(int index)
         {
-            return ref GetRefAt((int)index);
+            return ref GetRefAt(index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -233,24 +298,24 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EnsureCapacity(uint size)
+        public void EnsureCapacity(int size)
         {
-            if (_values.Capacity < (int)size)
+            if (_values.Capacity < size)
             {
-                _values.Capacity = (int)size;
-                _keys.Capacity = (int)size;
+                _values.Capacity = size;
+                _keys.Capacity = size;
             }
 
-            if (_keyToIndex.Capacity < (int)size)
+            if (_keyToIndex.Capacity < size)
             {
-                _keyToIndex.Capacity = (int)size;
+                _keyToIndex.Capacity = size;
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void IncreaseCapacityBy(uint size)
+        public void IncreaseCapacityBy(int size)
         {
-            var newCapacity = _values.Capacity + (int)size;
+            var newCapacity = _values.Capacity + size;
 
             _values.Capacity = newCapacity;
             _keys.Capacity = newCapacity;
@@ -262,13 +327,13 @@ namespace Trecs.Internal
         public TValue this[TKey key]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _values[(int)GetIndex(key)];
+            get => _values[GetIndex(key)];
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
                 AddValue(key, out var index);
 
-                _values[(int)index] = value;
+                _values[index] = value;
             }
         }
 
@@ -279,7 +344,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Remove(TKey key, out uint index, out TValue value)
+        public bool Remove(TKey key, out int index, out TValue value)
         {
             if (!_keyToIndex.TryGetValue(key, out int indexToRemove))
             {
@@ -288,7 +353,7 @@ namespace Trecs.Internal
                 return false;
             }
 
-            index = (uint)indexToRemove;
+            index = indexToRemove;
             value = _values[indexToRemove];
 
             int lastIndex = _values.Length - 1;
@@ -325,11 +390,11 @@ namespace Trecs.Internal
         //WARNING this method must stay stateless (not relying on states that can change, it's ok to read
         //constant states) because it will be used in multithreaded parallel code
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool TryGetIndex(TKey key, out uint findIndex)
+        public readonly bool TryGetIndex(TKey key, out int findIndex)
         {
             if (_keyToIndex.TryGetValue(key, out int index))
             {
-                findIndex = (uint)index;
+                findIndex = index;
                 return true;
             }
 
@@ -338,11 +403,11 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly uint GetIndex(TKey key)
+        public readonly int GetIndex(TKey key)
         {
 #if TRECS_INTERNAL_CHECKS && DEBUG
             if (_keyToIndex.TryGetValue(key, out int findIndex))
-                return (uint)findIndex;
+                return findIndex;
 
             ThrowManagedKeyNotFoundException(key);
             throw new KeyNotFoundException("Key not found in NativeDenseDictionary");
@@ -350,7 +415,7 @@ namespace Trecs.Internal
             //Burst is not able to vectorise code if throw is found, regardless if it's actually ever thrown
             _keyToIndex.TryGetValue(key, out int findIndex);
 
-            return (uint)findIndex;
+            return findIndex;
 #endif
         }
 
@@ -365,11 +430,11 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool AddValue(TKey key, out uint indexSet)
+        bool AddValue(TKey key, out int indexSet)
         {
             if (_keyToIndex.TryGetValue(key, out int existingIndex))
             {
-                indexSet = (uint)existingIndex;
+                indexSet = existingIndex;
                 return false;
             }
 
@@ -378,7 +443,7 @@ namespace Trecs.Internal
             _keys.Add(key);
             _keyToIndex.Add(key, newIndex);
 
-            indexSet = (uint)newIndex;
+            indexSet = newIndex;
             return true;
         }
 
@@ -496,14 +561,14 @@ namespace Trecs.Internal
 
             public KeyValuePairFast Current => new(_dic._keys[_index], _dic._values, _index);
 
-            public void SetRange(uint startIndex, uint count)
+            public void SetRange(int startIndex, int count)
             {
-                _index = (int)startIndex - 1;
-                _count = (int)count;
+                _index = startIndex - 1;
+                _count = count;
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 if (_count > _startCount)
                     throw new TrecsException("can't set a count greater than the starting one");
-                _startCount = (int)count;
+                _startCount = count;
 #endif
             }
         }

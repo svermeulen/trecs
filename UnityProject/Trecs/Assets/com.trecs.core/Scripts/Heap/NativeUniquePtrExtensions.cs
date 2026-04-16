@@ -3,6 +3,12 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Write operations for <see cref="NativeUniquePtr{T}"/> are defined as <c>ref this</c>
+    /// extension methods rather than instance methods so that callers must have write access
+    /// to the owning component. This lets the existing component resource tracking system
+    /// enforce thread safety for the pointed-to data without additional bookkeeping.
+    /// </summary>
     public static class NativeUniquePtrExtensions
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -127,9 +127,16 @@ namespace Trecs
 
                 foreach (var baseType in resolvedTemplate.AllBaseTemplates)
                 {
-                    // entities must always be placed in groups that are directly associated with their concrete type
-                    // this is important so that we can reliably query by abstract entity types, which only works when we
-                    // can assume that the entity type associated with each group is not abstract
+                    // If we allow this, then as one example, it's not possible to add an
+                    // entity to the base type group based on provided tagset, since we
+                    // would match to both groups
+                    // We could fix by requiring that the provided Add tagset exactly
+                    // matches group but this is limiting since we can't have factories
+                    // decoupled from templates
+                    // We could automagically choose the group that matches the given
+                    // tagsets best but then we won't catch real errors when truly
+                    // ambiguous tagsets are used
+                    // So game code just needs to create a dedicated base template I guess for now
                     Assert.That(
                         !_resolvedTemplateSet.Contains(baseType),
                         "Provided entity types must not be base types of other provided entity types.  Found {} as a base type of {}",
@@ -1058,7 +1065,7 @@ namespace Trecs
                 ResolvedTemplate = resolvedTemplate;
 
                 var tags = group.AsTagSet().Tags;
-                var tagsSet = new DenseHashSet<Tag>((uint)tags.Count);
+                var tagsSet = new DenseHashSet<Tag>(tags.Count);
 
                 foreach (var tag in tags)
                 {

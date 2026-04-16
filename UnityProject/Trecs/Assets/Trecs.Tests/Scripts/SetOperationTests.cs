@@ -11,27 +11,15 @@ namespace Trecs.Tests
     [TestFixture]
     public class SetOperationTests
     {
-        TestEnvironment CreateEnv()
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(QTestEntityA.Template)
-                .AddSet<FiltOpTestSet>()
-                .AddSet<FiltOpTestSet2>()
-                .AddBlobStore(CreateBlobStore());
-
-            return new TestEnvironment(builder.BuildAndInitialize());
-        }
-
-        static BlobStoreInMemory CreateBlobStore()
-        {
-            var blobStoreCommon = new BlobStoreCommon(null);
-            return new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                blobStoreCommon
+        TestEnvironment CreateEnv() =>
+            EcsTestHelper.CreateEnvironment(
+                b =>
+                {
+                    b.AddSet<FiltOpTestSet>();
+                    b.AddSet<FiltOpTestSet2>();
+                },
+                QTestEntityA.Template
             );
-        }
 
         #region Add / Exists
 

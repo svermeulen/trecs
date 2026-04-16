@@ -67,12 +67,11 @@ namespace Trecs.Internal
         public EntityIndexMultiMapper<T> QueryMappedEntities<T>(LocalReadOnlyFastList<Group> groups)
             where T : unmanaged, IEntityComponent
         {
-            var dictionary = new DenseDictionary<Group, IComponentArray<T>>((uint)groups.Count);
+            var dictionary = new DenseDictionary<Group, IComponentArray<T>>(groups.Count);
 
             foreach (var group in groups)
             {
                 QueryOrCreateEntityDictionary<T>(group, out var typeSafeDictionary);
-                //if (typeSafeDictionary.count > 0) avoiding this allows these entityIndexMappers to be precreated and stored
                 dictionary.Add(group, typeSafeDictionary as IComponentArray<T>);
             }
 
@@ -338,7 +337,7 @@ namespace Trecs.Internal
         public LocalReadOnlyFastList<Group> FindGroups<T1>()
             where T1 : unmanaged, IEntityComponent
         {
-            FastList<Group> result = localgroups.Value.groupArray;
+            FastList<Group> result = localgroups.Value.GroupArray;
             result.Clear();
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
@@ -363,7 +362,7 @@ namespace Trecs.Internal
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
         {
-            FastList<Group> result = localgroups.Value.groupArray;
+            FastList<Group> result = localgroups.Value.GroupArray;
             result.Clear();
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
@@ -472,10 +471,7 @@ namespace Trecs.Internal
             groupData = localArray[++startIndex % 3];
             localGroups.Intersect(groupData);
 
-            return new LocalReadOnlyFastList<Group>(
-                localGroups.UnsafeValues,
-                (uint)localGroups.Count
-            );
+            return new LocalReadOnlyFastList<Group>(localGroups.UnsafeValues, localGroups.Count);
         }
 
         public LocalReadOnlyFastList<Group> FindGroups<T1, T2, T3, T4>()
@@ -556,10 +552,7 @@ namespace Trecs.Internal
             groupData = localArray[++startIndex & 3];
             localGroups.Intersect(groupData);
 
-            return new LocalReadOnlyFastList<Group>(
-                localGroups.UnsafeValues,
-                (uint)localGroups.Count
-            );
+            return new LocalReadOnlyFastList<Group>(localGroups.UnsafeValues, localGroups.Count);
         }
 
         public LocalReadOnlyFastList<Group> FindGroups<T1, T2, T3, T4, T5>()
@@ -650,10 +643,7 @@ namespace Trecs.Internal
                     );
             }
 
-            return new LocalReadOnlyFastList<Group>(
-                localGroups.UnsafeValues,
-                (uint)localGroups.Count
-            );
+            return new LocalReadOnlyFastList<Group>(localGroups.UnsafeValues, localGroups.Count);
         }
 
         internal DenseDictionary<Group, IComponentArray> FindGroups_INTERNAL(ComponentId type)
@@ -956,7 +946,7 @@ namespace Trecs.Internal
         {
             internal DenseDictionary<Group, Group> groups;
             internal FastList<DenseDictionary<Group, IComponentArray>> listOfGroups;
-            public FastList<Group> groupArray;
+            public FastList<Group> GroupArray;
         }
 
         static readonly ThreadLocal<GroupsList> localgroups = new ThreadLocal<GroupsList>(() =>
@@ -965,7 +955,7 @@ namespace Trecs.Internal
 
             gl.groups = new DenseDictionary<Group, Group>();
             gl.listOfGroups = FastList<DenseDictionary<Group, IComponentArray>>.PreInit(5);
-            gl.groupArray = new FastList<Group>(1);
+            gl.GroupArray = new FastList<Group>(1);
 
             return gl;
         });

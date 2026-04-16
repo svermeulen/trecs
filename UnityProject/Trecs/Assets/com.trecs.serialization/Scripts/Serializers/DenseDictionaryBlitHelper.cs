@@ -30,7 +30,7 @@ namespace Trecs.Serialization
             ISerializationWriter writer
         )
         {
-            var count = (int)dict.UnsafeFreeValueCellIndex;
+            var count = dict.UnsafeFreeValueCellIndex;
             var bucketsCapacity = dict.UnsafeBucketsCapacity;
 
             // Write sizes first so deserialize can allocate before reading arrays
@@ -83,7 +83,7 @@ namespace Trecs.Serialization
             reader.BlitRead("_bucketsCapacity", ref bucketsCapacity);
             Assert.That(bucketsCapacity >= 0);
 
-            var count = (int)dict.UnsafeFreeValueCellIndex;
+            var count = dict.UnsafeFreeValueCellIndex;
             Assert.That(count >= 0);
 
             // Ensure arrays are large enough before reading into them

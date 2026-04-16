@@ -7,23 +7,23 @@ namespace Trecs.Collections
     public readonly ref struct LocalReadOnlyFastList<T>
     {
         readonly T[] _list;
-        readonly uint _count;
+        readonly int _count;
 
-        public int Count => (int)_count;
+        public int Count => _count;
 
         public LocalReadOnlyFastList(FastList<T> list)
         {
             _list = list.ToArrayFast(out var count);
-            _count = (uint)count;
+            _count = count;
         }
 
         public LocalReadOnlyFastList(ReadOnlyFastList<T> list)
         {
             _list = list.ToArrayFast(out var count);
-            _count = (uint)count;
+            _count = count;
         }
 
-        public LocalReadOnlyFastList(T[] list, uint count)
+        public LocalReadOnlyFastList(T[] list, int count)
         {
             _list = list;
             _count = count;
@@ -45,24 +45,14 @@ namespace Trecs.Collections
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                Assert.That((uint)index < _count, "Index out of range");
-                return ref _list[index];
-            }
-        }
-
-        public ref T this[uint index]
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                Assert.That(index < _count, "Index out of range");
+                Assert.That(index >= 0 && index < _count, "Index out of range");
                 return ref _list[index];
             }
         }
 
         public T[] ToArrayFast(out int count)
         {
-            count = (int)_count;
+            count = _count;
             return _list;
         }
 

@@ -4,52 +4,12 @@ using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
-    // Unique-per-template tags (for unambiguous entity creation)
-    public struct QId1 : ITag { }
-
-    public struct QId2 : ITag { }
-
-    public struct QId3 : ITag { }
-
-    // Categorization tags (for query filtering)
-    public struct QCatA : ITag { }
-
-    public struct QCatB : ITag { }
-
-    // --- Templates ---
-
-    // Has QCatA + two components
-    public partial class QTestEntityA : ITemplate, IHasTags<QId1>, IHasTags<QCatA>
-    {
-        public TestInt TestInt;
-        public TestFloat TestFloat;
-    }
-
-    // Has QCatA + QCatB + two components
-    public partial class QTestEntityAB : ITemplate, IHasTags<QId2>, IHasTags<QCatA>, IHasTags<QCatB>
-    {
-        public TestInt TestInt;
-        public TestFloat TestFloat;
-    }
-
-    // Has QCatB + only TestInt (no TestFloat, for MatchByComponents tests)
-    public partial class QTestEntityB : ITemplate, IHasTags<QId3>, IHasTags<QCatB>
-    {
-        public TestInt TestInt;
-    }
-
-    // --- Sets (scoped to QId1 tag) ---
-    public struct QTestSetA : IEntitySet<QId1> { }
-
-    // --- Aspects ---
-
+    // Aspects local to query composition tests
     partial struct QFilterTagView : IAspect, IRead<TestInt> { }
 
     partial struct QComponentFilterView : IAspect, IRead<TestInt, TestFloat> { }
 
     partial struct QMultiTagView : IAspect, IRead<TestInt> { }
-
-    partial struct QSingleTagView : IAspect, IRead<TestInt> { }
 
     // Aspect with negative tag matching — excludes entities with QCatB
     partial struct QWithoutTagView : IAspect, IRead<TestInt> { }
@@ -61,68 +21,29 @@ namespace Trecs.Tests
     public partial class QueryCompositionTests
     {
         // Environment with EntityA + sets (for set tests)
-        TestEnvironment CreateSetEnv()
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(QTestEntityA.Template)
-                .AddSet<QTestSetA>()
-                .AddBlobStore(CreateBlobStore());
-
-            return new TestEnvironment(builder.BuildAndInitialize());
-        }
+        TestEnvironment CreateSetEnv() =>
+            EcsTestHelper.CreateEnvironment(b => b.AddSet<QTestSetA>(), QTestEntityA.Template);
 
         // Environment with EntityA + EntityB (non-overlapping tags, for MatchByComponents)
-        TestEnvironment CreateComponentFilterEnv()
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(QTestEntityA.Template)
-                .AddTemplate(QTestEntityB.Template)
-                .AddBlobStore(CreateBlobStore());
-
-            return new TestEnvironment(builder.BuildAndInitialize());
-        }
+        TestEnvironment CreateComponentFilterEnv() =>
+            EcsTestHelper.CreateEnvironment(QTestEntityA.Template, QTestEntityB.Template);
 
         // Environment with all three templates (for multi-tag, tag merging tests)
-        TestEnvironment CreateMultiTagEnv()
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(QTestEntityA.Template)
-                .AddTemplate(QTestEntityAB.Template)
-                .AddTemplate(QTestEntityB.Template)
-                .AddBlobStore(CreateBlobStore());
-
-            return new TestEnvironment(builder.BuildAndInitialize());
-        }
+        TestEnvironment CreateMultiTagEnv() =>
+            EcsTestHelper.CreateEnvironment(
+                QTestEntityA.Template,
+                QTestEntityAB.Template,
+                QTestEntityB.Template
+            );
 
         // Environment with all templates + sets
-        TestEnvironment CreateFullEnv()
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(QTestEntityA.Template)
-                .AddTemplate(QTestEntityAB.Template)
-                .AddTemplate(QTestEntityB.Template)
-                .AddSet<QTestSetA>()
-                .AddBlobStore(CreateBlobStore());
-
-            return new TestEnvironment(builder.BuildAndInitialize());
-        }
-
-        static BlobStoreInMemory CreateBlobStore()
-        {
-            var blobStoreCommon = new BlobStoreCommon(null);
-            return new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                blobStoreCommon
+        TestEnvironment CreateFullEnv() =>
+            EcsTestHelper.CreateEnvironment(
+                b => b.AddSet<QTestSetA>(),
+                QTestEntityA.Template,
+                QTestEntityAB.Template,
+                QTestEntityB.Template
             );
-        }
 
         #region Set + Tags Composition
 
@@ -973,8 +894,8 @@ namespace Trecs.Tests
             // Entity indices should be valid (non-null group, sequential indices)
             NAssert.IsFalse(_entityIndexResults[0].IsNull);
             NAssert.IsFalse(_entityIndexResults[1].IsNull);
-            NAssert.AreEqual(0u, _entityIndexResults[0].Index);
-            NAssert.AreEqual(1u, _entityIndexResults[1].Index);
+            NAssert.AreEqual(0, _entityIndexResults[0].Index);
+            NAssert.AreEqual(1, _entityIndexResults[1].Index);
             // Both should be in the same group
             NAssert.AreEqual(_entityIndexResults[0].Group, _entityIndexResults[1].Group);
         }

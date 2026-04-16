@@ -45,9 +45,9 @@ namespace Trecs.Internal
             _sets.Remove(groupsToIgnore);
         }
 
-        public void Resize(uint preparecount)
+        public void Resize(int preparecount)
         {
-            _groups.EnsureCapacity((int)preparecount);
+            _groups.EnsureCapacity(preparecount);
         }
 
         public FastList<Group> Evaluate()
@@ -92,7 +92,7 @@ namespace Trecs.Internal
             groupsValue.Add(group);
         }
 
-        public QueryGroups(uint preparecount)
+        public QueryGroups(int preparecount)
         {
             var groupsValue = groups.Value;
 
@@ -170,25 +170,6 @@ namespace Trecs.Internal
             return this;
         }
 
-        // public QueryGroups WithAny<T>(EntityQuerier entitiesQuerier)
-        //     where T : struct, IEntityComponent
-        // {
-        //     var group       = groups.Value.Id;
-        //     var groupsCount = group.count;
-        //
-        //     for (uint i = 0; i < groupsCount; i++)
-        //     {
-        //         if (entitiesQuerier.Count<T>(group[i]) == 0)
-        //         {
-        //             group.UnorderedRemoveAt(i);
-        //             i--;
-        //             groupsCount--;
-        //         }
-        //     }
-        //
-        //     return this;
-        // }
-
         public QueryResult Evaluate()
         {
             var groupsValue = groups.Value;
@@ -212,7 +193,7 @@ namespace Trecs.Internal
             _group = group;
         }
 
-        public LocalReadOnlyFastList<Group> result => _group;
+        public LocalReadOnlyFastList<Group> Result => _group;
 
         readonly ReadOnlyFastList<Group> _group;
 
@@ -222,9 +203,9 @@ namespace Trecs.Internal
         {
             var count = 0;
 
-            var groupsCount = result.Count;
+            var groupsCount = Result.Count;
             for (var i = 0; i < groupsCount; ++i)
-                count += entitiesQuerier.Count<T>(result[i]);
+                count += entitiesQuerier.Count<T>(Result[i]);
 
             return count;
         }
@@ -234,10 +215,10 @@ namespace Trecs.Internal
         {
             var max = 0;
 
-            var groupsCount = result.Count;
+            var groupsCount = Result.Count;
             for (var i = 0; i < groupsCount; ++i)
             {
-                var count = entitiesQuerier.Count<T>(result[i]);
+                var count = entitiesQuerier.Count<T>(Result[i]);
                 if (count > max)
                     max = count;
             }

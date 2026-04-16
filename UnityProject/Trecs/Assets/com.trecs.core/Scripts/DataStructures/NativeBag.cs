@@ -25,7 +25,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public struct NativeBag : IDisposable
     {
-        public uint count
+        public uint Count
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -76,7 +76,7 @@ namespace Trecs.Internal
                     return true;
             }
 
-            return count == 0;
+            return Count == 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

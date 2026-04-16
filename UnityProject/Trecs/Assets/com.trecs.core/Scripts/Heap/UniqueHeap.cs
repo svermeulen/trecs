@@ -239,7 +239,7 @@ namespace Trecs.Internal
             _idCounter.Value = reader.Read<uint>("IdCounter");
 
             var numDynamic = reader.Read<int>("NumEntries");
-            _entries.EnsureCapacity((uint)numDynamic);
+            _entries.EnsureCapacity(numDynamic);
 
             for (int i = 0; i < numDynamic; i++)
             {

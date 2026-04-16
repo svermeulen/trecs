@@ -59,7 +59,7 @@ namespace Trecs.Samples
                 string path = SceneUtility.GetScenePathByBuildIndex(i);
                 var name = System.IO.Path.GetFileNameWithoutExtension(path);
 
-                if (name != "AllSamples")
+                if (name != "Main")
                 {
                     _sceneNames.Add(name);
                 }

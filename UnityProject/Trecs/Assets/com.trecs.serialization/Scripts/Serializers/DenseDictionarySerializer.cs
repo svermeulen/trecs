@@ -36,7 +36,7 @@ namespace Trecs.Serialization
             else
             {
                 // Fallback to element-by-element serialization
-                var numItems = reader.Read<uint>("count");
+                var numItems = reader.Read<int>("count");
                 Assert.That(numItems >= 0);
 
                 if (dict == null)
@@ -73,7 +73,7 @@ namespace Trecs.Serialization
             else
             {
                 // Fallback to element-by-element serialization
-                writer.Write<uint>("count", (uint)value.Count);
+                writer.Write<int>("count", value.Count);
 
                 foreach (var item in value)
                 {

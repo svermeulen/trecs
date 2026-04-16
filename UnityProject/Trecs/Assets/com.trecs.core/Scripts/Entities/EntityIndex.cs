@@ -133,6 +133,15 @@ namespace Trecs
         }
 
         /// <summary>
+        /// Resolves this transient index to a stable <see cref="EntityHandle"/> using a native accessor.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public EntityHandle ToHandle(NativeWorldAccessor accessor)
+        {
+            return accessor.GetEntityHandle(this);
+        }
+
+        /// <summary>
         /// Creates a live <see cref="EntityAccessor"/> bound to the given <see cref="WorldAccessor"/>.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

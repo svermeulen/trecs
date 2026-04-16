@@ -242,7 +242,7 @@ namespace Trecs.Internal
 
         /// <summary>
         /// Move entities from this array to the destination using swap-back.
-        /// Each MoveInfo.resolvedFromIndex must be pre-set by the caller to the entity's
+        /// Each MoveInfo.ResolvedFromIndex must be pre-set by the caller to the entity's
         /// current position after accounting for prior swap-backs.
         /// This eliminates per-component-type chain resolution.
         /// The destination is written via direct memcpy after gathering values,
@@ -274,7 +274,7 @@ namespace Trecs.Internal
                 for (var i = 0; i < iterations; i++)
                 {
                     ref MoveInfo swapInfo = ref entitiesToSwapInfo[i];
-                    var indexToRemove = swapInfo.resolvedFromIndex;
+                    var indexToRemove = swapInfo.ResolvedFromIndex;
 
                     Assert.That(!togroup.IsNull, "Invalid To Group");
                     Assert.That(
@@ -304,7 +304,7 @@ namespace Trecs.Internal
                     _count--;
 
                     // Set destination index directly (sequential from destBase)
-                    swapInfo.toIndex = destBase + i;
+                    swapInfo.ToIndex = destBase + i;
                 }
             }
 

@@ -164,7 +164,7 @@ namespace Trecs.Internal
 
             var numberOfEntityComponents = entityComponentsToBuild.Length;
             DenseDictionary<ComponentId, IComponentArray> group = GetOrAddDBGroup(groupId);
-            group.EnsureCapacity((uint)numberOfEntityComponents);
+            group.EnsureCapacity(numberOfEntityComponents);
 
             for (var index = 0; index < numberOfEntityComponents; index++)
             {

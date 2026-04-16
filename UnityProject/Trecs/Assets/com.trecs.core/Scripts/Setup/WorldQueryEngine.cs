@@ -150,10 +150,6 @@ namespace Trecs
 
         public Template GetSingleTemplateForTags(TagSet tags)
         {
-            // Note that we can't just do this because some templates have multiple groups
-            // var group = GetSingleGroupWithTags(tags);
-            // return GetResolvedTemplateForGroup(group);
-
             Template uniqueTemplate = null;
 
             foreach (var group in GetGroupsWithTags(tags))

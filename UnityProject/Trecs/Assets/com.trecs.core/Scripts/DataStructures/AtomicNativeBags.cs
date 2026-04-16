@@ -10,13 +10,13 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public unsafe struct AtomicNativeBags : IDisposable
     {
-        uint _threadsCount;
+        int _threadsCount;
 
         [Unity.Burst.NoAlias]
         [Unity.Collections.LowLevel.Unsafe.NativeDisableUnsafePtrRestriction]
         NativeBag* _data;
 
-        public uint count => _threadsCount;
+        public int Count => _threadsCount;
 
         public static AtomicNativeBags Create()
         {

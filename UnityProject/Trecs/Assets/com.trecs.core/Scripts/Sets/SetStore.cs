@@ -50,7 +50,7 @@ namespace Trecs.Internal
                 setDef.DebugName
             );
 
-            var validGroups = new DenseHashSet<Group>((uint)groups.Count);
+            var validGroups = new DenseHashSet<Group>(groups.Count);
             foreach (var group in groups)
             {
                 validGroups.Add(group);
@@ -143,14 +143,14 @@ namespace Trecs.Internal
             ref NativeSetDeferredQueues queues
         )
         {
-            for (int i = 0; i < queues.RemoveQueue.count; i++)
+            for (int i = 0; i < queues.RemoveQueue.Count; i++)
             {
                 ref var bag = ref queues.RemoveQueue.GetBag(i);
                 while (!bag.IsEmpty())
                     set.RemoveImmediateUnchecked(bag.Dequeue<EntityIndex>());
             }
 
-            for (int i = 0; i < queues.AddQueue.count; i++)
+            for (int i = 0; i < queues.AddQueue.Count; i++)
             {
                 ref var bag = ref queues.AddQueue.GetBag(i);
                 while (!bag.IsEmpty())
@@ -164,7 +164,7 @@ namespace Trecs.Internal
         )
         {
             var allRemoves = new NativeList<EntityIndex>(64, Allocator.Temp);
-            for (int i = 0; i < queues.RemoveQueue.count; i++)
+            for (int i = 0; i < queues.RemoveQueue.Count; i++)
             {
                 ref var bag = ref queues.RemoveQueue.GetBag(i);
                 while (!bag.IsEmpty())
@@ -176,7 +176,7 @@ namespace Trecs.Internal
             allRemoves.Dispose();
 
             var allAdds = new NativeList<EntityIndex>(64, Allocator.Temp);
-            for (int i = 0; i < queues.AddQueue.count; i++)
+            for (int i = 0; i < queues.AddQueue.Count; i++)
             {
                 ref var bag = ref queues.AddQueue.GetBag(i);
                 while (!bag.IsEmpty())
@@ -289,7 +289,7 @@ namespace Trecs.Internal
                 for (var index = 0; index < countOfEntitiesToSwap; index++)
                 {
                     int fromEntityIndex = keysOfEntitiesToSwap[index].key;
-                    int toIndex = (int)moveInfosOfEntitiesToSwap[index].toIndex;
+                    int toIndex = (int)moveInfosOfEntitiesToSwap[index].ToIndex;
 
                     if (fromGroupEntry.Remove(fromEntityIndex))
                     {

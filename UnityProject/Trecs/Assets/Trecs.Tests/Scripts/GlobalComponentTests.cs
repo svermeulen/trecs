@@ -22,25 +22,13 @@ namespace Trecs.Tests
     [TestFixture]
     public class GlobalComponentTests
     {
-        TestEnvironment CreateEnv()
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TestGlobalsTemplate.Template)
-                .AddTemplate(TestTemplates.SimpleAlpha)
-                .AddBlobStore(CreateBlobStore());
-
-            return new TestEnvironment(builder.BuildAndInitialize());
-        }
-
-        static BlobStoreInMemory CreateBlobStore()
-        {
-            var blobStoreCommon = new BlobStoreCommon(null);
-            return new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                blobStoreCommon
+        TestEnvironment CreateEnv() =>
+            EcsTestHelper.CreateEnvironment(
+                new WorldSettings(),
+                null,
+                globalsTemplate: TestGlobalsTemplate.Template,
+                TestTemplates.SimpleAlpha
             );
-        }
 
         [Test]
         public void Global_ReadInitialValue_ReturnsDefault()

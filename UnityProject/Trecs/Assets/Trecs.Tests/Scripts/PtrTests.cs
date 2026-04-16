@@ -293,10 +293,9 @@ namespace Trecs.Tests
 
         static BlobCache CreateBlobCache()
         {
-            var blobStoreCommon = new BlobStoreCommon(null);
             var blobStore = new BlobStoreInMemory(
                 new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                blobStoreCommon
+                null
             );
             var settings = new BlobCacheSettings
             {

@@ -9,23 +9,11 @@ namespace Trecs.Tests
     [TestFixture]
     public partial class TransientSetJobWriteTests
     {
-        TestEnvironment CreateEnv()
-        {
-            var blobStoreCommon = new BlobStoreCommon(null);
-            var blobStore = new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                blobStoreCommon
+        TestEnvironment CreateEnv() =>
+            EcsTestHelper.CreateEnvironment(
+                b => b.AddSet<TFJTestTransientSet>(),
+                QTestEntityA.Template
             );
-
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(QTestEntityA.Template)
-                .AddSet<TFJTestTransientSet>()
-                .AddBlobStore(blobStore);
-
-            return new TestEnvironment(builder.BuildAndInitialize());
-        }
 
         partial struct FlagEntitiesJob
         {

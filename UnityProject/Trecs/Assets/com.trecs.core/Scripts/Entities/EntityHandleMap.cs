@@ -21,7 +21,7 @@ namespace Trecs
 
         internal NativeDenseDictionary<Group, NativeList<EntityHandle>> _entityIndexToReferenceMap;
 
-        // (svermeulen) notes
+        // (SVKJ) notes
         // This method is designed to work safely across threads
         // It does not cause _entityHandleMap to be re-allocated,
         // even though it does return indices into this array that exceed
@@ -46,12 +46,15 @@ namespace Trecs
             while (filled < count)
             {
                 int tempFreeIndex = _nextFreeIndex;
+
                 if (tempFreeIndex >= _entityHandleMap.Length)
+                {
                     break;
+                }
 
                 ref var element = ref _entityHandleMap.ElementAt(tempFreeIndex);
-                int newFreeIndex = element.entityIndex.Index;
-                int version = element.version;
+                int newFreeIndex = element.EntityIndex.Index;
+                int version = element.Version;
                 _nextFreeIndex.Set(newFreeIndex);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
@@ -100,8 +103,8 @@ namespace Trecs
                         tempFreeIndex
                     );
                     // The recycle entities form a linked list, using the entityIndex.Index to store the next element.
-                    newFreeIndex = element.entityIndex.Index;
-                    version = element.version;
+                    newFreeIndex = element.EntityIndex.Index;
+                    version = element.Version;
                 }
             } while (tempFreeIndex != _nextFreeIndex.CompareExchange(newFreeIndex, tempFreeIndex));
 
@@ -140,8 +143,8 @@ namespace Trecs
             // These debug tests should be enough to detect if indices are being used correctly under native factories
             ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(reference.index);
             if (
-                entityHandleMapElement.version != reference.Version
-                || entityHandleMapElement.entityIndex.Group != Group.Null
+                entityHandleMapElement.Version != reference.Version
+                || entityHandleMapElement.EntityIndex.Group != Group.Null
             )
             {
                 throw new TrecsException(
@@ -166,7 +169,7 @@ namespace Trecs
             var reference = fromGroupList[from.Index];
             fromGroupList[from.Index] = default;
 
-            _entityHandleMap.ElementAt(reference.index).entityIndex = to;
+            _entityHandleMap.ElementAt(reference.index).EntityIndex = to;
 
             var toGroupList = GetOrCreateGroupList(to.Group);
             EnsureGroupListSize(toGroupList, to.Index + 1);
@@ -192,7 +195,7 @@ namespace Trecs
             EnsureGroupListSize(groupList, newIndex + 1);
             groupList[newIndex] = reference;
 
-            _entityHandleMap.ElementAt(reference.index).entityIndex = new EntityIndex(
+            _entityHandleMap.ElementAt(reference.index).EntityIndex = new EntityIndex(
                 newIndex,
                 group
             );
@@ -207,8 +210,8 @@ namespace Trecs
 
             // Invalidate the entity locator element by bumping its version and setting the entityIndex to point to a not existing element.
             ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(reference.index);
-            entityHandleMapElement.entityIndex = new EntityIndex(_nextFreeIndex, new Group(0)); //keep the free linked list updated
-            entityHandleMapElement.version++;
+            entityHandleMapElement.EntityIndex = new EntityIndex(_nextFreeIndex, new Group(0)); //keep the free linked list updated
+            entityHandleMapElement.Version++;
 
             // Mark the element as the last element used.
             _nextFreeIndex.Set(reference.index);
@@ -242,12 +245,12 @@ namespace Trecs
             // Ensure toGroupList is large enough for the largest destination index
             if (count > 0)
             {
-                var maxToIndex = values[0].toIndex;
+                var maxToIndex = values[0].ToIndex;
                 for (int i = 1; i < count; i++)
                 {
-                    if (values[i].toIndex > maxToIndex)
+                    if (values[i].ToIndex > maxToIndex)
                     {
-                        maxToIndex = values[i].toIndex;
+                        maxToIndex = values[i].ToIndex;
                     }
                 }
                 EnsureGroupListSize(toGroupList, maxToIndex + 1);
@@ -256,12 +259,20 @@ namespace Trecs
             for (int i = 0; i < count; i++)
             {
                 var fromIndex = keys[i].key;
-                var toIndex = values[i].toIndex;
+                var toIndex = values[i].ToIndex;
 
                 var reference = fromGroupList[fromIndex];
+#if TRECS_INTERNAL_CHECKS && DEBUG
+                Assert.That(
+                    !reference.IsNull,
+                    "BatchUpdateEntityHandles: null EntityHandle at fromIndex {} in group {}",
+                    fromIndex,
+                    fromGroup
+                );
+#endif
                 fromGroupList[fromIndex] = default;
 
-                _entityHandleMap.ElementAt(reference.index).entityIndex = new EntityIndex(
+                _entityHandleMap.ElementAt(reference.index).EntityIndex = new EntityIndex(
                     toIndex,
                     toGroup
                 );
@@ -293,8 +304,8 @@ namespace Trecs
                 groupList[entityArrayIndex] = default;
 
                 ref var element = ref _entityHandleMap.ElementAt(reference.index);
-                element.entityIndex = new EntityIndex(_nextFreeIndex, new Group(0));
-                element.version++;
+                element.EntityIndex = new EntityIndex(_nextFreeIndex, new Group(0));
+                element.Version++;
                 _nextFreeIndex.Set(reference.index);
             }
         }
@@ -322,12 +333,60 @@ namespace Trecs
                 groupList[entry.Key] = default;
                 groupList[entry.Value] = reference;
 
-                _entityHandleMap.ElementAt(reference.index).entityIndex = new EntityIndex(
+                _entityHandleMap.ElementAt(reference.index).EntityIndex = new EntityIndex(
                     entry.Value,
                     group
                 );
             }
         }
+
+#if TRECS_INTERNAL_CHECKS && DEBUG
+        /// <summary>
+        /// Verify that every non-null handle in a group's list has a matching
+        /// _entityHandleMap entry pointing back to that group and position.
+        /// </summary>
+        internal void ValidateGroupConsistency(Group group, int entityCount)
+        {
+            if (!_entityIndexToReferenceMap.TryGetValue(group, out var groupList))
+                return;
+
+            for (int i = 0; i < entityCount; i++)
+            {
+                var handle = groupList[i];
+                Assert.That(
+                    !handle.IsNull,
+                    "ValidateGroupConsistency: null handle at index {} in group {} (entityCount={})",
+                    i,
+                    group,
+                    entityCount
+                );
+
+                ref var element = ref _entityHandleMap.ElementAt(handle.index);
+                Assert.That(
+                    element.Version == handle.Version,
+                    "ValidateGroupConsistency: version mismatch at index {} in group {}: handle.Version={} element.Version={}",
+                    i,
+                    group,
+                    handle.Version,
+                    element.Version
+                );
+                Assert.That(
+                    element.EntityIndex.Group == group,
+                    "ValidateGroupConsistency: group mismatch at index {} in group {}: element points to group {}",
+                    i,
+                    group,
+                    element.EntityIndex.Group
+                );
+                Assert.That(
+                    element.EntityIndex.Index == i,
+                    "ValidateGroupConsistency: index mismatch at index {} in group {}: element points to index {}",
+                    i,
+                    group,
+                    element.EntityIndex.Index
+                );
+            }
+        }
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void RemoveAllGroupReferenceLocators(Group groupId)
@@ -350,8 +409,8 @@ namespace Trecs
                 }
 
                 ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(reference.index);
-                entityHandleMapElement.entityIndex = new EntityIndex(_nextFreeIndex, new Group(0));
-                entityHandleMapElement.version++;
+                entityHandleMapElement.EntityIndex = new EntityIndex(_nextFreeIndex, new Group(0));
+                entityHandleMapElement.Version++;
 
                 _nextFreeIndex.Set(reference.index);
             }
@@ -382,7 +441,7 @@ namespace Trecs
                     continue;
                 }
 
-                _entityHandleMap.ElementAt(reference.index).entityIndex = new EntityIndex(
+                _entityHandleMap.ElementAt(reference.index).EntityIndex = new EntityIndex(
                     i,
                     toGroupId
                 );
@@ -442,9 +501,9 @@ namespace Trecs
             // Make sure we are querying for the current version of the locator.
             // Otherwise the locator is pointing to a removed entity.
             ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(reference.index);
-            if (entityHandleMapElement.version == reference.Version)
+            if (entityHandleMapElement.Version == reference.Version)
             {
-                entityIndex = entityHandleMapElement.entityIndex;
+                entityIndex = entityHandleMapElement.EntityIndex;
                 return true;
             }
 
@@ -458,14 +517,18 @@ namespace Trecs
                 reference != EntityHandle.Null,
                 "Attempting to get EntityIndex from null EntityHandle"
             );
+            Assert.That(
+                reference.index < _entityHandleMap.Length,
+                "Attempting to get EntityIndex from EntityHandle with index out of bounds"
+            );
             // Make sure we are querying for the current version of the locator.
             // Otherwise the locator is pointing to a removed entity.
             ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(reference.index);
             Assert.That(
-                entityHandleMapElement.version == reference.Version,
+                entityHandleMapElement.Version == reference.Version,
                 "Attempting to get EntityIndex from an EntityHandle that has been invalidated"
             );
-            return entityHandleMapElement.entityIndex;
+            return entityHandleMapElement.EntityIndex;
         }
 
         internal void PreallocateIdMaps(Group groupId, int size)

@@ -159,6 +159,8 @@ namespace Trecs.SourceGen.Aspect
                 var lookupType = isReadOnly
                     ? $"NativeComponentLookupRead<{componentTypeName}>"
                     : $"NativeComponentLookupWrite<{componentTypeName}>";
+                if (!isReadOnly)
+                    sb.AppendLine(indentLevel + 1, "[Unity.Collections.NativeDisableParallelForRestriction]");
                 sb.AppendLine(indentLevel + 1, $"{lookupType} _lookup{i};");
             }
 
@@ -466,6 +468,52 @@ namespace Trecs.SourceGen.Aspect
             // Index property (read-only)
             sb.AppendProperty("int", "Index", "_entityIndex.Index", indentLevel, isInlined: true);
             sb.AppendLine();
+
+            // Entity operation methods (Remove, MoveTo)
+            GenerateEntityOperationMethods(sb, indentLevel);
+        }
+
+        /// <summary>
+        /// Generates Remove and MoveTo convenience methods that forward to
+        /// WorldAccessor / NativeWorldAccessor.
+        /// </summary>
+        private static void GenerateEntityOperationMethods(
+            OptimizedStringBuilder sb,
+            int indentLevel
+        )
+        {
+            var accessorSpecs = new[]
+            {
+                (Type: "WorldAccessor", Prefix: ""),
+                (Type: "NativeWorldAccessor", Prefix: "in "),
+            };
+
+            foreach (var (accessorType, paramPrefix) in accessorSpecs)
+            {
+                // Remove and MoveTo(TagSet) are defined as extension methods in AspectExtensions.cs
+
+                // MoveTo<T1..T4> generic overloads
+                // (Can't be extension methods due to C# partial type inference limitation)
+                for (int arity = 1; arity <= 4; arity++)
+                {
+                    var typeParams = string.Join(", ", Enumerable.Range(1, arity).Select(i => $"T{i}"));
+                    var whereClause = string.Join(" ", Enumerable.Range(1, arity).Select(i => $"where T{i} : struct, ITag"));
+
+                    sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
+                    sb.AppendLine(indentLevel, $"public readonly void MoveTo<{typeParams}>({paramPrefix}{accessorType} world) {whereClause} => world.MoveTo<{typeParams}>(_entityIndex);");
+                    sb.AppendLine();
+                }
+
+                // AddToSet / RemoveFromSet
+                // (Can't be extension methods due to C# partial type inference limitation)
+                sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
+                sb.AppendLine(indentLevel, $"public readonly void AddToSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => world.SetAdd<TSet>(_entityIndex);");
+                sb.AppendLine();
+
+                sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
+                sb.AppendLine(indentLevel, $"public readonly void RemoveFromSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => world.SetRemove<TSet>(_entityIndex);");
+                sb.AppendLine();
+            }
         }
 
         /// <summary>

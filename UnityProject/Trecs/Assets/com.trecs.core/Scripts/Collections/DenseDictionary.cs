@@ -26,19 +26,23 @@ namespace Trecs.Collections
         readonly SimpleResizableBuffer<TValue> _values;
         readonly SimpleResizableBuffer<int> _buckets;
 
-        uint _freeValueCellIndex;
-        uint _collisions;
+        int _freeValueCellIndex;
+        int _collisions;
         ulong _fastModBucketsMultiplier;
 
-        public DenseDictionary(uint size)
+        public DenseDictionary(int size)
         {
+            Assert.That(size >= 0, "DenseDictionary size must be non-negative");
+
             _valuesInfo = new(size);
             _values = new(size);
-            _buckets = new((uint)HashHelpers.GetPrime((int)size));
+            _buckets = new(HashHelpers.GetPrime(size));
 
             if (size > 0)
             {
-                _fastModBucketsMultiplier = HashHelpers.GetFastModMultiplier(size);
+                _fastModBucketsMultiplier = HashHelpers.GetFastModMultiplier(
+                    (uint)_buckets.Capacity
+                );
             }
         }
 
@@ -71,7 +75,7 @@ namespace Trecs.Collections
         public TValue this[TKey key]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _values[(int)GetIndex(key)];
+            get => _values[GetIndex(key)];
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
@@ -100,14 +104,14 @@ namespace Trecs.Collections
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public TValue[] UnsafeGetValues(out uint count)
+        public TValue[] UnsafeGetValues(out int count)
         {
             count = _freeValueCellIndex;
 
             return _values._realBuffer;
         }
 
-        public int Count => (int)_freeValueCellIndex;
+        public int Count => _freeValueCellIndex;
 
         public KeyEnumerable Keys => new KeyEnumerable(this);
 
@@ -143,7 +147,7 @@ namespace Trecs.Collections
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryAdd(TKey key, in TValue value, out uint index)
+        public bool TryAdd(TKey key, in TValue value, out int index)
         {
             var itemAdded = AddValue(key, out index);
 
@@ -170,7 +174,7 @@ namespace Trecs.Collections
             // stored hash codes. This is O(entries) instead of O(bucket capacity),
             // which is much faster when the dictionary is large but sparsely used.
             var bucketsCapacity = (uint)_buckets.Capacity;
-            for (uint i = 0; i < _freeValueCellIndex; i++)
+            for (int i = 0; i < _freeValueCellIndex; i++)
             {
                 var bucketIndex = Reduce(
                     (uint)_valuesInfo[i].hashcode,
@@ -213,7 +217,7 @@ namespace Trecs.Collections
         {
             if (TryGetIndex(key, out var findIndex) == true)
             {
-                result = _values[(int)findIndex];
+                result = _values[findIndex];
                 return true;
             }
 
@@ -226,14 +230,14 @@ namespace Trecs.Collections
         {
             if (TryGetIndex(key, out var findIndex) == true)
             {
-                return ref _values[(int)findIndex];
+                return ref _values[findIndex];
             }
 
             AddValue(key, out findIndex);
 
-            _values[(int)findIndex] = default;
+            _values[findIndex] = default;
 
-            return ref _values[(int)findIndex];
+            return ref _values[findIndex];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -241,27 +245,27 @@ namespace Trecs.Collections
         {
             if (TryGetIndex(key, out var findIndex) == true)
             {
-                return ref _values[(int)findIndex];
+                return ref _values[findIndex];
             }
 
             AddValue(key, out findIndex);
 
-            _values[(int)findIndex] = builder();
+            _values[findIndex] = builder();
 
-            return ref _values[(int)findIndex];
+            return ref _values[findIndex];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref TValue GetOrAdd(TKey key, out uint index)
+        public ref TValue GetOrAdd(TKey key, out int index)
         {
             if (TryGetIndex(key, out index) == true)
             {
-                return ref _values[(int)index];
+                return ref _values[index];
             }
 
             AddValue(key, out index);
 
-            return ref _values[(int)index];
+            return ref _values[index];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -269,14 +273,14 @@ namespace Trecs.Collections
         {
             if (TryGetIndex(key, out var findIndex) == true)
             {
-                return ref _values[(int)findIndex];
+                return ref _values[findIndex];
             }
 
             AddValue(key, out findIndex);
 
-            _values[(int)findIndex] = builder(ref parameter);
+            _values[findIndex] = builder(ref parameter);
 
-            return ref _values[(int)findIndex];
+            return ref _values[findIndex];
         }
 
         /// <summary>
@@ -297,21 +301,21 @@ namespace Trecs.Collections
         {
             if (TryGetIndex(key, out var findIndex))
             {
-                return ref _values[(int)findIndex];
+                return ref _values[findIndex];
             }
 
             AddValue(key, out findIndex);
 
-            if (_values[(int)findIndex] == null)
+            if (_values[findIndex] == null)
             {
-                _values[(int)findIndex] = builder();
+                _values[findIndex] = builder();
             }
             else
             {
-                recycler(ref Unsafe.As<TValue, TValueProxy>(ref _values[(int)findIndex]));
+                recycler(ref Unsafe.As<TValue, TValueProxy>(ref _values[findIndex]));
             }
 
-            return ref _values[(int)findIndex];
+            return ref _values[findIndex];
         }
 
         /// <summary>
@@ -337,30 +341,27 @@ namespace Trecs.Collections
         {
             if (TryGetIndex(key, out var findIndex) == true)
             {
-                return ref _values[(int)findIndex];
+                return ref _values[findIndex];
             }
 
             AddValue(key, out findIndex);
 
-            if (_values[(int)findIndex] == null)
+            if (_values[findIndex] == null)
             {
-                _values[(int)findIndex] = builder(ref parameter);
+                _values[findIndex] = builder(ref parameter);
             }
             else
             {
-                recycler(
-                    ref Unsafe.As<TValue, TValueProxy>(ref _values[(int)findIndex]),
-                    ref parameter
-                );
+                recycler(ref Unsafe.As<TValue, TValueProxy>(ref _values[findIndex]), ref parameter);
             }
 
-            return ref _values[(int)findIndex];
+            return ref _values[findIndex];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         //WARNING this method must stay stateless (not relying on states that can change, it's ok to read
         //constant states) because it will be used in multi-threaded parallel code
-        public ref TValue GetValueAtIndexByRef(uint index)
+        public ref TValue GetValueAtIndexByRef(int index)
         {
             return ref _values[index];
         }
@@ -370,36 +371,36 @@ namespace Trecs.Collections
         {
 #if DEBUG
             if (TryGetIndex(key, out var findIndex))
-                return ref _values[(int)findIndex];
+                return ref _values[findIndex];
 
             throw Assert.CreateException("Key not found");
 #else
             //Burst is not able to vectorise code if throw is found, regardless if it's actually ever thrown
             TryGetIndex(key, out var findIndex);
 
-            return ref _values[(int)findIndex];
+            return ref _values[findIndex];
 #endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EnsureCapacity(uint size)
+        public void EnsureCapacity(int size)
         {
             if (_values.Capacity < size)
             {
-                var expandPrime = HashHelpers.Expand((int)size);
+                var expandPrime = HashHelpers.Expand(size);
 
-                _values.Resize((uint)expandPrime, true);
-                _valuesInfo.Resize((uint)expandPrime, true);
+                _values.Resize(expandPrime, true);
+                _valuesInfo.Resize(expandPrime, true);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void IncreaseCapacityBy(uint size)
+        public void IncreaseCapacityBy(int size)
         {
-            var expandPrime = HashHelpers.Expand(_values.Capacity + (int)size);
+            var expandPrime = HashHelpers.Expand(_values.Capacity + size);
 
-            _values.Resize((uint)expandPrime, true);
-            _valuesInfo.Resize((uint)expandPrime, true);
+            _values.Resize(expandPrime, true);
+            _valuesInfo.Resize(expandPrime, true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -432,10 +433,10 @@ namespace Trecs.Collections
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryRemove(TKey key, out uint index, out TValue value)
+        public bool TryRemove(TKey key, out int index, out TValue value)
         {
             int hash = key.GetHashCode();
-            uint bucketIndex = Reduce(
+            int bucketIndex = Reduce(
                 (uint)hash,
                 (uint)_buckets.Capacity,
                 _fastModBucketsMultiplier
@@ -487,7 +488,7 @@ namespace Trecs.Collections
                 return false; //not found!
             }
 
-            index = (uint)indexToValueToRemove; //index is a out variable, for internal use we want to know the index of the element to remove
+            index = indexToValueToRemove; //index is a out variable, for internal use we want to know the index of the element to remove
 
             _freeValueCellIndex--; //one less value to iterate
             value = _values[indexToValueToRemove]; //value is a out variable, we want to know the value of the element to remove
@@ -565,7 +566,7 @@ namespace Trecs.Collections
         //WARNING this method must stay stateless (not relying on states that can change, it's ok to read
         //constant states) because it will be used in multithreaded parallel code
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetIndex(TKey key, out uint findIndex)
+        public bool TryGetIndex(TKey key, out int findIndex)
         {
             Assert.That(
                 _buckets.Capacity > 0,
@@ -574,7 +575,7 @@ namespace Trecs.Collections
 
             int hash = key.GetHashCode();
 
-            uint bucketIndex = Reduce(
+            int bucketIndex = Reduce(
                 (uint)hash,
                 (uint)_buckets.Capacity,
                 _fastModBucketsMultiplier
@@ -589,7 +590,7 @@ namespace Trecs.Collections
                 if (dictionaryNode.hashcode == hash && _keyComp.Equals(dictionaryNode.key, key))
                 {
                     //this is the one
-                    findIndex = (uint)valueIndex;
+                    findIndex = valueIndex;
                     return true;
                 }
 
@@ -601,7 +602,7 @@ namespace Trecs.Collections
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public uint GetIndex(TKey key)
+        public int GetIndex(TKey key)
         {
 #if DEBUG
             if (TryGetIndex(key, out var findIndex) == true)
@@ -650,10 +651,10 @@ namespace Trecs.Collections
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool AddValue(TKey key, out uint indexSet)
+        bool AddValue(TKey key, out int indexSet)
         {
             int hash = key.GetHashCode(); //IEquatable doesn't enforce the override of GetHashCode
-            uint bucketIndex = Reduce(
+            int bucketIndex = Reduce(
                 (uint)hash,
                 (uint)_buckets.Capacity,
                 _fastModBucketsMultiplier
@@ -677,7 +678,7 @@ namespace Trecs.Collections
                     if (dictionaryNode.hashcode == hash && _keyComp.Equals(dictionaryNode.key, key))
                     {
                         //the key already exists, simply replace the value!
-                        indexSet = (uint)currentValueIndex;
+                        indexSet = currentValueIndex;
                         return false;
                     }
 
@@ -698,7 +699,7 @@ namespace Trecs.Collections
             //item with this bucketIndex will point to the last value created
             //ToDo: if instead I assume that the original one is the one in the bucket
             //I wouldn't need to update the bucket here. Small optimization but important
-            _buckets[bucketIndex] = (int)(_freeValueCellIndex + 1);
+            _buckets[bucketIndex] = _freeValueCellIndex + 1;
 
             indexSet = _freeValueCellIndex;
             _freeValueCellIndex++;
@@ -708,11 +709,11 @@ namespace Trecs.Collections
             {
                 if (_buckets.Capacity < 100)
                 {
-                    RecomputeBuckets((uint)((int)_collisions << 1));
+                    RecomputeBuckets(_collisions << 1);
                 }
                 else
                 {
-                    RecomputeBuckets((uint)HashHelpers.Expand((int)_collisions));
+                    RecomputeBuckets(HashHelpers.Expand(_collisions));
                 }
             }
 
@@ -720,7 +721,7 @@ namespace Trecs.Collections
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void RecomputeBuckets(uint newSize)
+        internal void RecomputeBuckets(int newSize)
         {
             //we need more space and less collisions
             _buckets.Resize(newSize, false);
@@ -772,24 +773,26 @@ namespace Trecs.Collections
         {
             if (_freeValueCellIndex == _values.Capacity)
             {
-                var expandPrime = HashHelpers.Expand((int)_freeValueCellIndex);
+                var expandPrime = HashHelpers.Expand(_freeValueCellIndex);
 
-                _values.Resize((uint)expandPrime, true);
-                _valuesInfo.Resize((uint)expandPrime, true);
+                _values.Resize(expandPrime, true);
+                _valuesInfo.Resize(expandPrime, true);
             }
         }
 
         static readonly bool Is64BitProcess = Environment.Is64BitProcess;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static uint Reduce(uint hashcode, uint N, ulong fastModBucketsMultiplier)
+        static int Reduce(uint hashcode, uint N, ulong fastModBucketsMultiplier)
         {
             if (hashcode >= N) //is the condition return actually an optimization?
-                return Is64BitProcess
-                    ? HashHelpers.FastMod(hashcode, N, fastModBucketsMultiplier)
-                    : hashcode % N;
+                return (int)(
+                    Is64BitProcess
+                        ? HashHelpers.FastMod(hashcode, N, fastModBucketsMultiplier)
+                        : hashcode % N
+                );
 
-            return hashcode;
+            return (int)hashcode;
         }
 
         public readonly struct KeyEnumerable
@@ -922,16 +925,16 @@ namespace Trecs.Collections
                 // This is here to satisfy the IEnumerator<T> interface
             }
 
-            public void SetRange(uint startIndex, uint count)
+            public void SetRange(int startIndex, int count)
             {
-                _index = (int)startIndex - 1;
-                _count = (int)count;
+                _index = startIndex - 1;
+                _count = count;
 #if DEBUG
                 Assert.That(
                     _count <= _startCount,
                     "can't set a count greater than the starting one"
                 );
-                _startCount = (int)count;
+                _startCount = count;
 #endif
             }
         }
@@ -962,7 +965,7 @@ namespace Trecs.Collections
         /// <summary>
         /// Gets the internal count of elements for serialization.
         /// </summary>
-        public ref uint UnsafeFreeValueCellIndex => ref _freeValueCellIndex;
+        public ref int UnsafeFreeValueCellIndex => ref _freeValueCellIndex;
 
         /// <summary>
         /// Gets the internal buckets array for serialization.
@@ -977,7 +980,7 @@ namespace Trecs.Collections
         /// <summary>
         /// Gets the internal collision counter for serialization.
         /// </summary>
-        public ref uint UnsafeCollisions => ref _collisions;
+        public ref int UnsafeCollisions => ref _collisions;
 
         /// <summary>
         /// Gets the internal fast mod multiplier for serialization.
@@ -991,7 +994,7 @@ namespace Trecs.Collections
         {
             if (valuesCount > _valuesInfo.Capacity)
             {
-                var newCapacity = (uint)HashHelpers.Expand(valuesCount);
+                var newCapacity = HashHelpers.Expand(valuesCount);
                 _valuesInfo.Resize(newCapacity, false);
                 _values.Resize(newCapacity, false);
             }
@@ -1000,7 +1003,7 @@ namespace Trecs.Collections
             // This ensures _buckets.Capacity matches _fastModBucketsMultiplier
             if (bucketsCapacity != _buckets.Capacity)
             {
-                _buckets.Resize((uint)bucketsCapacity, false);
+                _buckets.Resize(bucketsCapacity, false);
             }
         }
     }

@@ -28,7 +28,7 @@ namespace Trecs.Internal
                 if (current.Value > 0) //there are entities in this group
                 {
                     var value = _lastComponentsToAddPerGroup[current.Key];
-                    Current = new GroupInfo() { group = current.Key, components = value };
+                    Current = new GroupInfo() { Group = current.Key, Components = value };
 
                     return true;
                 }
@@ -50,8 +50,8 @@ namespace Trecs.Internal
 
     struct GroupInfo
     {
-        public Group group;
-        public DenseDictionary<ComponentId, IComponentArray> components;
+        public Group Group;
+        public DenseDictionary<ComponentId, IComponentArray> Components;
     }
 
     internal class DoubleBufferedEntitiesToAdd
@@ -151,8 +151,6 @@ namespace Trecs.Internal
             _lastPendingReferences.Recycle();
             _lastNativeAddSortKeys.Recycle();
             _lastNativeAddStartIndices.Clear();
-
-            //      _totalEntitiesToAdd = 0;
         }
 
         public void Dispose()
@@ -368,10 +366,10 @@ namespace Trecs.Internal
 
         struct KeyedIndex : IComparable<KeyedIndex>
         {
-            public ulong key;
-            public int index;
+            public ulong Key;
+            public int Index;
 
-            public int CompareTo(KeyedIndex other) => key.CompareTo(other.key);
+            public int CompareTo(KeyedIndex other) => Key.CompareTo(other.Key);
         }
 
         /// <summary>
@@ -413,7 +411,7 @@ namespace Trecs.Internal
                 _cachedSortBuffer.Clear();
                 for (int i = 0; i < count; i++)
                 {
-                    _cachedSortBuffer.Add(new KeyedIndex { key = keys[i], index = i });
+                    _cachedSortBuffer.Add(new KeyedIndex { Key = keys[i], Index = i });
                 }
 
                 // Native sort (non-allocating)
@@ -423,11 +421,11 @@ namespace Trecs.Internal
                 for (int i = 1; i < count; i++)
                 {
                     Assert.That(
-                        _cachedSortBuffer[i].key != _cachedSortBuffer[i - 1].key,
+                        _cachedSortBuffer[i].Key != _cachedSortBuffer[i - 1].Key,
                         "Duplicate native add sort key detected in group {} (composite key {}). "
                             + "Each system must use unique sort keys for adds to the same group.",
                         group,
-                        _cachedSortBuffer[i].key
+                        _cachedSortBuffer[i].Key
                     );
                 }
 
@@ -435,7 +433,7 @@ namespace Trecs.Internal
                 bool alreadySorted = true;
                 for (int i = 0; i < count; i++)
                 {
-                    if (_cachedSortBuffer[i].index != i)
+                    if (_cachedSortBuffer[i].Index != i)
                     {
                         alreadySorted = false;
                         break;
@@ -451,7 +449,7 @@ namespace Trecs.Internal
                 _cachedSortIndices.Clear();
                 for (int i = 0; i < count; i++)
                 {
-                    _cachedSortIndices.Add(_cachedSortBuffer[i].index);
+                    _cachedSortIndices.Add(_cachedSortBuffer[i].Index);
                 }
 
                 // Apply permutation to all component arrays for this group

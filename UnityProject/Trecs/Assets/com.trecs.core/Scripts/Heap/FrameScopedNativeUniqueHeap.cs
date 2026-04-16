@@ -276,7 +276,7 @@ namespace Trecs
             _idCounter.EnsureAtLeast(reader.Read<uint>("IdCounter"));
             var numEntries = reader.Read<int>("NumEntries");
 
-            _activeEntries.EnsureCapacity((uint)numEntries);
+            _activeEntries.EnsureCapacity(numEntries);
 
             uint maxAddress = 0;
 

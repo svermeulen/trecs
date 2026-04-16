@@ -22,9 +22,17 @@ namespace Trecs.Tests
 
     public static class EcsTestHelper
     {
+        public static BlobStoreInMemory CreateBlobStore()
+        {
+            return new BlobStoreInMemory(
+                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
+                null
+            );
+        }
+
         public static TestEnvironment CreateEnvironment(params Template[] templates)
         {
-            return CreateEnvironment(new WorldSettings(), templates);
+            return CreateEnvironment(new WorldSettings(), null, templates);
         }
 
         public static TestEnvironment CreateEnvironment(
@@ -32,29 +40,55 @@ namespace Trecs.Tests
             params Template[] templates
         )
         {
-            var testGlobals = new Template(
-                debugName: "TestGlobals",
-                localBaseTemplates: new Template[] { TrecsTemplates.Globals.Template },
-                states: Array.Empty<TagSet>(),
-                localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
-                localTags: Array.Empty<Tag>()
-            );
+            return CreateEnvironment(settings, null, templates);
+        }
 
-            var blobStoreCommon = new BlobStoreCommon(null);
-            var blobStore = new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                blobStoreCommon
-            );
+        public static TestEnvironment CreateEnvironment(
+            Action<WorldBuilder> configure,
+            params Template[] templates
+        )
+        {
+            return CreateEnvironment(new WorldSettings(), configure, templates);
+        }
+
+        public static TestEnvironment CreateEnvironment(
+            WorldSettings settings,
+            Action<WorldBuilder> configure,
+            params Template[] templates
+        )
+        {
+            return CreateEnvironment(settings, configure, globalsTemplate: null, templates);
+        }
+
+        public static TestEnvironment CreateEnvironment(
+            WorldSettings settings,
+            Action<WorldBuilder> configure,
+            Template globalsTemplate,
+            params Template[] templates
+        )
+        {
+            if (globalsTemplate == null)
+            {
+                globalsTemplate = new Template(
+                    debugName: "TestGlobals",
+                    localBaseTemplates: new Template[] { TrecsTemplates.Globals.Template },
+                    states: Array.Empty<TagSet>(),
+                    localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
+                    localTags: Array.Empty<Tag>()
+                );
+            }
 
             var builder = new WorldBuilder()
                 .SetSettings(settings)
-                .AddTemplate(testGlobals)
-                .AddBlobStore(blobStore);
+                .AddEntityType(globalsTemplate)
+                .AddBlobStore(CreateBlobStore());
 
             foreach (var template in templates)
             {
-                builder.AddTemplate(template);
+                builder.AddEntityType(template);
             }
+
+            configure?.Invoke(builder);
 
             return new TestEnvironment(builder.BuildAndInitialize());
         }

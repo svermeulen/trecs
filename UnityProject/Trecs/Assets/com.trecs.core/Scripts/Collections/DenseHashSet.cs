@@ -25,7 +25,7 @@ namespace Trecs.Collections
         public DenseHashSet()
             : this(1) { }
 
-        public DenseHashSet(uint size)
+        public DenseHashSet(int size)
         {
             _dictionary = new DenseDictionary<T, HashSetEmptyValue>(size);
         }
@@ -93,7 +93,7 @@ namespace Trecs.Collections
         /// </summary>
         /// <param name="size">The minimum capacity to ensure.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EnsureCapacity(uint size)
+        public void EnsureCapacity(int size)
         {
             _dictionary.EnsureCapacity(size);
         }
@@ -103,7 +103,7 @@ namespace Trecs.Collections
         /// </summary>
         /// <param name="size">The number of elements to increase capacity by.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void IncreaseCapacityBy(uint size)
+        public void IncreaseCapacityBy(int size)
         {
             _dictionary.IncreaseCapacityBy(size);
         }
@@ -142,7 +142,7 @@ namespace Trecs.Collections
         /// <param name="findIndex">When this method returns, contains the index of the element if found; otherwise, 0.</param>
         /// <returns>True if the element was found, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetIndex(T item, out uint findIndex)
+        public bool TryGetIndex(T item, out int findIndex)
         {
             return _dictionary.TryGetIndex(item, out findIndex);
         }
@@ -154,7 +154,7 @@ namespace Trecs.Collections
         /// <returns>The index of the element.</returns>
         /// <exception cref="Exception">Thrown if the element is not found in the set.</exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public uint GetIndex(T item)
+        public int GetIndex(T item)
         {
             return _dictionary.GetIndex(item);
         }
@@ -187,7 +187,7 @@ namespace Trecs.Collections
         /// <param name="array">The array to copy elements to.</param>
         /// <param name="index">The starting index in the destination array.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void CopyElementsTo(T[] array, uint index = 0)
+        public void CopyElementsTo(T[] array, int index = 0)
         {
             int i = 0;
             foreach (var key in _dictionary.Keys)

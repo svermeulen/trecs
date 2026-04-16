@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -33,6 +34,8 @@ namespace Trecs.Internal
         // At small batch sizes (DoofusDemo: ~10 entities × 5 components = 50), the job
         // scheduling overhead exceeds the parallelism benefit. Only parallelize for
         // larger workloads where the data movement dominates scheduling cost.
+        // TODO: This value was set heuristically. Benchmark across different hardware
+        // to find the actual crossover point where parallel scheduling overhead is recovered.
         const int ParallelJobThreshold = 500;
 
         static readonly Action<
@@ -533,12 +536,8 @@ namespace Trecs.Internal
                     compIdx++;
                 }
 
-                // Build NativeArray of sorted indices for the Burst job
-                var nativeSortedIndices = new NativeArray<int>(numRemovals, Allocator.TempJob);
-                for (int i = 0; i < numRemovals; i++)
-                {
-                    nativeSortedIndices[i] = sortedIndices[i];
-                }
+                // Zero-copy view of the sorted indices for the Burst job
+                var nativeSortedIndices = sortedIndices.AsArray().GetSubArray(0, numRemovals);
 
                 // Execute Burst job(s) for data movement
                 if (numRemovals * numComponents >= ParallelJobThreshold && numComponents > 1)
@@ -549,11 +548,11 @@ namespace Trecs.Internal
                     {
                         var perCompJob = new RemoveDataPerComponentJob
                         {
-                            arrayPtr = arrayPtrs[ci],
-                            elementSize = elemSizes[ci],
-                            sourceCount = originalCount,
-                            numRemovals = numRemovals,
-                            sortedDescendingIndices = nativeSortedIndices,
+                            ArrayPtr = arrayPtrs[ci],
+                            ElementSize = elemSizes[ci],
+                            SourceCount = originalCount,
+                            NumRemovals = numRemovals,
+                            SortedDescendingIndices = nativeSortedIndices,
                         };
                         handles[ci] = perCompJob.Schedule();
                     }
@@ -568,13 +567,13 @@ namespace Trecs.Internal
                     // Single job for small batches
                     var removeJob = new RemoveDataJob
                     {
-                        arrayPtrs = arrayPtrs,
-                        elementSizes = elemSizes,
-                        sortedDescendingIndices = nativeSortedIndices,
-                        numComponents = numComponents,
-                        numRemovals = numRemovals,
-                        sourceCount = originalCount,
-                        maxElementSize = maxElemSize,
+                        ArrayPtrs = arrayPtrs,
+                        ElementSizes = elemSizes,
+                        SortedDescendingIndices = nativeSortedIndices,
+                        NumComponents = numComponents,
+                        NumRemovals = numRemovals,
+                        SourceCount = originalCount,
+                        MaxElementSize = maxElemSize,
                     };
                     removeJob.Run();
                 }
@@ -591,7 +590,6 @@ namespace Trecs.Internal
 
                 arrayPtrs.Dispose();
                 elemSizes.Dispose();
-                nativeSortedIndices.Dispose();
             }
 
             if (hasFilters)
@@ -623,6 +621,14 @@ namespace Trecs.Internal
                     fromGroup
                 );
             }
+
+#if TRECS_INTERNAL_CHECKS && DEBUG
+            var postRemoveCount = originalCount - numRemovals;
+            ecsRoot._entitiesQuerier._entityLocator.ValidateGroupConsistency(
+                fromGroup,
+                postRemoveCount
+            );
+#endif
         }
 
         /// <summary>
@@ -692,13 +698,12 @@ namespace Trecs.Internal
 
         static void SortDescending(NativeList<int> list)
         {
-            list.Sort();
-            // Reverse for descending order
-            var count = list.Length;
-            for (int lo = 0, hi = count - 1; lo < hi; lo++, hi--)
-            {
-                (list[lo], list[hi]) = (list[hi], list[lo]);
-            }
+            list.Sort(new DescendingIntComparer());
+        }
+
+        struct DescendingIntComparer : IComparer<int>
+        {
+            public int Compare(int a, int b) => b.CompareTo(a);
         }
 
         /// <summary>
@@ -740,11 +745,12 @@ namespace Trecs.Internal
                     DenseDictionary<ComponentId, IComponentArray> fromGroupDictionary =
                         ecsRoot.GetDBGroup(fromGroup);
 
-                    // Precompute resolved indices for each toGroup before the component-type loop.
-                    // This resolves chain lookups once per toGroup rather than once per (toGroup x componentType).
                     var sourceCount = GetGroupEntityCount(fromGroupDictionary);
 
-                    using (TrecsProfiling.Start("Move Precompute"))
+                    // Precompute resolved indices and execute data movement per toGroup.
+                    // These are merged into a single loop because Burst jobs complete
+                    // synchronously and the swap-back chain is built incrementally.
+                    using (TrecsProfiling.Start("Move Precompute+Execute"))
                     {
                         foreach (var (toGroup, fromEntityToEntityIDs) in toGroupMoveInfos)
                         {
@@ -756,16 +762,6 @@ namespace Trecs.Internal
                                 ref sourceCount,
                                 ecsRoot._transientEntityIDsAffectedByRemoveAtSwapBack
                             );
-                        }
-                    }
-
-                    // Process each toGroup's component data movement
-                    using (TrecsProfiling.Start("Move Execute"))
-                    {
-                        foreach (var (toGroup, fromEntityToEntityIDs) in toGroupMoveInfos)
-                        {
-                            if (fromEntityToEntityIDs.Count == 0)
-                                continue;
 
                             ExecuteMoveForToGroup(
                                 fromGroup,
@@ -796,6 +792,14 @@ namespace Trecs.Internal
                     }
 
                     FireMoveCallbacks(fromGroup, toGroupMoveInfos, ecsRoot);
+
+#if TRECS_INTERNAL_CHECKS && DEBUG
+                    var postMoveCount = GetGroupEntityCount(fromGroupDictionary);
+                    ecsRoot._entitiesQuerier._entityLocator.ValidateGroupConsistency(
+                        fromGroup,
+                        postMoveCount
+                    );
+#endif
                 }
             }
         }
@@ -825,7 +829,7 @@ namespace Trecs.Internal
                     resolvedIndex = updated;
                 }
 
-                values[i].resolvedFromIndex = resolvedIndex;
+                values[i].ResolvedFromIndex = resolvedIndex;
 
                 // Record swap-back for subsequent entities
                 sourceCount--;
@@ -915,14 +919,14 @@ namespace Trecs.Internal
                 var swapValues = fromEntityToEntityIDs.UnsafeValues;
                 for (int i = 0; i < numEntities; i++)
                 {
-                    resolvedFromIndices[i] = swapValues[i].resolvedFromIndex;
+                    resolvedFromIndices[i] = swapValues[i].ResolvedFromIndex;
                 }
 
                 // Pre-set toIndex on MoveInfo (sequential from destBase, known before data movement)
                 var destBase = toGroupIndexRange.Value.Start;
                 for (int i = 0; i < numEntities; i++)
                 {
-                    swapValues[i].toIndex = destBase + i;
+                    swapValues[i].ToIndex = destBase + i;
                 }
 
                 // Phase 2: Burst job(s) for data movement
@@ -936,13 +940,13 @@ namespace Trecs.Internal
                     {
                         var perCompJob = new MoveDataPerComponentJob
                         {
-                            srcPtr = srcPtrs[ci],
-                            dstPtr = dstPtrs[ci],
-                            elementSize = elementSizes[ci],
-                            dstBaseCount = dstBaseCounts[ci],
-                            sourceCount = sourceCount,
-                            numEntities = numEntities,
-                            resolvedFromIndices = resolvedFromIndices,
+                            SrcPtr = srcPtrs[ci],
+                            DstPtr = dstPtrs[ci],
+                            ElementSize = elementSizes[ci],
+                            DstBaseCount = dstBaseCounts[ci],
+                            SourceCount = sourceCount,
+                            NumEntities = numEntities,
+                            ResolvedFromIndices = resolvedFromIndices,
                         };
                         handles[ci] = perCompJob.Schedule();
                     }
@@ -957,14 +961,14 @@ namespace Trecs.Internal
                     // Single job for small batches (avoids scheduling overhead)
                     var job = new MoveDataJob
                     {
-                        srcPtrs = srcPtrs,
-                        dstPtrs = dstPtrs,
-                        elementSizes = elementSizes,
-                        dstBaseCounts = dstBaseCounts,
-                        resolvedFromIndices = resolvedFromIndices,
-                        numComponents = numComponents,
-                        numEntities = numEntities,
-                        sourceCount = sourceCount,
+                        SrcPtrs = srcPtrs,
+                        DstPtrs = dstPtrs,
+                        ElementSizes = elementSizes,
+                        DstBaseCounts = dstBaseCounts,
+                        ResolvedFromIndices = resolvedFromIndices,
+                        NumComponents = numComponents,
+                        NumEntities = numEntities,
+                        SourceCount = sourceCount,
                     };
                     job.Run();
                 }
@@ -1024,6 +1028,9 @@ namespace Trecs.Internal
             {
                 foreach (var (toGroup, fromEntityToEntityIDs) in toGroupMoveInfos)
                 {
+                    if (fromEntityToEntityIDs.Count == 0)
+                        continue;
+
                     rangeEnumerator.MoveNext();
 
                     if (
@@ -1066,18 +1073,18 @@ namespace Trecs.Internal
                             //by entityHandle
                             foreach (var groupToSubmit in _groupedEntityToAdd)
                             {
-                                if (groupToSubmit.components.Count == 0)
+                                if (groupToSubmit.Components.Count == 0)
                                 {
                                     continue;
                                 }
 
-                                var groupId = groupToSubmit.@group;
+                                var groupId = groupToSubmit.Group;
                                 var groupDB = GetOrAddDBGroup(groupId);
 
                                 EntityRange? addedIndices = null;
 
                                 //add the entityComponents in the group
-                                foreach (var (type, fromDictionary) in groupToSubmit.components)
+                                foreach (var (type, fromDictionary) in groupToSubmit.Components)
                                 {
                                     var toDictionary = GetOrAddTypeSafeDictionary(
                                         groupId,
@@ -1139,12 +1146,12 @@ namespace Trecs.Internal
                         {
                             foreach (GroupInfo groupToSubmit in _groupedEntityToAdd)
                             {
-                                if (groupToSubmit.components.Count == 0)
+                                if (groupToSubmit.Components.Count == 0)
                                 {
                                     continue;
                                 }
 
-                                var groupId = groupToSubmit.@group;
+                                var groupId = groupToSubmit.Group;
                                 var groupDB = GetDBGroup(groupId);
 
                                 enumerator.MoveNext();
@@ -1362,7 +1369,7 @@ namespace Trecs.Internal
 
             static bool HasAnyNonEmpty(AtomicNativeBags queue)
             {
-                for (int i = 0; i < queue.count; i++)
+                for (int i = 0; i < queue.Count; i++)
                 {
                     if (!queue.GetBag(i).IsEmpty())
                         return true;
@@ -1378,7 +1385,7 @@ namespace Trecs.Internal
 
             using (TrecsProfiling.Start("Native Remove Operations"))
             {
-                var removeBuffersCount = _nativeRemoveOperationQueue.count;
+                var removeBuffersCount = _nativeRemoveOperationQueue.Count;
 
                 var removals = new NativeList<(EntityIndex, int)>(Allocator.TempJob);
 
@@ -1439,7 +1446,7 @@ namespace Trecs.Internal
 
             using (TrecsProfiling.Start("Native Swap Operations"))
             {
-                var swapBuffersCount = _nativeMoveOperationQueue.count;
+                var swapBuffersCount = _nativeMoveOperationQueue.Count;
 
                 var swaps = new NativeList<(EntityIndex, Group, int)>(Allocator.TempJob);
 
@@ -1519,7 +1526,7 @@ namespace Trecs.Internal
                     IComponentBuilder[] cachedComponents = null;
                     var cachedComponentArrays = _cachedNativeAddComponentArrays;
 
-                    var addBuffersCount = _nativeAddOperationQueue.count;
+                    var addBuffersCount = _nativeAddOperationQueue.Count;
                     for (int i = 0; i < addBuffersCount; i++)
                     {
                         ref var buffer = ref _nativeAddOperationQueue.GetBag(i);

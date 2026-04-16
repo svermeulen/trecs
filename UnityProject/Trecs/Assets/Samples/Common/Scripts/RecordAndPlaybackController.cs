@@ -29,16 +29,7 @@ namespace Trecs.Samples
         readonly string _recordingPath;
         readonly string _bookmarkPath;
 
-        public enum ControllerState
-        {
-            Idle,
-            Recording,
-            Playback,
-        }
-
         ControllerState _state;
-
-        public ControllerState State => _state;
 
         public RecordAndPlaybackController(
             SerializationServices serialization,
@@ -71,6 +62,8 @@ namespace Trecs.Samples
                 "Recording controller ready. Keys: F5=Record, F6=Stop, F7=Playback, F8=Save Bookmark, F9=Load Bookmark"
             );
         }
+
+        public ControllerState State => _state;
 
         public void Tick()
         {
@@ -272,6 +265,13 @@ namespace Trecs.Samples
             }
 
             _serializerHelper.Dispose();
+        }
+
+        public enum ControllerState
+        {
+            Idle,
+            Recording,
+            Playback,
         }
     }
 }

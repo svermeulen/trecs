@@ -10,7 +10,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public struct UnsafeArrayIndex
     {
-        internal uint index;
+        internal uint Index;
     }
 
     /// <summary>
@@ -123,7 +123,7 @@ namespace Trecs.Internal
 #endif
                 ref var buffer = ref Unsafe.AsRef<T>(ptr + wrappedIndex);
 
-                index.index = _writeIndex;
+                index.Index = _writeIndex;
 
                 _writeIndex += structSize + Pad4(structSize);
 
@@ -137,9 +137,9 @@ namespace Trecs.Internal
         {
             unsafe
             {
-                var wrappedIndex = index.index % capacity;
+                var wrappedIndex = index.Index % capacity;
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                if ((index.index & (Alignment - 1)) != 0)
+                if ((index.Index & (Alignment - 1)) != 0)
                     throw new TrecsException($"invalid index detected");
 #endif
                 return ref Unsafe.AsRef<T>(ptr + wrappedIndex);
@@ -275,7 +275,7 @@ namespace Trecs.Internal
                 ptr = newPointer;
                 capacity = newCapacity;
 
-                //_readIndex  = 0; the idea is that the old readIndex should remain unchanged. Remember this is the unwrapped index.
+                // NOTE: _readIndex is intentionally NOT reset — it is an unwrapped index that must remain unchanged across resizes.
                 _writeIndex = _readIndex + currentSize;
             }
         }

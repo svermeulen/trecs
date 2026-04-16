@@ -20,10 +20,10 @@ namespace Trecs
 
         bool _hasDisposed;
 
-        public BlobStoreInMemory(BlobStoreInMemorySettings settings, BlobStoreCommon common)
+        public BlobStoreInMemory(BlobStoreInMemorySettings settings, ITrecsPoolManager poolManager)
         {
             _settings = settings;
-            _common = common;
+            _common = new(poolManager);
         }
 
         public bool IsReadOnly

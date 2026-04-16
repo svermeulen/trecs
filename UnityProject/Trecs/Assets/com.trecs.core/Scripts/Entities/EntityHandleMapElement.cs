@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 
 namespace Trecs.Internal
 {
@@ -6,19 +6,19 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public struct EntityHandleMapElement
     {
-        internal EntityIndex entityIndex;
-        internal int version;
+        internal EntityIndex EntityIndex;
+        internal int Version;
 
         internal EntityHandleMapElement(EntityIndex entityIndex)
         {
-            this.entityIndex = entityIndex;
-            version = 0;
+            EntityIndex = entityIndex;
+            Version = 0;
         }
 
         internal EntityHandleMapElement(EntityIndex entityIndex, int version)
         {
-            this.entityIndex = entityIndex;
-            this.version = version;
+            EntityIndex = entityIndex;
+            Version = version;
         }
     }
 }

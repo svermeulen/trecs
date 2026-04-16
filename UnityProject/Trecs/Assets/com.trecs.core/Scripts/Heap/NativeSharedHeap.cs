@@ -309,7 +309,7 @@ namespace Trecs
         {
             if (_pendingAdds.Count > 0)
             {
-                _allEntries.EnsureCapacity((uint)(_allEntries.Count + _pendingAdds.Count));
+                _allEntries.EnsureCapacity(_allEntries.Count + _pendingAdds.Count);
                 foreach (var (blobId, entry) in _pendingAdds)
                 {
                     _allEntries.Add(blobId, entry);

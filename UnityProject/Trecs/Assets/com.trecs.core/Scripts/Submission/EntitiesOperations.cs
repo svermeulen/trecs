@@ -209,6 +209,16 @@ namespace Trecs.Internal
                 if (_thisSubmissionInfo._entitiesRemoved.Contains(fromEntityIndex))
                     continue;
 
+                // Skip if already queued for a move (first move wins, dedup with managed moves)
+                if (
+                    !_thisSubmissionInfo._entitiesMoved.TryAdd(
+                        fromEntityIndex,
+                        (fromEntityIndex, toGroup),
+                        out _
+                    )
+                )
+                    continue;
+
                 if (fromEntityIndex.Group != cachedFromGroup)
                 {
                     cachedFromGroup = fromEntityIndex.Group;
@@ -256,10 +266,19 @@ namespace Trecs.Internal
 
             for (int i = 0; i < removeList.Count; i++)
             {
-                if (swapBackMapping.TryGetValue(removeList[i], out var newIndex))
+                var idx = removeList[i];
+#if TRECS_INTERNAL_CHECKS && DEBUG
+                var maxHops = swapBackMapping.Count;
+                var hops = 0;
+#endif
+                while (swapBackMapping.TryGetValue(idx, out var newIndex))
                 {
-                    removeList[i] = newIndex;
+                    idx = newIndex;
+#if TRECS_INTERNAL_CHECKS && DEBUG
+                    Assert.That(++hops <= maxHops, "Cycle detected in swap-back mapping");
+#endif
                 }
+                removeList[i] = idx;
             }
         }
 
@@ -427,12 +446,12 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public struct MoveInfo
     {
-        public int toIndex;
+        public int ToIndex;
 
         /// <summary>
         /// Precomputed resolved source index after accounting for prior swap-backs.
         /// Set during move precomputation in MoveEntities, before the component-type loop.
         /// </summary>
-        public int resolvedFromIndex;
+        public int ResolvedFromIndex;
     }
 }

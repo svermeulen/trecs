@@ -41,7 +41,7 @@ namespace Trecs
         void FlushDeterministic()
         {
             var allRemoves = new NativeList<EntityIndex>(64, Allocator.Temp);
-            for (int i = 0; i < RemoveQueue.count; i++)
+            for (int i = 0; i < RemoveQueue.Count; i++)
             {
                 ref var bag = ref RemoveQueue.GetBag(i);
                 while (!bag.IsEmpty())
@@ -56,7 +56,7 @@ namespace Trecs
             allRemoves.Dispose();
 
             var allAdds = new NativeList<EntityIndex>(64, Allocator.Temp);
-            for (int i = 0; i < AddQueue.count; i++)
+            for (int i = 0; i < AddQueue.Count; i++)
             {
                 ref var bag = ref AddQueue.GetBag(i);
                 while (!bag.IsEmpty())
@@ -73,7 +73,7 @@ namespace Trecs
 
         void FlushNonDeterministic()
         {
-            for (int i = 0; i < RemoveQueue.count; i++)
+            for (int i = 0; i < RemoveQueue.Count; i++)
             {
                 ref var bag = ref RemoveQueue.GetBag(i);
                 while (!bag.IsEmpty())
@@ -83,7 +83,7 @@ namespace Trecs
                 }
             }
 
-            for (int i = 0; i < AddQueue.count; i++)
+            for (int i = 0; i < AddQueue.Count; i++)
             {
                 ref var bag = ref AddQueue.GetBag(i);
                 while (!bag.IsEmpty())

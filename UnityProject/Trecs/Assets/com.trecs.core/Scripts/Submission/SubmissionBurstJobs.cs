@@ -14,37 +14,37 @@ namespace Trecs.Internal
     struct MoveDataJob : IJob
     {
         [NativeDisableUnsafePtrRestriction]
-        public NativeArray<long> srcPtrs;
+        public NativeArray<long> SrcPtrs;
 
         [NativeDisableUnsafePtrRestriction]
-        public NativeArray<long> dstPtrs;
-        public NativeArray<int> elementSizes;
-        public NativeArray<int> dstBaseCounts;
+        public NativeArray<long> DstPtrs;
+        public NativeArray<int> ElementSizes;
+        public NativeArray<int> DstBaseCounts;
 
         [ReadOnly]
-        public NativeArray<int> resolvedFromIndices;
+        public NativeArray<int> ResolvedFromIndices;
 
-        public int numComponents;
-        public int numEntities;
-        public int sourceCount;
+        public int NumComponents;
+        public int NumEntities;
+        public int SourceCount;
 
         public void Execute()
         {
-            var currentSourceCount = sourceCount;
+            var currentSourceCount = SourceCount;
 
-            for (int entityIdx = 0; entityIdx < numEntities; entityIdx++)
+            for (int entityIdx = 0; entityIdx < NumEntities; entityIdx++)
             {
-                var fromIdx = resolvedFromIndices[entityIdx];
+                var fromIdx = ResolvedFromIndices[entityIdx];
                 currentSourceCount--;
 
-                for (int compIdx = 0; compIdx < numComponents; compIdx++)
+                for (int compIdx = 0; compIdx < NumComponents; compIdx++)
                 {
                     unsafe
                     {
-                        var src = (byte*)srcPtrs[compIdx];
-                        var dst = (byte*)dstPtrs[compIdx];
-                        var elemSize = elementSizes[compIdx];
-                        var dstIdx = dstBaseCounts[compIdx] + entityIdx;
+                        var src = (byte*)SrcPtrs[compIdx];
+                        var dst = (byte*)DstPtrs[compIdx];
+                        var elemSize = ElementSizes[compIdx];
+                        var dstIdx = DstBaseCounts[compIdx] + entityIdx;
 
                         UnsafeUtility.MemCpy(
                             dst + dstIdx * elemSize,
@@ -74,44 +74,44 @@ namespace Trecs.Internal
     struct MoveDataPerComponentJob : IJob
     {
         [NativeDisableUnsafePtrRestriction]
-        public long srcPtr;
+        public long SrcPtr;
 
         [NativeDisableUnsafePtrRestriction]
-        public long dstPtr;
-        public int elementSize;
-        public int dstBaseCount;
-        public int sourceCount;
-        public int numEntities;
+        public long DstPtr;
+        public int ElementSize;
+        public int DstBaseCount;
+        public int SourceCount;
+        public int NumEntities;
 
         [ReadOnly]
-        public NativeArray<int> resolvedFromIndices;
+        public NativeArray<int> ResolvedFromIndices;
 
         public void Execute()
         {
-            var currentSourceCount = sourceCount;
+            var currentSourceCount = SourceCount;
 
             unsafe
             {
-                var src = (byte*)srcPtr;
-                var dst = (byte*)dstPtr;
+                var src = (byte*)SrcPtr;
+                var dst = (byte*)DstPtr;
 
-                for (int entityIdx = 0; entityIdx < numEntities; entityIdx++)
+                for (int entityIdx = 0; entityIdx < NumEntities; entityIdx++)
                 {
-                    var fromIdx = resolvedFromIndices[entityIdx];
+                    var fromIdx = ResolvedFromIndices[entityIdx];
                     currentSourceCount--;
 
                     UnsafeUtility.MemCpy(
-                        dst + (dstBaseCount + entityIdx) * elementSize,
-                        src + fromIdx * elementSize,
-                        elementSize
+                        dst + (DstBaseCount + entityIdx) * ElementSize,
+                        src + fromIdx * ElementSize,
+                        ElementSize
                     );
 
                     if (fromIdx != currentSourceCount)
                     {
                         UnsafeUtility.MemCpy(
-                            src + fromIdx * elementSize,
-                            src + currentSourceCount * elementSize,
-                            elementSize
+                            src + fromIdx * ElementSize,
+                            src + currentSourceCount * ElementSize,
+                            ElementSize
                         );
                     }
                 }
@@ -127,34 +127,34 @@ namespace Trecs.Internal
     struct RemoveDataJob : IJob
     {
         [NativeDisableUnsafePtrRestriction]
-        public NativeArray<long> arrayPtrs;
-        public NativeArray<int> elementSizes;
+        public NativeArray<long> ArrayPtrs;
+        public NativeArray<int> ElementSizes;
 
         [ReadOnly]
-        public NativeArray<int> sortedDescendingIndices;
+        public NativeArray<int> SortedDescendingIndices;
 
-        public int numComponents;
-        public int numRemovals;
-        public int sourceCount;
-        public int maxElementSize;
+        public int NumComponents;
+        public int NumRemovals;
+        public int SourceCount;
+        public int MaxElementSize;
 
         public void Execute()
         {
-            var currentCount = sourceCount;
+            var currentCount = SourceCount;
 
             unsafe
             {
-                var temp = (byte*)UnsafeUtility.Malloc(maxElementSize, 16, Allocator.Temp);
+                var temp = (byte*)UnsafeUtility.Malloc(MaxElementSize, 16, Allocator.Temp);
 
-                for (int removalIdx = 0; removalIdx < numRemovals; removalIdx++)
+                for (int removalIdx = 0; removalIdx < NumRemovals; removalIdx++)
                 {
-                    var indexToRemove = sortedDescendingIndices[removalIdx];
+                    var indexToRemove = SortedDescendingIndices[removalIdx];
                     currentCount--;
 
-                    for (int compIdx = 0; compIdx < numComponents; compIdx++)
+                    for (int compIdx = 0; compIdx < NumComponents; compIdx++)
                     {
-                        var ptr = (byte*)arrayPtrs[compIdx];
-                        var elemSize = elementSizes[compIdx];
+                        var ptr = (byte*)ArrayPtrs[compIdx];
+                        var elemSize = ElementSizes[compIdx];
 
                         var removedSlot = ptr + indexToRemove * elemSize;
                         var lastSlot = ptr + currentCount * elemSize;
@@ -181,38 +181,38 @@ namespace Trecs.Internal
     struct RemoveDataPerComponentJob : IJob
     {
         [NativeDisableUnsafePtrRestriction]
-        public long arrayPtr;
-        public int elementSize;
-        public int sourceCount;
-        public int numRemovals;
+        public long ArrayPtr;
+        public int ElementSize;
+        public int SourceCount;
+        public int NumRemovals;
 
         [ReadOnly]
-        public NativeArray<int> sortedDescendingIndices;
+        public NativeArray<int> SortedDescendingIndices;
 
         public void Execute()
         {
-            var currentCount = sourceCount;
+            var currentCount = SourceCount;
 
             unsafe
             {
-                var ptr = (byte*)arrayPtr;
+                var ptr = (byte*)ArrayPtr;
 
                 // Allocate temp buffer for swap (element-sized)
-                var temp = (byte*)UnsafeUtility.Malloc(elementSize, 16, Allocator.Temp);
+                var temp = (byte*)UnsafeUtility.Malloc(ElementSize, 16, Allocator.Temp);
 
-                for (int removalIdx = 0; removalIdx < numRemovals; removalIdx++)
+                for (int removalIdx = 0; removalIdx < NumRemovals; removalIdx++)
                 {
-                    var indexToRemove = sortedDescendingIndices[removalIdx];
+                    var indexToRemove = SortedDescendingIndices[removalIdx];
                     currentCount--;
 
-                    var removedSlot = ptr + indexToRemove * elementSize;
-                    var lastSlot = ptr + currentCount * elementSize;
+                    var removedSlot = ptr + indexToRemove * ElementSize;
+                    var lastSlot = ptr + currentCount * ElementSize;
 
                     if (indexToRemove != currentCount)
                     {
-                        UnsafeUtility.MemCpy(temp, removedSlot, elementSize);
-                        UnsafeUtility.MemCpy(removedSlot, lastSlot, elementSize);
-                        UnsafeUtility.MemCpy(lastSlot, temp, elementSize);
+                        UnsafeUtility.MemCpy(temp, removedSlot, ElementSize);
+                        UnsafeUtility.MemCpy(removedSlot, lastSlot, ElementSize);
+                        UnsafeUtility.MemCpy(lastSlot, temp, ElementSize);
                     }
                 }
 

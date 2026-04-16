@@ -51,6 +51,7 @@ namespace Trecs.Samples
             {
                 disposables();
             }
+            _disposables.Clear();
         }
     }
 }

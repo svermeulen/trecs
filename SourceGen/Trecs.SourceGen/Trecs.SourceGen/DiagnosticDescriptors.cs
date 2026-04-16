@@ -700,6 +700,30 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
+        // ── NativeUniquePtr copy prevention ────────────────────────
+
+        public static readonly DiagnosticDescriptor NativeUniquePtrByValueLocal = new(
+            id: "TRECS110",
+            title: "NativeUniquePtr must not be copied to a by-value local",
+            messageFormat:
+                "NativeUniquePtr<{0}> must not be copied to a local variable; "
+                + "access the owning field directly to preserve write-access tracking",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor NativeUniquePtrByValueParameter = new(
+            id: "TRECS111",
+            title: "NativeUniquePtr must not be passed by value",
+            messageFormat:
+                "Parameter '{0}' of type NativeUniquePtr<{1}> must be declared as ref, in, or out — "
+                + "not by value — to preserve write-access tracking",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
         public static readonly DiagnosticDescriptor UnhandledSourceGenError = new(
             id: "TRECS999",
             title: "Source generation error",

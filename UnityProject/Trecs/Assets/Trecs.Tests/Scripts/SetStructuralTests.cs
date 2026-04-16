@@ -9,26 +9,8 @@ namespace Trecs.Tests
     [TestFixture]
     public class SetStructuralTests
     {
-        TestEnvironment CreateEnv()
-        {
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(QTestEntityA.Template)
-                .AddSet<FiltStructSet>()
-                .AddBlobStore(CreateBlobStore());
-
-            return new TestEnvironment(builder.BuildAndInitialize());
-        }
-
-        static BlobStoreInMemory CreateBlobStore()
-        {
-            var blobStoreCommon = new BlobStoreCommon(null);
-            return new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                blobStoreCommon
-            );
-        }
+        TestEnvironment CreateEnv() =>
+            EcsTestHelper.CreateEnvironment(b => b.AddSet<FiltStructSet>(), QTestEntityA.Template);
 
         #region Set + Entity Removal (swap-back scenarios)
 
