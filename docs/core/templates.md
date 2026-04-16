@@ -1,6 +1,6 @@
 # Templates
 
-Templates define the component layout and tag identity of an entity — like a blueprint. Source generation creates the builder code that makes `AddEntity` work with type safety and validation.
+Templates define the component layout and tag identity of an entity — like a blueprint.
 
 ## Defining a Template
 
@@ -45,7 +45,7 @@ See [Tags & Groups](tags-and-groups.md) for details on how tags define entity gr
 
 ## Template Inheritance
 
-Use `IExtends<T>` to inherit components from a base template:
+Use `IExtends<T>` to inherit components and tags from a base template:
 
 ```csharp
 // Base template
@@ -67,7 +67,7 @@ public partial class FishEntity : ITemplate,
 }
 ```
 
-Multiple inheritance is supported (up to 4 base templates):
+Multiple inheritance is supported
 
 ```csharp
 public partial class ComplexEntity : ITemplate,
@@ -117,7 +117,7 @@ public partial class Player : ITemplate,
 
 ## Partitions
 
-Templates can declare multiple **partitions** — mutually exclusive tag combinations that define which group the entity belongs to. Entities in different partitions are stored in separate contiguous arrays, enabling efficient partition transitions and targeted iteration.
+Templates can declare multiple **partitions** — mutually exclusive tag combinations that define which sections of memory the entity belongs to. Entities in different partitions are stored in separate contiguous arrays, enabling efficient partition transitions and targeted iteration.
 
 ```csharp
 public partial class BallEntity : ITemplate,
