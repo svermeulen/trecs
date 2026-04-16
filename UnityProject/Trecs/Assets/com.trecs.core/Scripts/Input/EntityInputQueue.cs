@@ -342,6 +342,11 @@ namespace Trecs.Internal
             _frameScopedNativeUniqueHeap.ClearAtOrBeforeFrame(frame);
         }
 
+        // Note: these Serialize/Deserialize methods are used by the recording system
+        // for deterministic replay, not by bookmark serialization. Bookmarks don't need
+        // input queue state because the component values themselves (which include the
+        // last-applied input for RetainCurrent components) are already captured in the
+        // EcsStateSerializer snapshot.
         public void Serialize(ITrecsSerializationWriter writer)
         {
             writer.Write("NumHelpers", _componentTypeHelpers.Count);

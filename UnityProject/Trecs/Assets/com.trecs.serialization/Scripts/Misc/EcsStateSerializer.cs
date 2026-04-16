@@ -297,6 +297,11 @@ namespace Trecs.Serialization
             // because they will always desync
             // BUT we do need to serialize and deserialize them when reading/writing snapshots
             // because otherwise the component arrays are left in an invalid state
+            //
+            // Note: checksum data is only ever byte-compared, never deserialized, so
+            // ReadGroupEntityComponentsDB does not need a corresponding ShouldSkip guard.
+            // If that changes, the read path would need to skip the same components to
+            // keep the bit stream aligned.
 
             if (!writer.HasFlag(TrecsSerializationFlags.IsForChecksum))
             {

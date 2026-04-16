@@ -652,7 +652,7 @@ namespace Trecs.Tests
                 var _ = localReadOnly[3];
                 NAssert.IsTrue(false, "Should have thrown exception");
             }
-            catch (Trecs.TrecsException)
+            catch (TrecsException)
             { /* Expected */
             }
 
@@ -661,7 +661,7 @@ namespace Trecs.Tests
                 var _ = localReadOnly[-1];
                 NAssert.IsTrue(false, "Should have thrown exception");
             }
-            catch (Trecs.TrecsException)
+            catch (TrecsException)
             { /* Expected */
             }
 
@@ -670,7 +670,7 @@ namespace Trecs.Tests
                 var _ = localReadOnly[100];
                 NAssert.IsTrue(false, "Should have thrown exception");
             }
-            catch (Trecs.TrecsException)
+            catch (TrecsException)
             { /* Expected */
             }
 
@@ -683,7 +683,7 @@ namespace Trecs.Tests
                 var _ = emptyReadOnly[0];
                 NAssert.IsTrue(false, "Should have thrown exception");
             }
-            catch (Trecs.TrecsException)
+            catch (TrecsException)
             { /* Expected */
             }
         }
@@ -968,7 +968,7 @@ namespace Trecs.Tests
                 var _ = enumerator.Current;
                 NAssert.IsTrue(false, "Should have thrown exception");
             }
-            catch (Trecs.TrecsException)
+            catch (TrecsException)
             {
                 // Expected
             }
@@ -988,7 +988,7 @@ namespace Trecs.Tests
                 var _ = enumerator.Current;
                 NAssert.IsTrue(false, "Should have thrown exception");
             }
-            catch (Trecs.TrecsException)
+            catch (TrecsException)
             {
                 // Expected
             }
@@ -1000,7 +1000,7 @@ namespace Trecs.Tests
                 var _ = enumerator.Current;
                 NAssert.IsTrue(false, "Should have thrown exception");
             }
-            catch (Trecs.TrecsException)
+            catch (TrecsException)
             {
                 // Expected
             }

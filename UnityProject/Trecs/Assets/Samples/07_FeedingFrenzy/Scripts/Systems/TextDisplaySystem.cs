@@ -9,7 +9,7 @@ namespace Trecs.Samples.FeedingFrenzy101
         readonly TMP_Text _displayText;
         readonly StringBuilder _sb = new();
 
-        float _lastRefreshTime;
+        float _refreshCountdown;
 
         public TextDisplaySystem(TMP_Text displayText)
         {
@@ -18,12 +18,13 @@ namespace Trecs.Samples.FeedingFrenzy101
 
         public void Execute()
         {
-            if (World.ElapsedTime - _lastRefreshTime < RefreshInterval)
+            _refreshCountdown -= World.DeltaTime;
+            if (_refreshCountdown > 0)
             {
                 return;
             }
 
-            _lastRefreshTime = World.ElapsedTime;
+            _refreshCountdown = RefreshInterval;
 
             int fishCount = World.CountEntitiesWithTags<FrenzyTags.Fish>();
             int mealCount = World.CountEntitiesWithTags<FrenzyTags.Meal>();
