@@ -99,6 +99,11 @@ namespace Trecs
             get { return _systemRunner.IsExecutingSystems; }
         }
 
+        /// <summary>
+        /// Phase-aware time step. Returns <see cref="FixedDeltaTime"/> in fixed-update systems
+        /// or <see cref="VariableDeltaTime"/> in variable-update systems. Throws if called from
+        /// an ambiguous context (e.g. a standalone accessor).
+        /// </summary>
         public float DeltaTime
         {
             get
@@ -122,6 +127,11 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Phase-aware elapsed simulation time. Returns <see cref="FixedElapsedTime"/> in
+        /// fixed-update systems or <see cref="VariableElapsedTime"/> in variable-update systems.
+        /// Throws if called from an ambiguous context.
+        /// </summary>
         public float ElapsedTime
         {
             get
@@ -145,6 +155,11 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Phase-aware deterministic random number generator. Returns <see cref="FixedRng"/>
+        /// in fixed-update or <see cref="VariableRng"/> in variable-update systems. Each phase
+        /// has an independent stream to preserve determinism.
+        /// </summary>
         public Rng Rng
         {
             get
@@ -395,6 +410,12 @@ namespace Trecs
             );
         }
 
+        /// <summary>
+        /// Forces immediate processing of all deferred structural changes (adds, removes, moves).
+        /// Normally submission happens automatically between system phases; call this only when
+        /// you need entities to be visible before the next automatic submission point.
+        /// Cannot be called during system execution.
+        /// </summary>
         public void SubmitEntities()
         {
             Assert.That(
@@ -405,6 +426,11 @@ namespace Trecs
             _world.SubmitEntities();
         }
 
+        /// <summary>
+        /// Schedules moving an entity to the group identified by the given tags. The move is
+        /// deferred until the next entity submission. The entity's component data is preserved
+        /// for components shared between the source and destination groups.
+        /// </summary>
         public void MoveTo(EntityIndex entityIndex, TagSet tags)
         {
             AssertCanMakeStructuralChanges();
@@ -453,6 +479,9 @@ namespace Trecs
             where T3 : struct, ITag
             where T4 : struct, ITag => MoveTo<T1, T2, T3, T4>(entityHandle.ToIndex(_world));
 
+        /// <summary>
+        /// Schedules removal of an entity. The removal is deferred until the next entity submission.
+        /// </summary>
         public void RemoveEntity(EntityIndex entityIndex)
         {
             AssertCanMakeStructuralChanges();
@@ -533,6 +562,12 @@ namespace Trecs
             where T3 : struct, ITag
             where T4 : struct, ITag => CountEntitiesWithTags(TagSet<T1, T2, T3, T4>.Value);
 
+        /// <summary>
+        /// Creates a new entity in the group identified by the given tags and returns an
+        /// <see cref="EntityInitializer"/> for setting initial component values. The entity is
+        /// not visible to queries until the next entity submission. Call
+        /// <see cref="EntityInitializer.AssertComplete"/> after setting all required components.
+        /// </summary>
         public EntityInitializer AddEntity(
             TagSet tags,
             [CallerFilePath] string callerFile = "",
@@ -623,6 +658,10 @@ namespace Trecs
             return false;
         }
 
+        /// <summary>
+        /// Returns a <see cref="ComponentAccessor{T}"/> for the global (singleton) entity.
+        /// Use this for world-wide state that doesn't belong to any specific entity type.
+        /// </summary>
         public ComponentAccessor<T> GlobalComponent<T>()
             where T : unmanaged, IEntityComponent
         {
@@ -760,6 +799,11 @@ namespace Trecs
             return entityHandle.TryToIndex(_entitiesDb, out entityIndex);
         }
 
+        /// <summary>
+        /// Enqueues an input component value for the next fixed-update frame. Only callable from
+        /// <see cref="InputSystemAttribute"/> systems. The value is applied to the entity's
+        /// <see cref="InputAttribute"/> component at the start of the next fixed-update tick.
+        /// </summary>
         public void AddInput<T>(EntityHandle entityHandle, in T value)
             where T : unmanaged, IEntityComponent
         {

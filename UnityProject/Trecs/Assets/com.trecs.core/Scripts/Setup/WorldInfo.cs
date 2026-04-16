@@ -6,7 +6,11 @@ using Trecs.Internal;
 
 namespace Trecs
 {
-    // Note that we use FastList here just to ensure we can iterate over things without allocations
+    /// <summary>
+    /// Read-only metadata about all registered templates, groups, components, and tags in a world.
+    /// Use to discover which groups exist, resolve tag sets to groups, and inspect component layouts.
+    /// Accessed via <see cref="WorldAccessor.WorldInfo"/> or <see cref="World.WorldInfo"/>.
+    /// </summary>
     public class WorldInfo
     {
         static readonly TrecsLog _log = new(nameof(WorldInfo));

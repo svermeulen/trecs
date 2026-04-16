@@ -4,6 +4,11 @@ using Unity.Burst;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Zero-allocation cache for the <see cref="ComponentId"/> of a component type.
+    /// Access via <c>ComponentTypeId&lt;MyComponent&gt;.Value</c>. The ID is derived from the
+    /// type's <see cref="TypeIdAttribute"/> and stored in a <c>SharedStatic</c> for Burst compatibility.
+    /// </summary>
     public class ComponentTypeId<T>
         where T : unmanaged, IEntityComponent
     {

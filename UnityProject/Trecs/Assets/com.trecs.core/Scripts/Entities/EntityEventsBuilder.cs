@@ -17,6 +17,14 @@ namespace Trecs.Internal
 
 namespace Trecs
 {
+    /// <summary>
+    /// Fluent builder for subscribing to entity lifecycle and world events. Accessed via
+    /// <see cref="WorldAccessor.Events"/>. First select target groups (e.g.
+    /// <see cref="InGroupsWithTags{T1}()"/>, <see cref="InAllGroups()"/>), then chain
+    /// <see cref="EntityEventsSubscription.OnAdded"/>, <see cref="EntityEventsSubscription.OnRemoved"/>,
+    /// or <see cref="EntityEventsSubscription.OnMoved"/> on the returned subscription.
+    /// Dispose the subscription to unsubscribe.
+    /// </summary>
     public readonly ref struct EntityEventsBuilder
     {
         readonly EventsManager _eventsManager;
@@ -180,6 +188,12 @@ namespace Trecs
             _eventsManager.PostApplyInputsEvent.Subscribe(cb, priority);
     }
 
+    /// <summary>
+    /// A group-scoped event subscription that can observe entity add, remove, and move events.
+    /// Chain <see cref="OnAdded"/>, <see cref="OnRemoved"/>, and <see cref="OnMoved"/> to register
+    /// callbacks. Dispose to unsubscribe all registered observers. Optionally call
+    /// <see cref="WithPriority"/> before registering observers to control callback ordering.
+    /// </summary>
     public class EntityEventsSubscription : IDisposable
     {
         readonly EventsManager _eventsManager;

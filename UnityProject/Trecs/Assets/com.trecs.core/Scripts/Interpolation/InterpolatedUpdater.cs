@@ -1,5 +1,10 @@
 namespace Trecs
 {
+    /// <summary>
+    /// Variable-update system that blends <see cref="InterpolatedPrevious{T}"/> and the current
+    /// value of <typeparamref name="T"/> into <see cref="Interpolated{T}"/> each render frame,
+    /// using a caller-supplied <see cref="Interpolator"/> delegate.
+    /// </summary>
     [VariableUpdate]
     [ExecutePriority(-1000)]
     [ExecutesAfter(typeof(FixedUpdateSystem))]

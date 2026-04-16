@@ -4,6 +4,11 @@ using System.Linq;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Explicit ordering constraint that forces a sequence of systems to execute in the
+    /// specified order during topological sorting. Register instances via
+    /// <see cref="WorldBuilder"/> to impose cross-system ordering guarantees.
+    /// </summary>
     public class SystemOrderConstraint
     {
         public readonly IReadOnlyList<Type> SystemOrder;

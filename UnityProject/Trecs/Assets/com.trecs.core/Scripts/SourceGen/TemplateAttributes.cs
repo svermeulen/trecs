@@ -18,14 +18,17 @@ namespace Trecs
     }
 
     /// <summary>
-    /// Marker interface for tag types. Tags are empty structs implementing this interface.
-    /// Example: struct Doofus : ITag {}
+    /// Marker interface for tag types. Tags are empty structs that classify entities into
+    /// <see cref="Group"/>s. Implement on a struct to define a new tag:
+    /// <c>struct Doofus : ITag {}</c>
     /// </summary>
     public interface ITag { }
 
     /// <summary>
-    /// Marker interface for template declarations with no base templates.
-    /// Struct fields define components; source generator emits the builder code.
+    /// Marker interface for entity template declarations. A template is a class whose
+    /// fields define the components an entity type carries. The source generator emits
+    /// builder code and registration helpers. Register templates via
+    /// <see cref="WorldBuilder.AddEntityType"/>.
     /// </summary>
     public interface ITemplate { }
 
@@ -35,24 +38,18 @@ namespace Trecs
     public interface IExtends<T1>
         where T1 : class, ITemplate { }
 
-    /// <summary>
-    /// Declares that a template extends (inherits from) two base templates.
-    /// </summary>
+    /// <inheritdoc cref="IExtends{T1}"/>
     public interface IExtends<T1, T2>
         where T1 : class, ITemplate
         where T2 : class, ITemplate { }
 
-    /// <summary>
-    /// Declares that a template extends (inherits from) three base templates.
-    /// </summary>
+    /// <inheritdoc cref="IExtends{T1}"/>
     public interface IExtends<T1, T2, T3>
         where T1 : class, ITemplate
         where T2 : class, ITemplate
         where T3 : class, ITemplate { }
 
-    /// <summary>
-    /// Declares that a template extends (inherits from) four base templates.
-    /// </summary>
+    /// <inheritdoc cref="IExtends{T1}"/>
     public interface IExtends<T1, T2, T3, T4>
         where T1 : class, ITemplate
         where T2 : class, ITemplate
@@ -65,24 +62,18 @@ namespace Trecs
     public interface IHasTags<T1>
         where T1 : struct, ITag { }
 
-    /// <summary>
-    /// Declares tags on a template with two tag types.
-    /// </summary>
+    /// <inheritdoc cref="IHasTags{T1}"/>
     public interface IHasTags<T1, T2>
         where T1 : struct, ITag
         where T2 : struct, ITag { }
 
-    /// <summary>
-    /// Declares tags on a template with three tag types.
-    /// </summary>
+    /// <inheritdoc cref="IHasTags{T1}"/>
     public interface IHasTags<T1, T2, T3>
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag { }
 
-    /// <summary>
-    /// Declares tags on a template with four tag types.
-    /// </summary>
+    /// <inheritdoc cref="IHasTags{T1}"/>
     public interface IHasTags<T1, T2, T3, T4>
         where T1 : struct, ITag
         where T2 : struct, ITag
@@ -96,24 +87,18 @@ namespace Trecs
     public interface IHasState<T1>
         where T1 : struct, ITag { }
 
-    /// <summary>
-    /// Declares a state combination with two tags.
-    /// </summary>
+    /// <inheritdoc cref="IHasState{T1}"/>
     public interface IHasState<T1, T2>
         where T1 : struct, ITag
         where T2 : struct, ITag { }
 
-    /// <summary>
-    /// Declares a state combination with three tags.
-    /// </summary>
+    /// <inheritdoc cref="IHasState{T1}"/>
     public interface IHasState<T1, T2, T3>
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag { }
 
-    /// <summary>
-    /// Declares a state combination with four tags.
-    /// </summary>
+    /// <inheritdoc cref="IHasState{T1}"/>
     public interface IHasState<T1, T2, T3, T4>
         where T1 : struct, ITag
         where T2 : struct, ITag
@@ -137,24 +122,18 @@ namespace Trecs
     public interface IEntitySet<T1> : IEntitySet
         where T1 : struct, ITag { }
 
-    /// <summary>
-    /// Declares a set scoped to two tags.
-    /// </summary>
+    /// <inheritdoc cref="IEntitySet{T1}"/>
     public interface IEntitySet<T1, T2> : IEntitySet
         where T1 : struct, ITag
         where T2 : struct, ITag { }
 
-    /// <summary>
-    /// Declares a set scoped to three tags.
-    /// </summary>
+    /// <inheritdoc cref="IEntitySet{T1}"/>
     public interface IEntitySet<T1, T2, T3> : IEntitySet
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag { }
 
-    /// <summary>
-    /// Declares a set scoped to four tags.
-    /// </summary>
+    /// <inheritdoc cref="IEntitySet{T1}"/>
     public interface IEntitySet<T1, T2, T3, T4> : IEntitySet
         where T1 : struct, ITag
         where T2 : struct, ITag
@@ -177,31 +156,39 @@ namespace Trecs
     }
 
     /// <summary>
-    /// Marks a component field as interpolated. The source generator will emit .Interpolated() on the component builder.
+    /// Marks a template component field as interpolated. The framework stores a previous-frame
+    /// snapshot and blends between it and the current value each rendered frame, allowing smooth
+    /// visual motion at variable frame rates while the simulation runs at a fixed time step.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
     public class InterpolatedAttribute : Attribute { }
 
     /// <summary>
-    /// Marks a component field as fixed-update-only.
+    /// Restricts a template component field to the fixed-update phase only. Variable-update
+    /// systems cannot read or write this component.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
     public class FixedUpdateOnlyAttribute : Attribute { }
 
     /// <summary>
-    /// Marks a component field as variable-update-only.
+    /// Restricts a template component field to the variable-update phase only. Fixed-update
+    /// systems cannot read or write this component.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
     public class VariableUpdateOnlyAttribute : Attribute { }
 
     /// <summary>
-    /// Marks a component field as constant (immutable once set).
+    /// Marks a template component field as constant. The value is set once during entity
+    /// initialization and cannot be modified afterward. Attempts to write produce a runtime error.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
     public class ConstantAttribute : Attribute { }
 
     /// <summary>
-    /// Marks a component field as an input component.
+    /// Marks a template component field as externally-driven input. Input components are
+    /// written by <see cref="InputSystemAttribute"/> systems via <see cref="WorldAccessor.AddInput{T}"/>
+    /// and consumed by fixed-update systems. See <see cref="MissingInputFrameBehaviour"/> for
+    /// what happens when no input is provided for a frame.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
     public class InputAttribute : Attribute

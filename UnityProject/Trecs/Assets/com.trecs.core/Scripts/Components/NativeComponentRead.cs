@@ -1,5 +1,10 @@
 namespace Trecs
 {
+    /// <summary>
+    /// Read-only single-entity component accessor for use in Burst jobs. Wraps a buffer
+    /// and index pair, exposing the component via <see cref="Value"/>. Obtained from
+    /// <c>[FromWorld]</c> fields on job structs.
+    /// </summary>
     public readonly struct NativeComponentRead<T>
         where T : unmanaged, IEntityComponent
     {

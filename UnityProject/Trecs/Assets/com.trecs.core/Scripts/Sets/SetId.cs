@@ -3,6 +3,10 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Stable integer identifier for an entity set definition. Corresponds to a
+    /// <see cref="SetDef"/> registered via <see cref="WorldBuilder.AddSet{T}"/>.
+    /// </summary>
     public readonly struct SetId
         : IEquatable<SetId>,
             IComparable<SetId>,

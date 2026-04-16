@@ -20,6 +20,12 @@ namespace Trecs.Internal
 
 namespace Trecs
 {
+    /// <summary>
+    /// Burst-compatible resolver that maps <see cref="PtrHandle"/> values to native memory addresses
+    /// for <see cref="NativeUniquePtr{T}"/> lookups inside jobs. Checks both persistent and
+    /// frame-scoped heaps. Obtain via <see cref="HeapAccessor.NativeUniquePtrResolver"/> or
+    /// <see cref="NativeWorldAccessor.UniquePtrResolver"/>.
+    /// </summary>
     public readonly unsafe struct NativeUniquePtrResolver
     {
         readonly NativeDenseDictionary<uint, NativeUniqueHeapEntry> _persistentEntries;

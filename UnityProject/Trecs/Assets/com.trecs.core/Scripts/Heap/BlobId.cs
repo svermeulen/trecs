@@ -3,6 +3,13 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Identifier for a shared blob allocation in <see cref="SharedPtr{T}"/> and
+    /// <see cref="NativeSharedPtr{T}"/> heaps. The framework assigns IDs automatically,
+    /// but callers can supply an explicit <see cref="BlobId"/> to enable content-based
+    /// deduplication (two allocations with the same ID share the same underlying data).
+    /// A zero value represents a null (unallocated) blob.
+    /// </summary>
     [TypeId(283746019)]
     public struct BlobId : IEquatable<BlobId>, IStableHashProvider
     {

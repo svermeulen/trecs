@@ -3,6 +3,9 @@ using Trecs.Collections;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Metadata for a single blob entry in a <see cref="BlobManifest"/>.
+    /// </summary>
     [TypeId(378502946)]
     public struct BlobMetadata
     {
@@ -12,6 +15,10 @@ namespace Trecs
         public bool IsNative;
     }
 
+    /// <summary>
+    /// Index of all known blobs in a <see cref="IBlobStore"/>, mapping
+    /// <see cref="BlobId"/> to <see cref="BlobMetadata"/>.
+    /// </summary>
     [TypeId(767600239)]
     public class BlobManifest
     {

@@ -3,6 +3,12 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Job-safe builder for setting initial component values on a newly created entity.
+    /// Returned by entity-creation APIs; each <see cref="Set{T}"/> call enqueues the
+    /// component into a <see cref="NativeBag"/> for deferred application during the
+    /// next submission phase. Supports fluent chaining.
+    /// </summary>
     public readonly ref struct NativeEntityInitializer
     {
         readonly NativeBag _unsafeBuffer;

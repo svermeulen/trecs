@@ -38,25 +38,18 @@ namespace Trecs
             get { return Group.IsNull; }
         }
 
-        /// <summary>
-        /// Returns true if both operands refer to the same entity index and group.
-        /// </summary>
+        /// <inheritdoc/>
         public static bool operator ==(EntityIndex obj1, EntityIndex obj2)
         {
             return obj1.Index == obj2.Index && obj1.Group == obj2.Group;
         }
 
-        /// <summary>
-        /// Returns true if the operands differ in index or group.
-        /// </summary>
+        /// <inheritdoc/>
         public static bool operator !=(EntityIndex obj1, EntityIndex obj2)
         {
             return obj1.Index != obj2.Index || obj1.Group != obj2.Group;
         }
 
-        /// <summary>
-        /// Creates an EntityIndex with the given buffer index and group.
-        /// </summary>
         public EntityIndex(int index, Group groupId)
             : this()
         {

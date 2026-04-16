@@ -7,8 +7,19 @@ using Unity.Mathematics;
 
 namespace Trecs
 {
-    // Save ourselves 4 bytes by disabling default alignment
-    // Note that some code assumes this is 12 bytes (RigidBody.cs in dots physics)
+    /// <summary>
+    /// Reference-counted pointer to a shared native (unmanaged) heap allocation. Burst-compatible.
+    /// Multiple entities can reference the same data via <see cref="BlobId"/>. Resolve to a
+    /// <c>ref T</c> via <see cref="Get(in NativeSharedPtrResolver)"/> in jobs or
+    /// <see cref="Get(HeapAccessor)"/> on the main thread.
+    /// <para>
+    /// Allocate via <see cref="HeapAccessor.AllocNativeShared{T}"/>. Cloning increments the
+    /// reference count; disposing decrements it and frees when zero.
+    /// </para>
+    /// </summary>
+    /// <remarks>
+    /// Packed with <c>LayoutKind.Sequential, Pack = 1</c> to minimize component size (12 bytes).
+    /// </remarks>
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public readonly unsafe struct NativeSharedPtr<T> : IEquatable<NativeSharedPtr<T>>
         where T : unmanaged

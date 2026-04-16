@@ -20,6 +20,11 @@ namespace Trecs.Internal
 
 namespace Trecs
 {
+    /// <summary>
+    /// Burst-compatible resolver that maps <see cref="BlobId"/> values to native memory addresses
+    /// for <see cref="NativeSharedPtr{T}"/> lookups inside jobs. Obtain via
+    /// <see cref="HeapAccessor.NativeSharedPtrResolver"/> or <see cref="NativeWorldAccessor.SharedPtrResolver"/>.
+    /// </summary>
     public readonly unsafe struct NativeSharedPtrResolver
     {
         readonly NativeDenseDictionary<BlobId, NativeSharedHeapEntry> _entries;

@@ -5,6 +5,12 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Read-only view over the entity indices belonging to one group within a set.
+    /// Used internally by query iterators during iteration. Because this is a
+    /// <c>ref struct</c>, it cannot be stored as a job field — use
+    /// <see cref="NativeEntitySetIndices{TSet}"/> for job-compatible access.
+    /// </summary>
     public ref struct EntitySetIndices
     {
         readonly NativeBuffer<int> _indices;

@@ -2,6 +2,11 @@ using System;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Object pool interface for recycling managed allocations. Supply a custom implementation
+    /// to <see cref="WorldBuilder.SetPoolManager"/> to control how managed heap objects are
+    /// allocated and returned.
+    /// </summary>
     public interface ITrecsPoolManager
     {
         T Spawn<T>()

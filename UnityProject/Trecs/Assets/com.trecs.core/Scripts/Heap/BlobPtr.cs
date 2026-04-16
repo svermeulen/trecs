@@ -5,6 +5,12 @@ using Unity.Mathematics;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Pointer to a managed (class) blob stored in the <see cref="BlobCache"/>. Unlike
+    /// <see cref="SharedPtr{T}"/> which lives in the world's shared heap, blob pointers
+    /// reference data in external <see cref="IBlobStore"/> backends (e.g. disk, asset bundles)
+    /// and support asynchronous loading via <see cref="IBlobPtr.WarmUp"/>.
+    /// </summary>
     public readonly struct BlobPtr<T> : IEquatable<BlobPtr<T>>, IBlobPtr
         where T : class
     {

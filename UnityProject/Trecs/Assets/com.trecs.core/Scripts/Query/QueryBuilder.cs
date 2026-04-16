@@ -3,6 +3,14 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Fluent builder for dense entity queries. Chain <c>WithTags</c>, <c>WithoutTags</c>,
+    /// <c>WithComponents</c>, and <c>WithoutComponents</c> to narrow matching groups, then
+    /// terminate with <see cref="EntityIndices"/>, <see cref="GroupSlices"/>, <see cref="Single"/>,
+    /// or <see cref="Count"/> to consume results. Call <see cref="InSet{T}"/> to switch to
+    /// sparse (set-filtered) iteration via <see cref="SparseQueryBuilder"/>.
+    /// Obtained from <see cref="WorldAccessor.Query"/>.
+    /// </summary>
     public ref struct QueryBuilder
     {
         readonly WorldAccessor _world;

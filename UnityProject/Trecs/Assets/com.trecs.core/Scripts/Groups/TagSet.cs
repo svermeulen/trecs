@@ -5,10 +5,19 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// An immutable, order-independent combination of <see cref="Tag"/>s that uniquely identifies
+    /// a <see cref="Group"/>. Two tag sets containing the same tags always resolve to the same
+    /// <see cref="Id"/>, regardless of the order the tags were specified. Use the generic helpers
+    /// (e.g. <c>TagSet&lt;Red, Fast&gt;.Value</c>) for zero-allocation access in hot paths.
+    /// </summary>
     public readonly struct TagSet : IEquatable<TagSet>, IComparable<TagSet>, IStableHashProvider
     {
         public readonly int Id;
 
+        /// <summary>
+        /// Sentinel value representing an empty tag set.
+        /// </summary>
         public static readonly TagSet Null; //must stay here because of Burst
 
         public TagSet(int id)
@@ -17,6 +26,10 @@ namespace Trecs
             Id = id;
         }
 
+        /// <summary>
+        /// The individual <see cref="Tag"/>s that make up this set. Performs a registry lookup
+        /// on each access — cache the result if called in a tight loop.
+        /// </summary>
         public readonly IReadOnlyList<Tag> Tags
         {
             get { return TagSetRegistry.TagSetToTags(this); }
@@ -95,6 +108,11 @@ namespace Trecs
             return TagSetRegistry.TagsToTagSet(t1, t2, t3, t4);
         }
 
+        /// <summary>
+        /// Returns a new <see cref="TagSet"/> containing the union of this set's tags and
+        /// <paramref name="other"/>'s tags. Returns <c>this</c> unchanged if <paramref name="other"/>
+        /// is null or identical.
+        /// </summary>
         public readonly TagSet CombineWith(TagSet other)
         {
             if (other.IsNull)
@@ -112,6 +130,10 @@ namespace Trecs
         }
     }
 
+    /// <summary>
+    /// Zero-allocation cache for a <see cref="TagSet"/> composed of a single tag type.
+    /// Access via <c>TagSet&lt;T1&gt;.Value</c>.
+    /// </summary>
     public class TagSet<T1>
         where T1 : struct, ITag
     {
@@ -120,6 +142,7 @@ namespace Trecs
         public static void Warmup() { }
     }
 
+    /// <inheritdoc cref="TagSet{T1}"/>
     public class TagSet<T1, T2>
         where T1 : struct, ITag
         where T2 : struct, ITag
@@ -131,6 +154,7 @@ namespace Trecs
         TagSet() { }
     }
 
+    /// <inheritdoc cref="TagSet{T1}"/>
     public class TagSet<T1, T2, T3>
         where T1 : struct, ITag
         where T2 : struct, ITag
@@ -147,6 +171,7 @@ namespace Trecs
         TagSet() { }
     }
 
+    /// <inheritdoc cref="TagSet{T1}"/>
     public class TagSet<T1, T2, T3, T4>
         where T1 : struct, ITag
         where T2 : struct, ITag

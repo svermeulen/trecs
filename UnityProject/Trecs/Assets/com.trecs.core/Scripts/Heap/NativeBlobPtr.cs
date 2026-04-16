@@ -6,6 +6,11 @@ using Unity.Mathematics;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Pointer to a native (unmanaged) blob stored in the <see cref="BlobCache"/>. Resolves
+    /// to a <c>ref T</c> for direct access. Like <see cref="BlobPtr{T}"/> but for unmanaged
+    /// data backed by external <see cref="IBlobStore"/> storage.
+    /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public readonly struct NativeBlobPtr<T> : IEquatable<NativeBlobPtr<T>>, IBlobPtr
         where T : unmanaged

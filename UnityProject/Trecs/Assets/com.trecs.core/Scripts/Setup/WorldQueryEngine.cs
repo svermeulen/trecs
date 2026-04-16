@@ -6,6 +6,10 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Cached query engine that resolves groups matching tag, component, and exclusion criteria.
+    /// Results are memoized so repeated queries within a frame are allocation-free.
+    /// </summary>
     public class WorldQueryEngine
     {
         readonly ReadOnlyFastList<Group> _allGroups;

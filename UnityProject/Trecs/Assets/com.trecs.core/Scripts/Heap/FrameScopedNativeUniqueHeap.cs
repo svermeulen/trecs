@@ -6,6 +6,12 @@ using Unity.Collections;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Frame-scoped heap that owns unmanaged memory via <see cref="NativeUniquePtr{T}"/>.
+    /// Entries are tagged with the frame they were allocated on and can be bulk-cleared
+    /// by frame range. Removals are deferred until <c>FlushPendingOperations</c> to avoid
+    /// racing with Burst jobs that may still be reading through the native resolver.
+    /// </summary>
     public class FrameScopedNativeUniqueHeap
     {
         static readonly TrecsLog _log = new(nameof(FrameScopedNativeUniqueHeap));

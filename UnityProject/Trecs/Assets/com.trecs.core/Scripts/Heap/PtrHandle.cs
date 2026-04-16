@@ -3,6 +3,11 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Opaque handle to a heap-allocated pointer slot. Used as the component-stored reference
+    /// into <see cref="UniquePtr{T}"/>, <see cref="SharedPtr{T}"/>, <see cref="NativeUniquePtr{T}"/>,
+    /// and <see cref="NativeSharedPtr{T}"/>. A zero value represents a null handle.
+    /// </summary>
     [TypeId(604918273)]
     public struct PtrHandle : IEquatable<PtrHandle>, IStableHashProvider
     {

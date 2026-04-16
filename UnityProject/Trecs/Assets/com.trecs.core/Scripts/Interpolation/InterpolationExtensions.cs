@@ -2,6 +2,10 @@ using System.Runtime.CompilerServices;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Extension methods on <see cref="EntityInitializer"/> and <see cref="NativeEntityInitializer"/>
+    /// for initializing an entity with interpolation components in a single call.
+    /// </summary>
     public static class InterpolationExtensions
     {
         public static EntityInitializer SetInterpolated<T>(

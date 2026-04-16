@@ -24,17 +24,13 @@ namespace Trecs
 
         internal int index => UniqueId - 1;
 
-        /// <summary>
-        /// Returns true if both operands refer to the same entity and version.
-        /// </summary>
+        /// <inheritdoc/>
         public static bool operator ==(EntityHandle obj1, EntityHandle obj2)
         {
             return obj1.UniqueId == obj2.UniqueId && obj1.Version == obj2.Version;
         }
 
-        /// <summary>
-        /// Returns true if the operands differ in unique ID or version.
-        /// </summary>
+        /// <inheritdoc/>
         public static bool operator !=(EntityHandle obj1, EntityHandle obj2)
         {
             return obj1.UniqueId != obj2.UniqueId || obj1.Version != obj2.Version;
@@ -56,9 +52,6 @@ namespace Trecs
             return unchecked((int)math.hash(new uint2((uint)UniqueId, (uint)Version)));
         }
 
-        /// <summary>
-        /// Creates an EntityHandle with the given unique ID and version.
-        /// </summary>
         public EntityHandle(int uniqueId, int version)
             : this()
         {

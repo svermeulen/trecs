@@ -4,6 +4,16 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Exclusive-ownership pointer to a managed (class) heap allocation. Each entity
+    /// that holds a <see cref="UniquePtr{T}"/> owns its own independent copy. Allocate via
+    /// <see cref="HeapAccessor.AllocUnique{T}"/> or the frame-scoped variant.
+    /// <para>
+    /// Resolve the value with <see cref="Get(HeapAccessor)"/> or <see cref="Get(WorldAccessor)"/>.
+    /// Frame-scoped pointers are automatically cleaned up; persistent pointers must be
+    /// disposed explicitly via <see cref="Dispose(HeapAccessor)"/>.
+    /// </para>
+    /// </summary>
     public readonly struct UniquePtr<T> : IEquatable<UniquePtr<T>>
         where T : class
     {

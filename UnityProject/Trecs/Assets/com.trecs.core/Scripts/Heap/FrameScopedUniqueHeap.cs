@@ -4,6 +4,11 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Frame-scoped heap that owns managed objects via <see cref="UniquePtr{T}"/>.
+    /// Entries are tagged with the frame they were allocated on and can be bulk-cleared
+    /// by frame range, supporting rollback and replay scenarios.
+    /// </summary>
     public class FrameScopedUniqueHeap
     {
         static readonly TrecsLog _log = new(nameof(FrameScopedUniqueHeap));

@@ -6,6 +6,16 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Exclusive-ownership pointer to a native (unmanaged) heap allocation. Burst-compatible.
+    /// Resolve to a <c>ref readonly T</c> via <see cref="Get(in NativeUniquePtrResolver)"/> in jobs
+    /// or <see cref="Get(HeapAccessor)"/> on the main thread. For mutable access use
+    /// <see cref="NativeUniquePtrExtensions.GetMut{T}"/>.
+    /// <para>
+    /// Allocate via <see cref="HeapAccessor.AllocNativeUnique{T}"/>. Frame-scoped variants
+    /// are cleaned up automatically; persistent pointers must be disposed explicitly.
+    /// </para>
+    /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public readonly unsafe struct NativeUniquePtr<T> : IEquatable<NativeUniquePtr<T>>
         where T : unmanaged

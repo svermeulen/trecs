@@ -62,6 +62,9 @@ namespace Trecs
         }
     }
 
+    /// <summary>
+    /// Zero-allocation cache for a <see cref="ComponentTypeIdSet"/> composed of a single component type.
+    /// </summary>
     public static class ComponentTypeIdSet<T1>
         where T1 : unmanaged, IEntityComponent
     {
@@ -70,6 +73,7 @@ namespace Trecs
         );
     }
 
+    /// <inheritdoc cref="ComponentTypeIdSet{T1}"/>
     public static class ComponentTypeIdSet<T1, T2>
         where T1 : unmanaged, IEntityComponent
         where T2 : unmanaged, IEntityComponent
@@ -79,6 +83,7 @@ namespace Trecs
         );
     }
 
+    /// <inheritdoc cref="ComponentTypeIdSet{T1}"/>
     public static class ComponentTypeIdSet<T1, T2, T3>
         where T1 : unmanaged, IEntityComponent
         where T2 : unmanaged, IEntityComponent
@@ -89,6 +94,7 @@ namespace Trecs
         );
     }
 
+    /// <inheritdoc cref="ComponentTypeIdSet{T1}"/>
     public static class ComponentTypeIdSet<T1, T2, T3, T4>
         where T1 : unmanaged, IEntityComponent
         where T2 : unmanaged, IEntityComponent

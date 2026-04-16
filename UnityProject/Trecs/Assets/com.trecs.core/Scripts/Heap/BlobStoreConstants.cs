@@ -2,6 +2,9 @@ using Trecs.Collections;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Shared constants for blob store file naming and serialization.
+    /// </summary>
     public static class BlobStoreConstants
     {
         // Use .bytes since this can be directly used as assets inside the unity project

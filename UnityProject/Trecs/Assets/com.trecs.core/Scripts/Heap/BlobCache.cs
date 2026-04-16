@@ -7,6 +7,9 @@ using UnityEngine;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Configuration for the <see cref="BlobCache"/> cleanup interval and serialization version.
+    /// </summary>
     public class BlobCacheSettings
     {
         public float CleanIntervalSeconds;
@@ -19,6 +22,10 @@ namespace Trecs
         };
     }
 
+    /// <summary>
+    /// Loading state of a blob in the <see cref="BlobCache"/>. Used with
+    /// <see cref="IBlobPtr.GetLoadingState"/> for asynchronous blob warm-up.
+    /// </summary>
     public enum BlobLoadingState
     {
         NotLoaded,
@@ -26,6 +33,12 @@ namespace Trecs
         Loaded,
     }
 
+    /// <summary>
+    /// Central cache that unifies one or more <see cref="IBlobStore"/> backends, providing
+    /// handle-based access to managed and native blobs. Manages reference counting, periodic
+    /// cache cleanup, and asynchronous blob loading. Register blob stores via
+    /// <see cref="WorldBuilder.AddBlobStore"/>.
+    /// </summary>
     public class BlobCache
     {
         static readonly TrecsLog _log = new(nameof(BlobCache));

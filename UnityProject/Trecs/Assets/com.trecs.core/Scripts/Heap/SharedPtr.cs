@@ -5,6 +5,15 @@ using Unity.Mathematics;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Reference-counted pointer to a shared managed (class) heap allocation. Multiple entities
+    /// can hold a <see cref="SharedPtr{T}"/> referencing the same underlying object, identified
+    /// by a <see cref="BlobId"/>. Allocate via <see cref="HeapAccessor.AllocShared{T}"/>.
+    /// <para>
+    /// Resolve the value with <see cref="Get(HeapAccessor)"/> or <see cref="Get(WorldAccessor)"/>.
+    /// Cloning increments the reference count; disposing decrements it and frees when zero.
+    /// </para>
+    /// </summary>
     public readonly struct SharedPtr<T> : IEquatable<SharedPtr<T>>
         where T : class
     {

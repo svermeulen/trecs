@@ -363,6 +363,12 @@ namespace Trecs
             Dispose(false);
         }
 
+        /// <summary>
+        /// Fires all registered remove-event observers for every existing entity without actually
+        /// removing them. Call this before <see cref="Dispose"/> when
+        /// <see cref="WorldSettings.TriggerRemoveEventsOnDispose"/> is <c>false</c> and you need
+        /// cleanup callbacks to run while accessors are still valid.
+        /// </summary>
         public void TriggerAllRemoveEvents()
         {
             Assert.That(!_hasTriggeredAllRemoveEvents);
@@ -553,7 +559,8 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Only valid if called before Initialize
+        /// Registers a system after world construction but before <see cref="Initialize"/>.
+        /// Throws if called after initialization.
         /// </summary>
         public void AddSystem(ISystem system)
         {
@@ -567,6 +574,10 @@ namespace Trecs
             _systems.AddRange(systems);
         }
 
+        /// <summary>
+        /// Initializes all registered systems, creates the global entity, and performs the first
+        /// entity submission. Must be called exactly once after construction and before <see cref="Tick"/>.
+        /// </summary>
         public void Initialize()
         {
             Assert.That(!_isDisposed);
@@ -612,6 +623,10 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Advances the simulation by one frame. Runs input systems, fixed-update systems (potentially
+        /// multiple times to catch up), and variable-update systems, then ticks the blob cache.
+        /// </summary>
         public void Tick()
         {
             Assert.That(!_isDisposed);
@@ -623,6 +638,9 @@ namespace Trecs
             _blobCache.Tick();
         }
 
+        /// <summary>
+        /// Runs late-variable-update systems. Call after <see cref="Tick"/> each rendered frame.
+        /// </summary>
         public void LateTick()
         {
             Assert.That(!_isDisposed);
@@ -639,6 +657,10 @@ namespace Trecs
             return id;
         }
 
+        /// <summary>
+        /// Creates a standalone <see cref="WorldAccessor"/> not bound to any system. Useful for
+        /// application-level code that needs to interact with the ECS world outside of systems.
+        /// </summary>
         public WorldAccessor CreateAccessor(
             string debugName = null,
 #if DEBUG
@@ -659,6 +681,10 @@ namespace Trecs
             );
         }
 
+        /// <summary>
+        /// Creates a <see cref="WorldAccessor"/> configured for the given system type, inspecting
+        /// its attributes to determine update phase (fixed, variable, or input).
+        /// </summary>
         public WorldAccessor CreateAccessor(Type ownerType)
         {
             var debugName = ownerType.GetPrettyName();

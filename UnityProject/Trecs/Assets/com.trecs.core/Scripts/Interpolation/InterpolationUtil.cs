@@ -2,6 +2,10 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Utility methods for the interpolation subsystem, including computing the
+    /// normalized progress through the current fixed-update interval.
+    /// </summary>
     public static class InterpolationUtil
     {
         static readonly TrecsLog _log = new(nameof(InterpolationUtil));

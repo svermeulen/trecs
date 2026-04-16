@@ -1,10 +1,17 @@
 namespace Trecs
 {
+    /// <summary>
+    /// Disposable reference to a blob allocation in the <see cref="BlobCache"/>.
+    /// </summary>
     public interface IBlobAnchor
     {
         void Dispose(BlobCache blobCache);
     }
 
+    /// <summary>
+    /// Concrete <see cref="IBlobAnchor"/> backed by a <see cref="PtrHandle"/>.
+    /// Disposing releases the blob cache entry.
+    /// </summary>
     public class BlobAnchor : IBlobAnchor
     {
         public readonly PtrHandle Handle;

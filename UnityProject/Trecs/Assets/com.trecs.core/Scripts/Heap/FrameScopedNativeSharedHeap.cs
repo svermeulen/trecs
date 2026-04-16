@@ -5,6 +5,11 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Frame-scoped heap that stores unmanaged blobs via <see cref="NativeSharedPtr{T}"/>
+    /// backed by a <see cref="BlobCache"/>. Entries are tagged with the frame they were
+    /// allocated on and can be bulk-cleared by frame range for rollback and replay.
+    /// </summary>
     public class FrameScopedNativeSharedHeap
     {
         static readonly TrecsLog _log = new(nameof(FrameScopedNativeSharedHeap));

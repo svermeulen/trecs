@@ -5,6 +5,11 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Creates <see cref="Tag"/> instances from <see cref="ITag"/> types. Derives the tag's
+    /// stable integer ID from a <see cref="TagIdAttribute"/> if present, otherwise from a
+    /// deterministic hash of the type's full name. Detects ID collisions in debug builds.
+    /// </summary>
     public static class TagFactory
     {
 #if DEBUG && !TRECS_IS_PROFILING

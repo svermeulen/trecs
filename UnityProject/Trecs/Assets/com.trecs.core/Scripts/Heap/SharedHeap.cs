@@ -6,6 +6,10 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Manages reference-counted managed (class) allocations backing <see cref="SharedPtr{T}"/>.
+    /// Accessed internally through <see cref="HeapAccessor"/>; not typically used directly.
+    /// </summary>
     public class SharedHeap
     {
         static readonly TrecsLog _log = new(nameof(SharedHeap));

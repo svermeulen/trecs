@@ -5,6 +5,11 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// A fully resolved template with inherited components, tags, and groups materialized.
+    /// Created during <see cref="WorldBuilder.Build"/> by flattening the template inheritance
+    /// chain. Use <see cref="WorldInfo"/> to access resolved templates at runtime.
+    /// </summary>
     public class ResolvedTemplate
     {
         public ResolvedTemplate(
@@ -28,8 +33,14 @@ namespace Trecs
             AllBaseTemplates = allBaseTemplates;
         }
 
+        /// <summary>
+        /// All groups this template populates (one per valid state combination).
+        /// </summary>
         public IReadOnlyList<Group> Groups { get; }
 
+        /// <summary>
+        /// The original unresolved template definition.
+        /// </summary>
         public Template Template { get; }
 
         public string DebugName
@@ -37,6 +48,9 @@ namespace Trecs
             get { return Template.DebugName; }
         }
 
+        /// <summary>
+        /// All ancestor templates in the inheritance chain (transitive closure).
+        /// </summary>
         public IReadOnlyList<Template> AllBaseTemplates { get; }
 
         public override string ToString()
@@ -44,13 +58,24 @@ namespace Trecs
             return Template.DebugName;
         }
 
+        /// <summary>
+        /// Combined tag set from this template and all ancestors.
+        /// </summary>
         public TagSet AllTags { get; private set; }
 
+        /// <summary>
+        /// Valid state tag combinations (inherited from the unresolved template).
+        /// </summary>
         public IReadOnlyList<TagSet> States { get; }
 
+        /// <summary>
+        /// All resolved component declarations (local and inherited).
+        /// </summary>
         public IReadOnlyList<IResolvedComponentDeclaration> ComponentDeclarations { get; }
 
-        // This includes all declarations, including inherited ones
+        /// <summary>
+        /// Component builders for all declarations (local and inherited).
+        /// </summary>
         public IComponentBuilder[] ComponentBuilders { get; }
 
         public ReadOnlyDenseDictionary<

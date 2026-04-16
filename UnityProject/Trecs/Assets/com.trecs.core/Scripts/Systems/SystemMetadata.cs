@@ -3,6 +3,10 @@ using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Tick phase in which a system executes. Determines whether the system runs
+    /// on the fixed (deterministic) or variable (render) timeline.
+    /// </summary>
     public enum SystemRunPhase
     {
         Fixed,
@@ -11,6 +15,10 @@ namespace Trecs
         Input,
     }
 
+    /// <summary>
+    /// Runtime descriptor for a registered system, holding its <see cref="ISystem"/> instance,
+    /// dependency graph edges, <see cref="SystemRunPhase"/>, and associated <see cref="WorldAccessor"/>.
+    /// </summary>
     public class SystemMetadata
     {
         public SystemMetadata(

@@ -3,6 +3,11 @@ using Trecs.Collections;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Storage backend for blob data (e.g. disk, asset bundles, in-memory). One or more
+    /// blob stores are composed into a <see cref="BlobCache"/>. Register custom stores via
+    /// <see cref="WorldBuilder.AddBlobStore"/>. The first writable store receives new blobs.
+    /// </summary>
     public interface IBlobStore : IDisposable
     {
         bool TryGetManifestEntry(BlobId id, out BlobMetadata manifestEntry, bool updateAccessTime);

@@ -32,15 +32,11 @@ namespace Trecs
             End = end;
         }
 
-        /// <summary>
-        /// Returns true if both ranges have the same start and end.
-        /// </summary>
+        /// <inheritdoc/>
         public static bool operator ==(EntityRange left, EntityRange right) =>
             left.Start == right.Start && left.End == right.End;
 
-        /// <summary>
-        /// Returns true if the ranges differ in start or end.
-        /// </summary>
+        /// <inheritdoc/>
         public static bool operator !=(EntityRange left, EntityRange right) => !(left == right);
 
         /// <inheritdoc/>

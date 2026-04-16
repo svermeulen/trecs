@@ -7,6 +7,11 @@ using Unity.Collections;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Manages reference-counted native (unmanaged) allocations backing <see cref="NativeSharedPtr{T}"/>.
+    /// Provides a <see cref="NativeSharedPtrResolver"/> for Burst-compatible pointer resolution in jobs.
+    /// Accessed internally through <see cref="HeapAccessor"/>; not typically used directly.
+    /// </summary>
     public class NativeSharedHeap
     {
         static readonly TrecsLog _log = new(nameof(NativeSharedHeap));
