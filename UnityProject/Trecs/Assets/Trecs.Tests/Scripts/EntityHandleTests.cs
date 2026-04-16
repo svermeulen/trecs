@@ -156,18 +156,18 @@ namespace Trecs.Tests
         [Test]
         public void EntityHandle_StableAfterMove()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            var init = a.AddEntity(stateA).Set(new TestInt { Value = 42 }).AssertComplete();
+            var init = a.AddEntity(partitionA).Set(new TestInt { Value = 42 }).AssertComplete();
             var entityHandle = init.Handle;
             a.SubmitEntities();
 
             var entityIndex = entityHandle.ToIndex(a);
-            a.MoveTo(entityIndex, stateB);
+            a.MoveTo(entityIndex, partitionB);
             a.SubmitEntities();
 
             NAssert.IsTrue(a.EntityExists(entityHandle));
@@ -216,14 +216,14 @@ namespace Trecs.Tests
         [Test]
         public void EntityHandle_ToIndex_AfterMultipleStructuralCycles()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
             // Create tracked entity
-            var init = a.AddEntity(stateA)
+            var init = a.AddEntity(partitionA)
                 .Set(new TestInt { Value = 77 })
                 .Set(new TestVec { X = 1.0f, Y = 2.0f })
                 .AssertComplete();
@@ -234,7 +234,7 @@ namespace Trecs.Tests
             var roundRefs = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                var r = a.AddEntity(stateA).Set(new TestInt { Value = i }).AssertComplete();
+                var r = a.AddEntity(partitionA).Set(new TestInt { Value = i }).AssertComplete();
                 roundRefs[i] = r.Handle;
             }
             a.SubmitEntities();
@@ -242,22 +242,24 @@ namespace Trecs.Tests
             a.RemoveEntity(roundRefs[2]);
             a.SubmitEntities();
 
-            // Round 2: move tracked entity to StateB, add 3 more, remove 1
-            a.MoveTo(trackedRef.ToIndex(a), stateB);
+            // Round 2: move tracked entity to PartitionB, add 3 more, remove 1
+            a.MoveTo(trackedRef.ToIndex(a), partitionB);
             var round2Refs = new EntityHandle[3];
             for (int i = 0; i < 3; i++)
             {
-                var r = a.AddEntity(stateA).Set(new TestInt { Value = 100 + i }).AssertComplete();
+                var r = a.AddEntity(partitionA)
+                    .Set(new TestInt { Value = 100 + i })
+                    .AssertComplete();
                 round2Refs[i] = r.Handle;
             }
             a.SubmitEntities();
             a.RemoveEntity(round2Refs[1]);
             a.SubmitEntities();
 
-            // Round 3: add 5 more to StateA
+            // Round 3: add 5 more to PartitionA
             for (int i = 0; i < 5; i++)
             {
-                a.AddEntity(stateA).Set(new TestInt { Value = 200 + i }).AssertComplete();
+                a.AddEntity(partitionA).Set(new TestInt { Value = 200 + i }).AssertComplete();
             }
             a.SubmitEntities();
 

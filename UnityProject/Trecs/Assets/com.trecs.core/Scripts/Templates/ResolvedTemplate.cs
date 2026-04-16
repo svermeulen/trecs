@@ -16,7 +16,7 @@ namespace Trecs
             Template template,
             IReadOnlyList<Group> groups,
             IReadOnlyList<Template> allBaseTemplates,
-            IReadOnlyList<TagSet> states,
+            IReadOnlyList<TagSet> partitions,
             IReadOnlyList<IResolvedComponentDeclaration> componentDeclarations,
             ReadOnlyDenseDictionary<Type, IResolvedComponentDeclaration> componentDeclarationMap,
             IComponentBuilder[] componentBuilders,
@@ -28,13 +28,13 @@ namespace Trecs
             ComponentDeclarations = componentDeclarations;
             ComponentDeclarationMap = componentDeclarationMap;
             ComponentBuilders = componentBuilders;
-            States = states;
+            Partitions = partitions;
             AllTags = tagset;
             AllBaseTemplates = allBaseTemplates;
         }
 
         /// <summary>
-        /// All groups this template populates (one per valid state combination).
+        /// All groups this template populates (one per valid partition combination).
         /// </summary>
         public IReadOnlyList<Group> Groups { get; }
 
@@ -64,9 +64,9 @@ namespace Trecs
         public TagSet AllTags { get; private set; }
 
         /// <summary>
-        /// Valid state tag combinations (inherited from the unresolved template).
+        /// Valid partition tag combinations (inherited from the unresolved template).
         /// </summary>
-        public IReadOnlyList<TagSet> States { get; }
+        public IReadOnlyList<TagSet> Partitions { get; }
 
         /// <summary>
         /// All resolved component declarations (local and inherited).

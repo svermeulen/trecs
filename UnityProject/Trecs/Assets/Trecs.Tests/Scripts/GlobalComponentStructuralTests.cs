@@ -10,15 +10,15 @@ namespace Trecs.Tests
     [TestFixture]
     public class GlobalComponentStructuralTests
     {
-        static readonly TagSet StateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-        static readonly TagSet StateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+        static readonly TagSet PartitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+        static readonly TagSet PartitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
         TestEnvironment CreateEnv() =>
             EcsTestHelper.CreateEnvironment(
                 new WorldSettings(),
                 null,
                 globalsTemplate: TestGlobalsTemplate.Template,
-                TestTemplates.WithStates
+                TestTemplates.WithPartitions
             );
 
         #region Global unaffected by regular entity adds
@@ -34,7 +34,7 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 50; i++)
             {
-                a.AddEntity(StateA)
+                a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete();
@@ -58,7 +58,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[20];
             for (int i = 0; i < 20; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -84,7 +84,7 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 10; i++)
             {
-                a.AddEntity(StateA)
+                a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete();
@@ -93,10 +93,10 @@ namespace Trecs.Tests
 
             a.GlobalComponent<TestGlobalInt>().Write.Value = 77;
 
-            a.RemoveEntitiesWithTags(StateA);
+            a.RemoveEntitiesWithTags(PartitionA);
             a.SubmitEntities();
 
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateA));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(77, a.GlobalComponent<TestGlobalInt>().Read.Value);
         }
 
@@ -113,7 +113,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[10];
             for (int i = 0; i < 10; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -124,7 +124,7 @@ namespace Trecs.Tests
             a.GlobalComponent<TestGlobalInt>().Write.Value = 123;
 
             for (int i = 0; i < 5; i++)
-                a.MoveTo(handles[i].ToIndex(a), StateB);
+                a.MoveTo(handles[i].ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             NAssert.AreEqual(123, a.GlobalComponent<TestGlobalInt>().Read.Value);
@@ -143,7 +143,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[10];
             for (int i = 0; i < 10; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -156,12 +156,12 @@ namespace Trecs.Tests
 
             // Mix: move 0-2, remove 3-5, add 3 new
             for (int i = 0; i < 3; i++)
-                a.MoveTo(handles[i].ToIndex(a), StateB);
+                a.MoveTo(handles[i].ToIndex(a), PartitionB);
             for (int i = 3; i < 6; i++)
                 a.RemoveEntity(handles[i]);
             for (int i = 0; i < 3; i++)
             {
-                a.AddEntity(StateA)
+                a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = 100 + i })
                     .Set(new TestVec())
                     .AssertComplete();
@@ -185,7 +185,7 @@ namespace Trecs.Tests
             // Frame 1: add entities, set global
             for (int i = 0; i < 5; i++)
             {
-                a.AddEntity(StateA)
+                a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete();
@@ -195,7 +195,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(10, a.GlobalComponent<TestGlobalInt>().Read.Value);
 
             // Frame 2: remove some, update global
-            a.RemoveEntitiesWithTags(StateA);
+            a.RemoveEntitiesWithTags(PartitionA);
             a.GlobalComponent<TestGlobalInt>().Write.Value = 20;
             a.SubmitEntities();
             NAssert.AreEqual(20, a.GlobalComponent<TestGlobalInt>().Read.Value);
@@ -203,7 +203,7 @@ namespace Trecs.Tests
             // Frame 3: add more, update global again
             for (int i = 0; i < 3; i++)
             {
-                a.AddEntity(StateB)
+                a.AddEntity(PartitionB)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete();
@@ -230,7 +230,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -239,13 +239,13 @@ namespace Trecs.Tests
             a.SubmitEntities();
             NAssert.IsTrue(a.EntityExists(globalHandle), "After adds");
 
-            a.MoveTo(handles[0].ToIndex(a), StateB);
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
             a.RemoveEntity(handles[1]);
             a.SubmitEntities();
             NAssert.IsTrue(a.EntityExists(globalHandle), "After move+remove");
 
-            a.RemoveEntitiesWithTags(StateA);
-            a.RemoveEntitiesWithTags(StateB);
+            a.RemoveEntitiesWithTags(PartitionA);
+            a.RemoveEntitiesWithTags(PartitionB);
             a.SubmitEntities();
             NAssert.IsTrue(
                 a.EntityExists(globalHandle),
@@ -265,7 +265,7 @@ namespace Trecs.Tests
 
             a.GlobalComponent<TestGlobalInt>().Write.Value = 88;
 
-            var handle = a.AddEntity(StateA)
+            var handle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestVec())
                 .AssertComplete()
@@ -274,7 +274,7 @@ namespace Trecs.Tests
 
             int globalValueInCallback = -1;
             var sub = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -302,7 +302,7 @@ namespace Trecs.Tests
             a.GlobalComponent<TestGlobalInt>().Write.Value = 0;
 
             var sub = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnAdded(
                     (group, indices) =>
                     {
@@ -312,7 +312,7 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 5; i++)
             {
-                a.AddEntity(StateA)
+                a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete();

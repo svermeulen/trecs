@@ -5,8 +5,8 @@ namespace Trecs.Samples.FeedingFrenzy101
     /// <summary>
     /// Pairs idle fish with available meals each frame.
     ///
-    /// Demonstrates: Aspect queries with state-based tag filtering
-    /// and MoveTo state transitions.
+    /// Demonstrates: Aspect queries with partition-based tag filtering
+    /// and MoveTo partition transitions.
     ///
     /// This system is serial (not a job) because pairing fish 1:1 with
     /// meals is inherently sequential — each pairing removes both from
@@ -50,7 +50,7 @@ namespace Trecs.Samples.FeedingFrenzy101
             fish.Velocity = dir * fish.Speed;
             fish.SimRotation = quaternion.LookRotationSafe(dir, math.up());
 
-            // Transition both to Eating state — this moves them into
+            // Transition both to Eating partition — this moves them into
             // separate groups so eating systems only iterate eating entities
             fish.MoveTo<FrenzyTags.Fish, FrenzyTags.Eating>(World);
             meal.MoveTo<FrenzyTags.Meal, FrenzyTags.Eating>(World);

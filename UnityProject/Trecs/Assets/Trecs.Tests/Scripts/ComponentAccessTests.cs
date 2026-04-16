@@ -285,10 +285,10 @@ namespace Trecs.Tests
         [Test]
         public void Component_ThreeTypeQuery_ReturnsAlignedBuffers()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var tags = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
+            var tags = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
             for (int i = 0; i < 4; i++)
             {
                 a.AddEntity(tags)
@@ -385,14 +385,14 @@ namespace Trecs.Tests
         [Test]
         public void NativeComponentLookup_AcrossMultipleGroups()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            a.AddEntity(stateA).Set(new TestInt { Value = 100 }).AssertComplete();
-            a.AddEntity(stateB).Set(new TestInt { Value = 200 }).AssertComplete();
+            a.AddEntity(partitionA).Set(new TestInt { Value = 100 }).AssertComplete();
+            a.AddEntity(partitionB).Set(new TestInt { Value = 200 }).AssertComplete();
             a.SubmitEntities();
 
             // Lookup scoped to all Gamma-tagged groups
@@ -401,8 +401,8 @@ namespace Trecs.Tests
                 Allocator.TempJob
             );
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(stateA);
-            var groupB = a.WorldInfo.GetSingleGroupWithTags(stateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
+            var groupB = a.WorldInfo.GetSingleGroupWithTags(partitionB);
 
             NAssert.AreEqual(100, lookup[new EntityIndex(0, groupA)].Value);
             NAssert.AreEqual(200, lookup[new EntityIndex(0, groupB)].Value);
@@ -438,20 +438,20 @@ namespace Trecs.Tests
         [Test]
         public void QueryEntities_MultipleGroups_IteratesAll()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateAGroups = a.WorldInfo.GetGroupsWithTags(
-                TagSet.FromTags(TestTags.Gamma, TestTags.StateA)
+            var partitionAGroups = a.WorldInfo.GetGroupsWithTags(
+                TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA)
             );
-            var stateBGroups = a.WorldInfo.GetGroupsWithTags(
-                TagSet.FromTags(TestTags.Gamma, TestTags.StateB)
+            var partitionBGroups = a.WorldInfo.GetGroupsWithTags(
+                TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB)
             );
 
-            a.AddEntity(TagSet.FromTags(TestTags.Gamma, TestTags.StateA))
+            a.AddEntity(TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA))
                 .Set(new TestInt { Value = 1 })
                 .AssertComplete();
-            a.AddEntity(TagSet.FromTags(TestTags.Gamma, TestTags.StateB))
+            a.AddEntity(TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB))
                 .Set(new TestInt { Value = 2 })
                 .AssertComplete();
             a.SubmitEntities();
@@ -472,10 +472,10 @@ namespace Trecs.Tests
         [Test]
         public void QueryEntities_SkipsEmptyGroups()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            a.AddEntity(TagSet.FromTags(TestTags.Gamma, TestTags.StateA))
+            a.AddEntity(TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA))
                 .Set(new TestInt { Value = 1 })
                 .AssertComplete();
             a.SubmitEntities();

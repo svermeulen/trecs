@@ -17,7 +17,7 @@ namespace Trecs.Tests
             var t = new Template(
                 debugName: "MyTemplate",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
                 localTags: new Tag[] { TestTags.Alpha }
             );
@@ -31,7 +31,7 @@ namespace Trecs.Tests
             var t = new Template(
                 debugName: "TaggedTemplate",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
                 localTags: new Tag[] { TestTags.Alpha, TestTags.Beta }
             );
@@ -47,7 +47,7 @@ namespace Trecs.Tests
             var t = new Template(
                 debugName: "OneComp",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
@@ -73,7 +73,7 @@ namespace Trecs.Tests
             var t = new Template(
                 debugName: "MultiComp",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
@@ -114,15 +114,15 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Template_States_SetsStates()
+        public void Template_Partitions_SetsPartitions()
         {
             var t = new Template(
                 debugName: "StatefulTemplate",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: new TagSet[]
+                partitions: new TagSet[]
                 {
-                    TagSet.FromTags(TestTags.StateA),
-                    TagSet.FromTags(TestTags.StateB),
+                    TagSet.FromTags(TestTags.PartitionA),
+                    TagSet.FromTags(TestTags.PartitionB),
                 },
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
@@ -140,7 +140,7 @@ namespace Trecs.Tests
                 localTags: new Tag[] { TestTags.Gamma }
             );
 
-            NAssert.AreEqual(2, t.States.Count);
+            NAssert.AreEqual(2, t.Partitions.Count);
         }
 
         #endregion
@@ -153,7 +153,7 @@ namespace Trecs.Tests
             var parent = new Template(
                 debugName: "Parent",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
@@ -173,7 +173,7 @@ namespace Trecs.Tests
             var child = new Template(
                 debugName: "Child",
                 localBaseTemplates: new Template[] { parent },
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
                 localTags: new Tag[] { TestTags.Beta }
             );
@@ -188,7 +188,7 @@ namespace Trecs.Tests
             var parent = new Template(
                 debugName: "ParentForChild",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
@@ -208,7 +208,7 @@ namespace Trecs.Tests
             var child = new Template(
                 debugName: "ChildWithOwn",
                 localBaseTemplates: new Template[] { parent },
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestFloat>(
@@ -240,7 +240,7 @@ namespace Trecs.Tests
             var t = new Template(
                 debugName: "DefaultTest",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
@@ -271,7 +271,7 @@ namespace Trecs.Tests
             var t = new Template(
                 debugName: "InterpTemplate",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
@@ -300,7 +300,7 @@ namespace Trecs.Tests
             var t = new Template(
                 debugName: "InputTemplate",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(

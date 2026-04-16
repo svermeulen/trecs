@@ -193,47 +193,47 @@ namespace Trecs.Tests
         [Test]
         public void EntityCrud_MoveEntity_ChangesGroup()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            a.AddEntity(stateA).AssertComplete();
+            a.AddEntity(partitionA).AssertComplete();
             a.SubmitEntities();
 
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(stateA));
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(stateB));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionA));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(partitionB));
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(stateA);
-            a.MoveTo(new EntityIndex(0, groupA), stateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
+            a.MoveTo(new EntityIndex(0, groupA), partitionB);
             a.SubmitEntities();
 
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(stateA));
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(stateB));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(partitionA));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionB));
         }
 
         [Test]
         public void EntityCrud_MoveEntity_PreservesComponents()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            a.AddEntity(stateA)
+            a.AddEntity(partitionA)
                 .Set(new TestInt { Value = 77 })
                 .Set(new TestVec { X = 1.5f, Y = 2.5f })
                 .AssertComplete();
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(stateA);
-            a.MoveTo(new EntityIndex(0, groupA), stateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
+            a.MoveTo(new EntityIndex(0, groupA), partitionB);
             a.SubmitEntities();
 
-            var intComp = a.Query().WithTags(stateB).Single().Get<TestInt>();
-            var vecComp = a.Query().WithTags(stateB).Single().Get<TestVec>();
+            var intComp = a.Query().WithTags(partitionB).Single().Get<TestInt>();
+            var vecComp = a.Query().WithTags(partitionB).Single().Get<TestVec>();
 
             NAssert.AreEqual(77, intComp.Read.Value);
             NAssert.AreEqual(1.5f, vecComp.Read.X, 0.001f);
@@ -243,18 +243,18 @@ namespace Trecs.Tests
         [Test]
         public void EntityCrud_MoveEntity_EntityHandleStaysValid()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            var init = a.AddEntity(stateA).AssertComplete();
+            var init = a.AddEntity(partitionA).AssertComplete();
             var entityHandle = init.Handle;
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(stateA);
-            a.MoveTo(new EntityIndex(0, groupA), stateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
+            a.MoveTo(new EntityIndex(0, groupA), partitionB);
             a.SubmitEntities();
 
             NAssert.IsTrue(a.EntityExists(entityHandle));
@@ -263,22 +263,22 @@ namespace Trecs.Tests
         [Test]
         public void EntityCrud_MoveEntity_CountsUpdate()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            a.AddEntity(stateA).AssertComplete();
-            a.AddEntity(stateA).AssertComplete();
+            a.AddEntity(partitionA).AssertComplete();
+            a.AddEntity(partitionA).AssertComplete();
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(stateA);
-            a.MoveTo(new EntityIndex(0, groupA), stateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
+            a.MoveTo(new EntityIndex(0, groupA), partitionB);
             a.SubmitEntities();
 
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(stateA));
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(stateB));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionA));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionB));
         }
 
         #endregion

@@ -151,18 +151,18 @@ namespace Trecs.Tests
         [Test]
         public void Observer_OnMoved_Fires()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            a.AddEntity(stateA).AssertComplete();
+            a.AddEntity(partitionA).AssertComplete();
             a.SubmitEntities();
 
             int callCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(stateB)
+                .Events.InGroupsWithTags(partitionB)
                 .OnMoved(
                     (Group fromGroup, Group toGroup, EntityRange indices) =>
                     {
@@ -170,8 +170,8 @@ namespace Trecs.Tests
                     }
                 );
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(stateA);
-            a.MoveTo(new EntityIndex(0, groupA), stateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
+            a.MoveTo(new EntityIndex(0, groupA), partitionB);
             a.SubmitEntities();
 
             NAssert.Greater(callCount, 0);
@@ -181,23 +181,23 @@ namespace Trecs.Tests
         [Test]
         public void Observer_OnMoved_CorrectGroups()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            a.AddEntity(stateA).AssertComplete();
+            a.AddEntity(partitionA).AssertComplete();
             a.SubmitEntities();
 
-            var expectedGroupA = a.WorldInfo.GetSingleGroupWithTags(stateA);
-            var expectedGroupB = a.WorldInfo.GetSingleGroupWithTags(stateB);
+            var expectedGroupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
+            var expectedGroupB = a.WorldInfo.GetSingleGroupWithTags(partitionB);
 
             Group observedFrom = default;
             Group observedTo = default;
 
             var sub = a
-                .Events.InGroupsWithTags(stateB)
+                .Events.InGroupsWithTags(partitionB)
                 .OnMoved(
                     (Group fromGroup, Group toGroup, EntityRange indices) =>
                     {
@@ -206,7 +206,7 @@ namespace Trecs.Tests
                     }
                 );
 
-            a.MoveTo(new EntityIndex(0, expectedGroupA), stateB);
+            a.MoveTo(new EntityIndex(0, expectedGroupA), partitionB);
             a.SubmitEntities();
 
             NAssert.AreEqual(expectedGroupA, observedFrom);
@@ -253,18 +253,18 @@ namespace Trecs.Tests
         [Test]
         public void Observer_OnMoved_CanReadComponentDataInNewGroup()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            a.AddEntity(stateA).Set(new TestInt { Value = 88 }).AssertComplete();
+            a.AddEntity(partitionA).Set(new TestInt { Value = 88 }).AssertComplete();
             a.SubmitEntities();
 
             int observedValue = -1;
             var sub = a
-                .Events.InGroupsWithTags(stateB)
+                .Events.InGroupsWithTags(partitionB)
                 .OnMoved(
                     (Group fromGroup, Group toGroup, EntityRange indices) =>
                     {
@@ -277,8 +277,8 @@ namespace Trecs.Tests
                     }
                 );
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(stateA);
-            a.MoveTo(new EntityIndex(0, groupA), stateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
+            a.MoveTo(new EntityIndex(0, groupA), partitionB);
             a.SubmitEntities();
 
             NAssert.AreEqual(

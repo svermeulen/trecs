@@ -1,10 +1,10 @@
 using Unity.Mathematics;
 
-namespace Trecs.Samples.States
+namespace Trecs.Samples.Partitions
 {
     /// <summary>
     /// Counts down the rest timer on Resting balls. When the timer expires,
-    /// the ball is launched upward and transitions back to Active state.
+    /// the ball is launched upward and transitions back to the Active partition.
     /// </summary>
     [ExecutesAfter(typeof(PhysicsSystem))]
     public partial class WakeUpSystem : ISystem

@@ -55,14 +55,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 )
                 .AddEntityTypes(GetTemplates(config));
 
-            if (config.StateApproach == FrenzyStateApproach.Sets)
+            if (config.SubsetApproach == FrenzySubsetApproach.Sets)
             {
                 worldBuilder.AddSet<FrenzySets.Eating>().AddSet<FrenzySets.NotEating>();
             }
 
             var world = worldBuilder.Build();
 
-            var stateApproachDynamicSwitcher = new StateApproachDynamicSwitcher(world);
+            var subsetApproachDynamicSwitcher = new SubsetApproachDynamicSwitcher(world);
             var serialization = TrecsSerialization.Create(world);
             var recordAndPlayback = new RecordAndPlaybackController(
                 serialization,
@@ -152,7 +152,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 presetInput.Tick,
                 recordAndPlayback.Tick,
                 world.Tick,
-                stateApproachDynamicSwitcher.Tick,
+                subsetApproachDynamicSwitcher.Tick,
             };
 
             lateTickables = new() { world.LateTick };
@@ -186,12 +186,12 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
         Template[] GetTemplates(FrenzyConfigSettings config)
         {
-            if (config.StateApproach == FrenzyStateApproach.States)
+            if (config.SubsetApproach == FrenzySubsetApproach.Partitions)
             {
                 return new Template[]
                 {
-                    Templates.StatesFishEntity.Template,
-                    Templates.StatesMealEntity.Template,
+                    Templates.PartitionsFishEntity.Template,
+                    Templates.PartitionsMealEntity.Template,
                     Templates.Globals.Template,
                 };
             }
@@ -205,29 +205,29 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         }
 
         static ISystem CreateLookingForMealSystem(FrenzyConfigSettings config) =>
-            config.StateApproach switch
+            config.SubsetApproach switch
             {
-                FrenzyStateApproach.Branching => new Branching.LookingForMealSystem(),
-                FrenzyStateApproach.Sets => new Sets.LookingForMealSystem(),
-                FrenzyStateApproach.States => new States.LookingForMealSystem(),
+                FrenzySubsetApproach.Branching => new Branching.LookingForMealSystem(),
+                FrenzySubsetApproach.Sets => new Sets.LookingForMealSystem(),
+                FrenzySubsetApproach.Partitions => new Partitions.LookingForMealSystem(),
                 _ => throw new ArgumentOutOfRangeException(),
             };
 
         static ISystem CreateConsumingMealSystem(FrenzyConfigSettings config) =>
-            config.StateApproach switch
+            config.SubsetApproach switch
             {
-                FrenzyStateApproach.Branching => new Branching.ConsumingMealSystem(),
-                FrenzyStateApproach.Sets => new Sets.ConsumingMealSystem(),
-                FrenzyStateApproach.States => new States.ConsumingMealSystem(),
+                FrenzySubsetApproach.Branching => new Branching.ConsumingMealSystem(),
+                FrenzySubsetApproach.Sets => new Sets.ConsumingMealSystem(),
+                FrenzySubsetApproach.Partitions => new Partitions.ConsumingMealSystem(),
                 _ => throw new ArgumentOutOfRangeException(),
             };
 
         static ISystem CreateMovementSystem(FrenzyConfigSettings config) =>
-            config.StateApproach switch
+            config.SubsetApproach switch
             {
-                FrenzyStateApproach.Branching => new Branching.MovementSystem(),
-                FrenzyStateApproach.Sets => new Sets.MovementSystem(),
-                FrenzyStateApproach.States => new States.MovementSystem(),
+                FrenzySubsetApproach.Branching => new Branching.MovementSystem(),
+                FrenzySubsetApproach.Sets => new Sets.MovementSystem(),
+                FrenzySubsetApproach.Partitions => new Partitions.MovementSystem(),
                 _ => throw new ArgumentOutOfRangeException(),
             };
 
@@ -235,11 +235,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             FrenzyConfigSettings config,
             IdleBobSystemSettings settings
         ) =>
-            config.StateApproach switch
+            config.SubsetApproach switch
             {
-                FrenzyStateApproach.Branching => new Branching.IdleBobSystem(settings),
-                FrenzyStateApproach.Sets => new Sets.IdleBobSystem(settings),
-                FrenzyStateApproach.States => new States.IdleBobSystem(settings),
+                FrenzySubsetApproach.Branching => new Branching.IdleBobSystem(settings),
+                FrenzySubsetApproach.Sets => new Sets.IdleBobSystem(settings),
+                FrenzySubsetApproach.Partitions => new Partitions.IdleBobSystem(settings),
                 _ => throw new ArgumentOutOfRangeException(),
             };
 

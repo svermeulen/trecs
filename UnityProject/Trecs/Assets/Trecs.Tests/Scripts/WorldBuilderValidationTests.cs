@@ -85,7 +85,7 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(
                 TestTemplates.SimpleAlpha,
                 TestTemplates.TwoCompBeta,
-                TestTemplates.WithStates
+                TestTemplates.WithPartitions
             );
 
             NAssert.IsNotNull(env.Accessor);

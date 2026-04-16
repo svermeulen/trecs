@@ -81,25 +81,25 @@ namespace Trecs
         where T4 : struct, ITag { }
 
     /// <summary>
-    /// Declares a valid state combination on a template. Each IHasState implementation
-    /// represents one valid state. Type args are tag types that form the state's TagSet.
+    /// Declares a valid partition on a template. Each IHasPartition implementation
+    /// represents one valid partition. Type args are tag types that form the partition's TagSet.
     /// </summary>
-    public interface IHasState<T1>
+    public interface IHasPartition<T1>
         where T1 : struct, ITag { }
 
-    /// <inheritdoc cref="IHasState{T1}"/>
-    public interface IHasState<T1, T2>
+    /// <inheritdoc cref="IHasPartition{T1}"/>
+    public interface IHasPartition<T1, T2>
         where T1 : struct, ITag
         where T2 : struct, ITag { }
 
-    /// <inheritdoc cref="IHasState{T1}"/>
-    public interface IHasState<T1, T2, T3>
+    /// <inheritdoc cref="IHasPartition{T1}"/>
+    public interface IHasPartition<T1, T2, T3>
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag { }
 
-    /// <inheritdoc cref="IHasState{T1}"/>
-    public interface IHasState<T1, T2, T3, T4>
+    /// <inheritdoc cref="IHasPartition{T1}"/>
+    public interface IHasPartition<T1, T2, T3, T4>
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag

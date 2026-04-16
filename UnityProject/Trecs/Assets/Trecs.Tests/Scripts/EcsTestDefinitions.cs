@@ -9,8 +9,8 @@ namespace Trecs.Tests
         public static readonly Tag Beta = new(990000002, "TestBeta");
         public static readonly Tag Gamma = new(990000003, "TestGamma");
         public static readonly Tag Delta = new(990000004, "TestDelta");
-        public static readonly Tag StateA = new(990000005, "TestStateA");
-        public static readonly Tag StateB = new(990000006, "TestStateB");
+        public static readonly Tag PartitionA = new(990000005, "TestPartitionA");
+        public static readonly Tag PartitionB = new(990000006, "TestPartitionB");
         public static readonly Tag Epsilon = new(990000007, "TestEpsilon");
     }
 
@@ -36,7 +36,7 @@ namespace Trecs.Tests
             new Template(
                 debugName: "TestSimpleAlpha",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
@@ -57,7 +57,7 @@ namespace Trecs.Tests
             new Template(
                 debugName: "TestTwoCompBeta",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
@@ -84,14 +84,14 @@ namespace Trecs.Tests
                 localTags: new Tag[] { TestTags.Beta }
             );
 
-        public static Template WithStates =>
+        public static Template WithPartitions =>
             new Template(
-                debugName: "TestWithStates",
+                debugName: "TestWithPartitions",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: new TagSet[]
+                partitions: new TagSet[]
                 {
-                    TagSet.FromTags(TestTags.StateA),
-                    TagSet.FromTags(TestTags.StateB),
+                    TagSet.FromTags(TestTags.PartitionA),
+                    TagSet.FromTags(TestTags.PartitionB),
                 },
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
@@ -123,7 +123,7 @@ namespace Trecs.Tests
             new Template(
                 debugName: "TestZeroComponents",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
                 localTags: new Tag[] { TestTags.Epsilon }
             );
@@ -132,7 +132,7 @@ namespace Trecs.Tests
             new Template(
                 debugName: "TestWithDefaults",
                 localBaseTemplates: Array.Empty<Template>(),
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
@@ -163,7 +163,7 @@ namespace Trecs.Tests
             new Template(
                 debugName: "TestChildOfAlpha",
                 localBaseTemplates: new Template[] { SimpleAlpha },
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestFloat>(
@@ -184,7 +184,7 @@ namespace Trecs.Tests
             new Template(
                 debugName: "TestChildWithDefaults",
                 localBaseTemplates: new Template[] { WithDefaults },
-                states: Array.Empty<TagSet>(),
+                partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestVec>(

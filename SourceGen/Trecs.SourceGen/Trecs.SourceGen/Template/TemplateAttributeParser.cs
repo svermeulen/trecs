@@ -10,7 +10,7 @@ using Trecs.SourceGen.Shared;
 namespace Trecs.SourceGen.Template
 {
     /// <summary>
-    /// Parses template class declarations: extracts tags, base templates, states, components, and defaults
+    /// Parses template class declarations: extracts tags, base templates, partitions, components, and defaults
     /// </summary>
     internal static class TemplateAttributeParser
     {
@@ -33,7 +33,7 @@ namespace Trecs.SourceGen.Template
             var tagTypeNames = ExtractTagTypeNames(symbol);
             var baseTemplateTypeNames = ExtractBaseTemplateTypeNames(symbol);
             var isGlobals = IsGlobalsTemplate(symbol);
-            var states = ExtractStates(symbol);
+            var partitions = ExtractPartitions(symbol);
             var defaultInitializedFields = GetDefaultInitializedFields(syntax);
             var components = ExtractComponents(symbol, defaultInitializedFields);
 
@@ -47,7 +47,7 @@ namespace Trecs.SourceGen.Template
                 tagTypeNames,
                 baseTemplateTypeNames,
                 components,
-                states
+                partitions
             );
         }
 
@@ -94,24 +94,24 @@ namespace Trecs.SourceGen.Template
         }
 
         /// <summary>
-        /// Extracts state combinations from IHasState&lt;T1, T2, ...&gt; interfaces
+        /// Extracts partition combinations from IHasPartition&lt;T1, T2, ...&gt; interfaces
         /// </summary>
-        private static ImmutableArray<TemplateStateData> ExtractStates(INamedTypeSymbol symbol)
+        private static ImmutableArray<TemplatePartitionData> ExtractPartitions(INamedTypeSymbol symbol)
         {
-            var states = new List<TemplateStateData>();
+            var partitions = new List<TemplatePartitionData>();
 
             foreach (var iface in symbol.Interfaces)
             {
-                if (IsIHasStateInterface(iface))
+                if (IsIHasPartitionInterface(iface))
                 {
                     var tagNames = iface
                         .TypeArguments.Select(t => PerformanceCache.GetDisplayString(t))
                         .ToImmutableArray();
-                    states.Add(new TemplateStateData(tagNames));
+                    partitions.Add(new TemplatePartitionData(tagNames));
                 }
             }
 
-            return states.ToImmutableArray();
+            return partitions.ToImmutableArray();
         }
 
         /// <summary>
@@ -278,10 +278,10 @@ namespace Trecs.SourceGen.Template
                 && IsInTrecsNamespace(iface);
         }
 
-        private static bool IsIHasStateInterface(INamedTypeSymbol iface)
+        private static bool IsIHasPartitionInterface(INamedTypeSymbol iface)
         {
             return iface.IsGenericType
-                && iface.OriginalDefinition.Name == "IHasState"
+                && iface.OriginalDefinition.Name == "IHasPartition"
                 && IsInTrecsNamespace(iface);
         }
 

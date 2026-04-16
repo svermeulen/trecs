@@ -10,13 +10,13 @@ namespace Trecs.Tests
     [TestFixture]
     public class DeterministicSubmissionTests
     {
-        static readonly TagSet StateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-        static readonly TagSet StateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+        static readonly TagSet PartitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+        static readonly TagSet PartitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
         TestEnvironment CreateEnv()
         {
             var settings = new WorldSettings { RequireDeterministicSubmission = true };
-            return EcsTestHelper.CreateEnvironment(settings, TestTemplates.WithStates);
+            return EcsTestHelper.CreateEnvironment(settings, TestTemplates.WithPartitions);
         }
 
         #region Deterministic native removes
@@ -38,7 +38,7 @@ namespace Trecs.Tests
                 var handles = new EntityHandle[6];
                 for (int i = 0; i < 6; i++)
                 {
-                    handles[i] = a.AddEntity(StateA)
+                    handles[i] = a.AddEntity(PartitionA)
                         .Set(new TestInt { Value = i })
                         .Set(new TestVec())
                         .AssertComplete()
@@ -51,7 +51,7 @@ namespace Trecs.Tests
                 nativeEcs.RemoveEntity(handles[4].ToIndex(a));
                 a.SubmitEntities();
 
-                survivorValuesForward = CollectValues(a, StateA);
+                survivorValuesForward = CollectValues(a, PartitionA);
             }
 
             // Run 2: remove in reverse order (4, 2, 0)
@@ -63,7 +63,7 @@ namespace Trecs.Tests
                 var handles = new EntityHandle[6];
                 for (int i = 0; i < 6; i++)
                 {
-                    handles[i] = a.AddEntity(StateA)
+                    handles[i] = a.AddEntity(PartitionA)
                         .Set(new TestInt { Value = i })
                         .Set(new TestVec())
                         .AssertComplete()
@@ -76,7 +76,7 @@ namespace Trecs.Tests
                 nativeEcs.RemoveEntity(handles[0].ToIndex(a));
                 a.SubmitEntities();
 
-                survivorValuesReverse = CollectValues(a, StateA);
+                survivorValuesReverse = CollectValues(a, PartitionA);
             }
 
             NAssert.AreEqual(survivorValuesForward.Length, survivorValuesReverse.Length);
@@ -105,7 +105,7 @@ namespace Trecs.Tests
                 var handles = new EntityHandle[10];
                 for (int i = 0; i < 10; i++)
                 {
-                    handles[i] = a.AddEntity(StateA)
+                    handles[i] = a.AddEntity(PartitionA)
                         .Set(new TestInt { Value = i })
                         .Set(new TestVec())
                         .AssertComplete()
@@ -120,7 +120,7 @@ namespace Trecs.Tests
                 nativeEcs.RemoveEntity(handles[3].ToIndex(a));
                 a.SubmitEntities();
 
-                valuesScattered = CollectValues(a, StateA);
+                valuesScattered = CollectValues(a, PartitionA);
             }
 
             // Run 2: sorted removal order
@@ -132,7 +132,7 @@ namespace Trecs.Tests
                 var handles = new EntityHandle[10];
                 for (int i = 0; i < 10; i++)
                 {
-                    handles[i] = a.AddEntity(StateA)
+                    handles[i] = a.AddEntity(PartitionA)
                         .Set(new TestInt { Value = i })
                         .Set(new TestVec())
                         .AssertComplete()
@@ -147,7 +147,7 @@ namespace Trecs.Tests
                 nativeEcs.RemoveEntity(handles[7].ToIndex(a));
                 a.SubmitEntities();
 
-                valuesSorted = CollectValues(a, StateA);
+                valuesSorted = CollectValues(a, PartitionA);
             }
 
             NAssert.AreEqual(valuesScattered.Length, valuesSorted.Length);
@@ -182,7 +182,7 @@ namespace Trecs.Tests
                 var handles = new EntityHandle[6];
                 for (int i = 0; i < 6; i++)
                 {
-                    handles[i] = a.AddEntity(StateA)
+                    handles[i] = a.AddEntity(PartitionA)
                         .Set(new TestInt { Value = i })
                         .Set(new TestVec())
                         .AssertComplete()
@@ -190,13 +190,13 @@ namespace Trecs.Tests
                 }
                 a.SubmitEntities();
 
-                nativeEcs.MoveTo(handles[0].ToIndex(a), StateB);
-                nativeEcs.MoveTo(handles[2].ToIndex(a), StateB);
-                nativeEcs.MoveTo(handles[4].ToIndex(a), StateB);
+                nativeEcs.MoveTo(handles[0].ToIndex(a), PartitionB);
+                nativeEcs.MoveTo(handles[2].ToIndex(a), PartitionB);
+                nativeEcs.MoveTo(handles[4].ToIndex(a), PartitionB);
                 a.SubmitEntities();
 
-                stateAForward = CollectValues(a, StateA);
-                stateBForward = CollectValues(a, StateB);
+                stateAForward = CollectValues(a, PartitionA);
+                stateBForward = CollectValues(a, PartitionB);
             }
 
             // Run 2: move in reverse order
@@ -208,7 +208,7 @@ namespace Trecs.Tests
                 var handles = new EntityHandle[6];
                 for (int i = 0; i < 6; i++)
                 {
-                    handles[i] = a.AddEntity(StateA)
+                    handles[i] = a.AddEntity(PartitionA)
                         .Set(new TestInt { Value = i })
                         .Set(new TestVec())
                         .AssertComplete()
@@ -216,13 +216,13 @@ namespace Trecs.Tests
                 }
                 a.SubmitEntities();
 
-                nativeEcs.MoveTo(handles[4].ToIndex(a), StateB);
-                nativeEcs.MoveTo(handles[2].ToIndex(a), StateB);
-                nativeEcs.MoveTo(handles[0].ToIndex(a), StateB);
+                nativeEcs.MoveTo(handles[4].ToIndex(a), PartitionB);
+                nativeEcs.MoveTo(handles[2].ToIndex(a), PartitionB);
+                nativeEcs.MoveTo(handles[0].ToIndex(a), PartitionB);
                 a.SubmitEntities();
 
-                stateAReverse = CollectValues(a, StateA);
-                stateBReverse = CollectValues(a, StateB);
+                stateAReverse = CollectValues(a, PartitionA);
+                stateBReverse = CollectValues(a, PartitionB);
             }
 
             NAssert.AreEqual(stateAForward.Length, stateAReverse.Length);
@@ -230,7 +230,7 @@ namespace Trecs.Tests
                 NAssert.AreEqual(
                     stateAForward[i],
                     stateAReverse[i],
-                    $"StateA index {i} should match"
+                    $"PartitionA index {i} should match"
                 );
 
             NAssert.AreEqual(stateBForward.Length, stateBReverse.Length);
@@ -238,7 +238,7 @@ namespace Trecs.Tests
                 NAssert.AreEqual(
                     stateBForward[i],
                     stateBReverse[i],
-                    $"StateB index {i} should match"
+                    $"PartitionB index {i} should match"
                 );
         }
 
@@ -263,7 +263,7 @@ namespace Trecs.Tests
                 var handles = new EntityHandle[8];
                 for (int i = 0; i < 8; i++)
                 {
-                    handles[i] = a.AddEntity(StateA)
+                    handles[i] = a.AddEntity(PartitionA)
                         .Set(new TestInt { Value = i })
                         .Set(new TestVec())
                         .AssertComplete()
@@ -273,12 +273,12 @@ namespace Trecs.Tests
 
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
-                nativeEcs.MoveTo(handles[0].ToIndex(a), StateB);
-                nativeEcs.MoveTo(handles[3].ToIndex(a), StateB);
+                nativeEcs.MoveTo(handles[0].ToIndex(a), PartitionB);
+                nativeEcs.MoveTo(handles[3].ToIndex(a), PartitionB);
                 a.SubmitEntities();
 
-                stateA1 = CollectValues(a, StateA);
-                stateB1 = CollectValues(a, StateB);
+                stateA1 = CollectValues(a, PartitionA);
+                stateB1 = CollectValues(a, PartitionB);
             }
 
             // Run 2: interleaved order
@@ -290,7 +290,7 @@ namespace Trecs.Tests
                 var handles = new EntityHandle[8];
                 for (int i = 0; i < 8; i++)
                 {
-                    handles[i] = a.AddEntity(StateA)
+                    handles[i] = a.AddEntity(PartitionA)
                         .Set(new TestInt { Value = i })
                         .Set(new TestVec())
                         .AssertComplete()
@@ -298,23 +298,23 @@ namespace Trecs.Tests
                 }
                 a.SubmitEntities();
 
-                nativeEcs.MoveTo(handles[3].ToIndex(a), StateB);
+                nativeEcs.MoveTo(handles[3].ToIndex(a), PartitionB);
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
-                nativeEcs.MoveTo(handles[0].ToIndex(a), StateB);
+                nativeEcs.MoveTo(handles[0].ToIndex(a), PartitionB);
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
                 a.SubmitEntities();
 
-                stateA2 = CollectValues(a, StateA);
-                stateB2 = CollectValues(a, StateB);
+                stateA2 = CollectValues(a, PartitionA);
+                stateB2 = CollectValues(a, PartitionB);
             }
 
             NAssert.AreEqual(stateA1.Length, stateA2.Length);
             for (int i = 0; i < stateA1.Length; i++)
-                NAssert.AreEqual(stateA1[i], stateA2[i], $"StateA index {i}");
+                NAssert.AreEqual(stateA1[i], stateA2[i], $"PartitionA index {i}");
 
             NAssert.AreEqual(stateB1.Length, stateB2.Length);
             for (int i = 0; i < stateB1.Length; i++)
-                NAssert.AreEqual(stateB1[i], stateB2[i], $"StateB index {i}");
+                NAssert.AreEqual(stateB1[i], stateB2[i], $"PartitionB index {i}");
         }
 
         #endregion

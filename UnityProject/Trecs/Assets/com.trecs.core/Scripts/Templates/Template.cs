@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Trecs
 {
     /// <summary>
-    /// Declares an entity type's component layout, tags, valid states, and inheritance chain.
+    /// Declares an entity type's component layout, tags, valid partitions, and inheritance chain.
     /// Templates are defined as classes implementing <see cref="ITemplate"/> — the source generator
     /// produces concrete <see cref="Template"/> instances automatically. Register via
     /// <see cref="WorldBuilder.AddEntityType"/>.
@@ -13,7 +13,7 @@ namespace Trecs
         public Template(
             string debugName,
             IReadOnlyList<Template> localBaseTemplates,
-            IReadOnlyList<TagSet> states,
+            IReadOnlyList<TagSet> partitions,
             IReadOnlyList<IComponentDeclaration> localComponentDeclarations,
             IReadOnlyList<Tag> localTags
         )
@@ -22,7 +22,7 @@ namespace Trecs
             LocalBaseTemplates = localBaseTemplates;
             LocalComponentDeclarations = localComponentDeclarations;
             LocalTags = localTags;
-            States = states;
+            Partitions = partitions;
         }
 
         public override string ToString()
@@ -31,10 +31,10 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Valid tag combinations this template can transition between.
-        /// An empty list means the template has a single implicit state.
+        /// Valid partition tag combinations this template can be placed in.
+        /// An empty list means the template has a single implicit partition.
         /// </summary>
-        public IReadOnlyList<TagSet> States { get; }
+        public IReadOnlyList<TagSet> Partitions { get; }
 
         /// <summary>
         /// Tags declared directly on this template (not inherited from base templates).

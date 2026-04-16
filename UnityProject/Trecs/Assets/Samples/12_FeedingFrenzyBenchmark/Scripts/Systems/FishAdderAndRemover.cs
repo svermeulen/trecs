@@ -75,7 +75,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     or IterationStyle.WrapAsJobComponents
                     or IterationStyle.RawComponentBuffersJob;
             var tags =
-                globals.FrenzyConfig.StateApproach is FrenzyStateApproach.States
+                globals.FrenzyConfig.SubsetApproach is FrenzySubsetApproach.Partitions
                     ? TagSet<FrenzyTags.Fish, FrenzyTags.NotEating>.Value
                     : TagSet<FrenzyTags.Fish>.Value;
 
@@ -151,17 +151,17 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
         void RemoveFish(int count, in GlobalsView globals)
         {
-            switch (globals.FrenzyConfig.StateApproach)
+            switch (globals.FrenzyConfig.SubsetApproach)
             {
-                case FrenzyStateApproach.States:
-                    RemoveFishStates(count);
+                case FrenzySubsetApproach.Partitions:
+                    RemoveFishPartitions(count);
                     break;
 
-                case FrenzyStateApproach.Sets:
+                case FrenzySubsetApproach.Sets:
                     RemoveFishSets(count);
                     break;
 
-                case FrenzyStateApproach.Branching:
+                case FrenzySubsetApproach.Branching:
                     RemoveFishBranching(count);
                     break;
 
@@ -250,7 +250,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             }
         }
 
-        void RemoveFishStates(int count)
+        void RemoveFishPartitions(int count)
         {
             Assert.That(count > 0);
 

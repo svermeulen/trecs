@@ -3,11 +3,11 @@ using UnityEngine.SceneManagement;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
-    public class StateApproachDynamicSwitcher
+    public class SubsetApproachDynamicSwitcher
     {
         readonly WorldAccessor _ecs;
 
-        public StateApproachDynamicSwitcher(World world)
+        public SubsetApproachDynamicSwitcher(World world)
         {
             _ecs = world.CreateAccessor();
         }
@@ -16,33 +16,33 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         {
             if (Input.GetKeyDown(KeyCode.F1))
             {
-                SwitchStateApproach(FrenzyStateApproach.Branching);
+                SwitchSubsetApproach(FrenzySubsetApproach.Branching);
             }
             else if (Input.GetKeyDown(KeyCode.F2))
             {
-                SwitchStateApproach(FrenzyStateApproach.Sets);
+                SwitchSubsetApproach(FrenzySubsetApproach.Sets);
             }
             else if (Input.GetKeyDown(KeyCode.F3))
             {
-                SwitchStateApproach(FrenzyStateApproach.States);
+                SwitchSubsetApproach(FrenzySubsetApproach.Partitions);
             }
         }
 
-        void SwitchStateApproach(FrenzyStateApproach approach)
+        void SwitchSubsetApproach(FrenzySubsetApproach approach)
         {
             // Read the current runtime config so we preserve any in-session
             // changes (e.g. iteration style toggled via Tab) when reloading.
 
             var current = _ecs.GlobalComponent<FrenzyConfig>().Read;
 
-            if (current.StateApproach == approach)
+            if (current.SubsetApproach == approach)
             {
                 return;
             }
 
             FrenzyCompositionRoot.ConfigOverride = new FrenzyConfigSettings
             {
-                StateApproach = approach,
+                SubsetApproach = approach,
                 IterationStyle = current.IterationStyle,
                 Deterministic = current.Deterministic,
             };

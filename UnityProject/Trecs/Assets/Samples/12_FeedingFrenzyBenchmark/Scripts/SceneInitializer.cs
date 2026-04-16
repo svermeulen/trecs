@@ -22,7 +22,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             globals.DesiredPreset = _settings.DefaultPresetIndex;
             globals.FrenzyConfig = new FrenzyConfig
             {
-                StateApproach = _config.StateApproach,
+                SubsetApproach = _config.SubsetApproach,
                 IterationStyle = _config.IterationStyle,
                 Deterministic = _config.Deterministic,
             };

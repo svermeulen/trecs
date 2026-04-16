@@ -10,7 +10,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         {
             World = world.CreateAccessor();
 
-            if (config.StateApproach != FrenzyStateApproach.Sets)
+            if (config.SubsetApproach != FrenzySubsetApproach.Sets)
             {
                 return;
             }

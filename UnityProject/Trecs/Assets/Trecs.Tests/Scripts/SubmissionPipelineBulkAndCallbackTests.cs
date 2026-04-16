@@ -10,8 +10,8 @@ namespace Trecs.Tests
     [TestFixture]
     public class SubmissionPipelineBulkAndCallbackTests
     {
-        static readonly TagSet StateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-        static readonly TagSet StateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+        static readonly TagSet PartitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+        static readonly TagSet PartitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
         #region RemoveEntitiesWithTags + individual operations in same frame
 
@@ -19,7 +19,7 @@ namespace Trecs.Tests
         public void BulkRemove_PlusIndividualRemove_DifferentGroups()
         {
             using var env = EcsTestHelper.CreateEnvironment(
-                TestTemplates.WithStates,
+                TestTemplates.WithPartitions,
                 TestTemplates.SimpleAlpha
             );
             var a = env.Accessor;
@@ -27,7 +27,7 @@ namespace Trecs.Tests
             // Add entities to two different templates
             for (int i = 0; i < 5; i++)
             {
-                a.AddEntity(StateA)
+                a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete();
@@ -38,12 +38,12 @@ namespace Trecs.Tests
                 .Handle;
             a.SubmitEntities();
 
-            // Bulk remove all StateA, individually remove the alpha entity
-            a.RemoveEntitiesWithTags(StateA);
+            // Bulk remove all PartitionA, individually remove the alpha entity
+            a.RemoveEntitiesWithTags(PartitionA);
             a.RemoveEntity(alphaHandle);
             a.SubmitEntities();
 
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateA));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
         }
 
@@ -54,13 +54,13 @@ namespace Trecs.Tests
             // The bulk remove iterates all entities still in the source group
             // (including the one queued for move), so remove supersedes move.
             // All entities should be removed.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -68,15 +68,19 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            // Move entity 0 to StateB, then bulk remove StateA
-            // The bulk remove sees entity 0 still in StateA and removes it,
+            // Move entity 0 to PartitionB, then bulk remove PartitionA
+            // The bulk remove sees entity 0 still in PartitionA and removes it,
             // superseding the move.
-            a.MoveTo(handles[0].ToIndex(a), StateB);
-            a.RemoveEntitiesWithTags(StateA);
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.RemoveEntitiesWithTags(PartitionA);
             a.SubmitEntities();
 
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateB), "Bulk remove supersedes the move");
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(
+                0,
+                a.CountEntitiesWithTags(PartitionB),
+                "Bulk remove supersedes the move"
+            );
         }
 
         [Test]
@@ -85,13 +89,13 @@ namespace Trecs.Tests
             // Bulk remove a group, then native add to same group in same frame.
             // The bulk remove is queued first, processed during submission.
             // The native add is also deferred. Both should be applied.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
 
             for (int i = 0; i < 3; i++)
             {
-                a.AddEntity(StateA)
+                a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete();
@@ -99,15 +103,15 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Bulk remove all, then native add new
-            a.RemoveEntitiesWithTags(StateA);
-            var init = nativeEcs.AddEntity(StateA, sortKey: 0);
+            a.RemoveEntitiesWithTags(PartitionA);
+            var init = nativeEcs.AddEntity(PartitionA, sortKey: 0);
             init.Set(new TestInt { Value = 777 });
             init.Set(new TestVec());
             a.SubmitEntities();
 
             // Removes happen first (in SingleSubmission), then adds.
             // The new entity should exist.
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateA));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
         }
 
         [Test]
@@ -115,13 +119,13 @@ namespace Trecs.Tests
         {
             // Both bulk remove and individual remove target the same entity.
             // The dedup logic should handle this.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[3];
             for (int i = 0; i < 3; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -129,12 +133,12 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            // Remove entity 0 individually, then bulk remove all StateA
+            // Remove entity 0 individually, then bulk remove all PartitionA
             a.RemoveEntity(handles[0]);
-            a.RemoveEntitiesWithTags(StateA);
+            a.RemoveEntitiesWithTags(PartitionA);
             a.SubmitEntities();
 
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateA));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
         }
 
         #endregion
@@ -184,39 +188,42 @@ namespace Trecs.Tests
         public void Callback_MovesEntity_ProcessedInNextIteration()
         {
             // OnAdded callback moves the entity to a different state.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            // Pre-populate StateA with a base entity
-            a.AddEntity(StateA).Set(new TestInt { Value = 0 }).Set(new TestVec()).AssertComplete();
+            // Pre-populate PartitionA with a base entity
+            a.AddEntity(PartitionA)
+                .Set(new TestInt { Value = 0 })
+                .Set(new TestVec())
+                .AssertComplete();
             a.SubmitEntities();
 
             var subscription = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnAdded(
                     (group, indices) =>
                     {
-                        // Move newly added entities to StateB
+                        // Move newly added entities to PartitionB
                         for (int idx = indices.Start; idx < indices.End; idx++)
                         {
                             var ei = new EntityIndex(idx, group);
-                            a.MoveTo(ei, StateB);
+                            a.MoveTo(ei, PartitionB);
                         }
                     }
                 );
 
-            // Add new entity to StateA -> callback moves it to StateB
-            var newHandle = a.AddEntity(StateA)
+            // Add new entity to PartitionA -> callback moves it to PartitionB
+            var newHandle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 42 })
                 .Set(new TestVec())
                 .AssertComplete()
                 .Handle;
             a.SubmitEntities();
 
-            // The new entity should end up in StateB
+            // The new entity should end up in PartitionB
             NAssert.IsTrue(a.EntityExists(newHandle));
             NAssert.AreEqual(42, a.Component<TestInt>(newHandle).Read.Value);
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
 
             subscription.Dispose();
         }
@@ -296,13 +303,13 @@ namespace Trecs.Tests
         {
             // When another entity is removed causing swap-back,
             // our handle should still resolve correctly.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i * 10 })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -330,17 +337,17 @@ namespace Trecs.Tests
         [Test]
         public void HandleValid_AfterMove_ResolvesToNewGroup()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var handle = a.AddEntity(StateA)
+            var handle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 42 })
                 .Set(new TestVec())
                 .AssertComplete()
                 .Handle;
             a.SubmitEntities();
 
-            a.MoveTo(handle.ToIndex(a), StateB);
+            a.MoveTo(handle.ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             // Handle should still work after move
@@ -349,17 +356,17 @@ namespace Trecs.Tests
 
             // And the index should point to the new group
             var idx = handle.ToIndex(a);
-            var groupB = a.WorldInfo.GetSingleGroupWithTags(StateB);
+            var groupB = a.WorldInfo.GetSingleGroupWithTags(PartitionB);
             NAssert.AreEqual(groupB, idx.Group);
         }
 
         [Test]
         public void HandleInvalid_AfterRemove_ExistsFalse()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var handle = a.AddEntity(StateA)
+            var handle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestVec())
                 .AssertComplete()
@@ -378,10 +385,10 @@ namespace Trecs.Tests
         {
             // After removing an entity, a new entity might reuse the same internal slot.
             // The old handle should still be invalid (version mismatch).
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var oldHandle = a.AddEntity(StateA)
+            var oldHandle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestVec())
                 .AssertComplete()
@@ -392,7 +399,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Add new entity (may reuse internal handle slot)
-            var newHandle = a.AddEntity(StateA)
+            var newHandle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 2 })
                 .Set(new TestVec())
                 .AssertComplete()
@@ -409,13 +416,13 @@ namespace Trecs.Tests
         {
             // Remove multiple entities causing cascading swap-backs.
             // Remaining entity handles should all still be valid.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[10];
             for (int i = 0; i < 10; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -450,13 +457,13 @@ namespace Trecs.Tests
         {
             // One entity is being tracked. Other entities are moved and removed.
             // The tracked entity handle should remain valid throughout.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[6];
             for (int i = 0; i < 6; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -466,25 +473,25 @@ namespace Trecs.Tests
 
             var tracked = handles[3]; // Track entity 3
 
-            // Frame 2: Move 0,1 to StateB, remove 4
-            a.MoveTo(handles[0].ToIndex(a), StateB);
-            a.MoveTo(handles[1].ToIndex(a), StateB);
+            // Frame 2: Move 0,1 to PartitionB, remove 4
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.MoveTo(handles[1].ToIndex(a), PartitionB);
             a.RemoveEntity(handles[4]);
             a.SubmitEntities();
 
             NAssert.IsTrue(a.EntityExists(tracked));
             NAssert.AreEqual(3, a.Component<TestInt>(tracked).Read.Value);
 
-            // Frame 3: Remove 2, move 5 to StateB
+            // Frame 3: Remove 2, move 5 to PartitionB
             a.RemoveEntity(handles[2]);
-            a.MoveTo(handles[5].ToIndex(a), StateB);
+            a.MoveTo(handles[5].ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             NAssert.IsTrue(a.EntityExists(tracked));
             NAssert.AreEqual(3, a.Component<TestInt>(tracked).Read.Value);
 
-            // Frame 4: Move tracked to StateB
-            a.MoveTo(tracked.ToIndex(a), StateB);
+            // Frame 4: Move tracked to PartitionB
+            a.MoveTo(tracked.ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             NAssert.IsTrue(a.EntityExists(tracked));
@@ -498,10 +505,10 @@ namespace Trecs.Tests
         [Test]
         public void TryToIndex_ValidHandle_ReturnsTrue()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var handle = a.AddEntity(StateA)
+            var handle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestVec())
                 .AssertComplete()
@@ -515,10 +522,10 @@ namespace Trecs.Tests
         [Test]
         public void TryToIndex_RemovedHandle_ReturnsFalse()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var handle = a.AddEntity(StateA)
+            var handle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestVec())
                 .AssertComplete()
@@ -534,7 +541,7 @@ namespace Trecs.Tests
         [Test]
         public void TryToIndex_NullHandle_ReturnsFalse()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             NAssert.IsFalse(EntityHandle.Null.TryToIndex(a, out _));

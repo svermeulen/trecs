@@ -9,7 +9,7 @@ namespace Trecs.Samples.FeedingFrenzy101
 
         public struct Meal : ITag { }
 
-        // States — fish and meals transition between these
+        // Partitions — fish and meals transition between these
         public struct NotEating : ITag { }
 
         public struct Eating : ITag { }
@@ -99,16 +99,16 @@ namespace Trecs.Samples.FeedingFrenzy101
     public static partial class SampleTemplates
     {
         /// <summary>
-        /// Fish entity with two states: NotEating (idle, bobbing) and
-        /// Eating (moving toward a meal). States create separate memory
+        /// Fish entity with two partitions: NotEating (idle, bobbing) and
+        /// Eating (moving toward a meal). Partitions create separate memory
         /// groups for cache-friendly iteration.
         /// </summary>
         public partial class FishEntity
             : ITemplate,
                 IExtends<CommonTemplates.Renderable>,
                 IHasTags<FrenzyTags.Fish>,
-                IHasState<FrenzyTags.NotEating>,
-                IHasState<FrenzyTags.Eating>
+                IHasPartition<FrenzyTags.NotEating>,
+                IHasPartition<FrenzyTags.Eating>
         {
             public Rotation Rotation = new(quaternion.identity);
             public SimPosition SimPosition = default;
@@ -120,15 +120,15 @@ namespace Trecs.Samples.FeedingFrenzy101
         }
 
         /// <summary>
-        /// Meal entity with two states matching the fish states.
-        /// When a fish targets a meal, both move to the Eating state.
+        /// Meal entity with two partitions matching the fish partitions.
+        /// When a fish targets a meal, both move to the Eating partition.
         /// </summary>
         public partial class MealEntity
             : ITemplate,
                 IExtends<CommonTemplates.Renderable>,
                 IHasTags<FrenzyTags.Meal>,
-                IHasState<FrenzyTags.NotEating>,
-                IHasState<FrenzyTags.Eating>
+                IHasPartition<FrenzyTags.NotEating>,
+                IHasPartition<FrenzyTags.Eating>
         {
             public Rotation Rotation = new(quaternion.identity);
             public MealNutrition Nutrition;

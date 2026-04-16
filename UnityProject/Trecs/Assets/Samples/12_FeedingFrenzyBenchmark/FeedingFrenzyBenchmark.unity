@@ -178,7 +178,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Samples::Trecs.Samples.FeedingFrenzy.FrenzyCompositionRoot
   Config:
-    StateApproach: 1
+    SubsetApproach: 1
     IterationStyle: 5
     Deterministic: 0
   Settings:

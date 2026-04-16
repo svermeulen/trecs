@@ -165,35 +165,37 @@ namespace Trecs.Tests
         [Test]
         public void Batch_AddRemoveMove_ComponentsConsistent()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            // Add 5 to state A
+            // Add 5 to partition A
             var entityHandles = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                var init = a.AddEntity(stateA).Set(new TestInt { Value = i * 10 }).AssertComplete();
+                var init = a.AddEntity(partitionA)
+                    .Set(new TestInt { Value = i * 10 })
+                    .AssertComplete();
                 entityHandles[i] = init.Handle;
             }
             a.SubmitEntities();
 
-            // Move entity 1 to state B
-            a.MoveTo(entityHandles[1].ToIndex(a), stateB);
+            // Move entity 1 to partition B
+            a.MoveTo(entityHandles[1].ToIndex(a), partitionB);
             // Remove entity 3
             a.RemoveEntity(entityHandles[3]);
             a.SubmitEntities();
 
-            NAssert.AreEqual(3, a.CountEntitiesWithTags(stateA));
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(stateB));
+            NAssert.AreEqual(3, a.CountEntitiesWithTags(partitionA));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionB));
 
             // Verify moved entity component value
             var movedComp = a.Component<TestInt>(entityHandles[1]);
             NAssert.AreEqual(10, movedComp.Read.Value);
 
-            // Verify remaining in state A
+            // Verify remaining in partition A
             NAssert.IsTrue(a.EntityExists(entityHandles[0]));
             NAssert.AreEqual(0, a.Component<TestInt>(entityHandles[0]).Read.Value);
             NAssert.IsTrue(a.EntityExists(entityHandles[2]));
@@ -250,14 +252,14 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(
                 TestTemplates.SimpleAlpha,
-                TestTemplates.WithStates
+                TestTemplates.WithPartitions
             );
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            // Add 3 Alpha entities and 3 StateA entities
+            // Add 3 Alpha entities and 3 PartitionA entities
             for (int i = 0; i < 3; i++)
             {
                 a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = i }).AssertComplete();
@@ -266,15 +268,15 @@ namespace Trecs.Tests
             var gammaRefs = new EntityHandle[3];
             for (int i = 0; i < 3; i++)
             {
-                var init = a.AddEntity(stateA)
+                var init = a.AddEntity(partitionA)
                     .Set(new TestInt { Value = 100 + i })
                     .AssertComplete();
                 gammaRefs[i] = init.Handle;
             }
             a.SubmitEntities();
 
-            // Move one Gamma entity to StateB, then bulk-remove all Alpha
-            a.MoveTo(gammaRefs[0].ToIndex(a), stateB);
+            // Move one Gamma entity to PartitionB, then bulk-remove all Alpha
+            a.MoveTo(gammaRefs[0].ToIndex(a), partitionB);
             a.RemoveEntitiesWithTags(TestTags.Alpha);
             a.SubmitEntities();
 
@@ -285,13 +287,13 @@ namespace Trecs.Tests
             );
             NAssert.AreEqual(
                 2,
-                a.CountEntitiesWithTags(stateA),
-                "2 Gamma entities should remain in StateA"
+                a.CountEntitiesWithTags(partitionA),
+                "2 Gamma entities should remain in PartitionA"
             );
             NAssert.AreEqual(
                 1,
-                a.CountEntitiesWithTags(stateB),
-                "1 Gamma entity should be in StateB after move"
+                a.CountEntitiesWithTags(partitionB),
+                "1 Gamma entity should be in PartitionB after move"
             );
         }
 

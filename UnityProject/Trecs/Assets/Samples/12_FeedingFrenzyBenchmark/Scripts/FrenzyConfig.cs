@@ -2,11 +2,11 @@ using System;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
-    public enum FrenzyStateApproach
+    public enum FrenzySubsetApproach
     {
         Branching,
         Sets,
-        States,
+        Partitions,
     }
 
     public enum IterationStyle
@@ -25,7 +25,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
     [Serializable]
     public class FrenzyConfigSettings
     {
-        public FrenzyStateApproach StateApproach;
+        public FrenzySubsetApproach SubsetApproach;
         public IterationStyle IterationStyle;
         public bool Deterministic;
     }

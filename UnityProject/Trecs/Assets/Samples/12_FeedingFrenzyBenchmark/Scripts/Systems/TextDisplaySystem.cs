@@ -66,9 +66,9 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             _sb.AppendLine();
             AppendStat(
-                "State",
-                config.StateApproach.ToString(),
-                secondary: $"({(int)config.StateApproach + 1}/{StateApproachNames.Length})",
+                "Subset",
+                config.SubsetApproach.ToString(),
+                secondary: $"({(int)config.SubsetApproach + 1}/{SubsetApproachNames.Length})",
                 hotkey: "F1/F2/F3"
             );
             AppendStat(
@@ -85,7 +85,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             _sb.AppendLine();
             AppendNote("Note: F1/F2/F3 reload the scene to switch");
-            AppendNote("state approach.  Deterministic is fixed at");
+            AppendNote("subset approach.  Deterministic is fixed at");
             AppendNote("runtime — adjust on FrenzyCompositionRoot.");
 
             _displayText.text = _sb.ToString();
@@ -131,7 +131,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         const string OnColor = "#7CFC7C";
         const string OffColor = "#FF6B6B";
 
-        static readonly string[] StateApproachNames = Enum.GetNames(typeof(FrenzyStateApproach));
+        static readonly string[] SubsetApproachNames = Enum.GetNames(typeof(FrenzySubsetApproach));
         static readonly string[] IterationStyleNames = Enum.GetNames(typeof(IterationStyle));
     }
 }

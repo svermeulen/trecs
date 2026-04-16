@@ -153,22 +153,22 @@ namespace Trecs.Tests
 
         #endregion
 
-        #region States
+        #region Partitions
 
         [Test]
-        public void WorldInfo_WithStates_CorrectGroupCount()
+        public void WorldInfo_WithPartitions_CorrectGroupCount()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var wi = env.Accessor.WorldInfo;
 
-            // WithStates: Gamma+StateA, Gamma+StateB = 2 groups + 1 global = 3
+            // WithPartitions: Gamma+PartitionA, Gamma+PartitionB = 2 groups + 1 global = 3
             NAssert.AreEqual(3, wi.AllGroups.Count);
 
             var gammaGroups = wi.GetGroupsWithTags(TestTags.Gamma);
             NAssert.AreEqual(
                 2,
                 gammaGroups.Count,
-                "Gamma tag should match both StateA and StateB groups"
+                "Gamma tag should match both PartitionA and PartitionB groups"
             );
         }
 
@@ -178,33 +178,33 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(
                 TestTemplates.SimpleAlpha,
                 TestTemplates.TwoCompBeta,
-                TestTemplates.WithStates
+                TestTemplates.WithPartitions
             );
             var wi = env.Accessor.WorldInfo;
 
             // TwoCompBeta has TestInt + TestFloat
             // SimpleAlpha has TestInt only
-            // WithStates has TestInt + TestVec
+            // WithPartitions has TestInt + TestVec
             var groups = wi.GetGroupsWithTagsAndComponents<TestInt, TestFloat>(TestTags.Beta);
             NAssert.AreEqual(1, groups.Count, "Only Beta group has both TestInt and TestFloat");
         }
 
         [Test]
-        public void WorldInfo_ResolvedTemplate_StateGroupsShareComponents()
+        public void WorldInfo_ResolvedTemplate_PartitionGroupsShareComponents()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var wi = env.Accessor.WorldInfo;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            var groupA = wi.GetSingleGroupWithTags(stateA);
-            var groupB = wi.GetSingleGroupWithTags(stateB);
+            var groupA = wi.GetSingleGroupWithTags(partitionA);
+            var groupB = wi.GetSingleGroupWithTags(partitionB);
 
             var templateA = wi.GetResolvedTemplateForGroup(groupA);
             var templateB = wi.GetResolvedTemplateForGroup(groupB);
 
-            // Both state groups should have the same components
+            // Both partition groups should have the same components
             NAssert.IsTrue(templateA.HasComponent<TestInt>());
             NAssert.IsTrue(templateA.HasComponent<TestVec>());
             NAssert.IsTrue(templateB.HasComponent<TestInt>());

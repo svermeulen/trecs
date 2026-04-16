@@ -72,7 +72,7 @@ namespace Trecs.Tests
                 globalsTemplate = new Template(
                     debugName: "TestGlobals",
                     localBaseTemplates: new Template[] { TrecsTemplates.Globals.Template },
-                    states: Array.Empty<TagSet>(),
+                    partitions: Array.Empty<TagSet>(),
                     localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
                     localTags: Array.Empty<Tag>()
                 );

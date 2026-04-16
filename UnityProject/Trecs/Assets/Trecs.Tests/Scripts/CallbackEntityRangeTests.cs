@@ -12,18 +12,18 @@ namespace Trecs.Tests
     [TestFixture]
     public class CallbackEntityRangeTests
     {
-        static readonly TagSet StateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-        static readonly TagSet StateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+        static readonly TagSet PartitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+        static readonly TagSet PartitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
         #region OnRemoved — entity data accessible at callback time
 
         [Test]
         public void OnRemoved_SingleEntity_RangeHasCorrectCount()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            a.AddEntity(StateA)
+            a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 42 })
                 .Set(new TestVec { X = 1f, Y = 2f })
                 .AssertComplete();
@@ -32,7 +32,7 @@ namespace Trecs.Tests
             int removedCount = 0;
             Group observedGroup = default;
             var sub = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -41,7 +41,7 @@ namespace Trecs.Tests
                     }
                 );
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             a.RemoveEntity(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
@@ -53,13 +53,13 @@ namespace Trecs.Tests
         [Test]
         public void OnRemoved_MultipleEntities_RangeCountMatchesRemovals()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i * 10 })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -69,7 +69,7 @@ namespace Trecs.Tests
 
             int totalRemoved = 0;
             var sub = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -84,7 +84,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             NAssert.AreEqual(3, totalRemoved, "Callback should report 3 removed entities");
-            NAssert.AreEqual(2, a.CountEntitiesWithTags(StateA), "2 entities should survive");
+            NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA), "2 entities should survive");
             sub.Dispose();
         }
 
@@ -93,13 +93,13 @@ namespace Trecs.Tests
         {
             // Moves happen before removes in submission.
             // The removal range should still point to the correct entities.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[6];
             for (int i = 0; i < 6; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -109,7 +109,7 @@ namespace Trecs.Tests
 
             int removedCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -117,9 +117,9 @@ namespace Trecs.Tests
                     }
                 );
 
-            // Move entities 0, 1 to StateB; remove entities 4, 5
-            a.MoveTo(handles[0].ToIndex(a), StateB);
-            a.MoveTo(handles[1].ToIndex(a), StateB);
+            // Move entities 0, 1 to PartitionB; remove entities 4, 5
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.MoveTo(handles[1].ToIndex(a), PartitionB);
             a.RemoveEntity(handles[4]);
             a.RemoveEntity(handles[5]);
             a.SubmitEntities();
@@ -127,10 +127,14 @@ namespace Trecs.Tests
             NAssert.AreEqual(2, removedCount, "Should report exactly 2 removed entities");
             NAssert.AreEqual(
                 2,
-                a.CountEntitiesWithTags(StateA),
-                "2 entities should remain in StateA"
+                a.CountEntitiesWithTags(PartitionA),
+                "2 entities should remain in PartitionA"
             );
-            NAssert.AreEqual(2, a.CountEntitiesWithTags(StateB), "2 entities moved to StateB");
+            NAssert.AreEqual(
+                2,
+                a.CountEntitiesWithTags(PartitionB),
+                "2 entities moved to PartitionB"
+            );
             sub.Dispose();
         }
 
@@ -141,10 +145,13 @@ namespace Trecs.Tests
         [Test]
         public void OnMoved_SingleEntity_RangeInDestinationGroup()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            a.AddEntity(StateA).Set(new TestInt { Value = 77 }).Set(new TestVec()).AssertComplete();
+            a.AddEntity(PartitionA)
+                .Set(new TestInt { Value = 77 })
+                .Set(new TestVec())
+                .AssertComplete();
             a.SubmitEntities();
 
             int observedValue = -1;
@@ -152,7 +159,7 @@ namespace Trecs.Tests
             EntityRange observedRange = default;
 
             var sub = a
-                .Events.InGroupsWithTags(StateB)
+                .Events.InGroupsWithTags(PartitionB)
                 .OnMoved(
                     (fromGroup, toGroup, indices) =>
                     {
@@ -165,11 +172,11 @@ namespace Trecs.Tests
                     }
                 );
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
-            a.MoveTo(new EntityIndex(0, groupA), StateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
+            a.MoveTo(new EntityIndex(0, groupA), PartitionB);
             a.SubmitEntities();
 
-            var groupB = a.WorldInfo.GetSingleGroupWithTags(StateB);
+            var groupB = a.WorldInfo.GetSingleGroupWithTags(PartitionB);
             NAssert.AreEqual(groupB, observedToGroup);
             NAssert.AreEqual(1, observedRange.Count);
             NAssert.AreEqual(
@@ -183,13 +190,13 @@ namespace Trecs.Tests
         [Test]
         public void OnMoved_MultipleEntities_RangeCoversAll()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i * 10 })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -199,7 +206,7 @@ namespace Trecs.Tests
 
             var movedValues = new List<int>();
             var sub = a
-                .Events.InGroupsWithTags(StateB)
+                .Events.InGroupsWithTags(PartitionB)
                 .OnMoved(
                     (fromGroup, toGroup, indices) =>
                     {
@@ -211,9 +218,9 @@ namespace Trecs.Tests
                 );
 
             // Move 3 entities
-            a.MoveTo(handles[0].ToIndex(a), StateB);
-            a.MoveTo(handles[2].ToIndex(a), StateB);
-            a.MoveTo(handles[4].ToIndex(a), StateB);
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.MoveTo(handles[2].ToIndex(a), PartitionB);
+            a.MoveTo(handles[4].ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             NAssert.AreEqual(3, movedValues.Count);
@@ -227,13 +234,13 @@ namespace Trecs.Tests
         [Test]
         public void OnMoved_WithConcurrentRemoves_RangeOnlyCountsMoved()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[6];
             for (int i = 0; i < 6; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -243,7 +250,7 @@ namespace Trecs.Tests
 
             int movedCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(StateB)
+                .Events.InGroupsWithTags(PartitionB)
                 .OnMoved(
                     (fromGroup, toGroup, indices) =>
                     {
@@ -251,9 +258,9 @@ namespace Trecs.Tests
                     }
                 );
 
-            // Move 0,1 to StateB; remove 4,5
-            a.MoveTo(handles[0].ToIndex(a), StateB);
-            a.MoveTo(handles[1].ToIndex(a), StateB);
+            // Move 0,1 to PartitionB; remove 4,5
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.MoveTo(handles[1].ToIndex(a), PartitionB);
             a.RemoveEntity(handles[4]);
             a.RemoveEntity(handles[5]);
             a.SubmitEntities();
@@ -269,12 +276,12 @@ namespace Trecs.Tests
         [Test]
         public void OnAdded_MultipleEntities_RangeCoversAll()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var addedValues = new List<int>();
             var sub = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnAdded(
                     (group, indices) =>
                     {
@@ -287,7 +294,7 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 4; i++)
             {
-                a.AddEntity(StateA)
+                a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i * 10 })
                     .Set(new TestVec())
                     .AssertComplete();
@@ -308,13 +315,13 @@ namespace Trecs.Tests
         {
             // Removes are processed before adds. New entities should be
             // at the end of the group's arrays, after any swap-backs.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[3];
             for (int i = 0; i < 3; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -324,7 +331,7 @@ namespace Trecs.Tests
 
             int addedCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnAdded(
                     (group, indices) =>
                     {
@@ -334,18 +341,18 @@ namespace Trecs.Tests
 
             // Remove entity 0, add 2 new entities — all in same submission
             a.RemoveEntity(handles[0]);
-            a.AddEntity(StateA)
+            a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 100 })
                 .Set(new TestVec())
                 .AssertComplete();
-            a.AddEntity(StateA)
+            a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 101 })
                 .Set(new TestVec())
                 .AssertComplete();
             a.SubmitEntities();
 
             NAssert.AreEqual(2, addedCount, "OnAdded should fire for the 2 new entities");
-            NAssert.AreEqual(4, a.CountEntitiesWithTags(StateA), "3 - 1 + 2 = 4");
+            NAssert.AreEqual(4, a.CountEntitiesWithTags(PartitionA), "3 - 1 + 2 = 4");
             sub.Dispose();
         }
 

@@ -4,7 +4,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
 
-namespace Trecs.Samples.FeedingFrenzyBenchmark.States
+namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 {
     [ExecutesAfter(typeof(IConsumingMeal))]
     public partial class IdleBobSystem : IIdleBob, ISystem

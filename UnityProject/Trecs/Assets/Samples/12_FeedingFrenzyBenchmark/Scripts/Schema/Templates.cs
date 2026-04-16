@@ -38,14 +38,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             public DestinationPosition DestinationPosition = default;
         }
 
-        // States variant - adds state tags for group-based state tracking
-        public partial class StatesFishEntity
+        // Partitions variant - adds partition tags for group-based partition tracking
+        public partial class PartitionsFishEntity
             : ITemplate,
                 IExtends<FishEntity>,
-                IHasState<FrenzyTags.NotEating>,
-                IHasState<FrenzyTags.Eating> { }
+                IHasPartition<FrenzyTags.NotEating>,
+                IHasPartition<FrenzyTags.Eating> { }
 
-        // Base meal entity (no eating state tracking)
+        // Base meal entity (no eating partition tracking)
         public partial class MealEntity
             : ITemplate,
                 IExtends<CommonTemplates.Renderable>,
@@ -56,11 +56,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             public ApproachingFish ApproachingFish = default;
         }
 
-        // States meal variant - adds state tags
-        public partial class StatesMealEntity
+        // Partitions meal variant - adds partition tags
+        public partial class PartitionsMealEntity
             : ITemplate,
                 IExtends<MealEntity>,
-                IHasState<FrenzyTags.NotEating>,
-                IHasState<FrenzyTags.Eating> { }
+                IHasPartition<FrenzyTags.NotEating>,
+                IHasPartition<FrenzyTags.Eating> { }
     }
 }

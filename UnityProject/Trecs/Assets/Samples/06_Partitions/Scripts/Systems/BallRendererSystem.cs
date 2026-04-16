@@ -1,11 +1,11 @@
 using UnityEngine;
 
-namespace Trecs.Samples.States
+namespace Trecs.Samples.Partitions
 {
     /// <summary>
     /// Syncs ball positions to GameObjects and tints active balls differently
     /// from resting ones. Uses two aspects with different tag constraints
-    /// to iterate each state separately.
+    /// to iterate each partition separately.
     /// </summary>
     [VariableUpdate]
     [ExecutesAfter(typeof(WakeUpSystem))]

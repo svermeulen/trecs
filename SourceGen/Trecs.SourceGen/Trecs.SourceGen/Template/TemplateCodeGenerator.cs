@@ -96,23 +96,23 @@ namespace Trecs.SourceGen.Template
                 sb.AppendLine(argIndent, "localBaseTemplates: Array.Empty<Template>(),");
             }
 
-            // states
-            if (data.States.Length > 0)
+            // partitions
+            if (data.Partitions.Length > 0)
             {
-                sb.AppendLine(argIndent, "states: new TagSet[]");
+                sb.AppendLine(argIndent, "partitions: new TagSet[]");
                 sb.AppendLine(argIndent, "{");
-                for (int i = 0; i < data.States.Length; i++)
+                for (int i = 0; i < data.Partitions.Length; i++)
                 {
-                    var state = data.States[i];
-                    var tagArgs = string.Join(", ", state.TagTypeNames);
-                    var comma = i < data.States.Length - 1 ? "," : "";
+                    var partition = data.Partitions[i];
+                    var tagArgs = string.Join(", ", partition.TagTypeNames);
+                    var comma = i < data.Partitions.Length - 1 ? "," : "";
                     sb.AppendLine(argIndent + 1, $"TagSet<{tagArgs}>.Value{comma}");
                 }
                 sb.AppendLine(argIndent, "},");
             }
             else
             {
-                sb.AppendLine(argIndent, "states: Array.Empty<TagSet>(),");
+                sb.AppendLine(argIndent, "partitions: Array.Empty<TagSet>(),");
             }
 
             // localComponentDeclarations

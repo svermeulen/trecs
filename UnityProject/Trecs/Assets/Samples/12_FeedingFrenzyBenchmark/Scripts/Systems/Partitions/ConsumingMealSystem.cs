@@ -4,7 +4,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
 
-namespace Trecs.Samples.FeedingFrenzyBenchmark.States
+namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 {
     [ExecutesAfter(typeof(ILookingForMeal))]
     public partial class ConsumingMealSystem : IConsumingMeal, ISystem
@@ -139,7 +139,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.States
         void RunRawComponentBuffersJob()
         {
             // Parallel raw-buffer iteration over the eating-fish group only.
-            // (States approach uses tag-based state, so the eating fish are in
+            // (Partitions approach uses tag-based partitions, so the eating fish are in
             // their own group separate from not-eating fish.)
             var fishCount = World.CountEntitiesWithTags<FrenzyTags.Fish, FrenzyTags.Eating>();
 
