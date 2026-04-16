@@ -140,11 +140,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 }
             );
 
-            initializables = new()
-            {
-                world.Initialize,
-                sceneInitializer.Initialize,
-            };
+            initializables = new() { world.Initialize, sceneInitializer.Initialize };
 
             tickables = new()
             {
