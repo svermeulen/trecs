@@ -41,13 +41,6 @@ namespace Trecs
         public bool WarnOnUnusedTemplates { get; init; }
 
         /// <summary>
-        /// When true (in DEBUG builds without TRECS_IS_PROFILING), logs a warning at submission time
-        /// for any entity that was created via AddEntity without calling AssertComplete(),
-        /// and has required components that were not initialized via Set.
-        /// </summary>
-        public bool WarnOnMissingAssertComplete { get; init; }
-
-        /// <summary>
         /// Maximum number of submission iterations before throwing a circular submission error.
         /// Each iteration processes structural changes that may trigger further changes via callbacks.
         /// </summary>

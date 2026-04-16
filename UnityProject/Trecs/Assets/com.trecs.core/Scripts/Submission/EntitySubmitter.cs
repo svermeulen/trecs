@@ -141,10 +141,6 @@ namespace Trecs.Internal
             _setStore = setStore;
 
             _entitiesQuerier = entitiesQuerier;
-
-#if DEBUG && !TRECS_IS_PROFILING
-            _initTracker.SetEnabled(_trecsSettings.WarnOnMissingAssertComplete);
-#endif
         }
 
         public bool ConfigurationFrozen

@@ -203,7 +203,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
         {
             var pairs = new NativeList<int2>(Allocator.TempJob);
 
-            // Unlike sets and partitions we need to prepare pairs on main thread
+            // Unlike sets and states we need to prepare pairs on main thread
             AddFishMealPairs(pairs);
 
             if (pairs.Length == 0)

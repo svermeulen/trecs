@@ -8,7 +8,7 @@ namespace Trecs.Samples.Sets
     /// a grid along perpendicular axes. Each wave has its own set.
     /// Effect systems iterate only their wave's subset, and particles
     /// in both waves receive combined effects — something that would
-    /// require 2^N template partitions but needs only N sets.
+    /// require 2^N template states but needs only N sets.
     /// </summary>
     public class SetsCompositionRoot : CompositionRootBase
     {

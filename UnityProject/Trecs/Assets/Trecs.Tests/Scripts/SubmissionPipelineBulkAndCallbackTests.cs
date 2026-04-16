@@ -187,7 +187,7 @@ namespace Trecs.Tests
         [Test]
         public void Callback_MovesEntity_ProcessedInNextIteration()
         {
-            // OnAdded callback moves the entity to a different partition.
+            // OnAdded callback moves the entity to a different state.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
