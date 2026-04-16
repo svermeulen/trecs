@@ -110,7 +110,6 @@ namespace Trecs.SourceGen.Aspect
                 indentLevel--;
                 sb.AppendLine(indentLevel, "}");
             }
-
         }
 
         /// <summary>
@@ -160,7 +159,10 @@ namespace Trecs.SourceGen.Aspect
                     ? $"NativeComponentLookupRead<{componentTypeName}>"
                     : $"NativeComponentLookupWrite<{componentTypeName}>";
                 if (!isReadOnly)
-                    sb.AppendLine(indentLevel + 1, "[Unity.Collections.NativeDisableParallelForRestriction]");
+                    sb.AppendLine(
+                        indentLevel + 1,
+                        "[Unity.Collections.NativeDisableParallelForRestriction]"
+                    );
                 sb.AppendLine(indentLevel + 1, $"{lookupType} _lookup{i};");
             }
 
@@ -180,7 +182,8 @@ namespace Trecs.SourceGen.Aspect
                     var lookupType = isReadOnly
                         ? $"NativeComponentLookupRead<{componentTypeName}>"
                         : $"NativeComponentLookupWrite<{componentTypeName}>";
-                    if (i > 0) ctorSig.Append(", ");
+                    if (i > 0)
+                        ctorSig.Append(", ");
                     ctorSig.Append($"{lookupType} lookup{i}");
                 }
                 ctorSig.Append(")");
@@ -196,10 +199,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine();
 
             // Create method
-            sb.AppendLine(
-                indentLevel + 1,
-                $"public {aspectName} Create(EntityIndex entityIndex)"
-            );
+            sb.AppendLine(indentLevel + 1, $"public {aspectName} Create(EntityIndex entityIndex)");
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(indentLevel + 2, $"return new {aspectName}(");
             sb.AppendLine(indentLevel + 3, "entityIndex,");
@@ -246,8 +246,7 @@ namespace Trecs.SourceGen.Aspect
                 type =>
                 {
                     var fieldName = ComponentTypeHelper.GetPropertyName(type);
-                    var camelCaseFieldName =
-                        ComponentTypeHelper.ToCamelCase(fieldName);
+                    var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(fieldName);
                     var bufferType = GetBufferTypeName(type, attributeData);
                     return $"readonly {bufferType} _{camelCaseFieldName}Buffer;";
                 },
@@ -275,8 +274,7 @@ namespace Trecs.SourceGen.Aspect
                 allTypes.Select(componentType =>
                 {
                     var fieldName = ComponentTypeHelper.GetPropertyName(componentType);
-                    var camelCaseFieldName =
-                        ComponentTypeHelper.ToCamelCase(fieldName);
+                    var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(fieldName);
                     var bufferType = GetBufferTypeName(componentType, attributeData);
                     return $"in {bufferType} {camelCaseFieldName}Buffer";
                 })
@@ -294,8 +292,7 @@ namespace Trecs.SourceGen.Aspect
                 componentType =>
                 {
                     var fieldName = ComponentTypeHelper.GetPropertyName(componentType);
-                    var camelCaseFieldName =
-                        ComponentTypeHelper.ToCamelCase(fieldName);
+                    var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(fieldName);
                     return $"_{camelCaseFieldName}Buffer = {camelCaseFieldName}Buffer;";
                 },
                 indentLevel + 1
@@ -310,8 +307,7 @@ namespace Trecs.SourceGen.Aspect
                 allTypes.Select(componentType =>
                 {
                     var fieldName = ComponentTypeHelper.GetPropertyName(componentType);
-                    var camelCaseFieldName =
-                        ComponentTypeHelper.ToCamelCase(fieldName);
+                    var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(fieldName);
                     var bufferType = GetBufferTypeName(componentType, attributeData);
                     return $"in {bufferType} {camelCaseFieldName}Buffer";
                 })
@@ -328,8 +324,7 @@ namespace Trecs.SourceGen.Aspect
                 componentType =>
                 {
                     var fieldName = ComponentTypeHelper.GetPropertyName(componentType);
-                    var camelCaseFieldName =
-                        ComponentTypeHelper.ToCamelCase(fieldName);
+                    var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(fieldName);
                     return $"_{camelCaseFieldName}Buffer = {camelCaseFieldName}Buffer;";
                 },
                 indentLevel + 1
@@ -363,8 +358,7 @@ namespace Trecs.SourceGen.Aspect
                 allTypes,
                 "_entityIndex.Group",
                 "ecs",
-                type =>
-                    $"_{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
+                type => $"_{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
                 isFieldAssignment: true,
                 attributeData
             );
@@ -397,8 +391,7 @@ namespace Trecs.SourceGen.Aspect
             {
                 var propertyName = ComponentTypeHelper.GetPropertyName(readType);
                 var returnType = ComponentTypeHelper.GetPropertyReturnType(readType, true);
-                var camelCaseFieldName =
-                    ComponentTypeHelper.ToCamelCase(propertyName);
+                var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(propertyName);
                 var accessExpression = ComponentTypeHelper.GetPropertyAccessExpression(
                     $"_{camelCaseFieldName}Buffer",
                     "_entityIndex.Index",
@@ -422,8 +415,7 @@ namespace Trecs.SourceGen.Aspect
                 var propertyName = ComponentTypeHelper.GetPropertyName(writeType);
                 var returnType = ComponentTypeHelper.GetPropertyReturnType(writeType, false);
                 var (finalType, wasUnwrapped) = ComponentTypeHelper.UnwrapComponent(writeType);
-                var camelCaseFieldName =
-                    ComponentTypeHelper.ToCamelCase(propertyName);
+                var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(propertyName);
                 var bufferName = $"_{camelCaseFieldName}Buffer";
 
                 var accessExpression = GetWritePropertyAccessExpression(bufferName, writeType);
@@ -496,22 +488,40 @@ namespace Trecs.SourceGen.Aspect
                 // (Can't be extension methods due to C# partial type inference limitation)
                 for (int arity = 1; arity <= 4; arity++)
                 {
-                    var typeParams = string.Join(", ", Enumerable.Range(1, arity).Select(i => $"T{i}"));
-                    var whereClause = string.Join(" ", Enumerable.Range(1, arity).Select(i => $"where T{i} : struct, ITag"));
+                    var typeParams = string.Join(
+                        ", ",
+                        Enumerable.Range(1, arity).Select(i => $"T{i}")
+                    );
+                    var whereClause = string.Join(
+                        " ",
+                        Enumerable.Range(1, arity).Select(i => $"where T{i} : struct, ITag")
+                    );
 
-                    sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
-                    sb.AppendLine(indentLevel, $"public readonly void MoveTo<{typeParams}>({paramPrefix}{accessorType} world) {whereClause} => world.MoveTo<{typeParams}>(_entityIndex);");
+                    sb.AppendLine(
+                        indentLevel,
+                        "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
+                    );
+                    sb.AppendLine(
+                        indentLevel,
+                        $"public readonly void MoveTo<{typeParams}>({paramPrefix}{accessorType} world) {whereClause} => world.MoveTo<{typeParams}>(_entityIndex);"
+                    );
                     sb.AppendLine();
                 }
 
                 // AddToSet / RemoveFromSet
                 // (Can't be extension methods due to C# partial type inference limitation)
                 sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
-                sb.AppendLine(indentLevel, $"public readonly void AddToSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => world.SetAdd<TSet>(_entityIndex);");
+                sb.AppendLine(
+                    indentLevel,
+                    $"public readonly void AddToSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => world.SetAdd<TSet>(_entityIndex);"
+                );
                 sb.AppendLine();
 
                 sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
-                sb.AppendLine(indentLevel, $"public readonly void RemoveFromSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => world.SetRemove<TSet>(_entityIndex);");
+                sb.AppendLine(
+                    indentLevel,
+                    $"public readonly void RemoveFromSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => world.SetRemove<TSet>(_entityIndex);"
+                );
                 sb.AppendLine();
             }
         }
@@ -677,8 +687,7 @@ namespace Trecs.SourceGen.Aspect
                 allTypes,
                 "__ei.Group",
                 "__ecs",
-                type =>
-                    $"{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
+                type => $"{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
                 isFieldAssignment: false,
                 attributeData
             );
@@ -724,8 +733,7 @@ namespace Trecs.SourceGen.Aspect
                 allTypes,
                 "__ei.Group",
                 "__ecs",
-                type =>
-                    $"{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
+                type => $"{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
                 isFieldAssignment: false,
                 attributeData
             );
@@ -862,8 +870,7 @@ namespace Trecs.SourceGen.Aspect
             foreach (var type in allTypes)
             {
                 var fieldName = ComponentTypeHelper.GetPropertyName(type);
-                var varName =
-                    ComponentTypeHelper.ToCamelCase(fieldName) + "Buffer";
+                var varName = ComponentTypeHelper.ToCamelCase(fieldName) + "Buffer";
                 var typeDisplay = PerformanceCache.GetDisplayString(type);
                 bool isReadOnly = IsReadOnlyComponent(type, attributeData);
                 var bufferSuffix = isReadOnly ? "Read" : "Write";
@@ -925,8 +932,7 @@ namespace Trecs.SourceGen.Aspect
             foreach (var type in allTypes)
             {
                 var fieldName = ComponentTypeHelper.GetPropertyName(type);
-                var varName =
-                    ComponentTypeHelper.ToCamelCase(fieldName) + "Buffer";
+                var varName = ComponentTypeHelper.ToCamelCase(fieldName) + "Buffer";
                 var typeDisplay = PerformanceCache.GetDisplayString(type);
                 bool isReadOnly = IsReadOnlyComponent(type, attributeData);
                 var bufferSuffix = isReadOnly ? "Read" : "Write";

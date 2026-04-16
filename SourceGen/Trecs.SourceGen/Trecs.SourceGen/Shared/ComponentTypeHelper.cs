@@ -104,11 +104,13 @@ namespace Trecs.SourceGen.Shared
         /// </summary>
         public static string StripPrefix(string name, string? prefix)
         {
-            if (prefix != null
+            if (
+                prefix != null
                 && prefix.Length > 0
                 && name.Length > prefix.Length
                 && name.StartsWith(prefix)
-                && char.IsUpper(name[prefix.Length]))
+                && char.IsUpper(name[prefix.Length])
+            )
             {
                 return name.Substring(prefix.Length);
             }
@@ -127,7 +129,9 @@ namespace Trecs.SourceGen.Shared
             // come from assemblies with different prefix settings
             if (componentType is INamedTypeSymbol namedType && namedType.IsGenericType)
             {
-                var componentPrefix = SourceGenSettingsProvider.GetComponentPrefixForType(componentType);
+                var componentPrefix = SourceGenSettingsProvider.GetComponentPrefixForType(
+                    componentType
+                );
                 var typeName = StripPrefix(namedType.Name, componentPrefix);
                 foreach (var arg in namedType.TypeArguments)
                 {

@@ -52,7 +52,8 @@ namespace Trecs.SourceGen
                 && methodDecl
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
-                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == TrecsAttributeNames.SingleEntity
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == TrecsAttributeNames.SingleEntity
                     );
         }
 
@@ -314,7 +315,11 @@ namespace Trecs.SourceGen
             {
                 // Sparse path. Build the full SparseQueryBuilder inline.
                 var firstSetName = PerformanceCache.GetDisplayString(info.SetTypes[0]);
-                var attributeChain = QueryBuilderHelper.BuildAttributeCriteriaChain(info.AttributeTagTypes, info.MatchByComponents, info.ComponentTypes);
+                var attributeChain = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                    info.AttributeTagTypes,
+                    info.MatchByComponents,
+                    info.ComponentTypes
+                );
                 sb.AppendLine(
                     3,
                     $"var __builder = __world.Query(){attributeChain}.InSet<{firstSetName}>();"
@@ -354,7 +359,11 @@ namespace Trecs.SourceGen
             );
             sb.AppendLine(2, "{");
 
-            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(info.AttributeTagTypes, info.MatchByComponents, info.ComponentTypes);
+            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                info.AttributeTagTypes,
+                info.MatchByComponents,
+                info.ComponentTypes
+            );
             if (chain.Length > 0)
                 sb.AppendLine(3, $"__builder = __builder{chain};");
 
@@ -392,7 +401,11 @@ namespace Trecs.SourceGen
             );
             sb.AppendLine(2, "{");
 
-            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(info.AttributeTagTypes, info.MatchByComponents, info.ComponentTypes);
+            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                info.AttributeTagTypes,
+                info.MatchByComponents,
+                info.ComponentTypes
+            );
             if (chain.Length > 0)
                 sb.AppendLine(3, $"__builder = __builder{chain};");
 
@@ -662,7 +675,12 @@ namespace Trecs.SourceGen
 
             // Extract tag types, set types, and MatchByComponents from the iteration attribute.
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                context, methodDec, methodSymbol, classDec.Identifier.Text, TrecsAttributeNames.SingleEntity);
+                context,
+                methodDec,
+                methodSymbol,
+                classDec.Identifier.Text,
+                TrecsAttributeNames.SingleEntity
+            );
             if (criteria == null)
             {
                 isValid = false;
@@ -682,7 +700,8 @@ namespace Trecs.SourceGen
                 methodDec.Identifier.Text,
                 supportsEntityIndex: false,
                 aspectParam: aspectParam,
-                isValid: ref isValid);
+                isValid: ref isValid
+            );
             var customParameters = classified.CustomParameters;
             var setAccessorParameters = classified.SetAccessorParameters;
             var setReadParameters = classified.SetReadParameters;
@@ -725,6 +744,5 @@ namespace Trecs.SourceGen
 
             return isValid;
         }
-
     }
 }

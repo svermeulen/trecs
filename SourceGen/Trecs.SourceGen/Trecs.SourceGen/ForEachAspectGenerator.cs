@@ -49,7 +49,8 @@ namespace Trecs.SourceGen
                 && methodDecl
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
-                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == TrecsAttributeNames.EntityFilter
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == TrecsAttributeNames.EntityFilter
                     );
         }
 
@@ -215,10 +216,7 @@ namespace Trecs.SourceGen
             var sb = OptimizedStringBuilder.ForAspect(componentCount);
 
             // Add required namespaces
-            var requiredNamespaces = NamespaceCollector.Collect(
-                compilation,
-                validatedMethodInfo
-            );
+            var requiredNamespaces = NamespaceCollector.Collect(compilation, validatedMethodInfo);
 
             sb.AppendUsings(requiredNamespaces.ToArray());
 
@@ -258,7 +256,7 @@ namespace Trecs.SourceGen
             string customArgsDecStr,
             string customArgsCallStr,
             string visibility
-                    )
+        )
         {
             bool hasSets = info.HasSet;
             bool hasAnyAttributeCriteria =
@@ -332,7 +330,7 @@ namespace Trecs.SourceGen
             string customArgsDecStr,
             string customArgsCallStr,
             string visibility
-                    )
+        )
         {
             sb.AppendLine(
                 2,
@@ -344,7 +342,11 @@ namespace Trecs.SourceGen
             {
                 // Sparse path. Build the full SparseQueryBuilder inline.
                 var firstSetName = PerformanceCache.GetDisplayString(info.SetTypes[0]);
-                var attributeChain = QueryBuilderHelper.BuildAttributeCriteriaChain(info.AttributeTagTypes, info.MatchByComponents, info.ComponentTypes);
+                var attributeChain = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                    info.AttributeTagTypes,
+                    info.MatchByComponents,
+                    info.ComponentTypes
+                );
                 sb.AppendLine(
                     3,
                     $"var __builder = __world.Query(){attributeChain}.InSet<{firstSetName}>();"
@@ -377,7 +379,7 @@ namespace Trecs.SourceGen
             ValidatedMethodInfo info,
             string customArgsDecStr,
             string visibility
-                    )
+        )
         {
             sb.AppendLine(
                 2,
@@ -385,7 +387,11 @@ namespace Trecs.SourceGen
             );
             sb.AppendLine(2, "{");
 
-            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(info.AttributeTagTypes, info.MatchByComponents, info.ComponentTypes);
+            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                info.AttributeTagTypes,
+                info.MatchByComponents,
+                info.ComponentTypes
+            );
             if (chain.Length > 0)
                 sb.AppendLine(3, $"__builder = __builder{chain};");
 
@@ -418,7 +424,7 @@ namespace Trecs.SourceGen
             ValidatedMethodInfo info,
             string customArgsDecStr,
             string visibility
-                    )
+        )
         {
             sb.AppendLine(
                 2,
@@ -426,7 +432,11 @@ namespace Trecs.SourceGen
             );
             sb.AppendLine(2, "{");
 
-            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(info.AttributeTagTypes, info.MatchByComponents, info.ComponentTypes);
+            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                info.AttributeTagTypes,
+                info.MatchByComponents,
+                info.ComponentTypes
+            );
             if (chain.Length > 0)
                 sb.AppendLine(3, $"__builder = __builder{chain};");
 
@@ -509,7 +519,7 @@ namespace Trecs.SourceGen
             int indentLevel,
             string builderVar,
             string? worldVar
-                    )
+        )
         {
             string worldName = worldVar ?? "__world";
             if (worldVar == null)
@@ -562,7 +572,7 @@ namespace Trecs.SourceGen
             int indentLevel,
             string builderVar,
             string? worldVar
-                    )
+        )
         {
             string worldName = worldVar ?? "__world";
             if (worldVar == null)
@@ -621,7 +631,7 @@ namespace Trecs.SourceGen
             int indentLevel,
             string groupVar,
             string worldVar
-                    )
+        )
         {
             foreach (var type in info.ComponentTypes)
             {
@@ -650,7 +660,7 @@ namespace Trecs.SourceGen
             ValidatedMethodInfo info,
             string customArgsDecStr,
             string visibility
-                    )
+        )
         {
             sb.AppendLine(
                 2,
@@ -658,7 +668,12 @@ namespace Trecs.SourceGen
             );
             sb.AppendLine(2, "{");
 
-            NamespaceCollector.EmitSetAccessorDeclarations(sb, info, indentLevel: 3, worldVar: "__world");
+            NamespaceCollector.EmitSetAccessorDeclarations(
+                sb,
+                info,
+                indentLevel: 3,
+                worldVar: "__world"
+            );
 
             EmitPerGroupBufferFetch(
                 sb,
@@ -843,7 +858,12 @@ namespace Trecs.SourceGen
 
             // Extract tag types, set types, and MatchByComponents from the iteration attribute.
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                context, methodDec, methodSymbol, classDec.Identifier.Text, TrecsAttributeNames.EntityFilter);
+                context,
+                methodDec,
+                methodSymbol,
+                classDec.Identifier.Text,
+                TrecsAttributeNames.EntityFilter
+            );
             if (criteria == null)
             {
                 isValid = false;
@@ -861,7 +881,8 @@ namespace Trecs.SourceGen
                 methodDec.Identifier.Text,
                 supportsEntityIndex: true,
                 aspectParam: aspectParam,
-                isValid: ref isValid);
+                isValid: ref isValid
+            );
             var customParameters = classified.CustomParameters;
             var setAccessorParameters = classified.SetAccessorParameters;
             var setReadParameters = classified.SetReadParameters;
@@ -907,7 +928,6 @@ namespace Trecs.SourceGen
 
             return isValid;
         }
-
     }
 
     /// <summary>

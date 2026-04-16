@@ -39,7 +39,8 @@ namespace Trecs.SourceGen.Shared
         public static string BuildAttributeCriteriaChain(
             IEnumerable<ITypeSymbol> tagTypes,
             bool matchByComponents,
-            IEnumerable<ITypeSymbol> componentTypes)
+            IEnumerable<ITypeSymbol> componentTypes
+        )
         {
             var chain = new StringBuilder();
 

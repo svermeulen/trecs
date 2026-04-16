@@ -41,7 +41,10 @@ namespace Trecs.SourceGen
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
 
-            context.RegisterOperationAction(AnalyzeVariableDeclarator, OperationKind.VariableDeclarator);
+            context.RegisterOperationAction(
+                AnalyzeVariableDeclarator,
+                OperationKind.VariableDeclarator
+            );
             context.RegisterSymbolAction(AnalyzeMethodParameters, SymbolKind.Method);
         }
 
@@ -64,11 +67,13 @@ namespace Trecs.SourceGen
 
             // No initializer (unassigned local) is also a copy concern if assigned later,
             // but we can't easily track all assignments — flag it to be safe.
-            context.ReportDiagnostic(Diagnostic.Create(
-                DiagnosticDescriptors.NativeUniquePtrByValueLocal,
-                declarator.Syntax.GetLocation(),
-                typeArg
-            ));
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.NativeUniquePtrByValueLocal,
+                    declarator.Syntax.GetLocation(),
+                    typeArg
+                )
+            );
         }
 
         private static bool IsCopyFromVariable(IOperation operation)
@@ -77,9 +82,10 @@ namespace Trecs.SourceGen
             while (operation is IConversionOperation { IsImplicit: true } conv)
                 operation = conv.Operand;
 
-            return operation is IFieldReferenceOperation
-                or ILocalReferenceOperation
-                or IParameterReferenceOperation;
+            return operation
+                is IFieldReferenceOperation
+                    or ILocalReferenceOperation
+                    or IParameterReferenceOperation;
         }
 
         private static void AnalyzeMethodParameters(SymbolAnalysisContext context)
@@ -87,10 +93,12 @@ namespace Trecs.SourceGen
             var method = (IMethodSymbol)context.Symbol;
 
             // Skip methods declared on NativeUniquePtr itself (Equals, operators, etc.)
-            if (method.ContainingType is INamedTypeSymbol containingType
+            if (
+                method.ContainingType is INamedTypeSymbol containingType
                 && containingType.IsGenericType
                 && containingType.ConstructedFrom.Name == NativeUniquePtrName
-                && containingType.ContainingNamespace?.ToDisplayString() == TrecsNamespace)
+                && containingType.ContainingNamespace?.ToDisplayString() == TrecsNamespace
+            )
             {
                 return;
             }
@@ -103,14 +111,19 @@ namespace Trecs.SourceGen
                 if (!IsNativeUniquePtr(param.Type, out var typeArg))
                     continue;
 
-                context.ReportDiagnostic(Diagnostic.Create(
-                    DiagnosticDescriptors.NativeUniquePtrByValueParameter,
-                    param.DeclaringSyntaxReferences.Length > 0
-                        ? param.DeclaringSyntaxReferences[0].GetSyntax(context.CancellationToken).GetLocation()
-                        : method.Locations[0],
-                    param.Name,
-                    typeArg
-                ));
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.NativeUniquePtrByValueParameter,
+                        param.DeclaringSyntaxReferences.Length > 0
+                            ? param
+                                .DeclaringSyntaxReferences[0]
+                                .GetSyntax(context.CancellationToken)
+                                .GetLocation()
+                            : method.Locations[0],
+                        param.Name,
+                        typeArg
+                    )
+                );
             }
         }
 
@@ -130,9 +143,9 @@ namespace Trecs.SourceGen
             if (namedType.ConstructedFrom.Name != NativeUniquePtrName)
                 return false;
 
-            typeArgDisplay = namedType.TypeArguments[0].ToDisplayString(
-                SymbolDisplayFormat.MinimallyQualifiedFormat
-            );
+            typeArgDisplay = namedType
+                .TypeArguments[0]
+                .ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
             return true;
         }
     }

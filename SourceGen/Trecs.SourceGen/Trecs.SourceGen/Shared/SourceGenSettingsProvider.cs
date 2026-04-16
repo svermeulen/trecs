@@ -15,8 +15,9 @@ namespace Trecs.SourceGen.Shared
         // Sentinel value to distinguish "looked up, found null" from "never looked up"
         private const string NoPrefixSentinel = "\0__none__";
 
-        private static readonly ConcurrentDictionary<IAssemblySymbol, string> _prefixCache =
-            new(SymbolEqualityComparer.Default);
+        private static readonly ConcurrentDictionary<IAssemblySymbol, string> _prefixCache = new(
+            SymbolEqualityComparer.Default
+        );
 
         /// <summary>
         /// Gets the configured component prefix for the assembly that declares the given type.
@@ -28,7 +29,10 @@ namespace Trecs.SourceGen.Shared
             if (assembly == null)
                 return null;
 
-            var cached = _prefixCache.GetOrAdd(assembly, static asm => LookupPrefix(asm) ?? NoPrefixSentinel);
+            var cached = _prefixCache.GetOrAdd(
+                assembly,
+                static asm => LookupPrefix(asm) ?? NoPrefixSentinel
+            );
             return cached == NoPrefixSentinel ? null : cached;
         }
 
@@ -45,8 +49,7 @@ namespace Trecs.SourceGen.Shared
 
                 foreach (var namedArg in attr.NamedArguments)
                 {
-                    if (namedArg.Key == "ComponentPrefix"
-                        && namedArg.Value.Value is string prefix)
+                    if (namedArg.Key == "ComponentPrefix" && namedArg.Value.Value is string prefix)
                     {
                         return prefix;
                     }

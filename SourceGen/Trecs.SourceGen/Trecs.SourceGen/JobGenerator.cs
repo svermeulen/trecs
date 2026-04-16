@@ -86,7 +86,8 @@ namespace Trecs.SourceGen
                 .Any(m =>
                     m.AttributeLists.SelectMany(al => al.Attributes)
                         .Any(attr =>
-                            IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == TrecsAttributeNames.EntityFilter
+                            IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                            == TrecsAttributeNames.EntityFilter
                         )
                 );
             if (hasIterationAttr)
@@ -98,7 +99,8 @@ namespace Trecs.SourceGen
                 .Any(f =>
                     f.AttributeLists.SelectMany(al => al.Attributes)
                         .Any(attr =>
-                            IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == TrecsAttributeNames.FromWorld
+                            IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                            == TrecsAttributeNames.FromWorld
                         )
                 );
             if (hasFromWorldField)
@@ -241,7 +243,8 @@ namespace Trecs.SourceGen
                 bool hasEntityFilter = method
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
-                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == TrecsAttributeNames.EntityFilter
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == TrecsAttributeNames.EntityFilter
                     );
 
                 if (!hasEntityFilter)
@@ -276,7 +279,8 @@ namespace Trecs.SourceGen
                     .Any(f =>
                         f.AttributeLists.SelectMany(al => al.Attributes)
                             .Any(attr =>
-                                IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == TrecsAttributeNames.FromWorld
+                                IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                                == TrecsAttributeNames.FromWorld
                             )
                     );
                 if (!hasFromWorld)
@@ -360,7 +364,8 @@ namespace Trecs.SourceGen
                 && firstParamSyntax
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
-                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == TrecsAttributeNames.PassThroughArgument
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == TrecsAttributeNames.PassThroughArgument
                     );
             var useAspectPath =
                 firstParamType != null
@@ -614,7 +619,10 @@ namespace Trecs.SourceGen
                 // attribute is the global index, regardless of position).
                 bool isGlobalIndex = p
                     .AttributeLists.SelectMany(al => al.Attributes)
-                    .Any(a => IterationCriteriaParser.ExtractAttributeName(a.Name.ToString()) == TrecsAttributeNames.GlobalIndex);
+                    .Any(a =>
+                        IterationCriteriaParser.ExtractAttributeName(a.Name.ToString())
+                        == TrecsAttributeNames.GlobalIndex
+                    );
                 if (isGlobalIndex)
                 {
                     if (hasGlobalIndex)
@@ -923,7 +931,8 @@ namespace Trecs.SourceGen
                 bool hasFromWorld = field
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
-                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == TrecsAttributeNames.FromWorld
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == TrecsAttributeNames.FromWorld
                     );
                 if (!hasFromWorld)
                     continue;
@@ -972,7 +981,10 @@ namespace Trecs.SourceGen
                 // Check that write-side [NativeContainer] fields have
                 // [NativeDisableParallelForRestriction] — Unity's walker requires it.
                 CheckFromWorldFieldWriteAttributes(
-                    context, field, typeSymbol, kind,
+                    context,
+                    field,
+                    typeSymbol,
+                    kind,
                     structName: structDecl.Identifier.Text,
                     isParallelJob: isParallelJob
                 );
@@ -1144,7 +1156,8 @@ namespace Trecs.SourceGen
                 bool hasFromWorld = field
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
-                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == TrecsAttributeNames.FromWorld
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == TrecsAttributeNames.FromWorld
                     );
                 if (hasFromWorld)
                     continue;
@@ -1211,7 +1224,10 @@ namespace Trecs.SourceGen
             {
                 foreach (var attr in attrList.Attributes)
                 {
-                    if (IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == "NativeDisableParallelForRestrictionAttribute")
+                    if (
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == "NativeDisableParallelForRestrictionAttribute"
+                    )
                         hasNativeDisableParallel = true;
                 }
             }
@@ -1376,7 +1392,9 @@ namespace Trecs.SourceGen
             if (info.Kind == JobKind.Aspect)
             {
                 var ai = info.Aspect!;
-                sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}ei = new EntityIndex(i, {FromWorldEmitter.GenPrefix}Group);");
+                sb.AppendLine(
+                    $"{body}var {FromWorldEmitter.GenPrefix}ei = new EntityIndex(i, {FromWorldEmitter.GenPrefix}Group);"
+                );
                 var ctorArgs = string.Join(
                     ", ",
                     Enumerable.Range(0, ai.ComponentTypes.Count).Select(BufferFieldName)
@@ -1527,7 +1545,9 @@ namespace Trecs.SourceGen
             // Merge attribute criteria into the builder.
             var chain = BuildAttributeCriteriaChain(info);
             if (chain.Length > 0)
-                sb.AppendLine($"{body}{FromWorldEmitter.GenPrefix}builder = {FromWorldEmitter.GenPrefix}builder{chain};");
+                sb.AppendLine(
+                    $"{body}{FromWorldEmitter.GenPrefix}builder = {FromWorldEmitter.GenPrefix}builder{chain};"
+                );
 
             // Fail loud rather than walking every group in the world. The wording mentions
             // only the criteria the job actually supports today (Sets are rejected up-front
@@ -1536,11 +1556,15 @@ namespace Trecs.SourceGen
                 $"{body}Assert.That({FromWorldEmitter.GenPrefix}builder.HasAnyCriteria, \"{info.Symbol.Name}.ScheduleParallel requires query criteria — pass a builder with at least one tag or component constraint, or specify Tags/MatchByComponents on the [{info.IterationAttributeShortName}] attribute.\");"
             );
 
-            sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}world = {FromWorldEmitter.GenPrefix}builder.World;");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}world = {FromWorldEmitter.GenPrefix}builder.World;"
+            );
             sb.AppendLine(
                 $"{body}var {FromWorldEmitter.GenPrefix}scheduler = {FromWorldEmitter.GenPrefix}world.GetJobSchedulerForJob();"
             );
-            sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}allJobs = {FromWorldEmitter.GenPrefix}extraDeps;");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}allJobs = {FromWorldEmitter.GenPrefix}extraDeps;"
+            );
 
             if (info.NeedsGlobalIndexOffset)
                 sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}queryIndexOffset = 0;");
@@ -1553,15 +1577,21 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{body}{{");
             string innerBody = body + "    ";
 
-            sb.AppendLine($"{innerBody}var {FromWorldEmitter.GenPrefix}group = {FromWorldEmitter.GenPrefix}slice.Group;");
-            sb.AppendLine($"{innerBody}var {FromWorldEmitter.GenPrefix}count = {FromWorldEmitter.GenPrefix}slice.Count;");
+            sb.AppendLine(
+                $"{innerBody}var {FromWorldEmitter.GenPrefix}group = {FromWorldEmitter.GenPrefix}slice.Group;"
+            );
+            sb.AppendLine(
+                $"{innerBody}var {FromWorldEmitter.GenPrefix}count = {FromWorldEmitter.GenPrefix}slice.Count;"
+            );
             sb.AppendLine($"{innerBody}if ({FromWorldEmitter.GenPrefix}count == 0) continue;");
             sb.AppendLine();
 
             EmitPerGroupBody(sb, info, innerBody, orderedEmits);
 
             if (info.NeedsGlobalIndexOffset)
-                sb.AppendLine($"{innerBody}{FromWorldEmitter.GenPrefix}queryIndexOffset += {FromWorldEmitter.GenPrefix}count;");
+                sb.AppendLine(
+                    $"{innerBody}{FromWorldEmitter.GenPrefix}queryIndexOffset += {FromWorldEmitter.GenPrefix}count;"
+                );
 
             sb.AppendLine($"{body}}}");
             sb.AppendLine($"{body}return {FromWorldEmitter.GenPrefix}allJobs;");
@@ -1597,7 +1627,9 @@ namespace Trecs.SourceGen
         {
             // Per-group input deps. Start fresh from extraDeps so an earlier group's deps
             // don't bleed into a later group's job (each group schedules independently).
-            sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;"
+            );
 
             // Iteration buffer deps.
             var buffers = GetIterationBuffers(info);
@@ -1635,7 +1667,9 @@ namespace Trecs.SourceGen
                 );
 
             if (info.NeedsGroupField)
-                sb.AppendLine($"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}Group = {FromWorldEmitter.GenPrefix}group;");
+                sb.AppendLine(
+                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}Group = {FromWorldEmitter.GenPrefix}group;"
+                );
 
             if (info.NeedsGlobalIndexOffset)
                 sb.AppendLine(
@@ -1690,16 +1724,22 @@ namespace Trecs.SourceGen
             // at the call site). Re-adding them here would overflow the builder's FixedList4.
             var chain = BuildAttributeCriteriaChain(info);
             if (chain.Length > 0)
-                sb.AppendLine($"{body}{FromWorldEmitter.GenPrefix}builder = {FromWorldEmitter.GenPrefix}builder{chain};");
+                sb.AppendLine(
+                    $"{body}{FromWorldEmitter.GenPrefix}builder = {FromWorldEmitter.GenPrefix}builder{chain};"
+                );
 
             // SparseQueryBuilder always has at least one set (constructed via .InSet<>()),
             // so HasAnyCriteria is trivially true. No assert needed.
 
-            sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}world = {FromWorldEmitter.GenPrefix}builder.World;");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}world = {FromWorldEmitter.GenPrefix}builder.World;"
+            );
             sb.AppendLine(
                 $"{body}var {FromWorldEmitter.GenPrefix}scheduler = {FromWorldEmitter.GenPrefix}world.GetJobSchedulerForJob();"
             );
-            sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}allJobs = {FromWorldEmitter.GenPrefix}extraDeps;");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}allJobs = {FromWorldEmitter.GenPrefix}extraDeps;"
+            );
 
             if (info.NeedsGlobalIndexOffset)
                 sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}queryIndexOffset = 0;");
@@ -1712,7 +1752,9 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{body}{{");
             string innerBody = body + "    ";
 
-            sb.AppendLine($"{innerBody}var {FromWorldEmitter.GenPrefix}group = {FromWorldEmitter.GenPrefix}slice.Group;");
+            sb.AppendLine(
+                $"{innerBody}var {FromWorldEmitter.GenPrefix}group = {FromWorldEmitter.GenPrefix}slice.Group;"
+            );
             sb.AppendLine();
 
             // Pre-walk the slice into a TempJob-backed sparse-indices buffer. The
@@ -1732,7 +1774,9 @@ namespace Trecs.SourceGen
             EmitPerGroupBodyForSparse(sb, info, innerBody, orderedEmits);
 
             if (info.NeedsGlobalIndexOffset)
-                sb.AppendLine($"{innerBody}{FromWorldEmitter.GenPrefix}queryIndexOffset += {FromWorldEmitter.GenPrefix}count;");
+                sb.AppendLine(
+                    $"{innerBody}{FromWorldEmitter.GenPrefix}queryIndexOffset += {FromWorldEmitter.GenPrefix}count;"
+                );
 
             sb.AppendLine($"{body}}}");
             sb.AppendLine($"{body}return {FromWorldEmitter.GenPrefix}allJobs;");
@@ -1747,7 +1791,9 @@ namespace Trecs.SourceGen
         )
         {
             // Per-group input deps.
-            sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;"
+            );
 
             // Iteration buffer deps.
             var buffers = GetIterationBuffers(info);
@@ -1785,7 +1831,9 @@ namespace Trecs.SourceGen
                 );
 
             if (info.NeedsGroupField)
-                sb.AppendLine($"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}Group = {FromWorldEmitter.GenPrefix}group;");
+                sb.AppendLine(
+                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}Group = {FromWorldEmitter.GenPrefix}group;"
+                );
 
             if (info.NeedsGlobalIndexOffset)
                 sb.AppendLine(
@@ -1824,7 +1872,9 @@ namespace Trecs.SourceGen
             sb.AppendLine(
                 $"{body}var {FromWorldEmitter.GenPrefix}disposeHandle = {FromWorldEmitter.GenPrefix}indicesLifetime.Dispose({FromWorldEmitter.GenPrefix}handle);"
             );
-            sb.AppendLine($"{body}{FromWorldEmitter.GenPrefix}scheduler.TrackJob({FromWorldEmitter.GenPrefix}disposeHandle);");
+            sb.AppendLine(
+                $"{body}{FromWorldEmitter.GenPrefix}scheduler.TrackJob({FromWorldEmitter.GenPrefix}disposeHandle);"
+            );
             sb.AppendLine(
                 $"{body}{FromWorldEmitter.GenPrefix}allJobs = JobHandle.CombineDependencies({FromWorldEmitter.GenPrefix}allJobs, {FromWorldEmitter.GenPrefix}disposeHandle);"
             );
@@ -1836,7 +1886,9 @@ namespace Trecs.SourceGen
         {
             // Build per-field emit info; only fields that need a schedule param contribute
             // a method parameter (NativeSetWrite<TSet> contributes none).
-            var orderedEmits = info.FromWorldFields.Select(f => FromWorldFieldEmit.Build(f)).ToList();
+            var orderedEmits = info
+                .FromWorldFields.Select(f => FromWorldFieldEmit.Build(f))
+                .ToList();
             var paramFields = orderedEmits.Where(e => e.HasScheduleParam).ToList();
 
             var fromWorldParamDecl = FormatFromWorldParamDecl(paramFields);
@@ -1856,7 +1908,9 @@ namespace Trecs.SourceGen
             FromWorldEmitter.EmitFromWorldHoistedSetup(sb, body, orderedEmits);
 
             // Single, flat dep accumulation — no per-group loop.
-            sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;"
+            );
             FromWorldEmitter.EmitFromWorldDepRegistration(sb, body, orderedEmits);
 
             // Configure a job copy with materialised [FromWorld] field values.
@@ -1883,7 +1937,9 @@ namespace Trecs.SourceGen
             // index-keyed source) inside their public Execute(int i); the [FromWorld] fields
             // give them dependency-tracked component access by EntityIndex (typically via
             // NativeComponentLookupRead/Write).
-            var orderedEmits = info.FromWorldFields.Select(f => FromWorldFieldEmit.Build(f)).ToList();
+            var orderedEmits = info
+                .FromWorldFields.Select(f => FromWorldFieldEmit.Build(f))
+                .ToList();
             var paramFields = orderedEmits.Where(e => e.HasScheduleParam).ToList();
 
             var fromWorldParamDecl = FormatFromWorldParamDecl(paramFields);
@@ -1904,7 +1960,9 @@ namespace Trecs.SourceGen
             FromWorldEmitter.EmitFromWorldHoistedSetup(sb, body, orderedEmits);
 
             // Single, flat dep accumulation — no per-group loop.
-            sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;"
+            );
             FromWorldEmitter.EmitFromWorldDepRegistration(sb, body, orderedEmits);
 
             // Configure a job copy with materialised [FromWorld] field values.
@@ -1973,11 +2031,15 @@ namespace Trecs.SourceGen
         static string BuildAttributeCriteriaChain(JobInfo info)
         {
             var c = info.IterationCriteria;
-            var componentTypes = info.Kind == JobKind.Aspect
-                ? (IEnumerable<ITypeSymbol>)info.Aspect!.ComponentTypes
-                : info.Components!.Components.Select(p => p.Type!);
+            var componentTypes =
+                info.Kind == JobKind.Aspect
+                    ? (IEnumerable<ITypeSymbol>)info.Aspect!.ComponentTypes
+                    : info.Components!.Components.Select(p => p.Type!);
             return QueryBuilderHelper.BuildAttributeCriteriaChain(
-                c.TagTypes, c.MatchByComponents, componentTypes);
+                c.TagTypes,
+                c.MatchByComponents,
+                componentTypes
+            );
         }
 
         // ─── Data classes (nested so they don't pollute the namespace) ───────────
@@ -2161,6 +2223,5 @@ namespace Trecs.SourceGen
             public static ComponentsParam GlobalIndexParam(string name) =>
                 new(ComponentsParamRole.GlobalIndex, null, false, false, name, -1);
         }
-
     }
 }

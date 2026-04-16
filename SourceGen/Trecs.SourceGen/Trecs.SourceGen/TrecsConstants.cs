@@ -44,6 +44,5 @@ namespace Trecs.SourceGen
         /// Matches the maximum generic arity of the QueryBuilder.WithTags overloads.
         /// </summary>
         public const int MaxTagsPerCall = 4;
-
     }
 }

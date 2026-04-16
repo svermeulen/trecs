@@ -225,10 +225,13 @@ namespace Trecs.SourceGen.Shared
             for (int i = 0; i < allTypes.Length; i++)
             {
                 var compName = PerformanceCache.GetDisplayString(allTypes[i]);
-                var isReadOnly = aspectData.ReadTypes.Any(r =>
-                    SymbolEqualityComparer.Default.Equals(r, allTypes[i]))
+                var isReadOnly =
+                    aspectData.ReadTypes.Any(r =>
+                        SymbolEqualityComparer.Default.Equals(r, allTypes[i])
+                    )
                     && !aspectData.WriteTypes.Any(w =>
-                        SymbolEqualityComparer.Default.Equals(w, allTypes[i]));
+                        SymbolEqualityComparer.Default.Equals(w, allTypes[i])
+                    );
                 var createMethod = isReadOnly
                     ? "CreateNativeComponentLookupReadForJob"
                     : "CreateNativeComponentLookupWriteForJob";
@@ -238,16 +241,15 @@ namespace Trecs.SourceGen.Shared
                 sb.AppendLine(
                     $"{body}var {local} = {GenPrefix}world.{createMethod}<{compName}>({e.HoistedGroupsLocal}, Unity.Collections.Allocator.TempJob);"
                 );
-                sb.AppendLine(
-                    $"{body}{GenPrefix}scheduler.RegisterPendingDispose({local});"
-                );
+                sb.AppendLine($"{body}{GenPrefix}scheduler.RegisterPendingDispose({local});");
             }
 
             // Construct the NativeFactory from the individual lookups
             sb.Append($"{body}{GenPrefix}job.{e.FieldName} = new {e.GenericArgDisplay}(");
             for (int i = 0; i < lookupLocals.Count; i++)
             {
-                if (i > 0) sb.Append(", ");
+                if (i > 0)
+                    sb.Append(", ");
                 sb.Append(lookupLocals[i]);
             }
             sb.AppendLine(");");
@@ -431,9 +433,7 @@ namespace Trecs.SourceGen.Shared
                         // NativeWorldAccessor performs structural operations (add/remove/move)
                         // that write to shared native queues. The job must complete before
                         // SubmitEntities processes those queues at the next phase boundary.
-                        sb.AppendLine(
-                            $"{body}{GenPrefix}scheduler.TrackJob({GenPrefix}handle);"
-                        );
+                        sb.AppendLine($"{body}{GenPrefix}scheduler.TrackJob({GenPrefix}handle);");
                         break;
                     case FromWorldFieldKind.Group:
                     case FromWorldFieldKind.NativeEntityHandleBuffer:

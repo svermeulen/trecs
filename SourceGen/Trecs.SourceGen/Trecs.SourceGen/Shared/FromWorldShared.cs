@@ -54,7 +54,8 @@ namespace Trecs.SourceGen.Shared
             INamedTypeSymbol fieldType,
             ITypeSymbol? genericArgument,
             AspectAttributeData? aspectData = null,
-            List<ITypeSymbol>? inlineTagTypes = null)
+            List<ITypeSymbol>? inlineTagTypes = null
+        )
         {
             FieldName = fieldName;
             Kind = kind;
@@ -149,18 +150,29 @@ namespace Trecs.SourceGen.Shared
             return $"TagSet<{typeArgs}>.Value";
         }
 
-        public static FromWorldFieldEmit Build(FromWorldFieldInfo info, bool suppressScheduleParam = false)
+        public static FromWorldFieldEmit Build(
+            FromWorldFieldInfo info,
+            bool suppressScheduleParam = false
+        )
         {
             var result = BuildCore(info);
             if (suppressScheduleParam && result.HasScheduleParam)
             {
                 return new FromWorldFieldEmit(
-                    result.Kind, result.FieldName, result.GenericArgDisplay, result.GenericArgSymbol,
+                    result.Kind,
+                    result.FieldName,
+                    result.GenericArgDisplay,
+                    result.GenericArgSymbol,
                     result.AspectData,
-                    hasScheduleParam: false, scheduleParamType: "", scheduleParamName: "",
+                    hasScheduleParam: false,
+                    scheduleParamType: "",
+                    scheduleParamName: "",
                     isOptionalParam: false,
-                    result.NeedsHoistedSingleGroup, result.NeedsHoistedGroups,
-                    result.InlineTagSetExpression, result.TagSetExpression);
+                    result.NeedsHoistedSingleGroup,
+                    result.NeedsHoistedGroups,
+                    result.InlineTagSetExpression,
+                    result.TagSetExpression
+                );
             }
             return result;
         }
@@ -174,15 +186,11 @@ namespace Trecs.SourceGen.Shared
             var sym = info.GenericArgument;
             var lower = LowerFirst(info.FieldName);
             var hasInlineTags = info.InlineTagTypes != null;
-            var inlineExpr = hasInlineTags
-                ? BuildInlineTagSetExpression(info.InlineTagTypes!)
-                : "";
+            var inlineExpr = hasInlineTags ? BuildInlineTagSetExpression(info.InlineTagTypes!) : "";
             // When inline tags are present, the resolved TagSet is computed in a
             // local variable by EmitFromWorldHoistedSetup (combining inline + optional
             // runtime tags). Otherwise it's just the schedule param name.
-            var resolvedTagsLocal = hasInlineTags
-                ? "_trecs_" + lower + "_tags"
-                : lower + "Tags";
+            var resolvedTagsLocal = hasInlineTags ? "_trecs_" + lower + "_tags" : lower + "Tags";
             switch (info.Kind)
             {
                 case FromWorldFieldKind.NativeComponentBufferRead:
@@ -385,9 +393,11 @@ namespace Trecs.SourceGen.Shared
         {
             // Source-gen-emitted NativeFactory nested struct inside an IAspect. These live
             // in the user's namespace (not Trecs), so check before the namespace gate.
-            if (typeSymbol.Name == "NativeFactory"
+            if (
+                typeSymbol.Name == "NativeFactory"
                 && typeSymbol.ContainingType != null
-                && typeSymbol.ContainingType.AllInterfaces.Any(i => i.Name == "IAspect"))
+                && typeSymbol.ContainingType.AllInterfaces.Any(i => i.Name == "IAspect")
+            )
             {
                 return FromWorldFieldKind.NativeFactory;
             }

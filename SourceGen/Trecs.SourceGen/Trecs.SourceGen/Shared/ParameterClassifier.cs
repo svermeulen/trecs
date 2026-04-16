@@ -97,7 +97,8 @@ namespace Trecs.SourceGen.Shared
             string? methodName,
             bool supportsEntityIndex,
             ParameterSyntax? aspectParam,
-            ref bool isValid)
+            ref bool isValid
+        )
         {
             var result = new ClassifiedParameters();
 
@@ -149,12 +150,18 @@ namespace Trecs.SourceGen.Shared
                 if (
                     !isPassThrough
                     && paramType is INamedTypeSymbol namedNativeSet
-                    && (namedNativeSet.Name == "NativeSetRead" || namedNativeSet.Name == "NativeSetWrite")
+                    && (
+                        namedNativeSet.Name == "NativeSetRead"
+                        || namedNativeSet.Name == "NativeSetWrite"
+                    )
                     && namedNativeSet.TypeArguments.Length == 1
-                    && PerformanceCache.GetDisplayString(namedNativeSet.ContainingNamespace) == "Trecs"
+                    && PerformanceCache.GetDisplayString(namedNativeSet.ContainingNamespace)
+                        == "Trecs"
                 )
                 {
-                    var nativeSetTypeArg = PerformanceCache.GetDisplayString(namedNativeSet.TypeArguments[0]);
+                    var nativeSetTypeArg = PerformanceCache.GetDisplayString(
+                        namedNativeSet.TypeArguments[0]
+                    );
                     context.ReportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.NativeSetNotAllowedOnMainThread,
@@ -201,7 +208,9 @@ namespace Trecs.SourceGen.Shared
                             isIn
                         )
                     );
-                    result.ParameterSlots.Add(new ParamSlot(ParamSlotKind.LoopSetAccessor, setIndex));
+                    result.ParameterSlots.Add(
+                        new ParamSlot(ParamSlotKind.LoopSetAccessor, setIndex)
+                    );
                     continue;
                 }
 
@@ -396,14 +405,11 @@ namespace Trecs.SourceGen.Shared
 
                     var componentIndex = result.ComponentParameters.Count;
                     result.ComponentParameters.Add(
-                        new ParameterInfo(
-                            paramType,
-                            param.Identifier.ToString(),
-                            isRef,
-                            isIn
-                        )
+                        new ParameterInfo(paramType, param.Identifier.ToString(), isRef, isIn)
                     );
-                    result.ParameterSlots.Add(new ParamSlot(ParamSlotKind.LoopComponent, componentIndex));
+                    result.ParameterSlots.Add(
+                        new ParamSlot(ParamSlotKind.LoopComponent, componentIndex)
+                    );
                     continue;
                 }
 
@@ -442,12 +448,7 @@ namespace Trecs.SourceGen.Shared
                 // Explicit [PassThroughArgument] — pass-through custom arg.
                 var customIndex = result.CustomParameters.Count;
                 result.CustomParameters.Add(
-                    new ParameterInfo(
-                        paramType,
-                        param.Identifier.ToString(),
-                        isRef,
-                        isIn
-                    )
+                    new ParameterInfo(paramType, param.Identifier.ToString(), isRef, isIn)
                 );
                 result.ParameterSlots.Add(new ParamSlot(ParamSlotKind.Custom, customIndex));
             }

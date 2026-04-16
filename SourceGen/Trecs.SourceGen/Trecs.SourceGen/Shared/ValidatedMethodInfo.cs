@@ -139,7 +139,12 @@ namespace Trecs.SourceGen.Shared
         /// <summary>Whether the user used the 'in' modifier on this parameter.</summary>
         public bool IsIn { get; }
 
-        public SetAccessorParameterInfo(string setTypeArg, ITypeSymbol setTypeArgSymbol, string paramName, bool isIn)
+        public SetAccessorParameterInfo(
+            string setTypeArg,
+            ITypeSymbol setTypeArgSymbol,
+            string paramName,
+            bool isIn
+        )
         {
             SetTypeArg = setTypeArg;
             SetTypeArgSymbol = setTypeArgSymbol;
@@ -178,8 +183,6 @@ namespace Trecs.SourceGen.Shared
         /// Convenience constructor that auto-computes the display string from the type symbol.
         /// </summary>
         public ParameterInfo(ITypeSymbol typeSymbol, string name, bool isRef, bool isIn)
-            : this(PerformanceCache.GetDisplayString(typeSymbol), typeSymbol, name, isRef, isIn)
-        {
-        }
+            : this(PerformanceCache.GetDisplayString(typeSymbol), typeSymbol, name, isRef, isIn) { }
     }
 }

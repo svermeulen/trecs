@@ -56,7 +56,8 @@ namespace Trecs.SourceGen
                 && methodDecl
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
-                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString()) == TrecsAttributeNames.EntityFilter
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == TrecsAttributeNames.EntityFilter
                     );
         }
 
@@ -194,10 +195,7 @@ namespace Trecs.SourceGen
             var sb = OptimizedStringBuilder.ForAspect(componentCount);
 
             // Add required namespaces
-            var requiredNamespaces = NamespaceCollector.Collect(
-                compilation,
-                validatedParamsInfo
-            );
+            var requiredNamespaces = NamespaceCollector.Collect(compilation, validatedParamsInfo);
 
             sb.AppendUsings(requiredNamespaces.ToArray());
 
@@ -308,7 +306,11 @@ namespace Trecs.SourceGen
             {
                 // Sparse path. Build the full SparseQueryBuilder inline.
                 var firstSetName = PerformanceCache.GetDisplayString(info.SetTypes[0]);
-                var attributeChain = QueryBuilderHelper.BuildAttributeCriteriaChain(info.AttributeTagTypes, info.MatchByComponents, info.ComponentParameters.Select(p => p.TypeSymbol));
+                var attributeChain = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                    info.AttributeTagTypes,
+                    info.MatchByComponents,
+                    info.ComponentParameters.Select(p => p.TypeSymbol)
+                );
                 sb.AppendLine(
                     3,
                     $"var __builder = __world.Query(){attributeChain}.InSet<{firstSetName}>();"
@@ -341,7 +343,11 @@ namespace Trecs.SourceGen
             sb.AppendLine(2, $"void {methodName}(QueryBuilder __builder{customArgsDecStr})");
             sb.AppendLine(2, "{");
 
-            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(info.AttributeTagTypes, info.MatchByComponents, info.ComponentParameters.Select(p => p.TypeSymbol));
+            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                info.AttributeTagTypes,
+                info.MatchByComponents,
+                info.ComponentParameters.Select(p => p.TypeSymbol)
+            );
             if (chain.Length > 0)
                 sb.AppendLine(3, $"__builder = __builder{chain};");
 
@@ -373,7 +379,11 @@ namespace Trecs.SourceGen
             sb.AppendLine(2, $"void {methodName}(SparseQueryBuilder __builder{customArgsDecStr})");
             sb.AppendLine(2, "{");
 
-            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(info.AttributeTagTypes, info.MatchByComponents, info.ComponentParameters.Select(p => p.TypeSymbol));
+            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                info.AttributeTagTypes,
+                info.MatchByComponents,
+                info.ComponentParameters.Select(p => p.TypeSymbol)
+            );
             if (chain.Length > 0)
                 sb.AppendLine(3, $"__builder = __builder{chain};");
 
@@ -577,7 +587,12 @@ namespace Trecs.SourceGen
             int indentLevel
         )
         {
-            NamespaceCollector.EmitSetAccessorDeclarations(sb, validatedParamsInfo, indentLevel, "__world");
+            NamespaceCollector.EmitSetAccessorDeclarations(
+                sb,
+                validatedParamsInfo,
+                indentLevel,
+                "__world"
+            );
 
             var componentParams = validatedParamsInfo.ComponentParameters;
 
@@ -687,10 +702,10 @@ namespace Trecs.SourceGen
                 methodName: null,
                 supportsEntityIndex: true,
                 aspectParam: null,
-                isValid: ref isValid);
+                isValid: ref isValid
+            );
             bool hasAnyIterationParameter =
-                classified.ComponentParameters.Count > 0
-                || classified.HasEntityIndex;
+                classified.ComponentParameters.Count > 0 || classified.HasEntityIndex;
 
             if (!hasAnyIterationParameter)
             {
@@ -706,7 +721,12 @@ namespace Trecs.SourceGen
             // Extract tag types, set types, and MatchByComponents from the iteration attribute.
             var className = classDec.Identifier.Text;
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                context, methodDec, methodSymbol, className, TrecsAttributeNames.EntityFilter);
+                context,
+                methodDec,
+                methodSymbol,
+                className,
+                TrecsAttributeNames.EntityFilter
+            );
             if (criteria == null)
             {
                 isValid = false;
@@ -734,7 +754,6 @@ namespace Trecs.SourceGen
 
             return isValid;
         }
-
     }
 
     /// <summary>
@@ -757,5 +776,4 @@ namespace Trecs.SourceGen
             MethodSymbol = methodSymbol;
         }
     }
-
 }

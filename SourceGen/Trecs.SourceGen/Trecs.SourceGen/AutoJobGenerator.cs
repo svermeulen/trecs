@@ -373,7 +373,9 @@ namespace Trecs.SourceGen
                     }
                     var setTypeArgSymbol = namedNsr.TypeArguments[0];
                     var setTypeArg = PerformanceCache.GetDisplayString(setTypeArgSymbol);
-                    paramSlots.Add(AutoJobParam.NativeSetRead(paramName, setTypeArg, setTypeArgSymbol));
+                    paramSlots.Add(
+                        AutoJobParam.NativeSetRead(paramName, setTypeArg, setTypeArgSymbol)
+                    );
                     continue;
                 }
 
@@ -398,14 +400,20 @@ namespace Trecs.SourceGen
                     }
                     var setTypeArgSymbol = namedNsw.TypeArguments[0];
                     var setTypeArg = PerformanceCache.GetDisplayString(setTypeArgSymbol);
-                    paramSlots.Add(AutoJobParam.NativeSetWrite(paramName, setTypeArg, setTypeArgSymbol));
+                    paramSlots.Add(
+                        AutoJobParam.NativeSetWrite(paramName, setTypeArg, setTypeArgSymbol)
+                    );
                     continue;
                 }
 
                 // Check for SetAccessor<T> / SetRead<T> / SetWrite<T> (main-thread only — forbidden in [WrapAsJob]).
                 if (
                     paramType is INamedTypeSymbol namedSa
-                    && (namedSa.Name == "SetAccessor" || namedSa.Name == "SetRead" || namedSa.Name == "SetWrite")
+                    && (
+                        namedSa.Name == "SetAccessor"
+                        || namedSa.Name == "SetRead"
+                        || namedSa.Name == "SetWrite"
+                    )
                     && namedSa.TypeArguments.Length == 1
                     && PerformanceCache.GetDisplayString(namedSa.ContainingNamespace) == "Trecs"
                 )
@@ -628,12 +636,14 @@ namespace Trecs.SourceGen
 
                     // Reject types that already have first-class [WrapAsJob] support or
                     // are otherwise unsupported on [WrapAsJob] parameters.
-                    if (fwKind == FromWorldFieldKind.Unsupported
+                    if (
+                        fwKind == FromWorldFieldKind.Unsupported
                         || fwKind == FromWorldFieldKind.NativeWorldAccessor
                         || fwKind == FromWorldFieldKind.NativeSetRead
                         || fwKind == FromWorldFieldKind.NativeSetWrite
                         || fwKind == FromWorldFieldKind.NativeComponentRead
-                        || fwKind == FromWorldFieldKind.NativeComponentWrite)
+                        || fwKind == FromWorldFieldKind.NativeComponentWrite
+                    )
                     {
                         context.ReportDiagnostic(
                             Diagnostic.Create(
@@ -907,11 +917,16 @@ namespace Trecs.SourceGen
             foreach (var p in info.Params)
             {
                 if (
-                    (p.Role == AutoJobParamRole.NativeSetRead || p.Role == AutoJobParamRole.NativeSetWrite)
+                    (
+                        p.Role == AutoJobParamRole.NativeSetRead
+                        || p.Role == AutoJobParamRole.NativeSetWrite
+                    )
                     && p.SetTypeArgSymbol != null
                 )
                 {
-                    var ns2 = PerformanceCache.GetDisplayString(p.SetTypeArgSymbol.ContainingNamespace);
+                    var ns2 = PerformanceCache.GetDisplayString(
+                        p.SetTypeArgSymbol.ContainingNamespace
+                    );
                     if (!string.IsNullOrEmpty(ns2) && ns2 != "<global namespace>")
                         usings.Add(ns2);
                     if (p.SetTypeArgSymbol.ContainingType != null)
@@ -954,7 +969,9 @@ namespace Trecs.SourceGen
                 // Generic argument type.
                 if (fwInfo?.GenericArgument != null)
                 {
-                    var gaNs = PerformanceCache.GetDisplayString(fwInfo.GenericArgument.ContainingNamespace);
+                    var gaNs = PerformanceCache.GetDisplayString(
+                        fwInfo.GenericArgument.ContainingNamespace
+                    );
                     if (!string.IsNullOrEmpty(gaNs) && gaNs != "<global namespace>")
                         usings.Add(gaNs);
                 }
@@ -1039,7 +1056,9 @@ namespace Trecs.SourceGen
             {
                 var (type, readOnly) = buffers[i];
                 if (!readOnly)
-                    sb.AppendLine($"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]");
+                    sb.AppendLine(
+                        $"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]"
+                    );
                 var bufferType = readOnly
                     ? $"NativeComponentBufferRead<{PerformanceCache.GetDisplayString(type)}>"
                     : $"NativeComponentBufferWrite<{PerformanceCache.GetDisplayString(type)}>";
@@ -1066,14 +1085,18 @@ namespace Trecs.SourceGen
             foreach (var p in info.Params)
             {
                 if (p.Role == AutoJobParamRole.NativeSetRead)
-                    sb.AppendLine($"{fieldInd}public NativeSetRead<{p.SetTypeArg}> {GenPrefix}nsr_{p.Name};");
+                    sb.AppendLine(
+                        $"{fieldInd}public NativeSetRead<{p.SetTypeArg}> {GenPrefix}nsr_{p.Name};"
+                    );
             }
 
             // NativeSetWrite fields.
             foreach (var p in info.Params)
             {
                 if (p.Role == AutoJobParamRole.NativeSetWrite)
-                    sb.AppendLine($"{fieldInd}public NativeSetWrite<{p.SetTypeArg}> {GenPrefix}nsw_{p.Name};");
+                    sb.AppendLine(
+                        $"{fieldInd}public NativeSetWrite<{p.SetTypeArg}> {GenPrefix}nsw_{p.Name};"
+                    );
             }
 
             // FromWorld fields.
@@ -1082,10 +1105,13 @@ namespace Trecs.SourceGen
                 if (p.Role != AutoJobParamRole.FromWorld)
                     continue;
                 var fwKind = p.FromWorldInfo!.Kind;
-                bool isWrite = fwKind == FromWorldFieldKind.NativeComponentBufferWrite
+                bool isWrite =
+                    fwKind == FromWorldFieldKind.NativeComponentBufferWrite
                     || fwKind == FromWorldFieldKind.NativeComponentLookupWrite;
                 if (isWrite)
-                    sb.AppendLine($"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]");
+                    sb.AppendLine(
+                        $"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]"
+                    );
                 sb.AppendLine($"{fieldInd}public {p.TypeDisplay} {GenPrefix}fw_{p.Name};");
             }
 
@@ -1225,10 +1251,7 @@ namespace Trecs.SourceGen
             {
                 // Build a SparseQueryBuilder by chaining .InSet<T>() for the first set type.
                 var firstSetName = PerformanceCache.GetDisplayString(info.Criteria.SetTypes[0]);
-                var args = new List<string>
-                {
-                    $"{GenPrefix}world.Query().InSet<{firstSetName}>()",
-                };
+                var args = new List<string> { $"{GenPrefix}world.Query().InSet<{firstSetName}>()" };
                 args.AddRange(ptParams.Select(p => p.Name));
                 args.Add($"{GenPrefix}extraDeps");
                 sb.AppendLine(
@@ -1414,9 +1437,7 @@ namespace Trecs.SourceGen
             // that write to shared native queues. The job must complete before
             // SubmitEntities processes those queues at the next phase boundary.
             if (info.HasNativeWorldAccessor)
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}handle);"
-                );
+                sb.AppendLine($"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}handle);");
 
             sb.AppendLine(
                 $"{innerBody}{GenPrefix}allJobs = JobHandle.CombineDependencies({GenPrefix}allJobs, {GenPrefix}handle);"
@@ -1604,9 +1625,7 @@ namespace Trecs.SourceGen
             // that write to shared native queues. The job must complete before
             // SubmitEntities processes those queues at the next phase boundary.
             if (info.HasNativeWorldAccessor)
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}handle);"
-                );
+                sb.AppendLine($"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}handle);");
 
             // Dispose the indices lifetime after the job completes.
             sb.AppendLine(
@@ -1670,9 +1689,11 @@ namespace Trecs.SourceGen
 
         static List<FromWorldFieldEmit> GetFromWorldEmits(AutoJobInfo info)
         {
-            return info.Params
-                .Where(p => p.Role == AutoJobParamRole.FromWorld)
-                .Select(p => FromWorldFieldEmit.Build(p.FromWorldInfo!, suppressScheduleParam: true))
+            return info
+                .Params.Where(p => p.Role == AutoJobParamRole.FromWorld)
+                .Select(p =>
+                    FromWorldFieldEmit.Build(p.FromWorldInfo!, suppressScheduleParam: true)
+                )
                 .ToList();
         }
 
@@ -1703,13 +1724,17 @@ namespace Trecs.SourceGen
         static string BuildAttributeCriteriaChain(AutoJobInfo info)
         {
             var c = info.Criteria;
-            var componentTypes = info.IterKind == AutoJobIterationKind.Aspect
-                ? (IEnumerable<ITypeSymbol>)info.AspectData!.ComponentTypes
-                : info.Params
-                    .Where(p => p.Role == AutoJobParamRole.Component)
-                    .Select(p => p.Type!);
+            var componentTypes =
+                info.IterKind == AutoJobIterationKind.Aspect
+                    ? (IEnumerable<ITypeSymbol>)info.AspectData!.ComponentTypes
+                    : info
+                        .Params.Where(p => p.Role == AutoJobParamRole.Component)
+                        .Select(p => p.Type!);
             return QueryBuilderHelper.BuildAttributeCriteriaChain(
-                c.TagTypes, c.MatchByComponents, componentTypes);
+                c.TagTypes,
+                c.MatchByComponents,
+                componentTypes
+            );
         }
 
         // ─── Data classes ──────────────────────────────────────────────────────
@@ -1856,7 +1881,14 @@ namespace Trecs.SourceGen
                 string name,
                 string typeDisplay,
                 FromWorldFieldInfo fromWorldInfo
-            ) => new(AutoJobParamRole.FromWorld, type, name, typeDisplay, fromWorldInfo: fromWorldInfo);
+            ) =>
+                new(
+                    AutoJobParamRole.FromWorld,
+                    type,
+                    name,
+                    typeDisplay,
+                    fromWorldInfo: fromWorldInfo
+                );
         }
 
         sealed class AspectIterationData

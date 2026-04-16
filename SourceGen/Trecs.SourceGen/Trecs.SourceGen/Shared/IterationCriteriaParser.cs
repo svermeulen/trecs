@@ -17,7 +17,8 @@ namespace Trecs.SourceGen.Shared
         public IterationCriteria(
             List<ITypeSymbol> tagTypes,
             List<ITypeSymbol> setTypes,
-            bool matchByComponents)
+            bool matchByComponents
+        )
         {
             TagTypes = tagTypes;
             SetTypes = setTypes;
@@ -46,7 +47,8 @@ namespace Trecs.SourceGen.Shared
             MethodDeclarationSyntax method,
             IMethodSymbol methodSymbol,
             string containerName,
-            string attributeName = "ForEachEntityAttribute")
+            string attributeName = "ForEachEntityAttribute"
+        )
         {
             var tagTypes = new List<ITypeSymbol>();
             var setTypes = new List<ITypeSymbol>();

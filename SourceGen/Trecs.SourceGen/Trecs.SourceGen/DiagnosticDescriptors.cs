@@ -665,8 +665,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor UnrecognizedParameterType = new(
             id: "TRECS100",
             title: "Unrecognized parameter type requires [PassThroughArgument]",
-            messageFormat:
-                "Parameter '{0}' has unrecognized type '{1}'. Mark it [PassThroughArgument] to forward as a user-supplied value, or use a recognized type (component with in/ref, EntityIndex, WorldAccessor, SetAccessor<T>).",
+            messageFormat: "Parameter '{0}' has unrecognized type '{1}'. Mark it [PassThroughArgument] to forward as a user-supplied value, or use a recognized type (component with in/ref, EntityIndex, WorldAccessor, SetAccessor<T>).",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -677,8 +676,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor FromWorldUnsupportedOnWrapAsJob = new(
             id: "TRECS101",
             title: "Unsupported [FromWorld] parameter type on [WrapAsJob] method",
-            messageFormat:
-                "[FromWorld] parameter '{0}' of type '{1}' is not supported on [WrapAsJob] methods. "
+            messageFormat: "[FromWorld] parameter '{0}' of type '{1}' is not supported on [WrapAsJob] methods. "
                 + "For NativeWorldAccessor, NativeSetRead/Write use the first-class parameter support instead. "
                 + "For NativeComponentRead/Write use [PassThroughArgument]. "
                 + "Supported [FromWorld] types: Aspect.NativeFactory, NativeComponentLookupRead<T>, NativeComponentLookupWrite<T>, "
@@ -691,8 +689,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor FromWorldRequiresInlineTagsOnWrapAsJob = new(
             id: "TRECS102",
             title: "[FromWorld] on [WrapAsJob] requires inline Tag/Tags",
-            messageFormat:
-                "[FromWorld] parameter '{0}' on [WrapAsJob] method requires inline Tag or Tags "
+            messageFormat: "[FromWorld] parameter '{0}' on [WrapAsJob] method requires inline Tag or Tags "
                 + "(e.g. [FromWorld(Tag = typeof(MyTag))]). The generated wrapper method has no way "
                 + "to accept runtime TagSets. Use a manual job struct if runtime-variable tags are needed.",
             category: TrecsCategory,
@@ -705,8 +702,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor NativeUniquePtrByValueLocal = new(
             id: "TRECS110",
             title: "NativeUniquePtr must not be copied to a by-value local",
-            messageFormat:
-                "NativeUniquePtr<{0}> must not be copied to a local variable; "
+            messageFormat: "NativeUniquePtr<{0}> must not be copied to a local variable; "
                 + "access the owning field directly to preserve write-access tracking",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
@@ -716,8 +712,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor NativeUniquePtrByValueParameter = new(
             id: "TRECS111",
             title: "NativeUniquePtr must not be passed by value",
-            messageFormat:
-                "Parameter '{0}' of type NativeUniquePtr<{1}> must be declared as ref, in, or out — "
+            messageFormat: "Parameter '{0}' of type NativeUniquePtr<{1}> must be declared as ref, in, or out — "
                 + "not by value — to preserve write-access tracking",
             category: TrecsCategory,
             DiagnosticSeverity.Error,

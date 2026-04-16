@@ -834,7 +834,6 @@ namespace Trecs.SourceGen
                 sb.AppendLine();
             }
         }
-
     }
 
     internal class AutoSystemClassData
