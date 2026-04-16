@@ -21,7 +21,7 @@ A high-performance Entity Component System framework for Unity, designed for det
 
 ```csharp
 // Step 1: Define components
-[Unwrap] // <- Indicates that it is a single value component, so that Aspects can unwrap values directly
+[Unwrap]
 public partial struct Position : IEntityComponent
 {
     public float3 Value;
@@ -31,8 +31,6 @@ public partial struct Position : IEntityComponent
 public struct PlayerTag : ITag { }
 
 // Step 3: Define entity types
-// Note that this class is never actually instantiated
-// It is only used to declare the components and tags that entities of this type will have
 public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 {
     public Position Position;
@@ -42,34 +40,13 @@ public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 // Step 4: Define systems to operate on entities
 public partial class MovementSystem : ISystem
 {
-    [ForEachEntity(MatchByComponents = true)]
-    void Execute(ref Position pos, in Velocity vel)
-    {
-        pos.Value += vel.Value * World.DeltaTime;
-    }
-}
-
-// Or alternatively, match by tag instead of components:
-public partial class MovementSystem : ISystem
-{
-    [ForEachEntity(Tag = typeof(PlayerTag))]
-    void Execute(ref Position pos, in Velocity vel)
-    {
-        pos.Value += vel.Value * World.DeltaTime;
-    }
-}
-
-// Can also define an IAspect to group together components
-// and unwrap the single value components for direct access:
-public partial class MovementSystem : ISystem
-{
     [ForEachEntity(Tag = typeof(PlayerTag))]
     void Execute(in Player player)
     {
         player.Position += player.Velocity * World.DeltaTime;
     }
 
-    partial struct Player : IAspect, IRead<ApproachingFish>, IWrite<Position> { }
+    partial struct Player : IAspect, IRead<Velocity>, IWrite<Position> { }
 }
 
 // Step 5: Define, initialize, and run the world
