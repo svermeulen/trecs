@@ -1,15 +1,37 @@
 # Queries & Iteration
 
-Queries let you find and iterate over entities by their tags, components, or set membership. Most of the time you'll use `[ForEachEntity]` (see [Systems](../core/systems.md)), but manual queries give you full control.
+Queries let you find and iterate over entities by their tags, components, or set membership.
+
+## ForEachEntity
+
+The most common way to iterate entities is with `[ForEachEntity]` on a system method. It supports the same filtering criteria as the query builder:
+
+```csharp
+// By tag
+[ForEachEntity(Tag = typeof(GameTags.Player))]
+void Execute(ref Position position, in Velocity velocity) { ... }
+
+// By multiple tags
+[ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+void Execute(in ActiveBall ball) { ... }
+
+// By components (matches any entity that has these components, regardless of tags)
+[ForEachEntity(MatchByComponents = true)]
+void Execute(ref Position position, in Velocity velocity) { ... }
+
+// By set membership
+[ForEachEntity(Set = typeof(SampleSets.HighlightedParticle))]
+void Execute(in ParticleView particle) { ... }
+```
+
+See [Systems](../core/systems.md#foreachentity) for full details.
 
 ## QueryBuilder
 
-Access the query builder via `WorldAccessor.Query()`:
+For manual iteration outside of `[ForEachEntity]`, use the query builder via `WorldAccessor.Query()`:
 
 ```csharp
-var query = World.Query()
-    .WithTags<GameTags.Player>()
-    .WithComponents<Health>();
+var query = World.Query().WithTags<GameTags.Player>()
 ```
 
 ### Filtering by Tags
@@ -33,62 +55,74 @@ query.WithComponents<Position, Velocity>()
 query.WithoutComponents<Frozen>()
 ```
 
-### Filtering by Set
+### Filtering by both Components and Tags
 
-Calling `InSet<T>()` transitions to a `SparseQueryBuilder` — the iteration will only visit entities that are members of the set:
+Tag and component filters can be combined. This is useful when a tag is shared across multiple entity types that have different component layouts, and you only want to iterate entities that have specific components:
 
 ```csharp
-var sparseQuery = World.Query()
-    .WithTags<GameTags.Particle>()
-    .InSet<HighlightedParticles>();
+// Only iterate Renderable entities that also have a Velocity component
+var query = World.Query()
+    .WithTags<CommonTags.Renderable>()
+    .WithComponents<Velocity>();
 ```
+
+For example, if both `FishEntity` and `ObstacleEntity` share a `Renderable` tag but only `FishEntity` has a `Velocity` component, this query will skip obstacles and only visit fish.
 
 ## Iteration Patterns
 
 ### EntityIndices — Iterate Entity by Entity
 
 ```csharp
-var iter = World.Query().WithTags<GameTags.Player>().EntityIndices();
-while (iter.MoveNext())
+foreach (EntityIndex entityIndex in World.Query().WithTags<GameTags.Player>().EntityIndices())
 {
-    EntityIndex entityIndex = iter.Current;
     ref Position pos = ref World.Component<Position>(entityIndex).Write;
     pos.Value.y += 1f;
 }
 ```
 
-### GroupSlices — Iterate per Group (Dense)
+### Aspect Queries
 
-More efficient for bulk operations since you can access component buffers directly:
+Aspects provide a generated `Query()` method for manual iteration with bundled component access:
 
 ```csharp
-foreach (var slice in World.Query().WithTags<GameTags.Player>().GroupSlices())
-{
-    var positions = World.ComponentBuffer<Position>(slice.Group);
-    var velocities = World.ComponentBuffer<Velocity>(slice.Group);
+partial struct PlayerView : IAspect, IRead<Position>, IWrite<Health> { }
 
-    for (int i = 0; i < slice.Count; i++)
-    {
-        positions[i].Value += velocities[i].Value * dt;
-    }
+foreach (var player in PlayerView.Query(World).WithTags<GameTags.Player>())
+{
+    float3 pos = player.Position;
+    player.Health -= 1f;
 }
 ```
 
-### Sparse GroupSlices — Iterate Set Members
+!!! note
+    Aspect queries do **not** automatically filter by the aspect's components — you must provide filtering criteria. Either scope with `WithTags` or call `MatchByComponents()` to filter to only groups that have all the aspect's components:
 
-When querying with `InSet<T>()`, iteration is sparse — only set members are visited:
+    ```csharp
+    // Iterates any entity that has Position and Health, regardless of tags
+    foreach (var entity in PlayerView.Query(World).MatchByComponents())
+    {
+        ...
+    }
+    ```
+
+See [Aspects](aspects.md) for details on defining aspects.
+
+### Filtering by Set
+
+Calling `InSet<T>()` filters iteration to only entities that are members of the [set](../entity-management/sets.md):
 
 ```csharp
-foreach (var slice in World.Query().InSet<HighlightedParticles>().GroupSlices())
-{
-    var colors = World.ComponentBuffer<ColorComponent>(slice.Group);
+partial struct ParticleView : IAspect, IRead<Position>, IWrite<ColorComponent> { }
 
-    foreach (int idx in slice.Indices)
-    {
-        colors[idx].Value = Color.yellow;
-    }
+foreach (var particle in ParticleView.Query(World).InSet<HighlightedParticles>())
+{
+    particle.Color = Color.yellow;
 }
 ```
+
+### GroupSlices — Low-Level Bulk Access
+
+For advanced performance-critical scenarios, you can iterate per-group and access component buffers directly. See [Groups & TagSets — GroupSlices](../advanced/groups-and-tagsets.md#groupslices) for details.
 
 ## Counting
 
@@ -114,19 +148,3 @@ if (World.Query().WithTags<GameTags.Player>().TrySingle(out var player))
     ref readonly Position pos = ref player.Get<Position>().Read;
 }
 ```
-
-## Aspect-Based Queries
-
-Aspects provide a generated `Query()` method for manual iteration with bundled component access:
-
-```csharp
-partial struct PlayerView : IAspect, IRead<Position>, IWrite<Health> { }
-
-foreach (var player in PlayerView.Query(World).WithTags<GameTags.Player>())
-{
-    float3 pos = player.Position;
-    player.Health -= 1f;
-}
-```
-
-See [Aspects](aspects.md) for details.

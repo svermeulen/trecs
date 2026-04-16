@@ -22,6 +22,44 @@ Groups are the foundation of Trecs' performance model:
 - **Targeted iteration** — systems can iterate over specific groups by tag, skipping irrelevant entities entirely
 - **Partitions** — template [partitions](../core/templates.md#partitions) use groups to separate entities by state, so each partition can be iterated independently
 
+## GroupSlices
+
+`GroupSlices()` is a low-level iteration pattern that gives you direct access to component buffers per group. This bypasses the per-entity abstraction and can be more efficient for bulk operations, but requires you to manage group-level access yourself.
+
+### Dense GroupSlices
+
+```csharp
+foreach (var slice in World.Query().WithTags<GameTags.Player>().GroupSlices())
+{
+    var positions = World.ComponentBuffer<Position>(slice.Group);
+    var velocities = World.ComponentBuffer<Velocity>(slice.Group);
+
+    for (int i = 0; i < slice.Count; i++)
+    {
+        positions[i].Value += velocities[i].Value * dt;
+    }
+}
+```
+
+### Sparse GroupSlices (Set Members)
+
+When querying with `InSet<T>()`, iteration is sparse — only set members are visited:
+
+```csharp
+foreach (var slice in World.Query().InSet<HighlightedParticles>().GroupSlices())
+{
+    var colors = World.ComponentBuffer<ColorComponent>(slice.Group);
+
+    foreach (int idx in slice.Indices)
+    {
+        colors[idx].Value = Color.yellow;
+    }
+}
+```
+
+!!! tip
+    For most use cases, prefer `[ForEachEntity]`, aspect queries, or `EntityIndices()` iteration. GroupSlices are mainly useful when you need maximum throughput and are comfortable working at the group level. See [Queries & Iteration](../data-access/queries-and-iteration.md) for the higher-level alternatives.
+
 ## TagSet
 
 A `TagSet` is an immutable combination of tags. Tag sets are cached and compared by ID for fast equality checks.

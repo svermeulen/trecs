@@ -37,12 +37,13 @@ The aspect parameter is passed as `in` — the struct itself is read-only, but `
 
 ## Multiple IRead/IWrite Interfaces
 
-Each interface supports up to 8 type parameters. Stack multiple interfaces for more components:
+Each `IRead` or `IWrite` interface supports up to 8 type parameters. If you need more, stack multiple interfaces:
 
 ```csharp
 partial struct ComplexView : IAspect,
     IRead<Position, Velocity, Speed, Health>,
-    IWrite<Rotation, ColorComponent> { }
+    IRead<Rotation, ColorComponent, Lifetime>,
+    IWrite<UniformScale, Damage> { }
 ```
 
 ## Aspect Queries (Manual Iteration)
@@ -66,7 +67,7 @@ foreach (var boid in Boid.Query(World).MatchByComponents())
 }
 ```
 
-This is useful when you need iteration logic in `Execute()` beyond what `[ForEachEntity]` supports (e.g., nested loops, conditional queries).
+This is useful when you need iteration logic in `Execute()` beyond what `[ForEachEntity]` supports (e.g., iterating multiple queries at once) or if you just prefer this kind of style.
 
 ## Single Entity Access
 
@@ -112,6 +113,8 @@ public partial class RenderSystem : ISystem
 }
 ```
 
+However, it is most common to define aspects as nested private structs inside the system that uses them, since they are typically specific to that system's logic.
+
 ## AspectInterface
 
 Use `[AspectInterface]` to define shared component access contracts that multiple aspects can implement:
@@ -120,3 +123,6 @@ Use `[AspectInterface]` to define shared component access contracts that multipl
 [AspectInterface]
 public interface IMoveable : IRead<Position>, IWrite<Velocity> { }
 ```
+
+This can be useful if you need to pass aspects around to different service classes.
+

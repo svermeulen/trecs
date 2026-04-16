@@ -49,13 +49,18 @@ public partial class MovementSystem : ISystem
 }
 
 // Option 2: Manual Execute
-public partial class SpawnSystem : ISystem
+public partial class DamageSystem : ISystem
 {
     public void Execute()
     {
-        if (World.Rng.Next() < 0.1f)
-            World.AddEntity<GameTags.Bullet>().Set(new Position(float3.zero));
+        foreach (var enemy in EnemyView.Query(World).WithTags<GameTags.Enemy>())
+        {
+            if (enemy.Health <= 0)
+                World.RemoveEntity(enemy.EntityIndex);
+        }
     }
+
+    partial struct EnemyView : IAspect, IRead<Health>, IAspectEntityIndex { }
 }
 
 // Option 3: WrapAsJob (parallel, Burst-compiled)
@@ -224,11 +229,50 @@ public partial class RenderSystem : ISystem { ... }
 public partial class InputSystem : ISystem { ... }
 ```
 
-Fixed update runs at a fixed timestep (default 1/60s) and may run multiple times per frame to catch up. Variable update runs once per frame at the actual frame rate.
+Fixed update runs at a fixed timestep (default 1/60s) and may run multiple times per frame to catch up (or zero times at fast variable frame rates). Variable update runs once per frame at the actual frame rate. See [Input System](../advanced/input-system.md) for details on the input phase.
+
+Trecs does not hook into Unity's update loop automatically — you drive it by calling these methods on the world each frame:
+
+- **`world.Tick()`** — Runs variable-update systems and some number of fixed update ticks
+- **`world.LateTick()`** — Runs late-variable-update systems.
+
+Typically these are called from a MonoBehaviour like this:
+
+```csharp
+public class GameLoop : MonoBehaviour
+{
+    World _world;
+
+    void Start()
+    {
+        _world = new WorldBuilder()
+            .AddEntityType(PlayerEntity.Template)
+            .AddSystem(new MovementSystem())
+            .BuildAndInitialize();
+    }
+
+    void Update()
+    {
+        _world.Tick();
+    }
+
+    void LateUpdate()
+    {
+        _world.LateTick();
+    }
+
+    void OnDestroy()
+    {
+        _world.Dispose();
+    }
+}
+```
+
+All outstanding jobs are completed at the boundary between phases. See [Dependency Tracking](../performance/dependency-tracking.md#phase-boundaries).
 
 ## System Ordering
 
-Control execution order with attributes:
+Control execution order within a phase using `[ExecutesAfter]` and `[ExecutesBefore]`:
 
 ```csharp
 [ExecutesAfter(typeof(SpawnSystem))]
@@ -236,9 +280,6 @@ public partial class LifetimeSystem : ISystem { ... }
 
 [ExecutesBefore(typeof(RenderSystem))]
 public partial class PhysicsSystem : ISystem { ... }
-
-[ExecutePriority(100)]  // Higher priority = runs first
-public partial class CriticalSystem : ISystem { ... }
 ```
 
 Order constraints can also be declared at the builder level:
@@ -248,6 +289,20 @@ new WorldBuilder()
     .AddSystemOrderConstraint(typeof(SpawnSystem), typeof(LifetimeSystem))
     // ...
 ```
+
+### ExecutePriority
+
+Use `[ExecutePriority]` to influence ordering when no explicit constraints apply. The default priority is `0`. Lower values run earlier, higher values run later:
+
+```csharp
+[ExecutePriority(-10)]  // Runs before systems with default priority
+public partial class EarlySystem : ISystem { ... }
+
+[ExecutePriority(10)]   // Runs after systems with default priority
+public partial class LateSystem : ISystem { ... }
+```
+
+`[ExecutesAfter]` and `[ExecutesBefore]` constraints always take precedence over priority — priority only breaks ties among systems with no ordering constraints between them.
 
 ## Entity Operations in Systems
 
@@ -288,4 +343,3 @@ new WorldBuilder()
     .BuildAndInitialize();
 ```
 
-Constructor arguments let you inject non-ECS dependencies (registries, configuration, etc.).

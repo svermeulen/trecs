@@ -115,6 +115,11 @@ World.Events.InAllGroups()
 Subscribe to simulation lifecycle events:
 
 ```csharp
+World.Events.OnSubmissionStarted(() =>
+{
+    // Submission is about to begin
+});
+
 World.Events.OnSubmission(() =>
 {
     // All structural changes applied
