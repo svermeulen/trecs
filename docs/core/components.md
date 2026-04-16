@@ -62,17 +62,6 @@ if (world.TryComponent<Health>(entityIndex, out var healthAccessor))
 
 Accessing via Read/Write properties allows Trecs to lazily complete any jobs with conflicting access before providing the reference.
 
-### Buffer Access (All Entities in a Group)
-
-```csharp
-var buffer = world.ComponentBuffer<Position>(group);
-for (int i = 0; i < buffer.Count; i++)
-{
-    ref Position pos = ref buffer[i];
-    pos.Value.y += 1f;
-}
-```
-
 ## Component Field Attributes
 
 When declaring components in a [template](templates.md), fields can be annotated with attributes that control their update behavior:
