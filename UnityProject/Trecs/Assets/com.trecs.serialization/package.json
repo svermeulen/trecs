@@ -1,8 +1,14 @@
 {
   "name": "com.trecs.serialization",
   "version": "0.1.0",
-  "description": "tbd",
+  "displayName": "Trecs Serialization",
+  "description": "Serialization, recording, and playback support for Trecs",
+  "unity": "6000.3",
+  "author": {
+    "name": "Steve Vermeulen",
+    "url": "https://github.com/svermeulen"
+  },
   "dependencies": {
-    "com.trecs.core": "<local>"
+    "com.trecs.core": "0.1.0"
   }
 }

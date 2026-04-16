@@ -1,7 +1,13 @@
 {
   "name": "com.trecs.core",
   "version": "0.1.0",
-  "description": "A high-performance Entity Component System framework for Unity",
+  "displayName": "Trecs",
+  "description": "A high-performance, deterministic Entity Component System framework for Unity",
+  "unity": "6000.3",
+  "author": {
+    "name": "Steve Vermeulen",
+    "url": "https://github.com/svermeulen"
+  },
   "dependencies": {
     "com.unity.mathematics": "1.3.3",
     "com.unity.burst": "1.8.28",
