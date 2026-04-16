@@ -41,7 +41,7 @@ public partial class PlayerBullet : ITemplate, IHasTags<GameTags.Bullet, GameTag
 }
 ```
 
-See [Tags & Groups](tags-and-groups.md) for details on how tags define entity grouping.
+See [Tags](tags.md) for details on how tags are used.
 
 ## Template Inheritance
 

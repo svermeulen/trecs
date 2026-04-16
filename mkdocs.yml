@@ -40,7 +40,7 @@ nav:
       - Entities: core/entities.md
       - Components: core/components.md
       - Templates: core/templates.md
-      - Tags & Groups: core/tags-and-groups.md
+      - Tags: core/tags.md
       - Systems: core/systems.md
   - Data Access:
       - Queries & Iteration: data-access/queries-and-iteration.md
@@ -53,6 +53,7 @@ nav:
       - Jobs & Burst: performance/jobs-and-burst.md
       - Dependency Tracking: performance/dependency-tracking.md
   - Advanced:
+      - Groups & TagSets: advanced/groups-and-tagsets.md
       - Heap: advanced/heap.md
       - Interpolation: advanced/interpolation.md
       - Serialization: advanced/serialization.md
