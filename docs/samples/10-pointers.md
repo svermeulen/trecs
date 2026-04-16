@@ -50,7 +50,7 @@ public partial struct CTrail : IEntityComponent
 
 ```csharp
 // Allocate once
-SharedPtr<PatrolRoute> routePtr = ecs.Heap.AllocShared(new PatrolRoute
+SharedPtr<PatrolRoute> routePtr = world.Heap.AllocShared(new PatrolRoute
 {
     Waypoints = waypoints,
     Color = Color.red,
@@ -58,22 +58,20 @@ SharedPtr<PatrolRoute> routePtr = ecs.Heap.AllocShared(new PatrolRoute
 });
 
 // First entity gets the original
-ecs.AddEntity<PatrolTags.Follower>()
+world.AddEntity<PatrolTags.Follower>()
     .Set(new CRoute { Value = routePtr })
-    .Set(new CTrail { Value = ecs.Heap.AllocUnique(new TrailHistory { ... }) })
-    .AssertComplete();
+    .Set(new CTrail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) });
 
 // Second entity clones (increments ref count, shares same data)
-ecs.AddEntity<PatrolTags.Follower>()
-    .Set(new CRoute { Value = routePtr.Clone(ecs.Heap) })
-    .Set(new CTrail { Value = ecs.Heap.AllocUnique(new TrailHistory { ... }) })
-    .AssertComplete();
+world.AddEntity<PatrolTags.Follower>()
+    .Set(new CRoute { Value = routePtr.Clone(world.Heap) })
+    .Set(new CTrail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) });
 ```
 
 ### UniquePtr — Per-Entity Trail
 
 ```csharp
-UniquePtr<TrailHistory> trailPtr = ecs.Heap.AllocUnique(new TrailHistory
+UniquePtr<TrailHistory> trailPtr = world.Heap.AllocUnique(new TrailHistory
 {
     Positions = new List<Vector3>(),
     MaxLength = 100
@@ -112,18 +110,18 @@ void Execute(ref Position position, in CRoute route, in CTrail trail)
 Pointers must be disposed when entities are removed:
 
 ```csharp
-ecs.Events.InGroupsWithTags<PatrolTags.Follower>()
+world.Events.InGroupsWithTags<PatrolTags.Follower>()
     .OnRemoved((Group group, EntityRange indices) =>
     {
         for (int i = indices.Start; i < indices.End; i++)
         {
             var entityIndex = new EntityIndex(i, group);
 
-            var route = ecs.Component<CRoute>(entityIndex).Read;
-            route.Value.Dispose(ecs);
+            var route = world.Component<CRoute>(entityIndex).Read;
+            route.Value.Dispose(world);
 
-            var trail = ecs.Component<CTrail>(entityIndex).Read;
-            trail.Value.Dispose(ecs);
+            var trail = world.Component<CTrail>(entityIndex).Read;
+            trail.Value.Dispose(world);
         }
     })
     .AddTo(_eventDisposables);

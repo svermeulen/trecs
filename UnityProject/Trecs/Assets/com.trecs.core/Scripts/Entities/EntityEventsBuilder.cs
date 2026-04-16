@@ -34,12 +34,12 @@ namespace Trecs
         public EntityEventsBuilder(
             EventsManager eventsManager,
             WorldInfo worldInfo,
-            WorldAccessor ecs
+            WorldAccessor world
         )
         {
             _eventsManager = eventsManager;
             _worldInfo = worldInfo;
-            _world = ecs;
+            _world = world;
         }
 
         public EntityEventsSubscription InGroups(ReadOnlyFastList<Group> groups)
@@ -210,14 +210,14 @@ namespace Trecs
 
         internal EntityEventsSubscription(
             EventsManager eventsManager,
-            WorldAccessor ecs,
+            WorldAccessor world,
             ReadOnlyFastList<Group> groups
         )
         {
             _eventsManager = eventsManager;
-            _world = ecs;
+            _world = world;
             _groups = groups;
-            _debugName = ecs?.DebugName;
+            _debugName = world?.DebugName;
         }
 
         public EntityEventsSubscription WithPriority(int priority)

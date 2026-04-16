@@ -14,7 +14,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -34,7 +34,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -54,7 +54,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -75,7 +75,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -95,7 +95,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -118,7 +118,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -148,7 +148,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var h1 = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -179,7 +179,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -213,7 +213,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -247,7 +247,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -273,7 +273,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })
@@ -298,7 +298,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
-            var inputQueue = env.EcsWorld.GetEntityInputQueue();
+            var inputQueue = env.World.GetEntityInputQueue();
 
             var handle = a.AddEntity(TestTags.Alpha)
                 .Set(new TestInt { Value = 0 })

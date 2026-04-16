@@ -4,12 +4,12 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-// Unlike Branching/Filters, the States approach uses tag-based groups to
+// Unlike Branching/Filters, the Partitions approach uses tag-based groups to
 // ensure NotEating fish and NotEating meals are in the same group with matching
 // counts. This enables 1:1 index pairing (i-th fish pairs with i-th meal),
 // making the operation fully parallelizable via jobs.
 
-namespace Trecs.Samples.FeedingFrenzyBenchmark.States
+namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 {
     public partial class LookingForMealSystem : ILookingForMeal, ISystem
     {

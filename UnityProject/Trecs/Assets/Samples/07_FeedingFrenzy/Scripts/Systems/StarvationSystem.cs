@@ -10,7 +10,7 @@ namespace Trecs.Samples.FeedingFrenzy101
     /// to indicate starvation level (cyan = healthy, red-orange = starving).
     ///
     /// Demonstrates: [WrapAsJob] with a single-tag filter that matches
-    /// multiple state groups (both Eating and NotEating fish), and
+    /// multiple partition groups (both Eating and NotEating fish), and
     /// entity removal via NativeWorldAccessor in a parallel job.
     /// </summary>
     public partial class StarvationSystem : ISystem

@@ -50,8 +50,7 @@ namespace Trecs.Samples.Aspects
                     .Set(new Position(position))
                     .Set(new Velocity(velocity))
                     .Set(new Speed(speed))
-                    .Set(_gameObjectRegistry.Register(go))
-                    .AssertComplete();
+                    .Set(_gameObjectRegistry.Register(go));
             }
         }
     }

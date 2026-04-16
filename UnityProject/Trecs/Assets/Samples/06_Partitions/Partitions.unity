@@ -176,7 +176,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: de29014f891534970bf3d6983b90161a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Samples::Trecs.Samples.States.StatesCompositionRoot
+  m_EditorClassIdentifier: Samples::Trecs.Samples.Partitions.PartitionsCompositionRoot
   BallCount: 500
   SpawnRadius: 30
 --- !u!1 &800000011

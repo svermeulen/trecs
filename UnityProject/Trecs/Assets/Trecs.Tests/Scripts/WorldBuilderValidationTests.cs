@@ -62,7 +62,7 @@ namespace Trecs.Tests
 
             NAssert.Catch(() =>
             {
-                env.EcsWorld.AddSystem(new WBVDummySystem());
+                env.World.AddSystem(new WBVDummySystem());
             });
         }
 
@@ -75,7 +75,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
 
-            NAssert.IsNotNull(env.EcsWorld);
+            NAssert.IsNotNull(env.World);
             NAssert.IsNotNull(env.Accessor);
         }
 
@@ -85,7 +85,7 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(
                 TestTemplates.SimpleAlpha,
                 TestTemplates.TwoCompBeta,
-                TestTemplates.WithStates
+                TestTemplates.WithPartitions
             );
 
             NAssert.IsNotNull(env.Accessor);

@@ -9,17 +9,17 @@ namespace Trecs.Tests
         [Test]
         public void World_Dispose_AfterMixedOperations_DoesNotThrow()
         {
-            var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
             // Add entities
             var refs = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                var init = a.AddEntity(stateA)
+                var init = a.AddEntity(partitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec { X = i, Y = i })
                     .AssertComplete();
@@ -33,11 +33,11 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move some
-            a.MoveTo(refs[1].ToIndex(a), stateB);
+            a.MoveTo(refs[1].ToIndex(a), partitionB);
             a.SubmitEntities();
 
             // Add more
-            a.AddEntity(stateA).Set(new TestInt { Value = 99 }).AssertComplete();
+            a.AddEntity(partitionA).Set(new TestInt { Value = 99 }).AssertComplete();
             a.SubmitEntities();
 
             // Dispose should not throw
@@ -48,7 +48,7 @@ namespace Trecs.Tests
         public void World_IsDisposed_TrueAfterDispose()
         {
             var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var world = env.EcsWorld;
+            var world = env.World;
 
             NAssert.IsFalse(world.IsDisposed);
 

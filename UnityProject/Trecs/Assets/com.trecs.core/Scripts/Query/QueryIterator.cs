@@ -27,12 +27,12 @@ namespace Trecs
         int _slicePosition;
 
         /// <summary>No-set constructor — iterates all entities in every matched group.</summary>
-        internal QueryIterator(WorldAccessor ecs, ReadOnlyFastList<Group> resolvedGroups)
+        internal QueryIterator(WorldAccessor world, ReadOnlyFastList<Group> resolvedGroups)
         {
             _done = false;
             _currentGroup = default;
             _entityIndex = 0;
-            _world = ecs;
+            _world = world;
             _groups = resolvedGroups;
             _groupIndex = -1;
             _sliceCount = 0;
@@ -43,19 +43,23 @@ namespace Trecs
         }
 
         /// <summary>Single-set constructor — iterates entities belonging to the given set.</summary>
-        internal QueryIterator(WorldAccessor ecs, ReadOnlyFastList<Group> resolvedGroups, SetId set)
+        internal QueryIterator(
+            WorldAccessor world,
+            ReadOnlyFastList<Group> resolvedGroups,
+            SetId set
+        )
         {
             _done = false;
             _currentGroup = default;
             _entityIndex = 0;
-            _world = ecs;
+            _world = world;
             _groups = resolvedGroups;
             _groupIndex = -1;
             _sliceCount = 0;
             _slicePosition = 0;
             _sliceIndices = default;
             _hasSet = true;
-            _singleSet = ecs.GetSetGroupLookup(set);
+            _singleSet = world.GetSetGroupLookup(set);
         }
 
         public readonly EntityIndex Current

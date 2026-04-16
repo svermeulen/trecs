@@ -58,8 +58,7 @@ namespace Trecs.Samples.SpawnAndDestroy
                 .AddEntity<SampleTags.Sphere>()
                 .Set(new Position(position))
                 .Set(new Lifetime(_lifetime))
-                .Set(_gameObjectRegistry.Register(go))
-                .AssertComplete();
+                .Set(_gameObjectRegistry.Register(go));
         }
     }
 }

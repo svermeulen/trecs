@@ -3,7 +3,7 @@ using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
 
-namespace Trecs.Samples.FeedingFrenzyBenchmark.States
+namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 {
     [ExecutesAfter(typeof(IConsumingMeal))]
     public partial class MovementSystem : IMovement, ISystem

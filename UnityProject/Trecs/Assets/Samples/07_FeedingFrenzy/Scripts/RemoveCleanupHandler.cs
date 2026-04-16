@@ -7,7 +7,7 @@ namespace Trecs.Samples.FeedingFrenzy101
     ///
     /// When a fish is removed (starvation or scaling down), its target
     /// meal is also removed to prevent orphaned meals stuck in the
-    /// Eating state.
+    /// Eating partition.
     ///
     /// Uses [ForEachEntity] on the OnRemoved callback, which generates
     /// code that correctly accesses entity data during removal callbacks

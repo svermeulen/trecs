@@ -49,8 +49,7 @@ namespace Trecs.Samples.Snake
             World
                 .AddEntity<SnakeTags.SnakeSegment>()
                 .Set(new GridPos(prevPos))
-                .Set(new SegmentAge(World.Frame))
-                .AssertComplete();
+                .Set(new SegmentAge(World.Frame));
 
             // Advance the head and wrap with floor-mod so negative
             // intermediate values still land in [0, GridSize).

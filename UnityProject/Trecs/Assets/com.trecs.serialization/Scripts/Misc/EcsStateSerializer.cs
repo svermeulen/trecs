@@ -38,10 +38,10 @@ namespace Trecs.Serialization
         readonly Dictionary<Type, IComponentArrayCustomSerializer> _customComponentSerializers =
             new();
 
-        public EcsStateSerializer(World ecs)
+        public EcsStateSerializer(World world)
         {
-            _worldDef = ecs.WorldInfo;
-            _world = ecs;
+            _worldDef = world.WorldInfo;
+            _world = world;
 
             RegisterComponentTypeIds(_worldDef);
         }

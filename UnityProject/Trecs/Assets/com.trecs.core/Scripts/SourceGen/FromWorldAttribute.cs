@@ -14,7 +14,7 @@ namespace Trecs
     /// it is <b>optional</b> (<c>TagSet? = null</c>). When null, only the
     /// inline tags are used. When provided, the runtime tags are combined with
     /// the inline tags via <c>TagSet.CombineWith</c>. This allows callers to
-    /// refine the query at schedule time (e.g. adding a state tag).
+    /// refine the query at schedule time (e.g. adding a partition tag).
     /// </para>
     /// <para>
     /// <b>No inline tags</b> — When neither <see cref="Tag"/> nor

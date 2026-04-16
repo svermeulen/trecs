@@ -9,8 +9,8 @@ namespace Trecs.Tests
     [TestFixture]
     public class MoveRemoveEdgeCaseTests
     {
-        static readonly TagSet StateASet = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-        static readonly TagSet StateBSet = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+        static readonly TagSet PartitionASet = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+        static readonly TagSet PartitionBSet = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
         #region QueueMoveOperation missing _entitiesRemoved check
 
@@ -20,10 +20,10 @@ namespace Trecs.Tests
             // QueueMoveOperation (main-thread) doesn't check _entitiesRemoved,
             // so a remove-then-move sequence could leave the move un-reverted.
             // The entity should be removed (remove supersedes move).
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var init = a.AddEntity(StateASet)
+            var init = a.AddEntity(PartitionASet)
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestVec())
                 .AssertComplete();
@@ -34,7 +34,7 @@ namespace Trecs.Tests
 
             // Remove first, then move — remove should win
             a.RemoveEntity(handle.ToIndex(a));
-            a.MoveTo(handle.ToIndex(a), StateBSet);
+            a.MoveTo(handle.ToIndex(a), PartitionBSet);
             a.SubmitEntities();
 
             NAssert.AreEqual(
@@ -49,10 +49,10 @@ namespace Trecs.Tests
         {
             // Move-then-remove: QueueRemoveOperation calls RevertMoveOperationIfPreviouslyQueued,
             // so the move is reverted and the entity is removed. This should work.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var init = a.AddEntity(StateASet)
+            var init = a.AddEntity(PartitionASet)
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestVec())
                 .AssertComplete();
@@ -60,7 +60,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move first, then remove — remove should win
-            a.MoveTo(handle.ToIndex(a), StateBSet);
+            a.MoveTo(handle.ToIndex(a), PartitionBSet);
             a.RemoveEntity(handle.ToIndex(a));
             a.SubmitEntities();
 
@@ -80,13 +80,13 @@ namespace Trecs.Tests
         {
             // Entity A is moved out of group, entity B is removed from same group.
             // The move causes swap-back which could invalidate B's removal index.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                handles[i] = a.AddEntity(StateASet)
+                handles[i] = a.AddEntity(PartitionASet)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -94,26 +94,26 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            NAssert.AreEqual(5, a.CountEntitiesWithTags(StateASet));
+            NAssert.AreEqual(5, a.CountEntitiesWithTags(PartitionASet));
 
-            // Move entity 1 to StateB, remove entity 4 (at the tail — will be swap-back source)
-            a.MoveTo(handles[1].ToIndex(a), StateBSet);
+            // Move entity 1 to PartitionB, remove entity 4 (at the tail — will be swap-back source)
+            a.MoveTo(handles[1].ToIndex(a), PartitionBSet);
             a.RemoveEntity(handles[4]);
             a.SubmitEntities();
 
             NAssert.AreEqual(
                 3,
-                a.CountEntitiesWithTags(StateASet),
-                "StateA should have 3 entities (5 - 1 moved - 1 removed)"
+                a.CountEntitiesWithTags(PartitionASet),
+                "PartitionA should have 3 entities (5 - 1 moved - 1 removed)"
             );
             NAssert.AreEqual(
                 1,
-                a.CountEntitiesWithTags(StateBSet),
-                "StateB should have the 1 moved entity"
+                a.CountEntitiesWithTags(PartitionBSet),
+                "PartitionB should have the 1 moved entity"
             );
 
             // Verify the moved entity has correct data
-            var movedEntity = a.Query().WithTags(StateBSet).Single();
+            var movedEntity = a.Query().WithTags(PartitionBSet).Single();
             NAssert.AreEqual(1, movedEntity.Get<TestInt>().Read.Value);
 
             // Verify removed entity no longer exists
@@ -125,13 +125,13 @@ namespace Trecs.Tests
         {
             // Move entity at the tail, remove entity in the middle.
             // The tail entity is the swap-back source for the removal.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                handles[i] = a.AddEntity(StateASet)
+                handles[i] = a.AddEntity(PartitionASet)
                     .Set(new TestInt { Value = i * 10 })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -139,13 +139,13 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            // Move tail entity (4) to StateB, remove middle entity (2)
-            a.MoveTo(handles[4].ToIndex(a), StateBSet);
+            // Move tail entity (4) to PartitionB, remove middle entity (2)
+            a.MoveTo(handles[4].ToIndex(a), PartitionBSet);
             a.RemoveEntity(handles[2]);
             a.SubmitEntities();
 
-            NAssert.AreEqual(3, a.CountEntitiesWithTags(StateASet));
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateBSet));
+            NAssert.AreEqual(3, a.CountEntitiesWithTags(PartitionASet));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionBSet));
 
             // All surviving entities should still be accessible
             NAssert.IsTrue(a.EntityExists(handles[0]));
@@ -165,13 +165,13 @@ namespace Trecs.Tests
         public void MoveAndRemove_MultipleMovesAndRemoves_SameGroup()
         {
             // Multiple entities moved and multiple removed from same group.
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var handles = new EntityHandle[10];
             for (int i = 0; i < 10; i++)
             {
-                handles[i] = a.AddEntity(StateASet)
+                handles[i] = a.AddEntity(PartitionASet)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -179,16 +179,16 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            // Move entities 2, 5 to StateB. Remove entities 7, 8, 9 (tail entities).
-            a.MoveTo(handles[2].ToIndex(a), StateBSet);
-            a.MoveTo(handles[5].ToIndex(a), StateBSet);
+            // Move entities 2, 5 to PartitionB. Remove entities 7, 8, 9 (tail entities).
+            a.MoveTo(handles[2].ToIndex(a), PartitionBSet);
+            a.MoveTo(handles[5].ToIndex(a), PartitionBSet);
             a.RemoveEntity(handles[7]);
             a.RemoveEntity(handles[8]);
             a.RemoveEntity(handles[9]);
             a.SubmitEntities();
 
-            NAssert.AreEqual(5, a.CountEntitiesWithTags(StateASet));
-            NAssert.AreEqual(2, a.CountEntitiesWithTags(StateBSet));
+            NAssert.AreEqual(5, a.CountEntitiesWithTags(PartitionASet));
+            NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionBSet));
 
             // Verify all surviving entities are accessible and have correct data
             for (int i = 0; i < 10; i++)

@@ -1,6 +1,6 @@
 # Structural Changes
 
-Entity creation, removal, and state transitions are **deferred operations** — they are queued during system execution and applied at submission boundaries.
+Entity creation, removal, and partition transitions are **deferred operations** — they are queued during system execution and applied at submission boundaries.
 
 ## Why Deferred?
 
@@ -24,7 +24,7 @@ Structural changes are applied:
 
 1. **After each fixed update iteration** — `World.Tick()` calls `SubmitEntities()` after each fixed timestep step
 2. **At the end of `Tick()`** — any remaining changes are submitted
-3. **Manually** — `ecs.SubmitEntities()` can be called explicitly if needed
+3. **Manually** — `world.SubmitEntities()` can be called explicitly if needed
 
 ## Deferred Operations
 
@@ -33,8 +33,7 @@ Structural changes are applied:
 ```csharp
 World.AddEntity<GameTags.Bullet>()
     .Set(new Position(pos))
-    .Set(new Velocity(vel))
-    .AssertComplete();
+    .Set(new Velocity(vel));
 ```
 
 The entity is buffered and added to its group at the next submission.
@@ -47,7 +46,7 @@ World.RemoveEntity(entityHandle);
 World.RemoveEntitiesWithTags<GameTags.Bullet>();
 ```
 
-### Moving Entities (State Transitions)
+### Moving Entities (Partition Transitions)
 
 ```csharp
 World.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);

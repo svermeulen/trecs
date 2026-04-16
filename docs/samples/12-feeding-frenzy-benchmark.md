@@ -8,11 +8,11 @@ A performance benchmark that implements the same gameplay using three different 
 
 The same fish-eating-meals simulation as [07 — Feeding Frenzy](07-feeding-frenzy.md), but implemented three different ways. You can switch approaches and iteration styles at runtime to compare performance with up to 200,000+ entities.
 
-## Three State Approaches
+## Three Approaches
 
 ### Branching
 
-Eating/NotEating tracked via component values. Systems iterate all entities and branch on state:
+Eating/NotEating tracked via component values. Systems iterate all entities and branch on value:
 
 ```csharp
 // All fish iterated, check if eating
@@ -37,22 +37,22 @@ Uses `IEntitySet` for membership tracking. Systems filter by set:
 void IdleBob(in FishView fish) { ... }
 ```
 
-**Trade-off:** Only visits relevant entities. No group changes when state changes. Sparse iteration.
+**Trade-off:** Only visits relevant entities. No group changes when membership changes. Sparse iteration.
 
-### States
+### Partitions
 
-Uses `IHasState` for group separation:
+Uses `IHasPartition` for group separation:
 
 ```csharp
 [ForEachEntity(Tags = new[] { typeof(Fish), typeof(NotEating) })]
 void IdleBob(in FishView fish) { ... }
 ```
 
-**Trade-off:** Dense, cache-friendly iteration. But state changes copy component data between groups.
+**Trade-off:** Dense, cache-friendly iteration. But partition changes copy component data between groups.
 
 ## Nine Iteration Styles
 
-Each state approach is tested with multiple iteration patterns:
+Each approach is tested with multiple iteration patterns:
 
 | Style | Description |
 |-------|-------------|
@@ -70,7 +70,7 @@ Each state approach is tested with multiple iteration patterns:
 
 | Key | Action |
 |-----|--------|
-| F1 / F2 / F3 | Switch to Branching / Sets / States |
+| F1 / F2 / F3 | Switch to Branching / Sets / Partitions |
 | Tab / Shift+Tab | Cycle iteration style |
 | Up / Down | Adjust entity count preset |
 
@@ -96,7 +96,7 @@ Fish ↔ Meal pairing uses `EntityHandle` cross-references with cleanup handlers
 
 ## What to Learn from This Sample
 
-- **States are fastest for dense iteration** — entities are contiguous in memory
+- **Partitions are fastest for dense iteration** — entities are contiguous in memory
 - **Sets avoid group explosion** — no combinatorial blowup with multiple dimensions
 - **Branching is simplest but slowest** — iterates everything, branches per entity
 - **Jobs provide the biggest speedup** — Burst + parallel iteration scales with core count

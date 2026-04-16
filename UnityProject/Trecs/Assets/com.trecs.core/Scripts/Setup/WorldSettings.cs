@@ -7,12 +7,35 @@ namespace Trecs
     public class WorldSettings
     {
         public const float DefaultFixedTimeStep = 1.0f / 60.0f;
+        public const float DefaultMaxSecondsForFixedUpdatePerFrame = 1.0f / 3.0f;
 
+        /// <summary>
+        /// Duration of each fixed update tick in seconds.
+        /// </summary>
         public float FixedTimeStep { get; init; } = DefaultFixedTimeStep;
 
+        /// <summary>
+        /// Seed for the deterministic random number generator.
+        /// When null, a random seed is chosen automatically.
+        /// </summary>
         public ulong? RandomSeed { get; init; }
-        public float? MaxSecondsForFixedUpdatePerFrame { get; init; }
 
+        /// <summary>
+        /// Maximum wall-clock time (in seconds) that can be spent on fixed updates
+        /// in a single frame. When exceeded, the simulation skips forward to prevent
+        /// the spiral of death (where falling behind causes ever-increasing catch-up work).
+        /// Note that skipping forward means fixed update ticks are dropped, which breaks
+        /// determinism and may cause desyncs with recordings or networked peers.
+        /// Defaults to 1/3s, matching Unity's <c>Time.maximumDeltaTime</c>.
+        /// Set to null for unlimited updates (e.g. deterministic replay), but note
+        /// this risks the spiral of death if fixed updates are too expensive.
+        /// </summary>
+        public float? MaxSecondsForFixedUpdatePerFrame { get; init; } =
+            DefaultMaxSecondsForFixedUpdatePerFrame;
+
+        /// <summary>
+        /// When true, the world starts in a paused state and must be explicitly unpaused.
+        /// </summary>
         public bool StartPaused { get; init; }
 
         /// <summary>
@@ -31,7 +54,17 @@ namespace Trecs
         /// </summary>
         public bool RequireDeterministicSubmission { get; init; }
 
-        public bool WarnOnFixedUpdateFallingBehind { get; init; }
+        /// <summary>
+        /// When true, logs a warning if fixed updates fall behind and the simulation
+        /// has to skip forward (when <see cref="MaxSecondsForFixedUpdatePerFrame"/> is set)
+        /// or is at risk of entering the spiral of death (when it is null).
+        /// </summary>
+        public bool WarnOnFixedUpdateFallingBehind { get; init; } = true;
+
+        /// <summary>
+        /// When true, logs a warning whenever a job sync point is hit
+        /// (i.e. the main thread blocks waiting for jobs to complete).
+        /// </summary>
         public bool WarnOnJobSyncPoints { get; init; }
 
         /// <summary>
@@ -39,13 +72,6 @@ namespace Trecs
         /// but never had entities created in any of its groups.
         /// </summary>
         public bool WarnOnUnusedTemplates { get; init; }
-
-        /// <summary>
-        /// When true (in DEBUG builds without TRECS_IS_PROFILING), logs a warning at submission time
-        /// for any entity that was created via AddEntity without calling AssertComplete(),
-        /// and has required components that were not initialized via Set.
-        /// </summary>
-        public bool WarnOnMissingAssertComplete { get; init; }
 
         /// <summary>
         /// Maximum number of submission iterations before throwing a circular submission error.

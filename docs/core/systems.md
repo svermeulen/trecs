@@ -26,9 +26,49 @@ public partial class SpinnerSystem : ISystem
 Key points:
 
 - Systems are `partial class` (source generation fills in boilerplate)
-- Constructor injection works — pass dependencies when adding to the builder
+- Systems are not created by Trecs. Instantiate them however you like and register with the world builder.
 - `World` is a source-generated property providing the `WorldAccessor`
-- `[ForEachEntity]` marks methods that iterate over entities
+
+## The Execute Method
+
+Every system must define exactly one method named `Execute`. This is the system's entry point, called once per frame. There are several forms it can take:
+
+- **`[ForEachEntity]` method** — Source-generated iteration over matching entities. This is the most common form.
+- **`public void Execute()`** — A manual entry point where you write your own logic, queries, and iteration. Required when you have [multiple `[ForEachEntity]` methods](#multiple-foreachentity-methods) and need to call them explicitly.
+- **`[WrapAsJob]` static method** — A `[ForEachEntity]` method that runs as a Burst-compiled parallel job instead of on the main thread. See [Jobs & Burst](../performance/jobs-and-burst.md).
+
+```csharp
+// Option 1: ForEachEntity (most common)
+public partial class MovementSystem : ISystem
+{
+    [ForEachEntity(Tag = typeof(GameTags.Player))]
+    void Execute(in PlayerView player)
+    {
+        player.Position += player.Velocity * World.DeltaTime;
+    }
+}
+
+// Option 2: Manual Execute
+public partial class SpawnSystem : ISystem
+{
+    public void Execute()
+    {
+        if (World.Rng.Next() < 0.1f)
+            World.AddEntity<GameTags.Bullet>().Set(new Position(float3.zero));
+    }
+}
+
+// Option 3: WrapAsJob (parallel, Burst-compiled)
+public partial class ParticleMoveSystem : ISystem
+{
+    [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+    [WrapAsJob]
+    static void Execute(in Velocity velocity, ref Position position, in NativeWorldAccessor world)
+    {
+        position.Value += world.DeltaTime * velocity.Value;
+    }
+}
+```
 
 ## ForEachEntity
 
@@ -65,18 +105,7 @@ void Execute(ref Position position, in Velocity velocity)
 void Execute(in ParticleView particle) { ... }
 ```
 
-### Parameters
-
-`[ForEachEntity]` methods can receive any combination of these parameter types — the source generator wires them automatically:
-
-- **Component refs** — `ref T` (read-write) or `in T` (read-only) for `IEntityComponent` types
-- **Aspects** — `in MyAspect` for bundled component access (see [Aspects](../data-access/aspects.md))
-- **`EntityIndex`** — the current entity's transient index
-- **`EntityHandle`** — the current entity's stable handle
-- **`Group`** — the group the current entity belongs to
-- **`NativeWorldAccessor`** — job-safe world access (see [Jobs & Burst](../performance/jobs-and-burst.md))
-- **`[PassThroughArgument]` parameters** — custom values you pass in when calling the generated method
-- **`[GlobalIndex] int`** — a global 0-based index across all matched groups
+See [Sets](../entity-management/sets.md) for more on defining and using sets.
 
 ### Multiple ForEachEntity Methods
 
@@ -110,6 +139,54 @@ public partial class BallRendererSystem : ISystem
 ```
 
 When you have multiple `[ForEachEntity]` methods, you must provide an explicit `Execute()` that calls them.
+
+### Parameters
+
+`[ForEachEntity]` methods accept the following parameter types. The source generator wires them automatically.
+
+**Entity data** (choose one style per method — cannot be mixed):
+
+- **Component refs** — `ref T` (read-write) or `in T` (read-only) for `IEntityComponent` types. Multiple components can be listed.
+- **Aspect** — `in MyAspect` for bundled component access (see [Aspects](../data-access/aspects.md)). Only one aspect per method.
+
+**Additional parameters** (can be combined with either style above):
+
+- **`EntityIndex`** — the current entity's transient index
+- **`WorldAccessor`** — the system's world accessor (main-thread methods only)
+- **`NativeWorldAccessor`** — job-safe world access (`[WrapAsJob]` methods only). See [Jobs & Burst](../performance/jobs-and-burst.md).
+- **`[PassThroughArgument]`** — custom values passed in by the caller. See [below](#passthroughargument).
+
+### PassThroughArgument
+
+Mark a parameter with `[PassThroughArgument]` to pass custom values into a `[ForEachEntity]` method. The generated method will include matching parameters that the caller must provide:
+
+```csharp
+public partial class ParticleBoundSystem : ISystem
+{
+    readonly float _halfSize;
+
+    [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+    [WrapAsJob]
+    static void ExecuteAsJob(
+        ref Velocity velocity,
+        ref Position position,
+        [PassThroughArgument] float halfSize
+    )
+    {
+        // halfSize is passed in by the caller, not looked up from the world
+        if (position.Value.x > halfSize || position.Value.x < -halfSize)
+            velocity.Value.x = -velocity.Value.x;
+    }
+
+    public void Execute()
+    {
+        // Pass _halfSize to the generated method
+        ExecuteAsJob(_halfSize);
+    }
+}
+```
+
+This is useful for passing configuration, precomputed values, or other data that isn't a component on the iterated entities. `[PassThroughArgument]` works with both main-thread and `[WrapAsJob]` methods, but the value must be an unmanaged type when used with jobs.
 
 ## SingleEntity
 
@@ -184,13 +261,12 @@ public partial class SpawnSystem : ISystem
         // Create entities
         World.AddEntity<SampleTags.Sphere>()
             .Set(new Position(float3.zero))
-            .Set(new Lifetime(5f))
-            .AssertComplete();
+            .Set(new Lifetime(5f));
 
         // Remove entities
         World.RemoveEntity(entityIndex);
 
-        // State transitions
+        // Partition transitions
         World.MoveTo<BallTags.Ball, BallTags.Resting>(ball.EntityIndex);
 
         // Access time and RNG

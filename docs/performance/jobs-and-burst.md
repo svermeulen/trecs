@@ -28,7 +28,7 @@ public partial class ParticleJobSystem : ISystem
 }
 ```
 
-The source generator creates the job struct, scheduling method, and dependency tracking automatically.
+The source generator creates the job struct, scheduling method, and [dependency tracking](dependency-tracking.md) automatically.
 
 ## FromWorld — Auto-Wiring Job Fields
 
@@ -76,8 +76,7 @@ Use `Tag` or `Tags` to scope buffer/lookup fields to specific tag groups.
 ```csharp
 // In a job:
 nativeWorld.AddEntity<GameTags.Bullet>(sortKey: (uint)index)
-    .Set(new Position(pos))
-    .AssertComplete();
+    .Set(new Position(pos));
 
 nativeWorld.RemoveEntity(entityIndex);
 nativeWorld.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);

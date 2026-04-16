@@ -45,7 +45,7 @@ static void InterpolatePosition(
     in Position current,
     ref Position result,
     float percentThroughFixedFrame,
-    WorldAccessor ecs)
+    WorldAccessor world)
 {
     result.Value = math.lerp(previous.Value, current.Value, percentThroughFixedFrame);
 }
@@ -60,10 +60,9 @@ world.AddSystem(new InterpolatedUpdater<Position>(InterpolatePosition));
 ### 5. Create Entities with Interpolated Values
 
 ```csharp
-ecs.AddEntity<OrbitTags.Smooth>()
+world.AddEntity<OrbitTags.Smooth>()
     .SetInterpolated(new Position(startPos))  // Sets all three components
-    .Set(new OrbitParams { ... })
-    .AssertComplete();
+    .Set(new OrbitParams { ... });
 ```
 
 ### 6. Read Interpolated Values for Rendering
@@ -107,7 +106,7 @@ static void InterpolateRotation(
     in Rotation current,
     ref Rotation result,
     float t,
-    WorldAccessor ecs)
+    WorldAccessor world)
 {
     result.Value = math.slerp(previous.Value, current.Value, t);
 }

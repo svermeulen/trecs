@@ -9,8 +9,6 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public class EntityInitializationTracker
     {
-        static readonly TrecsLog _log = new(nameof(EntityInitializationTracker));
-
         struct TrackedEntity
         {
             public Group Group;
@@ -24,12 +22,6 @@ namespace Trecs.Internal
 
         readonly List<TrackedEntity> _entries = new();
         readonly Stack<HashSet<ComponentId>> _hashSetPool = new();
-        bool _enabled;
-
-        public void SetEnabled(bool enabled)
-        {
-            _enabled = enabled;
-        }
 
         public int Register(
             Group group,
@@ -88,9 +80,6 @@ namespace Trecs.Internal
 
         public void ValidateAllPending()
         {
-            if (!_enabled)
-                return;
-
             for (int i = 0; i < _entries.Count; i++)
             {
                 var entry = _entries[i];
@@ -102,14 +91,11 @@ namespace Trecs.Internal
 
                 if (missingComponents != null)
                 {
-                    _log.Warning(
-                        "Entity created at {}:{} (group {}, descriptor: {}) was submitted without calling AssertComplete(). "
-                            + "Missing initial values for the following components:\n{}",
-                        entry.CallerFile,
-                        entry.CallerLine,
-                        entry.Group,
-                        entry.DescriptorName,
-                        missingComponents
+                    throw new TrecsException(
+                        $"Entity created at {entry.CallerFile}:{entry.CallerLine} "
+                            + $"(group {entry.Group}, descriptor: {entry.DescriptorName}) "
+                            + "is missing initial values for the following components:\n"
+                            + missingComponents
                     );
                 }
             }

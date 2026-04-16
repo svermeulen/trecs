@@ -7,8 +7,8 @@ namespace Trecs.Tests
     [TestFixture]
     public class AdvancedEntityTests
     {
-        static readonly TagSet StateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-        static readonly TagSet StateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+        static readonly TagSet PartitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+        static readonly TagSet PartitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
         #region Heavy Churn - Entity Ref Stability
 
@@ -158,16 +158,16 @@ namespace Trecs.Tests
         [Test]
         public void QueryEntityIndices_AcrossStates_ReturnsAll()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             for (int i = 0; i < 3; i++)
             {
-                a.AddEntity(StateA).AssertComplete();
+                a.AddEntity(PartitionA).AssertComplete();
             }
             for (int i = 0; i < 2; i++)
             {
-                a.AddEntity(StateB).AssertComplete();
+                a.AddEntity(PartitionB).AssertComplete();
             }
             a.SubmitEntities();
 
@@ -204,15 +204,15 @@ namespace Trecs.Tests
         [Test]
         public void GetEntityHandle_AfterMove_StillCorrect()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var init = a.AddEntity(StateA).Set(new TestInt { Value = 50 }).AssertComplete();
+            var init = a.AddEntity(PartitionA).Set(new TestInt { Value = 50 }).AssertComplete();
             var entityHandle = init.Handle;
             a.SubmitEntities();
 
-            // Move to StateB
-            a.MoveTo(entityHandle.ToIndex(a), StateB);
+            // Move to PartitionB
+            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             // Get the new index and convert back to ref
@@ -287,27 +287,27 @@ namespace Trecs.Tests
         [Test]
         public void RemoveWithTags_AcrossMultipleGroups_RemovesAll()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             for (int i = 0; i < 3; i++)
             {
-                a.AddEntity(StateA).AssertComplete();
+                a.AddEntity(PartitionA).AssertComplete();
             }
             for (int i = 0; i < 2; i++)
             {
-                a.AddEntity(StateB).AssertComplete();
+                a.AddEntity(PartitionB).AssertComplete();
             }
             a.SubmitEntities();
 
             NAssert.AreEqual(5, a.Query().WithTags(TestTags.Gamma).Count());
 
-            // Remove all entities with Gamma tag (both StateA and StateB)
+            // Remove all entities with Gamma tag (both PartitionA and PartitionB)
             a.RemoveEntitiesWithTags(TestTags.Gamma);
             a.SubmitEntities();
 
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
             NAssert.AreEqual(0, a.Query().WithTags(TestTags.Gamma).Count());
         }
 
@@ -418,16 +418,16 @@ namespace Trecs.Tests
         [Test]
         public void QueryCount_MatchesManualIterationCount()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             for (int i = 0; i < 7; i++)
             {
-                a.AddEntity(StateA).AssertComplete();
+                a.AddEntity(PartitionA).AssertComplete();
             }
             for (int i = 0; i < 3; i++)
             {
-                a.AddEntity(StateB).AssertComplete();
+                a.AddEntity(PartitionB).AssertComplete();
             }
             a.SubmitEntities();
 
@@ -449,16 +449,16 @@ namespace Trecs.Tests
         [Test]
         public void QueryGroupSlices_TotalCountMatchesQueryCount()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             for (int i = 0; i < 4; i++)
             {
-                a.AddEntity(StateA).AssertComplete();
+                a.AddEntity(PartitionA).AssertComplete();
             }
             for (int i = 0; i < 6; i++)
             {
-                a.AddEntity(StateB).AssertComplete();
+                a.AddEntity(PartitionB).AssertComplete();
             }
             a.SubmitEntities();
 

@@ -43,17 +43,17 @@ namespace Trecs.Tests
         [Test]
         public void ReadLookup_MultipleGroups_ReadsFromBoth()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            a.AddEntity(stateA)
+            a.AddEntity(partitionA)
                 .Set(new TestInt { Value = 100 })
                 .Set(new TestVec())
                 .AssertComplete();
-            a.AddEntity(stateB)
+            a.AddEntity(partitionB)
                 .Set(new TestInt { Value = 200 })
                 .Set(new TestVec())
                 .AssertComplete();
@@ -65,8 +65,8 @@ namespace Trecs.Tests
                 Allocator.TempJob
             );
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(stateA);
-            var groupB = a.WorldInfo.GetSingleGroupWithTags(stateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
+            var groupB = a.WorldInfo.GetSingleGroupWithTags(partitionB);
 
             NAssert.AreEqual(100, lookup[new EntityIndex(0, groupA)].Value);
             NAssert.AreEqual(200, lookup[new EntityIndex(0, groupB)].Value);

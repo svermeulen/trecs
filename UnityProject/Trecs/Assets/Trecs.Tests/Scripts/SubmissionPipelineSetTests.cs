@@ -3,18 +3,18 @@ using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
-    // Tags and template with states for set+move+remove interaction tests
+    // Tags and template with partitions for set+move+remove interaction tests
     public struct SPTag : ITag { }
 
-    public struct SPStateA : ITag { }
+    public struct SPPartitionA : ITag { }
 
-    public struct SPStateB : ITag { }
+    public struct SPPartitionB : ITag { }
 
     public partial class SPTestEntity
         : ITemplate,
             IHasTags<SPTag>,
-            IHasState<SPStateA>,
-            IHasState<SPStateB>
+            IHasPartition<SPPartitionA>,
+            IHasPartition<SPPartitionB>
     {
         public TestInt TestInt;
         public TestVec TestVec;
@@ -32,8 +32,14 @@ namespace Trecs.Tests
     [TestFixture]
     public class SubmissionPipelineSetTests
     {
-        static readonly TagSet StateA = TagSet.FromTags(Tag<SPTag>.Value, Tag<SPStateA>.Value);
-        static readonly TagSet StateB = TagSet.FromTags(Tag<SPTag>.Value, Tag<SPStateB>.Value);
+        static readonly TagSet PartitionA = TagSet.FromTags(
+            Tag<SPTag>.Value,
+            Tag<SPPartitionA>.Value
+        );
+        static readonly TagSet PartitionB = TagSet.FromTags(
+            Tag<SPTag>.Value,
+            Tag<SPPartitionB>.Value
+        );
 
         TestEnvironment CreateEnv() =>
             EcsTestHelper.CreateEnvironment(
@@ -56,7 +62,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[4];
             for (int i = 0; i < 4; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -64,7 +70,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set = a.Set<SPSet>();
 
             // Add entities 0, 1, 2 to set
@@ -75,8 +81,8 @@ namespace Trecs.Tests
             a.SubmitEntities();
             NAssert.AreEqual(3, set.Read.Count);
 
-            // Move entity 0 to StateB, remove entity 1, entity 2 stays
-            a.MoveTo(handles[0].ToIndex(a), StateB);
+            // Move entity 0 to PartitionB, remove entity 1, entity 2 stays
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
             a.RemoveEntity(handles[1]);
             a.SubmitEntities();
 
@@ -98,7 +104,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[3];
             for (int i = 0; i < 3; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -106,7 +112,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set = a.Set<SPSet>();
 
             set.Write.AddImmediate(new EntityIndex(0, groupA));
@@ -114,7 +120,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move entity 0, then remove it (reverts the move)
-            a.MoveTo(handles[0].ToIndex(a), StateB);
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
             a.RemoveEntity(handles[0].ToIndex(a));
             a.SubmitEntities();
 
@@ -137,7 +143,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[4];
             for (int i = 0; i < 4; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i * 10 })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -145,7 +151,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set = a.Set<SPSet>();
 
             // Deferred add entity 1 to set, native-remove entity 0
@@ -155,7 +161,7 @@ namespace Trecs.Tests
 
             // After swap-back from removing entity 0, entity at index 1 may have moved.
             // The set should still correctly track the entity that was originally at index 1.
-            NAssert.AreEqual(3, a.CountEntitiesWithTags(StateA));
+            NAssert.AreEqual(3, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, set.Read.Count, "Set should have 1 entity from the deferred add");
         }
 
@@ -171,7 +177,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[3];
             for (int i = 0; i < 3; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -179,7 +185,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set = a.Set<SPSet>();
 
             // Add entity 0 to set, then native-remove entity 0
@@ -187,7 +193,7 @@ namespace Trecs.Tests
             nativeEcs.RemoveEntity(handles[0].ToIndex(a));
             a.SubmitEntities();
 
-            NAssert.AreEqual(2, a.CountEntitiesWithTags(StateA));
+            NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, set.Read.Count, "Entity was removed, set should be empty");
         }
 
@@ -204,7 +210,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[3];
             for (int i = 0; i < 3; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -212,7 +218,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set1 = a.Set<SPSet>();
             var set2 = a.Set<SPSet2>();
 
@@ -239,14 +245,14 @@ namespace Trecs.Tests
             using var env = CreateEnv();
             var a = env.Accessor;
 
-            var handle = a.AddEntity(StateA)
+            var handle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 42 })
                 .Set(new TestVec())
                 .AssertComplete()
                 .Handle;
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set1 = a.Set<SPSet>();
             var set2 = a.Set<SPSet2>();
 
@@ -254,8 +260,8 @@ namespace Trecs.Tests
             set2.Write.AddImmediate(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
-            // Move entity to StateB
-            a.MoveTo(handle.ToIndex(a), StateB);
+            // Move entity to PartitionB
+            a.MoveTo(handle.ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             NAssert.AreEqual(1, set1.Read.Count, "Set1 should track entity through move");
@@ -275,7 +281,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -283,7 +289,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set1 = a.Set<SPSet>();
             var set2 = a.Set<SPSet2>();
 
@@ -297,7 +303,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move entity 0 (set1), remove entity 1 (set2)
-            a.MoveTo(handles[0].ToIndex(a), StateB);
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
             a.RemoveEntity(handles[1]);
             a.SubmitEntities();
 
@@ -319,7 +325,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[total];
             for (int i = 0; i < total; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -327,7 +333,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set = a.Set<SPSet>();
 
             // Add every other entity to set (0, 2, 4, ..., 48)
@@ -373,7 +379,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[total];
             for (int i = 0; i < total; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -381,7 +387,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set = a.Set<SPSet>();
 
             // Add first 30 to set
@@ -392,9 +398,9 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(30, set.Read.Count);
 
-            // Move first 20 to StateB, native-remove every 4th among them (0, 4, 8, 12, 16)
+            // Move first 20 to PartitionB, native-remove every 4th among them (0, 4, 8, 12, 16)
             for (int i = 0; i < 20; i++)
-                a.MoveTo(handles[i].ToIndex(a), StateB);
+                a.MoveTo(handles[i].ToIndex(a), PartitionB);
             for (int i = 0; i < 20; i += 4)
                 nativeEcs.RemoveEntity(handles[i].ToIndex(a));
             a.SubmitEntities();
@@ -425,7 +431,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -433,7 +439,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set = a.Set<SPSet>();
 
             // Add entities 0, 2 to set
@@ -443,13 +449,13 @@ namespace Trecs.Tests
 
             // In one submission:
             // - Deferred set add entity 3
-            // - Move entity 0 to StateB (in set)
+            // - Move entity 0 to PartitionB (in set)
             // - Remove entity 1 (not in set, but causes swap-back)
             // - Add new entity
             a.SetAdd<SPSet>(new EntityIndex(3, groupA));
-            a.MoveTo(handles[0].ToIndex(a), StateB);
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
             a.RemoveEntity(handles[1]);
-            var newHandle = a.AddEntity(StateA)
+            var newHandle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 99 })
                 .Set(new TestVec())
                 .AssertComplete()
@@ -484,7 +490,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[4];
             for (int i = 0; i < 4; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i * 10 })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -492,9 +498,9 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            // Callback: when entity removed from StateA, add entity 3 to set
+            // Callback: when entity removed from PartitionA, add entity 3 to set
             var subscription = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -529,7 +535,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[4];
             for (int i = 0; i < 4; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i * 10 })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -537,7 +543,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set = a.Set<SPSet>();
 
             // Entities 1 and 2 in set
@@ -547,7 +553,7 @@ namespace Trecs.Tests
 
             // Callback: on remove, also remove entity 2
             var subscription = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -582,7 +588,7 @@ namespace Trecs.Tests
             var handles = new EntityHandle[6];
             for (int i = 0; i < 6; i++)
             {
-                handles[i] = a.AddEntity(StateA)
+                handles[i] = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec())
                     .AssertComplete()
@@ -590,7 +596,7 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set = a.Set<SPSet>();
 
             // Frame 1: Add entities 0, 2, 4 to set
@@ -600,21 +606,21 @@ namespace Trecs.Tests
             a.SubmitEntities();
             NAssert.AreEqual(3, set.Read.Count);
 
-            // Frame 2: Move entity 0 to StateB, remove entity 1
-            a.MoveTo(handles[0].ToIndex(a), StateB);
+            // Frame 2: Move entity 0 to PartitionB, remove entity 1
+            a.MoveTo(handles[0].ToIndex(a), PartitionB);
             a.RemoveEntity(handles[1]);
             a.SubmitEntities();
             NAssert.AreEqual(3, set.Read.Count, "Entity 0 moved but still tracked, 1 not in set");
 
             // Frame 3: Move entity 0 back, remove entity 4 (in set)
-            a.MoveTo(handles[0].ToIndex(a), StateA);
+            a.MoveTo(handles[0].ToIndex(a), PartitionA);
             a.RemoveEntity(handles[4]);
             a.SubmitEntities();
             NAssert.AreEqual(2, set.Read.Count, "Lost entity 4, entity 0 moved back");
 
             // Frame 4: Remove entity 0 (in set), add new entity
             a.RemoveEntity(handles[0]);
-            var newHandle = a.AddEntity(StateA)
+            var newHandle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 99 })
                 .Set(new TestVec())
                 .AssertComplete()

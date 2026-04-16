@@ -43,33 +43,24 @@ With `[Unwrap]`, aspect properties return `float3` and `float` directly instead 
 
 ```csharp
 // Read
-ref readonly Position pos = ref ecs.Component<Position>(entityIndex).Read;
+ref readonly Position pos = ref world.Component<Position>(entityIndex).Read;
 
 // Write
-ref Position pos = ref ecs.Component<Position>(entityIndex).Write;
+ref Position pos = ref world.Component<Position>(entityIndex).Write;
 pos.Current -= damage;
 
 // Via EntityAccessor
-var entity = entityIndex.ToEntity(ecs);
+var entity = entityIndex.ToEntity(world);
 ref Health hp = ref entity.Get<Health>().Write;
 
 // Safe access (check if component exists)
-if (ecs.TryComponent<Health>(entityIndex, out var healthAccessor))
+if (world.TryComponent<Health>(entityIndex, out var healthAccessor))
 {
     ref readonly Health hp = ref healthAccessor.Read;
 }
 ```
 
-### Buffer Access (All Entities in a Group)
-
-```csharp
-var buffer = ecs.ComponentBuffer<Position>(group);
-for (int i = 0; i < buffer.Count; i++)
-{
-    ref Position pos = ref buffer[i];
-    pos.Value.y += 1f;
-}
-```
+Accessing via Read/Write properties allows Trecs to lazily complete any jobs with conflicting access before providing the reference. See [Dependency Tracking](../performance/dependency-tracking.md) for details on how this works.
 
 ## Component Field Attributes
 
@@ -109,10 +100,10 @@ Every world has a single **global entity** for storing world-wide state:
 
 ```csharp
 // Read global component
-ref readonly Score score = ref ecs.GlobalComponent<Score>().Read;
+ref readonly Score score = ref world.GlobalComponent<Score>().Read;
 
 // Write global component
-ref Score score = ref ecs.GlobalComponent<Score>().Write;
+ref Score score = ref world.GlobalComponent<Score>().Write;
 score.Value += 10;
 ```
 

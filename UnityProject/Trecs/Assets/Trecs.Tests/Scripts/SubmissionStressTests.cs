@@ -20,9 +20,9 @@ namespace Trecs.Tests
         [TestCase(5000)]
         public void Stress_RemoveN_FromGroup(int count)
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
-            var tags = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
+            var tags = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
 
             // Add entities
             var entityIds = new EntityHandle[count];
@@ -74,37 +74,37 @@ namespace Trecs.Tests
         [TestCase(5000)]
         public void Stress_MoveN_BetweenGroups(int count)
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            // Add entities to state A
+            // Add entities to partition A
             var entityIds = new EntityHandle[count];
             for (int i = 0; i < count; i++)
             {
-                var init = a.AddEntity(stateA)
+                var init = a.AddEntity(partitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec { X = i * 0.1f, Y = i * 0.2f })
                     .AssertComplete();
                 entityIds[i] = init.Handle;
             }
             a.SubmitEntities();
-            NAssert.AreEqual(count, a.CountEntitiesWithTags(stateA));
+            NAssert.AreEqual(count, a.CountEntitiesWithTags(partitionA));
 
-            // Move half to state B
+            // Move half to partition B
             int moveCount = count / 2;
             for (int i = 0; i < moveCount; i++)
             {
-                a.MoveTo(entityIds[i * 2].ToIndex(a), stateB);
+                a.MoveTo(entityIds[i * 2].ToIndex(a), partitionB);
             }
 
             var sw = Stopwatch.StartNew();
             a.SubmitEntities();
             sw.Stop();
 
-            NAssert.AreEqual(count - moveCount, a.CountEntitiesWithTags(stateA));
-            NAssert.AreEqual(moveCount, a.CountEntitiesWithTags(stateB));
+            NAssert.AreEqual(count - moveCount, a.CountEntitiesWithTags(partitionA));
+            NAssert.AreEqual(moveCount, a.CountEntitiesWithTags(partitionB));
 
             // Verify moved entities are intact
             for (int i = 0; i < moveCount; i++)
@@ -137,9 +137,9 @@ namespace Trecs.Tests
         [TestCase(5000)]
         public void Stress_AddN_ToGroup(int count)
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
-            var tags = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
+            var tags = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
 
             // Schedule adds
             for (int i = 0; i < count; i++)
@@ -171,16 +171,16 @@ namespace Trecs.Tests
         [TestCase(5000)]
         public void Stress_MixedOps_N(int count)
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            // Add entities to state A
+            // Add entities to partition A
             var entityIds = new EntityHandle[count];
             for (int i = 0; i < count; i++)
             {
-                var init = a.AddEntity(stateA)
+                var init = a.AddEntity(partitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec { X = i * 0.1f, Y = i * 0.2f })
                     .AssertComplete();
@@ -197,13 +197,13 @@ namespace Trecs.Tests
             }
             for (int i = 0; i < moveCount; i++)
             {
-                a.MoveTo(entityIds[removeCount + i].ToIndex(a), stateB);
+                a.MoveTo(entityIds[removeCount + i].ToIndex(a), partitionB);
             }
             // Also add new entities
             int addCount = count / 4;
             for (int i = 0; i < addCount; i++)
             {
-                a.AddEntity(stateA)
+                a.AddEntity(partitionA)
                     .Set(new TestInt { Value = count + i })
                     .Set(new TestVec { X = 0, Y = 0 })
                     .AssertComplete();
@@ -214,8 +214,8 @@ namespace Trecs.Tests
             sw.Stop();
 
             int expectedA = count - removeCount - moveCount + addCount;
-            NAssert.AreEqual(expectedA, a.CountEntitiesWithTags(stateA));
-            NAssert.AreEqual(moveCount, a.CountEntitiesWithTags(stateB));
+            NAssert.AreEqual(expectedA, a.CountEntitiesWithTags(partitionA));
+            NAssert.AreEqual(moveCount, a.CountEntitiesWithTags(partitionB));
 
             UnityEngine.Debug.Log(
                 $"[StressTest] Mixed (remove={removeCount}, move={moveCount}, add={addCount}) from {count}: {sw.Elapsed.TotalMilliseconds:F3} ms"
@@ -230,9 +230,9 @@ namespace Trecs.Tests
         [TestCase(5000)]
         public void Stress_RemoveAll_N(int count)
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
-            var tags = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
+            var tags = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
 
             var entityIds = new EntityHandle[count];
             for (int i = 0; i < count; i++)

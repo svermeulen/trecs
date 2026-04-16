@@ -55,7 +55,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T Get(WorldAccessor ecs) => Get(ecs.Heap);
+        public T Get(WorldAccessor world) => Get(world.Heap);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGet(HeapAccessor heap, out T value)
@@ -87,7 +87,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGet(WorldAccessor ecs, out T value) => TryGet(ecs.Heap, out value);
+        public bool TryGet(WorldAccessor world, out T value) => TryGet(world.Heap, out value);
 
         public bool CanGet(HeapAccessor heap)
         {
@@ -104,7 +104,7 @@ namespace Trecs
             return heap.FrameScopedSharedHeap.ContainsEntry(Handle.Value);
         }
 
-        public bool CanGet(WorldAccessor ecs) => CanGet(ecs.Heap);
+        public bool CanGet(WorldAccessor world) => CanGet(world.Heap);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public SharedPtr<T> Clone(HeapAccessor heap)
@@ -125,7 +125,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public SharedPtr<T> Clone(WorldAccessor ecs) => Clone(ecs.Heap);
+        public SharedPtr<T> Clone(WorldAccessor world) => Clone(world.Heap);
 
         public BlobId GetBlobId(HeapAccessor heap)
         {
@@ -138,7 +138,7 @@ namespace Trecs
             return heap.FrameScopedSharedHeap.GetBlobId(heap.FixedFrame, Handle.Value);
         }
 
-        public BlobId GetBlobId(WorldAccessor ecs) => GetBlobId(ecs.Heap);
+        public BlobId GetBlobId(WorldAccessor world) => GetBlobId(world.Heap);
 
         public readonly void Dispose(HeapAccessor heap)
         {
@@ -149,7 +149,7 @@ namespace Trecs
             heap.SharedHeap.DisposeHandle(Handle);
         }
 
-        public readonly void Dispose(WorldAccessor ecs) => Dispose(ecs.Heap);
+        public readonly void Dispose(WorldAccessor world) => Dispose(world.Heap);
 
         public readonly bool IsNull
         {

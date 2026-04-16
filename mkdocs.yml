@@ -40,7 +40,7 @@ nav:
       - Entities: core/entities.md
       - Components: core/components.md
       - Templates: core/templates.md
-      - Tags & Groups: core/tags-and-groups.md
+      - Tags: core/tags.md
       - Systems: core/systems.md
   - Data Access:
       - Queries & Iteration: data-access/queries-and-iteration.md
@@ -51,7 +51,9 @@ nav:
       - Entity Events: entity-management/entity-events.md
   - Performance:
       - Jobs & Burst: performance/jobs-and-burst.md
+      - Dependency Tracking: performance/dependency-tracking.md
   - Advanced:
+      - Groups & TagSets: advanced/groups-and-tagsets.md
       - Heap: advanced/heap.md
       - Interpolation: advanced/interpolation.md
       - Serialization: advanced/serialization.md
@@ -65,7 +67,7 @@ nav:
       - 03 - Aspects: samples/03-aspects.md
       - 04 - Predator Prey: samples/04-predator-prey.md
       - 05 - Job System: samples/05-job-system.md
-      - 06 - States: samples/06-states.md
+      - 06 - Partitions: samples/06-partitions.md
       - 07 - Feeding Frenzy: samples/07-feeding-frenzy.md
       - 08 - Sets: samples/08-sets.md
       - 09 - Interpolation: samples/09-interpolation.md

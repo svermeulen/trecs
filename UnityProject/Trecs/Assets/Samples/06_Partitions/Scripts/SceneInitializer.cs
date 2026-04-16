@@ -1,7 +1,7 @@
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Trecs.Samples.States
+namespace Trecs.Samples.Partitions
 {
     public class SceneInitializer
     {
@@ -40,14 +40,13 @@ namespace Trecs.Samples.States
                 go.transform.position = (Vector3)position;
                 go.transform.localScale = Vector3.one * 0.6f;
 
-                // Balls start in Active state — they'll fall under gravity
+                // Balls start in Active partition — they'll fall under gravity
                 _world
                     .AddEntity<BallTags.Ball, BallTags.Active>()
                     .Set(new Position(position))
                     .Set(new Velocity(float3.zero))
                     .Set(new RestTimer(0f))
-                    .Set(_gameObjectRegistry.Register(go))
-                    .AssertComplete();
+                    .Set(_gameObjectRegistry.Register(go));
             }
         }
     }

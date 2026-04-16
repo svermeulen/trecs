@@ -1,18 +1,18 @@
 using System;
 using System.Collections.Generic;
 
-namespace Trecs.Samples.States
+namespace Trecs.Samples.Partitions
 {
     /// <summary>
-    /// Demonstrates template states: entities grouped by state tag for
+    /// Demonstrates template partitions: entities grouped by partition tag for
     /// cache-friendly iteration.
     ///
-    /// Balls bounce around with physics (Active state) then come to rest
-    /// on the ground (Resting state). After a timer, resting balls launch
+    /// Balls bounce around with physics (Active partition) then come to rest
+    /// on the ground (Resting partition). After a timer, resting balls launch
     /// back up. The physics system only touches Active balls — which are
     /// stored contiguously in memory, giving optimal cache performance.
     /// </summary>
-    public class StatesCompositionRoot : CompositionRootBase
+    public class PartitionsCompositionRoot : CompositionRootBase
     {
         public int BallCount = 100;
         public float SpawnRadius = 8f;

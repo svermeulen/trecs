@@ -1,6 +1,6 @@
 using Unity.Mathematics;
 
-namespace Trecs.Samples.States
+namespace Trecs.Samples.Partitions
 {
     public static class BallTags
     {
@@ -26,15 +26,15 @@ namespace Trecs.Samples.States
     public static partial class SampleTemplates
     {
         /// <summary>
-        /// Ball entity with two states: Active (physics simulated) and Resting (idle).
-        /// Entities in the Active state are stored contiguously in memory, so the
+        /// Ball entity with two partitions: Active (physics simulated) and Resting (idle).
+        /// Entities in the Active partition are stored contiguously in memory, so the
         /// physics system iterates them with optimal cache performance.
         /// </summary>
         public partial class BallEntity
             : ITemplate,
                 IHasTags<BallTags.Ball>,
-                IHasState<BallTags.Active>,
-                IHasState<BallTags.Resting>
+                IHasPartition<BallTags.Active>,
+                IHasPartition<BallTags.Resting>
         {
             public Position Position;
             public Velocity Velocity;

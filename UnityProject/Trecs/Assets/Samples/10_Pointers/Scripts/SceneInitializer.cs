@@ -6,7 +6,7 @@ namespace Trecs.Samples.Pointers
 {
     public class SceneInitializer
     {
-        readonly WorldAccessor _ecs;
+        readonly WorldAccessor _world;
         readonly GameObjectRegistry _gameObjectRegistry;
         readonly int _entitiesPerRoute;
 
@@ -16,7 +16,7 @@ namespace Trecs.Samples.Pointers
             int entitiesPerRoute
         )
         {
-            _ecs = world.CreateAccessor();
+            _world = world.CreateAccessor();
             _gameObjectRegistry = gameObjectRegistry;
             _entitiesPerRoute = entitiesPerRoute;
         }
@@ -27,7 +27,7 @@ namespace Trecs.Samples.Pointers
             // Each route's waypoint list is a managed List<Vector3> that
             // cannot exist in a struct component. AllocShared creates a
             // heap object with refcount 1.
-            var circleRoute = _ecs.Heap.AllocShared(
+            var circleRoute = _world.Heap.AllocShared(
                 new PatrolRoute
                 {
                     Waypoints = GenerateCircle(new Vector3(-8, 0, 0), 3f, 20),
@@ -36,7 +36,7 @@ namespace Trecs.Samples.Pointers
                 }
             );
 
-            var figure8Route = _ecs.Heap.AllocShared(
+            var figure8Route = _world.Heap.AllocShared(
                 new PatrolRoute
                 {
                     Waypoints = GenerateFigure8(Vector3.zero, 4f, 24),
@@ -45,7 +45,7 @@ namespace Trecs.Samples.Pointers
                 }
             );
 
-            var starRoute = _ecs.Heap.AllocShared(
+            var starRoute = _world.Heap.AllocShared(
                 new PatrolRoute
                 {
                     Waypoints = GenerateStar(new Vector3(8, 0, 0), 4f, 1.5f, 5),
@@ -63,14 +63,14 @@ namespace Trecs.Samples.Pointers
             // Each entity holds its own Clone. The originals are no longer
             // needed — dispose to decrement refcount. Objects stay alive
             // because entity clones still reference them.
-            circleRoute.Dispose(_ecs);
-            figure8Route.Dispose(_ecs);
-            starRoute.Dispose(_ecs);
+            circleRoute.Dispose(_world);
+            figure8Route.Dispose(_world);
+            starRoute.Dispose(_world);
         }
 
         void SpawnFollowers(SharedPtr<PatrolRoute> routePtr, int count)
         {
-            var route = routePtr.Get(_ecs);
+            var route = routePtr.Get(_world);
 
             for (int i = 0; i < count; i++)
             {
@@ -100,19 +100,19 @@ namespace Trecs.Samples.Pointers
                 // ─── Clone SharedPtr ────────────────────────────────
                 // Clone increments refcount. Each entity gets its own handle,
                 // all pointing to the same PatrolRoute object.
-                var routeClone = routePtr.Clone(_ecs);
+                var routeClone = routePtr.Clone(_world);
 
                 // ─── Allocate UniquePtr ─────────────────────────────
                 // Each entity gets its own TrailHistory with an empty list
                 // that will grow dynamically as the entity moves.
-                var trailPtr = _ecs.Heap.AllocUnique(new TrailHistory { MaxLength = 50 });
+                var trailPtr = _world.Heap.AllocUnique(new TrailHistory { MaxLength = 50 });
 
-                _ecs.AddEntity<PatrolTags.Follower>()
+                _world
+                    .AddEntity<PatrolTags.Follower>()
                     .Set(new Position((float3)pos))
                     .Set(new CRoute { Value = routeClone, Progress = progress })
                     .Set(new CTrail { Value = trailPtr })
-                    .Set(_gameObjectRegistry.Register(go))
-                    .AssertComplete();
+                    .Set(_gameObjectRegistry.Register(go));
             }
         }
 

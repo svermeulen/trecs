@@ -42,7 +42,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     or IterationStyle.RawComponentBuffersJob;
 
             var initialTags =
-                config.StateApproach is FrenzyStateApproach.States
+                config.SubsetApproach is FrenzySubsetApproach.Partitions
                     ? TagSet<FrenzyTags.Meal, FrenzyTags.NotEating>.Value
                     : TagSet<FrenzyTags.Meal>.Value;
 
@@ -73,8 +73,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                                 _settings.MealYOffset
                             )
                         )
-                    )
-                    .AssertComplete();
+                    );
             }
         }
 
@@ -100,12 +99,12 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
         void DespawnMeals(int count, in FrenzyConfig config)
         {
-            switch (config.StateApproach)
+            switch (config.SubsetApproach)
             {
-                case FrenzyStateApproach.States:
-                    DespawnMealsStates(count);
+                case FrenzySubsetApproach.Partitions:
+                    DespawnMealsPartitions(count);
                     break;
-                case FrenzyStateApproach.Sets:
+                case FrenzySubsetApproach.Sets:
                     DespawnMealsSets(count);
                     break;
                 default:
@@ -185,7 +184,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             }
         }
 
-        void DespawnMealsStates(int count)
+        void DespawnMealsPartitions(int count)
         {
             int removed = 0;
 

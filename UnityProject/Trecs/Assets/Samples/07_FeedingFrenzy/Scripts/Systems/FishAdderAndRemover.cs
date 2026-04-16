@@ -63,8 +63,7 @@ namespace Trecs.Samples.FeedingFrenzy101
                     .Set(new Position(pos))
                     .Set(new SimPosition(pos))
                     .Set(new Speed(speed))
-                    .Set(new UniformScale(scale))
-                    .AssertComplete();
+                    .Set(new UniformScale(scale));
             }
         }
 

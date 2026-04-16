@@ -16,13 +16,13 @@ namespace Trecs
         SparseGroupSlice _current;
 
         internal SparseGroupSliceIterator(
-            WorldAccessor ecs,
+            WorldAccessor world,
             ReadOnlyFastList<Group> validGroups,
             SetId set
         )
         {
             _validGroups = validGroups;
-            _set = ecs.GetSetGroupLookup(set);
+            _set = world.GetSetGroupLookup(set);
             _groupIndex = -1;
             _current = default;
         }

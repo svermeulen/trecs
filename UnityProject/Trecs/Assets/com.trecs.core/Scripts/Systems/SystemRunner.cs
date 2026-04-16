@@ -372,7 +372,7 @@ namespace Trecs.Internal
             return _systemSortIndex[i];
         }
 
-        public void Initialize(World ecs, SystemLoader.LoadInfo loadInfo)
+        public void Initialize(World world, SystemLoader.LoadInfo loadInfo)
         {
             Assert.That(!_hasDisposed);
             Assert.IsNotNull(

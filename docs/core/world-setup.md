@@ -61,15 +61,16 @@ This is the standard pattern used throughout Trecs. Adding systems post-Build al
 ## WorldSettings
 
 ```csharp
+// Values below are the defaults, shown here for reference. Only set the options you need to change.
 var settings = new WorldSettings
 {
     // Timing
-    FixedTimeStep = 1f / 60f,                  // Default: 1/60
-    MaxSecondsForFixedUpdatePerFrame = 0.1f,    // Cap on fixed update time per frame
+    FixedTimeStep = 1f / 60f,
+    MaxSecondsForFixedUpdatePerFrame = null,    // Cap on fixed update time per frame
 
     // Determinism
-    RandomSeed = 42,                            // Seed for deterministic RNG
-    RequireDeterministicSubmission = true,       // Sort structural ops for replay
+    RandomSeed = null,                          // Seed for deterministic RNG, set to an integer to enable a fixed value (otherwise will use System.Environment.TickCount)
+    RequireDeterministicSubmission = false,     // Sort structural ops for replay
 
     // Startup
     StartPaused = false,
@@ -81,7 +82,6 @@ var settings = new WorldSettings
     WarnOnFixedUpdateFallingBehind = false,
     WarnOnJobSyncPoints = false,
     WarnOnUnusedTemplates = false,
-    WarnOnMissingAssertComplete = false,
 
     // Safety
     MaxSubmissionIterations = 10,               // Prevent circular submission feedback
@@ -97,13 +97,14 @@ var world = new WorldBuilder()
     .Build();
 
 // 2. Add systems (between Build and Initialize)
+world.AddSystem(new FooSystem());
 world.AddSystems(new ISystem[] { ... });
 
 // 3. Initialize (allocates groups, initializes systems)
 world.Initialize();
 
 // 4. Create an accessor for interacting with the world
-var ecs = world.CreateAccessor();
+var world = world.CreateAccessor();
 
 // 5. Game loop
 while (running)
@@ -124,7 +125,7 @@ world.Dispose();
 `WorldAccessor` is the primary API for interacting with the world at runtime. Systems receive it automatically via source generation, but you can also create one manually:
 
 ```csharp
-var ecs = world.CreateAccessor();
+var world = world.CreateAccessor();
 ```
 
 `WorldAccessor` provides access to:

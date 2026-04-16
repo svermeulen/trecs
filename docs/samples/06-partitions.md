@@ -1,12 +1,12 @@
-# 06 — States
+# 06 — Partitions
 
-Built-in state transitions via template states. Entities in different states are stored in separate groups for cache-friendly, targeted iteration.
+Built-in partition transitions via template partitions. Entities in different partitions are stored in separate groups for cache-friendly, targeted iteration.
 
-**Source:** `Samples/06_States/`
+**Source:** `Samples/06_Partitions/`
 
 ## What It Does
 
-Balls bounce under gravity. When a ball's energy drops below a threshold, it transitions to a "Resting" state and turns gray. After a rest timer expires, it launches back into the air and returns to "Active".
+Balls bounce under gravity. When a ball's energy drops below a threshold, it transitions to a "Resting" partition and turns gray. After a rest timer expires, it launches back into the air and returns to "Active".
 
 ## Schema
 
@@ -18,13 +18,13 @@ public struct Active : ITag { }
 public struct Resting : ITag { }
 ```
 
-### Template with States
+### Template with Partitions
 
 ```csharp
 public partial class BallEntity : ITemplate,
     IHasTags<BallTags.Ball>,
-    IHasState<BallTags.Active>,
-    IHasState<BallTags.Resting>
+    IHasPartition<BallTags.Active>,
+    IHasPartition<BallTags.Resting>
 {
     public Position Position;
     public Velocity Velocity;
@@ -33,13 +33,13 @@ public partial class BallEntity : ITemplate,
 }
 ```
 
-Each `IHasState` declares a valid state. The entity always has the `Ball` tag plus exactly one state tag — creating two separate groups in memory.
+Each `IHasPartition` declares a valid partition. The entity always has the `Ball` tag plus exactly one partition tag — creating two separate groups in memory.
 
 ## Systems
 
 ### PhysicsSystem — Active Balls Only
 
-Only processes balls in the Active state:
+Only processes balls in the Active partition:
 
 ```csharp
 [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
@@ -84,7 +84,7 @@ public partial class WakeUpSystem : ISystem
 }
 ```
 
-### BallRendererSystem — Different Rendering Per State
+### BallRendererSystem — Different Rendering Per Partition
 
 Two `[ForEachEntity]` methods with different tag filters:
 
@@ -114,8 +114,8 @@ public partial class BallRendererSystem : ISystem
 
 ## Concepts Introduced
 
-- **`IHasState`** declares valid states on a template
-- **`MoveTo<Tag1, Tag2>()`** transitions entities between states
-- **State-filtered iteration** — systems iterate only entities in a specific state
+- **`IHasPartition`** declares valid partitions on a template
+- **`MoveTo<Tag1, Tag2>()`** transitions entities between partitions
+- **Partition-filtered iteration** — systems iterate only entities in a specific partition
 - **Group separation** — Active and Resting balls are stored in separate contiguous arrays
 - **Multiple `[ForEachEntity]` methods** — different queries in the same system, called from an explicit `Execute()`

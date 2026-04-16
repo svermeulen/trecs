@@ -42,7 +42,7 @@ namespace Trecs.Tests
                 TestTemplates.SimpleAlpha
             );
 
-            var runner = env.EcsWorld.GetSystemRunner();
+            var runner = env.World.GetSystemRunner();
             NAssert.IsTrue(runner.IsPaused, "SystemRunner should start paused");
         }
 
@@ -54,7 +54,7 @@ namespace Trecs.Tests
                 TestTemplates.SimpleAlpha
             );
 
-            var runner = env.EcsWorld.GetSystemRunner();
+            var runner = env.World.GetSystemRunner();
             NAssert.IsFalse(runner.IsPaused);
         }
 
@@ -69,7 +69,7 @@ namespace Trecs.Tests
 
             using var env = EcsTestHelper.CreateEnvironment(settings, TestTemplates.SimpleAlpha);
             // World creation succeeds with non-default timestep
-            NAssert.IsNotNull(env.EcsWorld);
+            NAssert.IsNotNull(env.World);
         }
 
         #endregion
@@ -87,8 +87,8 @@ namespace Trecs.Tests
 
             // Both worlds should be valid (seed consistency is hard to test externally
             // without accessing the Rng, but at least verify both construct)
-            NAssert.IsNotNull(env1.EcsWorld);
-            NAssert.IsNotNull(env2.EcsWorld);
+            NAssert.IsNotNull(env1.World);
+            NAssert.IsNotNull(env2.World);
         }
 
         #endregion
@@ -101,7 +101,7 @@ namespace Trecs.Tests
             var settings = new WorldSettings { MaxSubmissionIterations = 5 };
 
             using var env = EcsTestHelper.CreateEnvironment(settings, TestTemplates.SimpleAlpha);
-            NAssert.IsNotNull(env.EcsWorld);
+            NAssert.IsNotNull(env.World);
         }
 
         #endregion
@@ -113,7 +113,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a1 = env.Accessor;
-            var a2 = env.EcsWorld.CreateAccessor();
+            var a2 = env.World.CreateAccessor();
 
             // Both accessors can create entities
             a1.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 10 }).AssertComplete();

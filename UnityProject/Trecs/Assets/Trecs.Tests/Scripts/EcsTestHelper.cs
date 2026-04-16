@@ -4,19 +4,19 @@ namespace Trecs.Tests
 {
     public class TestEnvironment : IDisposable
     {
-        public World EcsWorld;
+        public World World;
 
         WorldAccessor _accessor;
-        public WorldAccessor Accessor => _accessor ??= EcsWorld.CreateAccessor();
+        public WorldAccessor Accessor => _accessor ??= World.CreateAccessor();
 
-        public TestEnvironment(World ecs)
+        public TestEnvironment(World world)
         {
-            EcsWorld = ecs;
+            World = world;
         }
 
         public void Dispose()
         {
-            EcsWorld.Dispose();
+            World.Dispose();
         }
     }
 
@@ -72,7 +72,7 @@ namespace Trecs.Tests
                 globalsTemplate = new Template(
                     debugName: "TestGlobals",
                     localBaseTemplates: new Template[] { TrecsTemplates.Globals.Template },
-                    states: Array.Empty<TagSet>(),
+                    partitions: Array.Empty<TagSet>(),
                     localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
                     localTags: Array.Empty<Tag>()
                 );

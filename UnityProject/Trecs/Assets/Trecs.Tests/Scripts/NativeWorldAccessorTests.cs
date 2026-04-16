@@ -97,48 +97,48 @@ namespace Trecs.Tests
         [Test]
         public void NativeAccessor_MoveTo_ChangesGroup()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            var handle = a.AddEntity(stateA)
+            var handle = a.AddEntity(partitionA)
                 .Set(new TestInt { Value = 77 })
                 .Set(new TestVec())
                 .AssertComplete()
                 .Handle;
             a.SubmitEntities();
 
-            nativeEcs.MoveTo(handle.ToIndex(a), stateB);
+            nativeEcs.MoveTo(handle.ToIndex(a), partitionB);
             a.SubmitEntities();
 
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(stateA));
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(stateB));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(partitionA));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionB));
         }
 
         [Test]
         public void NativeAccessor_MoveTo_PreservesComponents()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
 
-            var stateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-            var stateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+            var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+            var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-            var handle = a.AddEntity(stateA)
+            var handle = a.AddEntity(partitionA)
                 .Set(new TestInt { Value = 88 })
                 .Set(new TestVec { X = 1.5f, Y = 2.5f })
                 .AssertComplete()
                 .Handle;
             a.SubmitEntities();
 
-            nativeEcs.MoveTo(handle.ToIndex(a), stateB);
+            nativeEcs.MoveTo(handle.ToIndex(a), partitionB);
             a.SubmitEntities();
 
-            var comp = a.Query().WithTags(stateB).Single().Get<TestInt>();
+            var comp = a.Query().WithTags(partitionB).Single().Get<TestInt>();
             NAssert.AreEqual(88, comp.Read.Value);
         }
 

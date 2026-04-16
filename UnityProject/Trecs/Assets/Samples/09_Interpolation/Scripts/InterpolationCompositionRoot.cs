@@ -95,7 +95,7 @@ namespace Trecs.Samples.Interpolation
             in Position current,
             ref Position result,
             float percentThroughFixedFrame,
-            WorldAccessor ecs
+            WorldAccessor world
         )
         {
             result.Value = math.lerp(previous.Value, current.Value, percentThroughFixedFrame);

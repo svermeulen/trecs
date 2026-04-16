@@ -40,8 +40,7 @@ namespace Trecs.Samples.Snake
             _world
                 .AddEntity<SnakeTags.SnakeHead>()
                 .Set(new GridPos(headPos))
-                .Set(new Direction(new int2(1, 0)))
-                .AssertComplete();
+                .Set(new Direction(new int2(1, 0)));
 
             // Initial body segments stretch leftward from the head, with
             // descending FrameSpawned so the trim system would (in
@@ -56,8 +55,7 @@ namespace Trecs.Samples.Snake
                     // Negative frames so any segment spawned at runtime
                     // has a higher (newer) frame number than these
                     // initial segments and gets trimmed first.
-                    .Set(new SegmentAge(-i))
-                    .AssertComplete();
+                    .Set(new SegmentAge(-i));
             }
         }
 

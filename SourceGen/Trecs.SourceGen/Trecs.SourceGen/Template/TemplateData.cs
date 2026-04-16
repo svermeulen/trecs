@@ -45,13 +45,13 @@ namespace Trecs.SourceGen.Template
     }
 
     /// <summary>
-    /// Parsed data for a single IState interface on a template struct
+    /// Parsed data for a single IHasPartition interface on a template struct
     /// </summary>
-    internal class TemplateStateData
+    internal class TemplatePartitionData
     {
         public ImmutableArray<string> TagTypeNames { get; }
 
-        public TemplateStateData(ImmutableArray<string> tagTypeNames)
+        public TemplatePartitionData(ImmutableArray<string> tagTypeNames)
         {
             TagTypeNames = tagTypeNames;
         }
@@ -71,7 +71,7 @@ namespace Trecs.SourceGen.Template
         public ImmutableArray<string> TagTypeNames { get; }
         public ImmutableArray<string> BaseTemplateTypeNames { get; }
         public ImmutableArray<TemplateComponentData> Components { get; }
-        public ImmutableArray<TemplateStateData> States { get; }
+        public ImmutableArray<TemplatePartitionData> Partitions { get; }
 
         public TemplateDefinitionData(
             string typeName,
@@ -83,7 +83,7 @@ namespace Trecs.SourceGen.Template
             ImmutableArray<string> tagTypeNames,
             ImmutableArray<string> baseTemplateTypeNames,
             ImmutableArray<TemplateComponentData> components,
-            ImmutableArray<TemplateStateData> states
+            ImmutableArray<TemplatePartitionData> partitions
         )
         {
             TypeName = typeName;
@@ -95,7 +95,7 @@ namespace Trecs.SourceGen.Template
             TagTypeNames = tagTypeNames;
             BaseTemplateTypeNames = baseTemplateTypeNames;
             Components = components;
-            States = states;
+            Partitions = partitions;
         }
     }
 }

@@ -12,9 +12,9 @@ namespace Trecs
         readonly WorldAccessor _world;
         readonly EntityIndex _entityIndex;
 
-        internal ComponentAccessor(WorldAccessor ecs, EntityIndex entityIndex)
+        internal ComponentAccessor(WorldAccessor world, EntityIndex entityIndex)
         {
-            _world = ecs;
+            _world = world;
             _entityIndex = entityIndex;
         }
 

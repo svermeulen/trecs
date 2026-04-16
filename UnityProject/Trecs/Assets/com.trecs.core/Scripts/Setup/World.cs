@@ -753,112 +753,112 @@ namespace Trecs.Internal
     public static class WorldExtensions
     {
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static SystemRunner GetSystemRunner(this World ecs)
+        public static SystemRunner GetSystemRunner(this World world)
         {
-            return ecs.SystemRunner;
+            return world.SystemRunner;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static EntitySubmitter GetEntitySubmitter(this World ecs)
+        public static EntitySubmitter GetEntitySubmitter(this World world)
         {
-            return ecs.EntitySubmitter;
+            return world.EntitySubmitter;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static EntityQuerier GetEntityQuerier(this World ecs)
+        public static EntityQuerier GetEntityQuerier(this World world)
         {
-            return ecs.EntityQuerier;
+            return world.EntityQuerier;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static EventsManager GetEventsManager(this World ecs)
+        public static EventsManager GetEventsManager(this World world)
         {
-            return ecs.EventsManager;
+            return world.EventsManager;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static EntityInputQueue GetEntityInputQueue(this World ecs)
+        public static EntityInputQueue GetEntityInputQueue(this World world)
         {
-            return ecs.EntityInputQueue;
+            return world.EntityInputQueue;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static UniqueHeap GetUniqueHeap(this World ecs)
+        public static UniqueHeap GetUniqueHeap(this World world)
         {
-            return ecs.UniqueHeap;
+            return world.UniqueHeap;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static SharedHeap GetSharedHeap(this World ecs)
+        public static SharedHeap GetSharedHeap(this World world)
         {
-            return ecs.SharedHeap;
+            return world.SharedHeap;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static NativeSharedHeap GetNativeSharedHeap(this World ecs)
+        public static NativeSharedHeap GetNativeSharedHeap(this World world)
         {
-            return ecs.NativeSharedHeap;
+            return world.NativeSharedHeap;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static NativeUniqueHeap GetNativeUniqueHeap(this World ecs)
+        public static NativeUniqueHeap GetNativeUniqueHeap(this World world)
         {
-            return ecs.NativeUniqueHeap;
+            return world.NativeUniqueHeap;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static FrameScopedNativeUniqueHeap GetFrameScopedNativeUniqueHeap(this World ecs)
+        public static FrameScopedNativeUniqueHeap GetFrameScopedNativeUniqueHeap(this World world)
         {
-            return ecs.FrameScopedNativeUniqueHeap;
+            return world.FrameScopedNativeUniqueHeap;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static BlobCache GetBlobCache(this World ecs)
+        public static BlobCache GetBlobCache(this World world)
         {
-            return ecs.BlobCache;
+            return world.BlobCache;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static WorldAccessor GetAccessorById(this World ecs, int id)
+        public static WorldAccessor GetAccessorById(this World world, int id)
         {
-            return ecs.GetAccessorById(id);
+            return world.GetAccessorById(id);
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static ReadOnlyDenseDictionary<ISystem, WorldAccessor> GetExecuteAccessors(
-            this World ecs
+            this World world
         )
         {
-            return ecs.ExecuteAccessors;
+            return world.ExecuteAccessors;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static ReadOnlyDenseDictionary<int, WorldAccessor> GetAllAccessors(this World ecs)
+        public static ReadOnlyDenseDictionary<int, WorldAccessor> GetAllAccessors(this World world)
         {
-            return ecs.AllAccessors;
+            return world.AllAccessors;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static ComponentStore GetComponentStore(this World ecs)
+        public static ComponentStore GetComponentStore(this World world)
         {
-            return ecs.ComponentStore;
+            return world.ComponentStore;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static SetStore GetSetStore(this World ecs)
+        public static SetStore GetSetStore(this World world)
         {
-            return ecs.SetStore;
+            return world.SetStore;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static WorldAccessor CreateAccessorExplicit(
-            this World ecs,
+            this World world,
             bool isInputSystem,
             bool isFixedSystem,
             string debugName
         )
         {
-            return ecs.CreateAccessorImpl(
+            return world.CreateAccessorImpl(
                 isInputSystem: isInputSystem,
                 isFixedSystem: isFixedSystem,
                 debugName: debugName

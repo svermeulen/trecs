@@ -20,16 +20,16 @@ void Execute(ref Health health)
 **Pros:** Simple, no setup required.
 **Cons:** Iterates all entities, including those that don't match.
 
-## Approach B: Template States (Group Swaps)
+## Approach B: Template Partitions (Group Swaps)
 
-Use `IHasState` to move entities between groups:
+Use `IHasPartition` to move entities between groups:
 
 ```csharp
-// Template with states
+// Template with partitions
 public partial class EnemyEntity : ITemplate,
     IHasTags<GameTags.Enemy>,
-    IHasState<GameTags.Alive>,
-    IHasState<GameTags.Dead>
+    IHasPartition<GameTags.Alive>,
+    IHasPartition<GameTags.Dead>
 {
     public Health Health;
     public Position Position;
@@ -44,7 +44,7 @@ void Execute(in DeadEnemy enemy) { ... }
 ```
 
 **Pros:** Dense iteration — only matching entities are visited. Cache-friendly.
-**Cons:** Moving between groups copies component data. Adding dimensions multiplies the number of groups (2^N for N boolean states).
+**Cons:** Moving between groups copies component data. Adding dimensions multiplies the number of groups (2^N for N boolean partitions).
 
 ## Approach C: Sets (Indexed Subsets)
 
@@ -66,23 +66,23 @@ void Execute(in DeadEnemy enemy) { ... }
 
 ## Decision Guide
 
-| Factor | Component Check | Template States | Sets |
-|--------|----------------|-----------------|------|
+| Factor | Component Check | Template Partitions | Sets |
+|--------|----------------|---------------------|------|
 | **Setup** | None | Template + tags | Set struct + registration |
 | **Change cost** | None (just data) | Component copy | Index add/remove |
 | **Iteration** | All entities | Dense (fast) | Sparse (indexed) |
 | **Group count** | No increase | 2^N per dimension | No increase |
-| **Best for** | Rare checks, simple conditions | Core lifecycle states (1-2 dimensions) | Dynamic membership, many dimensions |
+| **Best for** | Rare checks, simple conditions | Core lifecycle partitions (1-2 dimensions) | Dynamic membership, many dimensions |
 
 ### Rules of Thumb
 
-- **1-2 boolean state dimensions** → Template states. Dense iteration is fast, and the group count stays manageable.
+- **1-2 boolean partition dimensions** → Template partitions. Dense iteration is fast, and the group count stays manageable.
 - **3+ dimensions, or many categories** → Sets. Avoids combinatorial explosion of groups.
 - **One-off checks** → Component value check. No need for infrastructure if you're just checking occasionally.
 
 ## Combinatorial Explosion
 
-With template states, each dimension doubles the number of groups:
+With template partitions, each dimension doubles the number of groups:
 
 | Dimensions | Groups |
 |-----------|--------|
@@ -95,14 +95,14 @@ At 3+ dimensions, prefer sets — they don't create additional groups.
 
 ## Mixing Approaches
 
-You can combine approaches. Use template states for core lifecycle (1-2 dimensions) and sets for dynamic categorization:
+You can combine approaches. Use template partitions for core lifecycle (1-2 dimensions) and sets for dynamic categorization:
 
 ```csharp
-// Template states for core state
+// Template partitions for core lifecycle
 public partial class Enemy : ITemplate,
     IHasTags<GameTags.Enemy>,
-    IHasState<GameTags.Alive>,
-    IHasState<GameTags.Dead>
+    IHasPartition<GameTags.Alive>,
+    IHasPartition<GameTags.Dead>
 { ... }
 
 // Sets for dynamic filters

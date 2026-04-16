@@ -14,9 +14,9 @@ namespace Trecs
         int _groupIndex;
         DenseGroupSlice _current;
 
-        internal DenseGroupSliceIterator(WorldAccessor ecs, ReadOnlyFastList<Group> validGroups)
+        internal DenseGroupSliceIterator(WorldAccessor world, ReadOnlyFastList<Group> validGroups)
         {
-            _world = ecs;
+            _world = world;
             _validGroups = validGroups;
             _groupIndex = -1;
             _current = default;

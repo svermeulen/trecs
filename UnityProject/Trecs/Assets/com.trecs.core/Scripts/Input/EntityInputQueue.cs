@@ -522,11 +522,11 @@ namespace Trecs.Internal
             // They are either invalid or redundant
             _removeQueueBuffer.Clear();
 
-            var ecs = _accessor;
+            var world = _accessor;
 
             foreach (var entityHandle in entityHandles)
             {
-                if (!entityHandle.Exists(ecs))
+                if (!entityHandle.Exists(world))
                 {
                     _log.Warning(
                         "Attempted to apply input for non-existing entity {}",
@@ -538,9 +538,9 @@ namespace Trecs.Internal
                 var valuesKey = new FrameEntityHandlePair(frame, entityHandle);
                 ref readonly var desiredValue = ref values.GetValueByRef(valuesKey);
 
-                var entityIndex = entityHandle.ToIndex(ecs);
+                var entityIndex = entityHandle.ToIndex(world);
 
-                if (!ecs.TryComponent<T>(entityIndex, out var component))
+                if (!world.TryComponent<T>(entityIndex, out var component))
                 {
                     _removeQueueBuffer.Add(entityHandle);
                     values.Remove(valuesKey);

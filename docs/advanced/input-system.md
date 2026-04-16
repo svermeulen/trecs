@@ -28,13 +28,13 @@ Controls what happens when no input is provided for a frame:
 Input is queued from outside the ECS update loop (e.g., from a MonoBehaviour):
 
 ```csharp
-ecs.AddInput(globalEntityHandle, new MoveInput { Direction = dir });
+world.AddInput(globalEntityHandle, new MoveInput { Direction = dir });
 ```
 
 Or by entity index:
 
 ```csharp
-ecs.AddInput(entityIndex, new MoveInput { Direction = dir });
+world.AddInput(entityIndex, new MoveInput { Direction = dir });
 ```
 
 ## Reading Input in Systems

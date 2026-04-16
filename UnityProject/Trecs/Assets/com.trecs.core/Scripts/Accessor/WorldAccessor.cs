@@ -565,8 +565,7 @@ namespace Trecs
         /// <summary>
         /// Creates a new entity in the group identified by the given tags and returns an
         /// <see cref="EntityInitializer"/> for setting initial component values. The entity is
-        /// not visible to queries until the next entity submission. Call
-        /// <see cref="EntityInitializer.AssertComplete"/> after setting all required components.
+        /// not visible to queries until the next entity submission
         /// </summary>
         public EntityInitializer AddEntity(
             TagSet tags,
@@ -1219,85 +1218,85 @@ namespace Trecs.Internal // Unsupported internal APIs
     public static class WorldAccessorBaseExtensions
     {
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static SystemRunner GetSystemRunner(this WorldAccessor ecs)
+        public static SystemRunner GetSystemRunner(this WorldAccessor world)
         {
-            return ecs.World.GetSystemRunner();
+            return world.World.GetSystemRunner();
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static EntitySubmitter GetEntitySubmitter(this WorldAccessor ecs)
+        public static EntitySubmitter GetEntitySubmitter(this WorldAccessor world)
         {
-            return ecs.World.GetEntitySubmitter();
+            return world.World.GetEntitySubmitter();
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static World GetWorld(this WorldAccessor ecs)
+        public static World GetWorld(this WorldAccessor world)
         {
-            return ecs.World;
+            return world.World;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static EntityQuerier GetEntityQuerier(this WorldAccessor ecs)
+        public static EntityQuerier GetEntityQuerier(this WorldAccessor world)
         {
-            return ecs.World.GetEntityQuerier();
+            return world.World.GetEntityQuerier();
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static EntityInputQueue GetEntityInputQueue(this WorldAccessor ecs)
+        public static EntityInputQueue GetEntityInputQueue(this WorldAccessor world)
         {
-            return ecs.World.GetEntityInputQueue();
+            return world.World.GetEntityInputQueue();
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static IReadOnlyList<ExecutableSystemInfo> GetSystems(this WorldAccessor ecs)
+        public static IReadOnlyList<ExecutableSystemInfo> GetSystems(this WorldAccessor world)
         {
-            return ecs.Systems;
+            return world.Systems;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static IReadOnlyList<int> GetSortedFixedSystems(this WorldAccessor ecs)
+        public static IReadOnlyList<int> GetSortedFixedSystems(this WorldAccessor world)
         {
-            return ecs.SortedFixedSystems;
+            return world.SortedFixedSystems;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static IReadOnlyList<int> GetSortedVariableSystems(this WorldAccessor ecs)
+        public static IReadOnlyList<int> GetSortedVariableSystems(this WorldAccessor world)
         {
-            return ecs.SortedVariableSystems;
+            return world.SortedVariableSystems;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static IReadOnlyList<int> GetSortedInputSystems(this WorldAccessor ecs)
+        public static IReadOnlyList<int> GetSortedInputSystems(this WorldAccessor world)
         {
-            return ecs.SortedInputSystems;
+            return world.SortedInputSystems;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static IReadOnlyList<int> GetSortedLateVariableSystems(this WorldAccessor ecs)
+        public static IReadOnlyList<int> GetSortedLateVariableSystems(this WorldAccessor world)
         {
-            return ecs.SortedLateVariableSystems;
+            return world.SortedLateVariableSystems;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static bool IsSystemEnabled(this WorldAccessor ecs, int systemIndex)
+        public static bool IsSystemEnabled(this WorldAccessor world, int systemIndex)
         {
-            return ecs.IsSystemEnabledImpl(systemIndex);
+            return world.IsSystemEnabledImpl(systemIndex);
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static void SetSystemEnabled(this WorldAccessor ecs, int systemIndex, bool enabled)
+        public static void SetSystemEnabled(this WorldAccessor world, int systemIndex, bool enabled)
         {
-            ecs.SetSystemEnabledImpl(systemIndex, enabled);
+            world.SetSystemEnabledImpl(systemIndex, enabled);
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static bool SyncMainThread(
-            this WorldAccessor ecs,
+            this WorldAccessor world,
             ComponentId componentId,
             Group group
         )
         {
-            return ecs.JobScheduler.SyncMainThread(ResourceId.Component(componentId), group);
+            return world.JobScheduler.SyncMainThread(ResourceId.Component(componentId), group);
         }
     }
 }

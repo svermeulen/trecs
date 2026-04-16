@@ -5,7 +5,7 @@ namespace Trecs.Samples.FeedingFrenzy101
     /// <summary>
     /// Spawns or removes meals to match the desired count.
     ///
-    /// Only spawns meals in the NotEating state. When removing,
+    /// Only spawns meals in the NotEating partition. When removing,
     /// prefers removing uneaten (NotEating) meals first.
     /// </summary>
     [ExecutesAfter(typeof(FishAdderAndRemover))]
@@ -51,8 +51,7 @@ namespace Trecs.Samples.FeedingFrenzy101
                     .AddEntity<FrenzyTags.Meal, FrenzyTags.NotEating>()
                     .Set(new Position(pos))
                     .Set(new MealNutrition(nutrition))
-                    .Set(new UniformScale(0.5f))
-                    .AssertComplete();
+                    .Set(new UniformScale(0.5f));
             }
         }
 

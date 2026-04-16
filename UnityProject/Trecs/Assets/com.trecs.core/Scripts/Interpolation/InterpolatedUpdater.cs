@@ -60,7 +60,7 @@ namespace Trecs
             in T current,
             ref T interpolated,
             float percentThroughFixedFrame,
-            WorldAccessor ecs
+            WorldAccessor world
         );
     }
 }

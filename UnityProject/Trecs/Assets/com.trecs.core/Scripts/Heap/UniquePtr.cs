@@ -40,9 +40,9 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal T Get(World ecs)
+        internal T Get(World world)
         {
-            if (ecs.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
+            if (world.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
             {
                 Assert.That(
                     entry.Type == typeof(T),
@@ -54,7 +54,7 @@ namespace Trecs
                 return (T)entry.Value;
             }
 
-            return ecs.FrameScopedUniqueHeap.ResolveValue<T>(ecs.FixedFrame, Handle.Value);
+            return world.FrameScopedUniqueHeap.ResolveValue<T>(world.FixedFrame, Handle.Value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -92,7 +92,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool TryGet(World ecs, out T value)
+        internal bool TryGet(World world, out T value)
         {
             if (IsNull)
             {
@@ -100,7 +100,7 @@ namespace Trecs
                 return false;
             }
 
-            if (ecs.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
+            if (world.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
             {
                 Assert.That(
                     entry.Type == typeof(T),
@@ -114,9 +114,9 @@ namespace Trecs
             }
 
             if (
-                ecs.FrameScopedUniqueHeap.TryResolveValue<T>(
+                world.FrameScopedUniqueHeap.TryResolveValue<T>(
                     Handle.Value,
-                    ecs.FixedFrame,
+                    world.FixedFrame,
                     out value
                 )
             )
@@ -169,15 +169,15 @@ namespace Trecs
         public bool TryGet(WorldAccessor accessor, out T value) => TryGet(accessor.Heap, out value);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool CanGet(World ecs)
+        internal bool CanGet(World world)
         {
             if (IsNull)
             {
                 return false;
             }
 
-            return ecs.UniqueHeap.TryGetEntry(Handle.Value, out _)
-                || ecs.FrameScopedUniqueHeap.ContainsEntry(Handle.Value);
+            return world.UniqueHeap.TryGetEntry(Handle.Value, out _)
+                || world.FrameScopedUniqueHeap.ContainsEntry(Handle.Value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -211,9 +211,9 @@ namespace Trecs
         public void Set(WorldAccessor accessor, T value) => Set(accessor.Heap, value);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Set(World ecs, T value)
+        public void Set(World world, T value)
         {
-            Set(ecs.UniqueHeap, value);
+            Set(world.UniqueHeap, value);
         }
 
         internal void Dispose(UniqueHeap heap)
@@ -222,13 +222,13 @@ namespace Trecs
             heap.DisposeEntry<T>(Handle.Value);
         }
 
-        internal void Dispose(World ecs)
+        internal void Dispose(World world)
         {
             Assert.That(
-                !ecs.FrameScopedUniqueHeap.ContainsEntry(Handle.Value),
+                !world.FrameScopedUniqueHeap.ContainsEntry(Handle.Value),
                 "Frame-scoped UniquePtr must not be manually disposed"
             );
-            Dispose(ecs.UniqueHeap);
+            Dispose(world.UniqueHeap);
         }
 
         public void Dispose(HeapAccessor heap)

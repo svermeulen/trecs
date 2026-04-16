@@ -87,7 +87,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
     public partial struct FrenzyConfig : IEntityComponent
     {
-        public FrenzyStateApproach StateApproach;
+        public FrenzySubsetApproach SubsetApproach;
         public IterationStyle IterationStyle;
         public bool Deterministic;
     }

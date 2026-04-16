@@ -6,8 +6,8 @@ namespace Trecs.Tests
     [TestFixture]
     public class ComplexLifecycleTests
     {
-        static readonly TagSet StateA = TagSet.FromTags(TestTags.Gamma, TestTags.StateA);
-        static readonly TagSet StateB = TagSet.FromTags(TestTags.Gamma, TestTags.StateB);
+        static readonly TagSet PartitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
+        static readonly TagSet PartitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
         #region Add-Remove-Add Cycles
 
@@ -66,10 +66,10 @@ namespace Trecs.Tests
         [Test]
         public void Lifecycle_MoveBackAndForth_EndsInOriginalState()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var init = a.AddEntity(StateA)
+            var init = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 77 })
                 .Set(new TestVec { X = 1.0f, Y = 2.0f })
                 .AssertComplete();
@@ -77,16 +77,16 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move A -> B
-            a.MoveTo(entityHandle.ToIndex(a), StateB);
+            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
             a.SubmitEntities();
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
 
             // Move B -> A
-            a.MoveTo(entityHandle.ToIndex(a), StateA);
+            a.MoveTo(entityHandle.ToIndex(a), PartitionA);
             a.SubmitEntities();
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
 
             // Component data preserved
             var comp = a.Component<TestInt>(entityHandle);
@@ -96,25 +96,25 @@ namespace Trecs.Tests
         [Test]
         public void Lifecycle_MoveMultipleEntities_CountsCorrect()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var refs = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                var init = a.AddEntity(StateA).Set(new TestInt { Value = i }).AssertComplete();
+                var init = a.AddEntity(PartitionA).Set(new TestInt { Value = i }).AssertComplete();
                 refs[i] = init.Handle;
             }
             a.SubmitEntities();
 
-            // Move entities 0, 2, 4 to StateB
-            a.MoveTo(refs[0].ToIndex(a), StateB);
-            a.MoveTo(refs[2].ToIndex(a), StateB);
-            a.MoveTo(refs[4].ToIndex(a), StateB);
+            // Move entities 0, 2, 4 to PartitionB
+            a.MoveTo(refs[0].ToIndex(a), PartitionB);
+            a.MoveTo(refs[2].ToIndex(a), PartitionB);
+            a.MoveTo(refs[4].ToIndex(a), PartitionB);
             a.SubmitEntities();
 
-            NAssert.AreEqual(2, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(3, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(3, a.CountEntitiesWithTags(PartitionB));
 
             // All refs should still be valid
             for (int i = 0; i < 5; i++)
@@ -159,43 +159,45 @@ namespace Trecs.Tests
         [Test]
         public void Lifecycle_MoveAndAdd_SingleSubmission()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var init = a.AddEntity(StateA).Set(new TestInt { Value = 10 }).AssertComplete();
+            var init = a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
             var entityHandle = init.Handle;
             a.SubmitEntities();
 
             // In one submission: move existing entity + add new one
-            a.MoveTo(entityHandle.ToIndex(a), StateB);
-            a.AddEntity(StateA).Set(new TestInt { Value = 20 }).AssertComplete();
+            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
+            a.AddEntity(PartitionA).Set(new TestInt { Value = 20 }).AssertComplete();
             a.SubmitEntities();
 
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
         }
 
         [Test]
         public void Lifecycle_RemoveAndMoveInSameSubmission_DifferentEntities()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var refs = new EntityHandle[3];
             for (int i = 0; i < 3; i++)
             {
-                var init = a.AddEntity(StateA).Set(new TestInt { Value = i * 10 }).AssertComplete();
+                var init = a.AddEntity(PartitionA)
+                    .Set(new TestInt { Value = i * 10 })
+                    .AssertComplete();
                 refs[i] = init.Handle;
             }
             a.SubmitEntities();
 
-            // Remove entity 0, move entity 2 to StateB
+            // Remove entity 0, move entity 2 to PartitionB
             a.RemoveEntity(refs[0]);
-            a.MoveTo(refs[2].ToIndex(a), StateB);
+            a.MoveTo(refs[2].ToIndex(a), PartitionB);
             a.SubmitEntities();
 
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
             NAssert.IsFalse(a.EntityExists(refs[0]));
             NAssert.IsTrue(a.EntityExists(refs[1]));
             NAssert.IsTrue(a.EntityExists(refs[2]));
@@ -292,7 +294,7 @@ namespace Trecs.Tests
         [Test]
         public void Lifecycle_MoveAll_ThenMoveBack_DataPreserved()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             const int count = 20;
@@ -300,7 +302,7 @@ namespace Trecs.Tests
 
             for (int i = 0; i < count; i++)
             {
-                var init = a.AddEntity(StateA)
+                var init = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i * 10 })
                     .Set(new TestVec { X = i, Y = i + 0.5f })
                     .AssertComplete();
@@ -308,25 +310,25 @@ namespace Trecs.Tests
             }
             a.SubmitEntities();
 
-            // Move all to StateB
+            // Move all to PartitionB
             for (int i = 0; i < count; i++)
             {
-                a.MoveTo(refs[i].ToIndex(a), StateB);
+                a.MoveTo(refs[i].ToIndex(a), PartitionB);
             }
             a.SubmitEntities();
 
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(count, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(count, a.CountEntitiesWithTags(PartitionB));
 
-            // Move all back to StateA
+            // Move all back to PartitionA
             for (int i = 0; i < count; i++)
             {
-                a.MoveTo(refs[i].ToIndex(a), StateA);
+                a.MoveTo(refs[i].ToIndex(a), PartitionA);
             }
             a.SubmitEntities();
 
-            NAssert.AreEqual(count, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(count, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
 
             // Verify all data is preserved
             for (int i = 0; i < count; i++)
@@ -347,16 +349,16 @@ namespace Trecs.Tests
         public void Observer_MoveDoesNotFireOnAdded()
         {
             // Moves only fire OnMoved, not OnAdded/OnRemoved
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var init = a.AddEntity(StateA).AssertComplete();
+            var init = a.AddEntity(PartitionA).AssertComplete();
             var entityHandle = init.Handle;
             a.SubmitEntities();
 
             int addedCallCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(StateB)
+                .Events.InGroupsWithTags(PartitionB)
                 .OnAdded(
                     (Group group, EntityRange indices) =>
                     {
@@ -364,7 +366,7 @@ namespace Trecs.Tests
                     }
                 );
 
-            a.MoveTo(entityHandle.ToIndex(a), StateB);
+            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             NAssert.AreEqual(0, addedCallCount, "OnAdded should NOT fire for moved entities");
@@ -375,16 +377,16 @@ namespace Trecs.Tests
         public void Observer_MoveDoesNotFireOnRemoved()
         {
             // Moves only fire OnMoved, not OnAdded/OnRemoved
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var init = a.AddEntity(StateA).AssertComplete();
+            var init = a.AddEntity(PartitionA).AssertComplete();
             var entityHandle = init.Handle;
             a.SubmitEntities();
 
             int removedCallCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(StateA)
+                .Events.InGroupsWithTags(PartitionA)
                 .OnRemoved(
                     (Group group, EntityRange indices) =>
                     {
@@ -392,7 +394,7 @@ namespace Trecs.Tests
                     }
                 );
 
-            a.MoveTo(entityHandle.ToIndex(a), StateB);
+            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             NAssert.AreEqual(0, removedCallCount, "OnRemoved should NOT fire for moved entities");
@@ -402,10 +404,10 @@ namespace Trecs.Tests
         [Test]
         public void Observer_MoveFiresOnMoved()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            var init = a.AddEntity(StateA).AssertComplete();
+            var init = a.AddEntity(PartitionA).AssertComplete();
             var entityHandle = init.Handle;
             a.SubmitEntities();
 
@@ -413,7 +415,7 @@ namespace Trecs.Tests
             Group observedFrom = default;
             Group observedTo = default;
             var sub = a
-                .Events.InGroupsWithTags(StateB)
+                .Events.InGroupsWithTags(PartitionB)
                 .OnMoved(
                     (Group fromGroup, Group toGroup, EntityRange indices) =>
                     {
@@ -423,10 +425,10 @@ namespace Trecs.Tests
                     }
                 );
 
-            var expectedGroupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
-            var expectedGroupB = a.WorldInfo.GetSingleGroupWithTags(StateB);
+            var expectedGroupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
+            var expectedGroupB = a.WorldInfo.GetSingleGroupWithTags(PartitionB);
 
-            a.MoveTo(entityHandle.ToIndex(a), StateB);
+            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             NAssert.AreEqual(1, movedCallCount, "OnMoved should fire exactly once");
@@ -545,19 +547,19 @@ namespace Trecs.Tests
         [Test]
         public void Native_MoveEntity_ChangesGroup()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
 
-            a.AddEntity(StateA).Set(new TestInt { Value = 10 }).AssertComplete();
+            a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
             a.SubmitEntities();
 
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
-            nativeEcs.MoveTo(new EntityIndex(0, groupA), StateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
+            nativeEcs.MoveTo(new EntityIndex(0, groupA), PartitionB);
             a.SubmitEntities();
 
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
         }
 
         [Test]
@@ -619,16 +621,16 @@ namespace Trecs.Tests
         [Test]
         public void Query_Count_AcrossMultipleGroups()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             for (int i = 0; i < 3; i++)
             {
-                a.AddEntity(StateA).AssertComplete();
+                a.AddEntity(PartitionA).AssertComplete();
             }
             for (int i = 0; i < 2; i++)
             {
-                a.AddEntity(StateB).AssertComplete();
+                a.AddEntity(PartitionB).AssertComplete();
             }
             a.SubmitEntities();
 
@@ -640,41 +642,41 @@ namespace Trecs.Tests
         [Test]
         public void Query_Count_AfterMixedOps()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var refs = new EntityHandle[5];
             for (int i = 0; i < 5; i++)
             {
-                var init = a.AddEntity(StateA).AssertComplete();
+                var init = a.AddEntity(PartitionA).AssertComplete();
                 refs[i] = init.Handle;
             }
             a.SubmitEntities();
 
-            // Remove 2, move 1 to StateB
+            // Remove 2, move 1 to PartitionB
             a.RemoveEntity(refs[0]);
             a.RemoveEntity(refs[1]);
-            a.MoveTo(refs[2].ToIndex(a), StateB);
+            a.MoveTo(refs[2].ToIndex(a), PartitionB);
             a.SubmitEntities();
 
-            NAssert.AreEqual(2, a.Query().WithTags(StateA).Count());
-            NAssert.AreEqual(1, a.Query().WithTags(StateB).Count());
+            NAssert.AreEqual(2, a.Query().WithTags(PartitionA).Count());
+            NAssert.AreEqual(1, a.Query().WithTags(PartitionB).Count());
             NAssert.AreEqual(3, a.Query().WithTags(TestTags.Gamma).Count());
         }
 
         [Test]
         public void Query_GroupSlices_CoversAllEntities()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             for (int i = 0; i < 3; i++)
             {
-                a.AddEntity(StateA).Set(new TestInt { Value = i }).AssertComplete();
+                a.AddEntity(PartitionA).Set(new TestInt { Value = i }).AssertComplete();
             }
             for (int i = 0; i < 2; i++)
             {
-                a.AddEntity(StateB).Set(new TestInt { Value = 10 + i }).AssertComplete();
+                a.AddEntity(PartitionB).Set(new TestInt { Value = 10 + i }).AssertComplete();
             }
             a.SubmitEntities();
 
@@ -738,27 +740,29 @@ namespace Trecs.Tests
         [Test]
         public void EntityHandle_MoveAndRemoveInterleaved_AllRefsCorrect()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var refs = new EntityHandle[6];
             for (int i = 0; i < 6; i++)
             {
-                var init = a.AddEntity(StateA).Set(new TestInt { Value = i * 10 }).AssertComplete();
+                var init = a.AddEntity(PartitionA)
+                    .Set(new TestInt { Value = i * 10 })
+                    .AssertComplete();
                 refs[i] = init.Handle;
             }
             a.SubmitEntities();
 
             // Entity 0: remove
-            // Entity 1: move to StateB
+            // Entity 1: move to PartitionB
             // Entity 2: stays
             // Entity 3: remove
-            // Entity 4: move to StateB
+            // Entity 4: move to PartitionB
             // Entity 5: stays
             a.RemoveEntity(refs[0]);
-            a.MoveTo(refs[1].ToIndex(a), StateB);
+            a.MoveTo(refs[1].ToIndex(a), PartitionB);
             a.RemoveEntity(refs[3]);
-            a.MoveTo(refs[4].ToIndex(a), StateB);
+            a.MoveTo(refs[4].ToIndex(a), PartitionB);
             a.SubmitEntities();
 
             NAssert.IsFalse(a.EntityExists(refs[0]));
@@ -768,8 +772,8 @@ namespace Trecs.Tests
             NAssert.IsTrue(a.EntityExists(refs[4]));
             NAssert.IsTrue(a.EntityExists(refs[5]));
 
-            NAssert.AreEqual(2, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(2, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionB));
 
             // Verify data integrity for surviving entities
             NAssert.AreEqual(10, a.Component<TestInt>(refs[1]).Read.Value);
@@ -785,7 +789,7 @@ namespace Trecs.Tests
         [Test]
         public void MultiComp_ScatteredRemoves_AllComponentsConsistent()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             const int count = 30;
@@ -793,7 +797,7 @@ namespace Trecs.Tests
 
             for (int i = 0; i < count; i++)
             {
-                var init = a.AddEntity(StateA)
+                var init = a.AddEntity(PartitionA)
                     .Set(new TestInt { Value = i })
                     .Set(new TestVec { X = i * 1.0f, Y = i * 2.0f })
                     .AssertComplete();
@@ -830,11 +834,11 @@ namespace Trecs.Tests
         [Test]
         public void MultiComp_NativeMove_DataPreserved()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
 
-            var init = a.AddEntity(StateA)
+            var init = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 55 })
                 .Set(new TestVec { X = 3.0f, Y = 4.0f })
                 .AssertComplete();
@@ -842,12 +846,12 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move via native path
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(StateA);
-            nativeEcs.MoveTo(new EntityIndex(0, groupA), StateB);
+            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
+            nativeEcs.MoveTo(new EntityIndex(0, groupA), PartitionB);
             a.SubmitEntities();
 
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(StateA));
-            NAssert.AreEqual(1, a.CountEntitiesWithTags(StateB));
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
 
             // Data should be preserved
             NAssert.IsTrue(a.EntityExists(entityHandle));
@@ -910,22 +914,22 @@ namespace Trecs.Tests
         [Test]
         public void WorldInfo_GetGroupsWithTags_ReturnsExpectedGroups()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
-            // WithStates template has Gamma tag + StateA and StateB states
+            // WithPartitions template has Gamma tag + PartitionA and PartitionB partitions
             var groups = a.WorldInfo.GetGroupsWithTags(TestTags.Gamma);
             NAssert.AreEqual(
                 2,
                 groups.Count,
-                "Should have 2 groups for Gamma tag (StateA and StateB)"
+                "Should have 2 groups for Gamma tag (PartitionA and PartitionB)"
             );
         }
 
         [Test]
         public void WorldInfo_GetSingleGroupWithTags_ThrowsOnMultiple()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithStates);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             // Gamma alone matches 2 groups, so GetSingleGroupWithTags should throw

@@ -301,30 +301,30 @@ namespace Trecs
             foreach (var baseType in template.LocalBaseTemplates)
             {
                 Assert.That(
-                    baseType.States.IsEmpty(),
-                    "Entity type states must only be specified in the concrete entity type"
+                    baseType.Partitions.IsEmpty(),
+                    "Entity type partitions must only be specified in the concrete entity type"
                 );
             }
 
             var allTags = new List<Tag>();
-            var allStates = new List<TagSet>();
+            var allPartitions = new List<TagSet>();
 
-            allStates.AddRange(template.States);
+            allPartitions.AddRange(template.Partitions);
             allTags.AddRange(template.LocalTags);
 
             foreach (var baseType in allBaseTypesList)
             {
                 allTags.AddRange(baseType.LocalTags);
-                allStates.AddRange(baseType.States);
+                allPartitions.AddRange(baseType.Partitions);
             }
 
             var tagset = TagSet.FromTags(allTags);
 
             return new(
                 template: template,
-                groups: CalculateTemplateGroups(tagset, allStates),
+                groups: CalculateTemplateGroups(tagset, allPartitions),
                 allBaseTemplates: allBaseTypesList,
-                states: allStates,
+                partitions: allPartitions,
                 componentDeclarations: allComponentDecs,
                 componentDeclarationMap: new(allResolvedComponentDecMap),
                 componentBuilders: componentBuilders.ToArray(),
@@ -333,12 +333,12 @@ namespace Trecs
 
             static IReadOnlyList<Group> CalculateTemplateGroups(
                 TagSet tags,
-                IReadOnlyList<TagSet> states
+                IReadOnlyList<TagSet> partitions
             )
             {
                 var groups = new List<Group>();
 
-                var groupTags = states.Select(x => x.Tags.ToList()).ToList();
+                var groupTags = partitions.Select(x => x.Tags.ToList()).ToList();
 
                 if (groupTags.IsEmpty())
                 {
