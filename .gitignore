@@ -16,3 +16,8 @@ bin/
 
 # MkDocs
 site/
+
+# Local dev symlinks
+svkj-local
+svkj-local.meta
+svkj_set_up_local.sh

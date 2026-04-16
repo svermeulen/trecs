@@ -16,9 +16,8 @@ namespace Trecs.SourceGen.Shared
     internal static class SourceGenLogger
     {
 #if SOURCEGEN_LOGGING || SOURCEGEN_TIMING || SOURCEGEN_DUMP
-        // We can't use Directory in source gen so we need to use hard coded path
         static readonly string TempDebugDir =
-            "/Users/svermeulen/projects/active/temp_source_gen_debugging/SourceGen";
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "TrecsSourceGen");
 
         static readonly string LogFilePath = System.IO.Path.Combine(
             TempDebugDir,
