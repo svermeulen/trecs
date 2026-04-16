@@ -128,9 +128,9 @@ namespace Trecs
         /// Resolves this stable reference to a transient <see cref="EntityIndex"/> for component access.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityIndex ToIndex(World ecs)
+        public EntityIndex ToIndex(World world)
         {
-            return ToIndex(ecs.EntityQuerier);
+            return ToIndex(world.EntityQuerier);
         }
 
         /// <summary>
@@ -155,9 +155,9 @@ namespace Trecs
         /// Attempts to resolve this reference to an <see cref="EntityIndex"/>, returning false if the entity no longer exists.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryToIndex(World ecs, out EntityIndex entityIndex)
+        public bool TryToIndex(World world, out EntityIndex entityIndex)
         {
-            return TryToIndex(ecs.EntityQuerier, out entityIndex);
+            return TryToIndex(world.EntityQuerier, out entityIndex);
         }
 
         /// <summary>
@@ -202,9 +202,9 @@ namespace Trecs
         /// Returns true if this entity has been submitted and currently exists in the world.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Exists(World ecs)
+        public bool Exists(World world)
         {
-            return Exists(ecs.EntityQuerier);
+            return Exists(world.EntityQuerier);
         }
 
         /// <summary>

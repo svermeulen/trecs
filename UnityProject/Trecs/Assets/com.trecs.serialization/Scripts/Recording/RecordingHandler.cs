@@ -25,7 +25,7 @@ namespace Trecs.Serialization
             RecordingChecksumCalculator checksumCalculator,
             IGameStateSerializer gameStateSerializer,
             SerializerRegistry serializerManager,
-            World ecs
+            World world
         )
         {
             _blobCache = blobCache;
@@ -33,7 +33,7 @@ namespace Trecs.Serialization
             _gameStateSerializer = gameStateSerializer;
             _serializerHelper = new SerializationBuffer(serializerManager);
 
-            _world = ecs.CreateAccessor();
+            _world = world.CreateAccessor();
             _eventSubscription = _world.Events.OnFixedUpdateCompleted(OnFixedUpdateCompleted);
         }
 

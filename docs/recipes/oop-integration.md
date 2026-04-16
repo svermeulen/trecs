@@ -31,13 +31,13 @@ MonoBehaviours read player input and queue it into the ECS world:
 ```csharp
 public class InputBridge : MonoBehaviour
 {
-    WorldAccessor _ecs;
+    WorldAccessor _world;
     EntityHandle _globalEntity;
 
     void Update()
     {
         var dir = new float2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-        _ecs.AddInput(_globalEntity, new MoveInput { Direction = dir });
+        _world.AddInput(_globalEntity, new MoveInput { Direction = dir });
     }
 }
 ```

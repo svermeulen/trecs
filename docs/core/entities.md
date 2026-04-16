@@ -37,7 +37,7 @@ world.AddEntity<SampleTags.Spinner>()
     .AssertComplete();
 
 // Create with multiple tags
-ecs.AddEntity<BallTags.Ball, BallTags.Active>()
+world.AddEntity<BallTags.Ball, BallTags.Active>()
     .Set(new Position(float3.zero))
     .Set(new Velocity(new float3(0, 5, 0)))
     .AssertComplete();
@@ -48,7 +48,7 @@ ecs.AddEntity<BallTags.Ball, BallTags.Active>()
 The initializer is a `ref struct` — it must be used immediately, not stored:
 
 ```csharp
-var initializer = ecs.AddEntity<MyTag>();
+var initializer = world.AddEntity<MyTag>();
 initializer.Set(new Position(float3.zero));
 initializer.Set(new Velocity(float3.zero));
 initializer.AssertComplete();  // Validates all required components are set
@@ -57,7 +57,7 @@ initializer.AssertComplete();  // Validates all required components are set
 The `Handle` property provides the entity's stable reference:
 
 ```csharp
-var init = ecs.AddEntity<MyTag>();
+var init = world.AddEntity<MyTag>();
 EntityHandle handle = init.Handle;  // Available immediately
 init.Set(new Position(float3.zero))
     .AssertComplete();
@@ -70,12 +70,12 @@ init.Set(new Position(float3.zero))
 
 ```csharp
 // Remove a single entity
-ecs.RemoveEntity(entityIndex);
-ecs.RemoveEntity(entityHandle);
+world.RemoveEntity(entityIndex);
+world.RemoveEntity(entityHandle);
 
 // Remove all entities with specific tags
-ecs.RemoveEntitiesWithTags<SampleTags.Sphere>();
-ecs.RemoveEntitiesWithTags<BallTags.Ball, BallTags.Active>();
+world.RemoveEntitiesWithTags<SampleTags.Sphere>();
+world.RemoveEntitiesWithTags<BallTags.Ball, BallTags.Active>();
 ```
 
 !!! note
@@ -85,19 +85,19 @@ ecs.RemoveEntitiesWithTags<BallTags.Ball, BallTags.Active>();
 
 ```csharp
 // Handle → Index
-EntityIndex index = handle.ToIndex(ecs);
+EntityIndex index = handle.ToIndex(world);
 
 // Index → Handle
-EntityHandle handle = index.ToHandle(ecs);
+EntityHandle handle = index.ToHandle(world);
 
 // Safe conversion (returns false if entity no longer exists)
-if (handle.TryToIndex(ecs, out EntityIndex index))
+if (handle.TryToIndex(world, out EntityIndex index))
 {
     // Entity still alive
 }
 
 // Check existence
-if (handle.Exists(ecs))
+if (handle.Exists(world))
 {
     // Entity still alive
 }
@@ -109,11 +109,11 @@ Use `EntityAccessor` for convenient component access on a single entity:
 
 ```csharp
 // From EntityIndex
-var entity = index.ToEntity(ecs);
+var entity = index.ToEntity(world);
 ref Position pos = ref entity.Get<Position>().Write;
 
 // From EntityHandle
-var entity = handle.ToEntity(ecs);
+var entity = handle.ToEntity(world);
 ref readonly Velocity vel = ref entity.Get<Velocity>().Read;
 
 // Safe access
@@ -128,8 +128,8 @@ However note that in many cases using the [aspects](../data-access/aspects.md) f
 ## Counting Entities
 
 ```csharp
-int total = ecs.CountAllEntities();
-int spinners = ecs.CountEntitiesWithTags<SampleTags.Spinner>();
-int activeBalls = ecs.CountEntitiesWithTags<BallTags.Ball, BallTags.Active>();
-int inGroup = ecs.CountEntitiesInGroup(group);
+int total = world.CountAllEntities();
+int spinners = world.CountEntitiesWithTags<SampleTags.Spinner>();
+int activeBalls = world.CountEntitiesWithTags<BallTags.Ball, BallTags.Active>();
+int inGroup = world.CountEntitiesInGroup(group);
 ```

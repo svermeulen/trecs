@@ -195,9 +195,9 @@ namespace Trecs.Internal
             return false;
         }
 
-        public EntityEventsBuilder Events(WorldInfo worldInfo, WorldAccessor ecs)
+        public EntityEventsBuilder Events(WorldInfo worldInfo, WorldAccessor world)
         {
-            return new EntityEventsBuilder(this, worldInfo, ecs);
+            return new EntityEventsBuilder(this, worldInfo, world);
         }
 
         internal void NotifyOnSubmission()

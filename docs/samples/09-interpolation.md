@@ -67,7 +67,7 @@ static void InterpolatePosition(
     in Position current,
     ref Position result,
     float percentThroughFixedFrame,
-    WorldAccessor ecs)
+    WorldAccessor world)
 {
     result.Value = math.lerp(previous.Value, current.Value, percentThroughFixedFrame);
 }
@@ -78,7 +78,7 @@ static void InterpolatePosition(
 Smooth entities use `SetInterpolated` to initialize all three components at once:
 
 ```csharp
-ecs.AddEntity<OrbitTags.Smooth>()
+world.AddEntity<OrbitTags.Smooth>()
     .SetInterpolated(new Position(startPos))
     .Set(new OrbitParams { ... })
     .AssertComplete();

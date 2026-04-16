@@ -80,7 +80,7 @@ namespace Trecs
             heap.NativeUniqueHeap.DisposeEntry(Handle.Value);
         }
 
-        public readonly void Dispose(WorldAccessor ecs) => Dispose(ecs.Heap);
+        public readonly void Dispose(WorldAccessor world) => Dispose(world.Heap);
 
         public readonly bool IsNull
         {

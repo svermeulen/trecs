@@ -5,11 +5,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
     public class SubsetApproachDynamicSwitcher
     {
-        readonly WorldAccessor _ecs;
+        readonly WorldAccessor _world;
 
         public SubsetApproachDynamicSwitcher(World world)
         {
-            _ecs = world.CreateAccessor();
+            _world = world.CreateAccessor();
         }
 
         public void Tick()
@@ -33,7 +33,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             // Read the current runtime config so we preserve any in-session
             // changes (e.g. iteration style toggled via Tab) when reloading.
 
-            var current = _ecs.GlobalComponent<FrenzyConfig>().Read;
+            var current = _world.GlobalComponent<FrenzyConfig>().Read;
 
             if (current.SubsetApproach == approach)
             {

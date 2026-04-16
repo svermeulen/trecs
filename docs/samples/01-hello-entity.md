@@ -106,9 +106,9 @@ world.AddSystems(new ISystem[]
 
 // Initialize is called separately (via the initializables list)
 // Entity creation happens in SceneInitializer.Initialize:
-var ecs = world.CreateAccessor();
+var world = world.CreateAccessor();
 
-ecs.AddEntity<SampleTags.Spinner>()
+world.AddEntity<SampleTags.Spinner>()
     .Set(gameObjectRegistry.Register(cube.gameObject))
     .AssertComplete();
 ```

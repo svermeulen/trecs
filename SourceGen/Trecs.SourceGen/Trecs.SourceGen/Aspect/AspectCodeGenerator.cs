@@ -344,7 +344,7 @@ namespace Trecs.SourceGen.Aspect
             // Generate constructor that takes WorldAccessor and EntityIndex
             sb.AppendLine(
                 indentLevel,
-                $"public {typeName}(WorldAccessor ecs, EntityIndex entityIndex)"
+                $"public {typeName}(WorldAccessor world, EntityIndex entityIndex)"
             );
             sb.AppendLine(indentLevel, "{");
             sb.AppendLine(indentLevel + 1, "_entityIndex = entityIndex;");
@@ -357,7 +357,7 @@ namespace Trecs.SourceGen.Aspect
                 indentLevel + 1,
                 allTypes,
                 "_entityIndex.Group",
-                "ecs",
+                "world",
                 type => $"_{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
                 isFieldAssignment: true,
                 attributeData
@@ -369,9 +369,9 @@ namespace Trecs.SourceGen.Aspect
             // Generate constructor that takes WorldAccessor and EntityHandle (convenience overload)
             sb.AppendLine(
                 indentLevel,
-                $"public {typeName}(WorldAccessor ecs, EntityHandle entityHandle)"
+                $"public {typeName}(WorldAccessor world, EntityHandle entityHandle)"
             );
-            sb.AppendLine(indentLevel + 1, ": this(ecs, entityHandle.ToIndex(ecs))");
+            sb.AppendLine(indentLevel + 1, ": this(world, entityHandle.ToIndex(world))");
             sb.AppendLine(indentLevel, "{");
             sb.AppendLine(indentLevel, "}");
             sb.AppendLine();
@@ -544,8 +544,8 @@ namespace Trecs.SourceGen.Aspect
             var allTypes = attributeData.AllComponentTypes;
 
             // --- Query(WorldAccessor) static entry point ---
-            sb.AppendLine(indentLevel, "public static AspectQuery Query(WorldAccessor ecs)");
-            sb.AppendLine(indentLevel + 1, "=> new AspectQuery(ecs.Query());");
+            sb.AppendLine(indentLevel, "public static AspectQuery Query(WorldAccessor world)");
+            sb.AppendLine(indentLevel + 1, "=> new AspectQuery(world.Query());");
             sb.AppendLine();
 
             // =====================================================================
@@ -679,14 +679,14 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 2, "{");
             sb.AppendLine(indentLevel + 3, "__ei = _builder.SingleEntityIndex();");
             sb.AppendLine(indentLevel + 2, "}");
-            sb.AppendLine(indentLevel + 2, "var __ecs = _builder.World;");
+            sb.AppendLine(indentLevel + 2, "var __world = _builder.World;");
 
             GenerateBatchedQueryComponents(
                 sb,
                 indentLevel + 2,
                 allTypes,
                 "__ei.Group",
-                "__ecs",
+                "__world",
                 type => $"{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
                 isFieldAssignment: false,
                 attributeData
@@ -725,14 +725,14 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 3, "found = _builder.TrySingleEntityIndex(out __ei);");
             sb.AppendLine(indentLevel + 2, "}");
             sb.AppendLine(indentLevel + 2, "if (!found) { view = default; return false; }");
-            sb.AppendLine(indentLevel + 2, "var __ecs = _builder.World;");
+            sb.AppendLine(indentLevel + 2, "var __world = _builder.World;");
 
             GenerateBatchedQueryComponents(
                 sb,
                 indentLevel + 2,
                 allTypes,
                 "__ei.Group",
-                "__ecs",
+                "__world",
                 type => $"{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
                 isFieldAssignment: false,
                 attributeData
@@ -1138,7 +1138,7 @@ namespace Trecs.SourceGen.Aspect
             int indentLevel,
             ImmutableArray<ITypeSymbol> allTypes,
             string groupExpression,
-            string ecsExpression,
+            string worldExpression,
             Func<ITypeSymbol, string> getVarName,
             bool isFieldAssignment,
             AspectAttributeData attributeData
@@ -1153,7 +1153,7 @@ namespace Trecs.SourceGen.Aspect
                 var prefix = isFieldAssignment ? "" : "var ";
                 sb.AppendLine(
                     indentLevel,
-                    $"{prefix}{varName} = {ecsExpression}.ComponentBuffer<{typeDisplay}>({groupExpression}).{bufferSuffix};"
+                    $"{prefix}{varName} = {worldExpression}.ComponentBuffer<{typeDisplay}>({groupExpression}).{bufferSuffix};"
                 );
             }
         }

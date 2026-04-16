@@ -19,7 +19,7 @@ namespace Trecs
         readonly SetId _set;
 
         internal SparseQueryBuilder(
-            WorldAccessor ecs,
+            WorldAccessor world,
             TagSet positiveTags,
             TagSet negativeTags,
             ComponentTypeIdSet positiveComps,
@@ -27,7 +27,7 @@ namespace Trecs
             SetId setId
         )
         {
-            _world = ecs;
+            _world = world;
             _positiveTags = positiveTags;
             _negativeTags = negativeTags;
             _positiveComps = positiveComps;

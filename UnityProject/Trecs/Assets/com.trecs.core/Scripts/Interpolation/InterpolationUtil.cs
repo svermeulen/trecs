@@ -10,12 +10,12 @@ namespace Trecs
     {
         static readonly TrecsLog _log = new(nameof(InterpolationUtil));
 
-        public static float CalculatePercentThroughFixedFrame(WorldAccessor ecs)
+        public static float CalculatePercentThroughFixedFrame(WorldAccessor world)
         {
-            var endOfFrameTime = ecs.VariableElapsedTime + ecs.VariableDeltaTime;
+            var endOfFrameTime = world.VariableElapsedTime + world.VariableDeltaTime;
 
-            var fixedCurrentTime = ecs.FixedElapsedTime;
-            var fixedPreviousTime = fixedCurrentTime - ecs.FixedDeltaTime;
+            var fixedCurrentTime = world.FixedElapsedTime;
+            var fixedPreviousTime = fixedCurrentTime - world.FixedDeltaTime;
 
             if (fixedCurrentTime <= 0 || fixedPreviousTime < 0)
             {

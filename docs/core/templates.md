@@ -138,7 +138,7 @@ void UpdateResting(in RestingBall ball)
 Creating an entity from a template:
 
 ```csharp
-ecs.AddEntity<SampleTags.Spinner>()
+world.AddEntity<SampleTags.Spinner>()
     .Set(new Rotation(quaternion.identity))
     .Set(new GameObjectId(42))
     .AssertComplete();

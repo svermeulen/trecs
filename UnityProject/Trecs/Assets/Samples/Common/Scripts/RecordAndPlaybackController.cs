@@ -24,7 +24,7 @@ namespace Trecs.Samples
         readonly BookmarkSerializer _bookmarkSerializer;
         readonly IGameStateSerializer _gameStateSerializer;
         readonly SerializationBuffer _serializerHelper;
-        readonly WorldAccessor _ecs;
+        readonly WorldAccessor _world;
         readonly int _serializationVersion;
         readonly string _recordingPath;
         readonly string _bookmarkPath;
@@ -45,7 +45,7 @@ namespace Trecs.Samples
             _bookmarkSerializer = serialization.BookmarkSerializer;
             _gameStateSerializer = serialization.GameStateSerializer;
             _serializerHelper = new SerializationBuffer(serialization.Registry);
-            _ecs = world.CreateAccessor(nameof(RecordAndPlaybackController));
+            _world = world.CreateAccessor(nameof(RecordAndPlaybackController));
             _serializationVersion = serializationVersion;
 
             var recordingDir = Path.Combine(
@@ -97,7 +97,7 @@ namespace Trecs.Samples
                 return;
             }
 
-            _log.Info("Starting recording at frame {}", _ecs.FixedFrame);
+            _log.Info("Starting recording at frame {}", _world.FixedFrame);
 
             _recordingHandler.StartRecording(
                 version: _serializationVersion,
@@ -206,7 +206,7 @@ namespace Trecs.Samples
             _bookmarkSerializer.SerializerHelper.MemoryStream.Position = 0;
             SaveMemoryStreamToFile(_bookmarkSerializer.SerializerHelper, _bookmarkPath);
 
-            _log.Info("Bookmark saved at frame {}", _ecs.FixedFrame);
+            _log.Info("Bookmark saved at frame {}", _world.FixedFrame);
         }
 
         void HandleLoadBookmark()
@@ -228,7 +228,7 @@ namespace Trecs.Samples
             var succeeded = _bookmarkSerializer.Load(_serializerHelper);
             Assert.That(succeeded, "Failed to load bookmark");
 
-            _log.Info("Bookmark loaded, now at frame {}", _ecs.FixedFrame);
+            _log.Info("Bookmark loaded, now at frame {}", _world.FixedFrame);
         }
 
         static void ReadFileIntoMemoryStream(SerializationBuffer helper, string filePath)

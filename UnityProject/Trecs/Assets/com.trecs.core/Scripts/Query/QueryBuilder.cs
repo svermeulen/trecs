@@ -20,9 +20,9 @@ namespace Trecs
         ComponentTypeIdSet _positiveComps;
         ComponentTypeIdSet _negativeComps;
 
-        internal QueryBuilder(WorldAccessor ecs)
+        internal QueryBuilder(WorldAccessor world)
         {
-            _world = ecs;
+            _world = world;
             _positiveTags = default;
             _negativeTags = default;
             _positiveComps = default;

@@ -24,7 +24,7 @@ Structural changes are applied:
 
 1. **After each fixed update iteration** — `World.Tick()` calls `SubmitEntities()` after each fixed timestep step
 2. **At the end of `Tick()`** — any remaining changes are submitted
-3. **Manually** — `ecs.SubmitEntities()` can be called explicitly if needed
+3. **Manually** — `world.SubmitEntities()` can be called explicitly if needed
 
 ## Deferred Operations
 

@@ -12,17 +12,17 @@ namespace Trecs
         readonly EntityIndex _entityIndex;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal EntityAccessor(WorldAccessor ecs, EntityIndex entityIndex)
+        internal EntityAccessor(WorldAccessor world, EntityIndex entityIndex)
         {
-            _world = ecs;
+            _world = world;
             _entityIndex = entityIndex;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal EntityAccessor(WorldAccessor ecs, EntityHandle entityHandle)
+        internal EntityAccessor(WorldAccessor world, EntityHandle entityHandle)
         {
-            _world = ecs;
-            _entityIndex = entityHandle.ToIndex(ecs);
+            _world = world;
+            _entityIndex = entityHandle.ToIndex(world);
         }
 
         /// <summary>

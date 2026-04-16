@@ -42,8 +42,8 @@ Groups are created **implicitly** from tag combinations. You never create groups
 
 ```csharp
 // These two entities belong to different groups:
-ecs.AddEntity<GameTags.Player>();           // Group: {Player}
-ecs.AddEntity<GameTags.Player, GameTags.VIP>(); // Group: {Player, VIP}
+world.AddEntity<GameTags.Player>();           // Group: {Player}
+world.AddEntity<GameTags.Player, GameTags.VIP>(); // Group: {Player, VIP}
 ```
 
 Each unique tag combination maps to exactly one group. Entities in the same group share the same component layout and are stored contiguously in memory.
@@ -86,8 +86,8 @@ void Execute(in ActiveBall ball) { ... }
 ## Tags in Queries
 
 ```csharp
-int count = ecs.CountEntitiesWithTags<GameTags.Player>();
-ecs.RemoveEntitiesWithTags<GameTags.Bullet>();
+int count = world.CountEntitiesWithTags<GameTags.Player>();
+world.RemoveEntitiesWithTags<GameTags.Bullet>();
 ```
 
 ## Tag<T> and Zero-Allocation Access

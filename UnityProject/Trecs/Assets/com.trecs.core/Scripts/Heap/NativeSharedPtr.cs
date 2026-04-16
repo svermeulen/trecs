@@ -51,9 +51,9 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe void* GetUnsafePtr(WorldAccessor ecs)
+        public readonly unsafe void* GetUnsafePtr(WorldAccessor world)
         {
-            return GetUnsafePtr(ecs.Heap);
+            return GetUnsafePtr(world.Heap);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -75,9 +75,9 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref T Get(WorldAccessor ecs)
+        public readonly unsafe ref T Get(WorldAccessor world)
         {
-            return ref Get(ecs.Heap);
+            return ref Get(world.Heap);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -99,7 +99,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public NativeSharedPtr<T> Clone(WorldAccessor ecs) => Clone(ecs.Heap);
+        public NativeSharedPtr<T> Clone(WorldAccessor world) => Clone(world.Heap);
 
         public readonly void Dispose(HeapAccessor heap)
         {
@@ -110,7 +110,7 @@ namespace Trecs
             heap.NativeSharedHeap.DisposeHandle(Handle);
         }
 
-        public readonly void Dispose(WorldAccessor ecs) => Dispose(ecs.Heap);
+        public readonly void Dispose(WorldAccessor world) => Dispose(world.Heap);
 
         public readonly bool IsNull
         {

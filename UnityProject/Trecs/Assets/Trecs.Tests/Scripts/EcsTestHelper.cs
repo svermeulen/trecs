@@ -9,9 +9,9 @@ namespace Trecs.Tests
         WorldAccessor _accessor;
         public WorldAccessor Accessor => _accessor ??= EcsWorld.CreateAccessor();
 
-        public TestEnvironment(World ecs)
+        public TestEnvironment(World world)
         {
-            EcsWorld = ecs;
+            EcsWorld = world;
         }
 
         public void Dispose()

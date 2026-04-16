@@ -55,7 +55,7 @@ public struct MeshReference : IEntityComponent
 }
 
 // Set during entity creation
-ecs.AddEntity<MyTag>()
+world.AddEntity<MyTag>()
     .Set(new MeshReference { Mesh = World.Heap.AllocShared(mesh) })
     .AssertComplete();
 

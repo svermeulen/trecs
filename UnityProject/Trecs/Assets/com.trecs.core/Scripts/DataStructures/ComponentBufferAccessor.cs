@@ -12,9 +12,9 @@ namespace Trecs
         readonly WorldAccessor _world;
         readonly Group _group;
 
-        internal ComponentBufferAccessor(WorldAccessor ecs, Group group)
+        internal ComponentBufferAccessor(WorldAccessor world, Group group)
         {
-            _world = ecs;
+            _world = world;
             _group = group;
         }
 
