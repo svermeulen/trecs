@@ -1,7 +1,3 @@
-#if !SVKJ_USE_UNITY_PROFILE_BLOCKS && SVKJ_IS_PROFILING
-#define SVKJ_HAS_PROFILING
-#endif
-
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -98,13 +94,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             var sceneInitializer = new SceneInitializer(Settings.Common, world, config);
 
-#if SVKJ_HAS_PROFILING
-            var profilerBridge = new Trecs.Internal.CsProfilerSystemRunnerBridge(
-                ProfilerRunner.GetComponent<Trecs.Internal.CsProfilerRunner>(),
-                world
-            );
-#endif
-
             if (Settings.Common.RenderingEnabled)
             {
                 var renderer = new RendererSystem();
@@ -155,9 +144,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             {
                 world.Initialize,
                 sceneInitializer.Initialize,
-#if SVKJ_HAS_PROFILING
-                profilerBridge.Initialize,
-#endif
             };
 
             tickables = new()
@@ -179,9 +165,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 perfStats.Dispose,
                 world.Dispose,
                 serialization.Dispose,
-#if SVKJ_HAS_PROFILING
-                profilerBridge.Dispose,
-#endif
             };
         }
 
