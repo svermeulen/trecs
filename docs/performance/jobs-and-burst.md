@@ -28,7 +28,7 @@ public partial class ParticleJobSystem : ISystem
 }
 ```
 
-The source generator creates the job struct, scheduling method, and dependency tracking automatically.
+The source generator creates the job struct, scheduling method, and [dependency tracking](dependency-tracking.md) automatically.
 
 ## FromWorld — Auto-Wiring Job Fields
 

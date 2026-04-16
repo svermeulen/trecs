@@ -51,6 +51,7 @@ nav:
       - Entity Events: entity-management/entity-events.md
   - Performance:
       - Jobs & Burst: performance/jobs-and-burst.md
+      - Dependency Tracking: performance/dependency-tracking.md
   - Advanced:
       - Heap: advanced/heap.md
       - Interpolation: advanced/interpolation.md

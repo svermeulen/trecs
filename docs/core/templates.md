@@ -78,6 +78,43 @@ public partial class ComplexEntity : ITemplate,
 }
 ```
 
+### How Inherited Definitions Are Merged
+
+When a template extends multiple bases, all components, tags, and partitions are merged together:
+
+- **Components** — The union of all components from all bases and the concrete template. If the same component appears in multiple bases, the declarations are merged as long as they are compatible.
+- **Tags** — Combined into a union set. Duplicates are deduplicated automatically.
+- **Partitions** — Combined from all bases.
+
+When the same component appears in more than one base template:
+
+- **Attributes must agree** — If multiple bases declare the same component with different attributes (e.g. one marks it `[Interpolated]` and another marks it `[FixedUpdateOnly]`), this is an error.
+- **Default values must match** — If multiple bases provide default values for the same component, the values must be identical. Providing different defaults is an error.
+- **One default is enough** — If only one base provides a default and others don't, the default is used. The component becomes optional at the `AddEntity` call site.
+
+```csharp
+// Both bases declare Position — this is fine as long as
+// attributes and defaults are compatible
+public partial class Renderable : ITemplate, IHasTags<CommonTags.Renderable>
+{
+    public Position Position = new(float3.zero);  // Has default
+}
+
+public partial class Moveable : ITemplate, IHasTags<CommonTags.Moveable>
+{
+    public Position Position;   // No default — OK, Renderable's default is used
+    public Velocity Velocity;
+}
+
+public partial class Player : ITemplate,
+    IExtends<Renderable, Moveable>,
+    IHasTags<GameTags.Player>
+{
+    public Health Health;
+    // Inherits Position (with default from Renderable) and Velocity from Moveable
+}
+```
+
 ## Partitions
 
 Templates can declare multiple **partitions** — mutually exclusive tag combinations that define which group the entity belongs to. Entities in different partitions are stored in separate contiguous arrays, enabling efficient partition transitions and targeted iteration.
@@ -152,10 +189,12 @@ Extend the framework's global template to add world-wide components:
 ```csharp
 public partial class MyGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
-    public Score Score;
+    public Score Score = default;
     public DesiredFishCount DesiredFishCount = new() { Value = 100 };
 
     [Input(MissingInputFrameBehaviour.RetainCurrent)]
-    public MoveInput MoveInput;
+    public MoveInput MoveInput = default;
 }
 ```
+
+The global entity is created automatically during world initialization — there is no `AddEntity` call or `EntityInitializer` to set values. Because of this, **all fields in a global template must have explicit default values**.

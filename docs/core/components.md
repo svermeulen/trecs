@@ -60,7 +60,7 @@ if (world.TryComponent<Health>(entityIndex, out var healthAccessor))
 }
 ```
 
-Accessing via Read/Write properties allows Trecs to lazily complete any jobs with conflicting access before providing the reference.
+Accessing via Read/Write properties allows Trecs to lazily complete any jobs with conflicting access before providing the reference. See [Dependency Tracking](../performance/dependency-tracking.md) for details on how this works.
 
 ## Component Field Attributes
 
