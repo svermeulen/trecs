@@ -107,7 +107,8 @@ namespace Trecs.Samples.Pointers
                 // that will grow dynamically as the entity moves.
                 var trailPtr = _world.Heap.AllocUnique(new TrailHistory { MaxLength = 50 });
 
-                _world.AddEntity<PatrolTags.Follower>()
+                _world
+                    .AddEntity<PatrolTags.Follower>()
                     .Set(new Position((float3)pos))
                     .Set(new CRoute { Value = routeClone, Progress = progress })
                     .Set(new CTrail { Value = trailPtr })

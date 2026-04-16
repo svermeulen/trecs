@@ -4,19 +4,19 @@ namespace Trecs.Tests
 {
     public class TestEnvironment : IDisposable
     {
-        public World EcsWorld;
+        public World World;
 
         WorldAccessor _accessor;
-        public WorldAccessor Accessor => _accessor ??= EcsWorld.CreateAccessor();
+        public WorldAccessor Accessor => _accessor ??= World.CreateAccessor();
 
         public TestEnvironment(World world)
         {
-            EcsWorld = world;
+            World = world;
         }
 
         public void Dispose()
         {
-            EcsWorld.Dispose();
+            World.Dispose();
         }
     }
 

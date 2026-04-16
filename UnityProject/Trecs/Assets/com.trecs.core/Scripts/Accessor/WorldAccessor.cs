@@ -565,7 +565,7 @@ namespace Trecs
         /// <summary>
         /// Creates a new entity in the group identified by the given tags and returns an
         /// <see cref="EntityInitializer"/> for setting initial component values. The entity is
-        /// not visible to queries until the next entity submission.
+        /// not visible to queries until the next entity submission
         /// </summary>
         public EntityInitializer AddEntity(
             TagSet tags,

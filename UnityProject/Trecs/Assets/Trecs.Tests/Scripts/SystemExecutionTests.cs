@@ -155,8 +155,8 @@ namespace Trecs.Tests
         {
             using var env = CreateEnvWithSystems(new SystemAfterA(), new SystemA());
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
 
             int indexA = TestSystemLog.ExecutionLog.IndexOf("A");
             int indexAfterA = TestSystemLog.ExecutionLog.IndexOf("AfterA");
@@ -171,8 +171,8 @@ namespace Trecs.Tests
         {
             using var env = CreateEnvWithSystems(new SystemA(), new SystemBeforeA());
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
 
             int indexA = TestSystemLog.ExecutionLog.IndexOf("A");
             int indexBeforeA = TestSystemLog.ExecutionLog.IndexOf("BeforeA");
@@ -191,8 +191,8 @@ namespace Trecs.Tests
                 new SystemA()
             );
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
 
             int indexA = TestSystemLog.ExecutionLog.IndexOf("A");
             int indexBetween = TestSystemLog.ExecutionLog.IndexOf("BetweenAC");
@@ -212,8 +212,8 @@ namespace Trecs.Tests
         {
             using var env = CreateEnvWithSystems(new VariableSystemA());
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
 
             NAssert.Contains("VarA", TestSystemLog.ExecutionLog);
         }
@@ -223,8 +223,8 @@ namespace Trecs.Tests
         {
             using var env = CreateEnvWithSystems(new VariableSystemAfterA(), new VariableSystemA());
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
 
             int indexVarA = TestSystemLog.ExecutionLog.IndexOf("VarA");
             int indexVarAfterA = TestSystemLog.ExecutionLog.IndexOf("VarAfterA");
@@ -243,14 +243,14 @@ namespace Trecs.Tests
             using var env = CreateEnvWithSystems(new VariableSystemA(), new LateVarSystem());
 
             // Tick runs variable systems
-            env.EcsWorld.Tick();
+            env.World.Tick();
 
             var logAfterTick = new List<string>(TestSystemLog.ExecutionLog);
             NAssert.Contains("VarA", logAfterTick, "Variable system runs on Tick");
             NAssert.IsFalse(logAfterTick.Contains("LateVar"), "LateVar should not run on Tick");
 
             // LateTick runs late variable systems
-            env.EcsWorld.LateTick();
+            env.World.LateTick();
 
             NAssert.Contains(
                 "LateVar",
@@ -277,8 +277,8 @@ namespace Trecs.Tests
                 new PrioritySystem10()
             );
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
 
             int idx5 = TestSystemLog.ExecutionLog.IndexOf("P5");
             int idx10 = TestSystemLog.ExecutionLog.IndexOf("P10");
@@ -299,16 +299,16 @@ namespace Trecs.Tests
             var system = new EnableDisableSystem();
             using var env = CreateEnvWithSystems(system);
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
             NAssert.AreEqual(1, system.ExecuteCount);
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
             NAssert.AreEqual(2, system.ExecuteCount);
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
             NAssert.AreEqual(3, system.ExecuteCount);
         }
 
@@ -322,8 +322,8 @@ namespace Trecs.Tests
             var system = new WorldAccessSystem();
             using var env = CreateEnvWithSystems(system);
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
 
             NAssert.IsTrue(system.HasAccessor, "System should have WorldAccessor during Execute");
         }
@@ -337,8 +337,8 @@ namespace Trecs.Tests
         {
             using var env = CreateEnvWithSystems(new VariableSystemA(), new VariableSystemB());
 
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
 
             NAssert.Contains("VarA", TestSystemLog.ExecutionLog);
             NAssert.Contains("VarB", TestSystemLog.ExecutionLog);
@@ -352,15 +352,15 @@ namespace Trecs.Tests
         public void System_WorldPaused_NoSystemsExecuteOnTick()
         {
             using var env = CreateEnvWithSystems(new VariableSystemA());
-            var runner = env.EcsWorld.GetSystemRunner();
+            var runner = env.World.GetSystemRunner();
 
             // First tick to initialize
-            env.EcsWorld.Tick();
-            env.EcsWorld.LateTick();
+            env.World.Tick();
+            env.World.LateTick();
             TestSystemLog.Clear();
 
             runner.IsPaused = true;
-            env.EcsWorld.Tick();
+            env.World.Tick();
             // Don't call LateTick when paused — Tick returns early without
             // setting _variableDeltaTime, so LateTick would throw
 

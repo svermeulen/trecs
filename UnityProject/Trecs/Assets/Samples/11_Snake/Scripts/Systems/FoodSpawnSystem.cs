@@ -50,9 +50,7 @@ namespace Trecs.Samples.Snake
                     continue;
                 }
 
-                World
-                    .AddEntity<SnakeTags.SnakeFood>()
-                    .Set(new GridPos(new int2(x, y)));
+                World.AddEntity<SnakeTags.SnakeFood>().Set(new GridPos(new int2(x, y)));
                 return true;
             }
 

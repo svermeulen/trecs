@@ -20,7 +20,8 @@ namespace Trecs.Samples.HelloEntity
             var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
             cube.name = "SpinnerCube";
 
-            world.AddEntity<SampleTags.Spinner>()
+            world
+                .AddEntity<SampleTags.Spinner>()
                 .Set(_gameObjectRegistry.Register(cube.gameObject));
         }
     }

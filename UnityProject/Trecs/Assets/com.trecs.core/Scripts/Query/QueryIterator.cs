@@ -43,7 +43,11 @@ namespace Trecs
         }
 
         /// <summary>Single-set constructor — iterates entities belonging to the given set.</summary>
-        internal QueryIterator(WorldAccessor world, ReadOnlyFastList<Group> resolvedGroups, SetId set)
+        internal QueryIterator(
+            WorldAccessor world,
+            ReadOnlyFastList<Group> resolvedGroups,
+            SetId set
+        )
         {
             _done = false;
             _currentGroup = default;

@@ -96,7 +96,9 @@ namespace Trecs.SourceGen.Template
         /// <summary>
         /// Extracts partition combinations from IHasPartition&lt;T1, T2, ...&gt; interfaces
         /// </summary>
-        private static ImmutableArray<TemplatePartitionData> ExtractPartitions(INamedTypeSymbol symbol)
+        private static ImmutableArray<TemplatePartitionData> ExtractPartitions(
+            INamedTypeSymbol symbol
+        )
         {
             var partitions = new List<TemplatePartitionData>();
 

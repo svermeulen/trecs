@@ -98,7 +98,7 @@ namespace Trecs.Tests
 
             // Simulate phase boundary: CompleteAllOutstanding + FlushJobWrites
             a.JobScheduler.CompleteAllOutstanding();
-            env.EcsWorld.GetSetStore().FlushAllSetJobWrites();
+            env.World.GetSetStore().FlushAllSetJobWrites();
 
             // Set should contain entries after flush (no auto-clear)
             var set = a.Set<TFJTestTransientSet>();

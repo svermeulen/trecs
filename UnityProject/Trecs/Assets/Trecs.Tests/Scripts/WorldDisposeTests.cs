@@ -48,7 +48,7 @@ namespace Trecs.Tests
         public void World_IsDisposed_TrueAfterDispose()
         {
             var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var world = env.EcsWorld;
+            var world = env.World;
 
             NAssert.IsFalse(world.IsDisposed);
 
