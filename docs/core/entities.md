@@ -30,15 +30,10 @@ EntityIndex index = handle.ToIndex(world);
 Entities are created via `WorldAccessor.AddEntity()`, which returns an `EntityInitializer` for setting component values:
 
 ```csharp
-// Create with a single tag
+// Specify tag, which should map to a unique entity type
 world.AddEntity<SampleTags.Spinner>()
     .Set(new Rotation(quaternion.identity))
     .Set(new GameObjectId(42));
-
-// Create with multiple tags
-world.AddEntity<BallTags.Ball, BallTags.Active>()
-    .Set(new Position(float3.zero))
-    .Set(new Velocity(new float3(0, 5, 0)));
 ```
 
 ### EntityInitializer
@@ -51,7 +46,7 @@ initializer.Set(new Position(float3.zero));
 initializer.Set(new Velocity(float3.zero));
 ```
 
-The `Handle` property provides the entity's stable reference:
+EntityInitializer exposes a `Handle` property which provides the entity's stable reference:
 
 ```csharp
 var init = world.AddEntity<MyTag>();
@@ -60,7 +55,7 @@ init.Set(new Position(float3.zero));
 ```
 
 !!! tip
-    You can optionally call `AssertComplete()` on the initializer to verify that all components declared by the template have been set. This check also runs automatically during entity submission, so `AssertComplete()` is only useful for catching mistakes earlier at the call site.
+    You can optionally call `AssertComplete()` on the initializer to verify that all non-optional components declared by the template have been set. This check also runs automatically during entity submission, so `AssertComplete()` is only useful for catching mistakes earlier at the call site.  Note that non-optional components are all components declared on the template definition (ITemplate) without an explicit value.
 
 ## Removing Entities
 
@@ -76,28 +71,6 @@ world.RemoveEntitiesWithTags<BallTags.Ball, BallTags.Active>();
 
 !!! note
     Entity removal is deferred — the entity is not immediately destroyed. It is removed during the next entity submission phase. See [Structural Changes](../entity-management/structural-changes.md).
-
-## Handle/Index Conversion
-
-```csharp
-// Handle → Index
-EntityIndex index = handle.ToIndex(world);
-
-// Index → Handle
-EntityHandle handle = index.ToHandle(world);
-
-// Safe conversion (returns false if entity no longer exists)
-if (handle.TryToIndex(world, out EntityIndex index))
-{
-    // Entity still alive
-}
-
-// Check existence
-if (handle.Exists(world))
-{
-    // Entity still alive
-}
-```
 
 ## Accessing Entity Data
 

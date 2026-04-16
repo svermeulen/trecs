@@ -60,6 +60,8 @@ if (world.TryComponent<Health>(entityIndex, out var healthAccessor))
 }
 ```
 
+Accessing via Read/Write properties allows Trecs to lazily complete any jobs with conflicting access before providing the reference.
+
 ### Buffer Access (All Entities in a Group)
 
 ```csharp
