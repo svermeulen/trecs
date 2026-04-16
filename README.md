@@ -21,8 +21,6 @@ A high-performance Entity Component System framework for Unity, designed for det
 
 ```csharp
 // Define a component
-[TypeId(1001)]
-[Unwrap]
 public partial struct Position : IEntityComponent
 {
     public float3 Value;

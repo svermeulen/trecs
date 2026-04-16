@@ -1709,9 +1709,8 @@ namespace Trecs.Internal
                     return;
                 }
 
-                throw new TrecsException(
-                    $"Cannot move entity that is already scheduled for a move in the same submission. Entity {fromEntityIndex.Index} in group {fromEntityIndex.Group} (type: {entityDescriptorName}) was already scheduled for a move."
-                );
+                // Duplicate move — first one wins, skip silently (matches QueueNativeMoveOperations dedup)
+                return;
             }
 
             _multipleOperationOnSameEntityChecker.Add(fromEntityIndex, OperationType.SwapFrom);
