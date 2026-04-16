@@ -1,6 +1,6 @@
 # 08 — Sets
 
-Dynamic entity subsets with overlapping membership. Unlike states (which are mutually exclusive), sets allow an entity to belong to multiple subsets simultaneously.
+Dynamic entity subsets with overlapping membership. Unlike partitions (which are mutually exclusive), sets allow an entity to belong to multiple subsets simultaneously.
 
 **Source:** `Samples/08_Sets/`
 
@@ -98,9 +98,9 @@ Same pattern, scoped to `WaveZ` set.
 
 Composites the final color from warm and cool intensities. A particle in both waves gets both effects blended together.
 
-## Why Sets, Not States?
+## Why Sets, Not Partitions?
 
-With states, an entity can only be in one state at a time. To represent "in WaveX", "in WaveZ", and "in both", you'd need four states (None, X, Z, XZ) — and that grows as 2^N for N wave effects.
+With partitions, an entity can only be in one partition at a time. To represent "in WaveX", "in WaveZ", and "in both", you'd need four partitions (None, X, Z, XZ) — and that grows as 2^N for N wave effects.
 
 With sets, each wave is independent. A particle can be in zero, one, or both sets simultaneously without any combinatorial explosion.
 
@@ -110,4 +110,4 @@ With sets, each wave is independent. A particle can be in zero, one, or both set
 - **`SetAdd` / `SetRemove`** — deferred membership changes
 - **`[ForEachEntity(Set = typeof(...))]`** — iterate only set members
 - **Overlapping membership** — entities can be in multiple sets
-- **Sets vs States trade-off** — sets avoid combinatorial explosion
+- **Sets vs Partitions trade-off** — sets avoid combinatorial explosion

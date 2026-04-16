@@ -54,7 +54,7 @@ Groups are the foundation of Trecs' performance model:
 
 - **Cache efficiency** — entities with the same tags are packed together, so iterating over them is fast
 - **Targeted iteration** — systems can iterate over specific groups by tag, skipping irrelevant entities entirely
-- **State machines** — template states use groups to separate entities by state, so each state can be iterated independently
+- **Partitions** — template partitions use groups to separate entities by partition, so each partition can be iterated independently
 
 ## Tags in Templates
 
@@ -67,7 +67,7 @@ public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
 }
 ```
 
-See [Templates](templates.md) for details on states (`IHasState`) and how tags define entity states.
+See [Templates](templates.md) for details on partitions (`IHasPartition`) and how tags define entity partitions.
 
 ## Tags in Systems
 

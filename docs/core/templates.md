@@ -78,15 +78,15 @@ public partial class ComplexEntity : ITemplate,
 }
 ```
 
-## States
+## Partitions
 
-Templates can declare multiple **states** — mutually exclusive tag combinations that define which group the entity belongs to. Entities in different states are stored in separate contiguous arrays, enabling efficient state transitions and targeted iteration.
+Templates can declare multiple **partitions** — mutually exclusive tag combinations that define which group the entity belongs to. Entities in different partitions are stored in separate contiguous arrays, enabling efficient partition transitions and targeted iteration.
 
 ```csharp
 public partial class BallEntity : ITemplate,
     IHasTags<BallTags.Ball>,
-    IHasState<BallTags.Active>,
-    IHasState<BallTags.Resting>
+    IHasPartition<BallTags.Active>,
+    IHasPartition<BallTags.Resting>
 {
     public Position Position;
     public Velocity Velocity;
@@ -95,11 +95,11 @@ public partial class BallEntity : ITemplate,
 }
 ```
 
-Each `IHasState` declares a valid state. The entity always has the base tags (`BallTags.Ball`) plus exactly one state tag.
+Each `IHasPartition` declares a valid partition. The entity always has the base tags (`BallTags.Ball`) plus exactly one partition tag.
 
-### State Transitions
+### Partition Transitions
 
-Move entities between states with `MoveTo`. In aspects, use the generated extension method:
+Move entities between partitions with `MoveTo`. In aspects, use the generated extension method:
 
 ```csharp
 // Ball hits the ground → transition to Resting
@@ -115,7 +115,7 @@ Or call `MoveTo` directly on the `WorldAccessor` with an `EntityIndex`:
 World.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
 ```
 
-Systems can target specific states:
+Systems can target specific partitions:
 
 ```csharp
 // Only processes Active balls

@@ -59,7 +59,7 @@ namespace Trecs.Tests
                 .AssertComplete();
             a.SubmitEntities();
 
-            // Lookup by Gamma tag — matches both state groups
+            // Lookup by Gamma tag — matches both partition groups
             using var lookup = a.CreateNativeComponentLookupRead<TestInt>(
                 TagSet.FromTags(TestTags.Gamma),
                 Allocator.TempJob

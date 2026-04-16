@@ -190,7 +190,7 @@ public partial class SpawnSystem : ISystem
         // Remove entities
         World.RemoveEntity(entityIndex);
 
-        // State transitions
+        // Partition transitions
         World.MoveTo<BallTags.Ball, BallTags.Resting>(ball.EntityIndex);
 
         // Access time and RNG

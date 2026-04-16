@@ -11,7 +11,7 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 | 03 | [Aspects](03-aspects.md) | Bundled component access for clean iteration |
 | 04 | [Predator Prey](04-predator-prey.md) | Cross-entity references, template inheritance, event cleanup |
 | 05 | [Job System](05-job-system.md) | Burst compilation, parallel jobs, WrapAsJob |
-| 06 | [States](06-states.md) | Template states, state transitions, group-based iteration |
+| 06 | [Partitions](06-partitions.md) | Template partitions, partition transitions, group-based iteration |
 | 07 | [Feeding Frenzy](07-feeding-frenzy.md) | Complex simulation, visual smoothing, multiple interacting systems |
 | 08 | [Sets](08-sets.md) | Dynamic entity subsets, overlapping membership |
 | 09 | [Interpolation](09-interpolation.md) | Fixed-to-variable timestep interpolation |
@@ -22,7 +22,7 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 | # | Sample | Description |
 |---|--------|-------------|
 | 11 | [Snake](11-snake.md) | Complete grid-based game with input handling and recording/playback |
-| 12 | [Feeding Frenzy Benchmark](12-feeding-frenzy-benchmark.md) | Performance benchmark comparing state management approaches and iteration styles |
+| 12 | [Feeding Frenzy Benchmark](12-feeding-frenzy-benchmark.md) | Performance benchmark comparing partition approaches and iteration styles |
 
 ## Running the Samples
 

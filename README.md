@@ -94,7 +94,7 @@ The project includes 12 samples covering everything from basic entity creation t
 | 03 Aspects | Bundled component access for clean iteration |
 | 04 Predator Prey | Cross-entity references, template inheritance |
 | 05 Job System | Burst compilation, parallel jobs |
-| 06 States | Template states, state transitions |
+| 06 Partitions | Template partitions, partition transitions |
 | 07 Feeding Frenzy | Complex multi-system simulation |
 | 08 Sets | Dynamic entity subsets, sparse iteration, overlapping membership |
 | 09 Interpolation | Fixed-to-variable timestep smoothing |

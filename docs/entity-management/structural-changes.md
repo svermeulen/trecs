@@ -1,6 +1,6 @@
 # Structural Changes
 
-Entity creation, removal, and state transitions are **deferred operations** — they are queued during system execution and applied at submission boundaries.
+Entity creation, removal, and partition transitions are **deferred operations** — they are queued during system execution and applied at submission boundaries.
 
 ## Why Deferred?
 
@@ -47,7 +47,7 @@ World.RemoveEntity(entityHandle);
 World.RemoveEntitiesWithTags<GameTags.Bullet>();
 ```
 
-### Moving Entities (State Transitions)
+### Moving Entities (Partition Transitions)
 
 ```csharp
 World.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
