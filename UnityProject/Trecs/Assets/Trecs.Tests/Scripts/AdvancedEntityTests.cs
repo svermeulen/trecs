@@ -313,10 +313,10 @@ namespace Trecs.Tests
 
         #endregion
 
-        #region Observer InAllGroups
+        #region Observer AllEntities
 
         [Test]
-        public void Observer_InAllGroups_FiresForAnyGroup()
+        public void Observer_AllEntities_FiresForAnyGroup()
         {
             using var env = EcsTestHelper.CreateEnvironment(
                 TestTemplates.SimpleAlpha,
@@ -326,7 +326,7 @@ namespace Trecs.Tests
 
             int callCount = 0;
             var sub = a
-                .Events.InAllGroups()
+                .Events.AllEntities()
                 .OnAdded(
                     (Group group, EntityRange indices) =>
                     {
@@ -360,13 +360,13 @@ namespace Trecs.Tests
                 count3 = 0;
 
             var sub1 = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded((Group g, EntityRange i) => count1++);
             var sub2 = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded((Group g, EntityRange i) => count2++);
             var sub3 = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded((Group g, EntityRange i) => count3++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
@@ -391,10 +391,10 @@ namespace Trecs.Tests
                 count2 = 0;
 
             var sub1 = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded((Group g, EntityRange i) => count1++);
             var sub2 = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded((Group g, EntityRange i) => count2++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();

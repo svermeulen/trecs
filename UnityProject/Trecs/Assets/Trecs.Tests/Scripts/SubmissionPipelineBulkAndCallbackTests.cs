@@ -161,7 +161,7 @@ namespace Trecs.Tests
 
             EntityHandle addedByCallback = default;
             var subscription = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -199,7 +199,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var subscription = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnAdded(
                     (group, indices) =>
                     {
@@ -249,7 +249,7 @@ namespace Trecs.Tests
             bool addedC = false;
 
             var sub1 = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -265,7 +265,7 @@ namespace Trecs.Tests
                 );
 
             var sub2 = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
                     (group, indices) =>
                     {

@@ -14,7 +14,7 @@ namespace Trecs.Samples.PredatorPrey
             _gameObjectRegistry = gameObjectRegistry;
 
             World
-                .Events.InGroupsWithTags<SampleTags.Prey>()
+                .Events.EntitiesWithTags<SampleTags.Prey>()
                 .OnRemoved(OnPreyRemoved)
                 .AddTo(_disposables);
         }

@@ -6,7 +6,7 @@ Entities are lightweight identifiers that group components together
 
 Trecs provides two ways of referring to entities for different use cases:
 
-`EntityHandle` is a stable reference that can be stored long-term, while `EntityIndex` is a fast, transient reference for immediate use within a system tick.
+`EntityHandle` is a stable reference that survives [structural changes](../entity-management/structural-changes.md) and can be stored in components for cross-entity relationships. `EntityIndex` is a fast, transient reference for immediate use within a system tick — it provides direct buffer access but is invalidated when entities are added, removed, or moved.
 
 | | EntityHandle | EntityIndex |
 |---|---|---|

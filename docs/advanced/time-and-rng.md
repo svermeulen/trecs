@@ -45,12 +45,7 @@ public partial class AnimationSystem : ISystem
 }
 ```
 
-### Phase Detection
-
-```csharp
-bool isFixed = World.IsFixedSystem;
-bool isInput = World.IsInputSystem;
-```
+You can also access the fixed time values while in variable update via World.FixedDeltaTime / World.FixedElapsedTime
 
 ## Deterministic RNG
 

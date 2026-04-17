@@ -233,7 +233,7 @@ namespace Trecs.Tests
 
             // Register callback: when any entity is removed, remove entity B
             var subscription = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -274,7 +274,7 @@ namespace Trecs.Tests
 
             // Callback: when entities are removed, also remove entity 6
             var subscription = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnRemoved(
                     (group, indices) =>
                     {

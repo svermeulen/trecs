@@ -89,7 +89,7 @@ public partial class SpinnerGameObjectUpdater : ISystem
 }
 ```
 
-Marked `[VariableUpdate]` because it touches Unity GameObjects — rendering should happen at the display frame rate, not the fixed timestep.
+Marked `[VariableUpdate]` because it touches Unity GameObjects — rendering should happen at the display frame rate, not the fixed timestep.  Though in this case it doesn't matter since rotation is updated in fixed and we aren't using [interpolation](../advanced/interpolation.md) in this sample.
 
 ## World Setup
 
@@ -120,4 +120,3 @@ world.AddEntity<SampleTags.Spinner>()
 - **Systems** implement `ISystem` and use `[ForEachEntity]` for iteration
 - **`[VariableUpdate]`** separates rendering from simulation
 - **`MatchByComponents`** iterates by component presence instead of tags
-- Constructor injection passes dependencies to systems

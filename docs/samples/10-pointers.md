@@ -110,7 +110,7 @@ void Execute(ref Position position, in CRoute route, in CTrail trail)
 Pointers must be disposed when entities are removed:
 
 ```csharp
-world.Events.InGroupsWithTags<PatrolTags.Follower>()
+world.Events.EntitiesWithTags<PatrolTags.Follower>()
     .OnRemoved((Group group, EntityRange indices) =>
     {
         for (int i = indices.Start; i < indices.End; i++)

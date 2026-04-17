@@ -69,7 +69,7 @@ var settings = new WorldSettings
     MaxSecondsForFixedUpdatePerFrame = null,    // Cap on fixed update time per frame
 
     // Determinism
-    RandomSeed = null,                          // Seed for deterministic RNG, set to an integer to enable a fixed value (otherwise will use System.Environment.TickCount)
+    RandomSeed = null,                          // Set to an integer for deterministic RNG; null uses System.Environment.TickCount
     RequireDeterministicSubmission = false,     // Sort structural ops for replay
 
     // Startup
@@ -103,8 +103,8 @@ world.AddSystems(new ISystem[] { ... });
 // 3. Initialize (allocates groups, initializes systems)
 world.Initialize();
 
-// 4. Create an accessor for interacting with the world
-var world = world.CreateAccessor();
+// 4. Create a WorldAccessor for interacting with the world
+var worldAccessor = world.CreateAccessor();
 
 // 5. Game loop
 while (running)

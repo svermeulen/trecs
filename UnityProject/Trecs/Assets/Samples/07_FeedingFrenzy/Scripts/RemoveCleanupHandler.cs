@@ -23,12 +23,12 @@ namespace Trecs.Samples.FeedingFrenzy101
             World = world.CreateAccessor();
 
             World
-                .Events.InGroupsWithTags<FrenzyTags.Fish>()
+                .Events.EntitiesWithTags<FrenzyTags.Fish>()
                 .OnRemoved(OnFishRemoved)
                 .AddTo(_disposables);
 
             World
-                .Events.InGroupsWithTags<FrenzyTags.Meal>()
+                .Events.EntitiesWithTags<FrenzyTags.Meal>()
                 .OnRemoved(OnMealRemoved)
                 .AddTo(_disposables);
         }

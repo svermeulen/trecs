@@ -274,7 +274,7 @@ namespace Trecs.Tests
 
             int globalValueInCallback = -1;
             var sub = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -302,7 +302,7 @@ namespace Trecs.Tests
             a.GlobalComponent<TestGlobalInt>().Write.Value = 0;
 
             var sub = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnAdded(
                     (group, indices) =>
                     {

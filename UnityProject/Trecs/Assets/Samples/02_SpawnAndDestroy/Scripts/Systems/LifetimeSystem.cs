@@ -2,7 +2,6 @@ using UnityEngine;
 
 namespace Trecs.Samples.SpawnAndDestroy
 {
-    [ExecutesAfter(typeof(SpawnSystem))]
     public partial class LifetimeSystem : ISystem
     {
         readonly GameObjectRegistry _gameObjectRegistry;
@@ -22,6 +21,7 @@ namespace Trecs.Samples.SpawnAndDestroy
                 var go = _gameObjectRegistry.Resolve(gameObjectId);
                 Object.Destroy(go);
                 _gameObjectRegistry.Unregister(gameObjectId);
+                // Removal is deferred — the entity continues to exist until the next submission
                 World.RemoveEntity(entityIndex);
             }
         }

@@ -55,7 +55,6 @@ Uses `World.Rng` for deterministic random placement.
 Counts down lifetime and removes expired entities, cleaning up their GameObjects inline:
 
 ```csharp
-[ExecutesAfter(typeof(SpawnSystem))]
 public partial class LifetimeSystem : ISystem
 {
     readonly GameObjectRegistry _gameObjectRegistry;
@@ -89,7 +88,6 @@ Syncs position to GameObjects each visual frame.
 
 - **Dynamic entity creation** with `AddEntity` and component initialization
 - **Entity removal** with `RemoveEntity` (deferred until submission)
-- **`[ExecutesAfter]`** for explicit system ordering
 - **`World.Rng`** for deterministic random numbers
-- **Individual component parameters** — `[ForEachEntity]` can receive components directly, not just aspects
+- **Individual component parameters** — `[ForEachEntity]` receives components directly
 - **Inline cleanup** — destroying GameObjects at removal time inside the system

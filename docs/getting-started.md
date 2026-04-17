@@ -27,7 +27,7 @@ public partial struct Rotation : IEntityComponent
 
 ### 2. Define a Tag
 
-Tags classify entities into different queryable groups:
+Tags classify entities. Systems use tags to filter which entities they operate on:
 
 ```csharp
 public struct Spinner : ITag { }
@@ -35,7 +35,7 @@ public struct Spinner : ITag { }
 
 ### 3. Define a Template
 
-Templates declare which components and tags an entity has:
+Templates are blueprints that declare which components and tags an entity has. The tag on the template is what you use when creating entities and querying them in systems:
 
 ```csharp
 public partial class SpinnerEntity : ITemplate, IHasTags<Spinner>

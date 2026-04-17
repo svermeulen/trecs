@@ -16,12 +16,12 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             }
 
             World
-                .Events.InGroupsWithTags<FrenzyTags.Fish>()
+                .Events.EntitiesWithTags<FrenzyTags.Fish>()
                 .OnAdded(OnFishAdded)
                 .AddTo(_disposables);
 
             World
-                .Events.InGroupsWithTags<FrenzyTags.Meal>()
+                .Events.EntitiesWithTags<FrenzyTags.Meal>()
                 .OnAdded(OnMealAdded)
                 .AddTo(_disposables);
         }

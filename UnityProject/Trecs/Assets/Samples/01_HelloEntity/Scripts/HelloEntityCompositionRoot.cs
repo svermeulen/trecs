@@ -1,3 +1,4 @@
+// Companion docs: https://svermeulen.github.io/trecs/samples/01-hello-entity/
 using System;
 using System.Collections.Generic;
 

@@ -37,10 +37,12 @@ Defines an aspect and uses it for iteration:
 ```csharp
 public partial class BoidMovementSystem : ISystem
 {
-    [ForEachEntity(MatchByComponents = true)]
-    void Execute(in Boid boid)
+    public void Execute()
     {
-        boid.Position += World.DeltaTime * boid.Speed * boid.Velocity;
+        foreach (var boid in Boid.Query(World).MatchByComponents())
+        {
+            boid.Position += World.DeltaTime * boid.Speed * boid.Velocity;
+        }
     }
 
     partial struct Boid : IAspect, IRead<Velocity, Speed>, IWrite<Position> { }
@@ -61,18 +63,25 @@ Wraps boids that go out of bounds. Uses `[ExecutesAfter]` to run after movement:
 [ExecutesAfter(typeof(BoidMovementSystem))]
 public partial class BoidWrapSystem : ISystem
 {
+    readonly float _halfSize;
+
+    public BoidWrapSystem(float areaSize)
+    {
+        _halfSize = areaSize / 2f;
+    }
+
     [ForEachEntity(MatchByComponents = true)]
     void Execute(in Boid boid)
     {
-        var p = boid.Position;
+        ref var p = ref boid.Position;
+
         if (p.x > _halfSize) p.x -= _halfSize * 2;
         else if (p.x < -_halfSize) p.x += _halfSize * 2;
         if (p.z > _halfSize) p.z -= _halfSize * 2;
         else if (p.z < -_halfSize) p.z += _halfSize * 2;
-        boid.Position = p;
     }
 
-    partial struct Boid : IAspect, IRead<Velocity, Speed>, IWrite<Position> { }
+    partial struct Boid : IAspect, IWrite<Position> { }
 }
 ```
 

@@ -16,7 +16,7 @@ public partial class RemoveCleanupHandler : IDisposable
         World = world.CreateAccessor();
 
         World.Events
-            .InGroupsWithTags<FrenzyTags.Fish>()
+            .EntitiesWithTags<FrenzyTags.Fish>()
             .OnRemoved(OnFishRemoved)
             .AddTo(_disposables);
     }
@@ -65,7 +65,7 @@ public partial class CleanupHandlers : IDisposable
         _gameObjectRegistry = gameObjectRegistry;
 
         World.Events
-            .InGroupsWithTags<SampleTags.Prey>()
+            .EntitiesWithTags<SampleTags.Prey>()
             .OnRemoved(OnPreyRemoved)
             .AddTo(_disposables);
     }
@@ -89,25 +89,36 @@ public partial class CleanupHandlers : IDisposable
 }
 ```
 
+## Disposing Subscriptions
+
+The `OnRemoved`, `OnAdded`, and `OnMoved` methods return an `IDisposable` that you can use to clean up the subscription when it's no longer needed.
+
+```csharp
+IDisposable sub = World.Events.OnSubmission(() => { ... });
+sub.Dispose();
+```
+
+Note that Trecs does not include a `DisposeCollection` type — you can use a simple wrapper like the one in the samples, or any `IDisposable` container of your choice.  Or just a `List<IDisposable>` and call `Dispose` on each item in `Dispose()`.
+
 ## Scoping Events
 
 Events can be scoped to specific groups:
 
 ```csharp
 // By tags
-World.Events.InGroupsWithTags<GameTags.Player>()
+World.Events.EntitiesWithTags<GameTags.Player>()
 
 // By multiple tags
-World.Events.InGroupsWithTags<GameTags.Player, GameTags.Active>()
+World.Events.EntitiesWithTags<GameTags.Player, GameTags.Active>()
 
 // By components
-World.Events.InGroupsWithComponents<Health>()
+World.Events.EntitiesWithComponents<Health>()
 
 // By specific group
 World.Events.InGroup(specificGroup)
 
 // All groups
-World.Events.InAllGroups()
+World.Events.AllEntities()
 ```
 
 ## Frame Events
@@ -141,25 +152,3 @@ World.Events.OnVariableUpdateStarted(() =>
 });
 ```
 
-## Disposing Subscriptions
-
-Use `AddTo` with a disposable collection to manage subscription lifetimes. Trecs does not include a `DisposeCollection` type — you can use a simple wrapper like the one in the samples, or any `IDisposable` container of your choice:
-
-```csharp
-readonly DisposeCollection _disposables = new();
-
-World.Events
-    .InGroupsWithTags<GameTags.Enemy>()
-    .OnRemoved(OnEnemyRemoved)
-    .AddTo(_disposables);
-
-// Clean up all subscriptions
-_disposables.Dispose();
-```
-
-Frame event subscriptions return an `IDisposable` directly:
-
-```csharp
-IDisposable sub = World.Events.OnSubmission(() => { ... });
-sub.Dispose();
-```

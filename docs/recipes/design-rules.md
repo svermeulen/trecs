@@ -5,12 +5,12 @@ Best practices for building with Trecs.
 ## Systems
 
 - **Keep systems stateless.** Use constructor parameters for immutable configuration, but don't store mutable state in system fields. All mutable state belongs in components.
-- **Declare system dependencies explicitly.** Use `[ExecutesAfter]` and `[ExecutesBefore]` to make ordering requirements clear.
+- **Declare system dependencies explicitly.** Use [`[ExecutesAfter]` and `[ExecutesBefore]`](../core/systems.md#system-ordering) to make ordering requirements clear.
 
 ## Components
 
 - **Data only, no logic.** Components are structs with fields. Put logic in systems.
-- **Keep components small and focused.** A `Health` component with `Current` and `Max` is better than a `CharacterStats` component with 20 fields.  It's common and normal to have many components with just one field with `[Unwrap]` attribute.
+- **Keep components small and focused.** A `Health` component with `Current` and `Max` is better than a `CharacterStats` component with 20 fields.  It's common and normal to have many components with just one field with [`[Unwrap]`](../core/components.md#the-unwrap-shorthand) attribute.
 - **Unmanaged only.** No classes, strings, arrays, or reference types. Use [heap pointers](../advanced/heap.md) for managed data.
 
 ## Entities & Templates
@@ -26,7 +26,7 @@ Best practices for building with Trecs.
 
 - **Use `World.Rng`, never `UnityEngine.Random`.** External RNG breaks replay.
 - **Use sort keys in parallel jobs.** When using `NativeWorldAccessor` for structural changes in jobs, provide deterministic sort keys.
-- **Enable `RequireDeterministicSubmission`** for any project that needs recording or networking.
+- **Enable [`RequireDeterministicSubmission`](../entity-management/structural-changes.md#deterministic-submission)** for any project that needs recording or networking.
 
 ## Common Anti-Patterns
 

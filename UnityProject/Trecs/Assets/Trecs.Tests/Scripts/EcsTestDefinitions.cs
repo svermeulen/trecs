@@ -30,6 +30,16 @@ namespace Trecs.Tests
         public float Y;
     }
 
+    public partial struct TestBool : IEntityComponent
+    {
+        public bool Value;
+    }
+
+    public partial struct TestShort : IEntityComponent
+    {
+        public short Value;
+    }
+
     public static class TestTemplates
     {
         public static Template SimpleAlpha =>

@@ -32,7 +32,7 @@ namespace Trecs.Tests
             int removedCount = 0;
             Group observedGroup = default;
             var sub = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -69,7 +69,7 @@ namespace Trecs.Tests
 
             int totalRemoved = 0;
             var sub = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -109,7 +109,7 @@ namespace Trecs.Tests
 
             int removedCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -159,7 +159,7 @@ namespace Trecs.Tests
             EntityRange observedRange = default;
 
             var sub = a
-                .Events.InGroupsWithTags(PartitionB)
+                .Events.EntitiesWithTags(PartitionB)
                 .OnMoved(
                     (fromGroup, toGroup, indices) =>
                     {
@@ -206,7 +206,7 @@ namespace Trecs.Tests
 
             var movedValues = new List<int>();
             var sub = a
-                .Events.InGroupsWithTags(PartitionB)
+                .Events.EntitiesWithTags(PartitionB)
                 .OnMoved(
                     (fromGroup, toGroup, indices) =>
                     {
@@ -250,7 +250,7 @@ namespace Trecs.Tests
 
             int movedCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(PartitionB)
+                .Events.EntitiesWithTags(PartitionB)
                 .OnMoved(
                     (fromGroup, toGroup, indices) =>
                     {
@@ -281,7 +281,7 @@ namespace Trecs.Tests
 
             var addedValues = new List<int>();
             var sub = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnAdded(
                     (group, indices) =>
                     {
@@ -331,7 +331,7 @@ namespace Trecs.Tests
 
             int addedCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnAdded(
                     (group, indices) =>
                     {

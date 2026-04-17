@@ -17,6 +17,13 @@ namespace Trecs.Tests
     // Aspect with negative component matching — excludes entities with TestFloat
     partial struct QWithoutCompView : IAspect, IRead<TestInt> { }
 
+    // Aspect with multiple IRead and IWrite base interfaces
+    partial struct QMultiInterfaceView
+        : IAspect,
+            IRead<TestInt, TestFloat>,
+            IRead<TestVec>,
+            IWrite<TestBool, TestShort> { }
+
     [TestFixture]
     public partial class QueryCompositionTests
     {
@@ -898,6 +905,79 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, _entityIndexResults[1].Index);
             // Both should be in the same group
             NAssert.AreEqual(_entityIndexResults[0].Group, _entityIndexResults[1].Group);
+        }
+
+        #endregion
+
+        #region Multiple IRead / IWrite Interfaces
+
+        TestEnvironment CreateMultiInterfaceEnv() =>
+            EcsTestHelper.CreateEnvironment(QTestEntityAll.Template);
+
+        [Test]
+        public void MultiInterface_Aspect_ReadsAllComponents()
+        {
+            using var env = CreateMultiInterfaceEnv();
+            var a = env.Accessor;
+
+            a.AddEntity(Tag<QId4>.Value)
+                .Set(new TestInt { Value = 42 })
+                .Set(new TestFloat { Value = 3.14f })
+                .Set(new TestVec { X = 1.0f, Y = 2.0f })
+                .Set(new TestBool { Value = true })
+                .Set(new TestShort { Value = 7 })
+                .AssertComplete();
+            a.SubmitEntities();
+
+            int count = 0;
+            foreach (var view in QMultiInterfaceView.Query(a).WithTags<QCatA>())
+            {
+                // IRead<TestInt, TestFloat> components
+                NAssert.AreEqual(42, view.TestInt.Value);
+                NAssert.AreEqual(3.14f, view.TestFloat.Value, 0.001f);
+
+                // IRead<TestVec> component
+                NAssert.AreEqual(1.0f, view.TestVec.X, 0.001f);
+                NAssert.AreEqual(2.0f, view.TestVec.Y, 0.001f);
+
+                // IWrite<TestBool, TestShort> components (readable too)
+                NAssert.AreEqual(true, view.TestBool.Value);
+                NAssert.AreEqual(7, view.TestShort.Value);
+
+                count++;
+            }
+
+            NAssert.AreEqual(1, count);
+        }
+
+        [Test]
+        public void MultiInterface_Aspect_WritesComponents()
+        {
+            using var env = CreateMultiInterfaceEnv();
+            var a = env.Accessor;
+
+            a.AddEntity(Tag<QId4>.Value)
+                .Set(new TestInt { Value = 1 })
+                .Set(new TestFloat { Value = 1.0f })
+                .Set(new TestVec { X = 0, Y = 0 })
+                .Set(new TestBool { Value = false })
+                .Set(new TestShort { Value = 0 })
+                .AssertComplete();
+            a.SubmitEntities();
+
+            // Modify IWrite components through the aspect
+            foreach (var view in QMultiInterfaceView.Query(a).WithTags<QCatA>())
+            {
+                view.TestBool = new TestBool { Value = true };
+                view.TestShort = new TestShort { Value = 99 };
+            }
+
+            // Verify the writes persisted
+            foreach (var view in QMultiInterfaceView.Query(a).WithTags<QCatA>())
+            {
+                NAssert.AreEqual(true, view.TestBool.Value);
+                NAssert.AreEqual(99, view.TestShort.Value);
+            }
         }
 
         #endregion

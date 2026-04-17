@@ -19,8 +19,8 @@ namespace Trecs
 {
     /// <summary>
     /// Fluent builder for subscribing to entity lifecycle and world events. Accessed via
-    /// <see cref="WorldAccessor.Events"/>. First select target groups (e.g.
-    /// <see cref="InGroupsWithTags{T1}()"/>, <see cref="InAllGroups()"/>), then chain
+    /// <see cref="WorldAccessor.Events"/>. First select target entities (e.g.
+    /// <see cref="EntitiesWithTags{T1}()"/>, <see cref="AllEntities()"/>), then chain
     /// <see cref="EntityEventsSubscription.OnAdded"/>, <see cref="EntityEventsSubscription.OnRemoved"/>,
     /// or <see cref="EntityEventsSubscription.OnMoved"/> on the returned subscription.
     /// Dispose the subscription to unsubscribe.
@@ -52,43 +52,43 @@ namespace Trecs
             return InGroups(new FastList<Group>(group));
         }
 
-        public EntityEventsSubscription InGroupsWithTags(TagSet tagSet)
+        public EntityEventsSubscription EntitiesWithTags(TagSet tagSet)
         {
             return InGroups(_worldInfo.GetGroupsWithTags(tagSet));
         }
 
-        public EntityEventsSubscription InGroupsWithTags<T1>()
-            where T1 : struct, ITag => InGroupsWithTags(TagSet<T1>.Value);
+        public EntityEventsSubscription EntitiesWithTags<T1>()
+            where T1 : struct, ITag => EntitiesWithTags(TagSet<T1>.Value);
 
-        public EntityEventsSubscription InGroupsWithTags<T1, T2>()
+        public EntityEventsSubscription EntitiesWithTags<T1, T2>()
             where T1 : struct, ITag
-            where T2 : struct, ITag => InGroupsWithTags(TagSet<T1, T2>.Value);
+            where T2 : struct, ITag => EntitiesWithTags(TagSet<T1, T2>.Value);
 
-        public EntityEventsSubscription InGroupsWithTags<T1, T2, T3>()
+        public EntityEventsSubscription EntitiesWithTags<T1, T2, T3>()
             where T1 : struct, ITag
             where T2 : struct, ITag
-            where T3 : struct, ITag => InGroupsWithTags(TagSet<T1, T2, T3>.Value);
+            where T3 : struct, ITag => EntitiesWithTags(TagSet<T1, T2, T3>.Value);
 
-        public EntityEventsSubscription InGroupsWithTags<T1, T2, T3, T4>()
+        public EntityEventsSubscription EntitiesWithTags<T1, T2, T3, T4>()
             where T1 : struct, ITag
             where T2 : struct, ITag
             where T3 : struct, ITag
-            where T4 : struct, ITag => InGroupsWithTags(TagSet<T1, T2, T3, T4>.Value);
+            where T4 : struct, ITag => EntitiesWithTags(TagSet<T1, T2, T3, T4>.Value);
 
-        public EntityEventsSubscription InGroupsWithComponents<T>()
+        public EntityEventsSubscription EntitiesWithComponents<T>()
             where T : unmanaged, IEntityComponent
         {
             return InGroups(_worldInfo.GetGroupsWithComponents<T>());
         }
 
-        public EntityEventsSubscription InGroupsWithComponents<T1, T2>()
+        public EntityEventsSubscription EntitiesWithComponents<T1, T2>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
         {
             return InGroups(_worldInfo.GetGroupsWithComponents<T1, T2>());
         }
 
-        public EntityEventsSubscription InGroupsWithComponents<T1, T2, T3>()
+        public EntityEventsSubscription EntitiesWithComponents<T1, T2, T3>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
@@ -96,7 +96,7 @@ namespace Trecs
             return InGroups(_worldInfo.GetGroupsWithComponents<T1, T2, T3>());
         }
 
-        public EntityEventsSubscription InGroupsWithComponents<T1, T2, T3, T4>()
+        public EntityEventsSubscription EntitiesWithComponents<T1, T2, T3, T4>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
@@ -105,20 +105,20 @@ namespace Trecs
             return InGroups(_worldInfo.GetGroupsWithComponents<T1, T2, T3, T4>());
         }
 
-        public EntityEventsSubscription InGroupsWithTagsAndComponents<T>(TagSet tagSet)
+        public EntityEventsSubscription EntitiesWithTagsAndComponents<T>(TagSet tagSet)
             where T : unmanaged, IEntityComponent
         {
             return InGroups(_worldInfo.GetGroupsWithTagsAndComponents<T>(tagSet));
         }
 
-        public EntityEventsSubscription InGroupsWithTagsAndComponents<T1, T2>(TagSet tagSet)
+        public EntityEventsSubscription EntitiesWithTagsAndComponents<T1, T2>(TagSet tagSet)
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
         {
             return InGroups(_worldInfo.GetGroupsWithTagsAndComponents<T1, T2>(tagSet));
         }
 
-        public EntityEventsSubscription InGroupsWithTagsAndComponents<T1, T2, T3>(TagSet tagSet)
+        public EntityEventsSubscription EntitiesWithTagsAndComponents<T1, T2, T3>(TagSet tagSet)
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
@@ -126,7 +126,7 @@ namespace Trecs
             return InGroups(_worldInfo.GetGroupsWithTagsAndComponents<T1, T2, T3>(tagSet));
         }
 
-        public EntityEventsSubscription InGroupsWithTagsAndComponents<T1, T2, T3, T4>(TagSet tagSet)
+        public EntityEventsSubscription EntitiesWithTagsAndComponents<T1, T2, T3, T4>(TagSet tagSet)
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
@@ -135,7 +135,7 @@ namespace Trecs
             return InGroups(_worldInfo.GetGroupsWithTagsAndComponents<T1, T2, T3, T4>(tagSet));
         }
 
-        public EntityEventsSubscription InAllGroups()
+        public EntityEventsSubscription AllEntities()
         {
             return InGroups(_worldInfo.AllGroups);
         }
@@ -189,7 +189,7 @@ namespace Trecs
     }
 
     /// <summary>
-    /// A group-scoped event subscription that can observe entity add, remove, and move events.
+    /// An entity event subscription that can observe entity add, remove, and move events.
     /// Chain <see cref="OnAdded"/>, <see cref="OnRemoved"/>, and <see cref="OnMoved"/> to register
     /// callbacks. Dispose to unsubscribe all registered observers. Optionally call
     /// <see cref="WithPriority"/> before registering observers to control callback ordering.

@@ -28,12 +28,6 @@ Controls what happens when no input is provided for a frame:
 Input is queued from outside the ECS update loop (e.g., from a MonoBehaviour):
 
 ```csharp
-world.AddInput(globalEntityHandle, new MoveInput { Direction = dir });
-```
-
-Or by entity index:
-
-```csharp
 world.AddInput(entityIndex, new MoveInput { Direction = dir });
 ```
 
@@ -59,5 +53,5 @@ The input system is designed for deterministic replay:
 
 - Inputs are applied at fixed update boundaries, not at variable frame rate
 - During [recording](recording-and-playback.md), inputs are captured alongside world state
-- During playback, recorded inputs replace live input
+- During playback, input systems are not run, and instead recorded inputs replace live input
 - `MissingInputFrameBehaviour` ensures consistent behavior when frames are skipped or repeated

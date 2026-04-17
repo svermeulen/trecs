@@ -76,11 +76,10 @@ TagSet tags = TagSet.FromTags(Tag<GameTags.Player>.Value, Tag<GameTags.Enemy>.Va
 TagSet combined = playerTags.CombineWith(TagSet<GameTags.Active>.Value);
 ```
 
-## Tag&lt;T&gt; and Zero-Allocation Access
+## Tag&lt;T&gt;
 
-For runtime tag operations, use the `Tag<T>` cache to avoid allocations:
+For runtime tag operations, use the `Tag<T>` cache:
 
 ```csharp
-Tag playerTag = Tag<GameTags.Player>.Value;       // Cached, zero-allocation
-int nativeGuid = Tag<GameTags.Player>.NativeGuid;  // Burst-compatible
+Tag playerTag = Tag<GameTags.Player>.Value;
 ```

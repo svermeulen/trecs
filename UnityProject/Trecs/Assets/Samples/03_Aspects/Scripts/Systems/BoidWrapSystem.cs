@@ -13,7 +13,7 @@ namespace Trecs.Samples.Aspects
         [ForEachEntity(MatchByComponents = true)]
         void Execute(in Boid boid)
         {
-            var p = boid.Position;
+            ref var p = ref boid.Position;
 
             if (p.x > _halfSize)
             {
@@ -32,8 +32,6 @@ namespace Trecs.Samples.Aspects
             {
                 p.z += _halfSize * 2;
             }
-
-            boid.Position = p;
         }
 
         partial struct Boid : IAspect, IWrite<Position> { }

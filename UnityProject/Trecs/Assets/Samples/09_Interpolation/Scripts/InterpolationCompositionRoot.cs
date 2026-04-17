@@ -1,3 +1,4 @@
+// Companion docs: https://svermeulen.github.io/trecs/samples/09-interpolation/
 using System;
 using System.Collections.Generic;
 using Trecs.Internal;

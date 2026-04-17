@@ -42,7 +42,7 @@ public class InputBridge : MonoBehaviour
 }
 ```
 
-Use `[InputSystem]` systems to process queued input at the start of each fixed update.
+Use [`[InputSystem]`](../advanced/input-system.md) systems to process queued input at the start of each fixed update.
 
 ## Layer 2: Pure ECS
 
@@ -96,7 +96,7 @@ public partial class EnemyGameObjectManager : IDisposable
         World = world.CreateAccessor();
         _registry = registry;
 
-        World.Events.InGroupsWithTags<GameTags.Enemy>()
+        World.Events.EntitiesWithTags<GameTags.Enemy>()
             .OnRemoved(OnEnemyRemoved)
             .AddTo(_disposables);
     }

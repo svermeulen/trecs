@@ -61,8 +61,9 @@ public partial class SnakeInputSystem : ISystem
     public void Tick()
     {
         if (Input.GetKeyDown(KeyCode.W)) _pendingDirection = new int2(0, 1);
-        if (Input.GetKeyDown(KeyCode.S)) _pendingDirection = new int2(0, -1);
-        // ...
+        else if (Input.GetKeyDown(KeyCode.S)) _pendingDirection = new int2(0, -1);
+        else if (Input.GetKeyDown(KeyCode.A)) _pendingDirection = new int2(-1, 0);
+        else if (Input.GetKeyDown(KeyCode.D)) _pendingDirection = new int2(1, 0);
     }
 
     public void Execute()
@@ -84,6 +85,42 @@ Every N fixed frames (controlled by `MoveTickCounter`):
 2. Spawns a new segment at the head's current position
 3. Advances the head one cell in the current direction
 4. Wraps around grid edges
+
+Demonstrates `World.GlobalComponent<T>()` for reading/writing global state, and `World.Frame` for tracking creation order:
+
+```csharp
+public void Execute()
+{
+    ref var counter = ref World.GlobalComponent<MoveTickCounter>().Write;
+
+    if (counter.FramesUntilNextMove > 0)
+    {
+        counter.FramesUntilNextMove--;
+        return;
+    }
+
+    counter.FramesUntilNextMove = _settings.FramesPerMove - 1;
+
+    var head = SnakeHead.Query(World).WithTags<SnakeTags.SnakeHead>().Single();
+
+    // Read input from global entity
+    var requested = World.GlobalComponent<MoveInput>().Read.RequestedDirection;
+    // ... apply turn, reject 180° reversals ...
+
+    // Spawn segment at head's current position, tagged with creation frame
+    World.AddEntity<SnakeTags.SnakeSegment>()
+        .Set(new GridPos(head.GridPos))
+        .Set(new SegmentAge(World.Frame));
+
+    // Advance head and wrap around grid edges
+    var newPos = head.GridPos + head.Direction;
+    newPos.x = ((newPos.x % size) + size) % size;
+    newPos.y = ((newPos.y % size) + size) % size;
+    head.GridPos = newPos;
+}
+
+partial struct SnakeHead : IAspect, IWrite<Direction, GridPos> { }
+```
 
 ### 3. FoodConsumeSystem
 

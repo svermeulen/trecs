@@ -7,6 +7,8 @@ namespace Trecs.Tests
 
     public struct QId3 : ITag { }
 
+    public struct QId4 : ITag { }
+
     // Categorization tags (for query filtering)
     public struct QCatA : ITag { }
 
@@ -32,6 +34,16 @@ namespace Trecs.Tests
     public partial class QTestEntityB : ITemplate, IHasTags<QId3>, IHasTags<QCatB>
     {
         public TestInt TestInt;
+    }
+
+    // Has QCatA + all five test components (for multi-interface aspect tests)
+    public partial class QTestEntityAll : ITemplate, IHasTags<QId4>, IHasTags<QCatA>
+    {
+        public TestInt TestInt;
+        public TestFloat TestFloat;
+        public TestVec TestVec;
+        public TestBool TestBool;
+        public TestShort TestShort;
     }
 
     // --- Shared Set ---

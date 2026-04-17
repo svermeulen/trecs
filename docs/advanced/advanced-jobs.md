@@ -60,7 +60,7 @@ partial struct FlexibleJob : IJobFor
 new FlexibleJob().ScheduleParallel(World, TagSet<GameTags.Player>.Value);
 ```
 
-This is useful when the same job struct needs to operate on different groups.
+This is useful when if the tagset being operated on is not known until runtime, or if you want to reuse the same job struct for multiple tag scopes. The generated `ScheduleParallel` method will have a parameter for each `[FromWorld]` field that doesn't specify tags inline.
 
 Fields that don't require tags (`NativeSetRead`, `NativeSetWrite`, `NativeWorldAccessor`) are populated automatically and never generate schedule parameters.
 
@@ -117,7 +117,7 @@ highlightedWrite.RemoveImmediate(entityIndex);
 
 ## External Job Tracking
 
-When scheduling Unity jobs manually (without Trecs source generation), register them so the [dependency tracker](../performance/dependency-tracking.md) knows about them:
+In the rare case where a job is scheduled manually without using the Trecs source generator (e.g., a third-party job or a custom scheduling pattern), you can register it with the world so the [dependency tracker](../performance/dependency-tracking.md) knows about them, using `TrackExternalJob`:
 
 ```csharp
 JobHandle handle = myJob.Schedule(count, batchSize);

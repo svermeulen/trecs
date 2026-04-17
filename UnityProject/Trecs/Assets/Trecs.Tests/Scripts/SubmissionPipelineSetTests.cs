@@ -500,7 +500,7 @@ namespace Trecs.Tests
 
             // Callback: when entity removed from PartitionA, add entity 3 to set
             var subscription = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {
@@ -553,7 +553,7 @@ namespace Trecs.Tests
 
             // Callback: on remove, also remove entity 2
             var subscription = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnRemoved(
                     (group, indices) =>
                     {

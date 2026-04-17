@@ -1,5 +1,10 @@
 namespace Trecs.Samples.JobSystem
 {
+    /// <summary>
+    /// Same logic implemented two ways: main-thread and [WrapAsJob].
+    /// The job version must be static and use NativeWorldAccessor instead of World.
+    /// The source generator creates the Burst-compiled job struct automatically.
+    /// </summary>
     public partial class ParticleMoveSystem : ISystem
     {
         [ForEachEntity(Tag = typeof(SampleTags.Particle))]

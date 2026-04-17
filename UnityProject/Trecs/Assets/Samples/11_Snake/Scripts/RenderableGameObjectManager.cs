@@ -28,7 +28,7 @@ namespace Trecs.Samples.Snake
             _nextId = World.Heap.AllocNativeUnique(1);
 
             World
-                .Events.InGroupsWithComponents<GameObjectId, PrefabId>()
+                .Events.EntitiesWithComponents<GameObjectId, PrefabId>()
                 .OnAdded(OnEntityAdded)
                 .OnRemoved(OnEntityRemoved)
                 .AddTo(_subscriptions);

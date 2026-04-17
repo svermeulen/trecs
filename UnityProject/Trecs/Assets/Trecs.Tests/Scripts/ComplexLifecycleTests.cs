@@ -358,7 +358,7 @@ namespace Trecs.Tests
 
             int addedCallCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(PartitionB)
+                .Events.EntitiesWithTags(PartitionB)
                 .OnAdded(
                     (Group group, EntityRange indices) =>
                     {
@@ -386,7 +386,7 @@ namespace Trecs.Tests
 
             int removedCallCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(PartitionA)
+                .Events.EntitiesWithTags(PartitionA)
                 .OnRemoved(
                     (Group group, EntityRange indices) =>
                     {
@@ -415,7 +415,7 @@ namespace Trecs.Tests
             Group observedFrom = default;
             Group observedTo = default;
             var sub = a
-                .Events.InGroupsWithTags(PartitionB)
+                .Events.EntitiesWithTags(PartitionB)
                 .OnMoved(
                     (Group fromGroup, Group toGroup, EntityRange indices) =>
                     {
@@ -445,7 +445,7 @@ namespace Trecs.Tests
 
             int callCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
                     (Group group, EntityRange indices) =>
                     {
@@ -878,7 +878,7 @@ namespace Trecs.Tests
             int addedCount = 0;
             int removedCount = 0;
             var addSub = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
                     (Group g, EntityRange i) =>
                     {
@@ -886,7 +886,7 @@ namespace Trecs.Tests
                     }
                 );
             var removeSub = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnRemoved(
                     (Group g, EntityRange i) =>
                     {

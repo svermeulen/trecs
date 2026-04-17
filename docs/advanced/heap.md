@@ -4,12 +4,12 @@ Components must be unmanaged structs, so they can't hold classes, arrays, or oth
 
 ## Pointer Types
 
-| Type | Ownership | Data Type | Burst-Safe |
-|------|-----------|-----------|------------|
-| `UniquePtr<T>` | Single owner | Managed (`class`) | No |
-| `SharedPtr<T>` | Reference counted | Managed (`class`) | No |
-| `NativeUniquePtr<T>` | Single owner | Unmanaged (`struct`) | Yes |
-| `NativeSharedPtr<T>` | Reference counted | Unmanaged (`struct`) | Yes |
+| Type | Ownership | Mutability | Data Type | Burst-Safe |
+|------|-----------|------------|-----------|------------|
+| `UniquePtr<T>` | Single owner | Mutable | Managed (`class`) | No |
+| `SharedPtr<T>` | Reference counted | Immutable | Managed (`class`) | No |
+| `NativeUniquePtr<T>` | Single owner | Mutable | Unmanaged (`struct`) | Yes |
+| `NativeSharedPtr<T>` | Reference counted | Immutable | Unmanaged (`struct`) | Yes |
 
 ## Allocating Pointers
 
@@ -86,43 +86,11 @@ shared.Dispose(World.Heap);  // Decrements ref count, frees if zero
 
 ## Pointers in Jobs
 
-Use native pointer types with resolvers:
-
-```csharp
-// Get resolvers (main thread)
-NativeSharedPtrResolver resolver = World.Heap.NativeSharedPtrResolver;
-
-// In a job:
-ref NativeData data = ref nativeShared.Get(in resolver);
-```
-
-Or via `NativeWorldAccessor`:
+Use native pointer types in jobs via `NativeWorldAccessor`:
 
 ```csharp
 ref NativeData data = ref nativeShared.Get(in nativeWorldAccessor);
 ```
-
-## BlobPtr and BlobCache
-
-For data that can be loaded from external sources (files, Addressables), use `BlobPtr<T>`:
-
-```csharp
-// Allocate with a BlobId
-NativeSharedPtr<MyBlob> ptr = World.Heap.AllocNativeShared<MyBlob>(blobId);
-```
-
-### IBlobStore
-
-Register custom blob stores for loading data:
-
-```csharp
-new WorldBuilder()
-    .AddBlobStore(new BlobStoreInMemory())  // Built-in in-memory store
-    .AddBlobStore(myCustomStore)            // Custom loader
-    // ...
-```
-
-`IBlobStore` implementations can load data from files, addressables, network, etc.
 
 ## Heap Types
 
@@ -139,4 +107,4 @@ Under the hood, Trecs maintains several heaps:
 | `FrameScopedNativeUniqueHeap` | Current fixed frame | Temporary native per-frame data |
 | `FrameScopedNativeSharedHeap` | Current fixed frame | Temporary shared native per-frame data |
 
-Frame-scoped heaps automatically clean up at the end of each fixed update — no manual disposal needed.
+Frame-scoped heaps automatically clean up at the end of each fixed update — no manual disposal needed. Note that during [recording playback](recording-and-playback.md), frame-scoped data may persist longer than a single fixed frame.

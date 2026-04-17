@@ -1,3 +1,4 @@
+// Companion docs: https://svermeulen.github.io/trecs/samples/03-aspects/
 using System;
 using System.Collections.Generic;
 

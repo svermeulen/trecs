@@ -104,6 +104,8 @@ With partitions, an entity can only be in one partition at a time. To represent 
 
 With sets, each wave is independent. A particle can be in zero, one, or both sets simultaneously without any combinatorial explosion.
 
+The drawback is that sets are sparse and may have slower iteration than partitions due to less memory locality
+
 ## Concepts Introduced
 
 - **`IEntitySet`** — defines a sparse entity subset

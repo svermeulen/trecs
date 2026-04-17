@@ -1,3 +1,4 @@
+// Companion docs: https://svermeulen.github.io/trecs/samples/10-pointers/
 using System;
 using System.Collections.Generic;
 
@@ -81,7 +82,7 @@ namespace Trecs.Samples.Pointers
             var cleanupAccessor = world.CreateAccessor();
 
             cleanupAccessor
-                .Events.InGroupsWithTags<PatrolTags.Follower>()
+                .Events.EntitiesWithTags<PatrolTags.Follower>()
                 .OnRemoved(
                     (Group group, EntityRange indices) =>
                     {

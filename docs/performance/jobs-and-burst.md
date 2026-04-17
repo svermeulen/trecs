@@ -50,7 +50,7 @@ The Trecs Source Generator will add a ScheduleParallel extension method for your
 
 This gives you control over the job struct fields (e.g., passing precomputed values like `DeltaTime`), while the source generator still handles scheduling and dependency tracking.
 
-However note that you can also use `[PassThroughArgument]` on fields of a `[WrapAsJob]` method to achieve the same effect without defining a job struct.
+However note that you can also use [`[PassThroughArgument]`](../core/systems.md#passthroughargument) on fields of a `[WrapAsJob]` method to achieve the same effect without defining a job struct.
 
 ## NativeWorldAccessor
 

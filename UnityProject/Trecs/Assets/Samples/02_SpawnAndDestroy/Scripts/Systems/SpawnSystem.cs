@@ -46,7 +46,7 @@ namespace Trecs.Samples.SpawnAndDestroy
             go.name = "Sphere";
             go.transform.position = (Vector3)position;
 
-            // Give each sphere a random color
+            // World.Rng provides deterministic randomness that works with recording/playback
             var renderer = go.GetComponent<Renderer>();
             renderer.material.color = new Color(
                 World.Rng.Next(),

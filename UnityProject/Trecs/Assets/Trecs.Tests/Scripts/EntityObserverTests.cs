@@ -16,7 +16,7 @@ namespace Trecs.Tests
 
             int callCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
                     (Group group, EntityRange indices) =>
                     {
@@ -39,7 +39,7 @@ namespace Trecs.Tests
 
             int totalAdded = 0;
             var sub = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
                     (Group group, EntityRange indices) =>
                     {
@@ -68,7 +68,7 @@ namespace Trecs.Tests
 
             int alphaCallCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
                     (Group group, EntityRange indices) =>
                     {
@@ -99,7 +99,7 @@ namespace Trecs.Tests
 
             int callCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnRemoved(
                     (Group group, EntityRange indices) =>
                     {
@@ -129,7 +129,7 @@ namespace Trecs.Tests
 
             int totalRemoved = 0;
             var sub = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnRemoved(
                     (Group group, EntityRange indices) =>
                     {
@@ -162,7 +162,7 @@ namespace Trecs.Tests
 
             int callCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(partitionB)
+                .Events.EntitiesWithTags(partitionB)
                 .OnMoved(
                     (Group fromGroup, Group toGroup, EntityRange indices) =>
                     {
@@ -197,7 +197,7 @@ namespace Trecs.Tests
             Group observedTo = default;
 
             var sub = a
-                .Events.InGroupsWithTags(partitionB)
+                .Events.EntitiesWithTags(partitionB)
                 .OnMoved(
                     (Group fromGroup, Group toGroup, EntityRange indices) =>
                     {
@@ -226,7 +226,7 @@ namespace Trecs.Tests
 
             int observedValue = -1;
             var sub = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
                     (Group group, EntityRange indices) =>
                     {
@@ -264,7 +264,7 @@ namespace Trecs.Tests
 
             int observedValue = -1;
             var sub = a
-                .Events.InGroupsWithTags(partitionB)
+                .Events.EntitiesWithTags(partitionB)
                 .OnMoved(
                     (Group fromGroup, Group toGroup, EntityRange indices) =>
                     {
@@ -301,7 +301,7 @@ namespace Trecs.Tests
 
             int callCount = 0;
             var sub = a
-                .Events.InGroupsWithTags(TestTags.Alpha)
+                .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
                     (Group group, EntityRange indices) =>
                     {

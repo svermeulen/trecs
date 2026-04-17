@@ -13,12 +13,14 @@ Predators (red) chase the nearest prey (green). When a predator catches its prey
 ### Components
 
 ```csharp
-public struct ChosenPrey : IEntityComponent
+[Unwrap]
+public partial struct ChosenPrey : IEntityComponent
 {
     public EntityHandle Value;  // Handle to the prey being chased
 }
 
-public struct ApproachingPredator : IEntityComponent
+[Unwrap]
+public partial struct ApproachingPredator : IEntityComponent
 {
     public EntityHandle Value;  // Handle to the predator chasing this prey
 }
@@ -41,25 +43,25 @@ Template inheritance shares common movement components:
 public partial class Movable : ITemplate, IHasTags<SampleTags.Movable>
 {
     public Position Position = default;
-    public MoveDirection MoveDirection;
+    public MoveDirection MoveDirection = default;
     public Speed Speed;
     public GameObjectId GameObjectId;
 }
 
 // Predator extends Movable
 public partial class PredatorEntity : ITemplate,
-    IExtends<Movable>,
-    IHasTags<SampleTags.Predator>
+    IHasTags<SampleTags.Predator>,
+    IExtends<Movable>
 {
-    public ChosenPrey ChosenPrey;
+    public ChosenPrey ChosenPrey = default;
 }
 
 // Prey extends Movable
 public partial class PreyEntity : ITemplate,
-    IExtends<Movable>,
-    IHasTags<SampleTags.Prey>
+    IHasTags<SampleTags.Prey>,
+    IExtends<Movable>
 {
-    public ApproachingPredator ApproachingPredator;
+    public ApproachingPredator ApproachingPredator = default;
 }
 ```
 
@@ -70,33 +72,37 @@ public partial class PreyEntity : ITemplate,
 Finds the nearest unassigned prey for each predator using nested aspect queries:
 
 ```csharp
-foreach (var predator in PredatorView.Query(World).WithTags<SampleTags.Predator>())
+foreach (var predator in Predator.Query(World).WithTags<SampleTags.Predator>())
 {
     if (!predator.ChosenPrey.IsNull) continue;  // Already has a target
 
-    float bestDist = float.MaxValue;
-    EntityIndex bestPrey = EntityIndex.Null;
+    float nearestDistSq = float.MaxValue;
+    Prey chosenPrey = default;
+    bool found = false;
 
-    foreach (var prey in PreyView.Query(World).WithTags<SampleTags.Prey>())
+    foreach (var prey in Prey.Query(World).WithTags<SampleTags.Prey>())
     {
         if (!prey.ApproachingPredator.IsNull) continue;  // Already claimed
 
-        float dist = math.distance(predator.Position, prey.Position);
-        if (dist < bestDist)
+        float distSq = math.distancesq(predator.Position, prey.Position);
+        if (distSq < nearestDistSq)
         {
-            bestDist = dist;
-            bestPrey = prey.EntityIndex;
+            nearestDistSq = distSq;
+            chosenPrey = prey;
+            found = true;
         }
     }
 
-    if (!bestPrey.IsNull)
+    if (found)
     {
-        // Link predator ↔ prey
-        predator.ChosenPrey = bestPrey.ToHandle(World);
-        World.Component<ApproachingPredator>(bestPrey).Write =
-            new ApproachingPredator { Value = predator.EntityIndex.ToHandle(World) };
+        // Link predator ↔ prey via aspects
+        chosenPrey.ApproachingPredator = predator.EntityIndex.ToHandle(World);
+        predator.ChosenPrey = chosenPrey.EntityIndex.ToHandle(World);
     }
 }
+
+partial struct Predator : IAspect, IRead<Position>, IWrite<ChosenPrey> { }
+partial struct Prey : IAspect, IRead<Position>, IWrite<ApproachingPredator> { }
 ```
 
 ### PredatorChaseSystem
@@ -109,7 +115,10 @@ Maintains the prey population by spawning replacements.
 
 ### Cleanup Handler
 
-When prey are removed, clean up their GameObjects using a `[ForEachEntity]`-based event handler with an aspect:
+When prey are removed, clean up their GameObjects using an `OnRemoved` event handler. Using events for cleanup is good practice for two reasons:
+
+- **Consistency** — since entity removal is deferred, the entity still exists until the next submission. If not cleaning up via an event, subsequent systems could attempt to use stale data on the about-to-be-removed entity.
+- **Centralized cleanup** — if entities can be removed from multiple places (e.g., caught by a predator, starvation, despawning), the same cleanup handler runs regardless of the removal source.
 
 ```csharp
 public partial class CleanupHandlers
@@ -123,7 +132,7 @@ public partial class CleanupHandlers
         _gameObjectRegistry = gameObjectRegistry;
 
         World.Events
-            .InGroupsWithTags<SampleTags.Prey>()
+            .EntitiesWithTags<SampleTags.Prey>()
             .OnRemoved(OnPreyRemoved)
             .AddTo(_disposables);
     }

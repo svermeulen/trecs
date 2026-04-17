@@ -96,7 +96,7 @@ public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 
 ## Global Entity
 
-Every world has a single **global entity** for storing world-wide state:
+Every world has a single **global entity** for storing world-wide state. Access it via `GlobalComponent<T>()`:
 
 ```csharp
 // Read global component
@@ -107,12 +107,4 @@ ref Score score = ref world.GlobalComponent<Score>().Write;
 score.Value += 10;
 ```
 
-To add components to the global entity, extend `TrecsTemplates.Globals` in a template:
-
-```csharp
-public partial class MyGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
-{
-    public Score Score;
-    public GameConfig Config;
-}
-```
+To define which components the global entity has, see [Global Entity Template](templates.md#global-entity-template).

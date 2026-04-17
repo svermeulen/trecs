@@ -37,6 +37,7 @@ namespace Trecs.Samples.PredatorPrey
 
     public static partial class SampleTemplates
     {
+        // Base template — PredatorEntity and PreyEntity inherit these components via IExtends
         public partial class Movable : ITemplate, IHasTags<SampleTags.Movable>
         {
             public Position Position = default;

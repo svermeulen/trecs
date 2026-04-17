@@ -26,12 +26,12 @@ The same model applies to immediate operations on [sets](../entity-management/se
 
 ## How Dependencies Are Declared
 
-When you use `[WrapAsJob]` or a manual job struct with `[ForEachEntity]`, the source generator inspects your component access (which parameters are `ref` vs `in`, which native fields/parameters use `Read` vs `Write` types) and emits dependency wiring automatically at schedule time. The generated code:
+When you define a job that uses Trecs components, the source generator inspects your component access (which parameters are `ref` vs `in`, which native fields/parameters use `Read` vs `Write` types) and emits dependency wiring automatically at schedule time. The generated `ScheduleParallel` method:
 
 1. Waits on all conflicting outstanding jobs before scheduling your job
 2. Registers your job's access after scheduling, so future jobs will depend on it correctly
 
-This all happens inside the generated `ScheduleParallel(World)` method — you just call it and the rest is handled.
+This all happens automatically inside the generated method — you just call it and the rest is handled.
 
 ## Main-Thread Sync
 
@@ -49,7 +49,7 @@ ref readonly Position pos = ref world.Component<Position>(entityIndex).Read;
 ref Position pos = ref world.Component<Position>(entityIndex).Write;
 ```
 
-This is why component access goes through `WorldAccessor` rather than raw arrays — it ensures thread safety automatically without requiring you to call `Complete()` on job handles.
+This is why component access must all go through `WorldAccessor` — it ensures thread safety automatically without requiring you to call `Complete()` on job handles.
 
 !!! tip
     Unintentional main-thread sync points can hurt performance. If a system accesses a component on the main thread that a prior job is still writing, it forces that job to complete immediately. Structure your systems so that main-thread access and job-based access to the same components don't overlap within the same phase.

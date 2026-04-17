@@ -33,8 +33,8 @@ else
 Uses `IEntitySet` for membership tracking. Systems filter by set:
 
 ```csharp
-[ForEachEntity(Set = typeof(NotEating))]
-void IdleBob(in FishView fish) { ... }
+[ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
+void IdleBob(in Fish fish) { ... }
 ```
 
 **Trade-off:** Only visits relevant entities. No group changes when membership changes. Sparse iteration.
@@ -44,8 +44,8 @@ void IdleBob(in FishView fish) { ... }
 Uses `IHasPartition` for group separation:
 
 ```csharp
-[ForEachEntity(Tags = new[] { typeof(Fish), typeof(NotEating) })]
-void IdleBob(in FishView fish) { ... }
+[ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+void IdleBob(in Fish fish) { ... }
 ```
 
 **Trade-off:** Dense, cache-friendly iteration. But partition changes copy component data between groups.

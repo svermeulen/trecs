@@ -18,13 +18,11 @@ namespace Trecs.Samples.Partitions
         [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
         void Execute(in ActiveBall ball)
         {
-            // Gravity + integration
             var vel = ball.Velocity;
             vel.y += Gravity * World.DeltaTime;
             ball.Position += vel * World.DeltaTime;
             ball.Velocity = vel;
 
-            // Floor bounce
             if (ball.Position.y < FloorY)
             {
                 var pos = ball.Position;
@@ -36,7 +34,8 @@ namespace Trecs.Samples.Partitions
                 ball.Velocity = vel;
             }
 
-            // Transition to Resting when energy is low
+            // MoveTo transitions the entity to a different partition — this moves
+            // component data to a new contiguous array so iteration stays cache-friendly
             if (
                 math.lengthsq(ball.Velocity) < RestThreshold * RestThreshold
                 && ball.Position.y <= FloorY + 0.01f

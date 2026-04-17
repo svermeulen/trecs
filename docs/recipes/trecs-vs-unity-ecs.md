@@ -40,7 +40,7 @@ A comparison for developers familiar with Unity's built-in ECS (Entities package
 | `World.Query().WithTags<T>()` | `EntityQuery` via `GetEntityQuery()` |
 | Aspects (`IAspect` + `IRead`/`IWrite`) | Aspects (`IAspect` + `RefRO`/`RefRW`) |
 | `[ForEachEntity]` with tag/component scope | `IJobEntity` with query attributes |
-| Sets for sparse filtering | Enableable components |
+| [Sets](../entity-management/sets.md) for sparse filtering | Enableable components |
 
 ### Jobs
 
@@ -58,7 +58,7 @@ A comparison for developers familiar with Unity's built-in ECS (Entities package
 | Core design goal | Nice-to-have |
 | Built-in recording/playback | No built-in equivalent |
 | Deterministic RNG (`World.Rng`) | No built-in equivalent |
-| Input system with frame isolation | Netcode for Entities (separate package) |
+| [Input system](../advanced/input-system.md) with frame isolation for perfect replay | Netcode for Entities (separate package) |
 | Checksum validation | No built-in equivalent |
 
 ### Serialization

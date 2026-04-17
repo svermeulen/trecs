@@ -20,9 +20,9 @@ void Execute(ref Health health)
 **Pros:** Simple, no setup required.
 **Cons:** Iterates all entities, including those that don't match.
 
-## Approach B: Template Partitions (Group Swaps)
+## Approach B: Template [Partitions](../core/templates.md#partitions)
 
-Use `IHasPartition` to move entities between groups:
+Use `IHasPartition` to define mutually exclusive states that entities can transition between:
 
 ```csharp
 // Template with partitions
@@ -46,12 +46,12 @@ void Execute(in DeadEnemy enemy) { ... }
 **Pros:** Dense iteration — only matching entities are visited. Cache-friendly.
 **Cons:** Moving between groups copies component data. Adding dimensions multiplies the number of groups (2^N for N boolean partitions).
 
-## Approach C: Sets (Indexed Subsets)
+## Approach C: [Sets](../entity-management/sets.md) (Indexed Subsets)
 
-Use sets for dynamic, sparse membership:
+Use sets for dynamic, sparse membership. Sets must be registered with the world builder via `AddSet<T>()`:
 
 ```csharp
-public struct DeadEnemies : IEntitySet<GameTags.Enemy> { }
+public struct DeadEnemies : IEntitySet { }
 
 // Add to set
 World.SetAdd<DeadEnemies>(entity.EntityIndex);
