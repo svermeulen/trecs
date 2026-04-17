@@ -99,12 +99,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             var fishMesh = SampleUtil.CreateDartMesh();
             var mealMesh = SampleUtil.CreateScaledCubeMesh();
-            var fishMaterial = SampleUtil.CreateUnlitIndirectMaterial(
-                Settings.Common.FishColor
-            );
-            var mealMaterial = SampleUtil.CreateUnlitIndirectMaterial(
-                Settings.Common.MealColor
-            );
+            var fishMaterial = SampleUtil.CreateUnlitIndirectMaterial(Settings.Common.FishColor);
+            var mealMaterial = SampleUtil.CreateUnlitIndirectMaterial(Settings.Common.MealColor);
 
             renderer.RegisterRenderable(
                 TagSet<FrenzyTags.Fish>.Value,
