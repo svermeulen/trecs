@@ -3,7 +3,7 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
-    public class SharedSerializerCacheHelper : IDisposable
+    internal class SharedSerializerCacheHelper : IDisposable
     {
         readonly SerializerRegistry _registry;
 

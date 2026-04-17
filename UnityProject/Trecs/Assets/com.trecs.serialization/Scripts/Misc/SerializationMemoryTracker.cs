@@ -10,7 +10,7 @@ using Trecs.Collections;
 
 namespace Trecs.Serialization
 {
-    public sealed class SerializationMemoryTracker
+    internal sealed class SerializationMemoryTracker
     {
         public class MemoryNode
         {

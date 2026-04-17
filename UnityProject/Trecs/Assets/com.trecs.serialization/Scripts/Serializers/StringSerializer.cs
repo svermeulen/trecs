@@ -1,6 +1,6 @@
 namespace Trecs.Serialization
 {
-    public class StringSerializer : ISerializer<string>
+    internal class StringSerializer : ISerializer<string>
     {
         public StringSerializer() { }
 

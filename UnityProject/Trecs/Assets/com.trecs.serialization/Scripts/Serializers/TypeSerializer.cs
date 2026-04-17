@@ -2,7 +2,7 @@ using System;
 
 namespace Trecs.Serialization
 {
-    public class TypeSerializer : ISerializer<Type>
+    internal class TypeSerializer : ISerializer<Type>
     {
         public TypeSerializer() { }
 

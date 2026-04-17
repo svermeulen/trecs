@@ -4,7 +4,7 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
-    public class BitReader
+    internal class BitReader
     {
         byte[] _bytes;
         int _byteIndex = 0;

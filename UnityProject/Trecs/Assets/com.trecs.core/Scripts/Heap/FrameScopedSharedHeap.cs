@@ -256,7 +256,7 @@ namespace Trecs
 
             // IdCounter handling for frame-scoped heaps is subtle. There are two callers:
             //
-            //   1) Full state restore (e.g. EcsStateSerializer loading a save). The world has
+            //   1) Full state restore (e.g. WorldStateSerializer loading a save). The world has
             //      been reset, so _idCounter is at its initial value. We want to take the
             //      saved value to preserve replay determinism — subsequent allocations must
             //      produce the same address sequence as the original run.

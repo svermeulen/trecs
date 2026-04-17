@@ -75,6 +75,7 @@ nav:
       - 10 - Pointers: samples/10-pointers.md
       - 11 - Snake: samples/11-snake.md
       - 12 - Feeding Frenzy Benchmark: samples/12-feeding-frenzy-benchmark.md
+      - 13 - Save Game: samples/13-save-game.md
   - Recipes:
       - OOP Integration: recipes/oop-integration.md
       - Entity Subset Patterns: recipes/entity-subset-patterns.md

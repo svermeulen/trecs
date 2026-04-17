@@ -1,15 +1,23 @@
 using System;
+using System.IO;
 using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
+    /// <summary>
+    /// Records inputs + periodic world-state checksums across a span of fixed
+    /// frames, then writes the recording to a stream or file. The resulting
+    /// recording can be replayed by <see cref="PlaybackHandler"/>.
+    ///
+    /// Main-thread only.
+    /// </summary>
     public class RecordingHandler : IInputHistoryLocker, IDisposable
     {
         static readonly TrecsLog _log = new(nameof(RecordingHandler));
 
-        readonly IGameStateSerializer _gameStateSerializer;
-        readonly SerializationBuffer _serializerHelper;
+        readonly WorldStateSerializer _worldStateSerializer;
+        readonly SerializationBuffer _buffer;
         readonly IDisposable _eventSubscription;
         readonly SimpleSubject _checksumRecorded = new();
         readonly RecordingChecksumCalculator _checksumCalculator;
@@ -17,21 +25,27 @@ namespace Trecs.Serialization
 
         WorldAccessor _world;
         bool _isRecording;
+        bool _disposed;
         RecordingInfo _recordingInfo;
         int _recordingVersion;
 
         public RecordingHandler(
-            BlobCache blobCache,
-            RecordingChecksumCalculator checksumCalculator,
-            IGameStateSerializer gameStateSerializer,
-            SerializerRegistry serializerManager,
+            WorldStateSerializer worldStateSerializer,
+            SerializerRegistry registry,
             World world
         )
         {
-            _blobCache = blobCache;
-            _checksumCalculator = checksumCalculator;
-            _gameStateSerializer = gameStateSerializer;
-            _serializerHelper = new SerializationBuffer(serializerManager);
+            if (worldStateSerializer == null)
+                throw new ArgumentNullException(nameof(worldStateSerializer));
+            if (registry == null)
+                throw new ArgumentNullException(nameof(registry));
+            if (world == null)
+                throw new ArgumentNullException(nameof(world));
+
+            _worldStateSerializer = worldStateSerializer;
+            _checksumCalculator = new RecordingChecksumCalculator(worldStateSerializer);
+            _blobCache = world.GetBlobCache();
+            _buffer = new SerializationBuffer(registry);
 
             _world = world.CreateAccessor();
             _eventSubscription = _world.Events.OnFixedUpdateCompleted(OnFixedUpdateCompleted);
@@ -60,43 +74,33 @@ namespace Trecs.Serialization
             }
         }
 
-        public SerializationBuffer SerializerHelper
-        {
-            get { return _serializerHelper; }
-        }
-
-        public void MakeBookmark(int version, bool includeTypeChecks)
-        {
-            Assert.That(_isRecording);
-
-            _gameStateSerializer.StartSerialize(
-                version: version,
-                _serializerHelper,
-                _gameStateSerializer.SerializationFlags,
-                includeTypeChecks: includeTypeChecks
-            );
-
-            var bookmarkMetadata = new BookmarkMetadata();
-
-            _blobCache.GetAllActiveBlobIds(bookmarkMetadata.BlobIds);
-
-            _serializerHelper.Write("metadata", bookmarkMetadata);
-            _gameStateSerializer.SerializeCurrentState(_serializerHelper);
-            var numBytes = _serializerHelper.EndWrite();
-
-            _log.Trace("Recording bookmark ({0.00} kb)", numBytes / 1024f);
-        }
-
+        /// <summary>
+        /// Start capturing inputs + checksums from the current fixed frame.
+        /// </summary>
+        /// <param name="version">User-defined schema version stored in the recording header.</param>
+        /// <param name="checksumsEnabled">When false, checksums are skipped (useful when profiling — checksums are the main recording cost).</param>
+        /// <param name="checksumFrameInterval">One checksum every N fixed frames. Must be >= 1.</param>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="checksumFrameInterval"/> is less than 1.</exception>
+        /// <exception cref="InvalidOperationException">A recording is already in progress.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
         public void StartRecording(int version, bool checksumsEnabled, int checksumFrameInterval)
         {
 #if TRECS_IS_PROFILING
             _log.Warning("Recording while profiling is enabled");
 #endif
-            Assert.That(!_isRecording);
+            ThrowIfDisposed();
+            if (_isRecording)
+                throw new InvalidOperationException(
+                    "Cannot StartRecording: a recording is already in progress. Call EndRecording first."
+                );
+            if (checksumFrameInterval < 1)
+                throw new ArgumentOutOfRangeException(
+                    nameof(checksumFrameInterval),
+                    checksumFrameInterval,
+                    "checksumFrameInterval must be >= 1"
+                );
+
             _isRecording = true;
-
-            Assert.IsNull(_recordingInfo);
-
             _recordingVersion = version;
 
             _recordingInfo = new RecordingInfo
@@ -119,51 +123,73 @@ namespace Trecs.Serialization
             _blobCache.GetAllActiveBlobIds(_recordingInfo.BlobIds);
         }
 
-        public RecordingInfo EndRecording(SerializationBuffer serializerHelper)
+        /// <summary>
+        /// Finish the active recording, write the resulting bytes to
+        /// <paramref name="stream"/>, and return the metadata describing the
+        /// recording.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="stream"/> is null.</exception>
+        /// <exception cref="InvalidOperationException">No recording is in progress.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
+        public RecordingMetadata EndRecording(Stream stream)
         {
-            Assert.That(_isRecording);
-            Assert.IsNotNull(_recordingInfo);
+            ThrowIfDisposed();
+            if (stream == null)
+                throw new ArgumentNullException(nameof(stream));
+            if (!_isRecording)
+                throw new InvalidOperationException(
+                    "Cannot EndRecording: no recording is currently in progress."
+                );
 
             var finalFrame = _world.FixedFrame;
-
-            _gameStateSerializer.StartSerialize(
-                version: _recordingVersion,
-                serializerHelper,
-                _gameStateSerializer.SerializationFlags,
-                includeTypeChecks: true
-            );
-
             _blobCache.GetAllActiveBlobIds(_recordingInfo.BlobIds);
 
-            long bytesStart = serializerHelper.NumBytesWritten;
-            serializerHelper.Write(
-                "metadata",
-                new DebugRecordingMetadata(
-                    startFixedFrame: _recordingInfo.StartFrame,
-                    endFixedFrame: finalFrame,
-                    checksums: _recordingInfo.Checksums,
-                    blobIds: _recordingInfo.BlobIds
-                )
-            );
-            _log.Debug(
-                "Serialized metadata ({0.00} kb)",
-                (serializerHelper.NumBytesWritten - bytesStart) / 1024f
+            var metadata = new RecordingMetadata(
+                version: _recordingVersion,
+                startFixedFrame: _recordingInfo.StartFrame,
+                endFixedFrame: finalFrame,
+                checksums: _recordingInfo.Checksums,
+                blobIds: _recordingInfo.BlobIds
             );
 
-            var entityInputQueue = _world.GetEntityInputQueue();
+            _buffer.ClearMemoryStream();
+            _buffer.StartWrite(version: _recordingVersion, includeTypeChecks: true);
 
-            entityInputQueue.Serialize(
-                new Trecs.Serialization.TrecsSerializationWriterAdapter(serializerHelper)
-            );
-            _log.Debug(
-                "Serialized EntityInputQueue ({0.00} kb)",
-                (serializerHelper.NumBytesWritten - bytesStart) / 1024f
-            );
+            long recordingNumBytes;
+            try
+            {
+                long bytesStart = _buffer.NumBytesWritten;
+                _buffer.Write("metadata", metadata);
+                _log.Debug(
+                    "Serialized metadata ({0.00} kb)",
+                    (_buffer.NumBytesWritten - bytesStart) / 1024f
+                );
 
-            serializerHelper.Write<int>("recordingSentinel", TrecsConstants.RecordingSentinelValue);
-            var recordingNumBytes = serializerHelper.EndWrite();
+                var entityInputQueue = _world.GetEntityInputQueue();
+                entityInputQueue.Serialize(
+                    new Trecs.Serialization.TrecsSerializationWriterAdapter(_buffer)
+                );
+                _log.Debug(
+                    "Serialized EntityInputQueue ({0.00} kb)",
+                    (_buffer.NumBytesWritten - bytesStart) / 1024f
+                );
 
-            serializerHelper.MemoryStream.Position = 0;
+                _buffer.Write<int>("recordingSentinel", TrecsConstants.RecordingSentinelValue);
+                recordingNumBytes = _buffer.EndWrite();
+            }
+            catch
+            {
+                _buffer.ResetForErrorRecovery();
+                // Preserve in-progress recording state so the caller can retry or End again;
+                // but un-wire the history locker so we don't lock input history indefinitely.
+                _world.GetEntityInputQueue().RemoveHistoryLocker(this);
+                _recordingInfo = null;
+                _isRecording = false;
+                throw;
+            }
+
+            _buffer.MemoryStream.Position = 0;
+            _buffer.MemoryStream.CopyTo(stream);
 
             var startFrame = _recordingInfo.StartFrame;
             var numFrames = finalFrame - startFrame;
@@ -174,12 +200,33 @@ namespace Trecs.Serialization
                 _recordingInfo.Checksums.Count
             );
 
-            entityInputQueue.RemoveHistoryLocker(this);
-
-            var recordingInfo = _recordingInfo;
+            _world.GetEntityInputQueue().RemoveHistoryLocker(this);
             _recordingInfo = null;
             _isRecording = false;
-            return recordingInfo;
+            return metadata;
+        }
+
+        /// <summary>
+        /// Finish the active recording and write the resulting bytes to
+        /// <paramref name="filePath"/>. Creates the parent directory if needed.
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="filePath"/> is null or empty.</exception>
+        /// <exception cref="InvalidOperationException">No recording is in progress.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
+        public RecordingMetadata EndRecording(string filePath)
+        {
+            ThrowIfDisposed();
+            if (string.IsNullOrEmpty(filePath))
+                throw new ArgumentException("filePath must be non-empty", nameof(filePath));
+
+            var dir = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            using var fs = File.Create(filePath);
+            return EndRecording(fs);
         }
 
         void OnFixedUpdateCompleted()
@@ -201,8 +248,7 @@ namespace Trecs.Serialization
                 {
                     var checksum = _checksumCalculator.CalculateCurrentChecksum(
                         version: _recordingVersion,
-                        _serializerHelper,
-                        _gameStateSerializer.ChecksumSerializationFlags
+                        _buffer
                     );
 
                     // Note that we can't do Add here because we sometimes record the client, which can do rollbacks,
@@ -215,16 +261,37 @@ namespace Trecs.Serialization
 #endif
         }
 
-        public void Dispose()
+        void ThrowIfDisposed()
         {
-            Assert.That(!_isRecording);
-            Assert.IsNull(_recordingInfo);
-
-            _eventSubscription.Dispose();
-            _serializerHelper.Dispose();
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(RecordingHandler));
+            }
         }
 
-        public class RecordingInfo
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+
+            if (_isRecording)
+            {
+                _log.Warning(
+                    "Disposing RecordingHandler while recording is active — recording data will be discarded"
+                );
+                _recordingInfo = null;
+                _isRecording = false;
+                _world.GetEntityInputQueue().RemoveHistoryLocker(this);
+            }
+
+            _eventSubscription.Dispose();
+            _buffer.Dispose();
+        }
+
+        class RecordingInfo
         {
             public int StartFrame;
             public bool ChecksumsEnabled;

@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using TMPro;
-using Trecs.Serialization;
 using UnityEngine;
 
 namespace Trecs.Samples.Snake
@@ -42,7 +41,12 @@ namespace Trecs.Samples.Snake
             var goManager = new RenderableGameObjectManager(world);
             RegisterPrefabs(goManager);
 
-            var serialization = TrecsSerialization.Create(world);
+            // SerializationFactory bundles the registry + WorldStateSerializer +
+            // BookmarkSerializer + RecordingHandler + PlaybackHandler.
+            // All of Snake's components are blittable so no custom serializers
+            // are needed; if you add a non-blittable component to your own game,
+            // register a custom ISerializer<T> via serialization.Registry here.
+            var serialization = SerializationFactory.CreateAll(world);
 
             var recordController = new RecordAndPlaybackController(
                 serialization,

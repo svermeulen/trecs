@@ -43,6 +43,27 @@ public partial class PlayerBullet : ITemplate, IHasTags<GameTags.Bullet, GameTag
 
 See [Tags](tags.md) for details on how tags are used.
 
+## Templates and Tags: Who Does What
+
+Templates and tags are closely related but play distinct roles, and understanding the split is key to using Trecs idiomatically:
+
+- **A template is the concrete shape.** It declares the exact component layout an entity is spawned with, along with defaults, partitions, and which tags the entity carries. The template class is referenced when you *define* the entity kind (the partial class itself), when you *register* it with the builder (`AddEntityType(EnemyEntity.Template)`), and when other templates extend it via `IExtends<EnemyEntity>`.
+- **A tag is the identity handle that the rest of the code uses.** Systems, queries, aspects, events, and cross-entity references all refer to entities through their tags, not through their template class. `[ForEachEntity(Tags = new[] { typeof(GameTags.Enemy) })]` and `World.CountEntitiesWithTags<GameTags.Enemy>()` are the normal ways to talk about "enemies" — runtime/system code should not name the template class directly. The split keeps gameplay code from depending on the concrete blueprint.
+
+In other words, **templates describe the shape; tags are the vocabulary**. This separation is deliberate: systems stay decoupled from concrete entity definitions, so you can evolve a template (add a component, split it into two templates, change inheritance) without touching any system code, as long as the tag contract stays the same.
+
+### Tags as a Proxy for Entity Type
+
+Because every template declares at least one identity tag, tags effectively act as a proxy for "entity type":
+
+- A tag can correspond **1:1 to a concrete template** — e.g. `GameTags.Spinner` is carried only by `SpinnerEntity`, so querying by that tag is equivalent to querying that specific entity type.
+- A tag can correspond to **an abstract role shared across many templates** — e.g. a `CommonTags.Renderable` tag declared on a base template is inherited by every template that does `IExtends<Renderable>`. Querying by the role tag iterates every entity that fulfills it, regardless of which concrete template produced it. This is the closest analogue Trecs has to "interface" or "base class" polymorphism for entities.
+- A tag can also be **orthogonal state** — e.g. `Alive` / `Dead`, `Active` / `Resting` — used as partition labels or transient markers rather than identity.
+
+The pattern to internalize: **systems read tags, templates write tags.** When you introduce a new entity kind, you pick its tags (reusing role tags where it fits, adding a fresh identity tag if it's genuinely new), declare them via `IHasTags<>` / `IExtends<>`, and the rest of the codebase queries by those tags without needing to know which template produced the entity.
+
+See [Tags](tags.md) for the mechanics of declaring and querying tags, and [Groups & TagSets](../advanced/groups-and-tagsets.md) for how tag combinations map to storage.
+
 ## Template Inheritance
 
 Use `IExtends<T>` to inherit components and tags from a base template:

@@ -2,7 +2,7 @@ using Trecs.Collections;
 
 namespace Trecs.Serialization
 {
-    public class BlobManifestSerializer : ISerializer<BlobManifest>
+    internal class BlobManifestSerializer : ISerializer<BlobManifest>
     {
         public BlobManifestSerializer() { }
 

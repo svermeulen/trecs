@@ -112,6 +112,7 @@ namespace Trecs
 
                 if (phaseDefault == PhaseDefault.Fixed)
                 {
+                    AssertTimeAccessAllowedInFixedPhase(nameof(DeltaTime));
                     return _systemRunner.FixedDeltaTime;
                 }
 
@@ -140,6 +141,7 @@ namespace Trecs
 
                 if (phaseDefault == PhaseDefault.Fixed)
                 {
+                    AssertTimeAccessAllowedInFixedPhase(nameof(ElapsedTime));
                     return _systemRunner.FixedElapsedTime;
                 }
 
@@ -279,7 +281,7 @@ namespace Trecs
         {
             get
             {
-
+                AssertTimeAccessAllowedInFixedPhaseIfInFixedPhase(nameof(FixedDeltaTime));
                 return _systemRunner.FixedDeltaTime;
             }
         }
@@ -298,7 +300,7 @@ namespace Trecs
         {
             get
             {
-
+                AssertTimeAccessAllowedInFixedPhaseIfInFixedPhase(nameof(FixedElapsedTime));
                 return _systemRunner.FixedElapsedTime;
             }
         }
@@ -707,14 +709,28 @@ namespace Trecs
         public NativeWorldAccessor ToNative()
         {
             var phase = GetPhaseDefault();
-            float dt =
-                phase == PhaseDefault.Fixed ? _systemRunner.FixedDeltaTime
-                : phase == PhaseDefault.Variable ? _systemRunner.VariableDeltaTime
-                : 0f;
-            float et =
-                phase == PhaseDefault.Fixed ? _systemRunner.FixedElapsedTime
-                : phase == PhaseDefault.Variable ? _systemRunner.VariableElapsedTime
-                : 0f;
+            float dt;
+            float et;
+
+            if (phase == PhaseDefault.Fixed && _systemRunner.AssertNoTimeInFixedPhase)
+            {
+                // Burst jobs can't throw, so we poison DeltaTime/ElapsedTime with NaN
+                // to make any arithmetic that reads them produce visibly broken output.
+                dt = float.NaN;
+                et = float.NaN;
+            }
+            else
+            {
+                dt =
+                    phase == PhaseDefault.Fixed ? _systemRunner.FixedDeltaTime
+                    : phase == PhaseDefault.Variable ? _systemRunner.VariableDeltaTime
+                    : 0f;
+                et =
+                    phase == PhaseDefault.Fixed ? _systemRunner.FixedElapsedTime
+                    : phase == PhaseDefault.Variable ? _systemRunner.VariableElapsedTime
+                    : 0f;
+            }
+
             return _structuralOps.GetNativeWorldAccessor(Id, CanMakeStructuralChanges, dt, et);
         }
 
@@ -1186,6 +1202,25 @@ namespace Trecs
                 "Attempted to use variable update only functionality from fixed context {}",
                 DebugName
             );
+        }
+
+        void AssertTimeAccessAllowedInFixedPhase(string memberName)
+        {
+            Assert.That(
+                !_systemRunner.AssertNoTimeInFixedPhase,
+                "Cannot access {} in the fixed-update phase when WorldSettings.AssertNoTimeInFixedPhase is enabled. "
+                    + "Wall-time values are not part of the deterministic simulation contract - use FixedFrame as a tick counter instead. (Context: {})",
+                memberName,
+                DebugName
+            );
+        }
+
+        void AssertTimeAccessAllowedInFixedPhaseIfInFixedPhase(string memberName)
+        {
+            if (GetPhaseDefault() == PhaseDefault.Fixed)
+            {
+                AssertTimeAccessAllowedInFixedPhase(memberName);
+            }
         }
 
         PhaseDefault GetPhaseDefault()

@@ -60,7 +60,7 @@ public class MyCompositionRoot : CompositionRootBase
 ```
 
 !!! note
-    This pattern is just a lightweight convenience for the samples. Trecs is deliberately unopinionated about how you structure your application — it doesn't register MonoBehaviours, manage singletons, or hook into Unity's update loop automatically. In a real project, you would use whatever approach you prefer for building your object graph: a dependency injection framework (e.g., Zenject, VContainer), plain MonoBehaviours, ScriptableObjects, or anything else. All Trecs needs is for your code to call `world.Tick()`, `world.LateTick()`, and `world.Dispose()` at the appropriate times.
+    This pattern is just a lightweight convenience for the samples. Trecs is deliberately unopinionated about how you structure your application — it doesn't register MonoBehaviours, manage singletons, or hook into Unity's update loop automatically. In a real project, you would use whatever approach you prefer for building your object graph: a dependency injection framework (e.g., Reflex, Zenject, VContainer), plain MonoBehaviours, ScriptableObjects, or anything else. All Trecs needs is for your code to call `world.Tick()`, `world.LateTick()`, and `world.Dispose()` at the appropriate times.
 
 ## Shared Utilities
 
@@ -70,3 +70,5 @@ The `Common/` directory contains utilities shared across samples:
 - **RendererSystem** — GPU-instanced indirect rendering for high entity counts
 - **RecordAndPlaybackController** — recording/replay with bookmark support
 - Common components, templates, tags
+
+Note that the samples use some of this helper code in Common/ and that this code is not part of the Trecs library itself. So if you copy code from the samples, be sure to also copy any dependencies from Common

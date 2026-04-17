@@ -4,7 +4,7 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
-    public class BitWriter
+    internal class BitWriter
     {
         readonly List<byte> _bytes = new();
         byte _currentByte = 0;

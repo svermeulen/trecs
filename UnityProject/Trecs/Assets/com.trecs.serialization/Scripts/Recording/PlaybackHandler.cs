@@ -1,50 +1,80 @@
 using System;
+using System.IO;
 using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
+    public enum PlaybackState
+    {
+        Idle,
+        Playing,
+        Desynced,
+    }
+
+    /// <summary>
+    /// Replays a recording captured by <see cref="RecordingHandler"/>,
+    /// verifying checksums per frame and surfacing desyncs.
+    ///
+    /// Main-thread only.
+    /// </summary>
     public class PlaybackHandler : IInputHistoryLocker, IDisposable
     {
         static readonly TrecsLog _log = new(nameof(PlaybackHandler));
 
-        readonly IGameStateSerializer _gameStateSerializer;
+        readonly WorldStateSerializer _worldStateSerializer;
         readonly RecordingChecksumCalculator _checksumCalculator;
         readonly BookmarkSerializer _bookmarkSerializer;
-        readonly SerializationBuffer _checksumSerializerHelper;
+        readonly SerializationBuffer _buffer;
+        readonly SerializationBuffer _checksumBuffer;
         readonly WorldAccessor _world;
-        bool _isPlaying;
-        bool _hasDesynced;
-        DebugRecordingMetadata _playbackMetadata;
+
+        PlaybackState _state = PlaybackState.Idle;
+        RecordingMetadata _playbackMetadata;
         int _version;
+        bool _disposed;
 
         public PlaybackHandler(
-            IGameStateSerializer gameStateSerializer,
-            RecordingChecksumCalculator checksumCalculator,
+            WorldStateSerializer worldStateSerializer,
             BookmarkSerializer bookmarkSerializer,
-            SerializerRegistry serializerManager,
-            World ecsProvider
+            SerializerRegistry registry,
+            World world
         )
         {
-            _gameStateSerializer = gameStateSerializer;
-            _checksumCalculator = checksumCalculator;
-            _bookmarkSerializer = bookmarkSerializer;
-            _checksumSerializerHelper = new SerializationBuffer(serializerManager);
+            if (worldStateSerializer == null)
+                throw new ArgumentNullException(nameof(worldStateSerializer));
+            if (bookmarkSerializer == null)
+                throw new ArgumentNullException(nameof(bookmarkSerializer));
+            if (registry == null)
+                throw new ArgumentNullException(nameof(registry));
+            if (world == null)
+                throw new ArgumentNullException(nameof(world));
 
-            _world = ecsProvider.CreateAccessor();
+            _worldStateSerializer = worldStateSerializer;
+            _checksumCalculator = new RecordingChecksumCalculator(worldStateSerializer);
+            _bookmarkSerializer = bookmarkSerializer;
+            _buffer = new SerializationBuffer(registry);
+            _checksumBuffer = new SerializationBuffer(registry);
+
+            _world = world.CreateAccessor();
+        }
+
+        public PlaybackState State
+        {
+            get { return _state; }
         }
 
         public bool IsPlaying
         {
-            get { return _isPlaying; }
+            get { return _state == PlaybackState.Playing || _state == PlaybackState.Desynced; }
         }
 
         public bool HasDesynced
         {
-            get { return _hasDesynced; }
+            get { return _state == PlaybackState.Desynced; }
         }
 
-        public DebugRecordingMetadata PlaybackMetadata
+        public RecordingMetadata PlaybackMetadata
         {
             get { return _playbackMetadata; }
         }
@@ -53,27 +83,29 @@ namespace Trecs.Serialization
         {
             get
             {
-                Assert.That(_isPlaying);
+                Assert.That(IsPlaying);
                 return -1;
             }
         }
 
         /// <summary>
-        /// Load and deserialize initial state from a pre-loaded serializer helper.
-        /// The caller is responsible for loading the initial state bookmark data into the
-        /// serializerHelper's memory stream before calling this.
-        /// Returns false if the static seed is incompatible.
+        /// Load an initial-state bookmark and restore it into the live world,
+        /// optionally verifying a post-deserialization checksum.
         /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="bookmarkStream"/> is null.</exception>
+        /// <exception cref="SerializationException">The bookmark payload is invalid.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
         public bool LoadInitialState(
-            SerializationBuffer serializerHelper,
+            Stream bookmarkStream,
             uint? expectedInitialChecksum,
             int version
         )
         {
-            if (!_bookmarkSerializer.Load(serializerHelper))
-            {
-                return false;
-            }
+            ThrowIfDisposed();
+            if (bookmarkStream == null)
+                throw new ArgumentNullException(nameof(bookmarkStream));
+
+            _bookmarkSerializer.LoadBookmark(bookmarkStream);
 
             if (expectedInitialChecksum.HasValue)
             {
@@ -83,12 +115,33 @@ namespace Trecs.Serialization
             return true;
         }
 
+        /// <summary>
+        /// Load an initial-state bookmark from a file path.
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="bookmarkPath"/> is null or empty.</exception>
+        /// <exception cref="FileNotFoundException">No file at <paramref name="bookmarkPath"/>.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
+        public bool LoadInitialState(
+            string bookmarkPath,
+            uint? expectedInitialChecksum,
+            int version
+        )
+        {
+            ThrowIfDisposed();
+            if (string.IsNullOrEmpty(bookmarkPath))
+                throw new ArgumentException("bookmarkPath must be non-empty", nameof(bookmarkPath));
+            if (!File.Exists(bookmarkPath))
+                throw new FileNotFoundException("Bookmark file not found", bookmarkPath);
+
+            using var fs = File.OpenRead(bookmarkPath);
+            return LoadInitialState(fs, expectedInitialChecksum, version);
+        }
+
         void VerifyPostDeserializationChecksum(uint expectedChecksum, int version)
         {
             var postDeserializeChecksum = _checksumCalculator.CalculateCurrentChecksum(
                 version: version,
-                _checksumSerializerHelper,
-                _gameStateSerializer.ChecksumSerializationFlags
+                _checksumBuffer
             );
 
             if (postDeserializeChecksum == expectedChecksum)
@@ -112,41 +165,59 @@ namespace Trecs.Serialization
         }
 
         /// <summary>
-        /// Start playback with recording data pre-loaded into params.SerializerHelper.
-        /// The caller is responsible for loading the recording file data into the
-        /// serializer helper's memory stream before calling this.
+        /// Start playback from <paramref name="recordingStream"/>.
         /// </summary>
-        public void StartPlayback(PlaybackStartParams startParams)
+        /// <exception cref="ArgumentNullException"><paramref name="recordingStream"/> is null.</exception>
+        /// <exception cref="InvalidOperationException">Playback is already active.</exception>
+        /// <exception cref="SerializationException">The recording payload is invalid.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
+        public void StartPlayback(Stream recordingStream, PlaybackStartParams startParams)
         {
-            Assert.That(!_isPlaying);
+            ThrowIfDisposed();
+            if (recordingStream == null)
+                throw new ArgumentNullException(nameof(recordingStream));
+            if (_state != PlaybackState.Idle)
+                throw new InvalidOperationException(
+                    "Cannot StartPlayback: playback is already active. Call EndPlayback first."
+                );
 
             _version = startParams.Version;
 
-            var serializerHelper = startParams.SerializerHelper;
+            _buffer.ClearMemoryStream();
+            recordingStream.CopyTo(_buffer.MemoryStream);
+            if (_buffer.MemoryStream.Length == 0)
+            {
+                throw new SerializationException(
+                    "Recording stream is empty — cannot start playback on an empty recording."
+                );
+            }
+            _buffer.MemoryStream.Position = 0;
+            _buffer.StartRead();
 
-            var succeeded = _gameStateSerializer.StartDeserialize(
-                serializerHelper,
-                startParams.SerializationFlags
-            );
-            Assert.That(succeeded);
+            RecordingMetadata recordingMetadata;
+            try
+            {
+                recordingMetadata = _buffer.Read<RecordingMetadata>("metadata");
 
-            var recordingMetadata = serializerHelper.Read<DebugRecordingMetadata>("metadata");
+                var queueForRead = _world.GetEntityInputQueue();
+                queueForRead.ClearAllInputs();
+                queueForRead.Deserialize(
+                    new Trecs.Serialization.TrecsSerializationReaderAdapter(_buffer)
+                );
+
+                var sentinelValue = _buffer.Read<int>("sentinel");
+                Assert.IsEqual(sentinelValue, TrecsConstants.RecordingSentinelValue);
+
+                _buffer.StopRead(verifySentinel: true);
+            }
+            catch
+            {
+                _buffer.ResetForErrorRecovery();
+                throw;
+            }
 
             var entityInputQueue = _world.GetEntityInputQueue();
-
-            entityInputQueue.ClearAllInputs();
-            entityInputQueue.Deserialize(
-                new Trecs.Serialization.TrecsSerializationReaderAdapter(serializerHelper)
-            );
-
             entityInputQueue.AddHistoryLocker(this);
-
-            var sentinelValue = serializerHelper.Read<int>("sentinel");
-            Assert.IsEqual(sentinelValue, TrecsConstants.RecordingSentinelValue);
-
-            serializerHelper.StopRead(verifySentinel: true);
-
-            _hasDesynced = false;
 
             // InputsOnly mode: remap input frames to be relative to current frame
             if (startParams.InputsOnly)
@@ -173,7 +244,8 @@ namespace Trecs.Serialization
                     adjustedChecksums.Add(frame + frameOffset, checksum);
                 }
 
-                recordingMetadata = new DebugRecordingMetadata(
+                recordingMetadata = new RecordingMetadata(
+                    recordingMetadata.Version,
                     adjustedStartFrame,
                     adjustedEndFrame,
                     adjustedChecksums,
@@ -184,20 +256,49 @@ namespace Trecs.Serialization
             _playbackMetadata = recordingMetadata;
 
             SetInputsEnabled(false);
-            _isPlaying = true;
+            _state = PlaybackState.Playing;
         }
 
         /// <summary>
-        /// Called each fixed update during playback. Performs checksum verification
-        /// and desync detection.
+        /// Start playback from a recording at <paramref name="recordingPath"/>.
         /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="recordingPath"/> is null or empty.</exception>
+        /// <exception cref="FileNotFoundException">No file at <paramref name="recordingPath"/>.</exception>
+        /// <exception cref="InvalidOperationException">Playback is already active.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
+        public void StartPlayback(string recordingPath, PlaybackStartParams startParams)
+        {
+            ThrowIfDisposed();
+            if (string.IsNullOrEmpty(recordingPath))
+                throw new ArgumentException(
+                    "recordingPath must be non-empty",
+                    nameof(recordingPath)
+                );
+            if (!File.Exists(recordingPath))
+                throw new FileNotFoundException("Recording file not found", recordingPath);
+
+            using var fs = File.OpenRead(recordingPath);
+            StartPlayback(fs, startParams);
+        }
+
+        /// <summary>
+        /// Call each fixed update during playback. Verifies the current-frame
+        /// checksum (if one was recorded for this frame) and surfaces desyncs
+        /// via the returned <see cref="PlaybackTickResult"/>.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Playback is not active.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
         public PlaybackTickResult TickPlayback()
         {
-            Assert.That(_isPlaying);
+            ThrowIfDisposed();
+            if (!IsPlaying)
+                throw new InvalidOperationException(
+                    "Cannot TickPlayback: playback is not active. Call StartPlayback first."
+                );
 
             var result = new PlaybackTickResult();
 
-            if (!_hasDesynced)
+            if (_state != PlaybackState.Desynced)
             {
                 var checksums = _playbackMetadata.Checksums;
                 var currentFrame = _world.FixedFrame;
@@ -210,8 +311,7 @@ namespace Trecs.Serialization
 
                     var actualChecksum = _checksumCalculator.CalculateCurrentChecksum(
                         version: _version,
-                        _checksumSerializerHelper,
-                        _gameStateSerializer.ChecksumSerializationFlags
+                        _checksumBuffer
                     );
 
                     result.ChecksumVerified = true;
@@ -230,7 +330,7 @@ namespace Trecs.Serialization
                             actualChecksum,
                             expectedChecksum
                         );
-                        _hasDesynced = true;
+                        _state = PlaybackState.Desynced;
                         result.DesyncDetected = true;
                     }
                 }
@@ -239,9 +339,16 @@ namespace Trecs.Serialization
             return result;
         }
 
+        /// <summary>
+        /// End the current playback session.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Playback is not active.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
         public void EndPlayback()
         {
-            Assert.That(_isPlaying);
+            ThrowIfDisposed();
+            if (!IsPlaying)
+                throw new InvalidOperationException("Cannot EndPlayback: playback is not active.");
 
             var entityInputQueue = _world.GetEntityInputQueue();
 
@@ -251,7 +358,7 @@ namespace Trecs.Serialization
             SetInputsEnabled(true);
 
             _playbackMetadata = null;
-            _isPlaying = false;
+            _state = PlaybackState.Idle;
 
             _log.Info("Playback ended");
         }
@@ -270,10 +377,38 @@ namespace Trecs.Serialization
             }
         }
 
+        void ThrowIfDisposed()
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(PlaybackHandler));
+            }
+        }
+
         public void Dispose()
         {
-            Assert.That(!_isPlaying);
-            _checksumSerializerHelper.Dispose();
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+
+            if (IsPlaying)
+            {
+                _log.Warning(
+                    "Disposing PlaybackHandler while playback is active — ending playback first"
+                );
+                // EndPlayback checks _disposed first so call its implementation inline.
+                var entityInputQueue = _world.GetEntityInputQueue();
+                entityInputQueue.RemoveHistoryLocker(this);
+                entityInputQueue.ClearFutureInputsAfterOrAt(_world.FixedFrame);
+                SetInputsEnabled(true);
+                _playbackMetadata = null;
+                _state = PlaybackState.Idle;
+            }
+
+            _buffer.Dispose();
+            _checksumBuffer.Dispose();
         }
     }
 }

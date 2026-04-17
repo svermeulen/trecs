@@ -6,7 +6,16 @@ A complete grid-based game with deterministic input handling, recording/playback
 
 ## What It Does
 
-Classic Snake — a head moves on a grid, eats food to grow, and leaves a trail of body segments. The game supports deterministic recording and playback via F5/F6/F7 keys.
+Classic Snake — a head moves on a grid, eats food to grow, and leaves a trail of body segments. The game supports deterministic recording and playback via hotkeys:
+
+| Key | Action |
+|---|---|
+| F5 | Toggle recording |
+| F6 | Toggle playback |
+| F8 | Save bookmark |
+| F9 | Load bookmark |
+
+Recordings and bookmarks are written under `{Application.persistentDataPath}/Snake/Recordings/`.
 
 ## Schema
 
@@ -152,7 +161,9 @@ new WorldBuilder()
     // ...
 ```
 
-The `RecordAndPlaybackController` handles F5 (record), F6 (stop), F7 (playback), F8/F9 (bookmarks).
+Serialization is wired in via the sample-side `SerializationFactory.CreateAll(world)` helper (in `Samples/Common/Scripts/`), which composes a registry + `WorldStateSerializer` + `BookmarkSerializer` + `RecordingHandler` + `PlaybackHandler`. The `RecordAndPlaybackController` reads keyboard input and drives `SaveBookmark(path)` / `LoadBookmark(path)` / `EndRecording(path)` / `StartPlayback(path, ...)` against file paths under `persistentDataPath`.
+
+See [Serialization](../advanced/serialization.md) for custom-serializer authoring and [Recording & Playback](../advanced/recording-and-playback.md) for the full handler API.
 
 ## Concepts Introduced
 

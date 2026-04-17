@@ -2,7 +2,7 @@ using System;
 
 namespace Trecs.Serialization
 {
-    public class DeprecatedSerializer<T> : ISerializer<T>
+    internal class DeprecatedSerializer<T> : ISerializer<T>
         where T : unmanaged
     {
         public void Serialize(in T value, ISerializationWriter recursiveWriter)

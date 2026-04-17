@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using Trecs.Internal;
-using Trecs.Serialization;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -65,7 +64,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             var world = worldBuilder.Build();
 
             var subsetApproachDynamicSwitcher = new SubsetApproachDynamicSwitcher(world);
-            var serialization = TrecsSerialization.Create(world);
+            var serialization = SerializationFactory.CreateAll(world);
             var recordAndPlayback = new RecordAndPlaybackController(
                 serialization,
                 world,

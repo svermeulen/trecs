@@ -126,6 +126,9 @@ public struct AudioSourceRef : IEntityComponent
 }
 ```
 
+!!! warning "Heap blob types must be serializable"
+    If you save/load or record/replay your world, every `T` you allocate on the heap (`SharedPtr<T>`, `UniquePtr<T>`, `NativeSharedPtr<T>`, `NativeUniquePtr<T>`) must have a serializer registered — blobs are written as part of world state using their registered `ISerializer<T>`. Unmanaged `T` is covered by `RegisterBlit<T>`; managed types like Unity `AudioClip` / `Mesh` need a custom `ISerializer<T>` (or `RegisterSkip<T>` if the pointed-to data can be safely reconstructed from elsewhere on load). See [Serialization](../advanced/serialization.md) for details.
+
 ## Why This Separation Matters
 
 - **Determinism** — Layer 2 has no external dependencies, enabling recording and replay

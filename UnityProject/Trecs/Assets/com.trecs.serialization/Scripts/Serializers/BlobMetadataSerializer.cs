@@ -1,6 +1,6 @@
 namespace Trecs.Serialization
 {
-    public class BlobMetadataSerializer : ISerializer<BlobMetadata>
+    internal class BlobMetadataSerializer : ISerializer<BlobMetadata>
     {
         public BlobMetadataSerializer() { }
 

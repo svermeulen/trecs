@@ -45,12 +45,16 @@ namespace Trecs
         /// <summary>
         /// The time step for the current phase (fixed or variable), in seconds.
         /// Populated by <see cref="WorldAccessor.ToNative"/>.
+        /// Will be <see cref="float.NaN"/> in fixed-phase jobs when
+        /// <see cref="WorldSettings.AssertNoTimeInFixedPhase"/> is enabled.
         /// </summary>
         public readonly float DeltaTime;
 
         /// <summary>
         /// The total elapsed simulation time for the current phase, in seconds.
         /// Populated by <see cref="WorldAccessor.ToNative"/>.
+        /// Will be <see cref="float.NaN"/> in fixed-phase jobs when
+        /// <see cref="WorldSettings.AssertNoTimeInFixedPhase"/> is enabled.
         /// </summary>
         public readonly float ElapsedTime;
 

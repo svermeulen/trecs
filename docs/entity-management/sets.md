@@ -77,6 +77,49 @@ foreach (var particle in ParticleView.Query(World).InSet<HighlightedParticle>())
 int highlighted = World.Query().InSet<HighlightedParticle>().Count();
 ```
 
+## Per-Frame Staging
+
+A useful pattern is to use a set as a **per-frame scratch list** for cross-system communication: clear it at the start of the frame, have one system populate it with entities matching some criterion, then have downstream systems iterate just those members. This avoids re-evaluating the criterion in every consumer (rendering, physics sync, audio cues, etc.).
+
+For this to work *within a single frame*, you must use the **immediate** APIs (`AddImmediate`, `RemoveImmediate`, `Clear`). The deferred `SetAdd` / `SetRemove` calls queue until the next entity submission, so any system reading the set later in the same frame would see only the previous frame's contents.
+
+```csharp
+public partial class CullingSystem : ISystem
+{
+    public void Execute()
+    {
+        // Cache the writer once — Set<T>().Write does a sync up front.
+        var visible = World.Set<VisibleThisFrame>().Write;
+
+        // Reset the staging set at the start of the frame.
+        visible.Clear();
+
+        // Populate it with whatever the camera can see.
+        foreach (var r in Renderable.Query(World).WithTags<GameTags.Renderable>())
+        {
+            if (Frustum.Intersects(r.Bounds))
+                visible.AddImmediate(r.EntityIndex);
+        }
+    }
+
+    partial struct Renderable : IAspect, IRead<Bounds> { }
+}
+
+[ExecutesAfter(typeof(CullingSystem))]
+public partial class RenderSystem : ISystem
+{
+    // Iterates only the entities CullingSystem flagged this frame.
+    [ForEachEntity(Set = typeof(VisibleThisFrame))]
+    void Render(in MeshInfo mesh, in WorldTransform xform) { ... }
+}
+```
+
+A few notes:
+
+- Trecs does not auto-clear sets between frames. If you want a fresh set each frame, do the clear yourself in the producer system before populating.
+- Cache the `SetWrite<T>` view (returned by `Set<T>().Write`) outside the loop. The accessor performs a job sync on each access; caching it does the sync once and then writes go straight to the underlying buffer.
+- From a Burst job, use `NativeSetWrite` for the same `AddImmediate` / `RemoveImmediate` semantics with thread-safe writes.
+
 ## When to Use Sets vs Tags
 
 | | Tags | Sets |

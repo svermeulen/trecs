@@ -10,7 +10,7 @@ namespace Trecs.Samples
     /// Sample-side helper that wires Unity keyboard input to the Trecs
     /// recording, playback, and bookmark serialization APIs.
     ///
-    /// Keys: F5=Record, F6=Stop, F7=Playback, F8=Save Bookmark, F9=Load Bookmark.
+    /// Keys: F5=Toggle Record, F6=Toggle Playback, F8=Save Bookmark, F9=Load Bookmark.
     ///
     /// Recordings and bookmarks are written under
     /// <c>{Application.persistentDataPath}/{sampleName}/Recordings/</c>.
@@ -22,8 +22,6 @@ namespace Trecs.Samples
         readonly RecordingHandler _recordingHandler;
         readonly PlaybackHandler _playbackHandler;
         readonly BookmarkSerializer _bookmarkSerializer;
-        readonly IGameStateSerializer _gameStateSerializer;
-        readonly SerializationBuffer _serializerHelper;
         readonly WorldAccessor _world;
         readonly int _serializationVersion;
         readonly string _recordingPath;
@@ -40,11 +38,9 @@ namespace Trecs.Samples
         {
             Assert.That(!string.IsNullOrEmpty(sampleName));
 
-            _recordingHandler = serialization.RecordingHandler;
-            _playbackHandler = serialization.PlaybackHandler;
-            _bookmarkSerializer = serialization.BookmarkSerializer;
-            _gameStateSerializer = serialization.GameStateSerializer;
-            _serializerHelper = new SerializationBuffer(serialization.Registry);
+            _recordingHandler = serialization.Recorder;
+            _playbackHandler = serialization.Playback;
+            _bookmarkSerializer = serialization.Bookmarks;
             _world = world.CreateAccessor(nameof(RecordAndPlaybackController));
             _serializationVersion = serializationVersion;
 
@@ -59,7 +55,7 @@ namespace Trecs.Samples
             Directory.CreateDirectory(recordingDir);
 
             _log.Info(
-                "Recording controller ready. Keys: F5=Record, F6=Stop, F7=Playback, F8=Save Bookmark, F9=Load Bookmark"
+                "Recording controller ready. Keys: F5=Toggle Record, F6=Toggle Playback, F8=Save Bookmark, F9=Load Bookmark"
             );
         }
 
@@ -69,15 +65,11 @@ namespace Trecs.Samples
         {
             if (Input.GetKeyDown(KeyCode.F5))
             {
-                HandleStartRecording();
+                HandleToggleRecording();
             }
             else if (Input.GetKeyDown(KeyCode.F6))
             {
-                HandleStop();
-            }
-            else if (Input.GetKeyDown(KeyCode.F7))
-            {
-                HandleStartPlayback();
+                HandleTogglePlayback();
             }
             else if (Input.GetKeyDown(KeyCode.F8))
             {
@@ -89,14 +81,40 @@ namespace Trecs.Samples
             }
         }
 
+        void HandleToggleRecording()
+        {
+            switch (_state)
+            {
+                case ControllerState.Idle:
+                    HandleStartRecording();
+                    break;
+                case ControllerState.Recording:
+                    HandleStopRecording();
+                    break;
+                case ControllerState.Playback:
+                    _log.Warning("Cannot toggle recording while playback is active");
+                    break;
+            }
+        }
+
+        void HandleTogglePlayback()
+        {
+            switch (_state)
+            {
+                case ControllerState.Idle:
+                    HandleStartPlayback();
+                    break;
+                case ControllerState.Playback:
+                    HandleStopPlayback();
+                    break;
+                case ControllerState.Recording:
+                    _log.Warning("Cannot toggle playback while recording is active");
+                    break;
+            }
+        }
+
         void HandleStartRecording()
         {
-            if (_state != ControllerState.Idle)
-            {
-                _log.Warning("Cannot start recording: currently in {} state", _state);
-                return;
-            }
-
             _log.Info("Starting recording at frame {}", _world.FixedFrame);
 
             _recordingHandler.StartRecording(
@@ -105,70 +123,45 @@ namespace Trecs.Samples
                 checksumFrameInterval: 30
             );
 
-            // Save initial state bookmark
-            _bookmarkSerializer.Save(version: _serializationVersion, includeTypeChecks: true);
-
-            _bookmarkSerializer.SerializerHelper.MemoryStream.Position = 0;
-            SaveMemoryStreamToFile(_bookmarkSerializer.SerializerHelper, _bookmarkPath);
+            // Save initial state bookmark so playback can start from the correct point
+            _bookmarkSerializer.SaveBookmark(
+                version: _serializationVersion,
+                filePath: _bookmarkPath
+            );
 
             _state = ControllerState.Recording;
             _log.Info("Recording started");
         }
 
-        void HandleStop()
+        void HandleStopRecording()
         {
-            if (_state == ControllerState.Recording)
-            {
-                _recordingHandler.EndRecording(_serializerHelper);
-                SaveMemoryStreamToFile(_serializerHelper, _recordingPath);
+            _recordingHandler.EndRecording(_recordingPath);
+            _state = ControllerState.Idle;
+            _log.Info("Recording saved to {}", _recordingPath);
+        }
 
-                _state = ControllerState.Idle;
-                _log.Info("Recording saved to {}", _recordingPath);
-            }
-            else if (_state == ControllerState.Playback)
-            {
-                _playbackHandler.EndPlayback();
-
-                _state = ControllerState.Idle;
-                _log.Info("Playback stopped");
-            }
-            else
-            {
-                _log.Warning("Nothing to stop");
-            }
+        void HandleStopPlayback()
+        {
+            _playbackHandler.EndPlayback();
+            _state = ControllerState.Idle;
+            _log.Info("Playback stopped");
         }
 
         void HandleStartPlayback()
         {
-            if (_state != ControllerState.Idle)
-            {
-                _log.Warning("Cannot start playback: currently in {} state", _state);
-                return;
-            }
-
             if (!File.Exists(_recordingPath))
             {
                 _log.Warning("No recording found at {}", _recordingPath);
                 return;
             }
 
-            // Load initial state bookmark if it exists
             if (File.Exists(_bookmarkPath))
             {
-                ReadFileIntoMemoryStream(_serializerHelper, _bookmarkPath);
-
-                if (
-                    !_playbackHandler.LoadInitialState(
-                        _serializerHelper,
-                        expectedInitialChecksum: null,
-                        version: _serializationVersion
-                    )
-                )
-                {
-                    _log.Error("Failed to load initial state bookmark");
-                    return;
-                }
-
+                _playbackHandler.LoadInitialState(
+                    _bookmarkPath,
+                    expectedInitialChecksum: null,
+                    version: _serializationVersion
+                );
                 _log.Info("Loaded initial state from bookmark");
             }
             else
@@ -178,17 +171,9 @@ namespace Trecs.Samples
                 );
             }
 
-            // Load recording
-            ReadFileIntoMemoryStream(_serializerHelper, _recordingPath);
-
             _playbackHandler.StartPlayback(
-                new PlaybackStartParams
-                {
-                    SerializerHelper = _serializerHelper,
-                    SerializationFlags = _gameStateSerializer.SerializationFlags,
-                    InputsOnly = false,
-                    Version = _serializationVersion,
-                }
+                _recordingPath,
+                new PlaybackStartParams { InputsOnly = false, Version = _serializationVersion }
             );
 
             _state = ControllerState.Playback;
@@ -201,10 +186,10 @@ namespace Trecs.Samples
 
         void HandleSaveBookmark()
         {
-            _bookmarkSerializer.Save(version: _serializationVersion, includeTypeChecks: true);
-
-            _bookmarkSerializer.SerializerHelper.MemoryStream.Position = 0;
-            SaveMemoryStreamToFile(_bookmarkSerializer.SerializerHelper, _bookmarkPath);
+            _bookmarkSerializer.SaveBookmark(
+                version: _serializationVersion,
+                filePath: _bookmarkPath
+            );
 
             _log.Info("Bookmark saved at frame {}", _world.FixedFrame);
         }
@@ -223,48 +208,13 @@ namespace Trecs.Samples
                 return;
             }
 
-            ReadFileIntoMemoryStream(_serializerHelper, _bookmarkPath);
-
-            var succeeded = _bookmarkSerializer.Load(_serializerHelper);
-            Assert.That(succeeded, "Failed to load bookmark");
-
+            _bookmarkSerializer.LoadBookmark(_bookmarkPath);
             _log.Info("Bookmark loaded, now at frame {}", _world.FixedFrame);
-        }
-
-        static void ReadFileIntoMemoryStream(SerializationBuffer helper, string filePath)
-        {
-            var memoryStream = helper.MemoryStream;
-            memoryStream.Position = 0;
-            memoryStream.SetLength(0);
-
-            using var fileStream = File.OpenRead(filePath);
-            fileStream.CopyTo(memoryStream);
-
-            memoryStream.Position = 0;
-        }
-
-        static void SaveMemoryStreamToFile(SerializationBuffer helper, string filePath)
-        {
-            var memoryStream = helper.MemoryStream;
-            memoryStream.Position = 0;
-
-            using var fileStream = File.Create(filePath);
-            memoryStream.CopyTo(fileStream);
         }
 
         public void Dispose()
         {
-            if (_state == ControllerState.Playback)
-            {
-                _playbackHandler.EndPlayback();
-            }
-            else if (_state == ControllerState.Recording)
-            {
-                _recordingHandler.EndRecording(_serializerHelper);
-                // Recording data is discarded — user closed play mode mid-recording
-            }
-
-            _serializerHelper.Dispose();
+            // Handlers' Dispose now gracefully stops mid-op work; nothing extra to do here.
         }
 
         public enum ControllerState

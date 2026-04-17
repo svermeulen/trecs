@@ -6,7 +6,7 @@ namespace Trecs.Serialization
 {
     // NOTE: Not thread safe
     // If needed then use thread locals instead
-    public static class MemoryBlitter
+    internal static class MemoryBlitter
     {
         static byte[] _buffer;
 
@@ -24,20 +24,6 @@ namespace Trecs.Serialization
                 Array.Resize(ref _buffer, newCapacity);
             }
         }
-
-        // We previously did this, but this causes allocs for unknown reasons
-        // public static unsafe void ReadRaw(void* valuePtr, int numBytes, BinaryReader reader)
-        // {
-        //     var destSpan = new Span<byte>(valuePtr, numBytes);
-        //     int bytesRead = reader.BaseStream.Read(destSpan);
-
-        //     Assert.That(
-        //         bytesRead == numBytes,
-        //         "Expected to read {} bytes, but only read {} bytes.",
-        //         numBytes,
-        //         bytesRead
-        //     );
-        // }
 
         public static unsafe void ReadRaw(void* valuePtr, int numBytes, BinaryReader reader)
         {
@@ -106,14 +92,6 @@ namespace Trecs.Serialization
                 WriteRaw(valuePtr, sizeof(T), writer);
             }
         }
-
-        // We previously did this, but this causes allocs for unknown reasons
-        // public static unsafe void WriteRaw(void* valuePtr, int numBytes, BinaryWriter writer)
-        // {
-        //     Assert.That(UnityThreadUtil.IsMainThread);
-        //     var sourceSpan = new ReadOnlySpan<byte>(valuePtr, numBytes);
-        //     writer.Write(sourceSpan);
-        // }
 
         public static unsafe void WriteRaw(void* valuePtr, int numBytes, BinaryWriter writer)
         {

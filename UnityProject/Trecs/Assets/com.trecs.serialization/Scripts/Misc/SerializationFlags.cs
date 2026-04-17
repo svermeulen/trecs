@@ -1,6 +1,6 @@
 namespace Trecs.Serialization
 {
-    public static class TrecsSerializationFlags
+    public static class SerializationFlags
     {
         public const int IsForChecksum = 637645322;
     }

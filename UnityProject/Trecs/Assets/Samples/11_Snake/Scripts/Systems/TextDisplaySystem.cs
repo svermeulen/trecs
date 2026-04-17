@@ -39,22 +39,33 @@ namespace Trecs.Samples.Snake
                 .Get<Direction>()
                 .Read.Value;
 
+            var state = _recordController.State;
+
             _sb.Clear();
             AppendStat("Score", $"{score}");
             AppendStat("Length", $"{length}");
             AppendStat("Frame", $"{frame}");
             AppendStat("Heading", DirectionName(direction.x, direction.y));
-            AppendStat("Mode", $"{_recordController.State}");
+            AppendStat("Mode", $"{state}", ModeColor(state));
             _sb.AppendLine();
             AppendHeader("Controls:");
-            AppendNote("   WASD - Move Snake");
-            AppendNote("   F5 - Start recording");
-            AppendNote("   F6 - Stop recording / playback");
-            AppendNote("   F7 - Play recording");
-            AppendNote("   F8 - Save bookmark");
-            AppendNote("   F9 - Load bookmark");
+            AppendControl("WASD", "Move Snake");
+            AppendControl("F5", "Start / stop recording");
+            AppendControl("F6", "Start / stop playback");
+            AppendControl("F8", "Save bookmark");
+            AppendControl("F9", "Load bookmark");
 
             _displayText.text = _sb.ToString();
+        }
+
+        static string ModeColor(RecordAndPlaybackController.ControllerState state)
+        {
+            return state switch
+            {
+                RecordAndPlaybackController.ControllerState.Recording => RecordingColor,
+                RecordAndPlaybackController.ControllerState.Playback => PlaybackColor,
+                _ => ValueColor,
+            };
         }
 
         static string DirectionName(int x, int y)
@@ -83,16 +94,19 @@ namespace Trecs.Samples.Snake
             _sb.AppendLine($"<b><color={LabelColor}>{text}</color></b>");
         }
 
-        void AppendStat(string label, string value)
+        void AppendStat(string label, string value, string valueColor = ValueColor)
         {
             _sb.Append($"<color={LabelColor}>{label}:</color> ");
-            _sb.Append($"<color={ValueColor}>{value}</color>");
+            _sb.Append($"<color={valueColor}>{value}</color>");
             _sb.AppendLine();
         }
 
-        void AppendNote(string text)
+        void AppendControl(string key, string description)
         {
-            _sb.AppendLine($"<color={SecondaryColor}>{text}</color>");
+            _sb.Append("   ");
+            _sb.Append($"<color={KeyColor}>{key}</color>");
+            _sb.Append($"<color={SecondaryColor}> - {description}</color>");
+            _sb.AppendLine();
         }
 
         const float RefreshInterval = 0.25f;
@@ -100,5 +114,8 @@ namespace Trecs.Samples.Snake
         const string LabelColor = "#E0E0E0";
         const string ValueColor = "#00E5FF";
         const string SecondaryColor = "#9E9E9E";
+        const string KeyColor = "#FFD54F";
+        const string RecordingColor = "#FF5252";
+        const string PlaybackColor = "#69F0AE";
     }
 }

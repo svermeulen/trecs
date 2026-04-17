@@ -1,6 +1,6 @@
 namespace Trecs.Serialization
 {
-    public class SkipSerializer<T> : ISerializer<T>
+    internal class SkipSerializer<T> : ISerializer<T>
     {
         public SkipSerializer() { }
 

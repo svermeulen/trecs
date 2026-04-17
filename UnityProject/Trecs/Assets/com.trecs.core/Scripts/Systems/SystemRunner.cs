@@ -52,7 +52,7 @@ namespace Trecs.Internal
         bool _fixedIsPaused = false;
         bool _stepFixedFrame = false;
         bool _desiredFixedIsPaused = false;
-        float? _lastSpiralOfDeathWarningTime;
+        int? _lastSpiralOfDeathWarningVariableFrame;
         float? _fastForwardTime;
         bool _postFastForwardSkipFrame;
         float _timeScale = 1f;
@@ -133,6 +133,7 @@ namespace Trecs.Internal
         public WorldSafetyManager SafetyManager => _safetyManager;
         internal bool WarnOnJobSyncPoints => _settings.WarnOnJobSyncPoints;
         internal bool RequireDeterministicSubmission => _settings.RequireDeterministicSubmission;
+        internal bool AssertNoTimeInFixedPhase => _settings.AssertNoTimeInFixedPhase;
 
         public bool IsExecutingSystems
         {
@@ -643,13 +644,13 @@ namespace Trecs.Internal
                 !_maxSecondsPerFixedUpdate.HasValue
                 && numUpdates > 5
                 && (
-                    !_lastSpiralOfDeathWarningTime.HasValue
-                    || Time.time - _lastSpiralOfDeathWarningTime.Value
-                        > MinIntervalBetweenSpiralOfDeathWarnings
+                    !_lastSpiralOfDeathWarningVariableFrame.HasValue
+                    || _variableFrameCount - _lastSpiralOfDeathWarningVariableFrame.Value
+                        > MinVariableFramesBetweenSpiralOfDeathWarnings
                 )
             )
             {
-                _lastSpiralOfDeathWarningTime = Time.time;
+                _lastSpiralOfDeathWarningVariableFrame = _variableFrameCount;
 
                 if (_settings.WarnOnFixedUpdateFallingBehind)
                 {
@@ -896,6 +897,6 @@ namespace Trecs.Internal
             public bool IsEnabled;
         }
 
-        const float MinIntervalBetweenSpiralOfDeathWarnings = 5.0f;
+        const int MinVariableFramesBetweenSpiralOfDeathWarnings = 300;
     }
 }

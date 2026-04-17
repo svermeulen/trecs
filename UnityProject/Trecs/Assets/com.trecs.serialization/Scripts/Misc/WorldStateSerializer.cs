@@ -6,10 +6,10 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Serialization
 {
-    public class EcsDeserializeResult<TStaticSeed>
+    public class WorldDeserializeResult<TStaticSeed>
         where TStaticSeed : unmanaged
     {
-        public EcsDeserializeResult(bool succeeded, TStaticSeed? requiredStaticSeed)
+        public WorldDeserializeResult(bool succeeded, TStaticSeed? requiredStaticSeed)
         {
             Succeeded = succeeded;
             RequiredStaticSeed = requiredStaticSeed;
@@ -29,16 +29,16 @@ namespace Trecs.Serialization
     /// Optional class that can be used to serialize/deserialize the entire game state.
     /// Must be disposed after World.
     /// </summary>
-    public class EcsStateSerializer
+    public class WorldStateSerializer
     {
-        static readonly TrecsLog _log = new(nameof(EcsStateSerializer));
+        static readonly TrecsLog _log = new(nameof(WorldStateSerializer));
 
         readonly World _world;
         readonly WorldInfo _worldDef;
         readonly Dictionary<Type, IComponentArrayCustomSerializer> _customComponentSerializers =
             new();
 
-        public EcsStateSerializer(World world)
+        public WorldStateSerializer(World world)
         {
             _worldDef = world.WorldInfo;
             _world = world;
@@ -140,7 +140,7 @@ namespace Trecs.Serialization
             }
         }
 
-        public void SerializeState(ISerializationWriter writer)
+        public virtual void SerializeState(ISerializationWriter writer)
         {
             using (TrecsProfiling.Start("Serializing game state"))
             {
@@ -149,7 +149,7 @@ namespace Trecs.Serialization
             }
         }
 
-        public EcsDeserializeResult<TStaticSeed> DeserializeStaticSeed<TStaticSeed>(
+        public WorldDeserializeResult<TStaticSeed> DeserializeStaticSeed<TStaticSeed>(
             in TStaticSeed currentStaticSeed,
             ISerializationReader reader
         )
@@ -173,13 +173,16 @@ namespace Trecs.Serialization
 
             if (!requiredStaticSeed.Equals(currentStaticSeed))
             {
-                return new EcsDeserializeResult<TStaticSeed>(
+                return new WorldDeserializeResult<TStaticSeed>(
                     succeeded: false,
                     requiredStaticSeed: requiredStaticSeed
                 );
             }
 
-            return new EcsDeserializeResult<TStaticSeed>(succeeded: true, requiredStaticSeed: null);
+            return new WorldDeserializeResult<TStaticSeed>(
+                succeeded: true,
+                requiredStaticSeed: null
+            );
         }
 
         void DeserializeStateImpl(ISerializationReader reader)
@@ -207,7 +210,7 @@ namespace Trecs.Serialization
             }
         }
 
-        public void DeserializeState(ISerializationReader reader)
+        public virtual void DeserializeState(ISerializationReader reader)
         {
             using (TrecsProfiling.Start("State Deserialization"))
             {
@@ -303,7 +306,7 @@ namespace Trecs.Serialization
             // If that changes, the read path would need to skip the same components to
             // keep the bit stream aligned.
 
-            if (!writer.HasFlag(TrecsSerializationFlags.IsForChecksum))
+            if (!writer.HasFlag(SerializationFlags.IsForChecksum))
             {
                 return false;
             }

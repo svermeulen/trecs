@@ -242,7 +242,7 @@ namespace Trecs
             }
         }
 
-        // Keep these for external callers (EcsStateSerializer, SceneInitializer, etc.)
+        // Keep these for external callers (WorldStateSerializer, SceneInitializer, etc.)
         internal UniqueHeap UniqueHeap
         {
             get

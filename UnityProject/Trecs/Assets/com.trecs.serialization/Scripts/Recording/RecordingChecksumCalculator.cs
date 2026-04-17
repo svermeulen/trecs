@@ -1,40 +1,29 @@
-using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
-    public class RecordingChecksumCalculator
+    internal class RecordingChecksumCalculator
     {
-        static readonly TrecsLog _log = new(nameof(RecordingChecksumCalculator));
+        readonly WorldStateSerializer _worldStateSerializer;
 
-        readonly IGameStateSerializer _gameStateSerializer;
-
-        public RecordingChecksumCalculator(IGameStateSerializer gameStateSerializer)
+        public RecordingChecksumCalculator(WorldStateSerializer worldStateSerializer)
         {
-            _gameStateSerializer = gameStateSerializer;
+            _worldStateSerializer = worldStateSerializer;
         }
 
-        public uint CalculateCurrentChecksum(
-            int version,
-            SerializationBuffer serializerHelper,
-            ReadOnlyDenseHashSet<int> flags
-        )
+        public uint CalculateCurrentChecksum(int version, SerializationBuffer serializerHelper)
         {
             using (TrecsProfiling.Start("CalculateChecksum"))
             {
-                // Note that this includes static seed here
-                // which probably is also helpful to include in checksum,
-                // in case that changes at runtime
-                _gameStateSerializer.StartSerialize(
+                serializerHelper.ClearMemoryStream();
+                serializerHelper.StartWrite(
                     version: version,
-                    serializerHelper,
-                    flags,
                     // Setting this to false is helpful since it reduces the time for CalculateChecksum from 37 ms to 15 ms
                     // Especially important since we run checksums in QA builds
                     includeTypeChecks: false
                 );
 
-                _gameStateSerializer.SerializeCurrentState(serializerHelper);
+                _worldStateSerializer.SerializeState(serializerHelper);
                 serializerHelper.EndWrite();
 
                 using (TrecsProfiling.Start("ChecksumCalculator.Run"))

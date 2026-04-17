@@ -2,6 +2,9 @@
 
 There are three main approaches to filtering entities at runtime. Each has different performance characteristics and use cases.
 
+!!! tip "Start simple — partitions in particular are an optimization"
+    Branching on a component value inside a normal iteration (Approach A) is the simplest option and is fast enough for most gameplay code, so it's a fine default. **Sets** are also a legitimate design tool whenever the subset is itself something you want to name, query, count, or iterate as a first-class concept — don't hesitate to reach for them when they fit the shape of the problem. **Partitions**, on the other hand, are primarily a performance optimization for cache-friendly dense iteration over very large populations; pick them when the profiler (or population size) calls for it, not as a general way to model state.
+
 ## Approach A: Check Component Values
 
 Iterate all entities and check a condition:
@@ -17,8 +20,8 @@ void Execute(ref Health health)
 }
 ```
 
-**Pros:** Simple, no setup required.
-**Cons:** Iterates all entities, including those that don't match.
+**Pros:** Simple, no setup required. State stays colocated with the data it describes, so there's nothing to keep in sync.
+**Cons:** Visits every entity the query matches (every group with the requested components when using `MatchByComponents`, or every entity in the tag-scoped groups otherwise), including those that fail the branch. Only a real problem when the population is large *and* the check sits in a hot loop.
 
 ## Approach B: Template [Partitions](../core/templates.md#partitions)
 
@@ -70,15 +73,19 @@ void Execute(in DeadEnemy enemy) { ... }
 |--------|----------------|---------------------|------|
 | **Setup** | None | Template + tags | Set struct + registration |
 | **Change cost** | None (just data) | Component copy | Index add/remove |
-| **Iteration** | All entities | Dense (fast) | Sparse (indexed) |
+| **Iteration** | Visits every entity the query matches (then branches) | Dense (only matching entities visited) | Sparse (indexed lookup per member) |
 | **Group count** | No increase | 2^N per dimension | No increase |
-| **Best for** | Rare checks, simple conditions | Core lifecycle partitions (1-2 dimensions) | Dynamic membership, many dimensions |
+| **Best for** | The default — gameplay code where the condition is local to the component data | Hot iteration over very large populations where cache locality dominates the cost | Dynamic membership, many dimensions, or any subset that's itself a first-class concept |
 
 ### Rules of Thumb
 
-- **1-2 boolean partition dimensions** → Template partitions. Dense iteration is fast, and the group count stays manageable.
+Pick the approach that matches the shape of the problem. Component checks are the simplest default, sets are a reasonable choice whenever a subset is itself a meaningful concept, and partitions are reserved for when iteration cost actually matters.
+
+- **Simple per-iteration filtering, membership not needed elsewhere** → Component value check. No registration, no transitions, no extra memory. Just `if` inside the loop.
+- **The subset is a named concept systems want to query, iterate, or count directly** → Sets. Use them freely when they model your design well — "visible enemies", "units under player control", "entities currently selected" are all natural fits.
+- **One system needs to flag a subset for several downstream systems in the same frame** → Sets, used as per-frame scratch storage. Clear the set at the top of the producer, fill it with `AddImmediate`, and have consumers iterate the set instead of re-running the producer's filter. See [Per-Frame Staging](../entity-management/sets.md#per-frame-staging) for the full pattern (and why the immediate APIs are required here).
 - **3+ dimensions, or many categories** → Sets. Avoids combinatorial explosion of groups.
-- **One-off checks** → Component value check. No need for infrastructure if you're just checking occasionally.
+- **Very large entity populations (thousands+) where a hot iteration shows up in the profiler** → Template partitions. The dense-array layout gives you cache-friendly iteration, but at the cost of data movement on transitions and extra groups per dimension. Treat this as a performance optimization, not a design primitive — the partition boundary should reflect a real hot path, not just a conceptual state split.
 
 ## Combinatorial Explosion
 
@@ -95,17 +102,17 @@ At 3+ dimensions, prefer sets — they don't create additional groups.
 
 ## Mixing Approaches
 
-You can combine approaches. Use template partitions for core lifecycle (1-2 dimensions) and sets for dynamic categorization:
+Nothing forces you to pick one approach per template. A typical mix is to use **partitions** when a lifecycle split (e.g. `Alive` / `Dead`) is hot enough that splitting the storage is worth it, and **sets** for everything else — dynamic categorizations, designer-meaningful subsets, multi-dimensional filters. Component-value branching covers the rest.
 
 ```csharp
-// Template partitions for core lifecycle
+// Partitions: only because Alive/Dead iteration is a measured hot path.
 public partial class Enemy : ITemplate,
     IHasTags<GameTags.Enemy>,
     IHasPartition<GameTags.Alive>,
     IHasPartition<GameTags.Dead>
 { ... }
 
-// Sets for dynamic filters
+// Sets: design-level subsets that systems want to query directly.
 public struct PoisonedEnemies : IEntitySet<GameTags.Enemy> { }
 public struct VisibleEnemies : IEntitySet<GameTags.Enemy> { }
 public struct TargetedEnemies : IEntitySet<GameTags.Enemy> { }

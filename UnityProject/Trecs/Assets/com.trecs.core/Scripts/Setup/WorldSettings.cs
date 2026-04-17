@@ -78,5 +78,25 @@ namespace Trecs
         /// Each iteration processes structural changes that may trigger further changes via callbacks.
         /// </summary>
         public int MaxSubmissionIterations { get; init; } = 10;
+
+        /// <summary>
+        /// When true, accessing <see cref="WorldAccessor.DeltaTime"/>, <see cref="WorldAccessor.ElapsedTime"/>,
+        /// <see cref="WorldAccessor.FixedDeltaTime"/>, or <see cref="WorldAccessor.FixedElapsedTime"/> during
+        /// the fixed-update phase throws. In Burst jobs (where exceptions are unavailable),
+        /// <see cref="NativeWorldAccessor.DeltaTime"/> and <see cref="NativeWorldAccessor.ElapsedTime"/> are
+        /// populated with <see cref="float.NaN"/> instead, so any arithmetic that reads them produces
+        /// visibly broken output.
+        ///
+        /// <para>
+        /// Enable this for deterministic-lockstep workloads (e.g. RTS networking) where the simulation must
+        /// produce bit-identical results across machines. Trecs itself guarantees deterministic scheduling,
+        /// iteration, and entity ordering, but it cannot guarantee deterministic floating-point math:
+        /// </para>
+        ///
+        /// <para>
+        /// Use <see cref="WorldAccessor.FixedFrame"/> as a discrete tick counter instead.
+        /// </para>
+        /// </summary>
+        public bool AssertNoTimeInFixedPhase { get; init; }
     }
 }

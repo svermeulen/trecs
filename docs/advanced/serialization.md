@@ -3,95 +3,241 @@
 !!! note
     Serialization types live in the `com.trecs.serialization` package, which must be installed separately from `com.trecs.core`.
 
-Trecs provides a full serialization framework for saving and restoring world state. This is the foundation for [Recording & Playback](recording-and-playback.md).
+Trecs ships an optional binary serialization framework for full ECS world state. It is the foundation for [Recording & Playback](recording-and-playback.md) and for save/load systems.
 
 ## Overview
 
-The serialization system has two layers:
+Compose just the pieces you need:
 
-1. **SerializerRegistry** — maps types to serializers
-2. **EcsStateSerializer** — serializes/deserializes entire world state (entities, components, heaps)
+- **`SerializerRegistry`** — maps types to their serializers.
+- **`WorldStateSerializer`** — reads/writes the entire ECS world (components, sets, heaps, entity handles).
+- **`BookmarkSerializer`** — captures and restores full state snapshots.
+- **`RecordingHandler` / `PlaybackHandler`** — capture and replay simulation history (covered in the next page).
 
-## SerializerRegistry
+The static helper `TrecsSerialization` provides preset registrations so the common path is one line. Users that only need partial setup (e.g. save-game-only projects that skip the recording machinery) can call individual `Register*Serializers` helpers instead.
 
-Register serializers for your types:
+## Quick start
 
 ```csharp
-var serialization = TrecsSerialization.Create();
+// 1. Build a registry pre-populated with all Trecs serializers.
+var registry = TrecsSerialization.CreateSerializerRegistry();
 
-// Core types are registered automatically (primitives, math types, ECS types)
-// Register custom serializers for your types:
-serialization.Registry.Register<MyData>(new MyDataSerializer());
+// 2. Register any custom serializers your game needs (see below).
+//    All blittable component types are auto-handled — no registration needed.
+//    registry.RegisterSerializer<MyCustomSerializer>();
+
+// 3. Compose only the handlers you actually use.
+var worldStateSerializer = new WorldStateSerializer(world);
+var bookmarks = new BookmarkSerializer(worldStateSerializer, registry, world);
 ```
 
-### ISerializer\<T\>
+For a save-game flow you stop here and use `BookmarkSerializer.SaveBookmark`/`LoadBookmark`. For deterministic record/replay also construct `RecordingHandler` and `PlaybackHandler` (see the [Recording & Playback](recording-and-playback.md) page).
 
-Implement this interface for custom serialization:
+## Granular registration
+
+If you do not want everything, use the building-block helpers:
 
 ```csharp
-public class MyDataSerializer : ISerializer<MyData>
+var registry = new SerializerRegistry();
+TrecsSerialization.RegisterCoreSerializers(registry);   // primitives, math types
+TrecsSerialization.RegisterTrecsSerializers(registry);  // ECS internals
+// (skip RegisterRecordingSerializers — save-game-only project)
+```
+
+`SerializerRegistry` itself contains only generic `RegisterBlit<T>`, `RegisterEnum<T>`, `RegisterSerializer<TSerializer>` etc. — it has no knowledge of Trecs ECS types and can be used standalone.
+
+## Authoring a custom serializer
+
+Most components are unmanaged structs and serialize automatically via the built-in blit serializer — no extra code required. You only need a custom `ISerializer<T>` for types that hold managed references (lists, dictionaries, strings) or where you want a non-default encoding.
+
+```csharp
+public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
 {
-    public void Serialize(in MyData value, ISerializationWriter writer)
+    public void Serialize(in HighScoreTable value, ISerializationWriter writer)
     {
-        writer.Write("X", value.X);
-        writer.Write("Y", value.Y);
+        writer.Write("count", value.Entries.Count);
+        foreach (var entry in value.Entries)
+        {
+            writer.Write("name", entry.Name);     // managed string
+            writer.Write("score", entry.Score);
+        }
     }
 
-    public void Deserialize(ref MyData value, ISerializationReader reader)
+    public void Deserialize(ref HighScoreTable value, ISerializationReader reader)
     {
-        reader.Read("X", ref value.X);
-        reader.Read("Y", ref value.Y);
+        value ??= new HighScoreTable();
+        var count = reader.Read<int>("count");
+        value.Entries.Clear();
+        for (int i = 0; i < count; i++)
+        {
+            value.Entries.Add(new HighScoreEntry
+            {
+                Name = reader.Read<string>("name"),
+                Score = reader.Read<int>("score"),
+            });
+        }
+    }
+}
+
+// Register before constructing any handler:
+registry.RegisterSerializer<HighScoreTableSerializer>();
+```
+
+!!! note "Field names are discarded"
+    The `name` arguments passed to `writer.Write` / `reader.Read` are **not** persisted in the binary stream — they exist only for debug memory tracking (`GetMemoryReport`) and as self-documentation. The binary format is purely positional: reads must occur in the exact same order as writes. Renaming a field is a no-op on disk; reordering reads or adding/removing one without bumping the format version will silently corrupt deserialization.
+
+### Blit registrations
+
+Unmanaged value types can be registered as a fast raw-byte copy:
+
+```csharp
+registry.RegisterBlit<MyStruct>();              // serialize only
+registry.RegisterBlit<MyStruct>(includeDelta: true);  // also enable delta encoding
+registry.RegisterEnum<MyEnum>();                // for enum types
+```
+
+Delta-capable types must implement `IEquatable<T>`.
+
+## Extending world state with non-ECS data
+
+If your game has state that lives outside the ECS world (scripting VMs, external caches), subclass `WorldStateSerializer` to write/read your additional chunks:
+
+```csharp
+public sealed class MyGameStateSerializer : WorldStateSerializer
+{
+    readonly LuaInterpreter _lua;
+
+    public MyGameStateSerializer(World world, LuaInterpreter lua) : base(world)
+    {
+        _lua = lua;
+    }
+
+    public override void SerializeState(ISerializationWriter writer)
+    {
+        base.SerializeState(writer);
+        writer.Write("luaState", _lua.CaptureSnapshot());
+    }
+
+    public override void DeserializeState(ISerializationReader reader)
+    {
+        base.DeserializeState(reader);
+        _lua.RestoreSnapshot(reader.Read<string>("luaState"));
+    }
+}
+
+// Pass the subclass to BookmarkSerializer / RecordingHandler / PlaybackHandler.
+var worldStateSer = new MyGameStateSerializer(world, lua);
+var bookmarks = new BookmarkSerializer(worldStateSer, registry, world);
+```
+
+## Buffer reuse
+
+`SerializationBuffer` is the shared write/read buffer used internally by every handler. Most users never touch it directly — `BookmarkSerializer.SaveBookmark(stream)` and friends manage it for you. Power users who need to drive the binary reader/writer themselves can construct one explicitly:
+
+```csharp
+using var buffer = new SerializationBuffer(registry);
+buffer.WriteAll(value, version: 1, includeTypeChecks: true);
+buffer.ResetMemoryPosition();
+var roundTripped = buffer.ReadAll<MyType>();
+```
+
+## Determinism notes
+
+- Always use `World.Rng` / `World.FixedRng` in fixed update — never `UnityEngine.Random` or `System.Random`.
+- Set `RequireDeterministicSubmission = true` in `WorldSettings` if you intend to record and replay.
+- Avoid floating-point non-determinism from uncontrolled thread scheduling.
+
+### `WorldSettings.AssertNoTimeInFixedPhase`
+
+For deterministic-lockstep workloads (e.g. RTS netcode) where the simulation must produce bit-identical results across machines, set `AssertNoTimeInFixedPhase = true`:
+
+```csharp
+var settings = new WorldSettings
+{
+    RequireDeterministicSubmission = true,
+    AssertNoTimeInFixedPhase = true,
+};
+```
+
+Trecs guarantees deterministic scheduling, iteration, and entity ordering, but it **cannot** guarantee deterministic floating-point math across hardware. Reading continuous time values (`DeltaTime`, `ElapsedTime`, `FixedDeltaTime`, `FixedElapsedTime`) during the fixed-update phase is a common source of drift, because accumulated floating-point error diverges across machines.
+
+With the flag enabled:
+
+- Accessing any of those four properties on `WorldAccessor` during fixed update **throws**.
+- In Burst jobs (where exceptions are unavailable), `NativeWorldAccessor.DeltaTime` / `NativeWorldAccessor.ElapsedTime` are populated with `float.NaN` so any arithmetic that uses them produces visibly broken output instead of silent desync.
+
+Use `World.FixedFrame` — a discrete tick counter — as your time source in fixed update instead. Variable-update systems are unaffected.
+
+See [Recording & Playback](recording-and-playback.md) for the determinism-sensitive lifecycle and desync-detection workflow.
+
+## Threading
+
+All `BookmarkSerializer`, `RecordingHandler`, and `PlaybackHandler` methods
+are **main-thread only**. The underlying `SerializationBuffer` and the
+blit fast-path use a shared static byte buffer, and every read/write
+path asserts `UnityThreadUtil.IsMainThread`. Do not call save/load from
+a background thread.
+
+## Binary format stability
+
+The binary layout is **version-sensitive** and not forward-compatible:
+
+- Adding, removing, or reordering fields on a blittable component changes
+  the byte layout, invalidating every previously saved bookmark or
+  recording that used the old shape.
+- The `version` integer you pass to `SaveBookmark(version, …)` /
+  `StartRecording(version, …)` is stored in the file header and exposed
+  on `BookmarkMetadata.Version` / `RecordingMetadata.Version`. Trecs does
+  not interpret it — bumping `version` on a breaking change is a
+  convention you own.
+- Use `BookmarkSerializer.PeekMetadata(path)` (or `(stream)`) to inspect
+  the saved version before committing to a full `LoadBookmark`, and
+  surface a user-facing error for incompatible saves.
+
+### Versioned custom serializers
+
+The `version` integer you pass to `SaveBookmark` / `StartRecording` is stamped into the file header *and* exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). Because the header records the version the file was written with, the deserializer can recognize older saves and read them with the layout they were written in. As long as you bump the version every time you change the on-disk layout, a single serializer can keep handling all prior versions:
+
+```csharp
+public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
+{
+    public void Serialize(in HighScoreTable value, ISerializationWriter writer)
+    {
+        // The writer always emits the current (latest) layout. The version stored
+        // in the file header records *which* layout this is, so old files saved by
+        // earlier code are still readable below.
+        writer.Write("count", value.Entries.Count);
+        foreach (var entry in value.Entries)
+        {
+            writer.Write("name", entry.Name);
+            writer.Write("score", entry.Score);
+            writer.Write("timestamp", entry.Timestamp);   // added in v2
+        }
+    }
+
+    public void Deserialize(ref HighScoreTable value, ISerializationReader reader)
+    {
+        value ??= new HighScoreTable();
+        var count = reader.Read<int>("count");
+        value.Entries.Clear();
+        for (int i = 0; i < count; i++)
+        {
+            var entry = new HighScoreEntry
+            {
+                Name = reader.Read<string>("name"),
+                Score = reader.Read<int>("score"),
+                // v1 saves don't contain timestamp; default it instead of reading.
+                Timestamp = reader.Version >= 2
+                    ? reader.Read<long>("timestamp")
+                    : 0,
+            };
+            value.Entries.Add(entry);
+        }
     }
 }
 ```
 
-### Built-in Serializers
+The example only adds a field, but `Version` lets you handle removals and reorderings too — branch the deserializer on `reader.Version` and read the appropriate layout for each historical version. The constraint is that you have to keep the read-side code for every old version you still want to support, and bump `version` every time the layout changes.
 
-Trecs includes serializers for:
+If your game needs long-term save compatibility across deeper schema changes (renamed types, restructured aggregates, splitting one component into two), wrap the Trecs bookmark inside your own versioned format and perform migrations before calling `LoadBookmark`.
 
-- **Primitives** — `bool`, `string`, enums
-- **Collections** — `List<T>`, `T[]`, `Dictionary<K,V>`, `HashSet<T>`, `NativeList<T>`, `NativeArray<T>`
-- **Blitting** — `BlitSerializer` for unmanaged structs (copies raw bytes)
-- **Special** — `DeprecatedSerializer` (skips data), `SkipSerializer`, `DefaultValueSerializer`
-
-## EcsStateSerializer
-
-Serializes the complete world state — all entities, components, sets, and heap data:
-
-```csharp
-// Serialize
-var writer = new BinarySerializationWriter();
-ecsStateSerializer.Serialize(world, writer);
-byte[] data = writer.ToArray();
-
-// Deserialize
-var reader = new BinarySerializationReader(data);
-ecsStateSerializer.Deserialize(world, reader);
-```
-
-## Delta Serialization
-
-For types that benefit from delta compression, implement `ISerializerDelta<T>`:
-
-```csharp
-public class MyDeltaSerializer : ISerializerDelta<MyData>
-{
-    public void SerializeDelta(in MyData value, in MyData baseValue,
-        ISerializationWriter writer) { ... }
-
-    public void DeserializeDelta(ref MyData value, in MyData baseValue,
-        ISerializationReader reader) { ... }
-}
-```
-
-## BlobCache Serialization
-
-Heap data (blobs) is serialized separately from component data. The `BlobCache` manages loading and caching via pluggable `IBlobStore` implementations:
-
-```csharp
-new WorldBuilder()
-    .AddBlobStore(new BlobStoreInMemory())
-    // ...
-```
-
-See [Heap](heap.md) for details on blob stores.

@@ -195,6 +195,20 @@ namespace Trecs.Serialization
             _memoryStream.SetLength(0);
         }
 
+        /// <summary>
+        /// Forcibly return the buffer to <see cref="State.Idle"/> regardless of
+        /// the current state. Intended for exception recovery in handler
+        /// internals — on a successful call, the normal <see cref="EndWrite"/>
+        /// / <see cref="StopRead"/> path already leaves the buffer idle.
+        /// Discards any partially-written/partially-read data.
+        /// </summary>
+        public void ResetForErrorRecovery()
+        {
+            _state = State.Idle;
+            _memoryStream.Position = 0;
+            _memoryStream.SetLength(0);
+        }
+
         public void StartRead(ReadOnlyDenseHashSet<int> flags = default)
         {
             Assert.That(_state == State.Idle);
