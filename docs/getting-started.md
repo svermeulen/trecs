@@ -8,6 +8,12 @@ Add Trecs to your Unity project via the Unity Package Manager:
 2. Click **+ > Add package from git URL**
 3. Enter: `https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.core`
 
+To use serialization features (bookmarks, recording/playback, full world state snapshots), also install the optional `com.trecs.serialization` package:
+
+1. Open **Window > Package Manager**
+2. Click **+ > Add package from git URL**
+3. Enter: `https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.serialization`
+
 Requires Unity 6000.3+.
 
 ## Your First Project
