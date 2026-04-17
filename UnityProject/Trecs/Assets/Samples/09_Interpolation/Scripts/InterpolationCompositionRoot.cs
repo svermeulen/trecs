@@ -1,8 +1,7 @@
 // Companion docs: https://svermeulen.github.io/trecs/samples/09-interpolation/
+
 using System;
 using System.Collections.Generic;
-using Trecs.Internal;
-using Unity.Mathematics;
 
 namespace Trecs.Samples.Interpolation
 {
@@ -55,21 +54,11 @@ namespace Trecs.Samples.Interpolation
                         SampleTemplates.RawOrbitEntity.Template,
                     }
                 )
-                // Register the previous-frame saver for Position.
-                // This copies Position → InterpolatedPrevious<Position>
-                // before each fixed update step.
-                .AddInterpolatedPreviousSaver(new InterpolatedPreviousSaver<Position>())
+                .AddInterpolationSampleInterpolators()
                 .Build();
 
             world.AddSystems(
-                new ISystem[]
-                {
-                    // Interpolation system: runs in variable update, computes
-                    // Interpolated<Position> = lerp(previous, current, percent)
-                    new InterpolatedUpdater<Position>(InterpolatePosition),
-                    new OrbitSystem(),
-                    new OrbitRendererSystem(gameObjectRegistry),
-                }
+                new ISystem[] { new OrbitSystem(), new OrbitRendererSystem(gameObjectRegistry) }
             );
 
             var sceneInitializer = new SceneInitializer(
@@ -85,21 +74,6 @@ namespace Trecs.Samples.Interpolation
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
             disposables = new() { world.Dispose };
-        }
-
-        /// <summary>
-        /// The interpolation function: blends between previous and current
-        /// Position values. Called each variable update frame.
-        /// </summary>
-        static void InterpolatePosition(
-            in Position previous,
-            in Position current,
-            ref Position result,
-            float percentThroughFixedFrame,
-            WorldAccessor world
-        )
-        {
-            result.Value = math.lerp(previous.Value, current.Value, percentThroughFixedFrame);
         }
     }
 }

@@ -16,98 +16,113 @@ Trecs runs simulation at a fixed timestep (default 1/60s), but rendering happens
 In your template, use the `[Interpolated]` attribute:
 
 ```csharp
-public partial class SmoothOrbitEntity : ITemplate, IHasTags<OrbitTags.Smooth>
+public partial class SmoothEntity : ITemplate, IHasTags<MyTags.Smooth>
 {
     [Interpolated]
-    public Position Position = Position.Default;
+    public Position Position = default;
+
+    [Interpolated]
+    public Rotation Rotation = default;
 
     public OrbitParams OrbitParams;
-    public GameObjectId GameObjectId;
 }
 ```
 
-This generates three components: `Position`, `Interpolated<Position>`, and `InterpolatedPrevious<Position>`.
+This automatically generates three components per interpolated field: `Position`, `Interpolated<Position>`, and `InterpolatedPrevious<Position>`.
 
-### 2. Register the Previous Saver
+### 2. Define Interpolation Functions
+
+Write static methods with `[GenerateInterpolatorSystem]` that define how each component type should be blended. The source generator creates a Burst-compiled job system for each:
+
+```csharp
+public static class MyInterpolators
+{
+    const string GroupName = "MyGameInterpolators";
+
+    [GenerateInterpolatorSystem("PositionInterpolatedUpdater", GroupName)]
+    [BurstCompile]
+    public static void InterpolatePosition(
+        in Position a, in Position b, ref Position result, float t)
+    {
+        result.Value = math.lerp(a.Value, b.Value, t);
+    }
+
+    [GenerateInterpolatorSystem("RotationInterpolatedUpdater", GroupName)]
+    [BurstCompile]
+    public static void InterpolateRotation(
+        in Rotation a, in Rotation b, ref Rotation result, float t)
+    {
+        // nlerp is cheaper than slerp and sufficient for small angular deltas
+        result.Value = math.nlerp(a.Value, b.Value, t);
+    }
+}
+```
+
+The `GroupName` parameter groups related interpolators so they can be registered together.
+
+### 3. Register with WorldBuilder
+
+The source generator creates an extension method named `Add{GroupName}` that registers all interpolators in the group — both the previous-frame savers and the variable-update blending systems:
 
 ```csharp
 var world = new WorldBuilder()
-    .AddEntityType(SampleTemplates.SmoothOrbitEntity.Template)
-    .AddInterpolatedPreviousSaver(new InterpolatedPreviousSaver<Position>())
+    .AddEntityType(SmoothEntity.Template)
+    .AddMyGameInterpolators()  // Generated — registers all interpolators in the group
     .Build();
 ```
 
-### 3. Define the Interpolation Function
+### 4. Create Entities with Interpolated Values
+
+Use `SetInterpolated()` to initialize all three components (current, interpolated, previous) in sync:
 
 ```csharp
-static void InterpolatePosition(
-    in Position previous,
-    in Position current,
-    ref Position result,
-    float percentThroughFixedFrame,
-    WorldAccessor world)
-{
-    result.Value = math.lerp(previous.Value, current.Value, percentThroughFixedFrame);
-}
-```
-
-### 4. Add the Interpolation System
-
-```csharp
-world.AddSystem(new InterpolatedUpdater<Position>(InterpolatePosition));
-```
-
-### 5. Create Entities with Interpolated Values
-
-```csharp
-world.AddEntity<OrbitTags.Smooth>()
-    .SetInterpolated(new Position(startPos))  // Sets all three components
+world.AddEntity<MyTags.Smooth>()
+    .SetInterpolated(new Position(startPos))
+    .SetInterpolated(new Rotation(startRot))
     .Set(new OrbitParams { ... });
 ```
 
-### 6. Read Interpolated Values for Rendering
+### 5. Read Interpolated Values for Rendering
 
-In your variable-update rendering system, read from `Interpolated<Position>` instead of `Position`:
+In your variable-update rendering system, read from `Interpolated<T>` instead of the raw component:
 
 ```csharp
 [VariableUpdate]
 public partial class RenderSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(OrbitTags.Smooth))]
-    void Execute(in Interpolated<Position> interpolatedPos, in GameObjectId id)
+    [ForEachEntity(Tag = typeof(MyTags.Smooth))]
+    void Execute(in Interpolated<Position> pos, in Interpolated<Rotation> rot, in GameObjectId id)
     {
         var go = _registry.Resolve(id);
-        go.transform.position = (Vector3)interpolatedPos.Value.Value;
+        go.transform.position = (Vector3)pos.Value.Value;
+        go.transform.rotation = rot.Value.Value;
     }
 }
 ```
+
+## What Gets Generated
+
+For each `[GenerateInterpolatorSystem]` method, the source generator creates:
+
+- A **Burst-compiled `IJobFor` system** that runs during variable update, iterating all entities with the component and blending previous → current using your function
+- An **extension method** on `WorldBuilder` (one per group) that registers all `InterpolatedPreviousSaver<T>` instances and interpolator systems in the group
+
+This means you write just the interpolation math — the boilerplate for scheduling, dependency tracking, and registration is handled automatically.
 
 ## Without Interpolation
 
 For comparison, entities without interpolation update visually only at fixed timestep boundaries, causing visible stuttering at low fixed rates or high frame rates:
 
 ```csharp
-public partial class RawOrbitEntity : ITemplate, IHasTags<OrbitTags.Raw>
+public partial class RawEntity : ITemplate, IHasTags<MyTags.Raw>
 {
-    public Position Position = Position.Default;  // No [Interpolated]
-    public OrbitParams OrbitParams;
-    public GameObjectId GameObjectId;
+    public Position Position = default;  // No [Interpolated]
 }
 ```
 
-## Custom Interpolation
+## Best Practices
 
-The interpolation function can implement any blending logic — linear, spherical, or custom curves:
-
-```csharp
-// Quaternion interpolation
-static void InterpolateRotation(
-    in Rotation previous,
-    in Rotation current,
-    ref Rotation result,
-    float t,
-    WorldAccessor world)
-{
-    result.Value = math.slerp(previous.Value, current.Value, t);
-}
-```
+- **Only interpolate visual components** — positions, rotations, scales, and colors that affect rendering. Don't interpolate gameplay state like health or ammo.
+- **Use `SetInterpolated()` at creation** — this ensures all three components start in sync with the same default and avoids a visual pop on the first frame.
+- **Group interpolators by project** — use a shared `GroupName` constant so a single `Add{GroupName}()` call registers everything.
+- **Prefer `nlerp` over `slerp` for rotations** — the angular delta between fixed frames is typically small enough that the difference is imperceptible, and `nlerp` is significantly cheaper.

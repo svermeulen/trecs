@@ -76,12 +76,16 @@ namespace Trecs.Samples.Interpolation
 
             var entity = _world.AddEntity<TTag>();
 
-            // SetInterpolated sets Position, Interpolated<Position>,
-            // and InterpolatedPrevious<Position> all at once.
             if (interpolated)
+            {
                 entity.SetInterpolated(new Position(position));
+                entity.SetInterpolated(new Rotation(quaternion.identity));
+            }
             else
+            {
                 entity.Set(new Position(position));
+                entity.Set(new Rotation(quaternion.identity));
+            }
 
             entity
                 .Set(

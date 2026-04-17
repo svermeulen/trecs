@@ -1,4 +1,5 @@
 // Companion docs: https://svermeulen.github.io/trecs/samples/12-feeding-frenzy-benchmark/
+
 using System;
 using System.Collections.Generic;
 using TMPro;
@@ -141,7 +142,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 }
             );
 
-            initializables = new() { world.Initialize, sceneInitializer.Initialize };
+            initializables = new()
+            {
+                world.Initialize,
+                sceneInitializer.Initialize,
+            };
 
             tickables = new()
             {

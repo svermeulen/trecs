@@ -1,4 +1,5 @@
 // Companion docs: https://svermeulen.github.io/trecs/samples/10-pointers/
+
 using System;
 using System.Collections.Generic;
 

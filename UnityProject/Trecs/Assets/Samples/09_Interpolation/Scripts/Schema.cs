@@ -26,6 +26,9 @@ namespace Trecs.Samples.Interpolation
         {
             [Interpolated]
             public Position Position = default;
+
+            [Interpolated]
+            public Rotation Rotation = default;
             public OrbitParams OrbitParams;
             public GameObjectId GameObjectId;
         }
@@ -38,6 +41,7 @@ namespace Trecs.Samples.Interpolation
         public partial class RawOrbitEntity : ITemplate, IHasTags<OrbitTags.Raw>
         {
             public Position Position = default;
+            public Rotation Rotation = default;
             public OrbitParams OrbitParams;
             public GameObjectId GameObjectId;
         }

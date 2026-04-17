@@ -37,20 +37,24 @@ namespace Trecs.Samples.Interpolation
         {
             var go = _registry.Resolve(view.GameObjectId);
             go.transform.position = (Vector3)view.InterpolatedPosition;
+            go.transform.rotation = view.InterpolatedRotation;
         }
 
-        // Raw entities only have Position (no Interpolated wrapper).
-        // Reading Position in variable update shows the fixed-frame
-        // position, which "jumps" at each fixed timestep boundary.
+        // Raw entities only have Position and Rotation (no Interpolated wrappers).
+        // Reading these in variable update shows the fixed-frame values,
+        // which "jump" at each fixed timestep boundary.
         [ForEachEntity(Tag = typeof(OrbitTags.Raw))]
         void RenderRaw(in RawOrbitView view)
         {
             var go = _registry.Resolve(view.GameObjectId);
             go.transform.position = (Vector3)view.Position;
+            go.transform.rotation = view.Rotation;
         }
 
-        partial struct SmoothOrbitView : IAspect, IRead<Interpolated<Position>, GameObjectId> { }
+        partial struct SmoothOrbitView
+            : IAspect,
+                IRead<Interpolated<Position>, Interpolated<Rotation>, GameObjectId> { }
 
-        partial struct RawOrbitView : IAspect, IRead<Position, GameObjectId> { }
+        partial struct RawOrbitView : IAspect, IRead<Position, Rotation, GameObjectId> { }
     }
 }

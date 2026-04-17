@@ -1,4 +1,5 @@
 // Companion docs: https://svermeulen.github.io/trecs/samples/11-snake/
+
 using System;
 using System.Collections.Generic;
 using TMPro;

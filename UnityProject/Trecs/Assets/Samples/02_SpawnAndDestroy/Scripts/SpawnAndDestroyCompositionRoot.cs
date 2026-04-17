@@ -1,4 +1,5 @@
 // Companion docs: https://svermeulen.github.io/trecs/samples/02-spawn-and-destroy/
+
 using System;
 using System.Collections.Generic;
 
