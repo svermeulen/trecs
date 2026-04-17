@@ -19,7 +19,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         public float SpawnConcentration = 1.5f;
         public float MealSize = 2f;
         public float MealYOffset = -2.5f;
-        public bool RenderingEnabled = true;
         public Color MealColor = new(r: 0.25848943f, g: 0.9245283f, b: 0, a: 0);
         public Color FishColor = new(0.7f, 0.9f, 1.0f, 0f);
 

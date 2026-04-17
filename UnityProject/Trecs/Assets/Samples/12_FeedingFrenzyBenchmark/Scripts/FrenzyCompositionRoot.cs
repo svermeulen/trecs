@@ -95,35 +95,32 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             var sceneInitializer = new SceneInitializer(Settings.Common, world, config);
 
-            if (Settings.Common.RenderingEnabled)
-            {
-                var renderer = new RendererSystem();
+            var renderer = new RendererSystem();
 
-                var fishMesh = SampleUtil.CreateDartMesh();
-                var mealMesh = SampleUtil.CreateScaledCubeMesh();
-                var fishMaterial = SampleUtil.CreateUnlitIndirectMaterial(
-                    Settings.Common.FishColor
-                );
-                var mealMaterial = SampleUtil.CreateUnlitIndirectMaterial(
-                    Settings.Common.MealColor
-                );
+            var fishMesh = SampleUtil.CreateDartMesh();
+            var mealMesh = SampleUtil.CreateScaledCubeMesh();
+            var fishMaterial = SampleUtil.CreateUnlitIndirectMaterial(
+                Settings.Common.FishColor
+            );
+            var mealMaterial = SampleUtil.CreateUnlitIndirectMaterial(
+                Settings.Common.MealColor
+            );
 
-                renderer.RegisterRenderable(
-                    TagSet<FrenzyTags.Fish>.Value,
-                    fishMesh,
-                    fishMaterial,
-                    maxPresetFishCount
-                );
+            renderer.RegisterRenderable(
+                TagSet<FrenzyTags.Fish>.Value,
+                fishMesh,
+                fishMaterial,
+                maxPresetFishCount
+            );
 
-                renderer.RegisterRenderable(
-                    TagSet<FrenzyTags.Meal>.Value,
-                    mealMesh,
-                    mealMaterial,
-                    maxPresetMealCount
-                );
+            renderer.RegisterRenderable(
+                TagSet<FrenzyTags.Meal>.Value,
+                mealMesh,
+                mealMaterial,
+                maxPresetMealCount
+            );
 
-                world.AddSystem(renderer);
-            }
+            world.AddSystem(renderer);
 
             // NOTE: This list determines OnReady call order
             world.AddSystems(
@@ -162,6 +159,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 perfStats.Dispose,
                 world.Dispose,
                 serialization.Dispose,
+                renderer.Dispose,
             };
         }
 
