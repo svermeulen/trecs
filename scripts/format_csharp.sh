@@ -5,3 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 cd $SCRIPT_DIR/../UnityProject/Trecs
 dotnet csharpier format ./Assets
+
+cd $SCRIPT_DIR/../SourceGen/Trecs.SourceGen
+dotnet csharpier format .
