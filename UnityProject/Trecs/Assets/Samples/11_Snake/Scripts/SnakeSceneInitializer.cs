@@ -63,7 +63,7 @@ namespace Trecs.Samples.Snake
         {
             // Unity's plane primitive is 10 units across; scale to match
             // the grid (one cell = 1 unit, plane sits centered on grid).
-            var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            var plane = SampleUtil.CreatePrimitive(PrimitiveType.Plane);
             plane.name = "GridPlane";
             plane.transform.localScale = new Vector3(
                 _settings.GridSize / 10f,

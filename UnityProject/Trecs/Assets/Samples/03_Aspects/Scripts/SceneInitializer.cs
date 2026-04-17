@@ -37,7 +37,7 @@ namespace Trecs.Samples.Aspects
                     rng.NextFloat(-halfSize, halfSize)
                 );
 
-                var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                var go = SampleUtil.CreatePrimitive(PrimitiveType.Capsule);
                 go.name = $"Boid_{i}";
                 go.transform.localScale = new Vector3(0.3f, 0.3f, 0.6f);
                 go.transform.position = (Vector3)position;

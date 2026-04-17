@@ -844,14 +844,16 @@ namespace Trecs
         {
             SyncAndRecordRead<T>(group);
             AssertGroupHasComponent<T>(group);
+            var nb = _entitiesDb.QuerySingleBuffer<T>(group);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
             var safety = SafetyManager.GetReadHandle(
                 ResourceId.Component(ComponentTypeId<T>.Value),
                 group
             );
-            return new NativeComponentBufferRead<T>(
-                _entitiesDb.QuerySingleBuffer<T>(group),
-                safety
-            );
+            return new NativeComponentBufferRead<T>(nb, safety);
+#else
+            return new NativeComponentBufferRead<T>(nb);
+#endif
         }
 
         internal NativeComponentBufferWrite<T> GetBufferWrite<T>(Group group)
@@ -859,14 +861,16 @@ namespace Trecs
         {
             SyncAndRecord<T>(group);
             AssertGroupHasComponent<T>(group);
+            var nb = _entitiesDb.QuerySingleBuffer<T>(group);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
             var safety = SafetyManager.GetWriteHandle(
                 ResourceId.Component(ComponentTypeId<T>.Value),
                 group
             );
-            return new NativeComponentBufferWrite<T>(
-                _entitiesDb.QuerySingleBuffer<T>(group),
-                safety
-            );
+            return new NativeComponentBufferWrite<T>(nb, safety);
+#else
+            return new NativeComponentBufferWrite<T>(nb);
+#endif
         }
 
         [Conditional("DEBUG")]
@@ -896,11 +900,15 @@ namespace Trecs
         {
             AssertGroupHasComponent<T>(group);
             var (nb, count) = _entitiesDb.QuerySingleBufferWithCount<T>(group);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
             var safety = SafetyManager.GetReadHandle(
                 ResourceId.Component(ComponentTypeId<T>.Value),
                 group
             );
             return (new NativeComponentBufferRead<T>(nb, safety), count);
+#else
+            return (new NativeComponentBufferRead<T>(nb), count);
+#endif
         }
 
         internal (
@@ -911,11 +919,15 @@ namespace Trecs
         {
             AssertGroupHasComponent<T>(group);
             var (nb, count) = _entitiesDb.QuerySingleBufferWithCount<T>(group);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
             var safety = SafetyManager.GetWriteHandle(
                 ResourceId.Component(ComponentTypeId<T>.Value),
                 group
             );
             return (new NativeComponentBufferWrite<T>(nb, safety), count);
+#else
+            return (new NativeComponentBufferWrite<T>(nb), count);
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -985,11 +997,15 @@ namespace Trecs
         {
             SyncAndRecordRead<T>(entityIndex.Group);
             var buf = _entitiesDb.QueryEntitiesAndIndex<T>(entityIndex, out var index);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
             var safety = SafetyManager.GetReadHandle(
                 ResourceId.Component(ComponentTypeId<T>.Value),
                 entityIndex.Group
             );
             return new(new NativeComponentBufferRead<T>(buf, safety), (int)index);
+#else
+            return new(new NativeComponentBufferRead<T>(buf), (int)index);
+#endif
         }
 
         internal NativeComponentWrite<T> GetComponentWrite<T>(EntityIndex entityIndex)
@@ -997,11 +1013,15 @@ namespace Trecs
         {
             SyncAndRecord<T>(entityIndex.Group);
             var buf = _entitiesDb.QueryEntitiesAndIndex<T>(entityIndex, out var index);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
             var safety = SafetyManager.GetWriteHandle(
                 ResourceId.Component(ComponentTypeId<T>.Value),
                 entityIndex.Group
             );
             return new(new NativeComponentBufferWrite<T>(buf, safety), (int)index);
+#else
+            return new(new NativeComponentBufferWrite<T>(buf), (int)index);
+#endif
         }
 
         internal ref EntitySet GetSetDirect(SetDef setDef)

@@ -294,9 +294,11 @@ namespace Trecs
         {
             var iter = CreateIterator();
 
-            Assert.That(iter.MoveNext(), "Query matched no entities");
+            var movedFirst = iter.MoveNext();
+            Assert.That(movedFirst, "Query matched no entities");
             var result = iter.Current;
-            Assert.That(!iter.MoveNext(), "Query matched multiple entities, expected exactly one");
+            var movedSecond = iter.MoveNext();
+            Assert.That(!movedSecond, "Query matched multiple entities, expected exactly one");
 
             return result;
         }

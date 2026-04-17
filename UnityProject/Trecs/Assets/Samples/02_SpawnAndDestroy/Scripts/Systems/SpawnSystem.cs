@@ -42,7 +42,7 @@ namespace Trecs.Samples.SpawnAndDestroy
             float radius = World.Rng.Next() * _spawnRadius;
             var position = new float3(math.cos(angle) * radius, 0.5f, math.sin(angle) * radius);
 
-            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            var go = SampleUtil.CreatePrimitive(PrimitiveType.Sphere);
             go.name = "Sphere";
             go.transform.position = (Vector3)position;
 

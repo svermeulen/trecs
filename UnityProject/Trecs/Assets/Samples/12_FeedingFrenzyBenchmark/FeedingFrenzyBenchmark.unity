@@ -208,7 +208,7 @@ MonoBehaviour:
       BobFrequency: 4.5
       BobBaseY: -2
   DisplayText: {fileID: 665378650}
-  ProfilerRunner: {fileID: 8571652274911916304}
+  ProfilerRunner: {fileID: 0}
 --- !u!1 &391647590
 GameObject:
   m_ObjectHideFlags: 0
@@ -1047,64 +1047,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2114482162}
   m_CullTransparentMesh: 1
---- !u!114 &1405300002742303587
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8571652274911916304}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b321de44d7bc742da834022101b4f857, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _impl: {fileID: 2338703112747956115}
---- !u!114 &2338703112747956115
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8571652274911916304}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 64108860f6e6d42ef919baa5aae2a4ef, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!4 &7918241311891959153
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8571652274911916304}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 39.43788, y: 28.72001, z: -21.16569}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &8571652274911916304
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 7918241311891959153}
-  - component: {fileID: 2338703112747956115}
-  - component: {fileID: 1405300002742303587}
-  m_Layer: 0
-  m_Name: CsProfilerRunner
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1112,7 +1054,6 @@ SceneRoots:
   - {fileID: 198587754}
   - {fileID: 1348245752}
   - {fileID: 1728220162}
-  - {fileID: 7918241311891959153}
   - {fileID: 1719597440}
   - {fileID: 1567691869}
   - {fileID: 391647594}

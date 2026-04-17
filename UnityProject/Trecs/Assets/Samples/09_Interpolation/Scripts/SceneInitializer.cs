@@ -68,7 +68,7 @@ namespace Trecs.Samples.Interpolation
                 math.sin(phase) * _orbitRadius
             );
 
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var go = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
             go.name = $"{label}_{index}";
             go.transform.position = (Vector3)position;
             go.transform.localScale = Vector3.one * 0.6f;

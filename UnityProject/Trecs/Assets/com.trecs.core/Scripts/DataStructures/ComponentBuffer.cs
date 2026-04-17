@@ -33,18 +33,24 @@ namespace Trecs
 
         // Public for cross-assembly source-gen access. Hidden from IntelliSense via
         // [EditorBrowsable(Never)].
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
         [EditorBrowsable(EditorBrowsableState.Never)]
         public NativeComponentBufferRead(NativeBuffer<T> nb, AtomicSafetyHandle safety)
         {
             _nb = nb;
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
             m_Safety = safety;
             CollectionHelper.SetStaticSafetyId<NativeComponentBufferRead<T>>(
                 ref m_Safety,
                 ref s_staticSafetyId.Data
             );
-#endif
         }
+#else
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public NativeComponentBufferRead(NativeBuffer<T> nb)
+        {
+            _nb = nb;
+        }
+#endif
 
         public int Capacity
         {
@@ -98,18 +104,24 @@ namespace Trecs
         >();
 #endif
 
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
         [EditorBrowsable(EditorBrowsableState.Never)]
         public NativeComponentBufferWrite(NativeBuffer<T> nb, AtomicSafetyHandle safety)
         {
             _nb = nb;
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
             m_Safety = safety;
             CollectionHelper.SetStaticSafetyId<NativeComponentBufferWrite<T>>(
                 ref m_Safety,
                 ref s_staticSafetyId.Data
             );
-#endif
         }
+#else
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public NativeComponentBufferWrite(NativeBuffer<T> nb)
+        {
+            _nb = nb;
+        }
+#endif
 
         public int Capacity
         {

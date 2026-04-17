@@ -35,6 +35,7 @@ namespace Trecs.Internal
 #endif
         bool _disposed;
 
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
         /// <summary>
         /// Get (or lazily create) the safety handle for the given <c>(resource, group)</c>.
         /// A single handle is shared by all containers (read and write) targeting the same
@@ -58,7 +59,6 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         AtomicSafetyHandle GetHandle(ResourceId resource, Group group)
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
             Assert.That(!_disposed, "WorldSafetyManager is disposed");
             var key = MakeKey(resource, group);
             if (!_handles.TryGetValue(key, out var handle))
@@ -68,10 +68,8 @@ namespace Trecs.Internal
                 _handles[key] = handle;
             }
             return handle;
-#else
-            return default;
-#endif
         }
+#endif
 
         /// <summary>
         /// Drain all outstanding jobs that hold any of the pooled handles, then release the

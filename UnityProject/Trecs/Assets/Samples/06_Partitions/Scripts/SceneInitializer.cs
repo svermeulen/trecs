@@ -35,7 +35,7 @@ namespace Trecs.Samples.Partitions
                     rng.NextFloat(-_spawnRadius, _spawnRadius)
                 );
 
-                var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                var go = SampleUtil.CreatePrimitive(PrimitiveType.Sphere);
                 go.name = $"Ball_{i}";
                 go.transform.position = (Vector3)position;
                 go.transform.localScale = Vector3.one * 0.6f;

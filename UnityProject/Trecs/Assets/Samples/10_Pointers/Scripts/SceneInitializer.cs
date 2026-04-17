@@ -82,7 +82,7 @@ namespace Trecs.Samples.Pointers
                 float t = progress - idx;
                 var pos = Vector3.Lerp(route.Waypoints[idx], route.Waypoints[nextIdx], t);
 
-                var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                var go = SampleUtil.CreatePrimitive(PrimitiveType.Sphere);
                 go.name = $"Follower_{route.Color}_{i}";
                 go.transform.position = pos;
                 go.transform.localScale = Vector3.one * 0.5f;

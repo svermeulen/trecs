@@ -133,7 +133,7 @@ namespace Trecs.Samples.SaveGame
         {
             while (_wallPool.Count <= index)
             {
-                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                var go = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
                 go.name = $"Wall_{_wallPool.Count}";
                 go.transform.localScale = Vector3.one;
                 go.GetComponent<Renderer>().sharedMaterial = _wallMat;
@@ -148,7 +148,7 @@ namespace Trecs.Samples.SaveGame
         {
             while (_targetPool.Count <= index)
             {
-                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                var go = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
                 go.name = $"Target_{_targetPool.Count}";
                 go.transform.localScale = new Vector3(0.8f, 0.05f, 0.8f);
                 go.GetComponent<Renderer>().sharedMaterial = _targetMat;
@@ -163,7 +163,7 @@ namespace Trecs.Samples.SaveGame
         {
             while (_boxPool.Count <= index)
             {
-                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                var go = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
                 go.name = $"Box_{_boxPool.Count}";
                 go.transform.localScale = Vector3.one * 0.8f;
                 go.GetComponent<Renderer>().sharedMaterial = _boxMat;
@@ -176,7 +176,7 @@ namespace Trecs.Samples.SaveGame
 
         static GameObject CreateCube(Color color, float scale, string name)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var go = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
             go.transform.localScale = Vector3.one * scale;
             go.GetComponent<Renderer>().sharedMaterial = SampleUtil.CreateMaterial(color);
@@ -186,7 +186,7 @@ namespace Trecs.Samples.SaveGame
 
         static GameObject CreateGround(int gridSize)
         {
-            var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            var plane = SampleUtil.CreatePrimitive(PrimitiveType.Plane);
             plane.name = "GridPlane";
             plane.transform.localScale = new Vector3(gridSize / 10f, 1f, gridSize / 10f);
             plane.transform.position = new Vector3(

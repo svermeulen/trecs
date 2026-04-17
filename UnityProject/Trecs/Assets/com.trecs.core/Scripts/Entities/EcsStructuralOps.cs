@@ -146,8 +146,9 @@ namespace Trecs
 
             var sets = _sets.EntitySets;
 
+            var success = sets.TryGetIndex(setId, out var index);
             Assert.That(
-                sets.TryGetIndex(setId, out var index),
+                success,
                 "Set with ID '{}' not registered. Add it to the WorldBuilder via AddSet<T>().",
                 setId
             );

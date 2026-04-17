@@ -113,13 +113,11 @@ namespace Trecs
 #endif
             ref var entry = ref ResolveEntry(group);
             var nb = new NativeBuffer<T>((T*)entry.DataPtr, entry.Count);
-            return new NativeComponentBufferRead<T>(nb,
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-                m_Safety
+            return new NativeComponentBufferRead<T>(nb, m_Safety);
 #else
-                default
+            return new NativeComponentBufferRead<T>(nb);
 #endif
-            );
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -310,13 +308,11 @@ namespace Trecs
 #endif
             ref var entry = ref ResolveEntry(group);
             var nb = new NativeBuffer<T>((T*)entry.DataPtr, entry.Count);
-            return new NativeComponentBufferWrite<T>(nb,
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-                m_Safety
+            return new NativeComponentBufferWrite<T>(nb, m_Safety);
 #else
-                default
+            return new NativeComponentBufferWrite<T>(nb);
 #endif
-            );
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

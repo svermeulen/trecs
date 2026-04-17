@@ -28,7 +28,7 @@ namespace Trecs.Samples.PredatorPrey
                 float radius = World.Rng.Next() * _settings.SpawnRadius;
                 var position = new float3(math.cos(angle) * radius, 0.5f, math.sin(angle) * radius);
 
-                var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                var go = SampleUtil.CreatePrimitive(PrimitiveType.Sphere);
                 go.name = "Prey";
                 go.transform.position = (Vector3)position;
                 go.GetComponent<Renderer>().material.color = Color.cyan;

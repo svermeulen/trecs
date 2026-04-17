@@ -100,7 +100,7 @@ namespace Trecs.Samples.Snake
 
         static GameObject CreateCube(Material material, float scale, string name)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var go = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
             go.transform.localScale = Vector3.one * scale;
             go.GetComponent<Renderer>().sharedMaterial = material;

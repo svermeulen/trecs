@@ -34,7 +34,7 @@ namespace Trecs.Samples.Sets
                         z * _settings.Spacing - offset
                     );
 
-                    var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                    var go = SampleUtil.CreatePrimitive(PrimitiveType.Sphere);
                     go.name = $"Particle_{x}_{z}";
                     go.transform.position = (Vector3)position;
                     go.transform.localScale = Vector3.one * _settings.BaseScale;

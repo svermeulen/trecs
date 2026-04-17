@@ -32,7 +32,7 @@ namespace Trecs.Samples.PredatorPrey
                     rng.NextFloat(-_settings.SpawnRadius, _settings.SpawnRadius)
                 );
 
-                var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                var go = SampleUtil.CreatePrimitive(PrimitiveType.Capsule);
                 go.name = $"Predator_{i}";
                 go.transform.localScale = new Vector3(0.6f, 0.6f, 1.2f);
                 go.transform.position = (Vector3)position;
