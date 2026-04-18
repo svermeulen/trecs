@@ -9,43 +9,43 @@ EditorBuildSettings:
     path: Assets/Samples/Main.unity
     guid: d7c52bfdc763d4c7fa70a1cc163c0755
   - enabled: 1
-    path: Assets/Samples/01_HelloEntity/HelloEntity.unity
+    path: Assets/Samples/Core/01_HelloEntity/HelloEntity.unity
     guid: 97e4cc1c0d80c4f92aad0f0ea2f49e0d
   - enabled: 1
-    path: Assets/Samples/02_SpawnAndDestroy/SpawnAndDestroy.unity
+    path: Assets/Samples/Core/02_SpawnAndDestroy/SpawnAndDestroy.unity
     guid: f4c1fa02136b9411a914835211d564e0
   - enabled: 1
-    path: Assets/Samples/03_Aspects/Aspects.unity
+    path: Assets/Samples/Core/03_Aspects/Aspects.unity
     guid: e18e8177978e14701b186ea0f1a903ba
   - enabled: 1
-    path: Assets/Samples/04_PredatorPrey/PredatorPrey.unity
+    path: Assets/Samples/Core/04_PredatorPrey/PredatorPrey.unity
     guid: 4b38ddb8e5e444a0d87ba9ff1ce76dc4
   - enabled: 1
-    path: Assets/Samples/05_JobSystem/JobSystem.unity
+    path: Assets/Samples/Core/05_JobSystem/JobSystem.unity
     guid: a7765ab31b05a421487f45b2aa3a382b
   - enabled: 1
-    path: Assets/Samples/06_Partitions/Partitions.unity
+    path: Assets/Samples/Core/06_Partitions/Partitions.unity
     guid: a584101a3b4eb46aaae34269c87fdfa2
   - enabled: 1
-    path: Assets/Samples/07_FeedingFrenzy/FeedingFrenzy.unity
+    path: Assets/Samples/Core/07_FeedingFrenzy/FeedingFrenzy.unity
     guid: aba3e00a7f5234fa6a8335ee4eb0408a
   - enabled: 1
-    path: Assets/Samples/08_Sets/Sets.unity
+    path: Assets/Samples/Core/08_Sets/Sets.unity
     guid: be1c0a33d6869403ea6eaa2b727ff219
   - enabled: 1
-    path: Assets/Samples/09_Interpolation/Interpolation.unity
+    path: Assets/Samples/Core/09_Interpolation/Interpolation.unity
     guid: d616b3352ebc045879133f1266f8d28d
   - enabled: 1
-    path: Assets/Samples/10_Pointers/Pointers.unity
+    path: Assets/Samples/Core/10_Pointers/Pointers.unity
     guid: a614f2e093d6747edb3e97ada24037aa
   - enabled: 1
-    path: Assets/Samples/11_Snake/Snake.unity
+    path: Assets/Samples/Serialization/11_Snake/Snake.unity
     guid: 325eb2f5c41c949db8ff03a4d6307174
   - enabled: 1
-    path: Assets/Samples/12_FeedingFrenzyBenchmark/FeedingFrenzyBenchmark.unity
+    path: Assets/Samples/Core/12_FeedingFrenzyBenchmark/FeedingFrenzyBenchmark.unity
     guid: 1f78097489b0d47a18e7110cf94c1e32
   - enabled: 1
-    path: Assets/Samples/13_SaveGame/SaveGame.unity
+    path: Assets/Samples/Serialization/13_SaveGame/SaveGame.unity
     guid: 1d5a33dbe6384099a166c1941b4c7571
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
