@@ -12,5 +12,12 @@
     "com.unity.mathematics": "1.3.3",
     "com.unity.burst": "1.8.28",
     "com.unity.collections": "2.6.2"
-  }
+  },
+  "samples": [
+    {
+      "displayName": "Tutorials",
+      "description": "Numbered tutorials covering core ECS features (entities, components, jobs, partitions, sets, interpolation, pointers).",
+      "path": "Samples~/Tutorials"
+    }
+  ]
 }

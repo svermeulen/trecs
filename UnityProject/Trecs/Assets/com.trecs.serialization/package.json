@@ -10,5 +10,12 @@
   },
   "dependencies": {
     "com.trecs.core": "0.1.0"
-  }
+  },
+  "samples": [
+    {
+      "displayName": "Tutorials",
+      "description": "Serialization and save-game examples (Snake, SaveGame).",
+      "path": "Samples~/Tutorials"
+    }
+  ]
 }
