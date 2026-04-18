@@ -123,7 +123,7 @@ See full documentation at **[svermeulen.github.io/trecs](https://svermeulen.gith
 
 ## Samples
 
-The project includes 12 samples covering everything from basic entity creation to complex simulations with Burst jobs. To try them, clone the repo, open `UnityProject/Trecs` in Unity 6000.3+, and run `Assets/Samples/Main.unity`.
+The project includes 13 samples covering everything from basic entity creation to complex simulations with Burst jobs. To try them, clone the repo, open `UnityProject/Trecs` in Unity 6000.3+, and run `Assets/Samples/Main.unity`.
 
 | Sample | Concepts |
 |--------|----------|
@@ -139,6 +139,7 @@ The project includes 12 samples covering everything from basic entity creation t
 | 10 Pointers | Storing memory outside of components |
 | 11 Snake | Complete game with recording/playback |
 | 12 Feeding Frenzy Benchmark | Exhaustive examples of the many Trecs patterns available |
+| 13 Save Game | Bookmark-based save/load slots with the serialization package |
 
 ## Acknowledgments
 
