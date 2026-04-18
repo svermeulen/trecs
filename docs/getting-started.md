@@ -2,19 +2,51 @@
 
 ## Installation
 
-Add Trecs to your Unity project via the Unity Package Manager:
-
-1. Open **Window > Package Manager**
-2. Click **+ > Add package from git URL**
-3. Enter: `https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.core`
-
-To use serialization features (bookmarks, recording/playback, full world state snapshots), also install the optional `com.trecs.serialization` package:
-
-1. Open **Window > Package Manager**
-2. Click **+ > Add package from git URL**
-3. Enter: `https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.serialization`
-
 Requires Unity 6000.3+.
+
+### Via OpenUPM (recommended)
+
+With the [openupm-cli](https://openupm.com/):
+
+```bash
+openupm add com.trecs.core
+# Optional: serialization features (bookmarks, recording/playback, save/load)
+openupm add com.trecs.serialization
+```
+
+Or add manually to `Packages/manifest.json`:
+
+```json
+{
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": ["com.trecs"]
+    }
+  ],
+  "dependencies": {
+    "com.trecs.core": "0.1.0",
+    "com.trecs.serialization": "0.1.0"
+  }
+}
+```
+
+### Via Git URL
+
+Open **Window > Package Manager**, click **+ > Add package from git URL**, and enter:
+
+```
+https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.core
+```
+
+For the optional serialization package:
+
+```
+https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.serialization
+```
+
+When using git URLs, add `com.trecs.core` before `com.trecs.serialization` (Unity can't resolve versioned dependencies from git URLs).
 
 ## Your First Project
 
