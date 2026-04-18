@@ -8,6 +8,8 @@
     "name": "Steve Vermeulen",
     "url": "https://github.com/svermeulen"
   },
+  "documentationUrl": "https://svermeulen.github.io/trecs/",
+  "changelogUrl": "https://svermeulen.github.io/trecs/changelog/",
   "dependencies": {
     "com.trecs.core": "0.1.0"
   },
