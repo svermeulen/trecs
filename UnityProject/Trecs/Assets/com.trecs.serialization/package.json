@@ -4,6 +4,16 @@
   "displayName": "Trecs Serialization",
   "description": "Serialization, recording, and playback support for Trecs",
   "unity": "6000.3",
+  "unityRelease": "10f1",
+  "keywords": [
+    "ecs",
+    "entity-component-system",
+    "serialization",
+    "save-game",
+    "recording",
+    "playback",
+    "trecs"
+  ],
   "author": {
     "name": "Steve Vermeulen",
     "url": "https://github.com/svermeulen"

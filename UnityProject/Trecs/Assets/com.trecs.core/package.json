@@ -4,6 +4,16 @@
   "displayName": "Trecs",
   "description": "A high-performance, deterministic Entity Component System framework for Unity",
   "unity": "6000.3",
+  "unityRelease": "10f1",
+  "keywords": [
+    "ecs",
+    "entity-component-system",
+    "data-oriented",
+    "burst",
+    "jobs",
+    "performance",
+    "deterministic"
+  ],
   "author": {
     "name": "Steve Vermeulen",
     "url": "https://github.com/svermeulen"
