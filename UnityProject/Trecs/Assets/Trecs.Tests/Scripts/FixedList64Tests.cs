@@ -29,14 +29,14 @@ namespace Trecs.Tests
         public void TestEqualitySameContent()
         {
             var list1 = new FixedList64<int> { Count = 3 };
-            list1.GetRef(0) = 5;
-            list1.GetRef(1) = 10;
-            list1.GetRef(2) = 15;
+            list1.Mut(0) = 5;
+            list1.Mut(1) = 10;
+            list1.Mut(2) = 15;
 
             var list2 = new FixedList64<int> { Count = 3 };
-            list2.GetRef(0) = 5;
-            list2.GetRef(1) = 10;
-            list2.GetRef(2) = 15;
+            list2.Mut(0) = 5;
+            list2.Mut(1) = 10;
+            list2.Mut(2) = 15;
 
             NAssert.IsTrue(list1 == list2);
             NAssert.IsTrue(!(list1 != list2));
@@ -47,14 +47,14 @@ namespace Trecs.Tests
         {
             // This test verifies the fix: only Count + active elements are compared
             var list1 = new FixedList64<int> { Count = 2 };
-            list1.GetRef(0) = 5;
-            list1.GetRef(1) = 10;
-            list1.Buffer.GetRef(2) = 999; // garbage in unused slot - access Buffer directly
+            list1.Mut(0) = 5;
+            list1.Mut(1) = 10;
+            list1.Buffer.Mut(2) = 999; // garbage in unused slot - access Buffer directly
 
             var list2 = new FixedList64<int> { Count = 2 };
-            list2.GetRef(0) = 5;
-            list2.GetRef(1) = 10;
-            list2.Buffer.GetRef(2) = 777; // different garbage in unused slot - access Buffer directly
+            list2.Mut(0) = 5;
+            list2.Mut(1) = 10;
+            list2.Buffer.Mut(2) = 777; // different garbage in unused slot - access Buffer directly
 
             NAssert.IsTrue(
                 list1 == list2,
@@ -66,13 +66,13 @@ namespace Trecs.Tests
         public void TestEqualityDifferentCount()
         {
             var list1 = new FixedList64<int> { Count = 2 };
-            list1.GetRef(0) = 5;
-            list1.GetRef(1) = 10;
+            list1.Mut(0) = 5;
+            list1.Mut(1) = 10;
 
             var list2 = new FixedList64<int> { Count = 3 };
-            list2.GetRef(0) = 5;
-            list2.GetRef(1) = 10;
-            list2.GetRef(2) = 15;
+            list2.Mut(0) = 5;
+            list2.Mut(1) = 10;
+            list2.Mut(2) = 15;
 
             NAssert.IsTrue(list1 != list2);
             NAssert.IsTrue(!(list1 == list2));
@@ -82,14 +82,14 @@ namespace Trecs.Tests
         public void TestEqualityDifferentContent()
         {
             var list1 = new FixedList64<int> { Count = 3 };
-            list1.GetRef(0) = 5;
-            list1.GetRef(1) = 10;
-            list1.GetRef(2) = 15;
+            list1.Mut(0) = 5;
+            list1.Mut(1) = 10;
+            list1.Mut(2) = 15;
 
             var list2 = new FixedList64<int> { Count = 3 };
-            list2.GetRef(0) = 5;
-            list2.GetRef(1) = 99; // different
-            list2.GetRef(2) = 15;
+            list2.Mut(0) = 5;
+            list2.Mut(1) = 99; // different
+            list2.Mut(2) = 15;
 
             NAssert.IsTrue(list1 != list2);
             NAssert.IsTrue(!(list1 == list2));
@@ -123,10 +123,10 @@ namespace Trecs.Tests
             };
 
             var list1 = new FixedList64<LargeTestStruct> { Count = 1 };
-            list1.GetRef(0) = struct1;
+            list1.Mut(0) = struct1;
 
             var list2 = new FixedList64<LargeTestStruct> { Count = 1 };
-            list2.GetRef(0) = struct2;
+            list2.Mut(0) = struct2;
 
             NAssert.IsTrue(list1 == list2);
         }
@@ -136,30 +136,30 @@ namespace Trecs.Tests
         #region Access / Modification
 
         [Test]
-        public void TestGetRefModification()
+        public void TestWriteModification()
         {
             var list = new FixedList64<int> { Count = 3 };
-            list.GetRef(0) = 5;
-            list.GetRef(1) = 10;
-            list.GetRef(2) = 15;
+            list.Mut(0) = 5;
+            list.Mut(1) = 10;
+            list.Mut(2) = 15;
 
-            ref int value = ref list.GetRef(1);
+            ref int value = ref list.Mut(1);
             NAssert.AreEqual(10, value);
 
             // Modify through reference
             value = 99;
-            NAssert.AreEqual(99, list.Get(1));
+            NAssert.AreEqual(99, list[1]);
         }
 
         [Test]
-        public void TestGet()
+        public void TestRead()
         {
             var list = new FixedList64<int> { Count = 3 };
-            list.GetRef(0) = 5;
-            list.GetRef(1) = 10;
-            list.GetRef(2) = 15;
+            list.Mut(0) = 5;
+            list.Mut(1) = 10;
+            list.Mut(2) = 15;
 
-            ref readonly int value = ref list.Get(1);
+            ref readonly int value = ref list[1];
             NAssert.AreEqual(10, value);
         }
 
@@ -180,13 +180,13 @@ namespace Trecs.Tests
             };
 
             var list = new FixedList64<LargeTestStruct> { Count = 1 };
-            list.GetRef(0) = largeStruct;
+            list.Mut(0) = largeStruct;
 
             // Modify through reference
-            ref var item = ref list.GetRef(0);
+            ref var item = ref list.Mut(0);
             item.A = 999;
 
-            NAssert.AreEqual(999, list.Get(0).A);
+            NAssert.AreEqual(999, list[0].A);
         }
 
         #endregion
@@ -201,14 +201,14 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 64; i++)
             {
-                list1.GetRef(i) = i;
-                list2.GetRef(i) = i;
+                list1.Mut(i) = i;
+                list2.Mut(i) = i;
             }
 
             NAssert.IsTrue(list1 == list2);
 
             // Change last element
-            list2.GetRef(63) = 999;
+            list2.Mut(63) = 999;
             NAssert.IsTrue(list1 != list2);
         }
 
@@ -220,15 +220,15 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 5; i++)
             {
-                list1.GetRef(i) = i * 2;
-                list2.GetRef(i) = i * 2;
+                list1.Mut(i) = i * 2;
+                list2.Mut(i) = i * 2;
             }
 
             // Fill unused slots with garbage
             for (int i = 5; i < 64; i++)
             {
-                list1.Buffer.GetRef(i) = 12345;
-                list2.Buffer.GetRef(i) = 67890;
+                list1.Buffer.Mut(i) = 12345;
+                list2.Buffer.Mut(i) = 67890;
             }
 
             NAssert.IsTrue(list1 == list2, "Should ignore garbage in unused slots");

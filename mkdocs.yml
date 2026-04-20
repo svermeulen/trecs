@@ -56,6 +56,7 @@ nav:
       - Advanced Job Features: advanced/advanced-jobs.md
       - Groups & TagSets: advanced/groups-and-tagsets.md
       - Heap: advanced/heap.md
+      - Fixed Collections: advanced/fixed-collections.md
       - Interpolation: advanced/interpolation.md
       - Serialization: advanced/serialization.md
       - Recording & Playback: advanced/recording-and-playback.md

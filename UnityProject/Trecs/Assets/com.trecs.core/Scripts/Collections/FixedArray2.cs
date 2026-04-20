@@ -1,4 +1,3 @@
-using System;
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
 
@@ -9,7 +8,7 @@ namespace Trecs.Collections
     public struct FixedArray2<T>
         where T : unmanaged
     {
-        static readonly int _length = 2;
+        const int _length = 2;
 
 #pragma warning disable CS0169
         T field0;
@@ -18,36 +17,33 @@ namespace Trecs.Collections
 
         public readonly int Length => _length;
 
-        public T this[int index]
+        // Readonly indexer returning `ref readonly T`. This shape is deliberate:
+        // - On mutable instances, reads via `arr[i]` are ergonomic.
+        // - On `in` parameters, the readonly modifier skips the defensive copy,
+        //   and the `ref readonly T` return prevents silent mutation.
+        // Writes go through the `Mut` extension method, which requires `ref` to
+        //   the array and therefore cannot be called on `in` parameters.
+        public readonly ref readonly T this[int index]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            readonly get
+            get
             {
                 Require.That(index >= 0 && index < _length, "out of bound index");
-                // need Unsafe.AsRef for readonly access
-                return Unsafe.Add(
-                    ref Unsafe.As<FixedArray2<T>, T>(ref Unsafe.AsRef(in this)),
-                    index
-                );
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set
-            {
-                Require.That(index >= 0 && index < _length, "out of bound index");
-
-                Unsafe.Add(ref Unsafe.As<FixedArray2<T>, T>(ref this), index) = value;
+                unsafe
+                {
+                    return ref *((T*)Unsafe.AsPointer(ref Unsafe.AsRef(in this)) + index);
+                }
             }
         }
 
         public override readonly bool Equals(object obj)
         {
-            FixedTypeCommon.Log.Warning("Used object Equals on FixedArray2, causing boxing");
             return obj is FixedArray2<T> other && this == other;
         }
 
-        public override int GetHashCode()
+        public override readonly int GetHashCode()
         {
-            throw new NotImplementedException();
+            return UnmanagedUtil.BlittableHashCode(this);
         }
 
         public static bool operator ==(in FixedArray2<T> left, in FixedArray2<T> right)
@@ -61,25 +57,21 @@ namespace Trecs.Collections
         }
     }
 
-    public static class FixedTypedArray2Extensions
+    public static class FixedArray2Extensions
     {
+        /// <summary>
+        /// Returns a mutable ref to element <paramref name="index"/>. Requires a
+        /// mutable reference to the array, so cannot be called on `in` parameters.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref T GetRef<T>(this ref FixedArray2<T> array, int index)
+        public static ref T Mut<T>(this ref FixedArray2<T> arr, int index)
             where T : unmanaged
         {
-            Require.That(index >= 0 && index < array.Length, "out of bound index");
-            return ref Unsafe.Add(ref Unsafe.As<FixedArray2<T>, T>(ref array), index);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref readonly T Get<T>(this in FixedArray2<T> array, int index)
-            where T : unmanaged
-        {
-            Require.That(index >= 0 && index < array.Length, "out of bound index");
-            return ref Unsafe.Add(
-                ref Unsafe.As<FixedArray2<T>, T>(ref Unsafe.AsRef(in array)),
-                index
-            );
+            Require.That(index >= 0 && index < 2, "out of bound index");
+            unsafe
+            {
+                return ref *((T*)Unsafe.AsPointer(ref arr) + index);
+            }
         }
     }
 }

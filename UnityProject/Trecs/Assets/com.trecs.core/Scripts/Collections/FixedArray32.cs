@@ -1,4 +1,3 @@
-﻿using System;
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
 
@@ -9,7 +8,7 @@ namespace Trecs.Collections
     public struct FixedArray32<T>
         where T : unmanaged
     {
-        static readonly int _length = 32;
+        const int _length = 32;
 
 #pragma warning disable CS0169
         FixedArray16<T> sixteensA;
@@ -18,35 +17,27 @@ namespace Trecs.Collections
 
         public readonly int Length => _length;
 
-        public T this[int index]
+        public readonly ref readonly T this[int index]
         {
-            readonly get
-            {
-                Require.That(index < _length, "out of bound index");
-                // need Unsafe.AsRef for readonly access
-                return Unsafe.Add(
-                    ref Unsafe.As<FixedArray32<T>, T>(ref Unsafe.AsRef(in this)),
-                    index
-                );
-            }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set
+            get
             {
-                Require.That(index < _length, "out of bound index");
-
-                Unsafe.Add(ref Unsafe.As<FixedArray32<T>, T>(ref this), index) = value;
+                Require.That(index >= 0 && index < _length, "out of bound index");
+                unsafe
+                {
+                    return ref *((T*)Unsafe.AsPointer(ref Unsafe.AsRef(in this)) + index);
+                }
             }
         }
 
         public override readonly bool Equals(object obj)
         {
-            FixedTypeCommon.Log.Warning("Used object Equals on FixedArray32, causing boxing");
             return obj is FixedArray32<T> other && this == other;
         }
 
-        public override int GetHashCode()
+        public override readonly int GetHashCode()
         {
-            throw new NotImplementedException();
+            return UnmanagedUtil.BlittableHashCode(this);
         }
 
         public static bool operator ==(in FixedArray32<T> left, in FixedArray32<T> right)
@@ -60,25 +51,21 @@ namespace Trecs.Collections
         }
     }
 
-    public static class FixedTypedArray32Extensions
+    public static class FixedArray32Extensions
     {
+        /// <summary>
+        /// Returns a mutable ref to element <paramref name="index"/>. Requires a
+        /// mutable reference to the array, so cannot be called on `in` parameters.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref T GetRef<T>(this ref FixedArray32<T> array, int index)
+        public static ref T Mut<T>(this ref FixedArray32<T> arr, int index)
             where T : unmanaged
         {
-            Require.That(index < array.Length, "out of bound index");
-            return ref Unsafe.Add(ref Unsafe.As<FixedArray32<T>, T>(ref array), index);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref readonly T Get<T>(this in FixedArray32<T> array, int index)
-            where T : unmanaged
-        {
-            Require.That(index < array.Length, "out of bound index");
-            return ref Unsafe.Add(
-                ref Unsafe.As<FixedArray32<T>, T>(ref Unsafe.AsRef(in array)),
-                index
-            );
+            Require.That(index >= 0 && index < 32, "out of bound index");
+            unsafe
+            {
+                return ref *((T*)Unsafe.AsPointer(ref arr) + index);
+            }
         }
     }
 }

@@ -23,7 +23,7 @@ Trecs has a deliberately small API surface — a handful of core concepts you ca
 |---|---|
 | `IEntityComponent` (unmanaged struct) | `IComponentData` (unmanaged struct) |
 | No managed components | `class IComponentData` (managed) |
-| No buffer components | `IBufferElementData` (dynamic buffer) |
+| [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline in component) | `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) |
 | Tags via `ITag` (separate from components) | `IComponentData` with no fields acts as tag |
 | `[Unwrap]` for single-field components | No equivalent |
 | Global state via `World.GlobalComponent<T>()` on a `Globals` template | Singletons via `SystemAPI.GetSingleton<T>()` (any component on a single-entity query) |
@@ -162,7 +162,7 @@ Neither layout is universally better — chunk-based storage shines when you hav
 
 - **Runtime shape changes** — adding or removing components on an existing entity to morph its archetype. Trecs fixes the component set at the template level; the only runtime structural change is a partition transition between compile-time-declared partitions.
 - **Managed components** — class-based components
-- **Dynamic buffers** — variable-length per-entity arrays
+- **Unbounded per-entity arrays** — Trecs covers the bounded case with [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time capacity, stored inline in the component); there's no runtime-growing equivalent of Unity's `DynamicBuffer<T>`
 - **Enableable components** — toggle components without structural changes
 - **Shared components** — components shared across entities
 - **Built-in transform hierarchy** — `LocalTransform`, `Parent`/`Child`, and a system that maintains `LocalToWorld`

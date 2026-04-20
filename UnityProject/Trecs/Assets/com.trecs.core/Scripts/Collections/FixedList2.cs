@@ -1,16 +1,15 @@
-using System;
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
 
 namespace Trecs.Collections
 {
     /// <summary>
-    /// This just wraps FixedArray2, adds a count, and does bounds checking
+    /// A bounded list with compile-time capacity of 2 elements, stored inline.
     /// </summary>
     public struct FixedList2<T>
         where T : unmanaged
     {
-        public FixedArray2<T> Buffer; // Don't access directly
+        public FixedArray2<T> Buffer; // Raw storage — prefer the indexer / Mut() for bounds-checked access.
 
         int _count;
 
@@ -38,21 +37,10 @@ namespace Trecs.Collections
             }
         }
 
-        /// Do not use this if T is very large since it copies
-        public T this[int index]
+        public readonly ref readonly T this[int index]
         {
-            readonly get
-            {
-                Require.That(
-                    index >= 0 && index < _count,
-                    "Out of bound index (index: {}, count: {})",
-                    index,
-                    _count
-                );
-                return Buffer[index];
-            }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set
+            get
             {
                 Require.That(
                     index >= 0 && index < _count,
@@ -60,18 +48,26 @@ namespace Trecs.Collections
                     index,
                     _count
                 );
-                Buffer[index] = value;
+                unsafe
+                {
+                    return ref *((T*)Unsafe.AsPointer(ref Unsafe.AsRef(in Buffer)) + index);
+                }
             }
         }
 
-        public override int GetHashCode()
+        public override readonly int GetHashCode()
         {
-            throw new NotImplementedException();
+            unsafe
+            {
+                fixed (FixedArray2<T>* bufPtr = &Buffer)
+                {
+                    return UnmanagedUtil.BlittableHashCode(bufPtr, _count * sizeof(T));
+                }
+            }
         }
 
         public override readonly bool Equals(object obj)
         {
-            FixedTypeCommon.Log.Warning("Used object Equals on FixedList2, causing boxing");
             return obj is FixedList2<T> other && this == other;
         }
 
@@ -111,25 +107,24 @@ namespace Trecs.Collections
 
     public static class FixedList2Extensions
     {
+        /// <summary>
+        /// Returns a mutable ref to element <paramref name="index"/>. Requires a
+        /// mutable reference to the list, so cannot be called on `in` parameters.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref T GetRef<T>(this ref FixedList2<T> pose, int index)
-            where T : unmanaged
-        {
-            Require.That((int)index >= 0 && (int)index < pose.Count);
-            return ref pose.Buffer.GetRef(index);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref readonly T Get<T>(this in FixedList2<T> pose, int index)
+        public static ref T Mut<T>(this ref FixedList2<T> list, int index)
             where T : unmanaged
         {
             Require.That(
-                (int)index >= 0 && (int)index < pose.Count,
-                "Index {} out of bounds for FixedList2 of count {}",
+                index >= 0 && index < list.Count,
+                "Out of bound index (index: {}, count: {})",
                 index,
-                pose.Count
+                list.Count
             );
-            return ref pose.Buffer.Get(index);
+            unsafe
+            {
+                return ref *((T*)Unsafe.AsPointer(ref list.Buffer) + index);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -137,7 +132,7 @@ namespace Trecs.Collections
             where T : unmanaged
         {
             Require.That(list.Count < 2, "FixedList2 is full");
-            list.Buffer[list.Count] = item;
+            list.Buffer.Mut(list.Count) = item;
             list.Count++;
         }
 
@@ -149,6 +144,19 @@ namespace Trecs.Collections
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void RemoveAt<T>(this ref FixedList2<T> list, int index)
+            where T : unmanaged
+        {
+            Require.That(index >= 0 && index < list.Count, "index out of bounds");
+            int lastIndex = list.Count - 1;
+            for (int i = index; i < lastIndex; i++)
+            {
+                list.Buffer.Mut(i) = list.Buffer[i + 1];
+            }
+            list.Count--;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void RemoveAtSwapBack<T>(this ref FixedList2<T> list, int index)
             where T : unmanaged
         {
@@ -156,7 +164,7 @@ namespace Trecs.Collections
             int lastIndex = list.Count - 1;
             if (index != lastIndex)
             {
-                list.Buffer[index] = list.Buffer[lastIndex];
+                list.Buffer.Mut(index) = list.Buffer[lastIndex];
             }
             list.Count--;
         }
