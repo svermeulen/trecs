@@ -145,7 +145,6 @@ var roundTripped = buffer.ReadAll<MyType>();
 
 - Always use `World.Rng` / `World.FixedRng` in fixed update — never `UnityEngine.Random` or `System.Random`.
 - Set `RequireDeterministicSubmission = true` in `WorldSettings` if you intend to record and replay.
-- Avoid floating-point non-determinism from uncontrolled thread scheduling.
 
 ### `WorldSettings.AssertNoTimeInFixedPhase`
 
