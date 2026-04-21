@@ -18,12 +18,20 @@ namespace Trecs.Internal
         readonly int _size;
         readonly int _alignment;
         readonly Type _innerType;
+        bool _disposed;
 
-        public IntPtr Ptr => _ptr;
+        public IntPtr Ptr
+        {
+            get
+            {
+                Assert.That(!_disposed, "NativeBlobBox used after Dispose");
+                return _ptr;
+            }
+        }
         public int Size => _size;
         public int Alignment => _alignment;
         public Type InnerType => _innerType;
-        public bool IsDisposed => _ptr == IntPtr.Zero;
+        public bool IsDisposed => _disposed;
 
         NativeBlobBox(IntPtr ptr, int size, int alignment, Type innerType)
         {
@@ -43,11 +51,12 @@ namespace Trecs.Internal
             _size = size;
             _alignment = alignment;
             _innerType = innerType;
+            NativeAllocTracker.OnAllocated();
         }
 
         ~NativeBlobBox()
         {
-            if (_ptr != IntPtr.Zero)
+            if (!_disposed)
             {
                 // We don't free here because finalizers run on a non-main thread and
                 // AllocatorManager.Free is main-thread only. We just warn so the leak
@@ -61,7 +70,7 @@ namespace Trecs.Internal
 
         public unsafe void Dispose()
         {
-            Assert.That(_ptr != IntPtr.Zero, "NativeBlobBox double-disposed");
+            Assert.That(!_disposed, "NativeBlobBox double-disposed");
             AllocatorManager.Free(
                 Allocator.Persistent,
                 _ptr.ToPointer(),
@@ -70,6 +79,8 @@ namespace Trecs.Internal
                 items: 1
             );
             _ptr = IntPtr.Zero;
+            _disposed = true;
+            NativeAllocTracker.OnDisposed();
             GC.SuppressFinalize(this);
         }
 
