@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace Trecs
 {
     /// <summary>
@@ -19,7 +21,7 @@ namespace Trecs
 
 namespace Trecs.Internal
 {
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public static class TrecsConstants
     {
         public const int RecordingSentinelValue = 584488256;

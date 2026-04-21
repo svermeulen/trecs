@@ -1,6 +1,6 @@
-namespace Trecs.Serialization
+namespace Trecs.Internal
 {
-    internal class SerializeCloner
+    public class SerializeCloner
     {
         readonly SharedSerializerCacheHelper _sharedSerializerHelper;
 

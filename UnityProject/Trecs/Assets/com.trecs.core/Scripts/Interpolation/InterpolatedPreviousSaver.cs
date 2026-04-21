@@ -1,6 +1,7 @@
 using System;
 using Trecs.Internal;
 using Unity.Burst;
+using Unity.Collections;
 using Unity.Jobs;
 using EditorBrowsable = System.ComponentModel.EditorBrowsableAttribute;
 using EditorBrowsableState = System.ComponentModel.EditorBrowsableState;
@@ -73,7 +74,7 @@ namespace Trecs
         {
             public NativeComponentBufferRead<T> CurrentValues;
 
-            [Unity.Collections.NativeDisableParallelForRestriction]
+            [NativeDisableParallelForRestriction]
             public NativeComponentBufferWrite<InterpolatedPrevious<T>> PreviousValues;
 
             public readonly void Execute(int i)

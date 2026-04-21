@@ -6,6 +6,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -169,8 +170,8 @@ namespace Trecs.Internal
                 throw new TrecsException("SimpleNativeArray: null-access");
         }
 
-        [Unity.Burst.NoAlias]
-        [Unity.Collections.LowLevel.Unsafe.NativeDisableUnsafePtrRestriction]
+        [NoAlias]
+        [NativeDisableUnsafePtrRestriction]
         unsafe UnsafeBlob* _queue;
     }
 }

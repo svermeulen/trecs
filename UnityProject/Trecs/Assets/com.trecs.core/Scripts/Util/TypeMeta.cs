@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Unity.Burst;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Internal
 {
@@ -7,8 +9,7 @@ namespace Trecs.Internal
     {
         public static readonly Type Type = typeof(T);
         public static readonly string Name = Type.Name;
-        public static readonly bool IsUnmanaged =
-            Unity.Collections.LowLevel.Unsafe.UnsafeUtility.IsUnmanaged<T>();
+        public static readonly bool IsUnmanaged = UnsafeUtility.IsUnmanaged<T>();
         public static readonly int Hash = TypeHash<T>.Value;
     }
 
@@ -59,7 +60,7 @@ namespace Trecs.Internal
                 info = new CachedTypeInfo
                 {
                     Name = type.Name,
-                    Hash = Unity.Burst.BurstRuntime.GetHashCode32(type),
+                    Hash = BurstRuntime.GetHashCode32(type),
                 };
 
                 _typeInfos.Add(type, info);
@@ -73,6 +74,6 @@ namespace Trecs.Internal
     // Have this separate from TypeMeta so it can be used in burst code
     public static class TypeHash<T>
     {
-        public static readonly int Value = Unity.Burst.BurstRuntime.GetHashCode32<T>();
+        public static readonly int Value = BurstRuntime.GetHashCode32<T>();
     }
 }

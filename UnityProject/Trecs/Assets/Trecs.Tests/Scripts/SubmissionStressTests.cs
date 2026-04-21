@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using NUnit.Framework;
+using Unity.Collections;
+using Debug = UnityEngine.Debug;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -59,7 +61,7 @@ namespace Trecs.Tests
                 NAssert.AreEqual(i * 2 + 1, a.Component<TestInt>(oddRef).Read.Value);
             }
 
-            UnityEngine.Debug.Log(
+            Debug.Log(
                 $"[StressTest] Remove {removeCount}/{count}: {sw.Elapsed.TotalMilliseconds:F3} ms"
             );
         }
@@ -122,7 +124,7 @@ namespace Trecs.Tests
                 NAssert.AreEqual(i * 2 + 1, a.Component<TestInt>(stayedRef).Read.Value);
             }
 
-            UnityEngine.Debug.Log(
+            Debug.Log(
                 $"[StressTest] Move {moveCount}/{count}: {sw.Elapsed.TotalMilliseconds:F3} ms"
             );
         }
@@ -156,9 +158,7 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(count, a.CountEntitiesWithTags(tags));
 
-            UnityEngine.Debug.Log(
-                $"[StressTest] Add {count}: {sw.Elapsed.TotalMilliseconds:F3} ms"
-            );
+            Debug.Log($"[StressTest] Add {count}: {sw.Elapsed.TotalMilliseconds:F3} ms");
         }
 
         #endregion
@@ -217,7 +217,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(expectedA, a.CountEntitiesWithTags(partitionA));
             NAssert.AreEqual(moveCount, a.CountEntitiesWithTags(partitionB));
 
-            UnityEngine.Debug.Log(
+            Debug.Log(
                 $"[StressTest] Mixed (remove={removeCount}, move={moveCount}, add={addCount}) from {count}: {sw.Elapsed.TotalMilliseconds:F3} ms"
             );
         }
@@ -257,9 +257,7 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(tags));
 
-            UnityEngine.Debug.Log(
-                $"[StressTest] RemoveAll {count}: {sw.Elapsed.TotalMilliseconds:F3} ms"
-            );
+            Debug.Log($"[StressTest] RemoveAll {count}: {sw.Elapsed.TotalMilliseconds:F3} ms");
         }
 
         #endregion
@@ -277,7 +275,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
-            var refs = a.ReserveEntityHandles(count, Unity.Collections.Allocator.Temp);
+            var refs = a.ReserveEntityHandles(count, Allocator.Temp);
 
             // Schedule native adds with reverse sort keys (worst case for sorting)
             for (int i = 0; i < count; i++)
@@ -308,7 +306,7 @@ namespace Trecs.Tests
                 );
             }
 
-            UnityEngine.Debug.Log(
+            Debug.Log(
                 $"[StressTest] NativeAdd (sorted) {count}: {sw.Elapsed.TotalMilliseconds:F3} ms"
             );
         }
@@ -338,7 +336,7 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(count, a.CountEntitiesWithTags(TestTags.Alpha));
 
-            UnityEngine.Debug.Log(
+            Debug.Log(
                 $"[StressTest] NativeAdd (no sort) {count}: {sw.Elapsed.TotalMilliseconds:F3} ms"
             );
         }
@@ -354,7 +352,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
-            var refs = a.ReserveEntityHandles(count, Unity.Collections.Allocator.Temp);
+            var refs = a.ReserveEntityHandles(count, Allocator.Temp);
 
             // Add with interleaved sort keys
             for (int i = 0; i < count; i++)
@@ -381,7 +379,7 @@ namespace Trecs.Tests
                 );
             }
 
-            UnityEngine.Debug.Log(
+            Debug.Log(
                 $"[StressTest] NativeAdd (multi-bag sorted) {count}: {sw.Elapsed.TotalMilliseconds:F3} ms"
             );
         }

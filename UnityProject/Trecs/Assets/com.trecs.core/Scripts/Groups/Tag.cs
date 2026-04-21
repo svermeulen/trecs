@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using Trecs.Internal;
 using Unity.Burst;
 
@@ -89,9 +90,7 @@ namespace Trecs
         /// </summary>
         public static int NativeGuid
         {
-            [System.Runtime.CompilerServices.MethodImpl(
-                System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining
-            )]
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _nativeGuid.Data;
         }
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Trecs.Collections;
 using Unity.Collections;
@@ -215,7 +216,7 @@ namespace Trecs.Internal
 
         // ── Validation ─────────────────────────────────────────────────
 
-        [System.Diagnostics.Conditional("DEBUG")]
+        [Conditional("DEBUG")]
         void AssertValidGroup(Group group)
         {
 #if DEBUG

@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Collections
 {
@@ -91,11 +92,7 @@ namespace Trecs.Collections
                 void* lhsPtr = Unsafe.AsPointer(ref lhsRef);
                 void* rhsPtr = Unsafe.AsPointer(ref rhsRef);
 
-                return Unity.Collections.LowLevel.Unsafe.UnsafeUtility.MemCmp(
-                        lhsPtr,
-                        rhsPtr,
-                        lhs.Count * sizeof(T)
-                    ) == 0;
+                return UnsafeUtility.MemCmp(lhsPtr, rhsPtr, lhs.Count * sizeof(T)) == 0;
             }
         }
 

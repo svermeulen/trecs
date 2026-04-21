@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using NAssert = NUnit.Framework.Assert;
 
@@ -452,7 +453,7 @@ namespace Trecs.Tests
             a.SetAdd<FiltOpTestSet>(new EntityIndex(3, group));
             a.SubmitEntities();
 
-            var values = new System.Collections.Generic.List<int>();
+            var values = new List<int>();
             foreach (var ei in a.Query().InSet<FiltOpTestSet>().EntityIndices())
             {
                 values.Add(a.Component<TestInt>(ei).Read.Value);
@@ -498,7 +499,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Iterate set - should have 3 entities, none with value 200
-            var values = new System.Collections.Generic.List<int>();
+            var values = new List<int>();
             foreach (var ei in a.Query().InSet<FiltOpTestSet>().EntityIndices())
             {
                 values.Add(a.Component<TestInt>(ei).Read.Value);

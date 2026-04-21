@@ -30,7 +30,7 @@ namespace Trecs.Serialization
 
         public static void RegisterSerializers(SerializerRegistry registry)
         {
-            registry.RegisterSerializer<BookmarkMetadata.Serializer>();
+            registry.RegisterSerializer<Serializer>();
         }
 
         public class Serializer : ISerializer<BookmarkMetadata>

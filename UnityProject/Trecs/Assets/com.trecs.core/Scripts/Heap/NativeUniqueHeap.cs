@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Trecs.Collections;
 using Trecs.Internal;
+using Unity.Burst;
 using Unity.Collections;
 
 namespace Trecs
@@ -341,7 +342,7 @@ namespace Trecs
         // is interchangeable across managed and Burst contexts.
         static int BurstHashFromType(Type t)
         {
-            return Unity.Burst.BurstRuntime.GetHashCode32(t);
+            return BurstRuntime.GetHashCode32(t);
         }
     }
 }

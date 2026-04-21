@@ -1,3 +1,5 @@
-[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Trecs.Tests")]
-[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Trecs.Serialization.Tests")]
-[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Trecs.Serialization")]
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("Trecs.Tests")]
+[assembly: InternalsVisibleTo("Trecs.Serialization.Tests")]
+[assembly: InternalsVisibleTo("Trecs.Serialization")]

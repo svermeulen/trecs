@@ -3,6 +3,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
+using Random = Unity.Mathematics.Random;
 
 namespace Trecs.Samples.JobSystem
 {
@@ -161,7 +162,7 @@ namespace Trecs.Samples.JobSystem
 
             public void Execute(int i)
             {
-                var rng = new Unity.Mathematics.Random(BaseSeed + (uint)i * 0x9E3779B9u + 1);
+                var rng = new Random(BaseSeed + (uint)i * 0x9E3779B9u + 1);
 
                 var position = new float3(
                     rng.NextFloat(-HalfSize, HalfSize),

@@ -143,7 +143,7 @@ The project includes 13 samples covering everything from basic entity creation t
 
 ## Acknowledgments
 
-Trecs was originally based on [Svelto.ECS](https://github.com/sebas77/Svelto.ECS) by Sebastiano Mandala
+Trecs was originally based on [Svelto.ECS](https://github.com/sebas77/Svelto.ECS) by Sebastiano Mandalà
 
 ## License
 

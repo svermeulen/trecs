@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using Trecs.Collections;
 using Unity.Collections;
 using Unity.Jobs;
@@ -27,17 +28,13 @@ namespace Trecs.Internal
 
         public int Length
         {
-            [System.Runtime.CompilerServices.MethodImpl(
-                System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining
-            )]
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _array.Length;
         }
 
         public int this[int i]
         {
-            [System.Runtime.CompilerServices.MethodImpl(
-                System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining
-            )]
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _array[i];
         }
     }

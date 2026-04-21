@@ -3,7 +3,10 @@
 using System;
 using System.Collections.Generic;
 using TMPro;
+using Trecs;
+using Trecs.Collections;
 using Trecs.Internal;
+using Trecs.Samples.FeedingFrenzyBenchmark.Branching;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -189,7 +192,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         static ISystem CreateLookingForMealSystem(FrenzyConfigSettings config) =>
             config.SubsetApproach switch
             {
-                FrenzySubsetApproach.Branching => new Branching.LookingForMealSystem(),
+                FrenzySubsetApproach.Branching => new LookingForMealSystem(),
                 FrenzySubsetApproach.Sets => new Sets.LookingForMealSystem(),
                 FrenzySubsetApproach.Partitions => new Partitions.LookingForMealSystem(),
                 _ => throw new ArgumentOutOfRangeException(),
@@ -198,7 +201,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         static ISystem CreateConsumingMealSystem(FrenzyConfigSettings config) =>
             config.SubsetApproach switch
             {
-                FrenzySubsetApproach.Branching => new Branching.ConsumingMealSystem(),
+                FrenzySubsetApproach.Branching => new ConsumingMealSystem(),
                 FrenzySubsetApproach.Sets => new Sets.ConsumingMealSystem(),
                 FrenzySubsetApproach.Partitions => new Partitions.ConsumingMealSystem(),
                 _ => throw new ArgumentOutOfRangeException(),
@@ -207,7 +210,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         static ISystem CreateMovementSystem(FrenzyConfigSettings config) =>
             config.SubsetApproach switch
             {
-                FrenzySubsetApproach.Branching => new Branching.MovementSystem(),
+                FrenzySubsetApproach.Branching => new MovementSystem(),
                 FrenzySubsetApproach.Sets => new Sets.MovementSystem(),
                 FrenzySubsetApproach.Partitions => new Partitions.MovementSystem(),
                 _ => throw new ArgumentOutOfRangeException(),
@@ -219,7 +222,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         ) =>
             config.SubsetApproach switch
             {
-                FrenzySubsetApproach.Branching => new Branching.IdleBobSystem(settings),
+                FrenzySubsetApproach.Branching => new IdleBobSystem(settings),
                 FrenzySubsetApproach.Sets => new Sets.IdleBobSystem(settings),
                 FrenzySubsetApproach.Partitions => new Partitions.IdleBobSystem(settings),
                 _ => throw new ArgumentOutOfRangeException(),

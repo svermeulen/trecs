@@ -1,6 +1,7 @@
 using System;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using UnityEngine;
 
 namespace Trecs.Internal
 {
@@ -52,7 +53,7 @@ namespace Trecs.Internal
                 // AllocatorManager.Free is main-thread only. We just warn so the leak
                 // is visible. Unity's NativeLeakDetection (via MallocTracked) catches
                 // the underlying allocation too.
-                UnityEngine.Debug.LogError(
+                Debug.LogError(
                     $"NativeBlobBox of inner type {_innerType} was leaked (not Disposed)"
                 );
             }

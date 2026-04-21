@@ -1,9 +1,9 @@
 using System;
-using Trecs.Internal;
+using Trecs.Serialization;
 
-namespace Trecs.Serialization
+namespace Trecs.Internal
 {
-    internal class SharedSerializerCacheHelper : IDisposable
+    public class SharedSerializerCacheHelper : IDisposable
     {
         readonly SerializerRegistry _registry;
 

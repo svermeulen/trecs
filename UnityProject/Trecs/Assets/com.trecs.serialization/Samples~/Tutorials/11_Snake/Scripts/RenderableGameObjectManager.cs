@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace Trecs.Samples.Snake
 {
@@ -155,7 +156,7 @@ namespace Trecs.Samples.Snake
             {
                 if (go != null)
                 {
-                    UnityEngine.Object.Destroy(go);
+                    Object.Destroy(go);
                 }
             }
 
@@ -170,7 +171,7 @@ namespace Trecs.Samples.Snake
                 {
                     if (go != null)
                     {
-                        UnityEngine.Object.Destroy(go);
+                        Object.Destroy(go);
                     }
                 }
             }
@@ -179,12 +180,12 @@ namespace Trecs.Samples.Snake
 
             if (_activeParent != null)
             {
-                UnityEngine.Object.Destroy(_activeParent.gameObject);
+                Object.Destroy(_activeParent.gameObject);
             }
 
             if (_inactiveParent != null)
             {
-                UnityEngine.Object.Destroy(_inactiveParent.gameObject);
+                Object.Destroy(_inactiveParent.gameObject);
             }
         }
 

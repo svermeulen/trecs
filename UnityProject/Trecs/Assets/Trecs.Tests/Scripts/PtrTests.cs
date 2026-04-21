@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using Trecs.Internal;
@@ -498,7 +499,7 @@ namespace Trecs.Tests
 
             var result = ptr.TryGetPtr(blobCache, out var nativePtr);
             NAssert.IsTrue(result);
-            NAssert.AreNotEqual(System.IntPtr.Zero, nativePtr);
+            NAssert.AreNotEqual(IntPtr.Zero, nativePtr);
 
             ptr.Dispose(blobCache);
             blobCache.Dispose();

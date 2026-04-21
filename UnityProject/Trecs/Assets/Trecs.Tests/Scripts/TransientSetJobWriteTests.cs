@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
@@ -134,7 +135,7 @@ namespace Trecs.Tests
             write.AddImmediate(new EntityIndex(5, group));
 
             // Query using InSet<TFJTestTransientSet> via QueryBuilder
-            var result = new System.Collections.Generic.List<int>();
+            var result = new List<int>();
             foreach (var ei in a.Query().InSet<TFJTestTransientSet>().EntityIndices())
             {
                 result.Add(ei.Index);

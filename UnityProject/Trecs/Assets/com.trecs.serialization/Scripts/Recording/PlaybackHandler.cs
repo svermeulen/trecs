@@ -183,27 +183,24 @@ namespace Trecs.Serialization
 
             _version = startParams.Version;
 
-            _buffer.ClearMemoryStream();
-            recordingStream.CopyTo(_buffer.MemoryStream);
-            if (_buffer.MemoryStream.Length == 0)
-            {
-                throw new SerializationException(
-                    "Recording stream is empty — cannot start playback on an empty recording."
-                );
-            }
-            _buffer.MemoryStream.Position = 0;
-            _buffer.StartRead();
-
             RecordingMetadata recordingMetadata;
             try
             {
+                _buffer.ClearMemoryStream();
+                recordingStream.CopyTo(_buffer.MemoryStream);
+                if (_buffer.MemoryStream.Length == 0)
+                {
+                    throw new SerializationException(
+                        "Recording stream is empty — cannot start playback on an empty recording."
+                    );
+                }
+                _buffer.MemoryStream.Position = 0;
+                _buffer.StartRead();
                 recordingMetadata = _buffer.Read<RecordingMetadata>("metadata");
 
                 var queueForRead = _world.GetEntityInputQueue();
                 queueForRead.ClearAllInputs();
-                queueForRead.Deserialize(
-                    new Trecs.Serialization.TrecsSerializationReaderAdapter(_buffer)
-                );
+                queueForRead.Deserialize(new TrecsSerializationReaderAdapter(_buffer));
 
                 var sentinelValue = _buffer.Read<int>("sentinel");
                 Assert.IsEqual(sentinelValue, TrecsConstants.RecordingSentinelValue);

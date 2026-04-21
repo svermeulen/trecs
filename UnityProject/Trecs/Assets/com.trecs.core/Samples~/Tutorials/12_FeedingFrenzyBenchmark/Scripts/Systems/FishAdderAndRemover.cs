@@ -4,6 +4,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
+using Random = Unity.Mathematics.Random;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
@@ -304,7 +305,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             public void Execute(int i)
             {
-                var rng = new Unity.Mathematics.Random(BaseSeed + (uint)i * 0x9E3779B9u + 1);
+                var rng = new Random(BaseSeed + (uint)i * 0x9E3779B9u + 1);
 
                 var scalePx = rng.NextFloat();
                 var scale = math.lerp(FishSizeMin, FishSizeMax, scalePx);
