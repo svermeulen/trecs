@@ -41,21 +41,26 @@ var loaded = bookmarks.LoadBookmark("save.bin");
 
 Stream overloads exist for both calls if you need to write/read from somewhere other than a file (e.g. a network socket or in-memory buffer).
 
-`PeekMetadata(stream)` reads only the bookmark header without restoring full state — handy for "Last saved at frame X" displays in a save-slot UI.
+`BookmarkSerializer.PeekMetadata(stream)` (or `(path)`) reads only the bookmark header without restoring full state — handy for "Last saved at frame X" displays in a save-slot UI. `RecordingHandler` exposes the same pair of overloads for replay-list tooling that wants to show duration, frame range, or schema version without loading a full recording.
 
 ### `BookmarkMetadata`
 
 The returned `BookmarkMetadata` carries:
 
+- `Version` — the schema version you passed to `SaveBookmark`
 - `FixedFrame` — the world's fixed frame at capture time
 - `BlobIds` — references to all heap blobs the snapshot relies on
-- `NumConnections` — used by host-bookmarks in multiplayer scenarios; defaults to `0`
 
 ## Recording
 
 ```csharp
 // Start capturing inputs + periodic checksums from the current frame.
-recorder.StartRecording(version: 1, checksumsEnabled: true, checksumFrameInterval: 30);
+recorder.StartRecording(
+    version: 1,
+    checksumsEnabled: true,
+    checksumFrameInterval: 30
+    // checksumFlags: 0  // optional — see note below
+);
 
 // ... game runs for some number of fixed frames ...
 
@@ -67,11 +72,21 @@ A `Stream` overload of `EndRecording` is also available.
 
 `RecordingMetadata` exposes:
 
+- `Version` — the schema version you passed to `StartRecording`
 - `StartFixedFrame` / `EndFixedFrame` — frame range covered
+- `ChecksumFlags` — flag bitmask that was active while computing checksums (replayed automatically during playback; see below)
 - `Checksums` — the per-frame checksums captured during recording, used for desync detection during playback
 - `BlobIds` — heap blobs the recording references
 
 `StartRecording` requires `checksumFrameInterval >= 1`.
+
+!!! note "`checksumFlags` (optional)"
+    Pass `checksumFlags` when any of your custom serializers branches on
+    `ISerializationWriter.Flags` (for example, to exclude non-deterministic
+    state from checksums). The flags are stored on `RecordingMetadata` and
+    replayed automatically by `PlaybackHandler`, so the verification path
+    sees exactly the same flags the recording path did. Leave it at `0`
+    if you don't use flags-sensitive serializers.
 
 ## Playback
 
@@ -81,8 +96,7 @@ Recording and playback are two halves of the same workflow. Playback typically f
 // (Optional but recommended) restore the bookmark captured when the recording started.
 playback.LoadInitialState(
     bookmarkPath: "bookmark.bin",
-    expectedInitialChecksum: null,
-    version: 1
+    expectedInitialChecksum: null
 );
 
 // Begin replaying recorded inputs.
@@ -107,7 +121,7 @@ playback.EndPlayback();
 
 ### `PlaybackState`
 
-`PlaybackHandler.State` exposes the lifecycle as an enum (`Idle`, `Playing`, `Desynced`). The `IsPlaying` and `HasDesynced` boolean accessors remain available for convenience.
+`PlaybackHandler.State` exposes the lifecycle as an enum (`Idle`, `Playing`, `Desynced`). The `IsPlaying` and `HasDesynced` boolean accessors remain available for convenience. `PlaybackHandler.PlaybackMetadata` returns the `RecordingMetadata` of the recording currently being played — useful for UI / debug overlays that want to display the recording's frame range or schema version live.
 
 ### `PlaybackTickResult`
 

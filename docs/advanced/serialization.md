@@ -193,6 +193,52 @@ The binary layout is **version-sensitive** and not forward-compatible:
   the saved version before committing to a full `LoadBookmark`, and
   surface a user-facing error for incompatible saves.
 
+!!! note "Two different 'versions'"
+    Don't confuse the user `version` above with Trecs's own internal
+    `FormatVersion` byte written at the start of every payload by
+    `SerializationHeaderUtil`. The format version describes the layout
+    of the header itself (magic bytes + fields); it is bumped only when
+    Trecs changes the framing, and users never set it. Your
+    `version` parameter is the schema version of your game's serialized
+    data — bump it whenever *your* serializers change shape.
+
+## Writer / reader flags
+
+Every `ISerializationWriter`/`ISerializationReader` carries a `long Flags`
+bitmask you can consult from inside a custom serializer. Flags are
+threaded in at the top level (`WriteAll(value, version, includeTypeChecks,
+flags: …)`, `StartWrite(version, includeTypeChecks, flags: …)`) and
+propagate to every nested serializer.
+
+Typical use: excluding non-deterministic state from checksums. Define a
+constant, set it from the recording's `checksumFlags` parameter, then
+branch inside your serializer:
+
+```csharp
+public static class MyAppFlags
+{
+    public const long ForChecksum = 1L << 0;
+}
+
+public void Serialize(in Npc value, ISerializationWriter writer)
+{
+    writer.Write("position", value.Position);
+    writer.Write("hp", value.Hp);
+
+    // Skip the animator fingerprint when computing checksums — it's
+    // driven by a non-deterministic presentation layer.
+    if ((writer.Flags & MyAppFlags.ForChecksum) == 0)
+    {
+        writer.Write("animatorHash", value.AnimatorHash);
+    }
+}
+```
+
+`RecordingHandler` stores the flags on `RecordingMetadata.ChecksumFlags`
+and `PlaybackHandler` passes them back in automatically during checksum
+verification, so recording and playback always agree on what was
+included.
+
 ### Versioned custom serializers
 
 The `version` integer you pass to `SaveBookmark` / `StartRecording` is stamped into the file header *and* exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). Because the header records the version the file was written with, the deserializer can recognize older saves and read them with the layout they were written in. As long as you bump the version every time you change the on-disk layout, a single serializer can keep handling all prior versions:
