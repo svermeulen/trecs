@@ -153,7 +153,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 140.03853, y: -50.66954}
+  m_AnchoredPosition: {x: 140.03853, y: -66}
   m_SizeDelta: {x: 243.2864, y: 63.1171}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &362337602
@@ -203,8 +203,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 23.42
-  m_fontSizeBase: 23.42
+  m_fontSize: 65.12
+  m_fontSizeBase: 65.12
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -303,8 +303,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Samples::Trecs.Samples.JobSystem.JobSystemCompositionRoot
   MinParticleCount: 100
   MaxParticleCount: 1000000
-  MaxParticleChangePerFrame: 5000
-  AreaSize: 20
+  MaxParticleChangePerFrame: 2500
+  AreaSize: 200
   MaxSpeed: 5
   ParticleSize: 0.15
   ParticleColor: {r: 0.2, g: 0.8, b: 1, a: 1}
@@ -402,7 +402,7 @@ Camera:
   m_GameObject: {fileID: 800000011}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 1
+  m_ClearFlags: 2
   m_BackGroundColor: {r: 0.05, g: 0.05, b: 0.1, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
@@ -621,8 +621,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 9, y: -61}
-  m_SizeDelta: {x: 567, y: 253.2481}
+  m_AnchoredPosition: {x: 49, y: -57}
+  m_SizeDelta: {x: 1406, y: 755.8447}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1877746091
 MonoBehaviour:

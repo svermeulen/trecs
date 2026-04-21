@@ -37,7 +37,7 @@ namespace Trecs.Samples.JobSystem
             {
                 velocity.Value.x = -velocity.Value.x;
             }
-            if (position.Value.y > halfSize || position.Value.y < 0)
+            if (position.Value.y > halfSize || position.Value.y < -halfSize)
             {
                 velocity.Value.y = -velocity.Value.y;
             }

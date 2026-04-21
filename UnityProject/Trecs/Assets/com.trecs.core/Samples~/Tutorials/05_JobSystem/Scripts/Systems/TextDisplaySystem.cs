@@ -10,6 +10,9 @@ namespace Trecs.Samples.JobSystem
         readonly StringBuilder _sb = new();
 
         float _refreshCountdown;
+        int _frameCount;
+        float _elapsedSinceRefresh;
+        float _fps;
 
         public TextDisplaySystem(TMP_Text displayText)
         {
@@ -18,6 +21,8 @@ namespace Trecs.Samples.JobSystem
 
         public void Execute()
         {
+            _frameCount++;
+            _elapsedSinceRefresh += World.DeltaTime;
             _refreshCountdown -= World.DeltaTime;
             if (_refreshCountdown > 0)
             {
@@ -26,12 +31,22 @@ namespace Trecs.Samples.JobSystem
 
             _refreshCountdown = RefreshInterval;
 
-            int particleCount = World.CountAllEntities();
+            if (_elapsedSinceRefresh > 0)
+            {
+                _fps = _frameCount / _elapsedSinceRefresh;
+            }
+            _frameCount = 0;
+            _elapsedSinceRefresh = 0;
+
+            // -1 to exclude global entity
+            int particleCount = World.CountAllEntities() - 1;
             int desiredCount = World.GlobalComponent<DesiredNumParticles>().Read.Value;
             bool jobsEnabled = World.GlobalComponent<IsJobsEnabled>().Read.Value;
 
             _sb.Clear();
-            AppendStat("Particle Count", $"{particleCount:N0}");
+            AppendStat("Entity Count", $"{particleCount:N0}");
+            float frameMs = _fps > 0 ? 1000f / _fps : 0f;
+            AppendStat("FPS", $"{_fps:N0} ({frameMs:N1}ms)");
             AppendStat("Desired Count", $"{desiredCount:N0}");
             AppendStat("Jobs", jobsEnabled ? "Enabled" : "Disabled");
 

@@ -29,7 +29,7 @@ namespace Trecs.Samples.JobSystem
 
             renderer.RegisterRenderable(
                 TagSet<SampleTags.Particle>.Value,
-                SampleUtil.CreateIcosphereMesh(),
+                SampleUtil.CreateScaledCubeMesh(1f, 1f, 1f),
                 SampleUtil.CreateUnlitInstancedMaterial(ParticleColor),
                 MaxParticleCount
             );

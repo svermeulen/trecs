@@ -82,7 +82,7 @@ namespace Trecs.Samples.JobSystem
             {
                 var position = new float3(
                     rng.NextFloat(-halfSize, halfSize),
-                    rng.NextFloat(0, halfSize),
+                    rng.NextFloat(-halfSize, halfSize),
                     rng.NextFloat(-halfSize, halfSize)
                 );
 
@@ -166,7 +166,7 @@ namespace Trecs.Samples.JobSystem
 
                 var position = new float3(
                     rng.NextFloat(-HalfSize, HalfSize),
-                    rng.NextFloat(0, HalfSize),
+                    rng.NextFloat(-HalfSize, HalfSize),
                     rng.NextFloat(-HalfSize, HalfSize)
                 );
 
