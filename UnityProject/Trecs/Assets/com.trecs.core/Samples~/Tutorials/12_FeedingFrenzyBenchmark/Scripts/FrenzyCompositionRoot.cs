@@ -3,8 +3,6 @@
 using System;
 using System.Collections.Generic;
 using TMPro;
-using Trecs;
-using Trecs.Collections;
 using Trecs.Internal;
 using Trecs.Samples.FeedingFrenzyBenchmark.Branching;
 using Unity.Mathematics;
