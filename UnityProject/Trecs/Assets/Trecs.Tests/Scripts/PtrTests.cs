@@ -1003,6 +1003,33 @@ namespace Trecs.Tests
         }
 
         [Test]
+        public void NativeSharedHeap_DisposeHandle_UnknownHandleThrows()
+        {
+            var (heap, blobCache) = CreateNativeSharedHeap();
+
+            NAssert.Throws<TrecsException>(
+                () => heap.DisposeHandle(new PtrHandle(12345))
+            );
+
+            heap.Dispose();
+            blobCache.Dispose();
+        }
+
+        [Test]
+        public void NativeSharedHeap_DisposeHandle_DoubleDisposeThrows()
+        {
+            var (heap, blobCache) = CreateNativeSharedHeap();
+
+            var ptr = heap.CreateBlob<int>(42);
+            heap.DisposeHandle(ptr.Handle);
+
+            NAssert.Throws<TrecsException>(() => heap.DisposeHandle(ptr.Handle));
+
+            heap.Dispose();
+            blobCache.Dispose();
+        }
+
+        [Test]
         public void NativeSharedHeap_NumEntries_TracksActiveBlobs()
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
