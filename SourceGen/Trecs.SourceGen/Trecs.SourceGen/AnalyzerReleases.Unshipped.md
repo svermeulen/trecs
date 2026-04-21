@@ -29,3 +29,4 @@ TRECS081 | Trecs | Error | JobGenerator
 TRECS082 | Trecs | Error | JobGenerator
 TRECS083 | Trecs | Error | JobGenerator
 TRECS084 | Trecs | Error | JobGenerator
+TRECS120 | Trecs | Error | DuplicateTypeIdGenerator
