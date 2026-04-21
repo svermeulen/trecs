@@ -99,7 +99,11 @@ namespace Trecs.SourceGen.Template
                         );
                         isValid = false;
                     }
-                    // Check for managed fields in component types
+                    // Check for managed fields in component types. This is
+                    // intentionally one level deep — we only care whether the
+                    // component itself contains reference fields. Nested
+                    // value-type chains can't introduce cycles here because
+                    // this loop doesn't recurse into them.
                     else if (field.Type is INamedTypeSymbol componentType)
                     {
                         foreach (var componentMember in componentType.GetMembers())
