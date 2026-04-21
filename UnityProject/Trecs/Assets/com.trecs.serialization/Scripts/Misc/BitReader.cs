@@ -1,10 +1,9 @@
 using System;
 using System.IO;
-using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Internal
 {
-    internal class BitReader
+    public class BitReader
     {
         byte[] _bytes;
         int _byteIndex = 0;

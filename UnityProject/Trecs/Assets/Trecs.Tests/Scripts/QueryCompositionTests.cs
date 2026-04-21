@@ -792,7 +792,7 @@ namespace Trecs.Tests
 
             // Query for QCatA without QCatA - should return nothing (contradictory but exercises code path)
             // Actually query for QCatB without QCatA should exclude EntityAB
-            var results = new System.Collections.Generic.List<int>();
+            var results = new List<int>();
             foreach (var ei in a.Query().WithTags<QCatB>().WithoutTags<QCatA>().EntityIndices())
             {
                 results.Add(a.Component<TestInt>(ei).Read.Value);

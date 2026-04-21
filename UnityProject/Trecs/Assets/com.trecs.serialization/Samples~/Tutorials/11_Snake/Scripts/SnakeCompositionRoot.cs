@@ -104,7 +104,7 @@ namespace Trecs.Samples.Snake
             go.name = name;
             go.transform.localScale = Vector3.one * scale;
             go.GetComponent<Renderer>().sharedMaterial = material;
-            GameObject.Destroy(go.GetComponent<Collider>());
+            Destroy(go.GetComponent<Collider>());
             return go;
         }
     }

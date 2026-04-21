@@ -1099,7 +1099,7 @@ namespace Trecs
             var handleMap = GetEntityHandleMap();
             if (!handleMap._entityIndexToReferenceMap.TryGetValue(group, out var groupList))
                 return default;
-            return new NativeEntityHandleBuffer(new Internal.NativeBuffer<EntityHandle>(groupList));
+            return new NativeEntityHandleBuffer(new NativeBuffer<EntityHandle>(groupList));
         }
 
         internal NativeComponentLookupRead<T> CreateNativeComponentLookupRead<T>(

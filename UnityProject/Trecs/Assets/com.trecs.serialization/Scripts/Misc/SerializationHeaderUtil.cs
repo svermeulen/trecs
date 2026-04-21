@@ -2,7 +2,7 @@ using System.IO;
 
 namespace Trecs.Internal
 {
-    internal static class SerializationHeaderUtil
+    public static class SerializationHeaderUtil
     {
         public static (int version, bool preferTypeChecks) ReadHeader(BinaryReader reader)
         {

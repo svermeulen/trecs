@@ -1,8 +1,8 @@
-using Trecs.Internal;
+using Trecs.Serialization;
 
-namespace Trecs.Serialization
+namespace Trecs.Internal
 {
-    internal class RecordingChecksumCalculator
+    public class RecordingChecksumCalculator
     {
         readonly WorldStateSerializer _worldStateSerializer;
 

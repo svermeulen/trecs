@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
@@ -41,7 +42,7 @@ namespace Trecs.Tests
             NAssert.Catch(() =>
             {
                 dec1.MergeAsConcrete(
-                    new System.Collections.Generic.List<IComponentDeclaration> { dec1, dec2 },
+                    new List<IComponentDeclaration> { dec1, dec2 },
                     "TestTemplate"
                 );
             });
@@ -78,7 +79,7 @@ namespace Trecs.Tests
             NAssert.Catch(() =>
             {
                 dec1.MergeAsConcrete(
-                    new System.Collections.Generic.List<IComponentDeclaration> { dec1, dec2 },
+                    new List<IComponentDeclaration> { dec1, dec2 },
                     "TestTemplate"
                 );
             });
@@ -115,7 +116,7 @@ namespace Trecs.Tests
             NAssert.Catch(() =>
             {
                 dec1.MergeAsConcrete(
-                    new System.Collections.Generic.List<IComponentDeclaration> { dec1, dec2 },
+                    new List<IComponentDeclaration> { dec1, dec2 },
                     "TestTemplate"
                 );
             });
@@ -141,10 +142,7 @@ namespace Trecs.Tests
 
             NAssert.Catch(() =>
             {
-                dec.MergeAsConcrete(
-                    new System.Collections.Generic.List<IComponentDeclaration> { dec },
-                    "TestTemplate"
-                );
+                dec.MergeAsConcrete(new List<IComponentDeclaration> { dec }, "TestTemplate");
             });
         }
 
@@ -179,7 +177,7 @@ namespace Trecs.Tests
             NAssert.Catch(() =>
             {
                 dec1.MergeAsConcrete(
-                    new System.Collections.Generic.List<IComponentDeclaration> { dec1, dec2 },
+                    new List<IComponentDeclaration> { dec1, dec2 },
                     "TestTemplate"
                 );
             });
@@ -216,7 +214,7 @@ namespace Trecs.Tests
             NAssert.Catch(() =>
             {
                 dec1.MergeAsConcrete(
-                    new System.Collections.Generic.List<IComponentDeclaration> { dec1, dec2 },
+                    new List<IComponentDeclaration> { dec1, dec2 },
                     "TestTemplate"
                 );
             });
@@ -251,7 +249,7 @@ namespace Trecs.Tests
             );
 
             var result = dec1.MergeAsConcrete(
-                new System.Collections.Generic.List<IComponentDeclaration> { dec1, dec2 },
+                new List<IComponentDeclaration> { dec1, dec2 },
                 "TestTemplate"
             );
 
@@ -290,7 +288,7 @@ namespace Trecs.Tests
             NAssert.Catch(() =>
             {
                 dec1.MergeAsConcrete(
-                    new System.Collections.Generic.List<IComponentDeclaration> { dec1, dec2 },
+                    new List<IComponentDeclaration> { dec1, dec2 },
                     "TestTemplate"
                 );
             });

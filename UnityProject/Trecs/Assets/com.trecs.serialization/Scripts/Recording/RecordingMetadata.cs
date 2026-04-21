@@ -29,7 +29,7 @@ namespace Trecs.Serialization
         {
             registry.RegisterSerializer<DenseDictionarySerializer<int, uint>>();
             registry.RegisterSerializer<DenseHashSetSerializer<BlobId>>();
-            registry.RegisterSerializer<RecordingMetadata.Serializer>();
+            registry.RegisterSerializer<Serializer>();
         }
 
         /// <summary>

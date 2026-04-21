@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using Trecs.Collections;
 using NAssert = NUnit.Framework.Assert;
@@ -239,7 +240,7 @@ namespace Trecs.Tests
             NAssert.IsTrue(list.Capacity >= 100); // Should have grown efficiently
 
             // Test with non-ICollection IEnumerable (can't pre-allocate)
-            var enumerable = System.Linq.Enumerable.Where(collection, x => x < 50);
+            var enumerable = Enumerable.Where(collection, x => x < 50);
             var list2 = new FastList<int>();
             list2.AddRange(enumerable);
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Collections.LowLevel.Unsafe;
@@ -642,7 +643,7 @@ namespace Trecs
             if (_handles.Count > 0)
             {
                 var seenTypes = new HashSet<Type>();
-                var typeNames = new System.Text.StringBuilder();
+                var typeNames = new StringBuilder();
 
                 foreach (var (_, blobId) in _handles)
                 {

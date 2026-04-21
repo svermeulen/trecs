@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace Trecs.Samples.SaveGame
 {
@@ -137,7 +138,7 @@ namespace Trecs.Samples.SaveGame
                 go.name = $"Wall_{_wallPool.Count}";
                 go.transform.localScale = Vector3.one;
                 go.GetComponent<Renderer>().sharedMaterial = _wallMat;
-                UnityEngine.Object.Destroy(go.GetComponent<Collider>());
+                Object.Destroy(go.GetComponent<Collider>());
                 go.transform.SetParent(_root, worldPositionStays: false);
                 _wallPool.Add(go);
             }
@@ -152,7 +153,7 @@ namespace Trecs.Samples.SaveGame
                 go.name = $"Target_{_targetPool.Count}";
                 go.transform.localScale = new Vector3(0.8f, 0.05f, 0.8f);
                 go.GetComponent<Renderer>().sharedMaterial = _targetMat;
-                UnityEngine.Object.Destroy(go.GetComponent<Collider>());
+                Object.Destroy(go.GetComponent<Collider>());
                 go.transform.SetParent(_root, worldPositionStays: false);
                 _targetPool.Add(go);
             }
@@ -167,7 +168,7 @@ namespace Trecs.Samples.SaveGame
                 go.name = $"Box_{_boxPool.Count}";
                 go.transform.localScale = Vector3.one * 0.8f;
                 go.GetComponent<Renderer>().sharedMaterial = _boxMat;
-                UnityEngine.Object.Destroy(go.GetComponent<Collider>());
+                Object.Destroy(go.GetComponent<Collider>());
                 go.transform.SetParent(_root, worldPositionStays: false);
                 _boxPool.Add(go);
             }
@@ -180,7 +181,7 @@ namespace Trecs.Samples.SaveGame
             go.name = name;
             go.transform.localScale = Vector3.one * scale;
             go.GetComponent<Renderer>().sharedMaterial = SampleUtil.CreateMaterial(color);
-            UnityEngine.Object.Destroy(go.GetComponent<Collider>());
+            Object.Destroy(go.GetComponent<Collider>());
             return go;
         }
 
@@ -197,7 +198,7 @@ namespace Trecs.Samples.SaveGame
             plane.GetComponent<Renderer>().sharedMaterial = SampleUtil.CreateMaterial(
                 new Color(0.15f, 0.15f, 0.18f)
             );
-            UnityEngine.Object.Destroy(plane.GetComponent<Collider>());
+            Object.Destroy(plane.GetComponent<Collider>());
             return plane;
         }
 
@@ -210,7 +211,7 @@ namespace Trecs.Samples.SaveGame
         {
             if (_root != null)
             {
-                UnityEngine.Object.Destroy(_root.gameObject);
+                Object.Destroy(_root.gameObject);
             }
         }
 

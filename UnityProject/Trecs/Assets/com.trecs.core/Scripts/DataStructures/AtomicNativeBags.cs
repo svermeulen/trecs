@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs.LowLevel.Unsafe;
@@ -12,8 +13,8 @@ namespace Trecs.Internal
     {
         int _threadsCount;
 
-        [Unity.Burst.NoAlias]
-        [Unity.Collections.LowLevel.Unsafe.NativeDisableUnsafePtrRestriction]
+        [NoAlias]
+        [NativeDisableUnsafePtrRestriction]
         NativeBag* _data;
 
         public int Count => _threadsCount;

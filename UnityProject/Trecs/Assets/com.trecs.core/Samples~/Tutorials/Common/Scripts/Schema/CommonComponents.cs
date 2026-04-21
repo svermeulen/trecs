@@ -1,4 +1,5 @@
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace Trecs.Samples
 {
@@ -32,6 +33,6 @@ namespace Trecs.Samples
     [Unwrap]
     public partial struct ColorComponent : IEntityComponent
     {
-        public UnityEngine.Color Value;
+        public Color Value;
     }
 }

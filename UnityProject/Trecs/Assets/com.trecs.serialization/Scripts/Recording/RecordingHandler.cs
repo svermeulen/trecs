@@ -152,12 +152,11 @@ namespace Trecs.Serialization
                 blobIds: _recordingInfo.BlobIds
             );
 
-            _buffer.ClearMemoryStream();
-            _buffer.StartWrite(version: _recordingVersion, includeTypeChecks: true);
-
             long recordingNumBytes;
             try
             {
+                _buffer.ClearMemoryStream();
+                _buffer.StartWrite(version: _recordingVersion, includeTypeChecks: true);
                 long bytesStart = _buffer.NumBytesWritten;
                 _buffer.Write("metadata", metadata);
                 _log.Debug(
@@ -166,9 +165,7 @@ namespace Trecs.Serialization
                 );
 
                 var entityInputQueue = _world.GetEntityInputQueue();
-                entityInputQueue.Serialize(
-                    new Trecs.Serialization.TrecsSerializationWriterAdapter(_buffer)
-                );
+                entityInputQueue.Serialize(new TrecsSerializationWriterAdapter(_buffer));
                 _log.Debug(
                     "Serialized EntityInputQueue ({0.00} kb)",
                     (_buffer.NumBytesWritten - bytesStart) / 1024f
@@ -227,6 +224,69 @@ namespace Trecs.Serialization
 
             using var fs = File.Create(filePath);
             return EndRecording(fs);
+        }
+
+        /// <summary>
+        /// Read just the recording metadata from <paramref name="stream"/> without
+        /// starting playback. Useful for displaying recording-list info (duration,
+        /// referenced blobs, schema version) without loading the full recording.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="stream"/> is null.</exception>
+        /// <exception cref="InvalidOperationException">A recording is currently in progress.</exception>
+        /// <exception cref="SerializationException">The stream is empty/truncated or the binary payload is invalid.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
+        public RecordingMetadata PeekMetadata(Stream stream)
+        {
+            ThrowIfDisposed();
+            if (stream == null)
+                throw new ArgumentNullException(nameof(stream));
+            if (_isRecording)
+                throw new InvalidOperationException(
+                    "Cannot PeekMetadata while a recording is in progress."
+                );
+
+            try
+            {
+                _buffer.ClearMemoryStream();
+                stream.CopyTo(_buffer.MemoryStream);
+                if (_buffer.MemoryStream.Length == 0)
+                {
+                    throw new SerializationException(
+                        "Recording stream is empty — cannot peek metadata."
+                    );
+                }
+                _buffer.MemoryStream.Position = 0;
+                _buffer.StartRead();
+                var metadata = _buffer.Read<RecordingMetadata>("metadata");
+                _buffer.StopRead(verifySentinel: false);
+                return metadata;
+            }
+            catch
+            {
+                _buffer.ResetForErrorRecovery();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Read just the recording metadata from <paramref name="filePath"/> without
+        /// starting playback.
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="filePath"/> is null or empty.</exception>
+        /// <exception cref="FileNotFoundException">No file at <paramref name="filePath"/>.</exception>
+        /// <exception cref="InvalidOperationException">A recording is currently in progress.</exception>
+        /// <exception cref="SerializationException">The file is empty/truncated or the binary payload is invalid.</exception>
+        /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
+        public RecordingMetadata PeekMetadata(string filePath)
+        {
+            ThrowIfDisposed();
+            if (string.IsNullOrEmpty(filePath))
+                throw new ArgumentException("filePath must be non-empty", nameof(filePath));
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException("Recording file not found", filePath);
+
+            using var fs = File.OpenRead(filePath);
+            return PeekMetadata(fs);
         }
 
         void OnFixedUpdateCompleted()

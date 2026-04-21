@@ -75,10 +75,7 @@ namespace Trecs.Tests
             var worldStateSer = new WorldStateSerializer(env.World);
             using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
 
-            var path = Path.Combine(
-                Path.GetTempPath(),
-                $"trecs_test_{System.Guid.NewGuid():N}.bin"
-            );
+            var path = Path.Combine(Path.GetTempPath(), $"trecs_test_{Guid.NewGuid():N}.bin");
             try
             {
                 bookmarks.SaveBookmark(version: 1, filePath: path);

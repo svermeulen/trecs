@@ -1,3 +1,4 @@
+using System;
 using Trecs.Internal;
 
 namespace Trecs.Collections
@@ -17,7 +18,7 @@ namespace Trecs.Collections
         public Rng(ulong? seed = null)
         {
             // Use SplitMix64 to expand the seed into 128 bits of state
-            ulong sm = seed ?? (ulong)System.Environment.TickCount;
+            ulong sm = seed ?? (ulong)Environment.TickCount;
             ulong t0 = SplitMix64(ref sm);
             ulong t1 = SplitMix64(ref sm);
             _s0 = (uint)t0;

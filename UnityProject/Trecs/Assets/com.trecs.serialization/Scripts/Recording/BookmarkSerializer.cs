@@ -84,10 +84,10 @@ namespace Trecs.Serialization
             };
             _blobCache.GetAllActiveBlobIds(metadata.BlobIds);
 
-            _buffer.ClearMemoryStream();
-            _buffer.StartWrite(version: version, includeTypeChecks: includeTypeChecks);
             try
             {
+                _buffer.ClearMemoryStream();
+                _buffer.StartWrite(version: version, includeTypeChecks: includeTypeChecks);
                 _buffer.Write("metadata", metadata);
                 _worldStateSerializer.SerializeState(_buffer);
                 var numBytes = _buffer.EndWrite();
@@ -145,10 +145,10 @@ namespace Trecs.Serialization
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
-            LoadStreamIntoBuffer(stream);
-            _buffer.StartRead();
             try
             {
+                LoadStreamIntoBuffer(stream);
+                _buffer.StartRead();
                 var metadata = _buffer.Read<BookmarkMetadata>("metadata");
                 _worldStateSerializer.DeserializeState(_buffer);
                 _buffer.StopRead(verifySentinel: true);
@@ -194,10 +194,10 @@ namespace Trecs.Serialization
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
-            LoadStreamIntoBuffer(stream);
-            _buffer.StartRead();
             try
             {
+                LoadStreamIntoBuffer(stream);
+                _buffer.StartRead();
                 var metadata = _buffer.Read<BookmarkMetadata>("metadata");
                 _buffer.StopRead(verifySentinel: false);
                 return metadata;

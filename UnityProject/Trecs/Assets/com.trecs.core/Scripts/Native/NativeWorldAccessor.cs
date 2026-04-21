@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
 using Unity.Collections.LowLevel.Unsafe;
@@ -263,7 +264,7 @@ namespace Trecs
             return new NativeEntityInitializer(bag, index, reservedRef);
         }
 
-        [System.Diagnostics.Conditional("DEBUG")]
+        [Conditional("DEBUG")]
         readonly void AssertStructuralChangesAllowed()
         {
             Assert.That(
@@ -273,7 +274,7 @@ namespace Trecs
             );
         }
 
-        [System.Diagnostics.Conditional("DEBUG")]
+        [Conditional("DEBUG")]
         readonly void AssertNonDeterministicAddAllowed()
         {
             Assert.That(

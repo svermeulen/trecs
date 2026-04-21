@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Trecs.Collections;
 using Trecs.Internal;
+using Unity.Burst;
 using Unity.Collections;
 
 namespace Trecs
@@ -370,7 +371,7 @@ namespace Trecs
 
         static int BurstHashFromType(Type t)
         {
-            return Unity.Burst.BurstRuntime.GetHashCode32(t);
+            return BurstRuntime.GetHashCode32(t);
         }
 
         readonly struct FrameEntry

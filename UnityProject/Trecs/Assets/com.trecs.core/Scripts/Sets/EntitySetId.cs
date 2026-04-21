@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Trecs.Internal;
 using Unity.Burst;
 
@@ -17,9 +18,7 @@ namespace Trecs
 
         public static SetId Value
         {
-            [System.Runtime.CompilerServices.MethodImpl(
-                System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining
-            )]
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _nativeSetId.Data;
         }
 

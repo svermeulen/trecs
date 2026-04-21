@@ -1,12 +1,11 @@
 using System;
 using System.IO;
-using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Internal
 {
     // NOTE: Not thread safe
     // If needed then use thread locals instead
-    internal static class MemoryBlitter
+    public static class MemoryBlitter
     {
         static byte[] _buffer;
 

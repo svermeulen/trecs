@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Unity.Burst;
 
 namespace Trecs.Internal
 {
@@ -8,8 +9,7 @@ namespace Trecs.Internal
     public struct SharedStaticWrapper<T, Key>
         where T : unmanaged
     {
-        static readonly Unity.Burst.SharedStatic<T> uniqueContextId =
-            Unity.Burst.SharedStatic<T>.GetOrCreate<Key>();
+        static readonly SharedStatic<T> uniqueContextId = SharedStatic<T>.GetOrCreate<Key>();
 
         public ref T Data
         {
