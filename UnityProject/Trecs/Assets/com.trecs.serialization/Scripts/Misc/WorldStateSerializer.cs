@@ -116,7 +116,7 @@ namespace Trecs.Serialization
             using (TrecsProfiling.Start("Serializing game state"))
             {
                 SerializeImpl(writer);
-                writer.Write("sentinel", SentinelValue);
+                writer.Write("stream_guard", WorldStateStreamGuard);
             }
         }
 
@@ -136,8 +136,8 @@ namespace Trecs.Serialization
 
             DeserializeImpl(reader);
 
-            var sentinelValue = reader.Read<int>("sentinel");
-            Assert.IsEqual(sentinelValue, SentinelValue);
+            var guard = reader.Read<int>("stream_guard");
+            Assert.IsEqual(guard, WorldStateStreamGuard);
 
             using (TrecsProfiling.Start("Triggering OnEcsDeserializeCompleted listeners"))
             {
@@ -561,7 +561,13 @@ namespace Trecs.Serialization
             }
         }
 
-        const int SentinelValue = 510120270;
+        // Distinct from SerializationConstants.EndOfPayloadMarker: that is a
+        // byte written once at the very end of any payload. This int guards the
+        // ECS-state section inside the world payload — if the ECS write/read
+        // sequence drifts (a Serialize* forgot to match its Deserialize*) this
+        // magic will mismatch and we fail loudly instead of silently reading
+        // garbage into component arrays.
+        const int WorldStateStreamGuard = 510120270;
     }
 
     public interface IComponentArrayCustomSerializer

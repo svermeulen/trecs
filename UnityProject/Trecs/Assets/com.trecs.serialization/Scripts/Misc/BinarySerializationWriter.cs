@@ -299,7 +299,7 @@ namespace Trecs.Serialization
 #if TRECS_INTERNAL_CHECKS && DEBUG
             long sentinelStartPos = outputWriter.BaseStream.Position;
 #endif
-            outputWriter.Write(SerializationConstants.SentinelValue);
+            outputWriter.Write(SerializationConstants.EndOfPayloadMarker);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackHeaderBytes(
                 (int)(outputWriter.BaseStream.Position - sentinelStartPos),

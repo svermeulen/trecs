@@ -106,23 +106,29 @@ namespace Trecs.Serialization
             _bitReader.ResetForErrorRecovery();
         }
 
+        /// <summary>
+        /// Verify the payload-level <see cref="SerializationConstants.EndOfPayloadMarker"/>
+        /// that <see cref="BinarySerializationWriter"/> appends to every stream.
+        /// Distinct from the ECS-state-level guard inside <c>WorldStateSerializer</c>
+        /// (<c>WorldStateStreamGuard</c>), which is checked during <c>DeserializeState</c>.
+        /// </summary>
         void VerifySentinel()
         {
             try
             {
                 var sentinel = _binaryReader.ReadByte();
                 Assert.That(
-                    sentinel == SerializationConstants.SentinelValue,
-                    "Data corruption detected - expected sentinel value {} but found {}. This indicates incomplete deserialization, corrupted data, or version mismatch.",
-                    SerializationConstants.SentinelValue,
+                    sentinel == SerializationConstants.EndOfPayloadMarker,
+                    "Data corruption detected - expected end-of-payload marker {} but found {}. This indicates incomplete deserialization, corrupted data, or version mismatch.",
+                    SerializationConstants.EndOfPayloadMarker,
                     sentinel
                 );
-                _log.Trace("Verified sentinel value at end of stream");
+                _log.Trace("Verified end-of-payload marker");
             }
             catch (EndOfStreamException)
             {
                 throw Assert.CreateException(
-                    "Data corruption detected - missing sentinel value at end of stream. This indicates truncated data or incomplete serialization."
+                    "Data corruption detected - missing end-of-payload marker. This indicates truncated data or incomplete serialization."
                 );
             }
         }
