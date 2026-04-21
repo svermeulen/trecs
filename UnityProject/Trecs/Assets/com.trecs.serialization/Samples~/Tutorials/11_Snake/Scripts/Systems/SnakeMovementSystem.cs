@@ -1,4 +1,4 @@
-namespace Trecs.Samples.Snake
+namespace Trecs.Serialization.Samples.Snake
 {
     /// <summary>
     /// Counts down the global move tick and, when it reaches zero, applies

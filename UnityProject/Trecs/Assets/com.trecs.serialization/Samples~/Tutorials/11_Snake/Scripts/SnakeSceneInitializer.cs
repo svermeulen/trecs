@@ -1,7 +1,7 @@
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Trecs.Samples.Snake
+namespace Trecs.Serialization.Samples.Snake
 {
     /// <summary>
     /// Spawns the initial snake state at startup: one head entity at the

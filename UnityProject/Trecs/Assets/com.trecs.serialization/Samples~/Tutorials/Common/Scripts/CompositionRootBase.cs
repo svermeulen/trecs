@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Trecs.Samples
+namespace Trecs.Serialization.Samples
 {
     public abstract class CompositionRootBase : MonoBehaviour
     {

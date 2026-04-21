@@ -4,7 +4,7 @@ using Trecs.Internal;
 using Trecs.Serialization;
 using UnityEngine;
 
-namespace Trecs.Samples
+namespace Trecs.Serialization.Samples
 {
     /// <summary>
     /// Sample-side helper that wires Unity keyboard input to the Trecs

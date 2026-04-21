@@ -3,7 +3,7 @@ using System.Text;
 using TMPro;
 using Unity.Mathematics;
 
-namespace Trecs.Samples.SaveGame
+namespace Trecs.Serialization.Samples.SaveGame
 {
     [VariableUpdate]
     public partial class TextDisplaySystem : ISystem

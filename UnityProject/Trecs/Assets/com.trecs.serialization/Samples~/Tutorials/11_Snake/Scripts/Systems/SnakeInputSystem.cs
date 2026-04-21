@@ -1,7 +1,7 @@
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Trecs.Samples.Snake
+namespace Trecs.Serialization.Samples.Snake
 {
     /// <summary>
     /// Reads arrow-key presses each variable frame and pushes a MoveInput

@@ -1,4 +1,4 @@
-namespace Trecs.Samples.Snake
+namespace Trecs.Serialization.Samples.Snake
 {
     /// <summary>
     /// Trims the oldest segments until the segment count matches the

@@ -1,6 +1,6 @@
 using Unity.Mathematics;
 
-namespace Trecs.Samples.Snake
+namespace Trecs.Serialization.Samples.Snake
 {
     public static partial class SnakeTemplates
     {

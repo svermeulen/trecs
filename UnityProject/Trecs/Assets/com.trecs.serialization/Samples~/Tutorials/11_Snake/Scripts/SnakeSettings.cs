@@ -1,6 +1,6 @@
 using System;
 
-namespace Trecs.Samples.Snake
+namespace Trecs.Serialization.Samples.Snake
 {
     [Serializable]
     public class SnakeSettings

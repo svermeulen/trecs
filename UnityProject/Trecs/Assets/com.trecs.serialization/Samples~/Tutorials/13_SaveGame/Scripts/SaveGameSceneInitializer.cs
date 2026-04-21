@@ -1,6 +1,6 @@
 using Unity.Mathematics;
 
-namespace Trecs.Samples.SaveGame
+namespace Trecs.Serialization.Samples.SaveGame
 {
     /// <summary>
     /// Parses the hardcoded Sokoban level string into wall, box, target,

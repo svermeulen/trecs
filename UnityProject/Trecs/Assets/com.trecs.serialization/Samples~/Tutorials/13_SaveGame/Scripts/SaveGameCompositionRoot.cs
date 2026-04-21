@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 
-namespace Trecs.Samples.SaveGame
+namespace Trecs.Serialization.Samples.SaveGame
 {
     public class SaveGameCompositionRoot : CompositionRootBase
     {

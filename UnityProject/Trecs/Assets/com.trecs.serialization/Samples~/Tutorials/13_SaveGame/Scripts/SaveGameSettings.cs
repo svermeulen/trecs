@@ -1,6 +1,6 @@
 using System;
 
-namespace Trecs.Samples.SaveGame
+namespace Trecs.Serialization.Samples.SaveGame
 {
     [Serializable]
     public class SaveGameSettings

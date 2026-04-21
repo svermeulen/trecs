@@ -1,7 +1,7 @@
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Trecs.Samples.SaveGame
+namespace Trecs.Serialization.Samples.SaveGame
 {
     /// <summary>
     /// Sokoban-style tap input: one move per keypress, not continuous.

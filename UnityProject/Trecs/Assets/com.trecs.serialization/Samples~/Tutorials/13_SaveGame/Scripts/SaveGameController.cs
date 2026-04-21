@@ -5,7 +5,7 @@ using Trecs.Internal;
 using Trecs.Serialization;
 using UnityEngine;
 
-namespace Trecs.Samples.SaveGame
+namespace Trecs.Serialization.Samples.SaveGame
 {
     /// <summary>
     /// Sample save-game controller that demonstrates the BookmarkSerializer

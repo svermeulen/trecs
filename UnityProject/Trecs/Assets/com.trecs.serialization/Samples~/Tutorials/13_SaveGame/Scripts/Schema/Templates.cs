@@ -1,4 +1,4 @@
-namespace Trecs.Samples.SaveGame
+namespace Trecs.Serialization.Samples.SaveGame
 {
     public static partial class SaveGameTemplates
     {

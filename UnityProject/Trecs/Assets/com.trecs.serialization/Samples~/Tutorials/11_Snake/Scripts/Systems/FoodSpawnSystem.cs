@@ -1,6 +1,6 @@
 using Unity.Mathematics;
 
-namespace Trecs.Samples.Snake
+namespace Trecs.Serialization.Samples.Snake
 {
     /// <summary>
     /// Tops the playfield up to <c>SnakeSettings.MaxFoodCount</c> food

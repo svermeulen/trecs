@@ -1,7 +1,7 @@
 using System.Text;
 using TMPro;
 
-namespace Trecs.Samples.Snake
+namespace Trecs.Serialization.Samples.Snake
 {
     [VariableUpdate]
     public partial class TextDisplaySystem : ISystem

@@ -1,6 +1,6 @@
 using Trecs.Serialization;
 
-namespace Trecs.Samples
+namespace Trecs.Serialization.Samples
 {
     /// <summary>
     /// Sample helper that constructs the full serialization stack (registry + world state

@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Trecs.Samples
+namespace Trecs.Serialization.Samples
 {
     public static class SampleUtil
     {

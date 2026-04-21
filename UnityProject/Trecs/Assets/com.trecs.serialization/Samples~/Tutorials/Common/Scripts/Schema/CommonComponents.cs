@@ -1,4 +1,4 @@
-namespace Trecs.Samples
+namespace Trecs.Serialization.Samples
 {
     public partial struct GameObjectId : IEntityComponent
     {

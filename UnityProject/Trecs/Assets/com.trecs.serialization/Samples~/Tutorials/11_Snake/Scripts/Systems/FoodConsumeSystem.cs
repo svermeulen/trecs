@@ -1,4 +1,4 @@
-namespace Trecs.Samples.Snake
+namespace Trecs.Serialization.Samples.Snake
 {
     /// <summary>
     /// After the head has moved this fixed frame, check whether the head's

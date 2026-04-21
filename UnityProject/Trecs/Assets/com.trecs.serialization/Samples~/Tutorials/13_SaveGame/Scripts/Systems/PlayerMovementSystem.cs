@@ -1,6 +1,6 @@
 using Unity.Mathematics;
 
-namespace Trecs.Samples.SaveGame
+namespace Trecs.Serialization.Samples.SaveGame
 {
     /// <summary>
     /// Sokoban movement, driven by tap input. Every fixed frame that the

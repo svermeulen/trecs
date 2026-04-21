@@ -1,7 +1,7 @@
 using System;
 using Trecs.Serialization;
 
-namespace Trecs.Samples
+namespace Trecs.Serialization.Samples
 {
     /// <summary>
     /// Sample-side bundle of all serialization handlers wired together.

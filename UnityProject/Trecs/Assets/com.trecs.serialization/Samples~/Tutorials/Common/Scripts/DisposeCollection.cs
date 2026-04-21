@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Trecs.Internal;
 
-namespace Trecs.Samples
+namespace Trecs.Serialization.Samples
 {
     public static class DisposeGroupExtensions
     {

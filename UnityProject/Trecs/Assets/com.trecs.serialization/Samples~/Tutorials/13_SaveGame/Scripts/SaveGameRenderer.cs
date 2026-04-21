@@ -4,7 +4,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace Trecs.Samples.SaveGame
+namespace Trecs.Serialization.Samples.SaveGame
 {
     /// <summary>
     /// Renders the Sokoban board as 3D primitives synced each variable

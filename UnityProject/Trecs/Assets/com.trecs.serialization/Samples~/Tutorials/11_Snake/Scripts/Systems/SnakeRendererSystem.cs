@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Trecs.Samples.Snake
+namespace Trecs.Serialization.Samples.Snake
 {
     /// <summary>
     /// Pushes every entity that has a GameObjectId and a GridPos to its
