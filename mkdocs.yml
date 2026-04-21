@@ -60,6 +60,7 @@ nav:
       - Interpolation: advanced/interpolation.md
       - Serialization: advanced/serialization.md
       - Recording & Playback: advanced/recording-and-playback.md
+      - Binary Format: advanced/binary-format.md
       - Input System: advanced/input-system.md
       - Time & RNG: advanced/time-and-rng.md
   - Samples:

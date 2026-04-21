@@ -286,3 +286,5 @@ The example only adds a field, but `Version` lets you handle removals and reorde
 
 If your game needs long-term save compatibility across deeper schema changes (renamed types, restructured aggregates, splitting one component into two), wrap the Trecs bookmark inside your own versioned format and perform migrations before calling `LoadBookmark`.
 
+For the exact on-disk layout (header fields, stream guards, endianness, integrity caveats), see the [Binary Format Reference](binary-format.md).
+

@@ -172,4 +172,5 @@ disposables.Add(bookmarks.Dispose);
 ## See also
 
 - [Serialization](serialization.md) — `SerializerRegistry`, `WorldStateSerializer`, custom serializers.
+- [Binary Format Reference](binary-format.md) — on-disk layout of recordings and bookmarks.
 - [Sample 11 — Snake](../samples/11-snake.md) — full record/replay flow wired to keyboard hotkeys.
