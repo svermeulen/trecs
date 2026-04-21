@@ -346,8 +346,11 @@ namespace Trecs
 
             if (!_activeHandles.TryGetValue(id, out var blobId))
             {
-                _log.Error("Attempted to dispose unrecognized blob handle {}", id);
-                return;
+                throw Assert.CreateException(
+                    "Attempted to dispose unrecognized native shared blob handle {} "
+                        + "(double-dispose or handle from a different heap?)",
+                    id
+                );
             }
 
             _activeHandles.RemoveMustExist(id);

@@ -75,6 +75,10 @@ namespace Trecs.Internal
             _settings = settings;
 
             _entitySubmitter = entitySubmitter;
+            // Late-wire the scheduler into the submitter so its deferred-flush
+            // assert can detect mid-job flushes (scheduler is owned here, but
+            // the submitter is constructed before the runner).
+            _entitySubmitter.SetJobScheduler(_jobScheduler);
 
             _log.Trace("Using Trecs Settings: {@}", settings);
         }

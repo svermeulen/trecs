@@ -88,13 +88,20 @@ namespace Trecs
             return _writableStore;
         }
 
+        /// <summary>
+        /// Drive periodic cache cleanup. <b>Main-thread only</b> and must be
+        /// called outside any active job execution — a concurrent
+        /// <c>BlobStore.CleanCache</c> removes entries that jobs may be reading
+        /// via <see cref="NativeSharedPtrResolver"/>, so calling <c>Tick</c>
+        /// mid-job can corrupt those reads. Typical call site: once per frame
+        /// between phases, from the world owner.
+        /// </summary>
         public void Tick()
         {
             Assert.That(!_hasDisposed);
+            Assert.That(UnityThreadUtil.IsMainThread, "BlobCache.Tick is main-thread only");
 
             _cleanCountdown -= Time.deltaTime;
-
-            // _dbg.Text("Num Handles: {}", _handles.Count);
 
             if (_cleanCountdown <= 0)
             {

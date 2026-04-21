@@ -34,7 +34,7 @@ namespace Trecs.Internal
             unsafe
             {
                 Require.That(t.data != null, "using disposed SharedNativeInt");
-                return *t.data;
+                return Volatile.Read(ref *t.data);
             }
         }
 
