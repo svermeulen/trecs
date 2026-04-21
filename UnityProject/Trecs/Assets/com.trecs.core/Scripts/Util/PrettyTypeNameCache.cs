@@ -69,6 +69,10 @@ namespace Trecs.Internal
         public static string GetPrettyName(this Type type)
         {
             Assert.IsNotNull(type);
+            Assert.That(
+                UnityThreadUtil.IsMainThread,
+                "PrettyTypeNameCache is main-thread only — the backing Dictionary has no synchronization"
+            );
 
             // Return from cache if available
             if (_formattedTypeNames.TryGetValue(type, out string prettyName))

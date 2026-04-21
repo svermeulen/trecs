@@ -371,9 +371,12 @@ namespace Trecs.Internal
         )
             where T1 : notnull
         {
+            // Match the rest of Assert.*: CustomFormatter uses {} placeholders
+            // rather than string.Format's {0}/{1}. Callers of IsEqual<T1,T2,T3>
+            // should use {} to stay consistent with every other assert path.
             throw CreateException(
                 "{}\nExpected (left): {}, Actual (right): {}",
-                string.Format(message, arg1, arg2),
+                CustomFormatter.CustomFormat(message, arg1, arg2),
                 expected,
                 actual
             );
