@@ -1,8 +1,10 @@
 using System;
+using System.ComponentModel;
 using System.IO;
 
 namespace Trecs.Internal
 {
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public class BitReader
     {
         byte[] _bytes;
@@ -68,6 +70,14 @@ namespace Trecs.Internal
         {
             Assert.That(_hasStarted);
             _hasStarted = false;
+        }
+
+        public void ResetForErrorRecovery()
+        {
+            _hasStarted = false;
+            _byteIndex = 0;
+            _bitPosition = 0;
+            _totalBits = 0;
         }
 
         public bool ReadBit()

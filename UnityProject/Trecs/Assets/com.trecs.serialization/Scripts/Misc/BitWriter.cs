@@ -64,5 +64,14 @@ namespace Trecs.Serialization
             _bitPosition = 0;
             _totalBits = 0;
         }
+
+        public void ResetForErrorRecovery()
+        {
+            _hasStarted = false;
+            _bytes.Clear();
+            _currentByte = 0;
+            _bitPosition = 0;
+            _totalBits = 0;
+        }
     }
 }

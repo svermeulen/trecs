@@ -4,6 +4,10 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Serialization
 {
+    /// <summary>
+    /// Serializer for <see cref="NativeList{T}"/> of unmanaged elements.
+    /// Writes length followed by the underlying memory as a single blit.
+    /// </summary>
     public class NativeListSerializer<T> : ISerializer<NativeList<T>>
         where T : unmanaged
     {

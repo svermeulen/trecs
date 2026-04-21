@@ -1,5 +1,8 @@
+using System.ComponentModel;
+
 namespace Trecs.Internal
 {
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public class SerializeCloner
     {
         readonly SharedSerializerCacheHelper _sharedSerializerHelper;

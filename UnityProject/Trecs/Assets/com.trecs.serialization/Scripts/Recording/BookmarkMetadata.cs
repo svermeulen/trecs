@@ -4,7 +4,7 @@ namespace Trecs.Serialization
 {
     /// <summary>
     /// Header data for a bookmark. Returned by
-    /// <see cref="BookmarkSerializer.SaveBookmark(int, System.IO.Stream, bool, int)"/>
+    /// <see cref="BookmarkSerializer.SaveBookmark(int, System.IO.Stream, bool)"/>
     /// and <see cref="BookmarkSerializer.LoadBookmark(System.IO.Stream)"/>,
     /// and readable without restoring full state via
     /// <see cref="BookmarkSerializer.PeekMetadata(System.IO.Stream)"/>.
@@ -17,16 +17,13 @@ namespace Trecs.Serialization
         /// interpret this value; it is surfaced so callers can decide whether
         /// a bookmark is compatible with the current world schema.
         /// </summary>
-        public int Version;
+        public int Version { get; init; }
 
         /// <summary>World fixed-frame at capture time.</summary>
-        public int FixedFrame;
-
-        /// <summary>Number of connected peers when this bookmark was saved (host bookmarks only).</summary>
-        public int NumConnections;
+        public int FixedFrame { get; init; }
 
         /// <summary>Heap blob references the bookmark depends on.</summary>
-        public readonly DenseHashSet<BlobId> BlobIds = new();
+        public DenseHashSet<BlobId> BlobIds { get; init; } = new();
 
         public static void RegisterSerializers(SerializerRegistry registry)
         {
@@ -39,18 +36,22 @@ namespace Trecs.Serialization
 
             public void Deserialize(ref BookmarkMetadata value, ISerializationReader reader)
             {
-                value ??= new();
-                value.Version = reader.Read<int>("Version");
-                reader.ReadInPlace<DenseHashSet<BlobId>>("BlobIds", value.BlobIds);
-                value.NumConnections = reader.Read<int>("NumConnections");
-                value.FixedFrame = reader.Read<int>("FixedFrame");
+                var version = reader.Read<int>("Version");
+                var blobIds = reader.Read<DenseHashSet<BlobId>>("BlobIds");
+                var fixedFrame = reader.Read<int>("FixedFrame");
+
+                value = new BookmarkMetadata
+                {
+                    Version = version,
+                    BlobIds = blobIds,
+                    FixedFrame = fixedFrame,
+                };
             }
 
             public void Serialize(in BookmarkMetadata value, ISerializationWriter writer)
             {
                 writer.Write("Version", value.Version);
                 writer.Write("BlobIds", value.BlobIds);
-                writer.Write("NumConnections", value.NumConnections);
                 writer.Write("FixedFrame", value.FixedFrame);
             }
         }

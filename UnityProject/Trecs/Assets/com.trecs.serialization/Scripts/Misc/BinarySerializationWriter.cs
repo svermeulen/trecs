@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization
@@ -16,8 +15,7 @@ namespace Trecs.Serialization
 #if TRECS_INTERNAL_CHECKS && DEBUG
         readonly SerializationMemoryTracker _memoryTracker = new();
 #endif
-        readonly DenseHashSet<int> _flags = new();
-
+        long _flags;
         bool _includeTypeChecks;
         bool _hasStarted = false;
         int _version;
@@ -29,7 +27,7 @@ namespace Trecs.Serialization
             _dataWriter = new BinaryWriter(_dataBuffer);
         }
 
-        public ReadOnlyDenseHashSet<int> Flags
+        public long Flags
         {
             get
             {
@@ -52,10 +50,10 @@ namespace Trecs.Serialization
             get { return _dataWriter; }
         }
 
-        public bool HasFlag(int flag)
+        public bool HasFlag(long flag)
         {
             Assert.That(_hasStarted);
-            return _flags.Contains(flag);
+            return (_flags & flag) != 0;
         }
 
         public string GetMemoryReport()
@@ -70,7 +68,7 @@ namespace Trecs.Serialization
         public void Start(
             int version,
             bool includeTypeChecks,
-            ReadOnlyDenseHashSet<int> flags = default,
+            long flags = 0,
             bool enableMemoryTracking = false
         )
         {
@@ -79,16 +77,16 @@ namespace Trecs.Serialization
             Assert.That(!_hasStarted);
             _hasStarted = true;
 
-            _flags.Clear();
+            var reservedUnused =
+                flags & SerializationFlags.ReservedMask & ~SerializationFlags.AllDefinedMask;
+            Assert.That(
+                reservedUnused == 0,
+                "Flag bits {:X} are reserved for Trecs and must not be set by app code. Use bits >= SerializationFlags.FirstUserBitIndex ({}) for app-defined flags.",
+                reservedUnused,
+                SerializationFlags.FirstUserBitIndex
+            );
 
-            if (!flags.IsNull)
-            {
-                foreach (var flag in flags)
-                {
-                    _flags.Add(flag);
-                }
-            }
-
+            _flags = flags;
             _includeTypeChecks = includeTypeChecks;
             _version = version;
             _dataBuffer.Position = 0;
@@ -269,8 +267,7 @@ namespace Trecs.Serialization
 #if TRECS_INTERNAL_CHECKS && DEBUG
             long headerStartPos = outputWriter.BaseStream.Position;
 #endif
-            outputWriter.Write(_version);
-            outputWriter.Write(_includeTypeChecks);
+            SerializationHeaderUtil.WriteHeader(outputWriter, _version, _flags, _includeTypeChecks);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackHeaderBytes(
                 (int)(outputWriter.BaseStream.Position - headerStartPos),
@@ -310,6 +307,15 @@ namespace Trecs.Serialization
             );
 #endif
             _log.Trace("Wrote sentinel value at byte {}", outputWriter.BaseStream.Position);
+        }
+
+        public void ResetForErrorRecovery()
+        {
+            _hasStarted = false;
+            _flags = 0;
+            _dataBuffer.Position = 0;
+            _dataBuffer.SetLength(0);
+            _bitWriter.ResetForErrorRecovery();
         }
 
         public void Dispose()
@@ -509,24 +515,22 @@ namespace Trecs.Serialization
             MemoryBlitter.WriteRaw(ptr, numBytes, _dataWriter);
         }
 
-        public void WriteBinary(string name, in SerializableByteArray value)
+        public void WriteBytes(string name, byte[] buffer, int offset, int count)
         {
             Assert.That(_hasStarted);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             long startPos = _dataBuffer.Position;
 #endif
-            // Write length first
-            _dataWriter.Write(value.Length);
+            _dataWriter.Write(count);
 
-            // Write raw binary data directly
-            if (value.Length > 0)
+            if (count > 0)
             {
-                _dataWriter.Write(value.Data, 0, value.Length);
+                _dataWriter.Write(buffer, offset, count);
             }
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackDirectWrite(
                 name,
-                typeof(SerializableByteArray),
+                typeof(byte[]),
                 (int)(_dataBuffer.Position - startPos)
             );
 #endif

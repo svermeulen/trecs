@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization
@@ -11,8 +10,8 @@ namespace Trecs.Serialization
 
         readonly SerializerRegistry _serializerManager;
         readonly BitReader _bitReader = new();
-        readonly DenseHashSet<int> _flags = new();
 
+        long _flags;
         int _version;
         bool _includesTypeChecks;
         BinaryReader _binaryReader;
@@ -23,7 +22,7 @@ namespace Trecs.Serialization
             _serializerManager = serializerManager;
         }
 
-        public ReadOnlyDenseHashSet<int> Flags
+        public long Flags
         {
             get
             {
@@ -51,13 +50,18 @@ namespace Trecs.Serialization
             }
         }
 
-        public bool HasFlag(int flag)
+        public bool HasFlag(long flag)
         {
             Assert.That(_hasStarted);
-            return _flags.Contains(flag);
+            return (_flags & flag) != 0;
         }
 
-        public void Start(BinaryReader binaryReader, ReadOnlyDenseHashSet<int> flags = default)
+        /// <summary>
+        /// Begin reading from <paramref name="binaryReader"/>. The version and
+        /// flags are read from the payload header — they're not caller-supplied
+        /// — and become accessible via <see cref="Version"/> / <see cref="Flags"/>.
+        /// </summary>
+        public void Start(BinaryReader binaryReader)
         {
             Assert.That(!_hasStarted);
 
@@ -66,17 +70,9 @@ namespace Trecs.Serialization
             Assert.IsNull(_binaryReader);
             _binaryReader = binaryReader;
 
-            _flags.Clear();
-
-            if (!flags.IsNull)
-            {
-                foreach (var flag in flags)
-                {
-                    _flags.Add(flag);
-                }
-            }
-
-            (_version, _includesTypeChecks) = SerializationHeaderUtil.ReadHeader(binaryReader);
+            (_version, _flags, _includesTypeChecks) = SerializationHeaderUtil.ReadHeader(
+                binaryReader
+            );
 
             _log.Trace("Completed reading header at byte {}", binaryReader.BaseStream.Position);
 
@@ -100,6 +96,14 @@ namespace Trecs.Serialization
                 VerifySentinel();
             }
             _binaryReader = null;
+        }
+
+        public void ResetForErrorRecovery()
+        {
+            _hasStarted = false;
+            _binaryReader = null;
+            _flags = 0;
+            _bitReader.ResetForErrorRecovery();
         }
 
         void VerifySentinel()
@@ -330,26 +334,23 @@ namespace Trecs.Serialization
             MemoryBlitter.ReadRaw(ptr, numBytes, _binaryReader);
         }
 
-        public void ReadBinary(string name, ref SerializableByteArray value)
+        public int ReadBytes(string name, ref byte[] buffer)
         {
             Assert.That(_hasStarted);
 
-            // Read length first
             var length = _binaryReader.ReadInt32();
 
-            // Resize array if needed
-            if (value.Data == null || value.Data.Length < length)
+            if (buffer == null || buffer.Length < length)
             {
-                value.Data = new byte[length];
+                buffer = new byte[length];
             }
 
-            value.Length = length;
-
-            // Read raw binary data directly
             if (length > 0)
             {
-                _binaryReader.Read(value.Data, 0, length);
+                _binaryReader.Read(buffer, 0, length);
             }
+
+            return length;
         }
     }
 }

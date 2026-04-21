@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization
@@ -108,7 +107,7 @@ namespace Trecs.Serialization
             in T baseValue,
             int version,
             bool includeTypeChecks,
-            ReadOnlyDenseHashSet<int> flags = default,
+            long flags = 0,
             bool enableMemoryTracking = false,
             bool allowUnclearedMemory = false
         )
@@ -117,32 +116,45 @@ namespace Trecs.Serialization
 
             Assert.That(allowUnclearedMemory || MemoryIsCleared);
 
-            _writer.Start(
-                version: version,
-                includeTypeChecks: includeTypeChecks,
-                flags: flags,
-                enableMemoryTracking: enableMemoryTracking
-            );
-            _writer.WriteDelta("value", value, baseValue);
-            _writer.Complete(_binaryWriter);
+            try
+            {
+                _writer.Start(
+                    version: version,
+                    includeTypeChecks: includeTypeChecks,
+                    flags: flags,
+                    enableMemoryTracking: enableMemoryTracking
+                );
+                _writer.WriteDelta("value", value, baseValue);
+                _writer.Complete(_binaryWriter);
+            }
+            catch
+            {
+                ResetForErrorRecovery();
+                throw;
+            }
 
             return _memoryStream.Position;
         }
 
-        public object ReadAllObjectDelta(
-            object baseValue,
-            ReadOnlyDenseHashSet<int> flags = default
-        )
+        public object ReadAllObjectDelta(object baseValue)
         {
             Assert.That(_state == State.Idle);
 
             Assert.That(MemoryPosition == 0);
 
-            _reader.Start(_binaryReader, flags: flags);
-            var result = _reader.ReadObjectDelta("value", baseValue);
-            _reader.Stop(verifySentinel: true);
+            try
+            {
+                _reader.Start(_binaryReader);
+                var result = _reader.ReadObjectDelta("value", baseValue);
+                _reader.Stop(verifySentinel: true);
 
-            return result;
+                return result;
+            }
+            catch
+            {
+                ResetForErrorRecovery();
+                throw;
+            }
         }
 
         public T Read<T>(string path)
@@ -160,7 +172,7 @@ namespace Trecs.Serialization
         public void StartWrite(
             int version,
             bool includeTypeChecks,
-            ReadOnlyDenseHashSet<int> flags = default,
+            long flags = 0,
             bool enableMemoryTracking = false
         )
         {
@@ -207,16 +219,30 @@ namespace Trecs.Serialization
             _state = State.Idle;
             _memoryStream.Position = 0;
             _memoryStream.SetLength(0);
+            _reader.ResetForErrorRecovery();
+            _writer.ResetForErrorRecovery();
         }
 
-        public void StartRead(ReadOnlyDenseHashSet<int> flags = default)
+        public void StartRead()
         {
             Assert.That(_state == State.Idle);
 
             Assert.That(MemoryPosition == 0);
 
             _state = State.Reading;
-            _reader.Start(_binaryReader, flags);
+            _reader.Start(_binaryReader);
+        }
+
+        /// <summary>
+        /// Read just the header at the current memory position without starting
+        /// a full read. Does not advance the memory position. Intended for
+        /// pre-flight validation (e.g. asserting required flags before calling
+        /// <see cref="StartRead"/>).
+        /// </summary>
+        public PayloadHeader PeekHeader()
+        {
+            Assert.That(_state == State.Idle);
+            return PayloadHeader.Peek(_memoryStream);
         }
 
         public void StopRead(bool verifySentinel)
@@ -263,7 +289,7 @@ namespace Trecs.Serialization
             in T value,
             int version,
             bool includeTypeChecks,
-            ReadOnlyDenseHashSet<int> flags = default,
+            long flags = 0,
             bool enableMemoryTracking = false,
             bool allowUnclearedMemory = false
         )
@@ -272,28 +298,44 @@ namespace Trecs.Serialization
 
             Assert.That(allowUnclearedMemory || MemoryIsCleared);
 
-            _writer.Start(
-                version: version,
-                includeTypeChecks: includeTypeChecks,
-                flags: flags,
-                enableMemoryTracking: enableMemoryTracking
-            );
-            _writer.Write("value", value);
-            _writer.Complete(_binaryWriter);
+            try
+            {
+                _writer.Start(
+                    version: version,
+                    includeTypeChecks: includeTypeChecks,
+                    flags: flags,
+                    enableMemoryTracking: enableMemoryTracking
+                );
+                _writer.Write("value", value);
+                _writer.Complete(_binaryWriter);
+            }
+            catch
+            {
+                ResetForErrorRecovery();
+                throw;
+            }
 
             return _memoryStream.Position;
         }
 
-        public object ReadAllObject(ReadOnlyDenseHashSet<int> flags = default)
+        public object ReadAllObject()
         {
             Assert.That(_state == State.Idle);
 
             Assert.That(MemoryPosition == 0);
 
-            _reader.Start(_binaryReader, flags: flags);
-            var result = _reader.ReadObject("value");
-            _reader.Stop(verifySentinel: true);
-            return result;
+            try
+            {
+                _reader.Start(_binaryReader);
+                var result = _reader.ReadObject("value");
+                _reader.Stop(verifySentinel: true);
+                return result;
+            }
+            catch
+            {
+                ResetForErrorRecovery();
+                throw;
+            }
         }
 
         // Use this if file can support multiple derived types
@@ -301,7 +343,7 @@ namespace Trecs.Serialization
             object value,
             int version,
             bool includeTypeChecks,
-            ReadOnlyDenseHashSet<int> flags = default,
+            long flags = 0,
             bool enableMemoryTracking = false
         )
         {
@@ -309,14 +351,22 @@ namespace Trecs.Serialization
 
             Assert.That(MemoryIsCleared);
 
-            _writer.Start(
-                version: version,
-                includeTypeChecks: includeTypeChecks,
-                flags,
-                enableMemoryTracking: enableMemoryTracking
-            );
-            _writer.WriteObject("value", value);
-            _writer.Complete(_binaryWriter);
+            try
+            {
+                _writer.Start(
+                    version: version,
+                    includeTypeChecks: includeTypeChecks,
+                    flags,
+                    enableMemoryTracking: enableMemoryTracking
+                );
+                _writer.WriteObject("value", value);
+                _writer.Complete(_binaryWriter);
+            }
+            catch
+            {
+                ResetForErrorRecovery();
+                throw;
+            }
 
             return _memoryStream.Position;
         }
@@ -341,35 +391,44 @@ namespace Trecs.Serialization
         /// <summary>
         /// Note that you can't call this multiple times for different parts of same data
         /// </summary>
-        public T ReadAll<T>(
-            ReadOnlyDenseHashSet<int> flags = default,
-            bool allowNonZeroMemoryPosition = false
-        )
+        public T ReadAll<T>(bool allowNonZeroMemoryPosition = false)
         {
             Assert.That(_state == State.Idle);
 
             Assert.That(allowNonZeroMemoryPosition || MemoryPosition == 0);
 
-            _reader.Start(_binaryReader, flags: flags);
-            var result = _reader.Read<T>("value");
-            _reader.Stop(verifySentinel: true);
+            try
+            {
+                _reader.Start(_binaryReader);
+                var result = _reader.Read<T>("value");
+                _reader.Stop(verifySentinel: true);
 
-            return result;
+                return result;
+            }
+            catch
+            {
+                ResetForErrorRecovery();
+                throw;
+            }
         }
 
-        public void ReadAll<T>(
-            ref T value,
-            ReadOnlyDenseHashSet<int> flags = default,
-            bool allowNonZeroMemoryPosition = false
-        )
+        public void ReadAll<T>(ref T value, bool allowNonZeroMemoryPosition = false)
         {
             Assert.That(_state == State.Idle);
 
             Assert.That(allowNonZeroMemoryPosition || MemoryPosition == 0);
 
-            _reader.Start(_binaryReader, flags: flags);
-            _reader.Read<T>("value", ref value);
-            _reader.Stop(verifySentinel: true);
+            try
+            {
+                _reader.Start(_binaryReader);
+                _reader.Read<T>("value", ref value);
+                _reader.Stop(verifySentinel: true);
+            }
+            catch
+            {
+                ResetForErrorRecovery();
+                throw;
+            }
         }
 
         // Use this if file can support multiple derived types
@@ -378,7 +437,7 @@ namespace Trecs.Serialization
             object baseValue,
             int version,
             bool includeTypeChecks,
-            ReadOnlyDenseHashSet<int> flags = default,
+            long flags = 0,
             bool enableMemoryTracking = false
         )
         {
@@ -386,14 +445,22 @@ namespace Trecs.Serialization
 
             Assert.That(MemoryIsCleared);
 
-            _writer.Start(
-                version: version,
-                includeTypeChecks: includeTypeChecks,
-                flags,
-                enableMemoryTracking: enableMemoryTracking
-            );
-            _writer.WriteObjectDelta("value", value, baseValue);
-            _writer.Complete(_binaryWriter);
+            try
+            {
+                _writer.Start(
+                    version: version,
+                    includeTypeChecks: includeTypeChecks,
+                    flags,
+                    enableMemoryTracking: enableMemoryTracking
+                );
+                _writer.WriteObjectDelta("value", value, baseValue);
+                _writer.Complete(_binaryWriter);
+            }
+            catch
+            {
+                ResetForErrorRecovery();
+                throw;
+            }
 
             return _memoryStream.Position;
         }
@@ -440,20 +507,24 @@ namespace Trecs.Serialization
         /// <summary>
         /// Note that you can't call this multiple times for different parts of same data
         /// </summary>
-        public T ReadAllDelta<T>(
-            in T baseValue,
-            ReadOnlyDenseHashSet<int> flags = default,
-            bool allowNonZeroMemoryPosition = false
-        )
+        public T ReadAllDelta<T>(in T baseValue, bool allowNonZeroMemoryPosition = false)
         {
             Assert.That(_state == State.Idle);
 
             Assert.That(allowNonZeroMemoryPosition || MemoryPosition == 0);
 
-            _reader.Start(_binaryReader, flags);
-            var result = _reader.ReadDelta<T>("value", baseValue);
-            _reader.Stop(verifySentinel: true);
-            return result;
+            try
+            {
+                _reader.Start(_binaryReader);
+                var result = _reader.ReadDelta<T>("value", baseValue);
+                _reader.Stop(verifySentinel: true);
+                return result;
+            }
+            catch
+            {
+                ResetForErrorRecovery();
+                throw;
+            }
         }
 
         public void Dispose()
@@ -620,7 +691,7 @@ namespace Trecs.Serialization
             _writer.BlitWriteDelta(name, value, baseValue);
         }
 
-        public bool HasFlag(int flag)
+        public bool HasFlag(long flag)
         {
             if (_state == State.Reading)
             {
@@ -634,7 +705,7 @@ namespace Trecs.Serialization
             throw new InvalidOperationException("Cannot access Flags when not reading or writing.");
         }
 
-        ReadOnlyDenseHashSet<int> ISerializationReader.Flags
+        long ISerializationReader.Flags
         {
             get
             {
@@ -643,7 +714,7 @@ namespace Trecs.Serialization
             }
         }
 
-        ReadOnlyDenseHashSet<int> ISerializationWriter.Flags
+        long ISerializationWriter.Flags
         {
             get
             {
@@ -679,16 +750,16 @@ namespace Trecs.Serialization
             }
         }
 
-        public void WriteBinary(string name, in SerializableByteArray value)
+        public void WriteBytes(string name, byte[] buffer, int offset, int count)
         {
             Assert.That(_state == State.Writing);
-            _writer.WriteBinary(name, value);
+            _writer.WriteBytes(name, buffer, offset, count);
         }
 
-        public void ReadBinary(string name, ref SerializableByteArray value)
+        public int ReadBytes(string name, ref byte[] buffer)
         {
             Assert.That(_state == State.Reading);
-            _reader.ReadBinary(name, ref value);
+            return _reader.ReadBytes(name, ref buffer);
         }
 
         public unsafe void BlitWriteRawBytes(string name, void* ptr, int numBytes)

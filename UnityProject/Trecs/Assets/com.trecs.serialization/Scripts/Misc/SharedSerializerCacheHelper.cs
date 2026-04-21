@@ -1,8 +1,10 @@
 using System;
+using System.ComponentModel;
 using Trecs.Serialization;
 
 namespace Trecs.Internal
 {
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public class SharedSerializerCacheHelper : IDisposable
     {
         readonly SerializerRegistry _registry;

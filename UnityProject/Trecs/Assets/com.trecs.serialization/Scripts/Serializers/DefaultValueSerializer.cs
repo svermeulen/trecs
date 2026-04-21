@@ -3,9 +3,9 @@ namespace Trecs.Serialization
     internal class DefaultValueSerializer<T> : ISerializer<T>
         where T : unmanaged
     {
-        public void Serialize(in T value, ISerializationWriter recursiveWriter) { }
+        public void Serialize(in T value, ISerializationWriter writer) { }
 
-        public void Deserialize(ref T value, ISerializationReader recursiveReader)
+        public void Deserialize(ref T value, ISerializationReader reader)
         {
             value = default(T);
         }

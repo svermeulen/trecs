@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using Trecs.Internal;
-using Trecs.Serialization;
 using UnityEngine;
 
 namespace Trecs.Serialization.Samples
@@ -155,13 +154,14 @@ namespace Trecs.Serialization.Samples
                 return;
             }
 
+            _playbackHandler.StartPlayback(
+                _recordingPath,
+                new PlaybackStartParams { InputsOnly = false, Version = _serializationVersion }
+            );
+
             if (File.Exists(_bookmarkPath))
             {
-                _playbackHandler.LoadInitialState(
-                    _bookmarkPath,
-                    expectedInitialChecksum: null,
-                    version: _serializationVersion
-                );
+                _playbackHandler.LoadInitialState(_bookmarkPath, expectedInitialChecksum: null);
                 _log.Info("Loaded initial state from bookmark");
             }
             else
@@ -170,11 +170,6 @@ namespace Trecs.Serialization.Samples
                     "No initial state bookmark found, starting playback from current state"
                 );
             }
-
-            _playbackHandler.StartPlayback(
-                _recordingPath,
-                new PlaybackStartParams { InputsOnly = false, Version = _serializationVersion }
-            );
 
             _state = ControllerState.Playback;
             _log.Info(

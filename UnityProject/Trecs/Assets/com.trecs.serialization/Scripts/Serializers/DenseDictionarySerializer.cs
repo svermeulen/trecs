@@ -4,6 +4,11 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
+    /// <summary>
+    /// Serializer for <see cref="DenseDictionary{TKey,TValue}"/> — the
+    /// deterministic, dense-indexed dictionary used by Trecs. Writes entries
+    /// in their internal dense order so the wire format is stable across runs.
+    /// </summary>
     public class DenseDictionarySerializer<TKey, TValue>
         : ISerializer<DenseDictionary<TKey, TValue>>
         where TKey : struct, IEquatable<TKey>

@@ -3,6 +3,11 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
+    /// <summary>
+    /// Serializer for <see cref="HashSet{T}"/>. Writes element count followed
+    /// by each element via the registered serializer for <typeparamref name="T"/>.
+    /// Order is not preserved (managed HashSet does not maintain insertion order).
+    /// </summary>
     public class HashSetSerializer<T> : ISerializer<HashSet<T>>
     {
         public HashSetSerializer() { }

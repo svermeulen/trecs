@@ -2,7 +2,7 @@ namespace Trecs.Serialization
 {
     public struct PlaybackStartParams
     {
-        public bool InputsOnly;
-        public int Version;
+        public bool InputsOnly { get; init; }
+        public int Version { get; init; }
     }
 }

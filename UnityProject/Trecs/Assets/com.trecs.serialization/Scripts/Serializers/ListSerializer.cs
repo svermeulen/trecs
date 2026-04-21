@@ -3,6 +3,10 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
+    /// <summary>
+    /// Serializer for <see cref="List{T}"/>. Writes the item count followed by
+    /// each element via the registered serializer for <typeparamref name="T"/>.
+    /// </summary>
     public class ListSerializer<T> : ISerializer<List<T>>
     {
         public ListSerializer() { }

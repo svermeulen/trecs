@@ -3,6 +3,12 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
+    /// <summary>
+    /// Serializer for <see cref="Dictionary{TKey,TValue}"/>. Writes entry count
+    /// followed by each (key, value) pair. Managed Dictionary does not
+    /// guarantee ordering across runs, so this serializer is unsuitable for
+    /// deterministic snapshots — prefer <see cref="DenseDictionarySerializer{TKey,TValue}"/>.
+    /// </summary>
     public class DictionarySerializer<TKey, TValue> : ISerializer<Dictionary<TKey, TValue>>
     {
         public DictionarySerializer() { }

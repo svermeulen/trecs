@@ -1,26 +1,16 @@
 using System;
-using Trecs.Collections;
 
 namespace Trecs.Serialization
 {
-    /// <summary>
-    /// This can be used to serialize raw binary data, while re-using an existing buffer
-    /// </summary>
-    public struct SerializableByteArray
-    {
-        public byte[] Data;
-        public int Length;
-    }
-
     public interface ISerializationWriter
     {
         int Version { get; }
 
         long NumBytesWritten { get; }
 
-        ReadOnlyDenseHashSet<int> Flags { get; }
+        long Flags { get; }
 
-        bool HasFlag(int flag);
+        bool HasFlag(long flag);
 
         void WriteBit(bool value);
 
@@ -97,11 +87,11 @@ namespace Trecs.Serialization
             where T : unmanaged;
 
         /// <summary>
-        /// Writes raw binary data.
-        /// For JSON serialization, data is encoded as base64.
-        /// For binary serialization, data is written directly.
+        /// Writes a length-prefixed byte range from <paramref name="buffer"/>.
+        /// For JSON serialization, bytes are encoded as base64.
+        /// For binary serialization, writes an int length followed by the bytes.
         /// </summary>
-        void WriteBinary(string name, in SerializableByteArray value);
+        void WriteBytes(string name, byte[] buffer, int offset, int count);
 
         /// <summary>
         /// Writes raw bytes from a pointer using direct memory copying.

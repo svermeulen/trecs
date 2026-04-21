@@ -680,7 +680,6 @@ namespace Trecs
             _hasDisposed = true;
         }
 
-        public static readonly ReadOnlyDenseHashSet<int> SerializationFlags =
-            new DenseHashSet<int>();
+        public const long SerializationFlags = 0;
     }
 }

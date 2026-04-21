@@ -4,6 +4,12 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
+    /// <summary>
+    /// Serializer for enum types. Writes the value as its underlying primitive
+    /// (byte/short/int/etc.). Delta encoding (for non-<c>[Flags]</c> enums) uses
+    /// a compact byte index into the declared value set. Register via
+    /// <see cref="SerializerRegistry.RegisterEnum{T}(bool)"/>.
+    /// </summary>
     public class EnumSerializer<T> : ISerializer<T>, ISerializerDelta<T>
         where T : unmanaged
     {

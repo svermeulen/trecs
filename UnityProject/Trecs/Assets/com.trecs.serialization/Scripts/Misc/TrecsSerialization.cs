@@ -11,10 +11,6 @@ namespace Trecs.Serialization
     /// registry pre-populated with everything Trecs needs (core primitives + ECS
     /// internals + recording metadata).
     ///
-    /// The granular building blocks (<see cref="RegisterCoreSerializers"/>,
-    /// <see cref="RegisterTrecsSerializers"/>, <see cref="RegisterRecordingSerializers"/>)
-    /// are exposed for callers who want partial setup — for example, a save-game-only
-    /// project that does not need the recording-metadata serializers.
     /// </summary>
     public static class TrecsSerialization
     {
@@ -28,14 +24,13 @@ namespace Trecs.Serialization
             var registry = new SerializerRegistry();
             RegisterCoreSerializers(registry);
             RegisterTrecsSerializers(registry);
-            RegisterRecordingSerializers(registry);
             return registry;
         }
 
         /// <summary>
         /// Registers core primitive and math type serializers. Always safe to call.
         /// </summary>
-        public static void RegisterCoreSerializers(SerializerRegistry registry)
+        static void RegisterCoreSerializers(SerializerRegistry registry)
         {
             registry.RegisterBlit<ComponentId>();
 
@@ -71,7 +66,7 @@ namespace Trecs.Serialization
         /// Required by <see cref="WorldStateSerializer"/>, <see cref="BookmarkSerializer"/>,
         /// <see cref="RecordingHandler"/>, and <see cref="PlaybackHandler"/>.
         /// </summary>
-        public static void RegisterTrecsSerializers(SerializerRegistry registry)
+        static void RegisterTrecsSerializers(SerializerRegistry registry)
         {
             // Heap serializers
             RegisterNativeSharedHeapSerializers(registry);
@@ -90,16 +85,7 @@ namespace Trecs.Serialization
 
             registry.RegisterSerializer<NativeDenseDictionarySerializer<uint, uint>>();
             registry.RegisterSerializer<NativeArraySerializer<uint>>();
-        }
 
-        /// <summary>
-        /// Registers serializers for the recording/playback subsystem — bookmark
-        /// metadata and recording metadata. Only needed if you intend to use
-        /// <see cref="BookmarkSerializer"/>, <see cref="RecordingHandler"/>, or
-        /// <see cref="PlaybackHandler"/>.
-        /// </summary>
-        public static void RegisterRecordingSerializers(SerializerRegistry registry)
-        {
             BookmarkMetadata.RegisterSerializers(registry);
             RecordingMetadata.RegisterSerializers(registry);
         }

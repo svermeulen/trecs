@@ -6,30 +6,22 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Serialization
 {
-    public class WorldDeserializeResult<TStaticSeed>
-        where TStaticSeed : unmanaged
+    /// <summary>
+    /// Serializes or deserializes the full game state. Implemented by
+    /// <see cref="WorldStateSerializer"/>; game code that needs to add its
+    /// own data (e.g. scripting VM state) can implement this interface via
+    /// composition around a <see cref="WorldStateSerializer"/>.
+    /// </summary>
+    public interface IWorldStateSerializer
     {
-        public WorldDeserializeResult(bool succeeded, TStaticSeed? requiredStaticSeed)
-        {
-            Succeeded = succeeded;
-            RequiredStaticSeed = requiredStaticSeed;
-        }
-
-        public bool Succeeded { get; }
-        public TStaticSeed? RequiredStaticSeed { get; }
-    }
-
-    public interface IComponentArrayCustomSerializer
-    {
-        void Serialize(IComponentArray array, ISerializationWriter writer);
-        void Deserialize(IComponentArray array, ISerializationReader reader);
+        void SerializeState(ISerializationWriter writer);
+        void DeserializeState(ISerializationReader reader);
     }
 
     /// <summary>
     /// Optional class that can be used to serialize/deserialize the entire game state.
-    /// Must be disposed after World.
     /// </summary>
-    public class WorldStateSerializer
+    public class WorldStateSerializer : IWorldStateSerializer
     {
         static readonly TrecsLog _log = new(nameof(WorldStateSerializer));
 
@@ -43,28 +35,24 @@ namespace Trecs.Serialization
             _worldDef = world.WorldInfo;
             _world = world;
 
+#if DEBUG && !TRECS_IS_PROFILING
             RegisterComponentTypeIds(_worldDef);
+#endif
         }
 
+#if DEBUG && !TRECS_IS_PROFILING
         static void RegisterComponentTypeIds(WorldInfo worldInfo)
         {
-            var registered = new HashSet<Type>();
-
             foreach (var template in worldInfo.ResolvedTemplates)
             {
                 foreach (var componentDec in template.ComponentDeclarations)
                 {
                     var componentType = componentDec.ComponentType;
-
-                    if (!registered.Add(componentType))
-                    {
-                        continue;
-                    }
-
                     Assert.That(TypeIdProvider.IsRegistered(componentType));
                 }
             }
         }
+#endif
 
         public void RegisterCustomComponentSerializer<T>(IComponentArrayCustomSerializer serializer)
             where T : unmanaged, IEntityComponent
@@ -123,66 +111,13 @@ namespace Trecs.Serialization
             array.SetCount(count);
         }
 
-        public void SerializeStaticSeed<TStaticSeed>(
-            in TStaticSeed staticSeed,
-            ISerializationWriter writer
-        )
-            where TStaticSeed : unmanaged
-        {
-            using (TrecsProfiling.Start("Serializing static seed"))
-            {
-                // Note that we blit instead of write here
-                // We do this so that other code can get static seed
-                // easily without using serialization system
-                // since it's sometimes needed before game load
-                writer.BlitWrite("staticSeed", staticSeed);
-                writer.BlitWrite("staticSeedSentinel", StaticSeedSentinel);
-            }
-        }
-
-        public virtual void SerializeState(ISerializationWriter writer)
+        public void SerializeState(ISerializationWriter writer)
         {
             using (TrecsProfiling.Start("Serializing game state"))
             {
                 SerializeImpl(writer);
                 writer.Write("sentinel", SentinelValue);
             }
-        }
-
-        public WorldDeserializeResult<TStaticSeed> DeserializeStaticSeed<TStaticSeed>(
-            in TStaticSeed currentStaticSeed,
-            ISerializationReader reader
-        )
-            where TStaticSeed : unmanaged
-        {
-            // Note that we Blit instead of Write here
-            // We do this so that other code can get static seed
-            // easily without using serialization system
-            // since it's sometimes needed before game load
-            TStaticSeed requiredStaticSeed = default;
-            reader.BlitRead<TStaticSeed>("staticSeed", ref requiredStaticSeed);
-            int staticSeedSentinel = 0;
-            reader.BlitRead<int>("staticSeedSentinel", ref staticSeedSentinel);
-            Assert.IsEqual(
-                staticSeedSentinel,
-                StaticSeedSentinel,
-                "Sentinel values do not match in given data"
-            );
-
-            _log.Trace("Read static seed as: {@}", requiredStaticSeed);
-
-            if (!requiredStaticSeed.Equals(currentStaticSeed))
-            {
-                return new WorldDeserializeResult<TStaticSeed>(
-                    succeeded: false,
-                    requiredStaticSeed: requiredStaticSeed
-                );
-            }
-
-            return new WorldDeserializeResult<TStaticSeed>(
-                succeeded: true,
-                requiredStaticSeed: null
-            );
         }
 
         void DeserializeStateImpl(ISerializationReader reader)
@@ -210,7 +145,7 @@ namespace Trecs.Serialization
             }
         }
 
-        public virtual void DeserializeState(ISerializationReader reader)
+        public void DeserializeState(ISerializationReader reader)
         {
             using (TrecsProfiling.Start("State Deserialization"))
             {
@@ -360,13 +295,6 @@ namespace Trecs.Serialization
             }
         }
 
-        void WriteIdChecker(ISerializationWriter writer)
-        {
-            // _idChecker has been removed (indices are inherently unique).
-            // Write disabled flag for backwards compatibility.
-            writer.Write<bool>("IdCheckerEnabled", false);
-        }
-
         void SerializeImpl(ISerializationWriter writer)
         {
             writer.Write("rngSeed", _world.FixedRng);
@@ -406,16 +334,6 @@ namespace Trecs.Serialization
             }
             _log.Trace(
                 "Entity sets serialized in {} kb",
-                (writer.NumBytesWritten - bytesBefore) / 1024f
-            );
-
-            bytesBefore = writer.NumBytesWritten;
-            using (TrecsProfiling.Start("Writing ID checker"))
-            {
-                WriteIdChecker(writer);
-            }
-            _log.Trace(
-                "ID checker serialized in {} kb",
                 (writer.NumBytesWritten - bytesBefore) / 1024f
             );
 
@@ -608,31 +526,6 @@ namespace Trecs.Serialization
             }
         }
 
-        void ReadIdChecker(ISerializationReader reader)
-        {
-            // _idChecker has been removed (indices are inherently unique).
-            // Read and discard the data for backwards compatibility.
-            var idCheckerEnabled = reader.Read<bool>("IdCheckerEnabled");
-
-            if (idCheckerEnabled)
-            {
-                var numItems = reader.Read<int>("numItems");
-
-                for (int i = 0; i < numItems; i++)
-                {
-                    reader.Read<Group>("group");
-
-                    NativeArray<uint> ids = default;
-                    reader.Read("ids", ref ids);
-
-                    if (ids.IsCreated)
-                    {
-                        ids.Dispose();
-                    }
-                }
-            }
-        }
-
         void DeserializeImpl(ISerializationReader reader)
         {
             reader.ReadInPlace("rngSeed", _world.FixedRng);
@@ -657,7 +550,6 @@ namespace Trecs.Serialization
                 ReadSetRoutingIndex(setStore.SetIdsByGroup, reader);
             }
 
-            ReadIdChecker(reader);
             using (TrecsProfiling.Start("Reading heap memory"))
             {
                 var trecsReader = new TrecsSerializationReaderAdapter(reader);
@@ -670,9 +562,11 @@ namespace Trecs.Serialization
         }
 
         const int SentinelValue = 510120270;
+    }
 
-        // Sometimes we need to read static seed manually outside of serialization system
-        // so let's be paranoid and use a sentinel there
-        public const int StaticSeedSentinel = 658447894;
+    public interface IComponentArrayCustomSerializer
+    {
+        void Serialize(IComponentArray array, ISerializationWriter writer);
+        void Deserialize(IComponentArray array, ISerializationReader reader);
     }
 }

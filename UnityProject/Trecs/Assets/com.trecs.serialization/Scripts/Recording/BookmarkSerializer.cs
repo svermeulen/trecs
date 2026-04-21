@@ -11,7 +11,7 @@ namespace Trecs.Serialization
     /// <remarks>
     /// The typical lifecycle is:
     /// <list type="number">
-    /// <item><see cref="SaveBookmark(int, Stream, bool, int)"/> or <see cref="SaveBookmark(int, string, bool, int)"/>
+    /// <item><see cref="SaveBookmark(int, Stream, bool)"/> or <see cref="SaveBookmark(int, string, bool)"/>
     /// to capture the current world state.</item>
     /// <item><see cref="LoadBookmark(Stream)"/> or <see cref="LoadBookmark(string)"/> later
     /// to restore the saved state directly into the live world.</item>
@@ -26,7 +26,7 @@ namespace Trecs.Serialization
     {
         static readonly TrecsLog _log = new(nameof(BookmarkSerializer));
 
-        readonly WorldStateSerializer _worldStateSerializer;
+        readonly IWorldStateSerializer _worldStateSerializer;
         readonly SerializationBuffer _buffer;
         readonly BlobCache _blobCache;
         readonly WorldAccessor _world;
@@ -34,19 +34,19 @@ namespace Trecs.Serialization
         bool _disposed;
 
         public BookmarkSerializer(
-            WorldStateSerializer worldStateSerializer,
+            IWorldStateSerializer worldStateSerializer,
             SerializerRegistry registry,
             World world
         )
         {
-            if (worldStateSerializer == null)
-                throw new ArgumentNullException(nameof(worldStateSerializer));
             if (registry == null)
                 throw new ArgumentNullException(nameof(registry));
             if (world == null)
                 throw new ArgumentNullException(nameof(world));
 
-            _worldStateSerializer = worldStateSerializer;
+            _worldStateSerializer =
+                worldStateSerializer
+                ?? throw new ArgumentNullException(nameof(worldStateSerializer));
             _blobCache = world.GetBlobCache();
             _world = world.CreateAccessor();
             _buffer = new SerializationBuffer(registry);
@@ -62,14 +62,12 @@ namespace Trecs.Serialization
         /// </param>
         /// <param name="stream">Output stream. Must be writable.</param>
         /// <param name="includeTypeChecks">Include per-field type IDs in the binary output for stricter validation on load.</param>
-        /// <param name="numConnections">Optional metadata field for host/multiplayer bookmarks.</param>
         /// <exception cref="ArgumentNullException"><paramref name="stream"/> is null.</exception>
         /// <exception cref="ObjectDisposedException">The bookmark serializer has been disposed.</exception>
         public BookmarkMetadata SaveBookmark(
             int version,
             Stream stream,
-            bool includeTypeChecks = true,
-            int numConnections = 0
+            bool includeTypeChecks = true
         )
         {
             ThrowIfDisposed();
@@ -79,7 +77,6 @@ namespace Trecs.Serialization
             var metadata = new BookmarkMetadata
             {
                 Version = version,
-                NumConnections = numConnections,
                 FixedFrame = _world.FixedFrame,
             };
             _blobCache.GetAllActiveBlobIds(metadata.BlobIds);
@@ -114,8 +111,7 @@ namespace Trecs.Serialization
         public BookmarkMetadata SaveBookmark(
             int version,
             string filePath,
-            bool includeTypeChecks = true,
-            int numConnections = 0
+            bool includeTypeChecks = true
         )
         {
             ThrowIfDisposed();
@@ -129,7 +125,7 @@ namespace Trecs.Serialization
             }
 
             using var fs = File.Create(filePath);
-            return SaveBookmark(version, fs, includeTypeChecks, numConnections);
+            return SaveBookmark(version, fs, includeTypeChecks);
         }
 
         /// <summary>

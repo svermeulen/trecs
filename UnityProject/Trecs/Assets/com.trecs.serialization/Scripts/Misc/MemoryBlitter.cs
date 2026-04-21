@@ -1,10 +1,12 @@
 using System;
+using System.ComponentModel;
 using System.IO;
 
 namespace Trecs.Internal
 {
     // NOTE: Not thread safe
     // If needed then use thread locals instead
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public static class MemoryBlitter
     {
         static byte[] _buffer;

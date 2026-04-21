@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Trecs.Internal;
-using Trecs.Serialization;
 using UnityEngine;
 
 namespace Trecs.Serialization.Samples.SaveGame

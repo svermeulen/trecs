@@ -4,12 +4,12 @@ namespace Trecs.Serialization
     {
         public SkipSerializer() { }
 
-        public void Serialize(in T value, ISerializationWriter recursiveWriter)
+        public void Serialize(in T value, ISerializationWriter writer)
         {
             // do nothing
         }
 
-        public void Deserialize(ref T value, ISerializationReader recursiveReader)
+        public void Deserialize(ref T value, ISerializationReader reader)
         {
             // do nothing
         }

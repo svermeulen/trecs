@@ -22,7 +22,7 @@ namespace Trecs.Serialization
     {
         static readonly TrecsLog _log = new(nameof(PlaybackHandler));
 
-        readonly WorldStateSerializer _worldStateSerializer;
+        readonly IWorldStateSerializer _worldStateSerializer;
         readonly RecordingChecksumCalculator _checksumCalculator;
         readonly BookmarkSerializer _bookmarkSerializer;
         readonly SerializationBuffer _buffer;
@@ -32,10 +32,11 @@ namespace Trecs.Serialization
         PlaybackState _state = PlaybackState.Idle;
         RecordingMetadata _playbackMetadata;
         int _version;
+        long _checksumFlags;
         bool _disposed;
 
         public PlaybackHandler(
-            WorldStateSerializer worldStateSerializer,
+            IWorldStateSerializer worldStateSerializer,
             BookmarkSerializer bookmarkSerializer,
             SerializerRegistry registry,
             World world
@@ -90,29 +91,33 @@ namespace Trecs.Serialization
 
         /// <summary>
         /// Load an initial-state bookmark and restore it into the live world,
-        /// optionally verifying a post-deserialization checksum.
+        /// optionally verifying a post-deserialization checksum against the
+        /// value stored in the active recording's metadata.
+        /// <see cref="StartPlayback"/> must have been called first so the
+        /// checksum flags and schema version are known.
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="bookmarkStream"/> is null.</exception>
-        /// <exception cref="SerializationException">The bookmark payload is invalid.</exception>
+        /// <exception cref="InvalidOperationException">Playback is not active.</exception>
+        /// <exception cref="SerializationException">The bookmark payload is invalid, or
+        /// <paramref name="expectedInitialChecksum"/> was supplied and the post-load
+        /// checksum did not match — indicating a serialization/deserialization defect.</exception>
         /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
-        public bool LoadInitialState(
-            Stream bookmarkStream,
-            uint? expectedInitialChecksum,
-            int version
-        )
+        public void LoadInitialState(Stream bookmarkStream, uint? expectedInitialChecksum)
         {
             ThrowIfDisposed();
             if (bookmarkStream == null)
                 throw new ArgumentNullException(nameof(bookmarkStream));
+            if (!IsPlaying)
+                throw new InvalidOperationException(
+                    "Cannot LoadInitialState: playback is not active. Call StartPlayback first."
+                );
 
             _bookmarkSerializer.LoadBookmark(bookmarkStream);
 
             if (expectedInitialChecksum.HasValue)
             {
-                VerifyPostDeserializationChecksum(expectedInitialChecksum.Value, version);
+                VerifyPostDeserializationChecksum(expectedInitialChecksum.Value);
             }
-
-            return true;
         }
 
         /// <summary>
@@ -120,12 +125,11 @@ namespace Trecs.Serialization
         /// </summary>
         /// <exception cref="ArgumentException"><paramref name="bookmarkPath"/> is null or empty.</exception>
         /// <exception cref="FileNotFoundException">No file at <paramref name="bookmarkPath"/>.</exception>
+        /// <exception cref="InvalidOperationException">Playback is not active.</exception>
+        /// <exception cref="SerializationException">The bookmark payload is invalid, or the
+        /// post-load checksum did not match <paramref name="expectedInitialChecksum"/>.</exception>
         /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
-        public bool LoadInitialState(
-            string bookmarkPath,
-            uint? expectedInitialChecksum,
-            int version
-        )
+        public void LoadInitialState(string bookmarkPath, uint? expectedInitialChecksum)
         {
             ThrowIfDisposed();
             if (string.IsNullOrEmpty(bookmarkPath))
@@ -134,34 +138,29 @@ namespace Trecs.Serialization
                 throw new FileNotFoundException("Bookmark file not found", bookmarkPath);
 
             using var fs = File.OpenRead(bookmarkPath);
-            return LoadInitialState(fs, expectedInitialChecksum, version);
+            LoadInitialState(fs, expectedInitialChecksum);
         }
 
-        void VerifyPostDeserializationChecksum(uint expectedChecksum, int version)
+        void VerifyPostDeserializationChecksum(uint expectedChecksum)
         {
             var postDeserializeChecksum = _checksumCalculator.CalculateCurrentChecksum(
-                version: version,
-                _checksumBuffer
+                version: _version,
+                _checksumBuffer,
+                _checksumFlags
             );
 
-            if (postDeserializeChecksum == expectedChecksum)
+            if (postDeserializeChecksum != expectedChecksum)
             {
-                _log.Info(
-                    "Post-deserialization checksum MATCHES ({}). Serialization OK - any desyncs occur during simulation.",
-                    postDeserializeChecksum
+                throw new SerializationException(
+                    $"Post-deserialization checksum MISMATCH (expected: {expectedChecksum}, got: {postDeserializeChecksum}). "
+                        + "This indicates a serialization/deserialization defect — not a simulation desync."
                 );
             }
-            else
-            {
-                _log.Error(
-                    "Post-deserialization checksum MISMATCH! Expected: {}, Got: {}",
-                    expectedChecksum,
-                    postDeserializeChecksum
-                );
-                _log.Error(
-                    "This indicates a serialization/deserialization issue, NOT a simulation issue."
-                );
-            }
+
+            _log.Info(
+                "Post-deserialization checksum MATCHES ({}). Serialization OK - any desyncs occur during simulation.",
+                postDeserializeChecksum
+            );
         }
 
         /// <summary>
@@ -245,12 +244,14 @@ namespace Trecs.Serialization
                     recordingMetadata.Version,
                     adjustedStartFrame,
                     adjustedEndFrame,
+                    recordingMetadata.ChecksumFlags,
                     adjustedChecksums,
                     recordingMetadata.BlobIds
                 );
             }
 
             _playbackMetadata = recordingMetadata;
+            _checksumFlags = recordingMetadata.ChecksumFlags;
 
             SetInputsEnabled(false);
             _state = PlaybackState.Playing;
@@ -293,47 +294,49 @@ namespace Trecs.Serialization
                     "Cannot TickPlayback: playback is not active. Call StartPlayback first."
                 );
 
-            var result = new PlaybackTickResult();
-
-            if (_state != PlaybackState.Desynced)
+            if (_state == PlaybackState.Desynced)
             {
-                var checksums = _playbackMetadata.Checksums;
-                var currentFrame = _world.FixedFrame;
-
-                _log.Trace("Completed playback frame {}", currentFrame);
-
-                if (checksums.TryGetValue(currentFrame, out var expectedChecksum))
-                {
-                    using var _ = TrecsProfiling.Start("CalculateCurrentChecksum");
-
-                    var actualChecksum = _checksumCalculator.CalculateCurrentChecksum(
-                        version: _version,
-                        _checksumBuffer
-                    );
-
-                    result.ChecksumVerified = true;
-                    result.ExpectedChecksum = expectedChecksum;
-                    result.ActualChecksum = actualChecksum;
-
-                    if (expectedChecksum == actualChecksum)
-                    {
-                        _log.Trace("Checksums match at frame {}", currentFrame);
-                    }
-                    else
-                    {
-                        _log.Warning(
-                            "Desync detected at frame {}. checksum {} != {}",
-                            currentFrame,
-                            actualChecksum,
-                            expectedChecksum
-                        );
-                        _state = PlaybackState.Desynced;
-                        result.DesyncDetected = true;
-                    }
-                }
+                return new PlaybackTickResult();
             }
 
-            return result;
+            var checksums = _playbackMetadata.Checksums;
+            var currentFrame = _world.FixedFrame;
+
+            _log.Trace("Completed playback frame {}", currentFrame);
+
+            if (!checksums.TryGetValue(currentFrame, out var expectedChecksum))
+            {
+                return new PlaybackTickResult();
+            }
+
+            using var _ = TrecsProfiling.Start("CalculateCurrentChecksum");
+
+            var actualChecksum = _checksumCalculator.CalculateCurrentChecksum(
+                version: _version,
+                _checksumBuffer,
+                _checksumFlags
+            );
+
+            if (expectedChecksum != actualChecksum)
+            {
+                _log.Warning(
+                    "Desync detected at frame {}. checksum {} != {}",
+                    currentFrame,
+                    actualChecksum,
+                    expectedChecksum
+                );
+                _state = PlaybackState.Desynced;
+            }
+            else
+            {
+                _log.Trace("Checksums match at frame {}", currentFrame);
+            }
+
+            return new PlaybackTickResult
+            {
+                ExpectedChecksum = expectedChecksum,
+                ActualChecksum = actualChecksum,
+            };
         }
 
         /// <summary>

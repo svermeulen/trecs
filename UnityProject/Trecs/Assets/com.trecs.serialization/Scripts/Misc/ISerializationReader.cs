@@ -1,5 +1,4 @@
 using System;
-using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization
@@ -8,9 +7,9 @@ namespace Trecs.Serialization
     {
         int Version { get; }
 
-        ReadOnlyDenseHashSet<int> Flags { get; }
+        long Flags { get; }
 
-        bool HasFlag(int flag);
+        bool HasFlag(long flag);
 
         /// <summary>
         /// Reads an unmanaged (blittable) value using direct memory copying.
@@ -87,11 +86,13 @@ namespace Trecs.Serialization
         string ReadStringDelta(string name, string baseValue);
 
         /// <summary>
-        /// Reads raw binary data.
-        /// For JSON serialization, data is decoded from base64.
-        /// For binary serialization, data is read directly.
+        /// Reads a length-prefixed byte range into <paramref name="buffer"/>,
+        /// resizing it if it's too small to hold the payload. Returns the
+        /// actual number of bytes read (which may be less than buffer.Length).
+        /// For JSON serialization, bytes are decoded from base64.
+        /// For binary serialization, reads an int length followed by that many bytes.
         /// </summary>
-        void ReadBinary(string name, ref SerializableByteArray value);
+        int ReadBytes(string name, ref byte[] buffer);
 
         /// <summary>
         /// Reads raw bytes into a pointer using direct memory copying.

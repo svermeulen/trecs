@@ -1,5 +1,3 @@
-using Trecs.Serialization;
-
 namespace Trecs.Serialization.Samples
 {
     /// <summary>

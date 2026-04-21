@@ -14,6 +14,7 @@ namespace Trecs.Serialization
             int version,
             int startFixedFrame,
             int endFixedFrame,
+            long checksumFlags,
             DenseDictionary<int, uint> checksums,
             DenseHashSet<BlobId> blobIds
         )
@@ -21,6 +22,7 @@ namespace Trecs.Serialization
             Version = version;
             StartFixedFrame = startFixedFrame;
             EndFixedFrame = endFixedFrame;
+            ChecksumFlags = checksumFlags;
             Checksums = checksums;
             BlobIds = blobIds;
         }
@@ -39,6 +41,15 @@ namespace Trecs.Serialization
 
         public int StartFixedFrame { get; }
         public int EndFixedFrame { get; }
+
+        /// <summary>
+        /// Serialization flags used when computing per-frame checksums during
+        /// recording. Playback must recompute checksums with the same flags,
+        /// which <see cref="PlaybackHandler"/> does automatically by reading
+        /// this value out of the metadata.
+        /// </summary>
+        public long ChecksumFlags { get; }
+
         public DenseDictionary<int, uint> Checksums { get; }
         public DenseHashSet<BlobId> BlobIds { get; }
 
@@ -51,6 +62,7 @@ namespace Trecs.Serialization
                 var version = reader.Read<int>("Version");
                 var startFixedFrame = reader.Read<int>("StartFixedFrame");
                 var endFixedFrame = reader.Read<int>("EndFixedFrame");
+                var checksumFlags = reader.Read<long>("ChecksumFlags");
                 var checksums = reader.Read<DenseDictionary<int, uint>>("Checksums");
                 var blobIds = reader.Read<DenseHashSet<BlobId>>("BlobIds");
 
@@ -58,6 +70,7 @@ namespace Trecs.Serialization
                     version,
                     startFixedFrame,
                     endFixedFrame,
+                    checksumFlags,
                     checksums,
                     blobIds
                 );
@@ -68,6 +81,7 @@ namespace Trecs.Serialization
                 writer.Write<int>("Version", value.Version);
                 writer.Write<int>("StartFixedFrame", value.StartFixedFrame);
                 writer.Write<int>("EndFixedFrame", value.EndFixedFrame);
+                writer.Write<long>("ChecksumFlags", value.ChecksumFlags);
                 writer.Write<DenseDictionary<int, uint>>("Checksums", value.Checksums);
                 writer.Write<DenseHashSet<BlobId>>("BlobIds", value.BlobIds);
             }

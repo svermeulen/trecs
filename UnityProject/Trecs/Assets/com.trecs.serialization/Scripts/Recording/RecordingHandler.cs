@@ -16,7 +16,7 @@ namespace Trecs.Serialization
     {
         static readonly TrecsLog _log = new(nameof(RecordingHandler));
 
-        readonly WorldStateSerializer _worldStateSerializer;
+        readonly IWorldStateSerializer _worldStateSerializer;
         readonly SerializationBuffer _buffer;
         readonly IDisposable _eventSubscription;
         readonly SimpleSubject _checksumRecorded = new();
@@ -30,7 +30,7 @@ namespace Trecs.Serialization
         int _recordingVersion;
 
         public RecordingHandler(
-            WorldStateSerializer worldStateSerializer,
+            IWorldStateSerializer worldStateSerializer,
             SerializerRegistry registry,
             World world
         )
@@ -80,10 +80,16 @@ namespace Trecs.Serialization
         /// <param name="version">User-defined schema version stored in the recording header.</param>
         /// <param name="checksumsEnabled">When false, checksums are skipped (useful when profiling — checksums are the main recording cost).</param>
         /// <param name="checksumFrameInterval">One checksum every N fixed frames. Must be >= 1.</param>
+        /// <param name="checksumFlags">Serialization flags passed to the checksum serializer. Required when any user serializer branches on writer flags (e.g. to exclude non-deterministic state from checksums) — playback must pass the same flags or checksums will mismatch.</param>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="checksumFrameInterval"/> is less than 1.</exception>
         /// <exception cref="InvalidOperationException">A recording is already in progress.</exception>
         /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
-        public void StartRecording(int version, bool checksumsEnabled, int checksumFrameInterval)
+        public void StartRecording(
+            int version,
+            bool checksumsEnabled,
+            int checksumFrameInterval,
+            long checksumFlags = 0
+        )
         {
 #if TRECS_IS_PROFILING
             _log.Warning("Recording while profiling is enabled");
@@ -110,6 +116,7 @@ namespace Trecs.Serialization
                 BlobIds = new DenseHashSet<BlobId>(),
                 ChecksumsEnabled = checksumsEnabled,
                 ChecksumFrameInterval = checksumFrameInterval,
+                ChecksumFlags = checksumFlags,
             };
 
             var entityInputQueue = _world.GetEntityInputQueue();
@@ -148,6 +155,7 @@ namespace Trecs.Serialization
                 version: _recordingVersion,
                 startFixedFrame: _recordingInfo.StartFrame,
                 endFixedFrame: finalFrame,
+                checksumFlags: _recordingInfo.ChecksumFlags,
                 checksums: _recordingInfo.Checksums,
                 blobIds: _recordingInfo.BlobIds
             );
@@ -308,7 +316,8 @@ namespace Trecs.Serialization
                 {
                     var checksum = _checksumCalculator.CalculateCurrentChecksum(
                         version: _recordingVersion,
-                        _buffer
+                        _buffer,
+                        _recordingInfo.ChecksumFlags
                     );
 
                     // Note that we can't do Add here because we sometimes record the client, which can do rollbacks,
@@ -356,6 +365,7 @@ namespace Trecs.Serialization
             public int StartFrame;
             public bool ChecksumsEnabled;
             public int ChecksumFrameInterval;
+            public long ChecksumFlags;
             public DenseDictionary<int, uint> Checksums;
             public DenseHashSet<BlobId> BlobIds;
         }

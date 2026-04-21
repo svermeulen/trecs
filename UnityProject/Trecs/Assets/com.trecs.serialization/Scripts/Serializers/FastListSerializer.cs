@@ -3,6 +3,10 @@ using Trecs.Serialization;
 
 namespace Trecs.Internal
 {
+    /// <summary>
+    /// Serializer for <see cref="FastList{T}"/> of unmanaged elements. Writes
+    /// the count followed by the underlying array as a single blit.
+    /// </summary>
     public class FastListSerializer<T> : ISerializer<FastList<T>>
         where T : unmanaged
     {

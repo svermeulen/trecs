@@ -2,6 +2,13 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
+    /// <summary>
+    /// Serializer for typed arrays (<typeparamref name="T"/> is an array type,
+    /// <typeparamref name="TElem"/> its element type). Writes the length
+    /// followed by each element via the registered serializer for
+    /// <typeparamref name="TElem"/>. For arrays of unmanaged types prefer the
+    /// blit path — this serializer is for arrays of managed/custom elements.
+    /// </summary>
     public class ArraySerializer<T, TElem> : ISerializer<T>
     {
         static readonly TrecsLog _log = new("ArraySerializer");
