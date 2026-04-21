@@ -4,4 +4,4 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 cd $SCRIPT_DIR/../UnityProject/Trecs
-jb cleanupcode ./Trecs.sln --profile="CleanUsings"
+jb cleanupcode ./Trecs.sln --profile="CleanupUsings"

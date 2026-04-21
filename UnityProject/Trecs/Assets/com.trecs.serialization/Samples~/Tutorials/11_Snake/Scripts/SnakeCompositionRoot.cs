@@ -79,8 +79,8 @@ namespace Trecs.Samples.Snake
             {
                 recordController.Dispose,
                 goManager.Dispose,
-                world.Dispose,
                 serialization.Dispose,
+                world.Dispose,
             };
         }
 

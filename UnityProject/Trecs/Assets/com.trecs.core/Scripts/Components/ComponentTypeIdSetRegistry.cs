@@ -6,7 +6,7 @@ namespace Trecs
 {
     public static class ComponentTypeIdSetRegistry
     {
-        static readonly Dictionary<int, IReadOnlyList<ComponentId>> _sets = new();
+        static readonly Dictionary<int, ComponentId[]> _sets = new();
         static readonly Dictionary<int, string> _debugStrings = new();
 
         public static ComponentTypeIdSet FromSingle(ComponentId componentId)
@@ -42,9 +42,9 @@ namespace Trecs
             var existingComponents = _sets[existing.Id];
 
             // Check if already present
-            foreach (var c in existingComponents)
+            for (int i = 0; i < existingComponents.Length; i++)
             {
-                if (c.Equals(componentId))
+                if (existingComponents[i].Equals(componentId))
                 {
                     return existing;
                 }
@@ -60,22 +60,22 @@ namespace Trecs
             if (_sets.TryGetValue(newId, out var newExistingSet))
             {
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                var newList = new ComponentId[existingComponents.Count + 1];
+                var newList = new ComponentId[existingComponents.Length + 1];
 
-                for (int i = 0; i < existingComponents.Count; i++)
+                for (int i = 0; i < existingComponents.Length; i++)
                 {
                     newList[i] = existingComponents[i];
                 }
-                newList[existingComponents.Count] = componentId;
+                newList[existingComponents.Length] = componentId;
                 ValidateSet(newId, newExistingSet, newList);
 #endif
             }
             else
             {
-                var newList = new ComponentId[existingComponents.Count + 1];
-                for (int i = 0; i < existingComponents.Count; i++)
+                var newList = new ComponentId[existingComponents.Length + 1];
+                for (int i = 0; i < existingComponents.Length; i++)
                     newList[i] = existingComponents[i];
-                newList[existingComponents.Count] = componentId;
+                newList[existingComponents.Length] = componentId;
                 _sets[newId] = newList;
             }
 
