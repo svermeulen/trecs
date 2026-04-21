@@ -102,7 +102,7 @@ A recording is a payload whose top-level value is a `RecordingMetadata` followed
 
 `RecordingSentinelValue` plays the same role as `WorldStateStreamGuard` but for recordings: it catches drift between recording and playback of the input-queue format.
 
-`RecordingMetadata.Checksums` is a `DenseDictionary<int, uint>` mapping fixed-frame number to a checksum computed at recording time. Playback recomputes the checksum on the same frames and raises a desync when they disagree. The hash algorithm used is FNV-1a (32-bit) today — see [Recording & Playback](recording-and-playback.md) for the collision caveat.
+`RecordingMetadata.Checksums` is a `DenseDictionary<int, uint>` mapping fixed-frame number to a checksum computed at recording time. Playback recomputes the checksum on the same frames and raises a desync when they disagree. The hash algorithm used is FNV-1a (32-bit) — non-cryptographic and not collision-resistant, but sufficient for sanity-check desync detection: a missed collision on one checksum frame is caught by the next one because real desyncs diverge further over time.
 
 ## Endianness and portability
 

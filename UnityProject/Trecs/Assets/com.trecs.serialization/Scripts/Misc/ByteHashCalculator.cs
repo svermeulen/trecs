@@ -2,10 +2,17 @@ using System.Runtime.CompilerServices;
 
 namespace Trecs.Serialization
 {
-    // This class provides a fast hash calculation for byte arrays using the FNV-1a hash algorithm.
-    // Note that this is a good hash for dictionaries etc. but not secure, and also, should not
-    // be used to uniquely identify data, as there is a high risk of collisions, even though the
-    // algorithm does have good distribution properties
+    // Fast FNV-1a byte-array hash. Intended use: non-cryptographic fingerprinting
+    // for sanity checks (e.g. recording/playback desync detection), dictionary
+    // keys, and similar best-effort checks. It is not collision-resistant in the
+    // cryptographic sense and must not be used for security or for content-
+    // addressed storage where uniqueness is load-bearing.
+    //
+    // For desync detection specifically, occasional collisions are acceptable:
+    // a missed desync on one checksum frame will be caught on the next
+    // checksum frame with very high probability, since real desyncs diverge
+    // further each frame. The 32-bit output is a deliberate trade-off for
+    // speed and storage density in RecordingMetadata.Checksums.
     public static class ByteHashCalculator
     {
         const uint FNV_PRIME = 16777619;
