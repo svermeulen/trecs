@@ -51,17 +51,18 @@ namespace Trecs.Internal
             _size = size;
             _alignment = alignment;
             _innerType = innerType;
-            NativeAllocTracker.OnAllocated();
         }
 
         ~NativeBlobBox()
         {
             if (!_disposed)
             {
-                // We don't free here because finalizers run on a non-main thread and
-                // AllocatorManager.Free is main-thread only. We just warn so the leak
-                // is visible. Unity's NativeLeakDetection (via MallocTracked) catches
-                // the underlying allocation too.
+                // Finalizers run on a non-main thread and AllocatorManager.Free
+                // is main-thread only, so we can't free here — we just warn.
+                // Unity's NativeLeakDetection (via MallocTracked on the
+                // underlying AllocatorManager.Allocate) is the authoritative
+                // leak report; this log just attributes the leak to a
+                // NativeBlobBox of a specific inner type.
                 Debug.LogError(
                     $"NativeBlobBox of inner type {_innerType} was leaked (not Disposed)"
                 );
@@ -80,7 +81,6 @@ namespace Trecs.Internal
             );
             _ptr = IntPtr.Zero;
             _disposed = true;
-            NativeAllocTracker.OnDisposed();
             GC.SuppressFinalize(this);
         }
 
