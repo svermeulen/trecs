@@ -46,19 +46,22 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void World_DisposeWithEmptyHeaps_DoesNotTripLeakAssertion()
+        public void World_UsageAndDispose_ReturnsToStartingCount()
         {
-            // Regression guard on the World.Dispose leak assertion: with no
-            // allocations in flight, teardown must not assert.
-            var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var a = env.Accessor;
+            // End-to-end: a World's normal lifecycle (construct, add entity,
+            // submit, dispose) should net zero allocations against the tracker.
+            // Uses the snapshot-and-delta pattern so sibling worlds or prior
+            // test carry-over don't affect the assertion.
+            int start = NativeAllocTracker.OutstandingCount;
 
-            a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
-            a.SubmitEntities();
+            using (var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha))
+            {
+                var a = env.Accessor;
+                a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
+                a.SubmitEntities();
+            }
 
-            // Dispose should succeed without throwing from the NativeAllocTracker
-            // assertion we added to World.Dispose.
-            env.Dispose();
+            NAssert.AreEqual(start, NativeAllocTracker.OutstandingCount);
         }
     }
 }

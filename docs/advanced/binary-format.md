@@ -6,7 +6,7 @@ This page documents the on-disk layout of Trecs binary payloads (bookmarks and r
 - Diagnosing a payload-corruption bug.
 - Implementing a migration from one `FormatVersion` to the next.
 
-All offsets below are in bytes, little-endian unless noted. Integers use the native `BinaryWriter` / `BinaryReader` encoding — `int` is 4 bytes, `long` is 8 bytes, `bool` is 1 byte.
+All offsets below are in bytes. Byte ordering is **mixed** — see the "Endianness and portability" section below. `int` is 4 bytes, `long` is 8 bytes, `bool` is 1 byte.
 
 ## Layered structure
 
@@ -106,7 +106,12 @@ A recording is a payload whose top-level value is a `RecordingMetadata` followed
 
 ## Endianness and portability
 
-`BinaryWriter` / `BinaryReader` use the host's native byte order. In practice this is little-endian on every platform Unity ships on (x64, ARM64, WebGL), but the format is **not** formally defined as little-endian — a big-endian host would produce non-portable files. Treat bookmarks and recordings as non-portable across architectures; do not share them between players running different CPUs without an explicit portability test.
+The format is a mix of two encodings:
+
+- **Primitives routed through `BinaryWriter` / `BinaryReader`** — header fields, explicit `Write<int>` / `Write<long>` / `Write<bool>` calls, the sentinels. Always little-endian (the .NET `BinaryWriter` / `BinaryReader` spec).
+- **Blittable structs routed through `MemoryBlitter`** — `BlitWrite<T>`, `BlitWriteArray<T>`, `BlitWriteRawBytes`. Raw memory copy, so host-native endian.
+
+On every platform Unity currently ships (x64, ARM64, WebGL) both encodings are little-endian in practice, so payloads round-trip cleanly. A hypothetical big-endian host would produce files where `BinaryWriter` output is LE while blit output is BE, making those files unreadable on little-endian hosts and vice versa. Treat bookmarks and recordings as non-portable across architectures; do not share them between players running different CPUs without an explicit portability test.
 
 ## Integrity
 

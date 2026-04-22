@@ -429,17 +429,6 @@ namespace Trecs
             _blobCache.Dispose();
 
             _isDisposed = true;
-
-#if DEBUG
-            var outstanding = NativeAllocTracker.OutstandingCount;
-            Assert.That(
-                outstanding == 0,
-                "Detected {} outstanding native allocations after World.Dispose "
-                    + "(NativeBlobBox etc). Check that every NativeUniqueHeap / "
-                    + "NativeSharedHeap entry was disposed before teardown.",
-                outstanding
-            );
-#endif
         }
 
 #if DEBUG && TRECS_IS_PROFILING

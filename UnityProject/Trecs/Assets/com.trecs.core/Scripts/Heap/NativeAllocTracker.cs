@@ -4,13 +4,19 @@ using System.Threading;
 namespace Trecs.Internal
 {
     /// <summary>
-    /// DEBUG-only tracker for outstanding native allocations owned by Trecs
-    /// heap primitives (e.g. <see cref="NativeBlobBox"/>). Every allocation
-    /// path increments the counter; every <c>Dispose</c> decrements it.
+    /// DEBUG-only process-wide counter of outstanding
+    /// <see cref="NativeBlobBox"/> instances. Increments on construction,
+    /// decrements on <c>Dispose</c>, and is readable via
+    /// <see cref="OutstandingCount"/> for tests that want to snapshot
+    /// before+after a scenario and verify no leaks.
     ///
-    /// <see cref="World.Dispose"/> asserts the counter is zero so leaks are
-    /// surfaced loudly in the test suite rather than relying on a non-main-
-    /// thread finalizer log.
+    /// Because the counter is process-wide, callers must snapshot and
+    /// compare against the baseline rather than asserting the absolute
+    /// value is zero: sibling worlds (multi-world scenarios) and prior
+    /// test carry-over both shift the counter independently of any given
+    /// operation. Per-heap <c>ClearAll(warnUndisposed: true)</c> is the
+    /// primary place leaks are reported; this tracker exists as a
+    /// finer-grained probe for targeted tests and debugging sessions.
     ///
     /// In non-DEBUG builds the inc/dec calls are stripped by
     /// <see cref="ConditionalAttribute"/> and the counter stays at zero.
