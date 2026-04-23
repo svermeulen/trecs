@@ -7,7 +7,12 @@ using Trecs.SourceGen.Performance;
 namespace Trecs.SourceGen.Shared
 {
     /// <summary>
-    /// Utility class for component type analysis and operations
+    /// Utility class for component type analysis and operations.
+    ///
+    /// No static caching of <see cref="ITypeSymbol"/> keyed data here: symbols
+    /// are tied to a Compilation, so a static cache across compilations can
+    /// return stale entries. Roslyn already caches symbol lookups internally;
+    /// these helpers are cheap enough to re-run per call.
     /// </summary>
     internal static class ComponentTypeHelper
     {
@@ -16,7 +21,12 @@ namespace Trecs.SourceGen.Shared
         /// </summary>
         public static bool IsUnwrapComponent(INamedTypeSymbol type)
         {
-            return ComponentAnalysisCache.IsUnwrapComponent(type);
+            return type.GetAttributes()
+                .Any(attr =>
+                    attr.AttributeClass?.Name == TrecsAttributeNames.Unwrap
+                    && PerformanceCache.GetDisplayString(attr.AttributeClass?.ContainingNamespace)
+                        == TrecsNamespaces.Trecs
+                );
         }
 
         /// <summary>
@@ -24,7 +34,7 @@ namespace Trecs.SourceGen.Shared
         /// </summary>
         public static bool IsEntityComponent(INamedTypeSymbol type)
         {
-            return ComponentAnalysisCache.IsEntityComponent(type);
+            return SymbolAnalyzer.ImplementsInterface(type, "IEntityComponent");
         }
 
         /// <summary>
@@ -32,7 +42,17 @@ namespace Trecs.SourceGen.Shared
         /// </summary>
         public static IFieldSymbol? GetUnwrapComponentField(INamedTypeSymbol type)
         {
-            return ComponentAnalysisCache.GetUnwrapComponentField(type);
+            if (!IsUnwrapComponent(type))
+            {
+                return null;
+            }
+
+            var fields = type.GetMembers()
+                .OfType<IFieldSymbol>()
+                .Where(f => !f.IsStatic && !f.IsConst)
+                .ToList();
+
+            return fields.Count == 1 ? fields[0] : null;
         }
 
         /// <summary>
@@ -43,7 +63,26 @@ namespace Trecs.SourceGen.Shared
             HashSet<ITypeSymbol>? visitedTypes = null
         )
         {
-            return ComponentAnalysisCache.UnwrapComponent(componentType);
+            visitedTypes ??= new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+
+            if (!visitedTypes.Add(componentType))
+            {
+                return (componentType, false);
+            }
+
+            if (componentType is not INamedTypeSymbol namedType || !IsUnwrapComponent(namedType))
+            {
+                return (componentType, false);
+            }
+
+            var field = GetUnwrapComponentField(namedType);
+            if (field == null)
+            {
+                return (componentType, false);
+            }
+
+            var (finalType, _) = UnwrapComponent(field.Type, visitedTypes);
+            return (finalType, true);
         }
 
         /// <summary>

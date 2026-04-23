@@ -155,7 +155,6 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-#pragma warning disable RS2000 // Add analyzer diagnostic IDs to analyzer release
         public static readonly DiagnosticDescriptor CouldNotResolveSymbol = new(
             id: "TRECS015",
             title: "Could not resolve symbol",
@@ -716,7 +715,5 @@ namespace Trecs.SourceGen
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
         );
-
-#pragma warning restore RS2000
     }
 }

@@ -211,12 +211,6 @@ namespace Trecs.SourceGen
 
                 if (attributeData == null)
                 {
-                    var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                        typeName,
-                        SymbolAnalyzer.GetNamespaceChain(aspectData.Symbol),
-                        "Failed to parse Aspect attribute"
-                    );
-                    context.AddSource(fileName, fallbackSource);
                     return;
                 }
 
@@ -240,12 +234,6 @@ namespace Trecs.SourceGen
 
                 if (!isValid)
                 {
-                    var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                        typeName,
-                        SymbolAnalyzer.GetNamespaceChain(aspectData.Symbol),
-                        "Aspect validation failed. Check diagnostics for details."
-                    );
-                    context.AddSource(fileName, fallbackSource);
                     return;
                 }
 
@@ -270,26 +258,10 @@ namespace Trecs.SourceGen
                     context.AddSource(fileName, source);
                     SourceGenLogger.WriteGeneratedFile(fileName, source);
                 }
-                else
-                {
-                    var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                        typeName,
-                        SymbolAnalyzer.GetNamespaceChain(aspectData.Symbol),
-                        "Code generation failed. Check diagnostics for details."
-                    );
-                    context.AddSource(fileName, fallbackSource);
-                }
             }
             catch (Exception ex)
             {
                 ErrorRecovery.ReportError(context, location, "Aspect generation", ex);
-
-                var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                    typeName,
-                    SymbolAnalyzer.GetNamespaceChain(aspectData.Symbol),
-                    $"Unexpected error: {ex.Message}"
-                );
-                context.AddSource(fileName, fallbackSource);
             }
         }
 
@@ -339,12 +311,6 @@ namespace Trecs.SourceGen
 
                 if (parsedData == null)
                 {
-                    var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                        typeName,
-                        SymbolAnalyzer.GetNamespaceChain(interfaceData.Symbol),
-                        "Failed to parse aspect interface"
-                    );
-                    context.AddSource(fileName, fallbackSource);
                     return;
                 }
 
@@ -365,26 +331,10 @@ namespace Trecs.SourceGen
                     context.AddSource(fileName, source);
                     SourceGenLogger.WriteGeneratedFile(fileName, source);
                 }
-                else
-                {
-                    var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                        typeName,
-                        SymbolAnalyzer.GetNamespaceChain(interfaceData.Symbol),
-                        "Interface code generation failed. Check diagnostics for details."
-                    );
-                    context.AddSource(fileName, fallbackSource);
-                }
             }
             catch (Exception ex)
             {
                 ErrorRecovery.ReportError(context, location, "AspectInterface generation", ex);
-
-                var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                    typeName,
-                    SymbolAnalyzer.GetNamespaceChain(interfaceData.Symbol),
-                    $"Unexpected error: {ex.Message}"
-                );
-                context.AddSource(fileName, fallbackSource);
             }
         }
     }

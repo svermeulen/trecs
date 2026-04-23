@@ -122,12 +122,6 @@ namespace Trecs.SourceGen
 
                 if (definitionData == null)
                 {
-                    var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                        typeName,
-                        SymbolAnalyzer.GetNamespaceChain(templateData.Symbol),
-                        "Failed to parse template declaration"
-                    );
-                    context.AddSource(fileName, fallbackSource);
                     return;
                 }
 
@@ -148,12 +142,6 @@ namespace Trecs.SourceGen
 
                 if (!isValid)
                 {
-                    var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                        typeName,
-                        SymbolAnalyzer.GetNamespaceChain(templateData.Symbol),
-                        "Template validation failed. Check diagnostics for details."
-                    );
-                    context.AddSource(fileName, fallbackSource);
                     return;
                 }
 
@@ -170,26 +158,10 @@ namespace Trecs.SourceGen
                     context.AddSource(fileName, source);
                     SourceGenLogger.WriteGeneratedFile(fileName, source);
                 }
-                else
-                {
-                    var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                        typeName,
-                        SymbolAnalyzer.GetNamespaceChain(templateData.Symbol),
-                        "Code generation failed. Check diagnostics for details."
-                    );
-                    context.AddSource(fileName, fallbackSource);
-                }
             }
             catch (Exception ex)
             {
                 ErrorRecovery.ReportError(context, location, "Template definition generation", ex);
-
-                var fallbackSource = ErrorRecovery.GenerateErrorFallback(
-                    typeName,
-                    SymbolAnalyzer.GetNamespaceChain(templateData.Symbol),
-                    $"Unexpected error: {ex.Message}"
-                );
-                context.AddSource(fileName, fallbackSource);
             }
         }
     }

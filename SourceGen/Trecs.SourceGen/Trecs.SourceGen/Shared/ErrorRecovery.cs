@@ -6,41 +6,14 @@ using Microsoft.CodeAnalysis;
 namespace Trecs.SourceGen.Shared
 {
     /// <summary>
-    /// Provides error recovery and fallback generation for source generators
+    /// Provides error recovery utilities for source generators. On failure
+    /// the generator reports a diagnostic and emits nothing — the user's
+    /// hand-written partial will get a missing-partial-implementation
+    /// compile error, but the generator diagnostic is the actionable signal.
+    /// Emitting a stub here historically shadowed that diagnostic.
     /// </summary>
     internal static class ErrorRecovery
     {
-        /// <summary>
-        /// Generates a partial class with error comments when generation fails
-        /// </summary>
-        public static string GenerateErrorFallback(
-            string typeName,
-            string namespaceName,
-            string errorMessage,
-            string typeKind = "class"
-        )
-        {
-            var sanitizedError = errorMessage
-                .Replace("*/", "* /")
-                .Replace("\n", " ")
-                .Replace("\r", " ");
-
-            return $@"#nullable enable
-// This file was generated with errors. Please check the diagnostics for details.
-
-{(string.IsNullOrEmpty(namespaceName) ? "" : $"namespace {namespaceName}\n{{\n")}    public partial {typeKind} {typeName}
-    {{
-        /*
-         * ERROR: Source generation failed
-         *
-         * {sanitizedError}
-         *
-         * Please fix the errors and rebuild the project.
-         */
-    }}
-{(string.IsNullOrEmpty(namespaceName) ? "" : "}\n")}";
-        }
-
         /// <summary>
         /// Safely executes a generation step with error recovery
         /// </summary>
