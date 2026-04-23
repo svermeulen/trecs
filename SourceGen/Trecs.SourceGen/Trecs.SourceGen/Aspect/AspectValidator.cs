@@ -87,30 +87,5 @@ namespace Trecs.SourceGen.Aspect
 
             return true;
         }
-
-        /// <summary>
-        /// Validates all Unwrap component types in a compilation
-        /// </summary>
-        public static void ValidateAllUnwrapComponents(
-            TypeDeclarationSyntax[] unwrapComponentTypes,
-            Compilation compilation,
-            Action<Diagnostic> reportDiagnostic
-        )
-        {
-            foreach (var structDecl in unwrapComponentTypes)
-            {
-                var semanticModel = compilation.GetSemanticModel(structDecl.SyntaxTree);
-                var symbol = semanticModel.GetDeclaredSymbol(structDecl);
-
-                if (symbol is INamedTypeSymbol namedSymbol)
-                {
-                    ComponentTypeHelper.ValidateUnwrapComponent(
-                        namedSymbol,
-                        structDecl.GetLocation(),
-                        reportDiagnostic
-                    );
-                }
-            }
-        }
     }
 }

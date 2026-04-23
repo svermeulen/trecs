@@ -1,8 +1,5 @@
 using System;
-using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Trecs.SourceGen.Shared;
 
@@ -47,16 +44,28 @@ namespace Trecs.SourceGen
                 hasTrecsReference
             );
 
-            var allUnwrapComponents = unwrapComponentProvider.Collect();
-
-            var aspectsWithDependencies = aspectProvider
-                .Combine(allUnwrapComponents)
-                .Combine(context.CompilationProvider);
-
+            // Unwrap components are validated in their own pipeline so validation runs once
+            // per component rather than once per (aspect × unwrap) pair inside ExecuteGeneration.
             context.RegisterSourceOutput(
-                aspectsWithDependencies,
-                static (spc, source) =>
-                    ExecuteGeneration(spc, source.Left.Left, source.Left.Right, source.Right)
+                unwrapComponentProvider,
+                static (spc, data) =>
+                {
+                    if (data == null)
+                        return;
+                    ComponentTypeHelper.ValidateUnwrapComponent(
+                        data.Symbol,
+                        data.Syntax.GetLocation(),
+                        spc.ReportDiagnostic
+                    );
+                }
+            );
+
+            // Aspect codegen no longer needs Compilation — the parser walks the symbol and the
+            // code generator is symbol-only. Dropping .Combine(CompilationProvider) lets upstream
+            // caching survive compilation edits that don't touch any aspect syntax.
+            context.RegisterSourceOutput(
+                aspectProvider,
+                static (spc, source) => ExecuteGeneration(spc, source)
             );
         }
 
@@ -143,9 +152,7 @@ namespace Trecs.SourceGen
 
         private static void ExecuteGeneration(
             SourceProductionContext context,
-            AspectTargetData? aspectData,
-            ImmutableArray<UnwrapComponentData?> unwrapComponents,
-            Compilation compilation
+            AspectTargetData? aspectData
         )
         {
             if (aspectData == null)
@@ -153,19 +160,17 @@ namespace Trecs.SourceGen
 
             if (aspectData.Symbol.TypeKind == TypeKind.Interface)
             {
-                ExecuteAspectInterfaceGeneration(context, aspectData, compilation);
+                ExecuteAspectInterfaceGeneration(context, aspectData);
             }
             else
             {
-                ExecuteAspectStructGeneration(context, aspectData, unwrapComponents, compilation);
+                ExecuteAspectStructGeneration(context, aspectData);
             }
         }
 
         private static void ExecuteAspectStructGeneration(
             SourceProductionContext context,
-            AspectTargetData aspectData,
-            ImmutableArray<UnwrapComponentData?> unwrapComponents,
-            Compilation compilation
+            AspectTargetData aspectData
         )
         {
             var location = aspectData.Syntax.GetLocation();
@@ -177,25 +182,6 @@ namespace Trecs.SourceGen
                 using var _ = SourceGenTimer.Time("AspectGenerator.Total");
 
                 SourceGenLogger.Log($"[IncrementalAspectGenerator] Processing {typeName}");
-
-                // Validate all Unwrap component types first
-                ErrorRecovery.TryExecute(
-                    () =>
-                    {
-                        using var _t = SourceGenTimer.Time("AspectGenerator.ValidateUnwrap");
-                        Aspect.AspectValidator.ValidateAllUnwrapComponents(
-                            unwrapComponents
-                                .Where(svc => svc != null)
-                                .Select(svc => svc!.Syntax)
-                                .ToArray(),
-                            compilation,
-                            context.ReportDiagnostic
-                        );
-                    },
-                    context,
-                    location,
-                    "UnwrapComponent validation"
-                );
 
                 // Parse the Aspect data from interfaces and attributes
                 Aspect.AspectAttributeData? attributeData;
@@ -244,8 +230,7 @@ namespace Trecs.SourceGen
                         () =>
                             Aspect.AspectCodeGenerator.GenerateAspectSource(
                                 aspectData.Symbol,
-                                attributeData,
-                                compilation
+                                attributeData
                             ),
                         context,
                         location,
@@ -267,8 +252,7 @@ namespace Trecs.SourceGen
 
         private static void ExecuteAspectInterfaceGeneration(
             SourceProductionContext context,
-            AspectTargetData interfaceData,
-            Compilation compilation
+            AspectTargetData interfaceData
         )
         {
             var location = interfaceData.Syntax.GetLocation();
@@ -318,8 +302,7 @@ namespace Trecs.SourceGen
                     () =>
                         Aspect.AspectCodeGenerator.GenerateAspectInterfaceSource(
                             interfaceData.Symbol,
-                            parsedData,
-                            compilation
+                            parsedData
                         ),
                     context,
                     location,

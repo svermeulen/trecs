@@ -19,8 +19,7 @@ namespace Trecs.SourceGen.Aspect
         /// </summary>
         public static string GenerateAspectSource(
             INamedTypeSymbol symbol,
-            AspectAttributeData attributeData,
-            Compilation compilation
+            AspectAttributeData attributeData
         )
         {
             var componentCount = attributeData.ReadTypes.Length + attributeData.WriteTypes.Length;
@@ -1036,8 +1035,7 @@ namespace Trecs.SourceGen.Aspect
         /// </summary>
         public static string GenerateAspectInterfaceSource(
             INamedTypeSymbol symbol,
-            AspectInterfaceData attributeData,
-            Compilation compilation
+            AspectInterfaceData attributeData
         )
         {
             var componentCount = attributeData.ReadTypes.Length + attributeData.WriteTypes.Length;
