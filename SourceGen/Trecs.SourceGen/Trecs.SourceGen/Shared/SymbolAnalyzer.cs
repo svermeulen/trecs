@@ -47,6 +47,25 @@ namespace Trecs.SourceGen.Shared
         }
 
         /// <summary>
+        /// Returns true if <paramref name="type"/> is an aspect interface — i.e. an interface
+        /// (not a struct/class) that extends <c>Trecs.IAspect</c> directly or transitively, and
+        /// is not <c>Trecs.IAspect</c> itself. Aspect interfaces are the shared-contract flavor
+        /// of aspects: a generic helper constrained on one compiles against any concrete aspect
+        /// that implements it.
+        /// </summary>
+        public static bool IsAspectInterface(ITypeSymbol type)
+        {
+            if (type.TypeKind != TypeKind.Interface)
+                return false;
+
+            // Exclude Trecs.IAspect itself — it's the marker, not an aspect interface.
+            if (IsExactType(type, "IAspect", TrecsNamespaces.Trecs))
+                return false;
+
+            return ImplementsInterface(type, "IAspect", TrecsNamespaces.Trecs);
+        }
+
+        /// <summary>
         /// Returns true if <paramref name="type"/> is exactly the named type in the given namespace.
         /// Robust against user-defined types of the same name in other namespaces.
         /// </summary>

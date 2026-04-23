@@ -1,7 +1,5 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Trecs.SourceGen.Performance;
 using Trecs.SourceGen.Shared;
@@ -16,18 +14,15 @@ namespace Trecs.SourceGen.Aspect
         /// <summary>
         /// Parses aspect data from a symbol implementing IAspect
         /// </summary>
-        public static AspectAttributeData? ParseAspectData(
-            INamedTypeSymbol symbol,
-            Action<Diagnostic>? reportDiagnostic = null,
-            Location? location = null
-        )
+        public static AspectAttributeData ParseAspectData(INamedTypeSymbol symbol)
         {
             var readTypes = new List<ITypeSymbol>();
             var writeTypes = new List<ITypeSymbol>();
             var interfaceTypes = new List<ITypeSymbol>();
 
             // Extract Read/Write types from IRead<>/IWrite<> interfaces
-            // and AspectInterface types from base interfaces.
+            // and aspect-interface types (base interfaces that extend Trecs.IAspect) from
+            // the base interface list.
             // Note: IHasTags, IInSet, IWithoutTags, IWithoutComponents are NOT extracted
             // for aspects — filtering is specified at iteration sites instead.
             InterfaceComponentExtractor.ExtractComponentsFromInterfaces(
@@ -37,14 +32,8 @@ namespace Trecs.SourceGen.Aspect
                 interfaceTypes
             );
 
-            // Recursively extract components from AspectInterface types
-            AspectInterfaceParser.ExtractInterfaceComponents(
-                interfaceTypes,
-                readTypes,
-                writeTypes,
-                reportDiagnostic,
-                location
-            );
+            // Recursively extract components from nested aspect interfaces
+            AspectInterfaceParser.ExtractInterfaceComponents(interfaceTypes, readTypes, writeTypes);
 
             // Remove duplicates using optimized cache
             var distinctReadTypes = PerformanceCache.GetDistinctTypes(readTypes);
@@ -98,15 +87,16 @@ namespace Trecs.SourceGen.Aspect
     }
 
     /// <summary>
-    /// Data class containing parsed AspectInterface attribute information
+    /// Data class containing parsed aspect-interface information (components declared directly
+    /// on an aspect-interface symbol, plus any nested aspect interfaces it extends).
     /// </summary>
-    internal class AspectInterfaceAttributeData
+    internal class AspectInterfaceData
     {
         public ImmutableArray<ITypeSymbol> ReadTypes { get; }
         public ImmutableArray<ITypeSymbol> WriteTypes { get; }
         public ImmutableArray<ITypeSymbol> InterfaceTypes { get; }
 
-        public AspectInterfaceAttributeData(
+        public AspectInterfaceData(
             List<ITypeSymbol> readTypes,
             List<ITypeSymbol> writeTypes,
             List<ITypeSymbol>? interfaceTypes = null

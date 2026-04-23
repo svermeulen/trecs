@@ -9,8 +9,10 @@ using Trecs.SourceGen.Shared;
 namespace Trecs.SourceGen
 {
     /// <summary>
-    /// Optimized incremental source generator for Aspect implementations
-    /// Uses advanced caching and dependency tracking for better performance
+    /// Incremental source generator for Trecs aspects. Handles both flavors of aspect — struct
+    /// (concrete, with component buffers and NativeFactory) and interface (shared contract for
+    /// polymorphic helpers). A type participates by implementing Trecs.IAspect in its base list;
+    /// dispatch into the two codegen paths is by symbol kind.
     /// </summary>
     [Generator]
     public class IncrementalAspectGenerator : IIncrementalGenerator
@@ -20,19 +22,11 @@ namespace Trecs.SourceGen
             // Check if compilation references Trecs assembly for better performance
             var hasTrecsReference = AssemblyFilterHelper.CreateTrecsReferenceCheck(context);
 
-            // Create optimized incremental provider for Aspect structs (detected by IAspect interface)
+            // Aspect types (struct or interface) — detected by IAspect appearing in the base list.
             var aspectProviderRaw = context
                 .SyntaxProvider.CreateSyntaxProvider(
-                    predicate: static (node, _) =>
-                        node is StructDeclarationSyntax sds
-                        && sds.Modifiers.Any(SyntaxKind.PartialKeyword)
-                        && sds.BaseList != null
-                        && sds.BaseList.Types.Any(static t =>
-                        {
-                            var typeStr = t.Type.ToString();
-                            return typeStr == "IAspect" || typeStr == "Trecs.IAspect";
-                        }),
-                    transform: static (context, _) => GetAspectDataFromSyntax(context)
+                    predicate: static (node, _) => HasIAspectInBaseList(node),
+                    transform: static (context, _) => GetAspectTargetFromSyntax(context)
                 )
                 .Where(static x => x != null);
             var aspectProvider = AssemblyFilterHelper.FilterByTrecsReference(
@@ -40,7 +34,7 @@ namespace Trecs.SourceGen
                 hasTrecsReference
             );
 
-            // Create optimized provider for Unwrap component structs
+            // Unwrap component structs — used for validation downstream.
             var unwrapComponentProviderRaw = context
                 .SyntaxProvider.ForAttributeWithMetadataName(
                     "Trecs.UnwrapAttribute",
@@ -53,55 +47,85 @@ namespace Trecs.SourceGen
                 hasTrecsReference
             );
 
-            // Create optimized provider for AspectInterface interfaces
-            var aspectInterfaceProviderRaw = context
-                .SyntaxProvider.ForAttributeWithMetadataName(
-                    "Trecs.AspectInterfaceAttribute",
-                    predicate: static (node, _) => node is InterfaceDeclarationSyntax,
-                    transform: static (context, _) => GetAspectInterfaceData(context)
-                )
-                .Where(static x => x != null);
-            var aspectInterfaceProvider = AssemblyFilterHelper.FilterByTrecsReference(
-                aspectInterfaceProviderRaw,
-                hasTrecsReference
-            );
-
-            // Collect all UnwrapComponents for cross-validation
             var allUnwrapComponents = unwrapComponentProvider.Collect();
 
-            // Combine Aspects with compilation and UnwrapComponents
             var aspectsWithDependencies = aspectProvider
                 .Combine(allUnwrapComponents)
                 .Combine(context.CompilationProvider);
 
-            // Register optimized source output with error handling for Aspects
             context.RegisterSourceOutput(
                 aspectsWithDependencies,
                 static (spc, source) =>
                     ExecuteGeneration(spc, source.Left.Left, source.Left.Right, source.Right)
             );
-
-            // Register source output for AspectInterfaces
-            var aspectInterfacesWithCompilation = aspectInterfaceProvider.Combine(
-                context.CompilationProvider
-            );
-
-            context.RegisterSourceOutput(
-                aspectInterfacesWithCompilation,
-                static (spc, source) =>
-                    ExecuteAspectInterfaceGeneration(spc, source.Left, source.Right)
-            );
         }
 
-        private static AspectData? GetAspectDataFromSyntax(GeneratorSyntaxContext context)
+        /// <summary>
+        /// Cheap syntactic filter: does this struct or interface declaration *potentially*
+        /// implement <c>Trecs.IAspect</c>? Runs before any semantic work, so it must stay
+        /// string-based.
+        ///
+        /// Under the new (attribute-free) design an aspect can implement IAspect transitively
+        /// via an aspect-interface whose name we can't resolve syntactically (e.g. <c>struct
+        /// Foo : IMovable</c>). So this predicate must let through anything whose base list
+        /// contains at least one non-IRead/IWrite entry, and the transform step does the real
+        /// semantic check via <see cref="SymbolAnalyzer.ImplementsInterface"/>. The cost of
+        /// the extra semantic resolutions is bounded (at most one per type with a user-defined
+        /// base interface) and paid only when the syntax node changes — Roslyn caches the
+        /// transform output.
+        ///
+        /// Intentionally does NOT gate on the <c>partial</c> modifier so the validator can
+        /// emit <c>TRECS020 AspectInterfaceMustBePartial</c> on non-partial aspect interfaces.
+        /// </summary>
+        private static bool HasIAspectInBaseList(SyntaxNode node)
         {
-            var structDecl = (StructDeclarationSyntax)context.Node;
-            var symbol = context.SemanticModel.GetDeclaredSymbol(structDecl) as INamedTypeSymbol;
+            BaseListSyntax? baseList = node switch
+            {
+                StructDeclarationSyntax sds => sds.BaseList,
+                InterfaceDeclarationSyntax ids => ids.BaseList,
+                _ => null,
+            };
+
+            if (baseList == null)
+                return false;
+
+            foreach (var baseType in baseList.Types)
+            {
+                if (IsCandidateBaseIdentifier(baseType.Type.ToString()))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Rules out base types that can't transitively carry IAspect: generic IRead/IWrite
+        /// (user-declared component access, never an aspect interface). Everything else is a
+        /// candidate for the semantic pass.
+        /// </summary>
+        private static bool IsCandidateBaseIdentifier(string typeStr)
+        {
+            if (typeStr.StartsWith("IRead<") || typeStr.StartsWith("Trecs.IRead<"))
+                return false;
+            if (typeStr.StartsWith("IWrite<") || typeStr.StartsWith("Trecs.IWrite<"))
+                return false;
+            return true;
+        }
+
+        private static AspectTargetData? GetAspectTargetFromSyntax(GeneratorSyntaxContext context)
+        {
+            var typeDecl = (TypeDeclarationSyntax)context.Node;
+            var symbol = context.SemanticModel.GetDeclaredSymbol(typeDecl) as INamedTypeSymbol;
 
             if (symbol == null)
                 return null;
 
-            return new AspectData(structDecl, symbol);
+            // Only emit for types that actually implement Trecs.IAspect. The syntactic predicate
+            // is conservative and lets through any partial with a non-IRead/IWrite base; this
+            // semantic check is the final gate.
+            if (!SymbolAnalyzer.ImplementsInterface(symbol, "IAspect", TrecsNamespaces.Trecs))
+                return null;
+
+            return new AspectTargetData(typeDecl, symbol);
         }
 
         private static UnwrapComponentData? GetUnwrapComponentData(
@@ -117,22 +141,9 @@ namespace Trecs.SourceGen
             return new UnwrapComponentData(structDecl, symbol);
         }
 
-        private static AspectInterfaceData? GetAspectInterfaceData(
-            GeneratorAttributeSyntaxContext context
-        )
-        {
-            var interfaceDecl = (InterfaceDeclarationSyntax)context.TargetNode;
-            var symbol = context.TargetSymbol as INamedTypeSymbol;
-
-            if (symbol == null)
-                return null;
-
-            return new AspectInterfaceData(interfaceDecl, symbol);
-        }
-
         private static void ExecuteGeneration(
             SourceProductionContext context,
-            AspectData? aspectData,
+            AspectTargetData? aspectData,
             ImmutableArray<UnwrapComponentData?> unwrapComponents,
             Compilation compilation
         )
@@ -140,6 +151,23 @@ namespace Trecs.SourceGen
             if (aspectData == null)
                 return;
 
+            if (aspectData.Symbol.TypeKind == TypeKind.Interface)
+            {
+                ExecuteAspectInterfaceGeneration(context, aspectData, compilation);
+            }
+            else
+            {
+                ExecuteAspectStructGeneration(context, aspectData, unwrapComponents, compilation);
+            }
+        }
+
+        private static void ExecuteAspectStructGeneration(
+            SourceProductionContext context,
+            AspectTargetData aspectData,
+            ImmutableArray<UnwrapComponentData?> unwrapComponents,
+            Compilation compilation
+        )
+        {
             var location = aspectData.Syntax.GetLocation();
             var typeName = aspectData.Symbol.Name;
             var fileName = GeneratorBase.CreateSafeFileName(aspectData.Symbol, "Aspect");
@@ -174,12 +202,7 @@ namespace Trecs.SourceGen
                 using (SourceGenTimer.Time("AspectGenerator.ParseAttributes"))
                 {
                     attributeData = ErrorRecovery.TryExecute(
-                        () =>
-                            Aspect.AspectAttributeParser.ParseAspectData(
-                                aspectData.Symbol,
-                                context.ReportDiagnostic,
-                                location
-                            )!,
+                        () => Aspect.AspectAttributeParser.ParseAspectData(aspectData.Symbol),
                         context,
                         location,
                         "Aspect data parsing"
@@ -188,7 +211,6 @@ namespace Trecs.SourceGen
 
                 if (attributeData == null)
                 {
-                    // Generate fallback with error comment
                     var fallbackSource = ErrorRecovery.GenerateErrorFallback(
                         typeName,
                         SymbolAnalyzer.GetNamespaceChain(aspectData.Symbol),
@@ -218,7 +240,6 @@ namespace Trecs.SourceGen
 
                 if (!isValid)
                 {
-                    // Generate fallback with validation error
                     var fallbackSource = ErrorRecovery.GenerateErrorFallback(
                         typeName,
                         SymbolAnalyzer.GetNamespaceChain(aspectData.Symbol),
@@ -228,21 +249,6 @@ namespace Trecs.SourceGen
                     return;
                 }
 
-                // Validate usage patterns (naming conventions, etc.).
-                ErrorRecovery.TryExecute(
-                    () =>
-                        Aspect.AspectValidator.ValidateUsagePatterns(
-                            attributeData,
-                            aspectData.Symbol,
-                            location,
-                            context.ReportDiagnostic
-                        ),
-                    context,
-                    location,
-                    "Usage pattern validation"
-                );
-
-                // Generate the source code
                 string? source;
                 using (SourceGenTimer.Time("AspectGenerator.CodeGen"))
                 {
@@ -266,7 +272,6 @@ namespace Trecs.SourceGen
                 }
                 else
                 {
-                    // Generation failed, provide fallback
                     var fallbackSource = ErrorRecovery.GenerateErrorFallback(
                         typeName,
                         SymbolAnalyzer.GetNamespaceChain(aspectData.Symbol),
@@ -277,10 +282,8 @@ namespace Trecs.SourceGen
             }
             catch (Exception ex)
             {
-                // Final fallback for any unhandled errors
                 ErrorRecovery.ReportError(context, location, "Aspect generation", ex);
 
-                // Still generate a partial class so compilation can continue
                 var fallbackSource = ErrorRecovery.GenerateErrorFallback(
                     typeName,
                     SymbolAnalyzer.GetNamespaceChain(aspectData.Symbol),
@@ -292,13 +295,10 @@ namespace Trecs.SourceGen
 
         private static void ExecuteAspectInterfaceGeneration(
             SourceProductionContext context,
-            AspectInterfaceData? interfaceData,
+            AspectTargetData interfaceData,
             Compilation compilation
         )
         {
-            if (interfaceData == null)
-                return;
-
             var location = interfaceData.Syntax.GetLocation();
             var typeName = interfaceData.Symbol.Name;
             var fileName = GeneratorBase.CreateSafeFileName(
@@ -312,35 +312,47 @@ namespace Trecs.SourceGen
                     $"[IncrementalAspectGenerator] Processing AspectInterface {typeName}"
                 );
 
-                // Parse the AspectInterfaceAttribute
-                var attributeData = ErrorRecovery.TryExecute(
-                    () =>
-                        Aspect.AspectInterfaceParser.ParseAspectInterfaceAttribute(
-                            interfaceData.Symbol
-                        )!,
+                // The interface must be partial so the generator can merge its emitted contract.
+                var ifaceDecl = (InterfaceDeclarationSyntax)interfaceData.Syntax;
+                var isPartial =
+                    ErrorRecovery.TryExecuteBool(
+                        () =>
+                            Aspect.AspectValidator.ValidateAspectInterfaceDeclaration(
+                                ifaceDecl,
+                                interfaceData.Symbol,
+                                context.ReportDiagnostic
+                            ),
+                        context,
+                        location,
+                        "AspectInterface partial validation"
+                    ) ?? false;
+
+                if (!isPartial)
+                    return;
+
+                var parsedData = ErrorRecovery.TryExecute(
+                    () => Aspect.AspectInterfaceParser.ParseAspectInterface(interfaceData.Symbol)!,
                     context,
                     location,
-                    "AspectInterface attribute parsing"
+                    "AspectInterface parsing"
                 );
 
-                if (attributeData == null)
+                if (parsedData == null)
                 {
-                    // Generate fallback with error comment
                     var fallbackSource = ErrorRecovery.GenerateErrorFallback(
                         typeName,
                         SymbolAnalyzer.GetNamespaceChain(interfaceData.Symbol),
-                        "Failed to parse AspectInterface attribute"
+                        "Failed to parse aspect interface"
                     );
                     context.AddSource(fileName, fallbackSource);
                     return;
                 }
 
-                // Generate the interface source code
                 var source = ErrorRecovery.TryExecute(
                     () =>
                         Aspect.AspectCodeGenerator.GenerateAspectInterfaceSource(
                             interfaceData.Symbol,
-                            attributeData,
+                            parsedData,
                             compilation
                         ),
                     context,
@@ -355,7 +367,6 @@ namespace Trecs.SourceGen
                 }
                 else
                 {
-                    // Generation failed, provide fallback
                     var fallbackSource = ErrorRecovery.GenerateErrorFallback(
                         typeName,
                         SymbolAnalyzer.GetNamespaceChain(interfaceData.Symbol),
@@ -366,10 +377,8 @@ namespace Trecs.SourceGen
             }
             catch (Exception ex)
             {
-                // Final fallback for any unhandled errors
                 ErrorRecovery.ReportError(context, location, "AspectInterface generation", ex);
 
-                // Still generate a partial interface so compilation can continue
                 var fallbackSource = ErrorRecovery.GenerateErrorFallback(
                     typeName,
                     SymbolAnalyzer.GetNamespaceChain(interfaceData.Symbol),
@@ -381,44 +390,27 @@ namespace Trecs.SourceGen
     }
 
     /// <summary>
-    /// Data structure for Aspect information used in incremental generation
+    /// Data structure for an aspect-generation target — a struct or an interface implementing
+    /// Trecs.IAspect. TypeKind on the symbol distinguishes the two flavors.
     /// </summary>
-    internal class AspectData
+    internal class AspectTargetData
     {
-        public StructDeclarationSyntax Syntax { get; }
+        public TypeDeclarationSyntax Syntax { get; }
         public INamedTypeSymbol Symbol { get; }
 
-        public AspectData(StructDeclarationSyntax syntax, INamedTypeSymbol symbol)
+        public AspectTargetData(TypeDeclarationSyntax syntax, INamedTypeSymbol symbol)
         {
             Syntax = syntax;
             Symbol = symbol;
         }
     }
 
-    /// <summary>
-    /// Data structure for UnwrapComponent information used in incremental generation
-    /// </summary>
     internal class UnwrapComponentData
     {
         public StructDeclarationSyntax Syntax { get; }
         public INamedTypeSymbol Symbol { get; }
 
         public UnwrapComponentData(StructDeclarationSyntax syntax, INamedTypeSymbol symbol)
-        {
-            Syntax = syntax;
-            Symbol = symbol;
-        }
-    }
-
-    /// <summary>
-    /// Data structure for AspectInterface information used in incremental generation
-    /// </summary>
-    internal class AspectInterfaceData
-    {
-        public InterfaceDeclarationSyntax Syntax { get; }
-        public INamedTypeSymbol Symbol { get; }
-
-        public AspectInterfaceData(InterfaceDeclarationSyntax syntax, INamedTypeSymbol symbol)
         {
             Syntax = syntax;
             Symbol = symbol;

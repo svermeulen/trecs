@@ -513,11 +513,7 @@ namespace Trecs.SourceGen
                         return null;
                     }
 
-                    var parsed = AspectAttributeParser.ParseAspectData(
-                        aspectNamedType,
-                        context.ReportDiagnostic,
-                        methodDecl.GetLocation()
-                    );
+                    var parsed = AspectAttributeParser.ParseAspectData(aspectNamedType);
                     if (parsed == null)
                         return null;
 
@@ -753,13 +749,7 @@ namespace Trecs.SourceGen
                         var aspectSymbol = namedType.ContainingType;
                         if (aspectSymbol != null)
                         {
-                            fwAspectData = AspectAttributeParser.ParseAspectData(
-                                aspectSymbol,
-                                context.ReportDiagnostic,
-                                methodDecl.GetLocation()
-                            );
-                            if (fwAspectData == null)
-                                return null;
+                            fwAspectData = AspectAttributeParser.ParseAspectData(aspectSymbol);
                         }
                     }
 

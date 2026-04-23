@@ -382,13 +382,8 @@ namespace Trecs.SourceGen
 
                         if (firstParamType is INamedTypeSymbol aspectType)
                         {
-                            var attributeData = AspectAttributeParser.ParseAspectData(
-                                aspectType,
-                                context.ReportDiagnostic,
-                                methodDecl.GetLocation()
-                            );
+                            var attributeData = AspectAttributeParser.ParseAspectData(aspectType);
 
-                            if (attributeData != null)
                             {
                                 var aspectTypeName = firstParam.Type?.ToString() ?? "UnknownType";
 

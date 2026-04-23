@@ -838,11 +838,7 @@ namespace Trecs.SourceGen
             var firstParamNamedType = aspectParamType as INamedTypeSymbol;
             var attributeData =
                 firstParamNamedType != null
-                    ? AspectAttributeParser.ParseAspectData(
-                        firstParamNamedType,
-                        context.ReportDiagnostic,
-                        methodDec.GetLocation()
-                    )
+                    ? AspectAttributeParser.ParseAspectData(firstParamNamedType)
                     : null;
 
             if (attributeData != null)

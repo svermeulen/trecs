@@ -176,28 +176,17 @@ namespace Trecs.SourceGen
 
         // TRECS017 and TRECS018 removed - duplicates of TRECS012 and TRECS013
 
-        public static readonly DiagnosticDescriptor AspectInterfaceNotFound = new(
-            id: "TRECS019",
-            title: "Aspect interface not found",
-            messageFormat: "Aspect interface '{0}' could not be found or does not have AspectInterfaceAttribute",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
+        // TRECS019 and TRECS021 are retired. TRECS019 (AspectInterfaceNotFound) diagnosed a
+        // reference to a non-aspect-interface in a struct aspect's base list — no longer
+        // reachable: the new detection filters aspect interfaces by IAspect membership
+        // upstream. TRECS021 (CircularAspectInterfaceReference) diagnosed cycles in the
+        // aspect-interface hierarchy — C# itself rejects these with CS0529 before the
+        // generator runs.
 
-        public static readonly DiagnosticDescriptor AspectInterfaceMustBeInterface = new(
+        public static readonly DiagnosticDescriptor AspectInterfaceMustBePartial = new(
             id: "TRECS020",
-            title: "Aspect interface must be an interface type",
-            messageFormat: "Aspect interface '{0}' must be an interface type, not a {1}",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
-        public static readonly DiagnosticDescriptor CircularAspectInterfaceReference = new(
-            id: "TRECS021",
-            title: "Circular Aspect interface reference detected",
-            messageFormat: "Circular reference detected in Aspect interface hierarchy: {0}",
+            title: "Aspect interface must be partial",
+            messageFormat: "Aspect interface '{0}' must be marked as partial — the source generator attaches a partial interface declaring the ref-returning property contract for each IRead<>/IWrite<> component",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true

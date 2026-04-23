@@ -656,22 +656,17 @@ namespace Trecs.SourceGen
             }
 
             var attributeData = AspectAttributeParser.ParseAspectData(
-                (INamedTypeSymbol)aspectParamType,
-                context.ReportDiagnostic,
-                methodDec.GetLocation()
+                (INamedTypeSymbol)aspectParamType
             );
 
             var componentTypes = new List<ITypeSymbol>();
-            if (attributeData != null)
-            {
-                componentTypes.AddRange(attributeData.ReadTypes);
-                componentTypes.AddRange(attributeData.WriteTypes);
-                var distinctComponentTypes = PerformanceCache.GetDistinctTypes(componentTypes);
-                componentTypes = distinctComponentTypes.ToList();
-            }
+            componentTypes.AddRange(attributeData.ReadTypes);
+            componentTypes.AddRange(attributeData.WriteTypes);
+            var distinctComponentTypes = PerformanceCache.GetDistinctTypes(componentTypes);
+            componentTypes = distinctComponentTypes.ToList();
 
-            var readComponentTypes = attributeData?.ReadTypes.ToList() ?? new List<ITypeSymbol>();
-            var writeComponentTypes = attributeData?.WriteTypes.ToList() ?? new List<ITypeSymbol>();
+            var readComponentTypes = attributeData.ReadTypes.ToList();
+            var writeComponentTypes = attributeData.WriteTypes.ToList();
 
             // Extract tag types, set types, and MatchByComponents from the iteration attribute.
             var criteria = IterationCriteriaParser.ParseIterationAttribute(

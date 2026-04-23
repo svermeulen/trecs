@@ -471,16 +471,9 @@ namespace Trecs.SourceGen
             }
 
             var firstParamNamed = firstParamType as INamedTypeSymbol;
-            var aspectData =
-                firstParamNamed != null
-                    ? AspectAttributeParser.ParseAspectData(
-                        firstParamNamed,
-                        context.ReportDiagnostic,
-                        method.GetLocation()
-                    )
-                    : null;
-            if (aspectData == null)
+            if (firstParamNamed == null)
                 return null;
+            var aspectData = AspectAttributeParser.ParseAspectData(firstParamNamed);
 
             var componentTypes = new List<ITypeSymbol>();
             componentTypes.AddRange(aspectData.ReadTypes);
@@ -1003,13 +996,7 @@ namespace Trecs.SourceGen
                     var aspectSymbol = typeSymbol.ContainingType;
                     if (aspectSymbol != null)
                     {
-                        aspectData = AspectAttributeParser.ParseAspectData(
-                            aspectSymbol,
-                            context.ReportDiagnostic,
-                            field.GetLocation()
-                        );
-                        if (aspectData == null)
-                            return null;
+                        aspectData = AspectAttributeParser.ParseAspectData(aspectSymbol);
                     }
                 }
 

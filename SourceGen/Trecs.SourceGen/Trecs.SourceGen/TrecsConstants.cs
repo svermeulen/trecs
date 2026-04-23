@@ -7,8 +7,6 @@ namespace Trecs.SourceGen
     /// </summary>
     internal static class TrecsAttributeNames
     {
-        public const string AspectInterface = "AspectInterfaceAttribute";
-
         // Iteration markers. Aspect-vs-components routing is decided by inspecting the
         // method's parameter types (does it take an IAspect or a ref/in IEntityComponent),
         // not by the attribute name itself. EntityFilter marks a normal iteration method;

@@ -5,8 +5,8 @@ using Trecs.SourceGen.Performance;
 namespace Trecs.SourceGen.Shared
 {
     /// <summary>
-    /// Extracts component types from IRead/IWrite interfaces and AspectInterface base interfaces
-    /// on a given type symbol.
+    /// Extracts component types from IRead/IWrite interfaces and aspect-interface base
+    /// interfaces (interfaces that themselves extend Trecs.IAspect) on a given type symbol.
     /// </summary>
     internal static class InterfaceComponentExtractor
     {
@@ -14,7 +14,7 @@ namespace Trecs.SourceGen.Shared
         /// Inspects the direct interfaces of a type symbol and extracts:
         /// - IRead type arguments → readTypes
         /// - IWrite type arguments → writeTypes
-        /// - Interfaces with [AspectInterface] → aspectInterfaceTypes
+        /// - Interfaces that extend Trecs.IAspect → aspectInterfaceTypes
         /// </summary>
         public static void ExtractComponentsFromInterfaces(
             ITypeSymbol symbol,
@@ -46,21 +46,11 @@ namespace Trecs.SourceGen.Shared
                 }
                 else if (containingNs == "Trecs" && ifaceName == "IAspect")
                 {
-                    // Marker interface — skip
+                    // Marker interface — skip (no cascade of components from IAspect itself)
                 }
-                else
+                else if (SymbolAnalyzer.IsAspectInterface(iface))
                 {
-                    // Check if this interface has [AspectInterface]
-                    if (
-                        PerformanceCache.HasAttributeByName(
-                            iface,
-                            TrecsAttributeNames.AspectInterface,
-                            TrecsNamespaces.Trecs
-                        )
-                    )
-                    {
-                        aspectInterfaceTypes.Add(iface);
-                    }
+                    aspectInterfaceTypes.Add(iface);
                 }
             }
         }

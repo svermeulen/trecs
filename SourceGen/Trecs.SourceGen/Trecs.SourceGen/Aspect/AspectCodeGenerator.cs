@@ -1036,7 +1036,7 @@ namespace Trecs.SourceGen.Aspect
         /// </summary>
         public static string GenerateAspectInterfaceSource(
             INamedTypeSymbol symbol,
-            AspectInterfaceAttributeData attributeData,
+            AspectInterfaceData attributeData,
             Compilation compilation
         )
         {
@@ -1078,7 +1078,7 @@ namespace Trecs.SourceGen.Aspect
         private static void GenerateInterfaceContent(
             OptimizedStringBuilder sb,
             INamedTypeSymbol symbol,
-            AspectInterfaceAttributeData attributeData,
+            AspectInterfaceData attributeData,
             string accessibility,
             List<string> containingTypes
         )
@@ -1099,8 +1099,9 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel, $"{effectiveAccessibility} partial interface {symbol.Name}");
             sb.AppendLine(indentLevel, "{");
 
-            // Always include the EntityIndex property since all Aspects have it
-            sb.AppendLine(indentLevel + 1, "EntityIndex EntityIndex { get; }");
+            // Note: EntityIndex is inherited from Trecs.IAspect — re-declaring it here would
+            // shadow the base and produce CS0108. The user's partial already lists IAspect in
+            // the base list (that's how we detected this type as an aspect interface).
 
             // Generate read properties with ref readonly
             foreach (var readType in attributeData.ReadTypes)
