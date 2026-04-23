@@ -12,8 +12,6 @@ namespace Trecs
 
         public static float CalculatePercentThroughFixedFrame(WorldAccessor world)
         {
-            var endOfFrameTime = world.VariableElapsedTime + world.VariableDeltaTime;
-
             var fixedCurrentTime = world.FixedElapsedTime;
             var fixedPreviousTime = fixedCurrentTime - world.FixedDeltaTime;
 
@@ -21,6 +19,8 @@ namespace Trecs
             {
                 return 0f;
             }
+
+            var endOfFrameTime = world.VariableElapsedTime + world.VariableDeltaTime;
 
             if (fixedCurrentTime <= fixedPreviousTime)
             {

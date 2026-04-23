@@ -252,10 +252,25 @@ namespace Trecs.Tests
             return values;
         }
 
+        /// <summary>
+        /// Advances <paramref name="frames"/> fixed-update frames in lockstep.
+        /// Decouples from Unity's non-deterministic <c>Time.deltaTime</c> in the
+        /// editor by pausing fixed update and stepping one frame at a time.
+        ///
+        /// Calls Tick+LateTick once up front to sync <c>_fixedIsPaused</c> to
+        /// <c>_desiredFixedIsPaused</c> (StepFrame silently warns-and-returns if
+        /// the two are out of sync) — that "prime" tick runs no fixed update
+        /// because the pause takes effect at its start.
+        /// </summary>
         static void StepFixedFrames(TestEnvironment env, int frames)
         {
             var runner = env.World.GetSystemRunner();
             runner.FixedIsPaused = true;
+
+            // Prime: sync the pause flag. No fixed frame runs this tick.
+            env.World.Tick();
+            env.World.LateTick();
+
             for (int i = 0; i < frames; i++)
             {
                 runner.StepFrame();
