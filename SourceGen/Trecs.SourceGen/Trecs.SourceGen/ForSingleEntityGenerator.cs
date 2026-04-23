@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -34,10 +35,18 @@ namespace Trecs.SourceGen
                 hasTrecsReference
             );
 
-            var methodWithCompilation = methodProvider.Combine(context.CompilationProvider);
+            // See IncrementalForEachGenerator for the caching rationale: extract just the
+            // compilation-derived string we need rather than combining with the full
+            // CompilationProvider (which changes identity on every edit).
+            var globalNsProvider = context.CompilationProvider.Select(
+                static (c, _) =>
+                    PerformanceCache.GetDisplayString(c.GlobalNamespace) ?? string.Empty
+            );
+
+            var methodWithGlobalNs = methodProvider.Combine(globalNsProvider);
 
             context.RegisterSourceOutput(
-                methodWithCompilation,
+                methodWithGlobalNs,
                 static (spc, source) => GenerateSource(spc, source.Left!, source.Right)
             );
         }
@@ -74,13 +83,32 @@ namespace Trecs.SourceGen
             if (!IterationAttributeRouting.RoutesToComponentsGenerator(methodSymbol))
                 return null;
 
-            return new ForEachMethodData(classDecl, methodDecl, methodSymbol);
+            // Validation runs in the transform so the terminal stage doesn't need a
+            // Compilation or SemanticModel.
+            var diagnostics = new List<Diagnostic>();
+            ValidatedMethodInfo? validated = null;
+            bool isValid = ValidateMethod(
+                classDecl,
+                methodDecl,
+                diagnostics.Add,
+                context.SemanticModel,
+                out validated
+            );
+
+            return new ForEachMethodData(
+                classDecl,
+                methodDecl,
+                methodSymbol,
+                isValid,
+                validated,
+                diagnostics.ToImmutableArray()
+            );
         }
 
         private static void GenerateSource(
             SourceProductionContext context,
             ForEachMethodData data,
-            Compilation compilation
+            string globalNamespaceName
         )
         {
             var location = data.MethodDecl.GetLocation();
@@ -91,6 +119,17 @@ namespace Trecs.SourceGen
                 $"{methodName}_ForSingleComponents"
             );
 
+            // Replay diagnostics collected in the transform phase.
+            foreach (var diag in data.Diagnostics)
+            {
+                context.ReportDiagnostic(diag);
+            }
+
+            if (!data.IsValid || data.ValidatedInfo == null)
+            {
+                return;
+            }
+
             try
             {
                 using var _timer_ = SourceGenTimer.Time("ForSingleEntityGenerator.Total");
@@ -98,35 +137,13 @@ namespace Trecs.SourceGen
                     $"[ForSingleComponentsGenerator] Processing {className}.{methodName}"
                 );
 
-                ValidatedMethodInfo? validatedParamsInfo = null;
-                var isValid =
-                    ErrorRecovery.TryExecuteBool(
-                        () =>
-                            ValidateMethod(
-                                data.ClassDecl,
-                                data.MethodDecl,
-                                context,
-                                compilation,
-                                out validatedParamsInfo
-                            ),
-                        context,
-                        location,
-                        "ForSingleComponents method validation"
-                    ) ?? false;
-
-                if (!isValid || validatedParamsInfo == null)
-                {
-                    return;
-                }
-
                 var source = ErrorRecovery.TryExecute(
                     () =>
                         GenerateSourceCode(
-                            context,
                             data.ClassDecl,
                             data.MethodDecl,
-                            validatedParamsInfo,
-                            compilation
+                            data.ValidatedInfo,
+                            globalNamespaceName
                         ),
                     context,
                     location,
@@ -161,11 +178,10 @@ namespace Trecs.SourceGen
         }
 
         private static string GenerateSourceCode(
-            SourceProductionContext context,
             ClassDeclarationSyntax classDec,
             MethodDeclarationSyntax methodDec,
             ValidatedMethodInfo validatedParamsInfo,
-            Compilation compilation
+            string globalNamespaceName
         )
         {
             var namespaceName = SymbolAnalyzer.GetNamespace(classDec);
@@ -176,7 +192,7 @@ namespace Trecs.SourceGen
             var sb = OptimizedStringBuilder.ForAspect(componentCount);
 
             var requiredNamespaces = NamespaceCollector.Collect(
-                compilation,
+                globalNamespaceName,
                 validatedParamsInfo,
                 includeSystemNamespace: true
             );
@@ -475,8 +491,8 @@ namespace Trecs.SourceGen
         private static bool ValidateMethod(
             ClassDeclarationSyntax classDec,
             MethodDeclarationSyntax methodDec,
-            SourceProductionContext context,
-            Compilation compilation,
+            System.Action<Diagnostic> reportDiagnostic,
+            SemanticModel semanticModel,
             out ValidatedMethodInfo? validatedParamsInfo
         )
         {
@@ -486,7 +502,7 @@ namespace Trecs.SourceGen
 
             if (!classDec.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.NotPartialClass,
                         classDec.Identifier.GetLocation(),
@@ -498,7 +514,7 @@ namespace Trecs.SourceGen
 
             if (methodDec.ReturnType.ToString() != "void")
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.InvalidReturnType,
                         methodDec.ReturnType.GetLocation()
@@ -507,12 +523,11 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
 
-            var semanticModel = compilation.GetSemanticModel(methodDec.SyntaxTree);
             var parameters = methodDec.ParameterList.Parameters;
 
             if (parameters.Count == 0)
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.EmptyParameters,
                         methodDec.ParameterList.GetLocation()
@@ -526,7 +541,7 @@ namespace Trecs.SourceGen
                 parameters,
                 semanticModel,
                 IterationMode.Components,
-                context,
+                reportDiagnostic,
                 methodName: null,
                 supportsEntityIndex: true,
                 aspectParam: null,
@@ -537,7 +552,7 @@ namespace Trecs.SourceGen
 
             if (!hasAnyIterationParameter)
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.EmptyParameters,
                         methodDec.ParameterList.GetLocation()
@@ -555,7 +570,7 @@ namespace Trecs.SourceGen
             if (methodSymbol != null)
             {
                 var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                    context,
+                    reportDiagnostic,
                     methodDec,
                     methodSymbol,
                     className,

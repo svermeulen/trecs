@@ -17,7 +17,14 @@ namespace Trecs.SourceGen.Shared
         /// Collects required namespaces from validated method info, returning a set
         /// suitable for generating using directives.
         /// </summary>
-        /// <param name="compilation">The compilation (used to detect the global namespace).</param>
+        /// <param name="globalNamespaceName">
+        /// Display string of the compilation's global namespace. Typed names whose
+        /// containing-namespace matches this are skipped (they'd generate a bogus using).
+        /// Extract once per compilation via
+        /// <c>context.CompilationProvider.Select((c, _) =&gt; c.GlobalNamespace.ToDisplayString())</c>
+        /// — keeping this a string (rather than a Compilation) is what lets the pipeline
+        /// around this generator actually cache.
+        /// </param>
         /// <param name="info">Validated method info containing all type references.</param>
         /// <param name="includeSystemNamespace">
         /// When <c>true</c>, adds <c>"System"</c> to the base set. The ForSingle* generators
@@ -25,7 +32,7 @@ namespace Trecs.SourceGen.Shared
         /// ambiguity when the user file also imports <c>UnityEngine</c>.
         /// </param>
         internal static HashSet<string> Collect(
-            Compilation compilation,
+            string globalNamespaceName,
             ValidatedMethodInfo info,
             bool includeSystemNamespace = false
         )
@@ -43,9 +50,6 @@ namespace Trecs.SourceGen.Shared
                 namespaces.Add("System");
             }
 
-            // Closure over compilation + namespaces for the helper lambda.
-            var globalNs = PerformanceCache.GetDisplayString(compilation.GlobalNamespace) ?? "";
-
             void AddNamespaceIfNeeded(ITypeSymbol typeSymbol)
             {
                 var ns = PerformanceCache.GetDisplayString(typeSymbol.ContainingNamespace);
@@ -54,7 +58,7 @@ namespace Trecs.SourceGen.Shared
                     && ns != "System"
                     && ns != null
                     && !ns.StartsWith("System.")
-                    && ns != globalNs
+                    && ns != globalNamespaceName
                 )
                 {
                     namespaces.Add(ns);

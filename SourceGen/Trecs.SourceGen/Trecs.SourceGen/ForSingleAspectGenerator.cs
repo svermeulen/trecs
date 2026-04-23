@@ -206,7 +206,7 @@ namespace Trecs.SourceGen
             var sb = OptimizedStringBuilder.ForAspect(componentCount);
 
             var requiredNamespaces = NamespaceCollector.Collect(
-                compilation,
+                PerformanceCache.GetDisplayString(compilation.GlobalNamespace) ?? "",
                 validatedMethodInfo,
                 includeSystemNamespace: true
             );
@@ -670,7 +670,7 @@ namespace Trecs.SourceGen
 
             // Extract tag types, set types, and MatchByComponents from the iteration attribute.
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                context,
+                context.ReportDiagnostic,
                 methodDec,
                 methodSymbol,
                 classDec.Identifier.Text,
@@ -691,7 +691,7 @@ namespace Trecs.SourceGen
                 parameters,
                 semanticModel,
                 IterationMode.Aspect,
-                context,
+                context.ReportDiagnostic,
                 methodDec.Identifier.Text,
                 supportsEntityIndex: false,
                 aspectParam: aspectParam,

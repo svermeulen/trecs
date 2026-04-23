@@ -43,7 +43,7 @@ namespace Trecs.SourceGen.Shared
         /// or <c>TrecsAttributeNames.SingleEntity</c>).
         /// </param>
         internal static IterationCriteria? ParseIterationAttribute(
-            SourceProductionContext context,
+            System.Action<Diagnostic> reportDiagnostic,
             MethodDeclarationSyntax method,
             IMethodSymbol methodSymbol,
             string containerName,
@@ -96,7 +96,7 @@ namespace Trecs.SourceGen.Shared
 
             if (singleTag != null && tagTypes.Count > 0)
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.TagAndTagsBothSpecified,
                         method.Identifier.GetLocation(),

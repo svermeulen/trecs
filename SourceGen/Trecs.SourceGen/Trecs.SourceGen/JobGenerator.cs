@@ -549,7 +549,7 @@ namespace Trecs.SourceGen
             if (methodSymbol == null)
                 return null;
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                context,
+                context.ReportDiagnostic,
                 method,
                 methodSymbol,
                 structSymbol.Name
@@ -708,7 +708,7 @@ namespace Trecs.SourceGen
             if (methodSymbol == null)
                 return null;
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                context,
+                context.ReportDiagnostic,
                 method,
                 methodSymbol,
                 structSymbol.Name

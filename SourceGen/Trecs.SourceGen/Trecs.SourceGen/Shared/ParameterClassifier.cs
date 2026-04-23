@@ -93,7 +93,7 @@ namespace Trecs.SourceGen.Shared
             SeparatedSyntaxList<ParameterSyntax> parameters,
             SemanticModel semanticModel,
             IterationMode mode,
-            SourceProductionContext context,
+            System.Action<Diagnostic> reportDiagnostic,
             string? methodName,
             bool supportsEntityIndex,
             ParameterSyntax? aspectParam,
@@ -117,7 +117,7 @@ namespace Trecs.SourceGen.Shared
 
                 if (isRef && isIn)
                 {
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.InvalidParameterModifiers,
                             param.GetLocation(),
@@ -162,7 +162,7 @@ namespace Trecs.SourceGen.Shared
                     var nativeSetTypeArg = PerformanceCache.GetDisplayString(
                         namedNativeSet.TypeArguments[0]
                     );
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.NativeSetNotAllowedOnMainThread,
                             param.GetLocation(),
@@ -187,7 +187,7 @@ namespace Trecs.SourceGen.Shared
                 {
                     if (isRef)
                     {
-                        context.ReportDiagnostic(
+                        reportDiagnostic(
                             Diagnostic.Create(
                                 DiagnosticDescriptors.ParameterMustBeByValue,
                                 param.GetLocation(),
@@ -226,7 +226,7 @@ namespace Trecs.SourceGen.Shared
                 {
                     if (!isIn || isRef)
                     {
-                        context.ReportDiagnostic(
+                        reportDiagnostic(
                             Diagnostic.Create(
                                 DiagnosticDescriptors.ParameterMustBeIn,
                                 param.GetLocation(),
@@ -264,7 +264,7 @@ namespace Trecs.SourceGen.Shared
                 {
                     if (!isIn || isRef)
                     {
-                        context.ReportDiagnostic(
+                        reportDiagnostic(
                             Diagnostic.Create(
                                 DiagnosticDescriptors.ParameterMustBeIn,
                                 param.GetLocation(),
@@ -306,7 +306,7 @@ namespace Trecs.SourceGen.Shared
                     if (!supportsEntityIndex)
                     {
                         // EntityIndex not supported in this mode — treat as unrecognized.
-                        context.ReportDiagnostic(
+                        reportDiagnostic(
                             Diagnostic.Create(
                                 DiagnosticDescriptors.UnrecognizedParameterType,
                                 param.GetLocation(),
@@ -320,7 +320,7 @@ namespace Trecs.SourceGen.Shared
 
                     if (isRef || isIn)
                     {
-                        context.ReportDiagnostic(
+                        reportDiagnostic(
                             Diagnostic.Create(
                                 DiagnosticDescriptors.ParameterMustBeByValue,
                                 param.GetLocation(),
@@ -333,7 +333,7 @@ namespace Trecs.SourceGen.Shared
 
                     if (result.HasEntityIndex)
                     {
-                        context.ReportDiagnostic(
+                        reportDiagnostic(
                             Diagnostic.Create(
                                 DiagnosticDescriptors.DuplicateLoopParameter,
                                 param.GetLocation(),
@@ -354,7 +354,7 @@ namespace Trecs.SourceGen.Shared
                 {
                     if (isRef || isIn)
                     {
-                        context.ReportDiagnostic(
+                        reportDiagnostic(
                             Diagnostic.Create(
                                 DiagnosticDescriptors.ParameterMustBeByValue,
                                 param.GetLocation(),
@@ -367,7 +367,7 @@ namespace Trecs.SourceGen.Shared
 
                     if (result.HasWorldAccessor)
                     {
-                        context.ReportDiagnostic(
+                        reportDiagnostic(
                             Diagnostic.Create(
                                 DiagnosticDescriptors.DuplicateLoopParameter,
                                 param.GetLocation(),
@@ -392,7 +392,7 @@ namespace Trecs.SourceGen.Shared
                     // Component mode: accept IEntityComponent params with in/ref modifier.
                     if (!isRef && !isIn)
                     {
-                        context.ReportDiagnostic(
+                        reportDiagnostic(
                             Diagnostic.Create(
                                 DiagnosticDescriptors.ComponentParameterMustBeInOrRef,
                                 param.GetLocation(),
@@ -417,7 +417,7 @@ namespace Trecs.SourceGen.Shared
                 {
                     // Aspect mode: IEntityComponent params are not valid — the aspect
                     // already declares the components. Report the specific error.
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.MixedAspectAndComponentParams,
                             param.GetLocation(),
@@ -433,7 +433,7 @@ namespace Trecs.SourceGen.Shared
                 // Unrecognized type without [PassThroughArgument] — report error.
                 if (!isPassThrough)
                 {
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.UnrecognizedParameterType,
                             param.GetLocation(),

@@ -216,7 +216,10 @@ namespace Trecs.SourceGen
             var sb = OptimizedStringBuilder.ForAspect(componentCount);
 
             // Add required namespaces
-            var requiredNamespaces = NamespaceCollector.Collect(compilation, validatedMethodInfo);
+            var requiredNamespaces = NamespaceCollector.Collect(
+                PerformanceCache.GetDisplayString(compilation.GlobalNamespace) ?? "",
+                validatedMethodInfo
+            );
 
             sb.AppendUsings(requiredNamespaces.ToArray());
 
@@ -854,7 +857,7 @@ namespace Trecs.SourceGen
 
             // Extract tag types, set types, and MatchByComponents from the iteration attribute.
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                context,
+                context.ReportDiagnostic,
                 methodDec,
                 methodSymbol,
                 classDec.Identifier.Text,
@@ -873,7 +876,7 @@ namespace Trecs.SourceGen
                 parameters,
                 semanticModel,
                 IterationMode.Aspect,
-                context,
+                context.ReportDiagnostic,
                 methodDec.Identifier.Text,
                 supportsEntityIndex: true,
                 aspectParam: aspectParam,

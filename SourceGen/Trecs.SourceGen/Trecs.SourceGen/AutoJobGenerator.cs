@@ -825,7 +825,7 @@ namespace Trecs.SourceGen
             // ── Parse [ForEachEntity] criteria ──
 
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                context,
+                context.ReportDiagnostic,
                 methodDecl,
                 methodSymbol,
                 classSymbol.Name
