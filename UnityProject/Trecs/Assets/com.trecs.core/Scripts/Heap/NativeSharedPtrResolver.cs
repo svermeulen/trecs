@@ -41,15 +41,20 @@ namespace Trecs
 
             if (!_entries.TryGetValue(address, out var entry))
             {
+                // A common cause: scheduling a Burst job that reads a NativeSharedPtr
+                // created via CreateBlob in the same frame, before submission has
+                // run FlushPendingOperations to move the entry into _allEntries.
+                // See NativeSharedHeap's class docstring for the full invariant.
                 throw new TrecsException(
-                    $"Attempted to resolve invalid heap memory address ({address.Value}) for type {typeof(T)}"
+                    $"NativeSharedPtrResolver could not resolve blob {address.Value} for type {typeof(T)}. "
+                        + "Blob was either never created, already disposed, or created this frame and not yet flushed."
                 );
             }
 
             if (entry.TypeHash != TypeHash<T>.Value)
             {
                 throw new TrecsException(
-                    $"Type hash mismatch: {entry.TypeHash} != {TypeHash<T>.Value}"
+                    $"Type hash mismatch for blob {address.Value}: stored {entry.TypeHash} != requested {TypeHash<T>.Value} ({typeof(T)})"
                 );
             }
 

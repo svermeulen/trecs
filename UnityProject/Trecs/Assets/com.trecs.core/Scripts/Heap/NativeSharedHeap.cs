@@ -11,6 +11,19 @@ namespace Trecs
     /// Manages reference-counted native (unmanaged) allocations backing <see cref="NativeSharedPtr{T}"/>.
     /// Provides a <see cref="NativeSharedPtrResolver"/> for Burst-compatible pointer resolution in jobs.
     /// Accessed internally through <see cref="HeapAccessor"/>; not typically used directly.
+    ///
+    /// <para><b>Pending-flush invariant.</b> New blobs created via <c>CreateBlob</c> are staged in
+    /// <c>_pendingAdds</c> and do not appear in <c>_allEntries</c> (the table that
+    /// <see cref="NativeSharedPtrResolver"/> reads from) until <c>FlushPendingOperations</c> runs
+    /// at the next submission boundary. Consequences for callers:</para>
+    /// <list type="bullet">
+    ///   <item><description><c>ResolveUnsafePtr</c> on the main thread (e.g. via <c>HeapAccessor</c>)
+    ///     transparently checks <c>_pendingAdds</c> and works on freshly-created blobs.</description></item>
+    ///   <item><description><see cref="NativeSharedPtrResolver"/> inside a Burst job only sees flushed
+    ///     entries. Scheduling a job that resolves a <c>NativeSharedPtr</c> created in the same frame
+    ///     before submission will fail at resolution time. Schedule such jobs after submission or defer
+    ///     creation until the previous frame.</description></item>
+    /// </list>
     /// </summary>
     public class NativeSharedHeap
     {
@@ -57,6 +70,18 @@ namespace Trecs
                 return ref _resolver;
             }
         }
+
+        /// <summary>
+        /// Number of newly-created blobs staged for insertion into
+        /// <c>_allEntries</c> at the next <c>FlushPendingOperations</c>. While
+        /// non-zero, Burst jobs that resolve those specific blobs via
+        /// <see cref="NativeSharedPtrResolver"/> will fail. The submission
+        /// pipeline flushes before scheduling native submission jobs, so the
+        /// common case is handled automatically — this property is useful for
+        /// user code that wants to schedule its own jobs mid-frame and needs
+        /// to check the invariant itself.
+        /// </summary>
+        public int PendingAddCount => _pendingAdds.Count;
 
         /// <summary>
         /// Resolves a blob pointer from managed (main-thread) code.
