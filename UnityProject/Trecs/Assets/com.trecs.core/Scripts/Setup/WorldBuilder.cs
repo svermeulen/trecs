@@ -35,8 +35,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetSettings(WorldSettings settings)
         {
-            Assert.IsNotNull(settings);
-            Assert.IsNull(_settings, "Settings have already been set");
+            Require.That(settings != null, "settings must not be null");
+            Require.That(_settings == null, "Settings have already been set");
             _settings = settings;
             return this;
         }
@@ -50,7 +50,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddEntityType(Template template)
         {
-            Assert.IsNotNull(template);
+            Require.That(template != null, "template must not be null");
             _templates.Add(template);
             return this;
         }
@@ -69,7 +69,7 @@ namespace Trecs
             // when the static constructor first runs inside a Burst-compiled job.
             _ = EntitySetId<T>.Value;
 
-            Assert.That(
+            Require.That(
                 !_sets.Any(f => f.Id == setDef.Id),
                 "Set '{}' is already added to the WorldBuilder",
                 setDef.DebugName
@@ -84,7 +84,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddEntityTypes(IEnumerable<Template> templates)
         {
-            Assert.IsNotNull(templates);
+            Require.That(templates != null, "templates must not be null");
             foreach (var template in templates)
             {
                 AddEntityType(template);
@@ -97,8 +97,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetPoolManager(ITrecsPoolManager poolManager)
         {
-            Assert.IsNotNull(poolManager);
-            Assert.IsNull(_poolManager, "PoolManager has already been set");
+            Require.That(poolManager != null, "poolManager must not be null");
+            Require.That(_poolManager == null, "PoolManager has already been set");
             _poolManager = poolManager;
             return this;
         }
@@ -108,7 +108,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddSystem(ISystem system)
         {
-            Assert.IsNotNull(system);
+            Require.That(system != null, "system must not be null");
             _systems.Add(system);
             return this;
         }
@@ -118,7 +118,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddSystems(IEnumerable<ISystem> systems)
         {
-            Assert.IsNotNull(systems);
+            Require.That(systems != null, "systems must not be null");
             foreach (var system in systems)
             {
                 AddSystem(system);
@@ -131,7 +131,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddBlobStore(IBlobStore store)
         {
-            Assert.IsNotNull(store);
+            Require.That(store != null, "store must not be null");
             _blobStores.Add(store);
             return this;
         }
@@ -141,7 +141,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddBlobStores(IEnumerable<IBlobStore> stores)
         {
-            Assert.IsNotNull(stores);
+            Require.That(stores != null, "stores must not be null");
             foreach (var store in stores)
             {
                 AddBlobStore(store);
@@ -154,8 +154,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetBlobCacheSettings(BlobCacheSettings settings)
         {
-            Assert.IsNotNull(settings);
-            Assert.IsNull(_blobCacheSettings, "BlobCacheSettings have already been set");
+            Require.That(settings != null, "settings must not be null");
+            Require.That(_blobCacheSettings == null, "BlobCacheSettings have already been set");
             _blobCacheSettings = settings;
             return this;
         }
@@ -185,7 +185,7 @@ namespace Trecs
             IEnumerable<SystemOrderConstraint> constraints
         )
         {
-            Assert.IsNotNull(constraints);
+            Require.That(constraints != null, "constraints must not be null");
             foreach (var constraint in constraints)
             {
                 AddSystemOrderConstraint(constraint);
@@ -229,7 +229,7 @@ namespace Trecs
         /// </summary>
         public World Build()
         {
-            Assert.That(!_hasBuilt, "Build() has already been called");
+            Require.That(!_hasBuilt, "Build() has already been called");
             _hasBuilt = true;
 
 #if DEBUG && !TRECS_IS_PROFILING
@@ -370,7 +370,7 @@ namespace Trecs.Internal
             ISystemMetadataProvider systemMetadataProvider
         )
         {
-            Assert.IsNotNull(systemMetadataProvider);
+            Require.That(systemMetadataProvider != null, "systemMetadataProvider must not be null");
             builder._systemMetadataProvider = systemMetadataProvider;
             return builder;
         }

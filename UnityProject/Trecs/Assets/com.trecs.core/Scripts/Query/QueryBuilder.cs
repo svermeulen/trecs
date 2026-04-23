@@ -250,6 +250,7 @@ namespace Trecs
 
         public readonly QueryIterator EntityIndices()
         {
+            AssertHasAnyCriteria();
             return CreateIterator();
         }
 
@@ -259,17 +260,20 @@ namespace Trecs
         /// </summary>
         public readonly DenseGroupSliceIterator GroupSlices()
         {
+            AssertHasAnyCriteria();
             var groups = ResolveGroups();
             return new DenseGroupSliceIterator(_world, groups);
         }
 
         public readonly ReadOnlyFastList<Group> Groups()
         {
+            AssertHasAnyCriteria();
             return ResolveGroups();
         }
 
         public readonly int Count()
         {
+            AssertHasAnyCriteria();
             var groups = ResolveGroups();
             return _world.CountEntitiesInGroups(groups);
         }
@@ -292,6 +296,7 @@ namespace Trecs
 
         public readonly EntityIndex SingleEntityIndex()
         {
+            AssertHasAnyCriteria();
             var iter = CreateIterator();
 
             var movedFirst = iter.MoveNext();
@@ -305,6 +310,7 @@ namespace Trecs
 
         public readonly bool TrySingleEntityIndex(out EntityIndex entityIndex)
         {
+            AssertHasAnyCriteria();
             var iter = CreateIterator();
 
             if (!iter.MoveNext())
@@ -323,6 +329,14 @@ namespace Trecs
 
             entityIndex = first;
             return true;
+        }
+
+        readonly void AssertHasAnyCriteria()
+        {
+            Require.That(
+                HasAnyCriteria,
+                "Query has no criteria — add at least one WithTags / WithoutTags / WithComponents / WithoutComponents constraint before calling a terminator"
+            );
         }
 
         internal readonly ReadOnlyFastList<Group> ResolveGroups()

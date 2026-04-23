@@ -13,6 +13,11 @@ namespace Trecs
     {
         public uint Value;
 
+        /// <summary>
+        /// Sentinel value representing a null handle. <see cref="IsNull"/> returns <c>true</c> for this value.
+        /// </summary>
+        public static readonly PtrHandle Null;
+
         public PtrHandle(uint value)
         {
             Value = value;

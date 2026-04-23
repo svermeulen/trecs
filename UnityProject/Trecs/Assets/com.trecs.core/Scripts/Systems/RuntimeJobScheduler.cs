@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Unity.Jobs;
 
@@ -13,6 +14,10 @@ namespace Trecs.Internal
     /// Tracks per (resource, group) pair for precise dependency resolution.
     /// Resources can be component types or sets.
     /// A job writing CPosition for Fish entities does not block reading CPosition for Meal entities.
+    ///
+    /// <b>Thread safety:</b> this type is main-thread only. All dictionaries and lists
+    /// are unsynchronized; concurrent access from a job thread or worker will corrupt state.
+    /// Every mutating method asserts it's running on the main thread in debug builds.
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
     public class RuntimeJobScheduler
@@ -51,6 +56,12 @@ namespace Trecs.Internal
         static long MakeKey(ResourceId resourceType, Group group)
         {
             return ((long)resourceType.Value << 32) | (uint)group.Id;
+        }
+
+        [Conditional("DEBUG")]
+        static void AssertMainThread()
+        {
+            Assert.That(UnityThreadHelper.IsMainThread, "RuntimeJobScheduler is main-thread only");
         }
 
         /// <summary>
@@ -95,11 +106,12 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// Register a scheduled job as a reader of a (resource, group) pair.
+        /// Register a scheduled job as a reader of a (resource, group) pair. Main thread only.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TrackJobRead(JobHandle handle, ResourceId resourceType, Group group)
         {
+            AssertMainThread();
             var key = MakeKey(resourceType, group);
 
             if (!_readers.TryGetValue(key, out var readerList))
@@ -114,10 +126,11 @@ namespace Trecs.Internal
 
         /// <summary>
         /// Register a scheduled job as a writer of a (resource, group) pair.
-        /// Replaces any previous writer and clears readers for this pair.
+        /// Replaces any previous writer and clears readers for this pair. Main thread only.
         /// </summary>
         public void TrackJobWrite(JobHandle handle, ResourceId resourceType, Group group)
         {
+            AssertMainThread();
             var key = MakeKey(resourceType, group);
 
             if (_readers.TryGetValue(key, out var readerList))
@@ -139,10 +152,11 @@ namespace Trecs.Internal
         /// <summary>
         /// Ensure it is safe to READ a (resource, group) pair on the main thread.
         /// Only completes outstanding writers for this pair — concurrent readers are safe.
-        /// Returns true if any jobs were actually completed (a sync point occurred).
+        /// Returns true if any jobs were actually completed (a sync point occurred). Main thread only.
         /// </summary>
         public bool SyncMainThreadForRead(ResourceId resourceType, Group group)
         {
+            AssertMainThread();
             var key = MakeKey(resourceType, group);
 
             if (_writers.TryGetValue(key, out var writerHandle))
@@ -159,10 +173,11 @@ namespace Trecs.Internal
         /// <summary>
         /// Ensure it is safe to WRITE a (resource, group) pair on the main thread.
         /// Completes outstanding writer and all readers for this pair.
-        /// Returns true if any jobs were actually completed (a sync point occurred).
+        /// Returns true if any jobs were actually completed (a sync point occurred). Main thread only.
         /// </summary>
         public bool SyncMainThread(ResourceId resourceType, Group group)
         {
+            AssertMainThread();
             var key = MakeKey(resourceType, group);
             bool synced = false;
 
@@ -194,11 +209,12 @@ namespace Trecs.Internal
         /// <summary>
         /// Track a job handle that doesn't have specific component access patterns.
         /// Used for jobs that perform structural operations (e.g. NativeWorldAccessor)
-        /// or other work that just needs to complete at the next phase boundary.
+        /// or other work that just needs to complete at the next phase boundary. Main thread only.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TrackJob(JobHandle handle)
         {
+            AssertMainThread();
             _untrackedJobs.Add(handle);
             _outstandingJobCount++;
         }
@@ -209,19 +225,22 @@ namespace Trecs.Internal
         /// <see cref="CompleteAllOutstanding"/> phase boundary, AFTER all outstanding
         /// jobs have completed. Use this for native containers whose layout makes
         /// <c>NativeList.Dispose(JobHandle)</c> illegal due to nested-container rules.
+        /// Main thread only.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RegisterPendingDispose(IDisposable disposable)
         {
+            AssertMainThread();
             _pendingDisposes.Add(disposable);
         }
 
         /// <summary>
         /// Complete all outstanding jobs and clear tracking state.
-        /// Called at phase boundaries.
+        /// Called at phase boundaries. Main thread only.
         /// </summary>
         public void CompleteAllOutstanding()
         {
+            AssertMainThread();
             using (TrecsProfiling.Start("Complete Writers"))
             {
                 foreach (var kvp in _writers)
