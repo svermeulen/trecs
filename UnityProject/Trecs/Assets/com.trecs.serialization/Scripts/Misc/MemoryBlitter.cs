@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.IO;
+using Trecs.Serialization;
 
 namespace Trecs.Internal
 {
@@ -32,12 +33,15 @@ namespace Trecs.Internal
 
             int bytesRead = reader.Read(_buffer, 0, numBytes);
 
-            Assert.That(
-                bytesRead == numBytes,
-                "Expected to read {} bytes, but only read {} bytes.",
-                numBytes,
-                bytesRead
-            );
+            // Unconditional throw: a short read on a blit path silently blits
+            // stale buffer content into the caller's memory, which corrupts
+            // components rather than failing. Must trip in release too.
+            if (bytesRead != numBytes)
+            {
+                throw new SerializationException(
+                    $"Truncated stream: expected {numBytes} bytes, got {bytesRead} at position {reader.BaseStream.Position}"
+                );
+            }
 
             fixed (void* bufferPtr = _buffer)
             {

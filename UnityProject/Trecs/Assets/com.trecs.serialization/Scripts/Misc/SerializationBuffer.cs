@@ -29,6 +29,13 @@ namespace Trecs.Serialization
             _writer = new BinarySerializationWriter(serializerManager);
         }
 
+        /// <summary>
+        /// Current read/write state of the buffer. Useful for defensive caller
+        /// code that needs to know whether it's safe to reset or reuse the
+        /// buffer without relying on exception-based signalling.
+        /// </summary>
+        public State CurrentState => _state;
+
         public MemoryStream MemoryStream
         {
             get
@@ -386,6 +393,24 @@ namespace Trecs.Serialization
 
             uint unsignedHash = ByteHashCalculator.Run(buffer, length);
             return unchecked((int)unsignedHash);
+        }
+
+        /// <summary>
+        /// Compute a checksum over the currently-written bytes. Safely handles
+        /// the <see cref="MemoryStream.GetBuffer"/> / <see cref="MemoryStream.Length"/>
+        /// discipline so callers cannot accidentally hash uninitialized trailing
+        /// bytes (which would produce a non-deterministic checksum and break
+        /// replay / desync detection).
+        /// </summary>
+        public uint ComputeChecksum()
+        {
+            Assert.That(!_hasDisposed);
+            Assert.That(_state == State.Idle);
+
+            int length = (int)_memoryStream.Length;
+            byte[] buffer = _memoryStream.GetBuffer();
+
+            return ByteHashCalculator.Run(buffer, length);
         }
 
         /// <summary>

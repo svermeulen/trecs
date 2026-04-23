@@ -1,6 +1,6 @@
-using System;
 using System.ComponentModel;
 using System.IO;
+using Trecs.Serialization;
 
 namespace Trecs.Internal
 {
@@ -86,7 +86,10 @@ namespace Trecs.Internal
 
             if (_byteIndex >= _bytes.Length || (_byteIndex * 8 + _bitPosition) >= _totalBits)
             {
-                throw new InvalidOperationException("No more bits to read");
+                var consumed = _byteIndex * 8 + _bitPosition;
+                throw new SerializationException(
+                    $"BitReader underrun at byte {_byteIndex}, bit {_bitPosition} ({consumed} of {_totalBits} bits consumed) — truncated or corrupt stream"
+                );
             }
 
             var bit = (_bytes[_byteIndex] & (1 << _bitPosition)) != 0;

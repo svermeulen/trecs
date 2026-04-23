@@ -35,14 +35,11 @@ namespace Trecs.Internal
 
                 using (TrecsProfiling.Start("ChecksumCalculator.Run"))
                 {
-                    var memoryStream = serializerHelper.MemoryStream;
-
-                    memoryStream.Position = 0;
-
-                    byte[] buffer = memoryStream.GetBuffer();
-                    int length = (int)memoryStream.Length;
-
-                    return ByteHashCalculator.Run(buffer, length);
+                    // Use the buffer helper rather than reaching into MemoryStream
+                    // directly: GetBuffer() returns the whole internal array and it
+                    // is easy to hash uninitialized trailing bytes by mistake, which
+                    // would poison the checksum and break replay / desync detection.
+                    return serializerHelper.ComputeChecksum();
                 }
             }
         }

@@ -14,12 +14,12 @@ namespace Trecs.Serialization
         public void Deserialize(ref List<T> value, ISerializationReader reader)
         {
             var numItems = reader.Read<int>("numItems");
-            Assert.That(numItems >= 0);
-            Assert.That(
-                numItems <= 1000000,
-                "Unexpectedly large number of items in list {}.  Data corruption?",
-                numItems
-            );
+            if (numItems < 0 || numItems > SerializationConstants.MaxCollectionLength)
+            {
+                throw new SerializationException(
+                    $"Invalid List<{typeof(T).Name}> length {numItems} (max {SerializationConstants.MaxCollectionLength}) — truncated or corrupt stream"
+                );
+            }
 
             if (value == null)
             {
