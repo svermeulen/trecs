@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -139,8 +138,8 @@ namespace Trecs.Tests
             SpawnEntities(envMain);
             SpawnEntities(envJob);
 
-            StepFixedFrames(envMain, 3);
-            StepFixedFrames(envJob, 3);
+            envMain.StepFixedFrames(3);
+            envJob.StepFixedFrames(3);
 
             var mainValues = CollectTestIntValues(envMain);
             var jobValues = CollectTestIntValues(envJob);
@@ -172,7 +171,7 @@ namespace Trecs.Tests
             SpawnEntities(env);
 
             // One fixed tick → Execute() schedules three sequential Increment jobs.
-            StepFixedFrames(env, 1);
+            env.StepFixedFrames(1);
 
             var values = CollectTestIntValues(env);
             for (int i = 0; i < values.Length; i++)
@@ -203,7 +202,7 @@ namespace Trecs.Tests
             // The assertion here is "does not throw" — if the scheduler mis-tracks
             // either read as a write, Unity's safety system throws on the second
             // ScheduleParallel call and the test fails.
-            StepFixedFrames(env, 1);
+            env.StepFixedFrames(1);
 
             // Post-condition: readers did not mutate state.
             var afterValues = CollectTestIntValues(env);
@@ -250,33 +249,6 @@ namespace Trecs.Tests
                 values[i] = buffer[i].Value;
             }
             return values;
-        }
-
-        /// <summary>
-        /// Advances <paramref name="frames"/> fixed-update frames in lockstep.
-        /// Decouples from Unity's non-deterministic <c>Time.deltaTime</c> in the
-        /// editor by pausing fixed update and stepping one frame at a time.
-        ///
-        /// Calls Tick+LateTick once up front to sync <c>_fixedIsPaused</c> to
-        /// <c>_desiredFixedIsPaused</c> (StepFrame silently warns-and-returns if
-        /// the two are out of sync) — that "prime" tick runs no fixed update
-        /// because the pause takes effect at its start.
-        /// </summary>
-        static void StepFixedFrames(TestEnvironment env, int frames)
-        {
-            var runner = env.World.GetSystemRunner();
-            runner.FixedIsPaused = true;
-
-            // Prime: sync the pause flag. No fixed frame runs this tick.
-            env.World.Tick();
-            env.World.LateTick();
-
-            for (int i = 0; i < frames; i++)
-            {
-                runner.StepFrame();
-                env.World.Tick();
-                env.World.LateTick();
-            }
         }
     }
 }

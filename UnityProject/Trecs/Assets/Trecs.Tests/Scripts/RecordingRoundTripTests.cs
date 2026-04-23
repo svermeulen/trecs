@@ -1,6 +1,5 @@
 using System.IO;
 using NUnit.Framework;
-using Trecs.Internal;
 using Trecs.Serialization;
 using NAssert = NUnit.Framework.Assert;
 
@@ -75,7 +74,7 @@ namespace Trecs.Tests
                     checksumFrameInterval: ChecksumFrameInterval
                 );
 
-                StepFixedFrames(env, FramesToRun);
+                env.StepFixedFrames(FramesToRun);
 
                 using var recordingStream = new MemoryStream();
                 recorder.EndRecording(recordingStream);
@@ -120,7 +119,7 @@ namespace Trecs.Tests
 
                 for (int i = 0; i < FramesToRun; i++)
                 {
-                    StepFixedFrames(env, 1);
+                    env.StepFixedFrames(1);
                     playback.TickPlayback();
 
                     NAssert.IsFalse(
@@ -163,7 +162,7 @@ namespace Trecs.Tests
                     checksumsEnabled: true,
                     checksumFrameInterval: ChecksumFrameInterval
                 );
-                StepFixedFrames(env, FramesToRun);
+                env.StepFixedFrames(FramesToRun);
                 using var recordingStream = new MemoryStream();
                 recorder.EndRecording(recordingStream);
                 recordingBytes = recordingStream.ToArray();
@@ -196,7 +195,7 @@ namespace Trecs.Tests
 
                 // Corrupt the state mid-playback — mutate entities so the next checksum
                 // cannot possibly match.
-                StepFixedFrames(env, 1);
+                env.StepFixedFrames(1);
                 foreach (var ei in env.Accessor.Query().WithTags(Tag<QId1>.Value).EntityIndices())
                 {
                     env.Accessor.Component<TestInt>(ei).Write.Value = 999999;
@@ -205,7 +204,7 @@ namespace Trecs.Tests
 
                 for (int i = 1; i < FramesToRun; i++)
                 {
-                    StepFixedFrames(env, 1);
+                    env.StepFixedFrames(1);
                     playback.TickPlayback();
                     if (playback.HasDesynced)
                         break;
@@ -242,37 +241,6 @@ namespace Trecs.Tests
                     .AssertComplete();
             }
             a.SubmitEntities();
-        }
-
-        /// <summary>
-        /// Advances <paramref name="frames"/> fixed-update frames in lockstep.
-        /// Pausing fixed update and explicitly stepping before each tick decouples
-        /// the test from Unity's <c>Time.deltaTime</c> (which is non-deterministic
-        /// in the editor) and guarantees exactly one fixed step per iteration.
-        ///
-        /// A "prime" Tick is issued first to sync <c>_fixedIsPaused</c> to
-        /// <c>_desiredFixedIsPaused</c> — <c>StepFrame</c> silently warns-and-returns
-        /// if the two are out of sync, so without this prime the very first fixed
-        /// step would be skipped. The prime tick itself runs no fixed update
-        /// because the pause takes effect at its start.
-        ///
-        /// Safe to call repeatedly: after the first prime, subsequent primes are
-        /// no-op ticks that don't fire fixed update.
-        /// </summary>
-        static void StepFixedFrames(TestEnvironment env, int frames)
-        {
-            var runner = env.World.GetSystemRunner();
-            runner.FixedIsPaused = true;
-
-            env.World.Tick();
-            env.World.LateTick();
-
-            for (int i = 0; i < frames; i++)
-            {
-                runner.StepFrame();
-                env.World.Tick();
-                env.World.LateTick();
-            }
         }
     }
 }
