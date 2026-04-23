@@ -23,7 +23,7 @@ namespace Trecs.Internal
         readonly SimpleSubject<int> _variableFrameCountChangeEvent = new();
         readonly SimpleSubject<float> _fixedElapsedTimeChangeEvent = new();
         readonly SimpleSubject<bool> _fixedIsPausedChangedEvent = new();
-        readonly RuntimeJobScheduler _jobScheduler = new();
+        readonly RuntimeJobScheduler _jobScheduler;
         readonly WorldSafetyManager _safetyManager = new();
 
         readonly EntitySubmitter _entitySubmitter;
@@ -63,7 +63,8 @@ namespace Trecs.Internal
         public SystemRunner(
             EntitySubmitter entitySubmitter,
             WorldSettings settings,
-            InterpolatedPreviousSaverManager interpolatedPreviousSaverManager
+            InterpolatedPreviousSaverManager interpolatedPreviousSaverManager,
+            RuntimeJobScheduler jobScheduler
         )
         {
             settings ??= new WorldSettings();
@@ -73,12 +74,9 @@ namespace Trecs.Internal
 
             _isPaused = settings.StartPaused;
             _settings = settings;
+            _jobScheduler = jobScheduler;
 
             _entitySubmitter = entitySubmitter;
-            // Late-wire the scheduler into the submitter so its deferred-flush
-            // assert can detect mid-job flushes (scheduler is owned here, but
-            // the submitter is constructed before the runner).
-            _entitySubmitter.SetJobScheduler(_jobScheduler);
 
             _log.Trace("Using Trecs Settings: {@}", settings);
         }

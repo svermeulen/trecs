@@ -66,10 +66,7 @@ namespace Trecs.Internal
         readonly NativeUniqueHeap _nativeUniqueHeap;
         readonly FrameScopedNativeUniqueHeap _frameScopedNativeUniqueHeap;
 
-        // Late-bound by SystemRunner (constructed after EntitySubmitter). Used only
-        // to assert that deferred native-heap flushes never run while jobs are still
-        // reading via the resolver — swap-back removals would corrupt those reads.
-        RuntimeJobScheduler _jobScheduler;
+        readonly RuntimeJobScheduler _jobScheduler;
 
         readonly AtomicNativeBags _nativeAddOperationQueue;
         readonly AtomicNativeBags _nativeRemoveOperationQueue;
@@ -117,11 +114,13 @@ namespace Trecs.Internal
             EntityQuerier entitiesQuerier,
             NativeSharedHeap nativeSharedHeap,
             NativeUniqueHeap nativeUniqueHeap,
-            FrameScopedNativeUniqueHeap frameScopedNativeUniqueHeap
+            FrameScopedNativeUniqueHeap frameScopedNativeUniqueHeap,
+            RuntimeJobScheduler jobScheduler
         )
         {
             _entitiesOperations = new EntitiesOperations();
 
+            _jobScheduler = jobScheduler;
             _nativeSharedHeap = nativeSharedHeap;
             _nativeUniqueHeap = nativeUniqueHeap;
             _frameScopedNativeUniqueHeap = frameScopedNativeUniqueHeap;
@@ -148,13 +147,6 @@ namespace Trecs.Internal
             _entitiesQuerier = entitiesQuerier;
         }
 
-        internal void SetJobScheduler(RuntimeJobScheduler jobScheduler)
-        {
-            Assert.That(_jobScheduler == null, "SetJobScheduler called twice");
-            Assert.IsNotNull(jobScheduler);
-            _jobScheduler = jobScheduler;
-        }
-
         public bool ConfigurationFrozen
         {
             get { return _componentStore.ConfigurationFrozen; }
@@ -179,7 +171,7 @@ namespace Trecs.Internal
             // (flush called mid-job) loudly in DEBUG rather than producing
             // corrupted reads.
             Assert.That(
-                _jobScheduler == null || !_jobScheduler.HasOutstandingJobs,
+                !_jobScheduler.HasOutstandingJobs,
                 "FlushAllDeferredOps called while jobs are still outstanding. "
                     + "Call scheduler.CompleteAllOutstanding() first."
             );

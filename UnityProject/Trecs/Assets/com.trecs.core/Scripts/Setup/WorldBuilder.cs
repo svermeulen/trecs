@@ -277,6 +277,8 @@ namespace Trecs
 
             var entityQuerier = new EntityQuerier(componentStore, setStore);
 
+            var jobScheduler = new RuntimeJobScheduler();
+
             var submitter = new EntitySubmitter(
                 worldInfo,
                 accessorRegistry,
@@ -287,7 +289,8 @@ namespace Trecs
                 entityQuerier,
                 nativeSharedHeap,
                 nativeUniqueHeap,
-                frameScopedNativeUniqueHeap
+                frameScopedNativeUniqueHeap,
+                jobScheduler
             );
 
             var interpolatedPreviousSaverManager = new InterpolatedPreviousSaverManager(
@@ -297,7 +300,8 @@ namespace Trecs
             var systemRunner = new SystemRunner(
                 submitter,
                 settings,
-                interpolatedPreviousSaverManager
+                interpolatedPreviousSaverManager,
+                jobScheduler
             );
 
             var entityInputQueue = new EntityInputQueue(
