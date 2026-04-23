@@ -23,7 +23,9 @@ namespace Trecs.SourceGen
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            // Create provider for methods with ForEachAspectAttribute
+            // Validation runs in the transform, so the terminal stage doesn't need a full
+            // Compilation — only the global-namespace display string. See
+            // IncrementalForEachGenerator for the caching rationale.
             var forEachMethodProvider = context
                 .SyntaxProvider.CreateSyntaxProvider(
                     predicate: static (s, _) => IsMethodWithForEachAspectAttribute(s),
@@ -31,13 +33,15 @@ namespace Trecs.SourceGen
                 )
                 .Where(static m => m is not null);
 
-            // Combine with compilation provider
-            var compilationProvider = context.CompilationProvider;
-            var forEachMethodWithCompilation = forEachMethodProvider.Combine(compilationProvider);
+            var globalNsProvider = context.CompilationProvider.Select(
+                static (c, _) =>
+                    PerformanceCache.GetDisplayString(c.GlobalNamespace) ?? string.Empty
+            );
 
-            // Register source output
+            var forEachWithGlobalNs = forEachMethodProvider.Combine(globalNsProvider);
+
             context.RegisterSourceOutput(
-                forEachMethodWithCompilation,
+                forEachWithGlobalNs,
                 static (spc, source) => GenerateForEachAspectSource(spc, source.Left!, source.Right)
             );
         }
@@ -82,13 +86,34 @@ namespace Trecs.SourceGen
             if (!IterationAttributeRouting.RoutesToAspectGenerator(methodSymbol))
                 return null;
 
-            return new ForEachAspectData(classDecl, methodDecl, methodSymbol);
+            // Validation runs here so the terminal stage doesn't need a Compilation /
+            // SemanticModel; captured diagnostics round-trip through value-equality
+            // pipeline state and are replayed downstream.
+            var diagnostics = new List<Diagnostic>();
+            ValidatedMethodInfo? validated = null;
+            bool isValid = ValidateMethod(
+                classDecl,
+                methodDecl,
+                methodSymbol,
+                diagnostics.Add,
+                context.SemanticModel,
+                out validated
+            );
+
+            return new ForEachAspectData(
+                classDecl,
+                methodDecl,
+                methodSymbol,
+                isValid,
+                validated,
+                diagnostics.ToImmutableArray()
+            );
         }
 
         private static void GenerateForEachAspectSource(
             SourceProductionContext context,
             ForEachAspectData data,
-            Compilation compilation
+            string globalNamespaceName
         )
         {
             var location = data.MethodDecl.GetLocation();
@@ -99,6 +124,17 @@ namespace Trecs.SourceGen
                 $"{methodName}_ForEachAspect"
             );
 
+            // Replay diagnostics collected in the transform phase.
+            foreach (var diag in data.Diagnostics)
+            {
+                context.ReportDiagnostic(diag);
+            }
+
+            if (!data.IsValid || data.ValidatedInfo == null)
+            {
+                return;
+            }
+
             try
             {
                 using var _ = SourceGenTimer.Time("ForEachAspectGenerator.Total");
@@ -106,38 +142,13 @@ namespace Trecs.SourceGen
                     $"[ForEachAspectGenerator] Processing {className}.{methodName}"
                 );
 
-                // Validate the method and extract info in a single pass
-                ValidatedMethodInfo? validatedMethodInfo = null;
-                var isValid =
-                    ErrorRecovery.TryExecuteBool(
-                        () =>
-                            ValidateMethod(
-                                data.ClassDecl,
-                                data.MethodDecl,
-                                data.MethodSymbol,
-                                context,
-                                compilation,
-                                out validatedMethodInfo
-                            ),
-                        context,
-                        location,
-                        "Method validation"
-                    ) ?? false;
-
-                if (!isValid || validatedMethodInfo == null)
-                {
-                    return;
-                }
-
-                // Generate the source code
                 var source = ErrorRecovery.TryExecute(
                     () =>
                         GenerateSource(
-                            context,
                             data.ClassDecl,
                             data.MethodDecl,
-                            validatedMethodInfo,
-                            compilation
+                            data.ValidatedInfo,
+                            globalNamespaceName
                         ),
                     context,
                     location,
@@ -174,11 +185,10 @@ namespace Trecs.SourceGen
         }
 
         private static string GenerateSource(
-            SourceProductionContext context,
             ClassDeclarationSyntax classDec,
             MethodDeclarationSyntax methodDec,
             ValidatedMethodInfo validatedMethodInfo,
-            Compilation compilation
+            string globalNamespaceName
         )
         {
             var customArgsDecStr = "";
@@ -217,7 +227,7 @@ namespace Trecs.SourceGen
 
             // Add required namespaces
             var requiredNamespaces = NamespaceCollector.Collect(
-                PerformanceCache.GetDisplayString(compilation.GlobalNamespace) ?? "",
+                globalNamespaceName,
                 validatedMethodInfo
             );
 
@@ -709,8 +719,8 @@ namespace Trecs.SourceGen
             ClassDeclarationSyntax classDec,
             MethodDeclarationSyntax methodDec,
             IMethodSymbol methodSymbol,
-            SourceProductionContext context,
-            Compilation compilation,
+            System.Action<Diagnostic> reportDiagnostic,
+            SemanticModel semanticModel,
             out ValidatedMethodInfo? validatedMethodInfo
         )
         {
@@ -720,7 +730,7 @@ namespace Trecs.SourceGen
             // Check if the class is partial
             if (!classDec.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.NotPartialClass,
                         classDec.Identifier.GetLocation(),
@@ -733,7 +743,7 @@ namespace Trecs.SourceGen
             // Check return type
             if (methodDec.ReturnType.ToString() != "void")
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.InvalidReturnType,
                         methodDec.ReturnType.GetLocation()
@@ -743,12 +753,11 @@ namespace Trecs.SourceGen
             }
 
             // Validate parameters
-            var semanticModel = compilation.GetSemanticModel(methodDec.SyntaxTree);
             var parameters = methodDec.ParameterList.Parameters;
 
             if (parameters.Count == 0)
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.EmptyParameters,
                         methodDec.ParameterList.GetLocation()
@@ -785,7 +794,7 @@ namespace Trecs.SourceGen
                 if (aspectParam != null)
                 {
                     // Two non-pass-through aspect params is ambiguous.
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.DuplicateLoopParameter,
                             p.GetLocation(),
@@ -802,7 +811,7 @@ namespace Trecs.SourceGen
 
             if (aspectParam == null || aspectParamType == null)
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.InvalidParameterList,
                         methodDec.ParameterList.GetLocation(),
@@ -815,7 +824,7 @@ namespace Trecs.SourceGen
             // Aspect must use 'in' modifier (not 'ref', not bare).
             if (aspectParam.Modifiers.Any(m => m.IsKind(SyntaxKind.RefKeyword)))
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.AspectParamMustBeIn,
                         aspectParam.GetLocation(),
@@ -826,7 +835,7 @@ namespace Trecs.SourceGen
             }
             if (!aspectParam.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword)))
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.InvalidParameterModifiers,
                         aspectParam.GetLocation(),
@@ -857,7 +866,7 @@ namespace Trecs.SourceGen
 
             // Extract tag types, set types, and MatchByComponents from the iteration attribute.
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                context.ReportDiagnostic,
+                reportDiagnostic,
                 methodDec,
                 methodSymbol,
                 classDec.Identifier.Text,
@@ -876,7 +885,7 @@ namespace Trecs.SourceGen
                 parameters,
                 semanticModel,
                 IterationMode.Aspect,
-                context.ReportDiagnostic,
+                reportDiagnostic,
                 methodDec.Identifier.Text,
                 supportsEntityIndex: true,
                 aspectParam: aspectParam,
@@ -891,7 +900,7 @@ namespace Trecs.SourceGen
 
             if (componentTypes.Count == 0)
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.AspectNoComponents,
                         aspectParam.GetLocation(),
@@ -930,23 +939,35 @@ namespace Trecs.SourceGen
     }
 
     /// <summary>
-    /// Data structure for ForEachAspect information used in incremental generation
+    /// Data structure for ForEachAspect information used in incremental generation.
+    /// Carries validation results + diagnostics forward from the transform phase so that
+    /// the terminal stage doesn't need access to a <see cref="Compilation"/> or
+    /// <see cref="SemanticModel"/>.
     /// </summary>
     internal class ForEachAspectData
     {
         public ClassDeclarationSyntax ClassDecl { get; }
         public MethodDeclarationSyntax MethodDecl { get; }
         public IMethodSymbol MethodSymbol { get; }
+        public bool IsValid { get; }
+        public ValidatedMethodInfo? ValidatedInfo { get; }
+        public ImmutableArray<Diagnostic> Diagnostics { get; }
 
         public ForEachAspectData(
             ClassDeclarationSyntax classDecl,
             MethodDeclarationSyntax methodDecl,
-            IMethodSymbol methodSymbol
+            IMethodSymbol methodSymbol,
+            bool isValid,
+            ValidatedMethodInfo? validatedInfo,
+            ImmutableArray<Diagnostic> diagnostics
         )
         {
             ClassDecl = classDecl;
             MethodDecl = methodDecl;
             MethodSymbol = methodSymbol;
+            IsValid = isValid;
+            ValidatedInfo = validatedInfo;
+            Diagnostics = diagnostics;
         }
     }
 }

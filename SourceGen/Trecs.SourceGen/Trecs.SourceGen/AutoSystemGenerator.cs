@@ -37,10 +37,18 @@ namespace Trecs.SourceGen
                 hasTrecsReference
             );
 
-            var classWithCompilation = classProvider.Combine(context.CompilationProvider);
+            // See IncrementalForEachGenerator for the caching rationale: validation runs
+            // in the transform, and the terminal stage only needs the global-namespace
+            // display string.
+            var globalNsProvider = context.CompilationProvider.Select(
+                static (c, _) =>
+                    PerformanceCache.GetDisplayString(c.GlobalNamespace) ?? string.Empty
+            );
+
+            var classWithGlobalNs = classProvider.Combine(globalNsProvider);
 
             context.RegisterSourceOutput(
-                classWithCompilation,
+                classWithGlobalNs,
                 static (spc, source) => GenerateAutoSystemSource(spc, source.Left!, source.Right)
             );
         }
@@ -76,47 +84,60 @@ namespace Trecs.SourceGen
             if (!isSystem)
                 return null;
 
-            return new AutoSystemClassData(classDecl, classSymbol);
+            // Validate in the transform so the terminal stage doesn't need the full
+            // Compilation. Diagnostics are replayed downstream.
+            var diagnostics = new List<Diagnostic>();
+            AutoSystemInfo? autoSystemInfo = null;
+            bool isValid = ValidateAndCollect(
+                classDecl,
+                classSymbol,
+                diagnostics.Add,
+                context.SemanticModel,
+                out autoSystemInfo
+            );
+
+            return new AutoSystemClassData(
+                classDecl,
+                classSymbol,
+                isValid,
+                autoSystemInfo,
+                diagnostics.ToImmutableArray()
+            );
         }
 
         private static void GenerateAutoSystemSource(
             SourceProductionContext context,
             AutoSystemClassData data,
-            Compilation compilation
+            string globalNamespaceName
         )
         {
             var location = data.ClassDecl.GetLocation();
             var className = data.ClassDecl.Identifier.Text;
             var fileName = SymbolAnalyzer.GetSafeFileName(data.ClassSymbol, "AutoSystem");
 
+            // Replay diagnostics collected in the transform phase.
+            foreach (var diag in data.Diagnostics)
+            {
+                context.ReportDiagnostic(diag);
+            }
+
+            if (!data.IsValid || data.AutoSystemInfo == null)
+            {
+                return;
+            }
+
             try
             {
                 using var _timer_ = SourceGenTimer.Time("AutoSystemGenerator.Total");
                 SourceGenLogger.Log($"[AutoSystemGenerator] Processing {className}");
 
-                AutoSystemInfo? autoSystemInfo = null;
-                var isValid =
-                    ErrorRecovery.TryExecuteBool(
-                        () =>
-                            ValidateAndCollect(
-                                data.ClassDecl,
-                                data.ClassSymbol,
-                                context,
-                                compilation,
-                                out autoSystemInfo
-                            ),
-                        context,
-                        location,
-                        "AutoSystem validation"
-                    ) ?? false;
-
-                if (!isValid || autoSystemInfo == null)
-                {
-                    return;
-                }
-
                 var source = ErrorRecovery.TryExecute(
-                    () => GenerateSourceCode(data.ClassDecl, autoSystemInfo, compilation),
+                    () =>
+                        GenerateSourceCode(
+                            data.ClassDecl,
+                            data.AutoSystemInfo,
+                            globalNamespaceName
+                        ),
                     context,
                     location,
                     "AutoSystem code generation"
@@ -147,8 +168,8 @@ namespace Trecs.SourceGen
         private static bool ValidateAndCollect(
             ClassDeclarationSyntax classDec,
             INamedTypeSymbol classSymbol,
-            SourceProductionContext context,
-            Compilation compilation,
+            System.Action<Diagnostic> reportDiagnostic,
+            SemanticModel semanticModel,
             out AutoSystemInfo? autoSystemInfo
         )
         {
@@ -159,7 +180,7 @@ namespace Trecs.SourceGen
             // Check if the class is partial
             if (!classDec.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.AutoSystemMustBePartial,
                         classDec.Identifier.GetLocation(),
@@ -172,7 +193,6 @@ namespace Trecs.SourceGen
             // Find all iteration methods in the class
             var hasWrapAsJobMethodNamedExecute = false;
             var iterationMethods = new List<IterationMethodInfo>();
-            var semanticModel = compilation.GetSemanticModel(classDec.SyntaxTree);
 
             foreach (var methodDecl in classDec.Members.OfType<MethodDeclarationSyntax>())
             {
@@ -198,7 +218,7 @@ namespace Trecs.SourceGen
                 // Validate iteration method modifiers
                 if (methodSymbol.IsStatic)
                 {
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.IterationMethodCannotBeStatic,
                             methodLocation,
@@ -210,7 +230,7 @@ namespace Trecs.SourceGen
 
                 if (methodSymbol.IsAbstract)
                 {
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.IterationMethodCannotBeAbstract,
                             methodLocation,
@@ -240,7 +260,7 @@ namespace Trecs.SourceGen
                     attrCount++;
                 if (attrCount > 1)
                 {
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.IterationMethodMultipleAttributes,
                             methodLocation,
@@ -490,7 +510,7 @@ namespace Trecs.SourceGen
                 // Custom params not allowed on methods named Execute
                 if (customParams.Count > 0 && methodName == "Execute")
                 {
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.AutoSystemMethodHasCustomParams,
                             methodDecl.Identifier.GetLocation(),
@@ -537,7 +557,7 @@ namespace Trecs.SourceGen
                     && member.PartialDefinitionPart == null
                 )
                 {
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(DiagnosticDescriptors.OldStyleInitializeHook, location)
                     );
                     isValid = false;
@@ -550,7 +570,7 @@ namespace Trecs.SourceGen
                     && (member.IsPartialDefinition || member.PartialDefinitionPart != null)
                 )
                 {
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.PartialMethodWrongName,
                             location,
@@ -568,7 +588,7 @@ namespace Trecs.SourceGen
                     && (member.IsPartialDefinition || member.PartialDefinitionPart != null)
                 )
                 {
-                    context.ReportDiagnostic(
+                    reportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.PartialMethodWrongName,
                             location,
@@ -589,7 +609,7 @@ namespace Trecs.SourceGen
                 && (hasIterationMethodNamedExecute || hasWrapAsJobMethodNamedExecute)
             )
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.AutoSystemExecuteConflict,
                         classDec.Identifier.GetLocation(),
@@ -607,7 +627,7 @@ namespace Trecs.SourceGen
                 && !hasWrapAsJobMethodNamedExecute
             )
             {
-                context.ReportDiagnostic(
+                reportDiagnostic(
                     Diagnostic.Create(
                         DiagnosticDescriptors.AutoSystemMissingExecute,
                         classDec.Identifier.GetLocation(),
@@ -685,7 +705,7 @@ namespace Trecs.SourceGen
         }
 
         private static HashSet<string> GetRequiredNamespaces(
-            Compilation compilation,
+            string globalNamespaceName,
             AutoSystemInfo autoSystemInfo
         )
         {
@@ -699,7 +719,7 @@ namespace Trecs.SourceGen
                     && ns != "System"
                     && ns != null
                     && !ns.StartsWith("System.")
-                    && ns != (PerformanceCache.GetDisplayString(compilation.GlobalNamespace) ?? "")
+                    && ns != globalNamespaceName
                 )
                 {
                     namespaces.Add(ns);
@@ -721,7 +741,7 @@ namespace Trecs.SourceGen
         private static string GenerateSourceCode(
             ClassDeclarationSyntax classDec,
             AutoSystemInfo autoSystemInfo,
-            Compilation compilation
+            string globalNamespaceName
         )
         {
             var namespaceName = SymbolAnalyzer.GetNamespace(classDec);
@@ -734,7 +754,7 @@ namespace Trecs.SourceGen
 
             var sb = OptimizedStringBuilder.ForAspect(0);
 
-            var requiredNamespaces = GetRequiredNamespaces(compilation, autoSystemInfo);
+            var requiredNamespaces = GetRequiredNamespaces(globalNamespaceName, autoSystemInfo);
             sb.AppendUsings(requiredNamespaces.ToArray());
 
             return sb.WrapInNamespace(
@@ -835,11 +855,23 @@ namespace Trecs.SourceGen
     {
         public ClassDeclarationSyntax ClassDecl { get; }
         public INamedTypeSymbol ClassSymbol { get; }
+        public bool IsValid { get; }
+        public AutoSystemInfo? AutoSystemInfo { get; }
+        public ImmutableArray<Diagnostic> Diagnostics { get; }
 
-        public AutoSystemClassData(ClassDeclarationSyntax classDecl, INamedTypeSymbol classSymbol)
+        public AutoSystemClassData(
+            ClassDeclarationSyntax classDecl,
+            INamedTypeSymbol classSymbol,
+            bool isValid,
+            AutoSystemInfo? autoSystemInfo,
+            ImmutableArray<Diagnostic> diagnostics
+        )
         {
             ClassDecl = classDecl;
             ClassSymbol = classSymbol;
+            IsValid = isValid;
+            AutoSystemInfo = autoSystemInfo;
+            Diagnostics = diagnostics;
         }
     }
 
