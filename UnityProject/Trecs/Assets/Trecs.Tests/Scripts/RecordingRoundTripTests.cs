@@ -249,11 +249,24 @@ namespace Trecs.Tests
         /// Pausing fixed update and explicitly stepping before each tick decouples
         /// the test from Unity's <c>Time.deltaTime</c> (which is non-deterministic
         /// in the editor) and guarantees exactly one fixed step per iteration.
+        ///
+        /// A "prime" Tick is issued first to sync <c>_fixedIsPaused</c> to
+        /// <c>_desiredFixedIsPaused</c> — <c>StepFrame</c> silently warns-and-returns
+        /// if the two are out of sync, so without this prime the very first fixed
+        /// step would be skipped. The prime tick itself runs no fixed update
+        /// because the pause takes effect at its start.
+        ///
+        /// Safe to call repeatedly: after the first prime, subsequent primes are
+        /// no-op ticks that don't fire fixed update.
         /// </summary>
         static void StepFixedFrames(TestEnvironment env, int frames)
         {
             var runner = env.World.GetSystemRunner();
             runner.FixedIsPaused = true;
+
+            env.World.Tick();
+            env.World.LateTick();
+
             for (int i = 0; i < frames; i++)
             {
                 runner.StepFrame();
