@@ -32,13 +32,13 @@ These contain `List<T>` — managed types that can't be stored directly in compo
 ### Components
 
 ```csharp
-public partial struct CRoute : IEntityComponent
+public partial struct Route : IEntityComponent
 {
     public SharedPtr<PatrolRoute> Value;  // Shared across entities
     public float Progress;
 }
 
-public partial struct CTrail : IEntityComponent
+public partial struct Trail : IEntityComponent
 {
     public UniquePtr<TrailHistory> Value;  // Unique per entity
 }
@@ -59,13 +59,13 @@ SharedPtr<PatrolRoute> routePtr = world.Heap.AllocShared(new PatrolRoute
 
 // First entity gets the original
 world.AddEntity<PatrolTags.Follower>()
-    .Set(new CRoute { Value = routePtr })
-    .Set(new CTrail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) });
+    .Set(new Route { Value = routePtr })
+    .Set(new Trail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) });
 
 // Second entity clones (increments ref count, shares same data)
 world.AddEntity<PatrolTags.Follower>()
-    .Set(new CRoute { Value = routePtr.Clone(world.Heap) })
-    .Set(new CTrail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) });
+    .Set(new Route { Value = routePtr.Clone(world.Heap) })
+    .Set(new Trail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) });
 ```
 
 ### UniquePtr — Per-Entity Trail
@@ -88,7 +88,7 @@ Reads the shared route and unique trail:
 
 ```csharp
 [ForEachEntity(MatchByComponents = true)]
-void Execute(ref Position position, in CRoute route, in CTrail trail)
+void Execute(ref Position position, in Route route, in Trail trail)
 {
     // Read shared route data
     var patrolRoute = route.Value.Get(World);
@@ -117,10 +117,10 @@ world.Events.EntitiesWithTags<PatrolTags.Follower>()
         {
             var entityIndex = new EntityIndex(i, group);
 
-            var route = world.Component<CRoute>(entityIndex).Read;
+            var route = world.Component<Route>(entityIndex).Read;
             route.Value.Dispose(world);
 
-            var trail = world.Component<CTrail>(entityIndex).Read;
+            var trail = world.Component<Trail>(entityIndex).Read;
             trail.Value.Dispose(world);
         }
     })

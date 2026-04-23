@@ -16,6 +16,7 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 | 08 | [Sets](08-sets.md) | Dynamic entity subsets, overlapping membership |
 | 09 | [Interpolation](09-interpolation.md) | Fixed-to-variable timestep interpolation |
 | 10 | [Pointers](10-pointers.md) | SharedPtr, UniquePtr, managed data on the heap |
+| 14 | [Native Pointers](14-native-pointers.md) | NativeSharedPtr / NativeUniquePtr accessed from a Burst job |
 
 ## Game Samples
 
