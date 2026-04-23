@@ -115,14 +115,42 @@ public partial class RenderSystem : ISystem
 
 However, it is most common to define aspects as nested private structs inside the system that uses them, since they are typically specific to that system's logic.
 
-## AspectInterface
+## Aspect Interfaces (Shared Contracts)
 
-Use `[AspectInterface]` to define shared component access contracts that multiple aspects can implement:
+Aspects typically pair one-to-one with a system — a bespoke component bundle for that system's iteration. Sometimes, though, you want a helper method that works across several aspects: same shape of component access, different concrete aspect at each callsite. That's what **aspect interfaces** are for.
+
+An aspect interface is a `partial interface` that extends `IAspect` and declares `IRead<>`/`IWrite<>` just like a concrete aspect struct. Any aspect struct that lists the interface in its base list inherits the declared components and implements the generated property contract.
 
 ```csharp
-[AspectInterface]
-public interface IMoveable : IRead<Position>, IWrite<Velocity> { }
+// Shared contract: anything that has a writable Position is an IPositionedBoid.
+public partial interface IPositionedBoid : IAspect, IWrite<Position> { }
+
+// Two concrete aspects that both implement the contract. Each can still declare
+// additional components; IPositionedBoid only contributes Position.
+partial struct MovementAspect : IPositionedBoid, IRead<Velocity, Speed> { }
+partial struct WrapAspect     : IPositionedBoid { }
+
+// Generic helper constrained on the aspect interface. Works on either aspect
+// above — no boxing, no virtual dispatch.
+public static class BoidBounds
+{
+    public static void WrapPosition<T>(in T boid, float halfSize) where T : IPositionedBoid
+    {
+        ref var p = ref boid.Position;
+        if (p.x > halfSize)      p.x -= halfSize * 2;
+        else if (p.x < -halfSize) p.x += halfSize * 2;
+        if (p.z > halfSize)      p.z -= halfSize * 2;
+        else if (p.z < -halfSize) p.z += halfSize * 2;
+    }
+}
 ```
 
-This can be useful if you need to pass aspects around to different service classes.
+**Rules:**
+
+- The interface must be declared `partial` — the source generator attaches a partial with the ref-returning property stubs so generic helpers compile against it.
+- The interface must list `IAspect` in its base list. That's the opt-in marker.
+- Aspect interfaces cascade: an interface can extend another aspect interface, and all `IRead<>`/`IWrite<>` types are merged into the concrete aspect. Inheritance cycles between aspect interfaces are rejected by the C# compiler itself (CS0529).
+- Iteration (`[ForEachEntity]`, `[SingleEntity]`) still requires a concrete aspect struct, not an aspect interface. Aspect interfaces are for polymorphic helpers you call *from* iteration, not as the iteration parameter itself.
+
+See `Samples/03_Aspects/` for a working example.
 
