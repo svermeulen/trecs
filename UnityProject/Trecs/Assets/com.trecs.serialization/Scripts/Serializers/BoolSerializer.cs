@@ -1,6 +1,6 @@
 namespace Trecs.Serialization
 {
-    internal class BoolSerializer : ISerializer<bool>, ISerializerDelta<bool>
+    public class BoolSerializer : ISerializer<bool>, ISerializerDelta<bool>
     {
         public BoolSerializer() { }
 

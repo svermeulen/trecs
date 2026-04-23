@@ -53,6 +53,6 @@ namespace Trecs.Serialization
         /// <see cref="ReservedMask"/> but not in this constant is reserved-but-
         /// unassigned, and user code passing it is almost certainly a mistake.
         /// </summary>
-        internal const long AllDefinedMask = IsForChecksum;
+        public const long AllDefinedMask = IsForChecksum;
     }
 }
