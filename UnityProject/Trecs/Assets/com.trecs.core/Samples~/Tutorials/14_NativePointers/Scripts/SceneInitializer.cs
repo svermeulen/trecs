@@ -29,15 +29,15 @@ namespace Trecs.Samples.NativePointers
             // Compare with Sample 10's AllocShared: same refcount semantics,
             // but the payload type must be unmanaged for Burst compatibility.
             var circleRoute = _world.Heap.AllocNativeShared(
-                BuildRoute(new float3(-8, 0, 0), RouteShape.Circle, new float4(0, 1, 1, 1), 2f)
+                BuildRoute(new float3(-8, 0, 0), RouteShape.Circle, Color.cyan, 2f)
             );
 
             var figure8Route = _world.Heap.AllocNativeShared(
-                BuildRoute(float3.zero, RouteShape.Figure8, new float4(1, 1, 0, 1), 3f)
+                BuildRoute(float3.zero, RouteShape.Figure8, Color.yellow, 3f)
             );
 
             var starRoute = _world.Heap.AllocNativeShared(
-                BuildRoute(new float3(8, 0, 0), RouteShape.Star, new float4(1, 0, 1, 1), 2.5f)
+                BuildRoute(new float3(8, 0, 0), RouteShape.Star, Color.magenta, 2.5f)
             );
 
             // ─── Spawn followers ────────────────────────────────────
@@ -57,7 +57,6 @@ namespace Trecs.Samples.NativePointers
         void SpawnFollowers(NativeSharedPtr<TRoute> routePtr, int count)
         {
             ref readonly var route = ref routePtr.Get(_world);
-            var color = new Color(route.Color.x, route.Color.y, route.Color.z, route.Color.w);
             int waypointCount = route.Waypoints.Length;
 
             for (int i = 0; i < count; i++)
@@ -73,14 +72,14 @@ namespace Trecs.Samples.NativePointers
                 go.name = $"NativeFollower_{i}";
                 go.transform.position = (Vector3)pos;
                 go.transform.localScale = Vector3.one * 0.5f;
-                go.GetComponent<Renderer>().material.color = color;
+                go.GetComponent<Renderer>().material.color = route.Color;
 
                 var lr = go.AddComponent<LineRenderer>();
                 lr.startWidth = 0.15f;
                 lr.endWidth = 0.02f;
                 lr.material = new Material(Shader.Find("Sprites/Default"));
-                lr.startColor = color;
-                lr.endColor = new Color(color.r, color.g, color.b, 0.3f);
+                lr.startColor = route.Color;
+                lr.endColor = new Color(route.Color.r, route.Color.g, route.Color.b, 0.3f);
                 lr.positionCount = 0;
 
                 // ─── Clone NativeSharedPtr ──────────────────────────
@@ -89,10 +88,9 @@ namespace Trecs.Samples.NativePointers
                 var routeClone = routePtr.Clone(_world);
 
                 // ─── Allocate NativeUniquePtr ───────────────────────
-                // Each entity gets its own TTrail with an empty FixedList.
-                var trailPtr = _world.Heap.AllocNativeUnique(
-                    new TTrail { Positions = new FixedList512Bytes<float3>(), MaxLength = 30 }
-                );
+                // Each entity gets its own TTrail; Positions defaults to an
+                // empty FixedList, which Add() will populate over time.
+                var trailPtr = _world.Heap.AllocNativeUnique(new TTrail { MaxLength = 40 });
 
                 _world
                     .AddEntity<NativePatrolTags.Follower>()
@@ -110,7 +108,7 @@ namespace Trecs.Samples.NativePointers
             Star,
         }
 
-        static TRoute BuildRoute(float3 center, RouteShape shape, float4 color, float speed)
+        static TRoute BuildRoute(float3 center, RouteShape shape, Color color, float speed)
         {
             var waypoints = new FixedList512Bytes<float3>();
             switch (shape)
@@ -125,12 +123,7 @@ namespace Trecs.Samples.NativePointers
                     AppendStar(ref waypoints, center, 4f, 1.5f, 5);
                     break;
             }
-            return new TRoute
-            {
-                Waypoints = waypoints,
-                Color = color,
-                Speed = speed,
-            };
+            return new TRoute(waypoints, color, speed);
         }
 
         static void AppendCircle(

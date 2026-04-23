@@ -1,5 +1,6 @@
 using Unity.Collections;
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace Trecs.Samples.NativePointers
 {
@@ -12,22 +13,37 @@ namespace Trecs.Samples.NativePointers
     /// Shared patrol route — allocated once per route shape, cloned to each follower.
     /// All followers of the same route share the same data via NativeSharedPtr.
     ///
-    /// Unlike Sample 10's managed PatrolRoute, every field here is unmanaged so that
-    /// the data can live in a native (Burst-accessible) heap allocation and be read
-    /// from inside a Burst job. Waypoints use FixedList512Bytes to stay inline.
+    /// Unlike Sample 10's managed PatrolRoute, every field here is unmanaged so the
+    /// data can live in a native (Burst-accessible) heap allocation and be read from
+    /// inside a Burst job. Marked <c>readonly struct</c> both to document intent
+    /// (shared routes are immutable) and to avoid the defensive copies the compiler
+    /// would otherwise emit when the struct is accessed through an <c>in</c> reference.
+    ///
+    /// Waypoints use <see cref="FixedList512Bytes{T}"/>, which stores elements inline
+    /// and caps the list at roughly 500 bytes of payload (≈ 42 float3 entries). Routes
+    /// bigger than that need a different container — <c>NativeArray</c> via
+    /// <c>NativeBlobPtr</c>, for example.
     /// </summary>
-    public struct TRoute
+    public readonly struct TRoute
     {
-        public FixedList512Bytes<float3> Waypoints;
-        public float4 Color;
-        public float Speed;
+        public readonly FixedList512Bytes<float3> Waypoints;
+        public readonly Color Color;
+        public readonly float Speed;
+
+        public TRoute(in FixedList512Bytes<float3> waypoints, Color color, float speed)
+        {
+            Waypoints = waypoints;
+            Color = color;
+            Speed = speed;
+        }
     }
 
     /// <summary>
     /// Per-entity trail of recent positions — each entity owns its own via NativeUniquePtr.
     ///
-    /// Unmanaged so a Burst job can mutate the list via <c>GetMut</c>. FixedList512Bytes
-    /// caps the trail length at ~42 float3 entries, which is plenty for visualization.
+    /// Unmanaged so a Burst job can mutate it via <c>GetMut</c>. Unlike <see cref="TRoute"/>,
+    /// this is a mutable struct: the movement job appends to and trims <see cref="Positions"/>
+    /// each tick. The same <see cref="FixedList512Bytes{T}"/> capacity cap applies.
     /// </summary>
     public struct TTrail
     {
