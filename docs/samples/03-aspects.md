@@ -55,31 +55,9 @@ The `Boid` aspect provides:
 - `ref readonly float Speed` (read-only, unwrapped from `Speed` component)
 - `ref float3 Position` (read-write, unwrapped from `Position` component)
 
-### Shared contract: `IPositionedBoid`
-
-Both `BoidMovementSystem.Boid` and `BoidWrapSystem.Boid` write `Position`. Rather than letting each system duplicate position-manipulation logic, the sample factors the "has-a-writable-Position" part out into an **aspect interface** — a shared component-access contract multiple aspects can implement:
-
-```csharp
-public partial interface IPositionedBoid : IAspect, IWrite<Position> { }
-
-public static class BoidBounds
-{
-    public static void WrapPosition<T>(in T boid, float halfSize) where T : IPositionedBoid
-    {
-        ref var p = ref boid.Position;
-        if (p.x > halfSize)      p.x -= halfSize * 2;
-        else if (p.x < -halfSize) p.x += halfSize * 2;
-        if (p.z > halfSize)      p.z -= halfSize * 2;
-        else if (p.z < -halfSize) p.z += halfSize * 2;
-    }
-}
-```
-
-The helper is a single static method constrained on the interface. It compiles and inlines for any aspect that implements `IPositionedBoid` — no boxing, no virtual dispatch.
-
 ### BoidWrapSystem
 
-Wraps boids that go out of bounds. Uses `[ExecutesAfter]` to run after movement, and delegates the wrap logic to the shared helper:
+Wraps boids that go out of bounds. Uses `[ExecutesAfter]` to run after movement:
 
 ```csharp
 [ExecutesAfter(typeof(BoidMovementSystem))]
@@ -95,14 +73,17 @@ public partial class BoidWrapSystem : ISystem
     [ForEachEntity(MatchByComponents = true)]
     void Execute(in Boid boid)
     {
-        BoidBounds.WrapPosition(boid, _halfSize);
+        ref var p = ref boid.Position;
+
+        if (p.x > _halfSize) p.x -= _halfSize * 2;
+        else if (p.x < -_halfSize) p.x += _halfSize * 2;
+        if (p.z > _halfSize) p.z -= _halfSize * 2;
+        else if (p.z < -_halfSize) p.z += _halfSize * 2;
     }
 
-    partial struct Boid : IPositionedBoid { }
+    partial struct Boid : IAspect, IWrite<Position> { }
 }
 ```
-
-`BoidMovementSystem.Boid` also implements `IPositionedBoid`, so it's eligible for any helper written against the interface — `BoidBounds.WrapPosition` is just the first one.
 
 ### BoidRendererSystem (Variable Update)
 
@@ -111,7 +92,6 @@ Reads position and velocity to update the GameObject transform and face the move
 ## Concepts Introduced
 
 - **Aspects** — `partial struct` implementing `IAspect`, `IRead<T>`, `IWrite<T>`
-- **Aspect interfaces** — `partial interface` extending `IAspect` plus `IRead<>`/`IWrite<>`; lets multiple aspects share a component-access contract so a generic helper can operate on any of them
 - **`[Unwrap]`** components expose their inner value type through aspect properties
 - **Multiple aspects per system** — different systems can define different aspect views over the same components
 - **Read vs Write** — `IRead<T>` provides `ref readonly`, `IWrite<T>` provides `ref`

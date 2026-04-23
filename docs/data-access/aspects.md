@@ -115,9 +115,9 @@ public partial class RenderSystem : ISystem
 
 However, it is most common to define aspects as nested private structs inside the system that uses them, since they are typically specific to that system's logic.
 
-## Aspect Interfaces (Shared Contracts)
+## Aspect Interfaces (Shared Contracts) — advanced
 
-Aspects typically pair one-to-one with a system — a bespoke component bundle for that system's iteration. Sometimes, though, you want a helper method that works across several aspects: same shape of component access, different concrete aspect at each callsite. That's what **aspect interfaces** are for.
+Most aspects pair one-to-one with a single system, and don't need any sharing mechanism beyond C# itself. Aspect interfaces are for the rarer case where you want a helper method that works across several aspects: same shape of component access, different concrete aspect at each callsite. If you're reading this for the first time, you probably don't need it — skip on.
 
 An aspect interface is a `partial interface` that extends `IAspect` and declares `IRead<>`/`IWrite<>` just like a concrete aspect struct. Any aspect struct that lists the interface in its base list inherits the declared components and implements the generated property contract.
 
@@ -151,6 +151,4 @@ public static class BoidBounds
 - The interface must list `IAspect` in its base list. That's the opt-in marker.
 - Aspect interfaces cascade: an interface can extend another aspect interface, and all `IRead<>`/`IWrite<>` types are merged into the concrete aspect. Inheritance cycles between aspect interfaces are rejected by the C# compiler itself (CS0529).
 - Iteration (`[ForEachEntity]`, `[SingleEntity]`) still requires a concrete aspect struct, not an aspect interface. Aspect interfaces are for polymorphic helpers you call *from* iteration, not as the iteration parameter itself.
-
-See `Samples/03_Aspects/` for a working example.
 
