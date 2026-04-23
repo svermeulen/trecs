@@ -83,7 +83,9 @@ nav:
       - OOP Integration: recipes/oop-integration.md
       - Entity Subset Patterns: recipes/entity-subset-patterns.md
       - Design Rules: recipes/design-rules.md
+      - Debugging & Troubleshooting: recipes/debugging.md
       - Trecs vs Unity ECS: recipes/trecs-vs-unity-ecs.md
+  - FAQ: faq.md
   - Changelog: changelog.md
 
 markdown_extensions:
