@@ -1,4 +1,4 @@
-using Unity.Collections;
+using Trecs.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -24,7 +24,7 @@ namespace Trecs.Samples.NativePointers
         public void Initialize()
         {
             // ─── Allocate shared routes ─────────────────────────────
-            // AllocNativeShared stores the unmanaged TRoute struct in the
+            // AllocNativeShared stores the unmanaged PatrolRoute struct in the
             // native heap and returns a 12-byte NativeSharedPtr handle.
             // Compare with Sample 10's AllocShared: same refcount semantics,
             // but the payload type must be unmanaged for Burst compatibility.
@@ -54,10 +54,10 @@ namespace Trecs.Samples.NativePointers
             starRoute.Dispose(_world);
         }
 
-        void SpawnFollowers(NativeSharedPtr<TRoute> routePtr, int count)
+        void SpawnFollowers(NativeSharedPtr<PatrolRoute> routePtr, int count)
         {
             ref readonly var route = ref routePtr.Get(_world);
-            int waypointCount = route.Waypoints.Length;
+            int waypointCount = route.Waypoints.Count;
 
             for (int i = 0; i < count; i++)
             {
@@ -84,19 +84,19 @@ namespace Trecs.Samples.NativePointers
 
                 // ─── Clone NativeSharedPtr ──────────────────────────
                 // Clone increments the refcount. Each entity gets its own
-                // handle pointing at the same TRoute blob.
+                // handle pointing at the same PatrolRoute blob.
                 var routeClone = routePtr.Clone(_world);
 
                 // ─── Allocate NativeUniquePtr ───────────────────────
-                // Each entity gets its own TTrail; Positions defaults to an
-                // empty FixedList, which Add() will populate over time.
-                var trailPtr = _world.Heap.AllocNativeUnique(new TTrail { MaxLength = 40 });
+                // Each entity gets its own TrailHistory; Positions defaults to
+                // an empty FixedList, which Add() will populate over time.
+                var trailPtr = _world.Heap.AllocNativeUnique(new TrailHistory { MaxLength = 40 });
 
                 _world
                     .AddEntity<NativePatrolTags.Follower>()
                     .Set(new Position(pos))
-                    .Set(new CNativeRoute { Value = routeClone, Progress = progress })
-                    .Set(new CNativeTrail { Value = trailPtr })
+                    .Set(new CRoute { Value = routeClone, Progress = progress })
+                    .Set(new CTrail { Value = trailPtr })
                     .Set(_gameObjectRegistry.Register(go));
             }
         }
@@ -108,9 +108,9 @@ namespace Trecs.Samples.NativePointers
             Star,
         }
 
-        static TRoute BuildRoute(float3 center, RouteShape shape, Color color, float speed)
+        static PatrolRoute BuildRoute(float3 center, RouteShape shape, Color color, float speed)
         {
-            var waypoints = new FixedList512Bytes<float3>();
+            var waypoints = new FixedList64<float3>();
             switch (shape)
             {
                 case RouteShape.Circle:
@@ -123,11 +123,11 @@ namespace Trecs.Samples.NativePointers
                     AppendStar(ref waypoints, center, 4f, 1.5f, 5);
                     break;
             }
-            return new TRoute(waypoints, color, speed);
+            return new PatrolRoute(waypoints, color, speed);
         }
 
         static void AppendCircle(
-            ref FixedList512Bytes<float3> waypoints,
+            ref FixedList64<float3> waypoints,
             float3 center,
             float radius,
             int count
@@ -143,7 +143,7 @@ namespace Trecs.Samples.NativePointers
         }
 
         static void AppendFigure8(
-            ref FixedList512Bytes<float3> waypoints,
+            ref FixedList64<float3> waypoints,
             float3 center,
             float size,
             int count
@@ -159,7 +159,7 @@ namespace Trecs.Samples.NativePointers
         }
 
         static void AppendStar(
-            ref FixedList512Bytes<float3> waypoints,
+            ref FixedList64<float3> waypoints,
             float3 center,
             float outerRadius,
             float innerRadius,
@@ -167,7 +167,7 @@ namespace Trecs.Samples.NativePointers
         )
         {
             int vertexCount = points * 2;
-            var vertices = new FixedList512Bytes<float3>();
+            var vertices = new FixedList64<float3>();
 
             for (int i = 0; i < vertexCount; i++)
             {

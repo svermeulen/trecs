@@ -4,7 +4,7 @@ namespace Trecs.Samples.NativePointers
 {
     /// <summary>
     /// Variable-update renderer that syncs ECS state to GameObjects.
-    /// Reads the NativeUniquePtr&lt;TTrail&gt; on the main thread via the
+    /// Reads the NativeUniquePtr&lt;TrailHistory&gt; on the main thread via the
     /// WorldAccessor overload of Get — the same pointer resolves from a
     /// job or from the main thread without any conversion.
     /// </summary>
@@ -20,16 +20,16 @@ namespace Trecs.Samples.NativePointers
         }
 
         [ForEachEntity(MatchByComponents = true)]
-        void Execute(in Position position, in CNativeTrail trail, in GameObjectId goId)
+        void Execute(in Position position, in CTrail trail, in GameObjectId goId)
         {
             var go = _registry.Resolve(goId);
             go.transform.position = (Vector3)position.Value;
 
             ref readonly var trailData = ref trail.Value.Get(World);
             var lineRenderer = go.GetComponent<LineRenderer>();
-            lineRenderer.positionCount = trailData.Positions.Length;
+            lineRenderer.positionCount = trailData.Positions.Count;
 
-            for (int i = 0; i < trailData.Positions.Length; i++)
+            for (int i = 0; i < trailData.Positions.Count; i++)
             {
                 lineRenderer.SetPosition(i, (Vector3)trailData.Positions[i]);
             }

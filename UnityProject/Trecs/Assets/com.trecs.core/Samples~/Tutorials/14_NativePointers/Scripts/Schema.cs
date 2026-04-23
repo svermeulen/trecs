@@ -1,4 +1,4 @@
-using Unity.Collections;
+using Trecs.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -13,24 +13,22 @@ namespace Trecs.Samples.NativePointers
     /// Shared patrol route — allocated once per route shape, cloned to each follower.
     /// All followers of the same route share the same data via NativeSharedPtr.
     ///
-    /// Unlike Sample 10's managed PatrolRoute, every field here is unmanaged so the
-    /// data can live in a native (Burst-accessible) heap allocation and be read from
-    /// inside a Burst job. Marked <c>readonly struct</c> both to document intent
-    /// (shared routes are immutable) and to avoid the defensive copies the compiler
-    /// would otherwise emit when the struct is accessed through an <c>in</c> reference.
+    /// Every field is unmanaged so the data can live in a native (Burst-accessible)
+    /// heap allocation and be read from inside a Burst job. Marked <c>readonly struct</c>
+    /// both to document intent (shared routes are immutable) and to avoid the defensive
+    /// copies the compiler would otherwise emit when accessing through an <c>in</c> reference.
     ///
-    /// Waypoints use <see cref="FixedList512Bytes{T}"/>, which stores elements inline
-    /// and caps the list at roughly 500 bytes of payload (≈ 42 float3 entries). Routes
-    /// bigger than that need a different container — <c>NativeArray</c> via
-    /// <c>NativeBlobPtr</c>, for example.
+    /// Waypoints use <see cref="FixedList64{T}"/> from Trecs.Collections — an inline,
+    /// bounded list sized to 64 elements. For bigger routes, pick a larger
+    /// <c>FixedListN</c> or switch to a heap-allocated container via <c>NativeBlobPtr</c>.
     /// </summary>
-    public readonly struct TRoute
+    public readonly struct PatrolRoute
     {
-        public readonly FixedList512Bytes<float3> Waypoints;
+        public readonly FixedList64<float3> Waypoints;
         public readonly Color Color;
         public readonly float Speed;
 
-        public TRoute(in FixedList512Bytes<float3> waypoints, Color color, float speed)
+        public PatrolRoute(in FixedList64<float3> waypoints, Color color, float speed)
         {
             Waypoints = waypoints;
             Color = color;
@@ -41,13 +39,13 @@ namespace Trecs.Samples.NativePointers
     /// <summary>
     /// Per-entity trail of recent positions — each entity owns its own via NativeUniquePtr.
     ///
-    /// Unmanaged so a Burst job can mutate it via <c>GetMut</c>. Unlike <see cref="TRoute"/>,
-    /// this is a mutable struct: the movement job appends to and trims <see cref="Positions"/>
-    /// each tick. The same <see cref="FixedList512Bytes{T}"/> capacity cap applies.
+    /// Unlike <see cref="PatrolRoute"/>, this is a mutable struct: the movement job
+    /// appends to and trims <see cref="Positions"/> each tick, so
+    /// <see cref="TrailHistory"/> must expose writable fields and cannot be readonly.
     /// </summary>
-    public struct TTrail
+    public struct TrailHistory
     {
-        public FixedList512Bytes<float3> Positions;
+        public FixedList64<float3> Positions;
         public int MaxLength;
     }
 
@@ -55,9 +53,9 @@ namespace Trecs.Samples.NativePointers
     /// Shared route reference and per-entity progress along it.
     /// The NativeSharedPtr handle is a 12-byte value type stored inline in the component.
     /// </summary>
-    public partial struct CNativeRoute : IEntityComponent
+    public partial struct CRoute : IEntityComponent
     {
-        public NativeSharedPtr<TRoute> Value;
+        public NativeSharedPtr<PatrolRoute> Value;
         public float Progress;
     }
 
@@ -65,9 +63,9 @@ namespace Trecs.Samples.NativePointers
     /// Per-entity trail history reference.
     /// The NativeUniquePtr handle is a 4-byte value type stored inline in the component.
     /// </summary>
-    public partial struct CNativeTrail : IEntityComponent
+    public partial struct CTrail : IEntityComponent
     {
-        public NativeUniquePtr<TTrail> Value;
+        public NativeUniquePtr<TrailHistory> Value;
     }
 
     public static partial class SampleTemplates
@@ -77,8 +75,8 @@ namespace Trecs.Samples.NativePointers
                 IHasTags<NativePatrolTags.Follower>
         {
             public Position Position;
-            public CNativeRoute Route;
-            public CNativeTrail Trail;
+            public CRoute Route;
+            public CTrail Trail;
             public GameObjectId GameObjectId;
         }
     }

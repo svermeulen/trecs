@@ -1,3 +1,4 @@
+using Trecs.Collections;
 using Unity.Mathematics;
 
 namespace Trecs.Samples.NativePointers
@@ -10,8 +11,8 @@ namespace Trecs.Samples.NativePointers
     /// variants over the managed ones from Sample 10.
     ///
     /// Demonstrates reading both native pointer types inside a job:
-    /// - NativeSharedPtr&lt;TRoute&gt;: waypoints + speed, shared across followers
-    /// - NativeUniquePtr&lt;TTrail&gt;: per-entity mutable position history
+    /// - NativeSharedPtr&lt;PatrolRoute&gt;: waypoints + speed, shared across followers
+    /// - NativeUniquePtr&lt;TrailHistory&gt;: per-entity mutable position history
     /// </summary>
     public partial class PatrolMovementSystem : ISystem
     {
@@ -19,8 +20,8 @@ namespace Trecs.Samples.NativePointers
         [WrapAsJob]
         static void Execute(
             ref Position position,
-            in CNativeRoute route,
-            ref CNativeTrail trail,
+            in CRoute route,
+            ref CTrail trail,
             in NativeWorldAccessor world
         )
         {
@@ -30,10 +31,10 @@ namespace Trecs.Samples.NativePointers
             ref readonly var waypoints = ref patrolRoute.Waypoints;
 
             float totalProgress = route.Progress + world.ElapsedTime * patrolRoute.Speed;
-            float wrappedProgress = totalProgress % waypoints.Length;
+            float wrappedProgress = totalProgress % waypoints.Count;
 
             int indexA = (int)wrappedProgress;
-            int indexB = (indexA + 1) % waypoints.Length;
+            int indexB = (indexA + 1) % waypoints.Count;
             float t = wrappedProgress - indexA;
 
             position.Value = math.lerp(waypoints[indexA], waypoints[indexB], t);
@@ -42,7 +43,7 @@ namespace Trecs.Samples.NativePointers
             // NativeUniquePtr that requires `ref this` — so the component
             // holding the pointer must itself be accessed by ref.
             ref var trailData = ref trail.Value.GetMut(world);
-            if (trailData.Positions.Length >= trailData.MaxLength)
+            if (trailData.Positions.Count >= trailData.MaxLength)
             {
                 trailData.Positions.RemoveAt(0);
             }
