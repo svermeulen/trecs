@@ -87,16 +87,35 @@ namespace Trecs.SourceGen
 
             // Validate in the transform so RegisterSourceOutput doesn't need a
             // Compilation. Diagnostics accumulated here are replayed downstream.
+            // Unexpected exceptions surface as a SourceGenerationError diagnostic rather
+            // than a generator crash.
             var diagnostics = new List<Diagnostic>();
             ValidatedMethodInfo? validated = null;
-            bool isValid = ValidateMethod(
-                classDecl,
-                methodDecl,
-                methodSymbol,
-                diagnostics.Add,
-                context.SemanticModel,
-                out validated
-            );
+            bool isValid;
+            try
+            {
+                isValid = ValidateMethod(
+                    classDecl,
+                    methodDecl,
+                    methodSymbol,
+                    diagnostics.Add,
+                    context.SemanticModel,
+                    out validated
+                );
+            }
+            catch (Exception ex)
+            {
+                diagnostics.Add(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.SourceGenerationError,
+                        methodDecl.GetLocation(),
+                        "ForSingleAspect method validation",
+                        ex.Message
+                    )
+                );
+                isValid = false;
+                validated = null;
+            }
 
             return new ForEachAspectData(
                 classDecl,

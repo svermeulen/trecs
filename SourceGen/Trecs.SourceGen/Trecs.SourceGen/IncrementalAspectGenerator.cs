@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Trecs.SourceGen.Aspect;
 using Trecs.SourceGen.Shared;
 
 namespace Trecs.SourceGen
@@ -134,7 +137,69 @@ namespace Trecs.SourceGen
             if (!SymbolAnalyzer.ImplementsInterface(symbol, "IAspect", TrecsNamespaces.Trecs))
                 return null;
 
-            return new AspectTargetData(typeDecl, symbol);
+            // Run parsing + validation here (the transform phase) so RegisterSourceOutput
+            // only needs the cached value-equality-ish data to emit source. Diagnostics
+            // accumulate into a list and are replayed downstream. Unexpected exceptions
+            // surface as a SourceGenerationError rather than a generator crash.
+            var diagnostics = new List<Diagnostic>();
+            bool isValid;
+            AspectAttributeData? attributeData = null;
+            AspectInterfaceData? interfaceData = null;
+
+            try
+            {
+                if (symbol.TypeKind == TypeKind.Interface)
+                {
+                    var ifaceDecl = (InterfaceDeclarationSyntax)typeDecl;
+                    var isPartial = AspectValidator.ValidateAspectInterfaceDeclaration(
+                        ifaceDecl,
+                        symbol,
+                        diagnostics.Add
+                    );
+                    if (isPartial)
+                    {
+                        interfaceData = AspectInterfaceParser.ParseAspectInterface(symbol);
+                        isValid = interfaceData != null;
+                    }
+                    else
+                    {
+                        isValid = false;
+                    }
+                }
+                else
+                {
+                    attributeData = AspectAttributeParser.ParseAspectData(symbol);
+                    isValid = AspectValidator.ValidateAspect(
+                        typeDecl,
+                        symbol,
+                        attributeData,
+                        diagnostics.Add
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                diagnostics.Add(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.SourceGenerationError,
+                        typeDecl.GetLocation(),
+                        "Aspect parse/validate",
+                        ex.Message
+                    )
+                );
+                isValid = false;
+                attributeData = null;
+                interfaceData = null;
+            }
+
+            return new AspectTargetData(
+                typeDecl,
+                symbol,
+                isValid,
+                attributeData,
+                interfaceData,
+                diagnostics.ToImmutableArray()
+            );
         }
 
         private static UnwrapComponentData? GetUnwrapComponentData(
@@ -158,6 +223,15 @@ namespace Trecs.SourceGen
             if (aspectData == null)
                 return;
 
+            // Replay diagnostics collected in the transform phase.
+            foreach (var diag in aspectData.Diagnostics)
+            {
+                context.ReportDiagnostic(diag);
+            }
+
+            if (!aspectData.IsValid)
+                return;
+
             if (aspectData.Symbol.TypeKind == TypeKind.Interface)
             {
                 ExecuteAspectInterfaceGeneration(context, aspectData);
@@ -173,6 +247,11 @@ namespace Trecs.SourceGen
             AspectTargetData aspectData
         )
         {
+            // Defensive: an IsValid struct-path target is guaranteed to have AttributeData,
+            // but this guards against future refactors.
+            if (aspectData.AttributeData == null)
+                return;
+
             var location = aspectData.Syntax.GetLocation();
             var typeName = aspectData.Symbol.Name;
             var fileName = GeneratorBase.CreateSafeFileName(aspectData.Symbol, "Aspect");
@@ -180,57 +259,16 @@ namespace Trecs.SourceGen
             try
             {
                 using var _ = SourceGenTimer.Time("AspectGenerator.Total");
-
                 SourceGenLogger.Log($"[IncrementalAspectGenerator] Processing {typeName}");
-
-                // Parse the Aspect data from interfaces and attributes
-                Aspect.AspectAttributeData? attributeData;
-                using (SourceGenTimer.Time("AspectGenerator.ParseAttributes"))
-                {
-                    attributeData = ErrorRecovery.TryExecute(
-                        () => Aspect.AspectAttributeParser.ParseAspectData(aspectData.Symbol),
-                        context,
-                        location,
-                        "Aspect data parsing"
-                    );
-                }
-
-                if (attributeData == null)
-                {
-                    return;
-                }
-
-                // Validate the Aspect
-                var isValid =
-                    ErrorRecovery.TryExecuteBool(
-                        () =>
-                        {
-                            using var _t = SourceGenTimer.Time("AspectGenerator.Validate");
-                            return Aspect.AspectValidator.ValidateAspect(
-                                aspectData.Syntax,
-                                aspectData.Symbol,
-                                attributeData,
-                                context.ReportDiagnostic
-                            );
-                        },
-                        context,
-                        location,
-                        "Aspect validation"
-                    ) ?? false;
-
-                if (!isValid)
-                {
-                    return;
-                }
 
                 string? source;
                 using (SourceGenTimer.Time("AspectGenerator.CodeGen"))
                 {
                     source = ErrorRecovery.TryExecute(
                         () =>
-                            Aspect.AspectCodeGenerator.GenerateAspectSource(
+                            AspectCodeGenerator.GenerateAspectSource(
                                 aspectData.Symbol,
-                                attributeData
+                                aspectData.AttributeData
                             ),
                         context,
                         location,
@@ -255,6 +293,11 @@ namespace Trecs.SourceGen
             AspectTargetData interfaceData
         )
         {
+            // Defensive: an IsValid interface-path target is guaranteed to have
+            // InterfaceData, but this guards against future refactors.
+            if (interfaceData.InterfaceData == null)
+                return;
+
             var location = interfaceData.Syntax.GetLocation();
             var typeName = interfaceData.Symbol.Name;
             var fileName = GeneratorBase.CreateSafeFileName(
@@ -268,41 +311,11 @@ namespace Trecs.SourceGen
                     $"[IncrementalAspectGenerator] Processing AspectInterface {typeName}"
                 );
 
-                // The interface must be partial so the generator can merge its emitted contract.
-                var ifaceDecl = (InterfaceDeclarationSyntax)interfaceData.Syntax;
-                var isPartial =
-                    ErrorRecovery.TryExecuteBool(
-                        () =>
-                            Aspect.AspectValidator.ValidateAspectInterfaceDeclaration(
-                                ifaceDecl,
-                                interfaceData.Symbol,
-                                context.ReportDiagnostic
-                            ),
-                        context,
-                        location,
-                        "AspectInterface partial validation"
-                    ) ?? false;
-
-                if (!isPartial)
-                    return;
-
-                var parsedData = ErrorRecovery.TryExecute(
-                    () => Aspect.AspectInterfaceParser.ParseAspectInterface(interfaceData.Symbol)!,
-                    context,
-                    location,
-                    "AspectInterface parsing"
-                );
-
-                if (parsedData == null)
-                {
-                    return;
-                }
-
                 var source = ErrorRecovery.TryExecute(
                     () =>
-                        Aspect.AspectCodeGenerator.GenerateAspectInterfaceSource(
+                        AspectCodeGenerator.GenerateAspectInterfaceSource(
                             interfaceData.Symbol,
-                            parsedData
+                            interfaceData.InterfaceData
                         ),
                     context,
                     location,
@@ -325,16 +338,40 @@ namespace Trecs.SourceGen
     /// <summary>
     /// Data structure for an aspect-generation target — a struct or an interface implementing
     /// Trecs.IAspect. TypeKind on the symbol distinguishes the two flavors.
+    ///
+    /// Carries the parsed attribute/interface data and validation diagnostics forward from
+    /// the transform phase so the terminal stage can emit source without re-running parse
+    /// + validate on every compilation pump.
     /// </summary>
     internal class AspectTargetData
     {
         public TypeDeclarationSyntax Syntax { get; }
         public INamedTypeSymbol Symbol { get; }
+        public bool IsValid { get; }
 
-        public AspectTargetData(TypeDeclarationSyntax syntax, INamedTypeSymbol symbol)
+        /// <summary>Populated for the struct-aspect path; null on the interface path.</summary>
+        public AspectAttributeData? AttributeData { get; }
+
+        /// <summary>Populated for the interface-aspect path; null on the struct path.</summary>
+        public AspectInterfaceData? InterfaceData { get; }
+
+        public ImmutableArray<Diagnostic> Diagnostics { get; }
+
+        public AspectTargetData(
+            TypeDeclarationSyntax syntax,
+            INamedTypeSymbol symbol,
+            bool isValid,
+            AspectAttributeData? attributeData,
+            AspectInterfaceData? interfaceData,
+            ImmutableArray<Diagnostic> diagnostics
+        )
         {
             Syntax = syntax;
             Symbol = symbol;
+            IsValid = isValid;
+            AttributeData = attributeData;
+            InterfaceData = interfaceData;
+            Diagnostics = diagnostics;
         }
     }
 

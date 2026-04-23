@@ -85,16 +85,34 @@ namespace Trecs.SourceGen
                 return null;
 
             // Validate in the transform so the terminal stage doesn't need the full
-            // Compilation. Diagnostics are replayed downstream.
+            // Compilation. Diagnostics are replayed downstream. Unexpected exceptions
+            // surface as a SourceGenerationError diagnostic rather than a generator crash.
             var diagnostics = new List<Diagnostic>();
             AutoSystemInfo? autoSystemInfo = null;
-            bool isValid = ValidateAndCollect(
-                classDecl,
-                classSymbol,
-                diagnostics.Add,
-                context.SemanticModel,
-                out autoSystemInfo
-            );
+            bool isValid;
+            try
+            {
+                isValid = ValidateAndCollect(
+                    classDecl,
+                    classSymbol,
+                    diagnostics.Add,
+                    context.SemanticModel,
+                    out autoSystemInfo
+                );
+            }
+            catch (Exception ex)
+            {
+                diagnostics.Add(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.SourceGenerationError,
+                        classDecl.GetLocation(),
+                        "AutoSystem validation",
+                        ex.Message
+                    )
+                );
+                isValid = false;
+                autoSystemInfo = null;
+            }
 
             return new AutoSystemClassData(
                 classDecl,

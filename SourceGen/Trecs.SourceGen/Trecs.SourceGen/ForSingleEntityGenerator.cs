@@ -84,16 +84,34 @@ namespace Trecs.SourceGen
                 return null;
 
             // Validation runs in the transform so the terminal stage doesn't need a
-            // Compilation or SemanticModel.
+            // Compilation or SemanticModel. Wrapped in try/catch so unexpected exceptions
+            // surface as a SourceGenerationError diagnostic rather than a generator crash.
             var diagnostics = new List<Diagnostic>();
             ValidatedMethodInfo? validated = null;
-            bool isValid = ValidateMethod(
-                classDecl,
-                methodDecl,
-                diagnostics.Add,
-                context.SemanticModel,
-                out validated
-            );
+            bool isValid;
+            try
+            {
+                isValid = ValidateMethod(
+                    classDecl,
+                    methodDecl,
+                    diagnostics.Add,
+                    context.SemanticModel,
+                    out validated
+                );
+            }
+            catch (Exception ex)
+            {
+                diagnostics.Add(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.SourceGenerationError,
+                        methodDecl.GetLocation(),
+                        "ForSingleComponents method validation",
+                        ex.Message
+                    )
+                );
+                isValid = false;
+                validated = null;
+            }
 
             return new ForEachMethodData(
                 classDecl,

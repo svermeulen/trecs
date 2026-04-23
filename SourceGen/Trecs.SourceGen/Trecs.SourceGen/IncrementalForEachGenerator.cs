@@ -102,17 +102,37 @@ namespace Trecs.SourceGen
 
             // Run validation here (the transform phase) so we don't have to combine with
             // CompilationProvider just to fetch a SemanticModel in the terminal stage.
-            // Diagnostics are accumulated and replayed in RegisterSourceOutput.
+            // Diagnostics are accumulated and replayed in RegisterSourceOutput. Unexpected
+            // exceptions are caught and surfaced as a SourceGenerationError diagnostic
+            // (matching the old ErrorRecovery.TryExecuteBool behaviour from before the
+            // validator moved into the transform).
             var diagnostics = new List<Diagnostic>();
             ValidatedMethodInfo? validated = null;
-            bool isValid = ValidateMethod(
-                classDecl,
-                methodDecl,
-                methodSymbol,
-                diagnostics.Add,
-                context.SemanticModel,
-                out validated
-            );
+            bool isValid;
+            try
+            {
+                isValid = ValidateMethod(
+                    classDecl,
+                    methodDecl,
+                    methodSymbol,
+                    diagnostics.Add,
+                    context.SemanticModel,
+                    out validated
+                );
+            }
+            catch (Exception ex)
+            {
+                diagnostics.Add(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.SourceGenerationError,
+                        methodDecl.GetLocation(),
+                        "ForEach method validation",
+                        ex.Message
+                    )
+                );
+                isValid = false;
+                validated = null;
+            }
 
             return new ForEachMethodData(
                 classDecl,

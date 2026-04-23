@@ -88,17 +88,35 @@ namespace Trecs.SourceGen
 
             // Validation runs here so the terminal stage doesn't need a Compilation /
             // SemanticModel; captured diagnostics round-trip through value-equality
-            // pipeline state and are replayed downstream.
+            // pipeline state and are replayed downstream. Unexpected exceptions surface
+            // as a SourceGenerationError diagnostic rather than a generator crash.
             var diagnostics = new List<Diagnostic>();
             ValidatedMethodInfo? validated = null;
-            bool isValid = ValidateMethod(
-                classDecl,
-                methodDecl,
-                methodSymbol,
-                diagnostics.Add,
-                context.SemanticModel,
-                out validated
-            );
+            bool isValid;
+            try
+            {
+                isValid = ValidateMethod(
+                    classDecl,
+                    methodDecl,
+                    methodSymbol,
+                    diagnostics.Add,
+                    context.SemanticModel,
+                    out validated
+                );
+            }
+            catch (Exception ex)
+            {
+                diagnostics.Add(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.SourceGenerationError,
+                        methodDecl.GetLocation(),
+                        "ForEachAspect method validation",
+                        ex.Message
+                    )
+                );
+                isValid = false;
+                validated = null;
+            }
 
             return new ForEachAspectData(
                 classDecl,
