@@ -22,221 +22,190 @@ namespace Trecs.SourceGen
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            // Check if compilation references Trecs assembly for better performance
             var hasTrecsReference = AssemblyFilterHelper.CreateTrecsReferenceCheck(context);
 
-            // Create provider for struct types implementing IEntityComponent
-            var entityComponentProviderRaw = context
+            // Extract a value-equality EntityComponentModel in the transform so the
+            // Roslyn incremental pipeline can actually cache across edits. Storing
+            // SyntaxNode / ISymbol in pipeline state defeats caching because those
+            // types use reference equality.
+            var modelProviderRaw = context
                 .SyntaxProvider.CreateSyntaxProvider(
-                    predicate: static (s, _) => IsStructDeclaration(s),
-                    transform: static (ctx, _) => GetEntityComponentData(ctx)
+                    predicate: static (s, _) => s is StructDeclarationSyntax,
+                    transform: static (ctx, _) => ExtractModel(ctx)
                 )
-                .Where(static m => m is not null);
-            var entityComponentProvider = AssemblyFilterHelper.FilterByTrecsReference(
-                entityComponentProviderRaw,
+                .Where(static m => m is not null)
+                .Select(static (m, _) => m!.Value);
+
+            var modelProvider = AssemblyFilterHelper.FilterByTrecsReference(
+                modelProviderRaw,
                 hasTrecsReference
             );
 
-            // Combine with compilation provider
-            var entityComponentWithCompilation = entityComponentProvider.Combine(
-                context.CompilationProvider
-            );
-
-            // Register source output
-            context.RegisterSourceOutput(
-                entityComponentWithCompilation,
-                static (spc, source) =>
-                    GenerateEntityComponentSource(spc, source.Left!, source.Right)
-            );
+            context.RegisterSourceOutput(modelProvider, static (spc, m) => Generate(spc, m));
         }
 
-        private static bool IsStructDeclaration(SyntaxNode node)
-        {
-            return node is StructDeclarationSyntax;
-        }
-
-        private static EntityComponentData? GetEntityComponentData(GeneratorSyntaxContext context)
+        static EntityComponentModel? ExtractModel(GeneratorSyntaxContext context)
         {
             var structDecl = (StructDeclarationSyntax)context.Node;
             var symbol = context.SemanticModel.GetDeclaredSymbol(structDecl);
 
             if (
-                symbol != null
-                && SymbolAnalyzer.ImplementsInterface(
+                symbol is null
+                || symbol.TypeKind != TypeKind.Struct
+                || !SymbolAnalyzer.ImplementsInterface(
                     symbol,
                     "IEntityComponent",
                     TrecsNamespaces.Trecs
                 )
             )
             {
-                SourceGenLogger.Log(
-                    $"[IncrementalEntityComponentGenerator] Found struct with base list: {symbol.Name}"
-                );
-                return new EntityComponentData(structDecl, symbol);
+                return null;
             }
 
-            return null;
-        }
-
-        private static void GenerateEntityComponentSource(
-            SourceProductionContext context,
-            EntityComponentData data,
-            Compilation compilation
-        )
-        {
-            var location = data.StructDecl.GetLocation();
-            var symbol = data.Symbol;
-            var structDecl = data.StructDecl;
-
-            try
-            {
-                using var _timer_ = SourceGenTimer.Time("EntityComponentGenerator.Total");
-                SourceGenLogger.Log(
-                    $"[IncrementalEntityComponentGenerator] Processing {symbol.Name}"
-                );
-
-                // Make sure the type is a struct
-                if (symbol.TypeKind != TypeKind.Struct)
-                {
-                    SourceGenLogger.Log(
-                        $"[IncrementalEntityComponentGenerator] Type {symbol.Name} implements IEntityComponent but is not a struct"
-                    );
-                    return;
-                }
-
-                // Make sure it's declared as partial
-                if (!IsPartialType(structDecl))
-                {
-                    SourceGenLogger.Log(
-                        $"[IncrementalEntityComponentGenerator] Type {symbol.Name} is not declared as partial, generated code may cause errors"
-                    );
-                }
-
-                // Generate the equality and operator methods
-                var source = GenerateComponentCode(symbol);
-                var fileName = SymbolAnalyzer.GetSafeFileName(symbol);
-
-                context.AddSource(fileName, source);
-                SourceGenLogger.WriteGeneratedFile(fileName, source);
-            }
-            catch (Exception ex)
-            {
-                SourceGenLogger.Log(
-                    $"[IncrementalEntityComponentGenerator] Error generating code for {symbol.Name}: {ex.Message}"
-                );
-
-                // Report error for any unhandled exceptions
-                var diagnostic = Diagnostic.Create(
-                    DiagnosticDescriptors.CouldNotResolveSymbol,
-                    location,
-                    $"{symbol.Name}: {ex.Message}"
-                );
-                context.ReportDiagnostic(diagnostic);
-            }
-        }
-
-        /// <summary>
-        /// Checks if a type is declared with the partial modifier
-        /// </summary>
-        private static bool IsPartialType(TypeDeclarationSyntax typeDeclaration)
-        {
-            return typeDeclaration.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword));
-        }
-
-        /// <summary>
-        /// Generates the source code for the component's equality and operator methods
-        /// </summary>
-        private static string GenerateComponentCode(INamedTypeSymbol symbol)
-        {
-            var namespaceName = PerformanceCache.GetDisplayString(symbol.ContainingNamespace);
-            var typeName = symbol.Name;
-            var containingTypes = GetContainingTypeChain(symbol);
-
-            // Get the accessibility of the original type
-            var accessibility = GetAccessibilityModifier(symbol);
-
-            // Check if this is a UnwrapComponent
-            var isUnwrapComponent = PerformanceCache.HasAttributeByName(
+            var isPartial = structDecl.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword));
+            var isUnwrap = PerformanceCache.HasAttributeByName(
                 symbol,
                 TrecsAttributeNames.Unwrap,
                 TrecsNamespaces.Trecs
             );
 
+            string? unwrapFieldName = null;
+            string? unwrapFieldTypeDisplay = null;
+            bool hasUnwrapConstructor = false;
+            if (isUnwrap)
+            {
+                var field = symbol
+                    .GetMembers()
+                    .OfType<IFieldSymbol>()
+                    .FirstOrDefault(f => !f.IsStatic && !f.IsConst);
+                if (field != null)
+                {
+                    unwrapFieldName = field.Name;
+                    unwrapFieldTypeDisplay = PerformanceCache.GetDisplayString(field.Type);
+                    hasUnwrapConstructor = symbol.Constructors.Any(c =>
+                        c.Parameters.Length == 1
+                        && SymbolEqualityComparer.Default.Equals(c.Parameters[0].Type, field.Type)
+                    );
+                }
+            }
+
+            var containingTypes = ImmutableArray.CreateBuilder<ContainingTypeInfo>();
+            var current = symbol.ContainingType;
+            while (current != null)
+            {
+                containingTypes.Add(
+                    new ContainingTypeInfo(
+                        current.Name,
+                        current.TypeKind == TypeKind.Class ? "class" : "struct",
+                        GetAccessibility(current)
+                    )
+                );
+                current = current.ContainingType;
+            }
+            containingTypes.Reverse();
+
+            return new EntityComponentModel(
+                TypeName: symbol.Name,
+                Namespace: PerformanceCache.GetDisplayString(symbol.ContainingNamespace),
+                Accessibility: GetAccessibility(symbol),
+                IsPartial: isPartial,
+                IsUnwrap: isUnwrap,
+                UnwrapFieldName: unwrapFieldName,
+                UnwrapFieldTypeDisplay: unwrapFieldTypeDisplay,
+                HasUnwrapConstructor: hasUnwrapConstructor,
+                ContainingTypes: containingTypes.ToImmutable(),
+                SafeFileName: SymbolAnalyzer.GetSafeFileName(symbol)
+            );
+        }
+
+        static void Generate(SourceProductionContext context, EntityComponentModel model)
+        {
+            try
+            {
+                using var _timer_ = SourceGenTimer.Time("EntityComponentGenerator.Total");
+                SourceGenLogger.Log(
+                    $"[IncrementalEntityComponentGenerator] Processing {model.TypeName}"
+                );
+
+                if (!model.IsPartial)
+                {
+                    SourceGenLogger.Log(
+                        $"[IncrementalEntityComponentGenerator] Type {model.TypeName} is not declared as partial, generated code may cause errors"
+                    );
+                }
+
+                var source = GenerateComponentCode(model);
+                context.AddSource(model.SafeFileName, source);
+                SourceGenLogger.WriteGeneratedFile(model.SafeFileName, source);
+            }
+            catch (Exception ex)
+            {
+                SourceGenLogger.Log(
+                    $"[IncrementalEntityComponentGenerator] Error generating code for {model.TypeName}: {ex.Message}"
+                );
+
+                var diagnostic = Diagnostic.Create(
+                    DiagnosticDescriptors.CouldNotResolveSymbol,
+                    Location.None,
+                    $"{model.TypeName}: {ex.Message}"
+                );
+                context.ReportDiagnostic(diagnostic);
+            }
+        }
+
+        static string GenerateComponentCode(EntityComponentModel model)
+        {
             var sb = new StringBuilder();
 
-            // Add using statements
             sb.AppendLine("using System;");
             sb.AppendLine("using Trecs;");
             sb.AppendLine("using Trecs.Internal;");
             sb.AppendLine("using Trecs.Collections;");
             sb.AppendLine();
 
-            // Start namespace (if not global)
-            if (!string.IsNullOrEmpty(namespaceName))
+            if (!string.IsNullOrEmpty(model.Namespace))
             {
-                sb.AppendLine($"namespace {namespaceName}");
+                sb.AppendLine($"namespace {model.Namespace}");
                 sb.AppendLine("{");
             }
 
-            // Open nested containing types if needed
-            int indentLevel = string.IsNullOrEmpty(namespaceName) ? 0 : 1;
-            foreach (var containingType in containingTypes)
+            int indentLevel = string.IsNullOrEmpty(model.Namespace) ? 0 : 1;
+            foreach (var containingType in model.ContainingTypes)
             {
                 var indent = new string(' ', indentLevel * 4);
-                var kind = containingType.Item2 == TypeKind.Class ? "class" : "struct";
-                var containerAccessibility = containingType.Item3;
-
                 sb.AppendLine(
-                    $"{indent}{containerAccessibility} partial {kind} {containingType.Item1}"
+                    $"{indent}{containingType.Accessibility} partial {containingType.Kind} {containingType.Name}"
                 );
                 sb.AppendLine($"{indent}{{");
                 indentLevel++;
             }
 
-            // Start struct declaration
             var structIndent = new string(' ', indentLevel * 4);
-            sb.AppendLine($"{structIndent}{accessibility} partial struct {typeName}");
+            sb.AppendLine($"{structIndent}{model.Accessibility} partial struct {model.TypeName}");
             sb.AppendLine($"{structIndent}{{");
             indentLevel++;
 
             var methodIndent = new string(' ', indentLevel * 4);
 
-            // Add constructor for UnwrapComponent
-            if (isUnwrapComponent)
+            if (
+                model.IsUnwrap
+                && model.UnwrapFieldName != null
+                && model.UnwrapFieldTypeDisplay != null
+                && !model.HasUnwrapConstructor
+            )
             {
-                // Get the single field from the component
-                var field = symbol
-                    .GetMembers()
-                    .OfType<IFieldSymbol>()
-                    .Where(f => !f.IsStatic && !f.IsConst)
-                    .FirstOrDefault();
-
-                if (field != null)
-                {
-                    // Check if constructor already exists
-                    var hasConstructor = symbol.Constructors.Any(c =>
-                        c.Parameters.Length == 1
-                        && SymbolEqualityComparer.Default.Equals(c.Parameters[0].Type, field.Type)
-                    );
-
-                    if (!hasConstructor)
-                    {
-                        // Generate constructor that takes the value
-                        sb.AppendLine(
-                            $"{methodIndent}public {typeName}({PerformanceCache.GetDisplayString(field.Type)} value)"
-                        );
-                        sb.AppendLine($"{methodIndent}{{");
-                        sb.AppendLine($"{methodIndent}    this.{field.Name} = value;");
-                        sb.AppendLine($"{methodIndent}}}");
-                        sb.AppendLine();
-                    }
-                }
+                sb.AppendLine(
+                    $"{methodIndent}public {model.TypeName}({model.UnwrapFieldTypeDisplay} value)"
+                );
+                sb.AppendLine($"{methodIndent}{{");
+                sb.AppendLine($"{methodIndent}    this.{model.UnwrapFieldName} = value;");
+                sb.AppendLine($"{methodIndent}}}");
+                sb.AppendLine();
             }
 
-            // Add Equals override
             sb.AppendLine($"{methodIndent}public override bool Equals(object obj)");
             sb.AppendLine($"{methodIndent}{{");
-            sb.AppendLine($"{methodIndent}    if (obj is {typeName} other)");
+            sb.AppendLine($"{methodIndent}    if (obj is {model.TypeName} other)");
             sb.AppendLine($"{methodIndent}    {{");
             sb.AppendLine(
                 $"{methodIndent}        return UnmanagedUtil.BlittableEquals(this, other);"
@@ -246,7 +215,6 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{methodIndent}}}");
             sb.AppendLine();
 
-            // Add GetHashCode override
             sb.AppendLine($"{methodIndent}public override readonly int GetHashCode()");
             sb.AppendLine($"{methodIndent}{{");
             sb.AppendLine($"{methodIndent}    throw new NotImplementedException(");
@@ -256,24 +224,21 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{methodIndent}}}");
             sb.AppendLine();
 
-            // Add == operator
             sb.AppendLine(
-                $"{methodIndent}public static bool operator ==(in {typeName} left, in {typeName} right)"
+                $"{methodIndent}public static bool operator ==(in {model.TypeName} left, in {model.TypeName} right)"
             );
             sb.AppendLine($"{methodIndent}{{");
             sb.AppendLine($"{methodIndent}    return UnmanagedUtil.BlittableEquals(left, right);");
             sb.AppendLine($"{methodIndent}}}");
             sb.AppendLine();
 
-            // Add != operator
             sb.AppendLine(
-                $"{methodIndent}public static bool operator !=(in {typeName} left, in {typeName} right)"
+                $"{methodIndent}public static bool operator !=(in {model.TypeName} left, in {model.TypeName} right)"
             );
             sb.AppendLine($"{methodIndent}{{");
             sb.AppendLine($"{methodIndent}    return !UnmanagedUtil.BlittableEquals(left, right);");
             sb.AppendLine($"{methodIndent}}}");
 
-            // Close all braces
             while (indentLevel > 0)
             {
                 indentLevel--;
@@ -283,63 +248,79 @@ namespace Trecs.SourceGen
             return sb.ToString();
         }
 
-        /// <summary>
-        /// Gets the accessibility modifier for a symbol as a string
-        /// </summary>
-        private static string GetAccessibilityModifier(ISymbol symbol)
-        {
-            switch (symbol.DeclaredAccessibility)
+        static string GetAccessibility(ISymbol symbol) =>
+            symbol.DeclaredAccessibility switch
             {
-                case Accessibility.Public:
-                    return "public";
-                case Accessibility.Internal:
-                    return "internal";
-                case Accessibility.Private:
-                    return "private";
-                case Accessibility.Protected:
-                    return "protected";
-                case Accessibility.ProtectedOrInternal:
-                    return "protected internal";
-                case Accessibility.ProtectedAndInternal:
-                    return "private protected";
-                default:
-                    return "internal"; // Default to internal if not specified
-            }
-        }
-
-        /// <summary>
-        /// Gets the chain of containing types for a nested type
-        /// </summary>
-        private static List<(string, TypeKind, string)> GetContainingTypeChain(
-            INamedTypeSymbol symbol
-        )
-        {
-            var result = new List<(string, TypeKind, string)>();
-            var current = symbol.ContainingType;
-
-            while (current != null)
-            {
-                result.Add((current.Name, current.TypeKind, GetAccessibilityModifier(current)));
-                current = current.ContainingType;
-            }
-
-            result.Reverse();
-            return result;
-        }
+                Accessibility.Public => "public",
+                Accessibility.Internal => "internal",
+                Accessibility.Private => "private",
+                Accessibility.Protected => "protected",
+                Accessibility.ProtectedOrInternal => "protected internal",
+                Accessibility.ProtectedAndInternal => "private protected",
+                _ => "internal",
+            };
     }
 
     /// <summary>
-    /// Data structure for entity component information used in incremental generation
+    /// Value-equality model carried through the incremental pipeline so Roslyn
+    /// can cache generator output. All fields are primitives or
+    /// <see cref="ImmutableArray{T}"/> of value-equality records — no Roslyn
+    /// symbol / syntax references.
     /// </summary>
-    internal class EntityComponentData
+    internal readonly record struct EntityComponentModel(
+        string TypeName,
+        string Namespace,
+        string Accessibility,
+        bool IsPartial,
+        bool IsUnwrap,
+        string? UnwrapFieldName,
+        string? UnwrapFieldTypeDisplay,
+        bool HasUnwrapConstructor,
+        ImmutableArray<ContainingTypeInfo> ContainingTypes,
+        string SafeFileName
+    )
     {
-        public StructDeclarationSyntax StructDecl { get; }
-        public INamedTypeSymbol Symbol { get; }
+        public bool Equals(EntityComponentModel other) =>
+            TypeName == other.TypeName
+            && Namespace == other.Namespace
+            && Accessibility == other.Accessibility
+            && IsPartial == other.IsPartial
+            && IsUnwrap == other.IsUnwrap
+            && UnwrapFieldName == other.UnwrapFieldName
+            && UnwrapFieldTypeDisplay == other.UnwrapFieldTypeDisplay
+            && HasUnwrapConstructor == other.HasUnwrapConstructor
+            && SafeFileName == other.SafeFileName
+            && ContainingTypes.SequenceEqual(other.ContainingTypes);
 
-        public EntityComponentData(StructDeclarationSyntax structDecl, INamedTypeSymbol symbol)
+        public override int GetHashCode()
         {
-            StructDecl = structDecl;
-            Symbol = symbol;
+            unchecked
+            {
+                int h = 17;
+                h = h * 31 + (TypeName?.GetHashCode() ?? 0);
+                h = h * 31 + (Namespace?.GetHashCode() ?? 0);
+                h = h * 31 + (Accessibility?.GetHashCode() ?? 0);
+                h = h * 31 + IsPartial.GetHashCode();
+                h = h * 31 + IsUnwrap.GetHashCode();
+                h = h * 31 + (UnwrapFieldName?.GetHashCode() ?? 0);
+                h = h * 31 + (UnwrapFieldTypeDisplay?.GetHashCode() ?? 0);
+                h = h * 31 + HasUnwrapConstructor.GetHashCode();
+                h = h * 31 + (SafeFileName?.GetHashCode() ?? 0);
+                h = h * 31 + ContainingTypes.Length;
+                return h;
+            }
         }
     }
+
+    internal readonly record struct ContainingTypeInfo(
+        string Name,
+        string Kind,
+        string Accessibility
+    );
+}
+
+namespace System.Runtime.CompilerServices
+{
+    // Polyfill required for C# records on netstandard2.0 target.
+    internal static class IsExternalInit { }
 }
