@@ -28,6 +28,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             out List<Action> disposables
         )
         {
+            // Benchmark sample: uncap frame rate so the overhead of our systems,
+            // not vsync, determines throughput.
+            Application.targetFrameRate = 2000;
+
             // Allow static override for F1/F2/F3 maps
             FrenzyConfigSettings config;
 

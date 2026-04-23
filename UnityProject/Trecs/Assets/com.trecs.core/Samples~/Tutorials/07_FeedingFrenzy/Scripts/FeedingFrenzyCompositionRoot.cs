@@ -28,6 +28,10 @@ namespace Trecs.Samples.FeedingFrenzy101
             out List<Action> disposables
         )
         {
+            // Benchmark-style sample: uncap frame rate so our systems, not vsync,
+            // determine throughput with many thousands of entities.
+            Application.targetFrameRate = 2000;
+
             // ─── GPU instanced rendering ────────────────────────────
             var renderer = new RendererSystem();
 

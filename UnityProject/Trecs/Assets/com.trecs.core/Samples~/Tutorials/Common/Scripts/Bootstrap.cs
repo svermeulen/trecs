@@ -14,8 +14,6 @@ namespace Trecs.Samples
 
         void Awake()
         {
-            Application.targetFrameRate = 2000;
-
             CompositionRoot.Construct(
                 out var initializables,
                 out _tickables,

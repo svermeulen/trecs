@@ -25,6 +25,10 @@ namespace Trecs.Samples.JobSystem
             out List<Action> disposables
         )
         {
+            // Benchmark sample: uncap frame rate so the overhead of our systems,
+            // not vsync, determines throughput.
+            Application.targetFrameRate = 2000;
+
             var renderer = new RendererSystem();
 
             renderer.RegisterRenderable(
