@@ -5,8 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Trecs.Internal;
-using Trecs;
 using Trecs.Collections;
+using Trecs;
 
 namespace Trecs.Serialization
 {

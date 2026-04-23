@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs
@@ -21,7 +22,7 @@ namespace Trecs
 
         public static SetDef CreateSet(Type setType)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             Assert.That(
                 typeof(IEntitySet).IsAssignableFrom(setType),
                 "Set type {} must implement IEntitySet",

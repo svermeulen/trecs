@@ -20,7 +20,7 @@ namespace Trecs.Internal
 
         public static TagSet TagsToTagSet(IReadOnlyList<Tag> tags)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             if (tags.Count == 0)
             {
@@ -66,7 +66,7 @@ namespace Trecs.Internal
 
         public static TagSet TagsToTagSet(Tag t1)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             int id = t1.Guid;
 
@@ -92,7 +92,7 @@ namespace Trecs.Internal
 
         public static TagSet TagsToTagSet(Tag t1, Tag t2)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             int id = t1.Guid ^ t2.Guid;
 
@@ -120,7 +120,7 @@ namespace Trecs.Internal
 
         public static TagSet TagsToTagSet(Tag t1, Tag t2, Tag t3)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             int id = t1.Guid ^ t2.Guid ^ t3.Guid;
 
@@ -156,7 +156,7 @@ namespace Trecs.Internal
 
         public static TagSet TagsToTagSet(Tag t1, Tag t2, Tag t3, Tag t4)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             int id = t1.Guid ^ t2.Guid ^ t3.Guid ^ t4.Guid;
 
             if (id == 0)
@@ -199,7 +199,7 @@ namespace Trecs.Internal
 
         public static TagSet CombineTagSets(TagSet a, TagSet b)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             var tagsA = TagSetToTags(a);
             var tagsB = TagSetToTags(b);

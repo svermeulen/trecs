@@ -75,7 +75,7 @@ namespace Trecs.Internal
             // circuit before CustomFormatter's Type-formatting path runs. A
             // non-Burst job reaching here is already a misuse worth surfacing
             // loudly instead of silently racing on the cache.
-            Assert.That(UnityThreadUtil.IsMainThread, "PrettyTypeNameCache is main-thread only");
+            Assert.That(UnityThreadHelper.IsMainThread, "PrettyTypeNameCache is main-thread only");
 
             // Return from cache if available
             if (_formattedTypeNames.TryGetValue(type, out string prettyName))

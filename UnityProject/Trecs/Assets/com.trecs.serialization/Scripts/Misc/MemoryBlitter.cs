@@ -48,7 +48,7 @@ namespace Trecs.Internal
         public static unsafe void Read<T>(ref T value, BinaryReader reader)
             where T : unmanaged
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             fixed (void* valuePtr = &value)
             {
@@ -65,7 +65,7 @@ namespace Trecs.Internal
         public static unsafe void ReadArray<T>(T[] value, int count, BinaryReader reader)
             where T : unmanaged
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             Assert.That(value.Length >= count);
 
@@ -78,7 +78,7 @@ namespace Trecs.Internal
         public static unsafe void ReadArrayPtr<T>(T* valuePtr, int length, BinaryReader reader)
             where T : unmanaged
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             ReadRaw(valuePtr, sizeof(T) * length, reader);
         }
@@ -86,7 +86,7 @@ namespace Trecs.Internal
         public static unsafe void Write<T>(in T value, BinaryWriter writer)
             where T : unmanaged
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             fixed (void* valuePtr = &value)
             {
@@ -96,7 +96,7 @@ namespace Trecs.Internal
 
         public static unsafe void WriteRaw(void* valuePtr, int numBytes, BinaryWriter writer)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             EnsureBufferCapacity(numBytes);
 
             fixed (void* bufferPtr = _buffer)
@@ -117,7 +117,7 @@ namespace Trecs.Internal
             where T : unmanaged
         {
             Assert.That(value.Length >= count);
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             fixed (void* valuePtr = value)
             {
@@ -128,7 +128,7 @@ namespace Trecs.Internal
         public static unsafe void WriteArrayPtr<T>(T* valuePtr, int length, BinaryWriter writer)
             where T : unmanaged
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             WriteRaw(valuePtr, sizeof(T) * length, writer);
         }

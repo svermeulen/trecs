@@ -73,7 +73,7 @@ namespace Trecs
         {
             Assert.That(!_isDisposed);
             Assert.That(
-                UnityThreadUtil.IsMainThread,
+                UnityThreadHelper.IsMainThread,
                 "ResolveUnsafePtr must be called from the main thread; jobs use NativeUniquePtrResolver"
             );
             Assert.That(address != 0, "Attempted to resolve null address");
@@ -191,7 +191,7 @@ namespace Trecs
         internal void FlushPendingOperations()
         {
             Assert.That(!_isDisposed);
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
 
             if (_pendingAdds.Count > 0)
             {

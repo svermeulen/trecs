@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs
@@ -19,7 +20,7 @@ namespace Trecs
 
         public static Tag CreateTag(Type tagType)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             Assert.That(tagType.DerivesFrom(typeof(ITag)));
 
             int tagId;

@@ -1,4 +1,4 @@
-﻿namespace Trecs.Internal
+namespace Trecs.Internal
 {
 #if DEBUG
     struct ECSTuple<T1, T2>

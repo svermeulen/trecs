@@ -3,9 +3,9 @@ using UnityEngine;
 
 namespace Trecs.Internal
 {
-    public static class UnityThreadUtil
+    public static class UnityThreadHelper
     {
-        static UnityThreadUtil()
+        static UnityThreadHelper()
         {
             MainThreadId = Thread.CurrentThread.ManagedThreadId;
         }

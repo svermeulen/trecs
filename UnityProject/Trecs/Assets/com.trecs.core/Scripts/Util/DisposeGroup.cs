@@ -19,7 +19,7 @@ namespace Trecs.Internal
 
         public bool IsEmpty
         {
-            get { return _disposables.IsEmpty(); }
+            get { return _disposables.Count == 0; }
         }
 
         public void Dispose()

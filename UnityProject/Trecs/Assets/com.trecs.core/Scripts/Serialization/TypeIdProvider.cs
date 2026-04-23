@@ -65,7 +65,7 @@ namespace Trecs.Internal
 
         public static int GetTypeId(Type type)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             if (_cache.TryGetValue(type, out var cachedId))
             {
                 return cachedId;
@@ -127,7 +127,7 @@ namespace Trecs.Internal
 
         public static void Register(Type type, int id)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             if (_cache.TryGetValue(type, out var existingId))
             {
                 Assert.That(
@@ -174,7 +174,7 @@ namespace Trecs.Internal
 
         public static Type GetTypeFromId(int id)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             if (_reverseCache.TryGetValue(id, out var type))
             {
                 return type;

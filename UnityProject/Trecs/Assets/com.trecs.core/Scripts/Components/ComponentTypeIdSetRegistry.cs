@@ -11,7 +11,7 @@ namespace Trecs
 
         public static ComponentTypeIdSet FromSingle(ComponentId componentId)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             int id = componentId.Value;
 
             if (id == 0)
@@ -38,7 +38,7 @@ namespace Trecs
             ComponentId componentId
         )
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             var existingComponents = _sets[existing.Id];
 
             // Check if already present
@@ -84,7 +84,7 @@ namespace Trecs
 
         public static IReadOnlyList<ComponentId> GetComponents(ComponentTypeIdSet set)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             Assert.That(!set.IsNull, "Cannot get components from null ComponentTypeIdSet");
 
             if (_sets.TryGetValue(set.Id, out var existing))
@@ -97,7 +97,7 @@ namespace Trecs
 
         public static string SetToString(ComponentTypeIdSet set)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             if (set.IsNull)
             {
                 return "Null";

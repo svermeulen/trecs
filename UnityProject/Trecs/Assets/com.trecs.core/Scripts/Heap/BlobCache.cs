@@ -99,7 +99,7 @@ namespace Trecs
         public void Tick()
         {
             Assert.That(!_hasDisposed);
-            Assert.That(UnityThreadUtil.IsMainThread, "BlobCache.Tick is main-thread only");
+            Assert.That(UnityThreadHelper.IsMainThread, "BlobCache.Tick is main-thread only");
 
             _cleanCountdown -= Time.deltaTime;
 

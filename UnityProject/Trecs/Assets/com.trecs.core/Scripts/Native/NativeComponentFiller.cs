@@ -43,14 +43,14 @@ namespace Trecs.Internal
         internal static void Register<T>(IFiller entityBuilder)
             where T : unmanaged, IEntityComponent
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             ComponentId location = ComponentTypeId<T>.Value;
             _map.Add(location, entityBuilder);
         }
 
         internal static IFiller GetBuilderFromId(ComponentId typeId)
         {
-            Assert.That(UnityThreadUtil.IsMainThread);
+            Assert.That(UnityThreadHelper.IsMainThread);
             return _map[typeId];
         }
     }

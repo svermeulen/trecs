@@ -68,7 +68,7 @@ namespace Trecs
         {
             Assert.That(!_isDisposed);
             Assert.That(
-                UnityThreadUtil.IsMainThread,
+                UnityThreadHelper.IsMainThread,
                 "NativeSharedHeap.ResolveUnsafePtr (and ISharedPtrResolver) is main-thread only. "
                     + "Burst jobs must use NativeSharedPtrResolver instead."
             );
