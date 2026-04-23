@@ -1,8 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using Trecs.Collections;
 using Trecs.Internal;
+#if DEBUG && !TRECS_IS_PROFILING
+using System.Collections.Generic;
+#endif
 
 namespace Trecs
 {

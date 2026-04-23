@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using Trecs.Serialization;
-using UnityEngine;
 
 namespace Trecs.Internal
 {
