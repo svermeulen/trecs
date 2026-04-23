@@ -22,8 +22,6 @@ namespace Trecs.Samples.NativePointers
     {
         public int EntitiesPerRoute = 3;
 
-        DisposeCollection _eventDisposables;
-
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -32,7 +30,6 @@ namespace Trecs.Samples.NativePointers
         )
         {
             var gameObjectRegistry = new GameObjectRegistry();
-            _eventDisposables = new DisposeCollection();
 
             // Native pointers use the same blob store as managed pointers —
             // the in-memory store is sufficient for samples.
@@ -47,6 +44,8 @@ namespace Trecs.Samples.NativePointers
                 .AddBlobStore(blobStore)
                 .Build();
 
+            var cleanupHandler = new PointerCleanupHandler(world);
+
             world.AddSystems(
                 new ISystem[]
                 {
@@ -55,8 +54,6 @@ namespace Trecs.Samples.NativePointers
                 }
             );
 
-            RegisterPointerCleanup(world);
-
             var sceneInitializer = new SceneInitializer(
                 world,
                 gameObjectRegistry,
@@ -64,40 +61,9 @@ namespace Trecs.Samples.NativePointers
             );
 
             initializables = new() { world.Initialize, sceneInitializer.Initialize };
-
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { _eventDisposables.Dispose, world.Dispose };
-        }
-
-        /// <summary>
-        /// Native pointers stored in components MUST be disposed manually when
-        /// entities are removed. This handler disposes both the cloned route
-        /// NativeSharedPtr (decrements refcount) and the per-entity trail
-        /// NativeUniquePtr (releases the blob).
-        /// </summary>
-        void RegisterPointerCleanup(World world)
-        {
-            var cleanupAccessor = world.CreateAccessor();
-
-            cleanupAccessor
-                .Events.EntitiesWithTags<NativePatrolTags.Follower>()
-                .OnRemoved(
-                    (Group group, EntityRange indices) =>
-                    {
-                        for (int i = indices.Start; i < indices.End; i++)
-                        {
-                            var entityIndex = new EntityIndex(i, group);
-
-                            var route = cleanupAccessor.Component<CNativeRoute>(entityIndex).Read;
-                            route.Value.Dispose(cleanupAccessor);
-
-                            var trail = cleanupAccessor.Component<CNativeTrail>(entityIndex).Read;
-                            trail.Value.Dispose(cleanupAccessor);
-                        }
-                    }
-                )
-                .AddTo(_eventDisposables);
+            disposables = new() { cleanupHandler.Dispose, world.Dispose };
         }
     }
 }
