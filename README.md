@@ -123,7 +123,7 @@ See full documentation at **[svermeulen.github.io/trecs](https://svermeulen.gith
 
 ## Samples
 
-The project includes 14 samples covering everything from basic entity creation to complex simulations with Burst jobs. To try them, clone the repo, open `UnityProject/Trecs` in Unity 6000.3+, and run `Assets/Samples/Main.unity`.
+The project includes 15 samples covering everything from basic entity creation to complex simulations with Burst jobs. To try them, clone the repo, open `UnityProject/Trecs` in Unity 6000.3+, and run `Assets/Samples/Main.unity`.
 
 | Sample | Concepts |
 |--------|----------|
@@ -141,6 +141,7 @@ The project includes 14 samples covering everything from basic entity creation t
 | 12 Feeding Frenzy Benchmark | Exhaustive examples of the many Trecs patterns available |
 | 13 Save Game | Bookmark-based save/load slots with the serialization package |
 | 14 Native Pointers | `NativeSharedPtr` and `NativeUniquePtr` read and mutated inside a Burst job |
+| 15 Aspect Interfaces | Reusing aspect logic across entity types via interface composition |
 
 ## Acknowledgments
 

@@ -21,7 +21,7 @@ Use the [feature request template](https://github.com/svermeulen/trecs/issues/ne
 ### Prerequisites
 
 - **Unity** 6000.3.10f1 or later
-- **.NET SDK** 6.0+ (for the source generator)
+- **.NET SDK** 8.0+ (for the source generator)
 - **Git**
 
 ### Getting Started

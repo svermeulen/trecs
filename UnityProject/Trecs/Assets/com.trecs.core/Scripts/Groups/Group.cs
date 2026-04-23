@@ -66,7 +66,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly int CompareTo(Group other)
         {
-            return other.Id.CompareTo(Id);
+            return Id.CompareTo(other.Id);
         }
 
         /// <summary>

@@ -47,9 +47,10 @@ namespace Trecs
     public class LateVariableUpdateAttribute : Attribute { }
 
     /// <summary>
-    /// Marks a system as an input system, which runs once per rendered frame before
-    /// fixed-update. Input systems can call <see cref="WorldAccessor.AddInput{T}"/> to
-    /// enqueue input that the fixed-update simulation will consume deterministically.
+    /// Marks a system as an input system, which runs at the start of every
+    /// fixed-update tick (so zero-to-many times per rendered frame, matching
+    /// the fixed-tick cadence). Input systems can call <see cref="WorldAccessor.AddInput{T}"/>
+    /// to enqueue input that the fixed-update simulation will consume deterministically.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class InputSystemAttribute : Attribute { }

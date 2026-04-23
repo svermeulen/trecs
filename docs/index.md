@@ -53,7 +53,7 @@ var world = new WorldBuilder()
     .AddEntityType(PlayerEntity.Template)
     .Build();
 
-world.AddSystems(new ISystem[] { new MovementSystem() });
+world.AddSystem(new MovementSystem());
 world.Initialize();
 
 // Call this from a MonoBehaviour Update
