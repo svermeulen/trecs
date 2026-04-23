@@ -93,11 +93,11 @@ namespace Trecs.Samples.Pointers
 
                             // Dispose SharedPtr: decrements refcount.
                             // Object is freed when last clone is disposed.
-                            var route = cleanupAccessor.Component<CRoute>(entityIndex).Read;
+                            var route = cleanupAccessor.Component<Route>(entityIndex).Read;
                             route.Value.Dispose(cleanupAccessor);
 
                             // Dispose UniquePtr: returns object to pool.
-                            var trail = cleanupAccessor.Component<CTrail>(entityIndex).Read;
+                            var trail = cleanupAccessor.Component<Trail>(entityIndex).Read;
                             trail.Value.Dispose(cleanupAccessor);
                         }
                     }

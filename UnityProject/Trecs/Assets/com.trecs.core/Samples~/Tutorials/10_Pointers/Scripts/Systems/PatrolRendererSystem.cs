@@ -18,7 +18,7 @@ namespace Trecs.Samples.Pointers
         }
 
         [ForEachEntity(MatchByComponents = true)]
-        void Execute(in Position position, in CTrail trail, in GameObjectId goId)
+        void Execute(in Position position, in Trail trail, in GameObjectId goId)
         {
             var go = _registry.Resolve(goId);
             go.transform.position = (Vector3)position.Value;

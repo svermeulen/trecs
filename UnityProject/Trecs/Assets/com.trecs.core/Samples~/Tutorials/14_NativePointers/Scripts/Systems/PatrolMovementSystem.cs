@@ -20,8 +20,8 @@ namespace Trecs.Samples.NativePointers
         [WrapAsJob]
         static void Execute(
             ref Position position,
-            in CRoute route,
-            ref CTrail trail,
+            in Route route,
+            ref Trail trail,
             in NativeWorldAccessor world
         )
         {

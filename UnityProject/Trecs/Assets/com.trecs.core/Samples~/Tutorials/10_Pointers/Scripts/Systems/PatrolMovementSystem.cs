@@ -14,7 +14,7 @@ namespace Trecs.Samples.Pointers
     public partial class PatrolMovementSystem : ISystem
     {
         [ForEachEntity(MatchByComponents = true)]
-        void Execute(ref Position position, in CRoute route, in CTrail trail)
+        void Execute(ref Position position, in Route route, in Trail trail)
         {
             // Read shared route — same waypoint list for all followers of this route
             var patrolRoute = route.Value.Get(World);

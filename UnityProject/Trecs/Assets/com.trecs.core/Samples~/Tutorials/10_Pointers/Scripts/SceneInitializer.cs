@@ -110,8 +110,8 @@ namespace Trecs.Samples.Pointers
                 _world
                     .AddEntity<PatrolTags.Follower>()
                     .Set(new Position((float3)pos))
-                    .Set(new CRoute { Value = routeClone, Progress = progress })
-                    .Set(new CTrail { Value = trailPtr })
+                    .Set(new Route { Value = routeClone, Progress = progress })
+                    .Set(new Trail { Value = trailPtr })
                     .Set(_gameObjectRegistry.Register(go));
             }
         }

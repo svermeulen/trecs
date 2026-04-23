@@ -53,7 +53,7 @@ namespace Trecs.Samples.NativePointers
     /// Shared route reference and per-entity progress along it.
     /// The NativeSharedPtr handle is a 12-byte value type stored inline in the component.
     /// </summary>
-    public partial struct CRoute : IEntityComponent
+    public partial struct Route : IEntityComponent
     {
         public NativeSharedPtr<PatrolRoute> Value;
         public float Progress;
@@ -63,7 +63,7 @@ namespace Trecs.Samples.NativePointers
     /// Per-entity trail history reference.
     /// The NativeUniquePtr handle is a 4-byte value type stored inline in the component.
     /// </summary>
-    public partial struct CTrail : IEntityComponent
+    public partial struct Trail : IEntityComponent
     {
         public NativeUniquePtr<TrailHistory> Value;
     }
@@ -75,8 +75,8 @@ namespace Trecs.Samples.NativePointers
                 IHasTags<NativePatrolTags.Follower>
         {
             public Position Position;
-            public CRoute Route;
-            public CTrail Trail;
+            public Route Route;
+            public Trail Trail;
             public GameObjectId GameObjectId;
         }
     }

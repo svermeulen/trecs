@@ -25,7 +25,7 @@ namespace Trecs.Samples.NativePointers
         WorldAccessor World { get; }
 
         [ForEachEntity]
-        void OnFollowerRemoved(in CRoute route, in CTrail trail)
+        void OnFollowerRemoved(in Route route, in Trail trail)
         {
             // Dispose NativeSharedPtr: decrements the refcount. The blob is
             // freed once the last clone is disposed.

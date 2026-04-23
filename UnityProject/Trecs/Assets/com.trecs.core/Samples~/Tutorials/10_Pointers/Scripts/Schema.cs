@@ -42,7 +42,7 @@ namespace Trecs.Samples.Pointers
     /// Shared route reference and per-entity progress along it.
     /// The SharedPtr handle is a 12-byte value type stored inline in the component.
     /// </summary>
-    public partial struct CRoute : IEntityComponent
+    public partial struct Route : IEntityComponent
     {
         public SharedPtr<PatrolRoute> Value;
         public float Progress;
@@ -52,7 +52,7 @@ namespace Trecs.Samples.Pointers
     /// Per-entity trail history reference.
     /// The UniquePtr handle is a 4-byte value type stored inline in the component.
     /// </summary>
-    public partial struct CTrail : IEntityComponent
+    public partial struct Trail : IEntityComponent
     {
         public UniquePtr<TrailHistory> Value;
     }
@@ -62,8 +62,8 @@ namespace Trecs.Samples.Pointers
         public partial class PatrolFollowerEntity : ITemplate, IHasTags<PatrolTags.Follower>
         {
             public Position Position;
-            public CRoute Route;
-            public CTrail Trail;
+            public Route Route;
+            public Trail Trail;
             public GameObjectId GameObjectId;
         }
     }
