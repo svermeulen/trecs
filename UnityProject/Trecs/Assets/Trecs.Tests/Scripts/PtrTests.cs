@@ -1007,9 +1007,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            NAssert.Throws<TrecsException>(
-                () => heap.DisposeHandle(new PtrHandle(12345))
-            );
+            NAssert.Throws<TrecsException>(() => heap.DisposeHandle(new PtrHandle(12345)));
 
             heap.Dispose();
             blobCache.Dispose();
