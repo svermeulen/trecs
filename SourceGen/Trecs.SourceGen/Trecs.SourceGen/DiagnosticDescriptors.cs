@@ -697,18 +697,6 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // TypeId diagnostics (TRECS120-129)
-
-        public static readonly DiagnosticDescriptor DuplicateTypeId = new(
-            id: "TRECS120",
-            title: "Duplicate [TypeId]",
-            messageFormat: "Type '{0}' uses [TypeId({1})] which collides with type '{2}'. "
-                + "TypeIds must be unique across the compilation — pick a different random int.",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
         // ── NativeUniquePtr copy prevention ────────────────────────
 
         public static readonly DiagnosticDescriptor NativeUniquePtrByValueLocal = new(
