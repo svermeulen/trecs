@@ -162,18 +162,19 @@ namespace Trecs.Serialization
             {
                 writer.Write("setId", sets.UnsafeKeys[i]);
 
-                ref readonly var groupMap = ref sets.UnsafeValues[i]._entriesPerGroup;
+                ref readonly var set = ref sets.UnsafeValues[i];
+                var registeredGroups = set._registeredGroups;
+                var entriesPerGroup = set._entriesPerGroup;
 
-                var numGroups = groupMap.Count;
-
+                var numGroups = registeredGroups.Length;
                 writer.Write("numGroups", numGroups);
 
                 for (int k = 0; k < numGroups; k++)
                 {
-                    var group = groupMap.UnsafeKeys[k];
+                    var group = registeredGroups[k];
                     writer.Write("group", _worldDef.ToTagSet(group));
 
-                    ref readonly var groupEntities = ref groupMap.UnsafeValues[k];
+                    var groupEntities = entriesPerGroup[group.Index];
 
                     // This one looks ok to blit
                     writer.Write("entityIdToDenseIndex", groupEntities._entityIdToDenseIndex);

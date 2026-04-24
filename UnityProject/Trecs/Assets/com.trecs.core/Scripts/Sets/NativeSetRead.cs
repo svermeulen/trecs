@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
@@ -15,7 +17,8 @@ namespace Trecs
     public struct NativeSetRead<TSet>
         where TSet : struct, IEntitySet
     {
-        readonly NativeDenseDictionary<GroupIndex, SetGroupEntry> _entriesPerGroup;
+        [NativeDisableContainerSafetyRestriction]
+        readonly NativeList<SetGroupEntry> _entriesPerGroup;
 
         internal NativeSetRead(in EntitySet set)
         {
@@ -31,15 +34,23 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Exists(EntityIndex entityIndex)
         {
-            if (_entriesPerGroup.TryGetValue(entityIndex.GroupIndex, out var groupEntry))
-                return groupEntry.Exists(entityIndex.Index);
-            return false;
+            var group = entityIndex.GroupIndex;
+            if (group.IsNull)
+                return false;
+            var entry = _entriesPerGroup[group.Index];
+            return entry.IsValid && entry.Exists(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGetGroupEntry(GroupIndex group, out SetGroupEntryRead groupEntry)
         {
-            if (_entriesPerGroup.TryGetValue(group, out var entry))
+            if (group.IsNull)
+            {
+                groupEntry = default;
+                return false;
+            }
+            var entry = _entriesPerGroup[group.Index];
+            if (entry.IsValid)
             {
                 groupEntry = new SetGroupEntryRead(entry);
                 return true;

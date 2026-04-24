@@ -1,6 +1,7 @@
 using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 
 namespace Trecs
@@ -23,7 +24,10 @@ namespace Trecs
     {
         public AtomicNativeBags AddQueue;
         public AtomicNativeBags RemoveQueue;
-        public NativeDenseDictionary<GroupIndex, SetGroupEntry> EntriesPerGroup;
+
+        [NativeDisableContainerSafetyRestriction]
+        public NativeList<SetGroupEntry> EntriesPerGroup;
+
         public bool RequireDeterministic;
 
         public void Execute()
@@ -51,7 +55,7 @@ namespace Trecs
             for (int i = 0; i < allRemoves.Length; i++)
             {
                 var entityIndex = allRemoves[i];
-                EntriesPerGroup[entityIndex.GroupIndex].Remove(entityIndex.Index);
+                EntriesPerGroup[entityIndex.GroupIndex.Index].Remove(entityIndex.Index);
             }
             allRemoves.Dispose();
 
@@ -66,7 +70,7 @@ namespace Trecs
             for (int i = 0; i < allAdds.Length; i++)
             {
                 var entityIndex = allAdds[i];
-                EntriesPerGroup[entityIndex.GroupIndex].Add(entityIndex.Index);
+                EntriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
             }
             allAdds.Dispose();
         }
@@ -79,7 +83,7 @@ namespace Trecs
                 while (!bag.IsEmpty())
                 {
                     var entityIndex = bag.Dequeue<EntityIndex>();
-                    EntriesPerGroup[entityIndex.GroupIndex].Remove(entityIndex.Index);
+                    EntriesPerGroup[entityIndex.GroupIndex.Index].Remove(entityIndex.Index);
                 }
             }
 
@@ -89,7 +93,7 @@ namespace Trecs
                 while (!bag.IsEmpty())
                 {
                     var entityIndex = bag.Dequeue<EntityIndex>();
-                    EntriesPerGroup[entityIndex.GroupIndex].Add(entityIndex.Index);
+                    EntriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
                 }
             }
         }

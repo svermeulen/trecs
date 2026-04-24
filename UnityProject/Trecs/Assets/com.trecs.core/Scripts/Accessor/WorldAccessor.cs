@@ -1055,9 +1055,10 @@ namespace Trecs
             if (_systemRunner.JobScheduler.HasOutstandingJobs)
             {
                 var resourceId = ResourceId.Set(setId);
-                foreach (var entry in setCollection._entriesPerGroup)
+                var registered = setCollection._registeredGroups;
+                for (int i = 0; i < registered.Length; i++)
                 {
-                    _systemRunner.JobScheduler.SyncMainThreadForRead(resourceId, entry.Key);
+                    _systemRunner.JobScheduler.SyncMainThreadForRead(resourceId, registered[i]);
                 }
             }
 
@@ -1075,9 +1076,10 @@ namespace Trecs
             if (_systemRunner.JobScheduler.HasOutstandingJobs)
             {
                 var resourceId = ResourceId.Set(setId);
-                foreach (var entry in setCollection._entriesPerGroup)
+                var registered = setCollection._registeredGroups;
+                for (int i = 0; i < registered.Length; i++)
                 {
-                    _systemRunner.JobScheduler.SyncMainThread(resourceId, entry.Key);
+                    _systemRunner.JobScheduler.SyncMainThread(resourceId, registered[i]);
                 }
             }
 

@@ -162,8 +162,8 @@ namespace Trecs.Internal
             var rid = ResourceId.Set(EntitySet<TSet>.Value.Id);
             var scheduler = world.JobScheduler;
             ref var collection = ref world.GetSetForJobScheduling<TSet>();
-            foreach (var entry in collection._entriesPerGroup)
-                deps = scheduler.IncludeWriteDep(deps, rid, entry.Key);
+            for (int i = 0; i < collection._registeredGroups.Length; i++)
+                deps = scheduler.IncludeWriteDep(deps, rid, collection._registeredGroups[i]);
             return deps;
         }
 
@@ -187,8 +187,8 @@ namespace Trecs.Internal
             };
             var flushHandle = flushJob.Schedule(handle);
 
-            foreach (var entry in collection._entriesPerGroup)
-                scheduler.TrackJobWrite(flushHandle, rid, entry.Key);
+            for (int i = 0; i < collection._registeredGroups.Length; i++)
+                scheduler.TrackJobWrite(flushHandle, rid, collection._registeredGroups[i]);
         }
 
         // ── NativeEntitySetIndices (read-only set indices for one group) ──
@@ -201,7 +201,7 @@ namespace Trecs.Internal
             where TSet : struct, IEntitySet
         {
             ref var collection = ref world.GetSetForJobScheduling<TSet>();
-            if (collection._entriesPerGroup.TryGetValue(group, out var groupEntry))
+            if (collection.TryGetGroupEntry(group, out var groupEntry))
             {
                 var indices = groupEntry.Indices;
                 return new NativeEntitySetIndices<TSet>(indices.Buffer, indices.Count);
@@ -230,8 +230,8 @@ namespace Trecs.Internal
             var rid = ResourceId.Set(setId);
             var scheduler = world.JobScheduler;
             ref var collection = ref world.GetSetForJobScheduling(setId);
-            foreach (var entry in collection._entriesPerGroup)
-                deps = scheduler.IncludeReadDep(deps, rid, entry.Key);
+            for (int i = 0; i < collection._registeredGroups.Length; i++)
+                deps = scheduler.IncludeReadDep(deps, rid, collection._registeredGroups[i]);
             return deps;
         }
 
@@ -246,8 +246,8 @@ namespace Trecs.Internal
             var rid = ResourceId.Set(setId);
             var scheduler = world.JobScheduler;
             ref var collection = ref world.GetSetForJobScheduling(setId);
-            foreach (var entry in collection._entriesPerGroup)
-                scheduler.TrackJobRead(handle, rid, entry.Key);
+            for (int i = 0; i < collection._registeredGroups.Length; i++)
+                scheduler.TrackJobRead(handle, rid, collection._registeredGroups[i]);
         }
 
         // ── Sparse iteration helpers ──

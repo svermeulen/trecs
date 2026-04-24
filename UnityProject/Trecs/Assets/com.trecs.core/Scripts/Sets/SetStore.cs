@@ -62,7 +62,10 @@ namespace Trecs.Internal
                 validGroups.Add(group);
             }
 
-            EntitySets.Add(setDef.Id, new EntitySet(setDef.Id, validGroups));
+            EntitySets.Add(
+                setDef.Id,
+                new EntitySet(setDef.Id, worldInfo.AllGroups.Count, validGroups)
+            );
             DeferredQueues.Add(
                 setDef.Id,
                 new NativeSetDeferredQueues(AtomicNativeBags.Create(), AtomicNativeBags.Create())
@@ -234,7 +237,7 @@ namespace Trecs.Internal
             {
                 ref var setCollection = ref EntitySets.GetValueByRef(setIds[i]);
 
-                if (!setCollection._entriesPerGroup.TryGetValue(fromGroup, out var fromGroupEntry))
+                if (!setCollection.TryGetGroupEntry(fromGroup, out var fromGroupEntry))
                 {
                     continue;
                 }
@@ -276,7 +279,7 @@ namespace Trecs.Internal
             {
                 ref var setCollection = ref EntitySets.GetValueByRef(setIds[i]);
 
-                if (!setCollection._entriesPerGroup.TryGetValue(fromGroup, out var fromGroupEntry))
+                if (!setCollection.TryGetGroupEntry(fromGroup, out var fromGroupEntry))
                 {
                     continue;
                 }

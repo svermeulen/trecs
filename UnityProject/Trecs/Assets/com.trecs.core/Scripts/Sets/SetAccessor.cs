@@ -33,7 +33,7 @@ namespace Trecs
             get
             {
                 _world.SyncSetForRead(_setId);
-                return new SetRead<T>(_world, _world.GetSetCollection(_setId)._entriesPerGroup);
+                return new SetRead<T>(_world, _world.GetSetCollection(_setId));
             }
         }
 
@@ -47,11 +47,7 @@ namespace Trecs
             get
             {
                 _world.SyncSetForWrite(_setId);
-                return new SetWrite<T>(
-                    _world,
-                    _setId,
-                    _world.GetSetCollection(_setId)._entriesPerGroup
-                );
+                return new SetWrite<T>(_world, _setId, _world.GetSetCollection(_setId));
             }
         }
     }

@@ -1,4 +1,6 @@
 using Trecs.Internal;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
@@ -7,19 +9,29 @@ namespace Trecs
     /// </summary>
     public ref struct EntitySetIterator
     {
-        int _indexGroup;
-        readonly int _groupCount;
-        readonly NativeDenseDictionary<GroupIndex, SetGroupEntry> _entriesPerGroup;
+        int _registeredIndex;
+        readonly int _registeredCount;
+
+        [NativeDisableContainerSafetyRestriction]
+        readonly NativeList<SetGroupEntry> _entriesPerGroup;
+
+        [NativeDisableContainerSafetyRestriction]
+        readonly NativeList<GroupIndex> _registeredGroups;
+
         SetGroupEntry _current;
 
         internal EntitySetIterator(in EntitySet set)
-            : this(set._entriesPerGroup) { }
+            : this(set._entriesPerGroup, set._registeredGroups) { }
 
-        internal EntitySetIterator(NativeDenseDictionary<GroupIndex, SetGroupEntry> entriesPerGroup)
+        internal EntitySetIterator(
+            NativeList<SetGroupEntry> entriesPerGroup,
+            NativeList<GroupIndex> registeredGroups
+        )
         {
             _entriesPerGroup = entriesPerGroup;
-            _groupCount = _entriesPerGroup.Count;
-            _indexGroup = -1;
+            _registeredGroups = registeredGroups;
+            _registeredCount = registeredGroups.Length;
+            _registeredIndex = -1;
             _current = default;
         }
 
@@ -27,15 +39,15 @@ namespace Trecs
 
         public bool MoveNext()
         {
-            while (++_indexGroup < _groupCount)
+            while (++_registeredIndex < _registeredCount)
             {
-                _current = _entriesPerGroup.GetValuesWrite(out _)[_indexGroup];
+                _current = _entriesPerGroup[_registeredGroups[_registeredIndex].Index];
 
                 if (_current.Count > 0)
                     break;
             }
 
-            return _indexGroup < _groupCount;
+            return _registeredIndex < _registeredCount;
         }
 
         public readonly ref struct RefCurrent

@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
@@ -14,17 +16,19 @@ namespace Trecs
     {
         readonly WorldAccessor _world;
         readonly SetId _setId;
-        readonly NativeDenseDictionary<GroupIndex, SetGroupEntry> _entriesPerGroup;
 
-        internal SetWrite(
-            WorldAccessor world,
-            SetId setId,
-            NativeDenseDictionary<GroupIndex, SetGroupEntry> entriesPerGroup
-        )
+        [NativeDisableContainerSafetyRestriction]
+        readonly NativeList<SetGroupEntry> _entriesPerGroup;
+
+        [NativeDisableContainerSafetyRestriction]
+        readonly NativeList<GroupIndex> _registeredGroups;
+
+        internal SetWrite(WorldAccessor world, SetId setId, in EntitySet set)
         {
             _world = world;
             _setId = setId;
-            _entriesPerGroup = entriesPerGroup;
+            _entriesPerGroup = set._entriesPerGroup;
+            _registeredGroups = set._registeredGroups;
         }
 
         // ── Write operations ─────────────────────────────────────────────
@@ -33,14 +37,14 @@ namespace Trecs
         public void AddImmediate(EntityIndex entityIndex)
         {
             AssertValidGroup(entityIndex.GroupIndex);
-            _entriesPerGroup[entityIndex.GroupIndex].Add(entityIndex.Index);
+            _entriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveImmediate(EntityIndex entityIndex)
         {
             AssertValidGroup(entityIndex.GroupIndex);
-            _entriesPerGroup[entityIndex.GroupIndex].Remove(entityIndex.Index);
+            _entriesPerGroup[entityIndex.GroupIndex.Index].Remove(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -66,9 +70,11 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Exists(EntityIndex entityIndex)
         {
-            if (_entriesPerGroup.TryGetValue(entityIndex.GroupIndex, out var groupEntry))
-                return groupEntry.Exists(entityIndex.Index);
-            return false;
+            var group = entityIndex.GroupIndex;
+            if (group.IsNull)
+                return false;
+            var entry = _entriesPerGroup[group.Index];
+            return entry.IsValid && entry.Exists(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -80,7 +86,13 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGetGroupEntry(GroupIndex group, out SetGroupEntry groupEntry)
         {
-            return _entriesPerGroup.TryGetValue(group, out groupEntry);
+            if (group.IsNull)
+            {
+                groupEntry = default;
+                return false;
+            }
+            groupEntry = _entriesPerGroup[group.Index];
+            return groupEntry.IsValid;
         }
 
         public int Count
@@ -89,9 +101,10 @@ namespace Trecs
             get
             {
                 int count = 0;
-                var groupEntries = _entriesPerGroup.GetValuesRead(out var groupCount);
-                for (int i = 0; i < groupCount; i++)
-                    count += groupEntries[i].Count;
+                for (int i = 0; i < _registeredGroups.Length; i++)
+                {
+                    count += _entriesPerGroup[_registeredGroups[i].Index].Count;
+                }
                 return count;
             }
         }
@@ -99,7 +112,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public EntitySetIterator GetEnumerator()
         {
-            return new EntitySetIterator(_entriesPerGroup);
+            return new EntitySetIterator(_entriesPerGroup, _registeredGroups);
         }
 
         // ── Validation ───────────────────────────────────────────────────
@@ -109,7 +122,7 @@ namespace Trecs
         {
 #if DEBUG
             Assert.That(
-                _entriesPerGroup.ContainsKey(group),
+                !group.IsNull && _entriesPerGroup[group.Index].IsValid,
                 "GroupIndex {} does not belong to this set's template",
                 group
             );
