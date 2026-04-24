@@ -10,14 +10,14 @@ namespace Trecs
     /// </summary>
     public ref struct SparseGroupSliceIterator
     {
-        readonly ReadOnlyFastList<Group> _validGroups;
+        readonly ReadOnlyFastList<GroupIndex> _validGroups;
         SetGroupLookup _set;
         int _groupIndex;
         SparseGroupSlice _current;
 
         internal SparseGroupSliceIterator(
             WorldAccessor world,
-            ReadOnlyFastList<Group> validGroups,
+            ReadOnlyFastList<GroupIndex> validGroups,
             SetId set
         )
         {

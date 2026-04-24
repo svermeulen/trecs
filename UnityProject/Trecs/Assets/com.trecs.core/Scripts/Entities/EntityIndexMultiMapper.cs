@@ -13,7 +13,7 @@ namespace Trecs.Internal
     public readonly struct EntityIndexMultiMapper<T>
         where T : unmanaged, IEntityComponent
     {
-        internal EntityIndexMultiMapper(DenseDictionary<Group, IComponentArray<T>> dictionary)
+        internal EntityIndexMultiMapper(DenseDictionary<GroupIndex, IComponentArray<T>> dictionary)
         {
             _dic = dictionary;
         }
@@ -31,14 +31,14 @@ namespace Trecs.Internal
             if (!Exists(entity))
                 throw new TrecsException("EntityIndexMultiMapper: Entity not found");
 #endif
-            ref var dict = ref _dic.GetValueByRef(entity.Group);
+            ref var dict = ref _dic.GetValueByRef(entity.GroupIndex);
             return ref dict.GetValueAtIndexByRef(entity.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Exists(EntityIndex entity)
         {
-            return _dic.TryGetIndex(entity.Group, out var index)
+            return _dic.TryGetIndex(entity.GroupIndex, out var index)
                 && entity.Index < _dic.GetValueAtIndexByRef(index).Count;
         }
 
@@ -46,7 +46,7 @@ namespace Trecs.Internal
         public bool TryGetEntity(EntityIndex entity, out T component)
         {
             component = default;
-            if (_dic.TryGetIndex(entity.Group, out var index))
+            if (_dic.TryGetIndex(entity.GroupIndex, out var index))
             {
                 ref var componentArray = ref _dic.GetValueAtIndexByRef(index);
                 if (entity.Index < componentArray.Count)
@@ -59,7 +59,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool FindIndex(Group group, int entityIndex, out int index)
+        public bool FindIndex(GroupIndex group, int entityIndex, out int index)
         {
             index = entityIndex;
             if (_dic.TryGetIndex(group, out var groupIndex))
@@ -70,7 +70,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int GetIndex(Group group, int entityIndex)
+        public int GetIndex(GroupIndex group, int entityIndex)
         {
             return entityIndex;
         }
@@ -78,11 +78,11 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int GetIndex(EntityIndex entityIndex)
         {
-            return GetIndex(entityIndex.Group, entityIndex.Index);
+            return GetIndex(entityIndex.GroupIndex, entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Exists(Group group, int entityIndex)
+        public bool Exists(GroupIndex group, int entityIndex)
         {
             return _dic.TryGetIndex(group, out var groupIndex)
                 && entityIndex < _dic.GetValueAtIndexByRef(groupIndex).Count;
@@ -90,6 +90,6 @@ namespace Trecs.Internal
 
         public Type Template => TypeMeta<T>.Type;
 
-        readonly DenseDictionary<Group, IComponentArray<T>> _dic;
+        readonly DenseDictionary<GroupIndex, IComponentArray<T>> _dic;
     }
 }

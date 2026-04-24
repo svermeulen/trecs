@@ -34,17 +34,17 @@ namespace Trecs.Internal
         readonly SimpleSubject _postApplyInputsEvent = new();
 
         readonly DenseDictionary<
-            Group,
+            GroupIndex,
             FastList<PrioritizedObserver<EntitiesAddedObserver>>
         > _reactiveOnAddedObservers;
 
         readonly DenseDictionary<
-            Group,
+            GroupIndex,
             FastList<PrioritizedObserver<EntitiesMovedObserver>>
         > _reactiveOnMovedObservers;
 
         readonly DenseDictionary<
-            Group,
+            GroupIndex,
             FastList<PrioritizedObserver<EntitiesRemovedObserver>>
         > _reactiveOnRemovedObservers;
 
@@ -58,17 +58,17 @@ namespace Trecs.Internal
         internal SimpleSubject PostApplyInputsEvent => _postApplyInputsEvent;
 
         internal DenseDictionary<
-            Group,
+            GroupIndex,
             FastList<PrioritizedObserver<EntitiesAddedObserver>>
         > ReactiveOnAddedObservers => _reactiveOnAddedObservers;
 
         internal DenseDictionary<
-            Group,
+            GroupIndex,
             FastList<PrioritizedObserver<EntitiesMovedObserver>>
         > ReactiveOnMovedObservers => _reactiveOnMovedObservers;
 
         internal DenseDictionary<
-            Group,
+            GroupIndex,
             FastList<PrioritizedObserver<EntitiesRemovedObserver>>
         > ReactiveOnRemovedObservers => _reactiveOnRemovedObservers;
 
@@ -80,7 +80,7 @@ namespace Trecs.Internal
         }
 
         internal void ObserveEntitiesAddedEvent(
-            Group group,
+            GroupIndex group,
             EntitiesAddedObserver observer,
             int priority = 0,
             string debugName = null
@@ -98,7 +98,7 @@ namespace Trecs.Internal
             );
         }
 
-        internal void UnobserveEntitiesAddedEvent(Group group, EntitiesAddedObserver observer)
+        internal void UnobserveEntitiesAddedEvent(GroupIndex group, EntitiesAddedObserver observer)
         {
             if (_reactiveOnAddedObservers.TryGetValue(group, out var list))
             {
@@ -108,7 +108,7 @@ namespace Trecs.Internal
         }
 
         internal void ObserveEntitiesMovedEvent(
-            Group group,
+            GroupIndex group,
             EntitiesMovedObserver observer,
             int priority = 0,
             string debugName = null
@@ -126,7 +126,7 @@ namespace Trecs.Internal
             );
         }
 
-        internal void UnobserveEntitiesMovedEvent(Group group, EntitiesMovedObserver observer)
+        internal void UnobserveEntitiesMovedEvent(GroupIndex group, EntitiesMovedObserver observer)
         {
             if (_reactiveOnMovedObservers.TryGetValue(group, out var list))
             {
@@ -136,7 +136,7 @@ namespace Trecs.Internal
         }
 
         internal void ObserveEntitiesRemovedEvent(
-            Group group,
+            GroupIndex group,
             EntitiesRemovedObserver observer,
             int priority = 0,
             string debugName = null
@@ -156,7 +156,10 @@ namespace Trecs.Internal
             );
         }
 
-        internal void UnobserveEntitiesRemovedEvent(Group group, EntitiesRemovedObserver observer)
+        internal void UnobserveEntitiesRemovedEvent(
+            GroupIndex group,
+            EntitiesRemovedObserver observer
+        )
         {
             if (_reactiveOnRemovedObservers.TryGetValue(group, out var list))
             {

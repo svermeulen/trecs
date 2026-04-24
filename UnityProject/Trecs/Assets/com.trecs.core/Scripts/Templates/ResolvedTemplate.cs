@@ -14,7 +14,7 @@ namespace Trecs
     {
         public ResolvedTemplate(
             Template template,
-            IReadOnlyList<Group> groups,
+            IReadOnlyList<TagSet> groupTagSets,
             IReadOnlyList<Template> allBaseTemplates,
             IReadOnlyList<TagSet> partitions,
             IReadOnlyList<IResolvedComponentDeclaration> componentDeclarations,
@@ -24,7 +24,7 @@ namespace Trecs
         )
         {
             Template = template;
-            Groups = groups;
+            GroupTagSets = groupTagSets;
             ComponentDeclarations = componentDeclarations;
             ComponentDeclarationMap = componentDeclarationMap;
             ComponentBuilders = componentBuilders;
@@ -34,9 +34,18 @@ namespace Trecs
         }
 
         /// <summary>
-        /// All groups this template populates (one per valid partition combination).
+        /// Tag sets identifying the groups this template populates (one per valid
+        /// partition combination). Used during world build to assign
+        /// <see cref="GroupIndex"/>es.
         /// </summary>
-        public IReadOnlyList<Group> Groups { get; }
+        public IReadOnlyList<TagSet> GroupTagSets { get; }
+
+        /// <summary>
+        /// All groups this template populates (one per valid partition combination).
+        /// Populated after world build — do not access before
+        /// <see cref="WorldBuilder.Build"/> finishes.
+        /// </summary>
+        public IReadOnlyList<GroupIndex> Groups { get; internal set; }
 
         /// <summary>
         /// The original unresolved template definition.

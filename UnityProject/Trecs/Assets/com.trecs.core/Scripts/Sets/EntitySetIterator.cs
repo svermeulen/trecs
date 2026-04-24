@@ -3,19 +3,19 @@ using Trecs.Internal;
 namespace Trecs
 {
     /// <summary>
-    /// Unified set iterator. Yields (EntitySetIndices indices, Group group) per non-empty group.
+    /// Unified set iterator. Yields (EntitySetIndices indices, GroupIndex group) per non-empty group.
     /// </summary>
     public ref struct EntitySetIterator
     {
         int _indexGroup;
         readonly int _groupCount;
-        readonly NativeDenseDictionary<Group, SetGroupEntry> _entriesPerGroup;
+        readonly NativeDenseDictionary<GroupIndex, SetGroupEntry> _entriesPerGroup;
         SetGroupEntry _current;
 
         internal EntitySetIterator(in EntitySet set)
             : this(set._entriesPerGroup) { }
 
-        internal EntitySetIterator(NativeDenseDictionary<Group, SetGroupEntry> entriesPerGroup)
+        internal EntitySetIterator(NativeDenseDictionary<GroupIndex, SetGroupEntry> entriesPerGroup)
         {
             _entriesPerGroup = entriesPerGroup;
             _groupCount = _entriesPerGroup.Count;
@@ -47,20 +47,20 @@ namespace Trecs
                 _entry = entry;
             }
 
-            public void Deconstruct(out EntitySetIndices indices, out Group group)
+            public void Deconstruct(out EntitySetIndices indices, out GroupIndex group)
             {
                 indices = _entry.Indices;
-                group = _entry.Group;
+                group = _entry.GroupIndex;
             }
 
             public void Deconstruct(
                 out EntitySetIndices indices,
-                out Group group,
+                out GroupIndex group,
                 out SetGroupEntryRead groupEntry
             )
             {
                 indices = _entry.Indices;
-                group = _entry.Group;
+                group = _entry.GroupIndex;
                 groupEntry = new SetGroupEntryRead(_entry);
             }
         }

@@ -524,7 +524,7 @@ namespace Trecs
             using (TrecsProfiling.Start("AddEntity"))
             {
                 initializer = _entitySubmitter.AddEntity(
-                    _worldInfo.GlobalEntityIndex.Group,
+                    _worldInfo.GlobalEntityIndex.GroupIndex,
                     globalTemplate.ComponentBuilders,
                     globalTemplate.DebugName
                 );

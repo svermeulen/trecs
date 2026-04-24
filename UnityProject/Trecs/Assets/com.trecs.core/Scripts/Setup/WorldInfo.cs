@@ -15,9 +15,9 @@ namespace Trecs
     {
         static readonly TrecsLog _log = new(nameof(WorldInfo));
 
-        readonly ReadOnlyDenseDictionary<Group, GroupInfo> _groupInfos;
-        readonly Dictionary<Template, FastList<Group>> _templateGroupsMap;
-        readonly ReadOnlyFastList<Group> _allGroups;
+        readonly ReadOnlyDenseDictionary<GroupIndex, GroupInfo> _groupInfos;
+        readonly Dictionary<Template, FastList<GroupIndex>> _templateGroupsMap;
+        readonly ReadOnlyFastList<GroupIndex> _allGroups;
         readonly Dictionary<TagSet, GroupIndex> _tagSetToIndex;
         readonly TagSet[] _indexToTagSet;
         readonly ReadOnlyFastList<ResolvedTemplate> _resolvedTemplates;
@@ -29,9 +29,9 @@ namespace Trecs
 
         const int _globalEntitySlotIndex = 0;
 
-        readonly Group _globalGroup;
+        readonly GroupIndex _globalGroup;
         readonly EntityIndex _globalEntityIndex;
-        readonly ReadOnlyFastList<Group> _globalGroups;
+        readonly ReadOnlyFastList<GroupIndex> _globalGroups;
 
         public WorldInfo(IReadOnlyList<Template> templatesList)
         {
@@ -50,12 +50,46 @@ namespace Trecs
                 resolvedTemplatesList.Add(ResolveTemplate(template));
             }
 
-            var groupTemplateMap = new DenseDictionary<Group, GroupInfo>();
-            var templateGroupsMap = new Dictionary<Template, FastList<Group>>();
-            var allGroups = new FastList<Group>();
+            // Pass 1: assign a sequential GroupIndex to each unique TagSet that
+            // appears as a group on any resolved template.
+            var tagSetToIndex = new Dictionary<TagSet, GroupIndex>();
+            var indexToTagSet = new List<TagSet>();
+
+            foreach (var resolvedTemplate in resolvedTemplatesList)
+            {
+                foreach (var tagSet in resolvedTemplate.GroupTagSets)
+                {
+                    if (!tagSetToIndex.ContainsKey(tagSet))
+                    {
+                        Assert.That(
+                            indexToTagSet.Count <= ushort.MaxValue,
+                            "GroupIndex is ushort — world would have more than {} groups",
+                            ushort.MaxValue
+                        );
+                        var idx = new GroupIndex((ushort)indexToTagSet.Count);
+                        tagSetToIndex.Add(tagSet, idx);
+                        indexToTagSet.Add(tagSet);
+                    }
+                }
+            }
+
+            // Populate ResolvedTemplate.Groups now that we have the mapping.
+            foreach (var resolvedTemplate in resolvedTemplatesList)
+            {
+                var groups = new List<GroupIndex>(resolvedTemplate.GroupTagSets.Count);
+                foreach (var tagSet in resolvedTemplate.GroupTagSets)
+                {
+                    groups.Add(tagSetToIndex[tagSet]);
+                }
+                resolvedTemplate.Groups = groups;
+            }
+
+            var groupTemplateMap = new DenseDictionary<GroupIndex, GroupInfo>();
+            var templateGroupsMap = new Dictionary<Template, FastList<GroupIndex>>();
+            var allGroups = new FastList<GroupIndex>();
             var allTemplates = new FastList<Template>();
 
-            void AddGroupToTemplate(Template template, Group group)
+            void AddGroupToTemplate(Template template, GroupIndex group)
             {
                 if (templateGroupsMap.TryGetValue(template, out var existingGroups))
                 {
@@ -63,12 +97,12 @@ namespace Trecs
                 }
                 else
                 {
-                    templateGroupsMap.Add(template, new FastList<Group> { group });
+                    templateGroupsMap.Add(template, new FastList<GroupIndex> { group });
                 }
             }
 
             ResolvedTemplate globalTemplate = null;
-            Group? globalGroup = null;
+            GroupIndex? globalGroup = null;
 
             foreach (var resolvedTemplate in resolvedTemplatesList)
             {
@@ -97,17 +131,23 @@ namespace Trecs
                     globalGroup = resolvedTemplate.Groups[0];
                 }
 
-                var templateGroupsSvList = new FastList<Group>();
+                var templateGroupsSvList = new FastList<GroupIndex>();
 
-                foreach (var group in resolvedTemplate.Groups)
+                for (int i = 0; i < resolvedTemplate.Groups.Count; i++)
                 {
+                    var group = resolvedTemplate.Groups[i];
+                    var groupTagSet = resolvedTemplate.GroupTagSets[i];
+
                     Assert.That(
                         !groupTemplateMap.ContainsKey(group),
                         "Found same group {} added multiple times.  Groups must be unique.",
                         group
                     );
 
-                    groupTemplateMap.Add(group, new GroupInfo(group, resolvedTemplate));
+                    groupTemplateMap.Add(
+                        group,
+                        new GroupInfo(group, groupTagSet, resolvedTemplate)
+                    );
 
                     AddGroupToTemplate(resolvedTemplate.Template, group);
 
@@ -161,7 +201,7 @@ namespace Trecs
 
             _globalTemplate = globalTemplate;
             _globalGroup = globalGroup.Value;
-            _globalGroups = new FastList<Group>(new[] { globalGroup.Value });
+            _globalGroups = new FastList<GroupIndex>(new[] { globalGroup.Value });
             _globalEntityIndex = new(_globalEntitySlotIndex, _globalGroup);
 
             _groupInfos = new(groupTemplateMap);
@@ -170,23 +210,8 @@ namespace Trecs
             _resolvedTemplates = resolvedTemplatesList;
             _allTemplates = allTemplates;
 
-            Assert.That(
-                allGroups.Count <= ushort.MaxValue,
-                "GroupIndex is ushort — world has {} groups but limit is {}",
-                allGroups.Count,
-                ushort.MaxValue
-            );
-
-            _indexToTagSet = new TagSet[allGroups.Count];
-            _tagSetToIndex = new Dictionary<TagSet, GroupIndex>(allGroups.Count);
-
-            for (int i = 0; i < allGroups.Count; i++)
-            {
-                var tagSet = allGroups[i].AsTagSet();
-                var index = new GroupIndex((ushort)i);
-                _indexToTagSet[i] = tagSet;
-                _tagSetToIndex.Add(tagSet, index);
-            }
+            _indexToTagSet = indexToTagSet.ToArray();
+            _tagSetToIndex = tagSetToIndex;
 
             _queryEngine = new WorldQueryEngine(_allGroups, _groupInfos, this);
         }
@@ -195,7 +220,7 @@ namespace Trecs
         /// Resolves a <see cref="TagSet"/> to the sequential <see cref="GroupIndex"/>
         /// assigned at world-build time. The mapping is fixed once the world is built.
         /// </summary>
-        internal GroupIndex ToGroupIndex(TagSet tagSet)
+        public GroupIndex ToGroupIndex(TagSet tagSet)
         {
             if (_tagSetToIndex.TryGetValue(tagSet, out var index))
             {
@@ -206,15 +231,9 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Transitional bridge — resolves a <see cref="Group"/> to its
-        /// <see cref="GroupIndex"/>. Removed in Stage 3 when <c>Group</c> is deleted.
-        /// </summary>
-        internal GroupIndex ToGroupIndex(Group group) => ToGroupIndex(group.AsTagSet());
-
-        /// <summary>
         /// Returns the <see cref="TagSet"/> associated with a <see cref="GroupIndex"/>.
         /// </summary>
-        internal TagSet ToTagSet(GroupIndex groupIndex)
+        public TagSet ToTagSet(GroupIndex groupIndex)
         {
             Assert.That(
                 groupIndex.Value < _indexToTagSet.Length,
@@ -376,7 +395,7 @@ namespace Trecs
 
             return new(
                 template: template,
-                groups: CalculateTemplateGroups(tagset, allPartitions),
+                groupTagSets: CalculateTemplateGroupTagSets(tagset, allPartitions),
                 allBaseTemplates: allBaseTypesList,
                 partitions: allPartitions,
                 componentDeclarations: allComponentDecs,
@@ -385,12 +404,12 @@ namespace Trecs
                 tagset: tagset
             );
 
-            static IReadOnlyList<Group> CalculateTemplateGroups(
+            static IReadOnlyList<TagSet> CalculateTemplateGroupTagSets(
                 TagSet tags,
                 IReadOnlyList<TagSet> partitions
             )
             {
-                var groups = new List<Group>();
+                var groups = new List<TagSet>();
 
                 var groupTags = partitions.Select(x => x.Tags.ToList()).ToList();
 
@@ -402,7 +421,7 @@ namespace Trecs
                 foreach (var tagList in groupTags)
                 {
                     tagList.AddRange(tags.Tags);
-                    groups.Add(new Group(TagSet.FromTags(tagList).Id));
+                    groups.Add(TagSet.FromTags(tagList));
                 }
 
                 return groups;
@@ -416,17 +435,17 @@ namespace Trecs
             get { return _resolvedTemplates; }
         }
 
-        public Group GlobalGroup
+        public GroupIndex GlobalGroup
         {
             get { return _globalGroup; }
         }
 
-        public ReadOnlyFastList<Group> GlobalGroups
+        public ReadOnlyFastList<GroupIndex> GlobalGroups
         {
             get { return _globalGroups; }
         }
 
-        public ReadOnlyFastList<Group> AllGroups
+        public ReadOnlyFastList<GroupIndex> AllGroups
         {
             get { return _allGroups; }
         }
@@ -446,7 +465,7 @@ namespace Trecs
             get { return _globalTemplate; }
         }
 
-        public ReadOnlyFastList<Group> GetTemplateGroups(Template template)
+        public ReadOnlyFastList<GroupIndex> GetTemplateGroups(Template template)
         {
             if (_templateGroupsMap.TryGetValue(template, out var groups))
             {
@@ -456,7 +475,7 @@ namespace Trecs
             throw Assert.CreateException("No groups found for template {}", template);
         }
 
-        public ReadOnlyDenseHashSet<Tag> GetGroupTags(Group group)
+        public ReadOnlyDenseHashSet<Tag> GetGroupTags(GroupIndex group)
         {
             if (_groupInfos.TryGetValue(group, out var groupInfo))
             {
@@ -469,7 +488,7 @@ namespace Trecs
         public Template GetSingleTemplateForTags(TagSet tags) =>
             _queryEngine.GetSingleTemplateForTags(tags);
 
-        public ResolvedTemplate GetResolvedTemplateForGroup(Group group)
+        public ResolvedTemplate GetResolvedTemplateForGroup(GroupIndex group)
         {
             if (_groupInfos.TryGetValue(group, out var info))
             {
@@ -487,41 +506,45 @@ namespace Trecs
             return _resolvedTemplateSet.Contains(template);
         }
 
-        public bool GroupIsTemplate(Group group, Template template)
+        public bool GroupIsTemplate(GroupIndex group, Template template)
         {
             var resolvedTemplate = GetResolvedTemplateForGroup(group);
             return resolvedTemplate.Template == template
                 || resolvedTemplate.AllBaseTemplates.Contains(template);
         }
 
-        public ReadOnlyFastList<Group> CommonGetTaggedGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> CommonGetTaggedGroupsWithComponents(
             TagSet tagset,
             List<Type> componentTypes
         ) => _queryEngine.CommonGetTaggedGroupsWithComponents(tagset, componentTypes);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1>(TagSet tagset)
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<T1>(TagSet tagset)
             where T1 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithTagsAndComponents<T1>(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2>(TagSet tagset)
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<T1, T2>(TagSet tagset)
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithTagsAndComponents<T1, T2>(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2, T3>(TagSet tagset)
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<T1, T2, T3>(
+            TagSet tagset
+        )
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3>(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2, T3, T4>(TagSet tagset)
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<T1, T2, T3, T4>(
+            TagSet tagset
+        )
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
             where T4 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4>(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5>(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5>(
             TagSet tagset
         )
             where T1 : unmanaged, IEntityComponent
@@ -531,7 +554,7 @@ namespace Trecs
             where T5 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5>(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6>(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6>(
             TagSet tagset
         )
             where T1 : unmanaged, IEntityComponent
@@ -542,9 +565,15 @@ namespace Trecs
             where T6 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6>(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6, T7>(
-            TagSet tagset
-        )
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7
+        >(TagSet tagset)
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
@@ -554,7 +583,7 @@ namespace Trecs
             where T7 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6, T7>(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<
             T1,
             T2,
             T3,
@@ -574,7 +603,7 @@ namespace Trecs
             where T8 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6, T7, T8>(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<
             T1,
             T2,
             T3,
@@ -596,7 +625,7 @@ namespace Trecs
             where T9 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithTagsAndComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9>(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<
             T1,
             T2,
             T3,
@@ -622,7 +651,7 @@ namespace Trecs
                 tagset
             );
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<
             T1,
             T2,
             T3,
@@ -660,7 +689,7 @@ namespace Trecs
                 T11
             >(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTagsAndComponents<
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTagsAndComponents<
             T1,
             T2,
             T3,
@@ -701,63 +730,63 @@ namespace Trecs
                 T12
             >(tagset);
 
-        public Group GetSingleGroupWithTags(TagSet tagset) =>
+        public GroupIndex GetSingleGroupWithTags(TagSet tagset) =>
             _queryEngine.GetSingleGroupWithTags(tagset);
 
-        public Group GetSingleGroupWithTags<T1>()
+        public GroupIndex GetSingleGroupWithTags<T1>()
             where T1 : struct, ITag => _queryEngine.GetSingleGroupWithTags<T1>();
 
-        public Group GetSingleGroupWithTags<T1, T2>()
+        public GroupIndex GetSingleGroupWithTags<T1, T2>()
             where T1 : struct, ITag
             where T2 : struct, ITag => _queryEngine.GetSingleGroupWithTags<T1, T2>();
 
-        public Group GetSingleGroupWithTags<T1, T2, T3>()
+        public GroupIndex GetSingleGroupWithTags<T1, T2, T3>()
             where T1 : struct, ITag
             where T2 : struct, ITag
             where T3 : struct, ITag => _queryEngine.GetSingleGroupWithTags<T1, T2, T3>();
 
-        public Group GetSingleGroupWithTags<T1, T2, T3, T4>()
+        public GroupIndex GetSingleGroupWithTags<T1, T2, T3, T4>()
             where T1 : struct, ITag
             where T2 : struct, ITag
             where T3 : struct, ITag
             where T4 : struct, ITag => _queryEngine.GetSingleGroupWithTags<T1, T2, T3, T4>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithTags(TagSet tagset) =>
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTags(TagSet tagset) =>
             _queryEngine.GetGroupsWithTags(tagset);
 
-        public ReadOnlyFastList<Group> GetGroupsWithTags<T1>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTags<T1>()
             where T1 : struct, ITag => _queryEngine.GetGroupsWithTags<T1>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithTags<T1, T2>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTags<T1, T2>()
             where T1 : struct, ITag
             where T2 : struct, ITag => _queryEngine.GetGroupsWithTags<T1, T2>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithTags<T1, T2, T3>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTags<T1, T2, T3>()
             where T1 : struct, ITag
             where T2 : struct, ITag
             where T3 : struct, ITag => _queryEngine.GetGroupsWithTags<T1, T2, T3>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithTags<T1, T2, T3, T4>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithTags<T1, T2, T3, T4>()
             where T1 : struct, ITag
             where T2 : struct, ITag
             where T3 : struct, ITag
             where T4 : struct, ITag => _queryEngine.GetGroupsWithTags<T1, T2, T3, T4>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(Type componentType) =>
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(Type componentType) =>
             _queryEngine.GetGroupsWithComponents(componentType);
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2
         ) => _queryEngine.GetGroupsWithComponents(componentType1, componentType2);
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2,
             Type componentType3
         ) => _queryEngine.GetGroupsWithComponents(componentType1, componentType2, componentType3);
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2,
             Type componentType3,
@@ -770,7 +799,7 @@ namespace Trecs
                 componentType4
             );
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2,
             Type componentType3,
@@ -785,7 +814,7 @@ namespace Trecs
                 componentType5
             );
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2,
             Type componentType3,
@@ -802,7 +831,7 @@ namespace Trecs
                 componentType6
             );
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2,
             Type componentType3,
@@ -821,7 +850,7 @@ namespace Trecs
                 componentType7
             );
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2,
             Type componentType3,
@@ -842,7 +871,7 @@ namespace Trecs
                 componentType8
             );
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2,
             Type componentType3,
@@ -865,7 +894,7 @@ namespace Trecs
                 componentType9
             );
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2,
             Type componentType3,
@@ -890,7 +919,7 @@ namespace Trecs
                 componentType10
             );
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2,
             Type componentType3,
@@ -917,7 +946,7 @@ namespace Trecs
                 componentType11
             );
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents(
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents(
             Type componentType1,
             Type componentType2,
             Type componentType3,
@@ -946,28 +975,28 @@ namespace Trecs
                 componentType12
             );
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<T1>()
             where T1 : unmanaged, IEntityComponent => _queryEngine.GetGroupsWithComponents<T1>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<T1, T2>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithComponents<T1, T2>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<T1, T2, T3>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithComponents<T1, T2, T3>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<T1, T2, T3, T4>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
             where T4 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4, T5>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<T1, T2, T3, T4, T5>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
@@ -975,7 +1004,7 @@ namespace Trecs
             where T5 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4, T5, T6>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<T1, T2, T3, T4, T5, T6>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
@@ -984,7 +1013,7 @@ namespace Trecs
             where T6 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
@@ -994,7 +1023,16 @@ namespace Trecs
             where T7 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8
+        >()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
@@ -1005,7 +1043,17 @@ namespace Trecs
             where T8 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9>()
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<
+            T1,
+            T2,
+            T3,
+            T4,
+            T5,
+            T6,
+            T7,
+            T8,
+            T9
+        >()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
@@ -1017,7 +1065,7 @@ namespace Trecs
             where T9 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<
             T1,
             T2,
             T3,
@@ -1041,7 +1089,7 @@ namespace Trecs
             where T10 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<
             T1,
             T2,
             T3,
@@ -1067,7 +1115,7 @@ namespace Trecs
             where T11 : unmanaged, IEntityComponent =>
             _queryEngine.GetGroupsWithComponents<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>();
 
-        public ReadOnlyFastList<Group> GetGroupsWithComponents<
+        public ReadOnlyFastList<GroupIndex> GetGroupsWithComponents<
             T1,
             T2,
             T3,
@@ -1108,7 +1156,7 @@ namespace Trecs
                 T12
             >();
 
-        public bool GroupHasComponent<T>(Group group)
+        public bool GroupHasComponent<T>(GroupIndex group)
             where T : IEntityComponent
         {
             var template = GetResolvedTemplateForGroup(group);
@@ -1117,12 +1165,13 @@ namespace Trecs
 
         internal class GroupInfo
         {
-            public GroupInfo(Group group, ResolvedTemplate resolvedTemplate)
+            public GroupInfo(GroupIndex group, TagSet tagSet, ResolvedTemplate resolvedTemplate)
             {
-                Group = group;
+                GroupIndex = group;
+                TagSet = tagSet;
                 ResolvedTemplate = resolvedTemplate;
 
-                var tags = group.AsTagSet().Tags;
+                var tags = tagSet.Tags;
                 var tagsSet = new DenseHashSet<Tag>(tags.Count);
 
                 foreach (var tag in tags)
@@ -1135,7 +1184,8 @@ namespace Trecs
 
             public DenseHashSet<Tag> Tags { get; }
             public ResolvedTemplate ResolvedTemplate { get; }
-            public Group Group { get; }
+            public GroupIndex GroupIndex { get; }
+            public TagSet TagSet { get; }
         }
     }
 }

@@ -7,7 +7,7 @@ namespace Trecs
 {
     /// <summary>
     /// An immutable, order-independent combination of <see cref="Tag"/>s that uniquely identifies
-    /// a <see cref="Group"/>. Two tag sets containing the same tags always resolve to the same
+    /// a <see cref="GroupIndex"/>. Two tag sets containing the same tags always resolve to the same
     /// <see cref="Id"/>, regardless of the order the tags were specified. Use the generic helpers
     /// (e.g. <c>TagSet&lt;Red, Fast&gt;.Value</c>) for zero-allocation access in hot paths.
     /// </summary>

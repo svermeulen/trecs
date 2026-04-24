@@ -256,7 +256,7 @@ namespace Trecs
 
         /// <summary>
         /// Returns a dense group slice iterator for queries without set filters.
-        /// Each slice has Group, Count, and an identity indexer.
+        /// Each slice has GroupIndex, Count, and an identity indexer.
         /// </summary>
         public readonly DenseGroupSliceIterator GroupSlices()
         {
@@ -265,7 +265,7 @@ namespace Trecs
             return new DenseGroupSliceIterator(_world, groups);
         }
 
-        public readonly ReadOnlyFastList<Group> Groups()
+        public readonly ReadOnlyFastList<GroupIndex> Groups()
         {
             AssertHasAnyCriteria();
             return ResolveGroups();
@@ -339,7 +339,7 @@ namespace Trecs
             );
         }
 
-        internal readonly ReadOnlyFastList<Group> ResolveGroups()
+        internal readonly ReadOnlyFastList<GroupIndex> ResolveGroups()
         {
             var key = new GroupQueryKey(
                 _positiveTags,

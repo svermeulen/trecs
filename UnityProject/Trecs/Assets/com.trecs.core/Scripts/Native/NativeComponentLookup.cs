@@ -13,7 +13,7 @@ namespace Trecs
     /// </summary>
     internal unsafe struct NativeComponentLookupEntry
     {
-        public int GroupId;
+        public GroupIndex GroupIndex;
         public void* DataPtr; // raw pointer into the underlying ComponentArray's NativeList<T>
         public int Count;
     }
@@ -93,20 +93,20 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-                ref var entry = ref ResolveEntry(entityIndex.Group);
+                ref var entry = ref ResolveEntry(entityIndex.GroupIndex);
                 Require.That(
                     entityIndex.Index < entry.Count,
                     "NativeComponentLookupRead: Entity index {} out of range (count={}) in group {}",
                     entityIndex.Index,
                     entry.Count,
-                    entityIndex.Group
+                    entityIndex.GroupIndex
                 );
                 return ref UnsafeUtility.ArrayElementAsRef<T>(entry.DataPtr, entityIndex.Index);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal NativeComponentBufferRead<T> GetBufferForGroupInternal(Group group)
+        internal NativeComponentBufferRead<T> GetBufferForGroupInternal(GroupIndex group)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
@@ -126,7 +126,7 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-            if (TryFindEntry(entityIndex.Group, out var entryIdx))
+            if (TryFindEntry(entityIndex.GroupIndex, out var entryIdx))
             {
                 ref var entry = ref _entries[entryIdx];
                 if (entityIndex.Index < entry.Count)
@@ -146,12 +146,12 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-            return TryFindEntry(entityIndex.Group, out var entryIdx)
+            return TryFindEntry(entityIndex.GroupIndex, out var entryIdx)
                 && entityIndex.Index < _entries[entryIdx].Count;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ref NativeComponentLookupEntry ResolveEntry(Group group)
+        ref NativeComponentLookupEntry ResolveEntry(GroupIndex group)
         {
             if (TryFindEntry(group, out var entryIdx))
                 return ref _entries[entryIdx];
@@ -165,11 +165,11 @@ namespace Trecs
         // (groupId → entryIdx) field, populate it in BuildNativeComponentLookupEntries,
         // and dispose it alongside _entries. The change is local — no API impact.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool TryFindEntry(Group group, out int entryIdx)
+        bool TryFindEntry(GroupIndex group, out int entryIdx)
         {
             for (int i = 0; i < _entryCount; i++)
             {
-                if (_entries[i].GroupId == group.Id)
+                if (_entries[i].GroupIndex == group)
                 {
                     entryIdx = i;
                     return true;
@@ -191,9 +191,9 @@ namespace Trecs
         // Burst can compile. Managed callers throw the rich exception and never reach
         // the fallback; Burst callers throw the simpler one.
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static ref NativeComponentLookupEntry ThrowGroupNotInLookup(Group group)
+        static ref NativeComponentLookupEntry ThrowGroupNotInLookup(GroupIndex group)
         {
-            ThrowGroupNotInLookupManaged(group.Id);
+            ThrowGroupNotInLookupManaged(group.Value);
             throw new InvalidOperationException(
                 "NativeComponentLookupRead: entity's group is not in this lookup's permitted "
                     + "group set. Add the group to the lookup's [ForEachEntity] or schedule-time TagSet."
@@ -288,20 +288,20 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-                ref var entry = ref ResolveEntry(entityIndex.Group);
+                ref var entry = ref ResolveEntry(entityIndex.GroupIndex);
                 Require.That(
                     entityIndex.Index < entry.Count,
                     "NativeComponentLookupWrite: Entity index {} out of range (count={}) in group {}",
                     entityIndex.Index,
                     entry.Count,
-                    entityIndex.Group
+                    entityIndex.GroupIndex
                 );
                 return ref UnsafeUtility.ArrayElementAsRef<T>(entry.DataPtr, entityIndex.Index);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal NativeComponentBufferWrite<T> GetBufferForGroupInternal(Group group)
+        internal NativeComponentBufferWrite<T> GetBufferForGroupInternal(GroupIndex group)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
@@ -321,7 +321,7 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-            if (TryFindEntry(entityIndex.Group, out var entryIdx))
+            if (TryFindEntry(entityIndex.GroupIndex, out var entryIdx))
             {
                 ref var entry = ref _entries[entryIdx];
                 if (entityIndex.Index < entry.Count)
@@ -341,12 +341,12 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-            return TryFindEntry(entityIndex.Group, out var entryIdx)
+            return TryFindEntry(entityIndex.GroupIndex, out var entryIdx)
                 && entityIndex.Index < _entries[entryIdx].Count;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        ref NativeComponentLookupEntry ResolveEntry(Group group)
+        ref NativeComponentLookupEntry ResolveEntry(GroupIndex group)
         {
             if (TryFindEntry(group, out var entryIdx))
                 return ref _entries[entryIdx];
@@ -356,11 +356,11 @@ namespace Trecs
         // See NativeComponentLookupRead.TryFindEntry for the linear-scan rationale and
         // upgrade-to-hashmap path.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool TryFindEntry(Group group, out int entryIdx)
+        bool TryFindEntry(GroupIndex group, out int entryIdx)
         {
             for (int i = 0; i < _entryCount; i++)
             {
-                if (_entries[i].GroupId == group.Id)
+                if (_entries[i].GroupIndex == group)
                 {
                     entryIdx = i;
                     return true;
@@ -373,9 +373,9 @@ namespace Trecs
         // See NativeComponentLookupRead.ThrowGroupNotInLookup for the rationale on the
         // ref-returning throw helper pattern and the [BurstDiscard] split.
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static ref NativeComponentLookupEntry ThrowGroupNotInLookup(Group group)
+        static ref NativeComponentLookupEntry ThrowGroupNotInLookup(GroupIndex group)
         {
-            ThrowGroupNotInLookupManaged(group.Id);
+            ThrowGroupNotInLookupManaged(group.Value);
             throw new InvalidOperationException(
                 "NativeComponentLookupWrite: entity's group is not in this lookup's permitted "
                     + "group set. Add the group to the lookup's [ForEachEntity] or schedule-time TagSet."

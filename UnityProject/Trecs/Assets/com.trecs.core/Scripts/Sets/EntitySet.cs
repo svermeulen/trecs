@@ -32,15 +32,15 @@ namespace Trecs.Internal
     /// </summary>
     internal readonly struct EntitySet
     {
-        internal readonly NativeDenseDictionary<Group, SetGroupEntry> _entriesPerGroup;
+        internal readonly NativeDenseDictionary<GroupIndex, SetGroupEntry> _entriesPerGroup;
         internal readonly AtomicNativeBags _jobAddQueue;
         internal readonly AtomicNativeBags _jobRemoveQueue;
         readonly SetId _setId;
 
-        internal EntitySet(SetId setId, DenseHashSet<Group> validGroups)
+        internal EntitySet(SetId setId, DenseHashSet<GroupIndex> validGroups)
         {
             _setId = setId;
-            _entriesPerGroup = new NativeDenseDictionary<Group, SetGroupEntry>(
+            _entriesPerGroup = new NativeDenseDictionary<GroupIndex, SetGroupEntry>(
                 validGroups.Count,
                 Allocator.Persistent
             );
@@ -66,15 +66,15 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddImmediate(EntityIndex entityIndex)
         {
-            AssertValidGroup(entityIndex.Group);
-            _entriesPerGroup[entityIndex.Group].Add(entityIndex.Index);
+            AssertValidGroup(entityIndex.GroupIndex);
+            _entriesPerGroup[entityIndex.GroupIndex].Add(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveImmediate(EntityIndex entityIndex)
         {
-            AssertValidGroup(entityIndex.Group);
-            _entriesPerGroup[entityIndex.Group].Remove(entityIndex.Index);
+            AssertValidGroup(entityIndex.GroupIndex);
+            _entriesPerGroup[entityIndex.GroupIndex].Remove(entityIndex.Index);
         }
 
         // ── Internal immediate operations (structural updates) ─────────
@@ -82,13 +82,13 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void AddImmediateUnchecked(EntityIndex entityIndex)
         {
-            _entriesPerGroup[entityIndex.Group].Add(entityIndex.Index);
+            _entriesPerGroup[entityIndex.GroupIndex].Add(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void RemoveImmediateUnchecked(EntityIndex entityIndex)
         {
-            if (_entriesPerGroup.TryGetValue(entityIndex.Group, out var groupEntry))
+            if (_entriesPerGroup.TryGetValue(entityIndex.GroupIndex, out var groupEntry))
             {
                 groupEntry.Remove(entityIndex.Index);
             }
@@ -99,7 +99,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Exists(EntityIndex entityIndex)
         {
-            if (_entriesPerGroup.TryGetValue(entityIndex.Group, out var groupEntry))
+            if (_entriesPerGroup.TryGetValue(entityIndex.GroupIndex, out var groupEntry))
             {
                 return groupEntry.Exists(entityIndex.Index);
             }
@@ -107,13 +107,13 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetGroupEntry(Group group, out SetGroupEntry groupEntry)
+        public bool TryGetGroupEntry(GroupIndex group, out SetGroupEntry groupEntry)
         {
             return _entriesPerGroup.TryGetValue(group, out groupEntry);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public SetGroupEntry GetSetGroupEntry(Group group)
+        public SetGroupEntry GetSetGroupEntry(GroupIndex group)
         {
             if (_entriesPerGroup.TryGetValue(group, out var groupEntry))
                 return groupEntry;
@@ -139,7 +139,7 @@ namespace Trecs.Internal
                 while (!bag.IsEmpty())
                 {
                     var entityIndex = bag.Dequeue<EntityIndex>();
-                    _entriesPerGroup[entityIndex.Group].Remove(entityIndex.Index);
+                    _entriesPerGroup[entityIndex.GroupIndex].Remove(entityIndex.Index);
                 }
             }
 
@@ -149,7 +149,7 @@ namespace Trecs.Internal
                 while (!bag.IsEmpty())
                 {
                     var entityIndex = bag.Dequeue<EntityIndex>();
-                    _entriesPerGroup[entityIndex.Group].Add(entityIndex.Index);
+                    _entriesPerGroup[entityIndex.GroupIndex].Add(entityIndex.Index);
                 }
             }
         }
@@ -217,12 +217,12 @@ namespace Trecs.Internal
         // ── Validation ─────────────────────────────────────────────────
 
         [Conditional("DEBUG")]
-        void AssertValidGroup(Group group)
+        void AssertValidGroup(GroupIndex group)
         {
 #if DEBUG
             Assert.That(
                 _entriesPerGroup.ContainsKey(group),
-                "Group {} does not belong to this set's template",
+                "GroupIndex {} does not belong to this set's template",
                 group
             );
 #endif

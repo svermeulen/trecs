@@ -19,7 +19,7 @@ namespace Trecs
 
     /// <summary>
     /// Marker interface for tag types. Tags are empty structs that classify entities into
-    /// <see cref="Group"/>s. Implement on a struct to define a new tag:
+    /// <see cref="GroupIndex"/>s. Implement on a struct to define a new tag:
     /// <c>struct Doofus : ITag {}</c>
     /// </summary>
     public interface ITag { }

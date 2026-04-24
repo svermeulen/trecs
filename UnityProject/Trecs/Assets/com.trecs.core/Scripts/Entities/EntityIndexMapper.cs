@@ -12,10 +12,10 @@ namespace Trecs.Internal
         where T : unmanaged, IEntityComponent
     {
         public int Count => _map.Count;
-        public Group GroupId { get; }
+        public GroupIndex GroupId { get; }
         public Type Template => TypeMeta<T>.Type;
 
-        internal EntityIndexMapper(Group groupStructId, IComponentArray<T> dic)
+        internal EntityIndexMapper(GroupIndex groupStructId, IComponentArray<T> dic)
             : this()
         {
             GroupId = groupStructId;
@@ -77,7 +77,7 @@ namespace Trecs.Internal
         int GetIndex(int index);
         bool Exists(int index);
 
-        Group GroupId { get; }
+        GroupIndex GroupId { get; }
         Type Template { get; }
     }
 }

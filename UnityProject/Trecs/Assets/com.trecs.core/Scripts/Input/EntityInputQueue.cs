@@ -69,7 +69,7 @@ namespace Trecs.Internal
                             _resetToDefaultGroups.Add(
                                 new ResetToDefaultGroupInfo
                                 {
-                                    Group = group,
+                                    GroupIndex = group,
                                     ComponentBuilder = componentDec.Builder,
                                 }
                             );
@@ -81,7 +81,7 @@ namespace Trecs.Internal
                             _warnOnMissingInfos.Add(
                                 new GroupComponentTypePair
                                 {
-                                    Group = group,
+                                    GroupIndex = group,
                                     ComponentType = componentDec.ComponentType,
                                 }
                             );
@@ -498,7 +498,7 @@ namespace Trecs.Internal
             _frameScopedNativeUniqueHeap.RemapFrameOffsets(frameOffset);
         }
 
-        internal void ResetInputs<T>(Group group)
+        internal void ResetInputs<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             var values = _accessor.ComponentBuffer<T>(group).Write;
@@ -556,7 +556,7 @@ namespace Trecs.Internal
                 _warnOnMissingTempBuffer.Remove(
                     new GroupComponentTypePair()
                     {
-                        Group = entityIndex.Group,
+                        GroupIndex = entityIndex.GroupIndex,
                         ComponentType = typeof(T),
                     }
                 );
@@ -626,7 +626,7 @@ namespace Trecs.Internal
             {
                 foreach (var info in _resetToDefaultGroups)
                 {
-                    info.ComponentBuilder.ResetInputs(this, info.Group);
+                    info.ComponentBuilder.ResetInputs(this, info.GroupIndex);
                 }
             }
 
@@ -663,7 +663,7 @@ namespace Trecs.Internal
 #if DEBUG
             foreach (var info in _warnOnMissingTempBuffer)
             {
-                if (_accessor.CountEntitiesInGroup(info.Group) > 0)
+                if (_accessor.CountEntitiesInGroup(info.GroupIndex) > 0)
                 {
                     _log.Warning(
                         "No frame data found for input component {} on frame {}",
@@ -742,18 +742,18 @@ namespace Trecs.Internal
 
         class ResetToDefaultGroupInfo
         {
-            public Group Group;
+            public GroupIndex GroupIndex;
             public IComponentBuilder ComponentBuilder;
         }
 
         struct GroupComponentTypePair : IEquatable<GroupComponentTypePair>
         {
-            public Group Group;
+            public GroupIndex GroupIndex;
             public Type ComponentType;
 
             public readonly bool Equals(GroupComponentTypePair other)
             {
-                return Group == other.Group && ComponentType == other.ComponentType;
+                return GroupIndex == other.GroupIndex && ComponentType == other.ComponentType;
             }
 
             public override readonly bool Equals(object obj)
@@ -764,7 +764,7 @@ namespace Trecs.Internal
             public override readonly int GetHashCode()
             {
                 return unchecked(
-                    (int)math.hash(new int2(Group.GetStableHashCode(), ComponentType.GetHashCode()))
+                    (int)math.hash(new int2(GroupIndex.Value, ComponentType.GetHashCode()))
                 );
             }
 

@@ -22,7 +22,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public class RuntimeJobScheduler
     {
-        // Key: composite of (ResourceId, Group) packed into a long.
+        // Key: composite of (ResourceId, GroupIndex) packed into a long.
         // Writer: the last outstanding job that writes this (resource, group) pair.
         // Readers: outstanding jobs that read (but don't write) this (resource, group) pair.
         readonly Dictionary<long, JobHandle> _writers = new();
@@ -53,9 +53,9 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static long MakeKey(ResourceId resourceType, Group group)
+        static long MakeKey(ResourceId resourceType, GroupIndex group)
         {
-            return ((long)resourceType.Value << 32) | (uint)group.Id;
+            return ((long)resourceType.Value << 32) | (uint)group.Value;
         }
 
         [Conditional("DEBUG")]
@@ -69,7 +69,11 @@ namespace Trecs.Internal
         /// A job that reads resource R in group G must wait for the outstanding writer of (R, G).
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public JobHandle IncludeReadDep(JobHandle baseDeps, ResourceId resourceType, Group group)
+        public JobHandle IncludeReadDep(
+            JobHandle baseDeps,
+            ResourceId resourceType,
+            GroupIndex group
+        )
         {
             var key = MakeKey(resourceType, group);
 
@@ -85,7 +89,11 @@ namespace Trecs.Internal
         /// Include the dependency for writing a (resource, group) pair in a job.
         /// A job that writes resource R in group G must wait for the outstanding writer AND all readers of (R, G).
         /// </summary>
-        public JobHandle IncludeWriteDep(JobHandle baseDeps, ResourceId resourceType, Group group)
+        public JobHandle IncludeWriteDep(
+            JobHandle baseDeps,
+            ResourceId resourceType,
+            GroupIndex group
+        )
         {
             var key = MakeKey(resourceType, group);
 
@@ -109,7 +117,7 @@ namespace Trecs.Internal
         /// Register a scheduled job as a reader of a (resource, group) pair. Main thread only.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TrackJobRead(JobHandle handle, ResourceId resourceType, Group group)
+        public void TrackJobRead(JobHandle handle, ResourceId resourceType, GroupIndex group)
         {
             AssertMainThread();
             var key = MakeKey(resourceType, group);
@@ -128,7 +136,7 @@ namespace Trecs.Internal
         /// Register a scheduled job as a writer of a (resource, group) pair.
         /// Replaces any previous writer and clears readers for this pair. Main thread only.
         /// </summary>
-        public void TrackJobWrite(JobHandle handle, ResourceId resourceType, Group group)
+        public void TrackJobWrite(JobHandle handle, ResourceId resourceType, GroupIndex group)
         {
             AssertMainThread();
             var key = MakeKey(resourceType, group);
@@ -154,7 +162,7 @@ namespace Trecs.Internal
         /// Only completes outstanding writers for this pair — concurrent readers are safe.
         /// Returns true if any jobs were actually completed (a sync point occurred). Main thread only.
         /// </summary>
-        public bool SyncMainThreadForRead(ResourceId resourceType, Group group)
+        public bool SyncMainThreadForRead(ResourceId resourceType, GroupIndex group)
         {
             AssertMainThread();
             var key = MakeKey(resourceType, group);
@@ -175,7 +183,7 @@ namespace Trecs.Internal
         /// Completes outstanding writer and all readers for this pair.
         /// Returns true if any jobs were actually completed (a sync point occurred). Main thread only.
         /// </summary>
-        public bool SyncMainThread(ResourceId resourceType, Group group)
+        public bool SyncMainThread(ResourceId resourceType, GroupIndex group)
         {
             AssertMainThread();
             var key = MakeKey(resourceType, group);

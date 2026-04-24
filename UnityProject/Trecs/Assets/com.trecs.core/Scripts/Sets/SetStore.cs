@@ -11,10 +11,10 @@ namespace Trecs.Internal
         internal NativeDenseDictionary<SetId, EntitySet> EntitySets;
         internal NativeDenseDictionary<SetId, NativeSetDeferredQueues> DeferredQueues;
 
-        // Routing index: maps Group to set IDs registered for that group.
+        // Routing index: maps GroupIndex to set IDs registered for that group.
         // When an entity in group G is removed/swapped, we look up all set IDs
         // registered under G and update them.
-        internal NativeDenseDictionary<Group, NativeList<SetId>> SetIdsByGroup;
+        internal NativeDenseDictionary<GroupIndex, NativeList<SetId>> SetIdsByGroup;
 
         public SetStore()
         {
@@ -23,7 +23,7 @@ namespace Trecs.Internal
                 0,
                 Allocator.Persistent
             );
-            SetIdsByGroup = new NativeDenseDictionary<Group, NativeList<SetId>>(
+            SetIdsByGroup = new NativeDenseDictionary<GroupIndex, NativeList<SetId>>(
                 0,
                 Allocator.Persistent
             );
@@ -50,7 +50,7 @@ namespace Trecs.Internal
                 setDef.DebugName
             );
 
-            var validGroups = new DenseHashSet<Group>(groups.Count);
+            var validGroups = new DenseHashSet<GroupIndex>(groups.Count);
             foreach (var group in groups)
             {
                 validGroups.Add(group);
@@ -218,7 +218,7 @@ namespace Trecs.Internal
         /// </summary>
         public void RemoveEntitiesFromSets(
             FastList<int> entityIndicesRemoved,
-            Group fromGroup,
+            GroupIndex fromGroup,
             DenseDictionary<int, int> entityIdsAffectedByRemoveAtSwapBack
         )
         {
@@ -259,8 +259,8 @@ namespace Trecs.Internal
 
         public void SwapEntityBetweenSets(
             DenseDictionary<int, MoveInfo> fromEntityToEntityIDs,
-            Group fromGroup,
-            Group toGroup,
+            GroupIndex fromGroup,
+            GroupIndex toGroup,
             DenseDictionary<int, int> entityIdsAffectedByRemoveAtSwapBack
         )
         {

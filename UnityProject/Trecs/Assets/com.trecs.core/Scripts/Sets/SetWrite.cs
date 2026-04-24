@@ -14,12 +14,12 @@ namespace Trecs
     {
         readonly WorldAccessor _world;
         readonly SetId _setId;
-        readonly NativeDenseDictionary<Group, SetGroupEntry> _entriesPerGroup;
+        readonly NativeDenseDictionary<GroupIndex, SetGroupEntry> _entriesPerGroup;
 
         internal SetWrite(
             WorldAccessor world,
             SetId setId,
-            NativeDenseDictionary<Group, SetGroupEntry> entriesPerGroup
+            NativeDenseDictionary<GroupIndex, SetGroupEntry> entriesPerGroup
         )
         {
             _world = world;
@@ -32,15 +32,15 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddImmediate(EntityIndex entityIndex)
         {
-            AssertValidGroup(entityIndex.Group);
-            _entriesPerGroup[entityIndex.Group].Add(entityIndex.Index);
+            AssertValidGroup(entityIndex.GroupIndex);
+            _entriesPerGroup[entityIndex.GroupIndex].Add(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveImmediate(EntityIndex entityIndex)
         {
-            AssertValidGroup(entityIndex.Group);
-            _entriesPerGroup[entityIndex.Group].Remove(entityIndex.Index);
+            AssertValidGroup(entityIndex.GroupIndex);
+            _entriesPerGroup[entityIndex.GroupIndex].Remove(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -66,7 +66,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Exists(EntityIndex entityIndex)
         {
-            if (_entriesPerGroup.TryGetValue(entityIndex.Group, out var groupEntry))
+            if (_entriesPerGroup.TryGetValue(entityIndex.GroupIndex, out var groupEntry))
                 return groupEntry.Exists(entityIndex.Index);
             return false;
         }
@@ -78,7 +78,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetGroupEntry(Group group, out SetGroupEntry groupEntry)
+        public bool TryGetGroupEntry(GroupIndex group, out SetGroupEntry groupEntry)
         {
             return _entriesPerGroup.TryGetValue(group, out groupEntry);
         }
@@ -105,12 +105,12 @@ namespace Trecs
         // ── Validation ───────────────────────────────────────────────────
 
         [Conditional("DEBUG")]
-        void AssertValidGroup(Group group)
+        void AssertValidGroup(GroupIndex group)
         {
 #if DEBUG
             Assert.That(
                 _entriesPerGroup.ContainsKey(group),
-                "Group {} does not belong to this set's template",
+                "GroupIndex {} does not belong to this set's template",
                 group
             );
 #endif

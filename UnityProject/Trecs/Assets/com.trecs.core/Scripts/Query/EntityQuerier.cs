@@ -15,9 +15,9 @@ namespace Trecs.Internal
 
         internal EntityHandleMap _entityLocator;
 
-        internal EntityQuerier(ComponentStore componentStore, SetStore setStore)
+        internal EntityQuerier(ComponentStore componentStore, SetStore setStore, int groupCount)
         {
-            _entityLocator.InitEntityHandleMap();
+            _entityLocator.InitEntityHandleMap(groupCount);
 
             _componentStore = componentStore;
             _setStore = setStore;
@@ -52,7 +52,7 @@ namespace Trecs.Internal
         // ── Component queries ───────────────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityIndexMapper<T> QueryMappedEntities<T>(Group groupStructId)
+        public EntityIndexMapper<T> QueryMappedEntities<T>(GroupIndex groupStructId)
             where T : unmanaged, IEntityComponent
         {
             if (!SafeQueryEntityDictionary<T>(groupStructId, out var typeSafeDictionary))
@@ -64,10 +64,12 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityIndexMultiMapper<T> QueryMappedEntities<T>(LocalReadOnlyFastList<Group> groups)
+        public EntityIndexMultiMapper<T> QueryMappedEntities<T>(
+            LocalReadOnlyFastList<GroupIndex> groups
+        )
             where T : unmanaged, IEntityComponent
         {
-            var dictionary = new DenseDictionary<Group, IComponentArray<T>>(groups.Count);
+            var dictionary = new DenseDictionary<GroupIndex, IComponentArray<T>>(groups.Count);
 
             foreach (var group in groups)
             {
@@ -85,7 +87,7 @@ namespace Trecs.Internal
         public bool Exists<T>(EntityIndex entityGID)
             where T : unmanaged, IEntityComponent
         {
-            if (!SafeQueryEntityDictionary<T>(entityGID.Group, out var casted))
+            if (!SafeQueryEntityDictionary<T>(entityGID.GroupIndex, out var casted))
                 return false;
 
             return casted != null && entityGID.Index < casted.Count;
@@ -95,7 +97,7 @@ namespace Trecs.Internal
         /// determine if component with specific ID exists in group
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Exists<T>(int id, Group group)
+        public bool Exists<T>(int id, GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             if (!SafeQueryEntityDictionary<T>(group, out var casted))
@@ -108,7 +110,7 @@ namespace Trecs.Internal
         /// determine if group exists and is not empty
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool ExistsAndIsNotEmpty(Group gid)
+        public bool ExistsAndIsNotEmpty(GroupIndex gid)
         {
             if (
                 _componentStore.GroupEntityComponentsDB.TryGetValue(
@@ -127,7 +129,7 @@ namespace Trecs.Internal
         /// determine if entities we specific components are found in group
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool HasAny<T>(Group groupStruct)
+        public bool HasAny<T>(GroupIndex groupStruct)
             where T : unmanaged, IEntityComponent
         {
             return Count<T>(groupStruct) > 0;
@@ -137,7 +139,7 @@ namespace Trecs.Internal
         /// count the number of components in a group
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Count<T>(Group groupStruct)
+        public int Count<T>(GroupIndex groupStruct)
             where T : unmanaged, IEntityComponent
         {
             if (!SafeQueryEntityDictionary<T>(groupStruct, out var typeSafeDictionary))
@@ -161,7 +163,7 @@ namespace Trecs.Internal
         {
             if (
                 !_componentStore.GroupEntityComponentsDB.TryGetValue(
-                    entityIndex.Group,
+                    entityIndex.GroupIndex,
                     out var componentMap
                 )
             )
@@ -175,7 +177,7 @@ namespace Trecs.Internal
             return false;
         }
 
-        public int CountEntitiesInGroup(Group group)
+        public int CountEntitiesInGroup(GroupIndex group)
         {
             if (
                 !_componentStore.GroupEntityComponentsDB.TryGetValue(
@@ -231,7 +233,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public NativeBuffer<T> QueryEntitiesAndIndex<T>(int id, Group group, out int index)
+        public NativeBuffer<T> QueryEntitiesAndIndex<T>(int id, GroupIndex group, out int index)
             where T : unmanaged, IEntityComponent
         {
             EntityIndex entityGID = new EntityIndex(id, group);
@@ -262,7 +264,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryQueryEntitiesAndIndex<T>(
             int id,
-            Group group,
+            GroupIndex group,
             out int index,
             out NativeBuffer<T> array
         )
@@ -279,7 +281,7 @@ namespace Trecs.Internal
         static string FormatQueryFailMessage<T>(EntityIndex entityGID, QueryFailReason failReason)
         {
             var baseMsg =
-                $"Entity with index '{entityGID.Index}', group '{entityGID.Group}' and component '{typeof(T)}'";
+                $"Entity with index '{entityGID.Index}', group '{entityGID.GroupIndex}' and component '{typeof(T)}'";
 
             if (failReason == QueryFailReason.IndexOutOfRange)
             {
@@ -295,7 +297,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetEntity<T>(int entityHandle, Group @group, out T value)
+        public bool TryGetEntity<T>(int entityHandle, GroupIndex @group, out T value)
             where T : unmanaged, IEntityComponent
         {
             if (TryQueryEntitiesAndIndex<T>(entityHandle, group, out var index, out var array))
@@ -312,14 +314,14 @@ namespace Trecs.Internal
         public bool TryGetEntity<T>(EntityIndex entityIndex, out T value)
             where T : unmanaged, IEntityComponent
         {
-            return TryGetEntity<T>(entityIndex.Index, entityIndex.Group, out value);
+            return TryGetEntity<T>(entityIndex.Index, entityIndex.GroupIndex, out value);
         }
 
         /// <summary>
         /// Expects that only one entity of type T exists in the group
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T QueryUniqueEntity<T>(Group group)
+        public ref T QueryUniqueEntity<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             var (buffer, count) = QuerySingleBufferWithCount<T>(group);
@@ -334,15 +336,15 @@ namespace Trecs.Internal
         /// <summary>
         /// Return all the groups where the entity component is found. It's a linear operation, but usually the number of groups are very low
         /// </summary>
-        public LocalReadOnlyFastList<Group> FindGroups<T1>()
+        public LocalReadOnlyFastList<GroupIndex> FindGroups<T1>()
             where T1 : unmanaged, IEntityComponent
         {
-            FastList<Group> result = localgroups.Value.GroupArray;
+            FastList<GroupIndex> result = localgroups.Value.GroupArray;
             result.Clear();
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T1>.Value,
-                    out DenseDictionary<Group, IComponentArray> result1
+                    out DenseDictionary<GroupIndex, IComponentArray> result1
                 )
             )
                 return result;
@@ -358,23 +360,23 @@ namespace Trecs.Internal
             return result;
         }
 
-        public LocalReadOnlyFastList<Group> FindGroups<T1, T2>()
+        public LocalReadOnlyFastList<GroupIndex> FindGroups<T1, T2>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
         {
-            FastList<Group> result = localgroups.Value.GroupArray;
+            FastList<GroupIndex> result = localgroups.Value.GroupArray;
             result.Clear();
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T1>.Value,
-                    out DenseDictionary<Group, IComponentArray> result1
+                    out DenseDictionary<GroupIndex, IComponentArray> result1
                 )
             )
                 return result;
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T2>.Value,
-                    out DenseDictionary<Group, IComponentArray> result2
+                    out DenseDictionary<GroupIndex, IComponentArray> result2
                 )
             )
                 return result;
@@ -410,12 +412,12 @@ namespace Trecs.Internal
         /// <typeparam name="T2"></typeparam>
         /// <typeparam name="T3"></typeparam>
         /// <returns></returns>
-        public LocalReadOnlyFastList<Group> FindGroups<T1, T2, T3>()
+        public LocalReadOnlyFastList<GroupIndex> FindGroups<T1, T2, T3>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
         {
-            FastList<DenseDictionary<Group, IComponentArray>> localArray = localgroups
+            FastList<DenseDictionary<GroupIndex, IComponentArray>> localArray = localgroups
                 .Value
                 .listOfGroups;
 
@@ -426,7 +428,9 @@ namespace Trecs.Internal
                 )
                 || localArray[0].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T2>.Value,
@@ -434,7 +438,9 @@ namespace Trecs.Internal
                 )
                 || localArray[1].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T3>.Value,
@@ -442,11 +448,13 @@ namespace Trecs.Internal
                 )
                 || localArray[2].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
 
             localgroups.Value.groups.Clear();
 
-            DenseDictionary<Group, Group> localGroups = localgroups.Value.groups;
+            DenseDictionary<GroupIndex, GroupIndex> localGroups = localgroups.Value.groups;
 
             int startIndex = 0;
             int min = int.MaxValue;
@@ -466,21 +474,26 @@ namespace Trecs.Internal
             var groupData = localArray[++startIndex % 3];
             localGroups.Intersect(groupData);
             if (localGroups.Count == 0)
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
 
             groupData = localArray[++startIndex % 3];
             localGroups.Intersect(groupData);
 
-            return new LocalReadOnlyFastList<Group>(localGroups.UnsafeValues, localGroups.Count);
+            return new LocalReadOnlyFastList<GroupIndex>(
+                localGroups.UnsafeValues,
+                localGroups.Count
+            );
         }
 
-        public LocalReadOnlyFastList<Group> FindGroups<T1, T2, T3, T4>()
+        public LocalReadOnlyFastList<GroupIndex> FindGroups<T1, T2, T3, T4>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
             where T4 : unmanaged, IEntityComponent
         {
-            FastList<DenseDictionary<Group, IComponentArray>> localArray = localgroups
+            FastList<DenseDictionary<GroupIndex, IComponentArray>> localArray = localgroups
                 .Value
                 .listOfGroups;
 
@@ -491,7 +504,9 @@ namespace Trecs.Internal
                 )
                 || localArray[0].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T2>.Value,
@@ -499,7 +514,9 @@ namespace Trecs.Internal
                 )
                 || localArray[1].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T3>.Value,
@@ -507,7 +524,9 @@ namespace Trecs.Internal
                 )
                 || localArray[2].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T4>.Value,
@@ -515,7 +534,9 @@ namespace Trecs.Internal
                 )
                 || localArray[3].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
 
             localgroups.Value.groups.Clear();
 
@@ -542,27 +563,34 @@ namespace Trecs.Internal
             var groupData = localArray[++startIndex & 3]; //&3 == %4
             localGroups.Intersect(groupData);
             if (localGroups.Count == 0)
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
 
             groupData = localArray[++startIndex & 3];
             localGroups.Intersect(groupData);
             if (localGroups.Count == 0)
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
 
             groupData = localArray[++startIndex & 3];
             localGroups.Intersect(groupData);
 
-            return new LocalReadOnlyFastList<Group>(localGroups.UnsafeValues, localGroups.Count);
+            return new LocalReadOnlyFastList<GroupIndex>(
+                localGroups.UnsafeValues,
+                localGroups.Count
+            );
         }
 
-        public LocalReadOnlyFastList<Group> FindGroups<T1, T2, T3, T4, T5>()
+        public LocalReadOnlyFastList<GroupIndex> FindGroups<T1, T2, T3, T4, T5>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
             where T4 : unmanaged, IEntityComponent
             where T5 : unmanaged, IEntityComponent
         {
-            FastList<DenseDictionary<Group, IComponentArray>> localArray = localgroups
+            FastList<DenseDictionary<GroupIndex, IComponentArray>> localArray = localgroups
                 .Value
                 .listOfGroups;
 
@@ -574,7 +602,9 @@ namespace Trecs.Internal
                 )
                 || localArray[0].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T2>.Value,
@@ -582,7 +612,9 @@ namespace Trecs.Internal
                 )
                 || localArray[1].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T3>.Value,
@@ -590,7 +622,9 @@ namespace Trecs.Internal
                 )
                 || localArray[2].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T4>.Value,
@@ -598,7 +632,9 @@ namespace Trecs.Internal
                 )
                 || localArray[3].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
             if (
                 !_componentStore.GroupsPerComponent.TryGetValue(
                     ComponentTypeId<T5>.Value,
@@ -606,7 +642,9 @@ namespace Trecs.Internal
                 )
                 || localArray[4].Count == 0
             )
-                return new LocalReadOnlyFastList<Group>(ReadOnlyFastList<Group>.DefaultEmptyList);
+                return new LocalReadOnlyFastList<GroupIndex>(
+                    ReadOnlyFastList<GroupIndex>.DefaultEmptyList
+                );
 
             localgroups.Value.groups.Clear();
 
@@ -638,15 +676,18 @@ namespace Trecs.Internal
                 var groupData = localArray[(startIndex + i) % 5];
                 localGroups.Intersect(groupData);
                 if (localGroups.Count == 0)
-                    return new LocalReadOnlyFastList<Group>(
-                        ReadOnlyFastList<Group>.DefaultEmptyList
+                    return new LocalReadOnlyFastList<GroupIndex>(
+                        ReadOnlyFastList<GroupIndex>.DefaultEmptyList
                     );
             }
 
-            return new LocalReadOnlyFastList<Group>(localGroups.UnsafeValues, localGroups.Count);
+            return new LocalReadOnlyFastList<GroupIndex>(
+                localGroups.UnsafeValues,
+                localGroups.Count
+            );
         }
 
-        internal DenseDictionary<Group, IComponentArray> FindGroups_INTERNAL(ComponentId type)
+        internal DenseDictionary<GroupIndex, IComponentArray> FindGroups_INTERNAL(ComponentId type)
         {
             if (!_componentStore.GroupsPerComponent.ContainsKey(type))
             {
@@ -668,7 +709,7 @@ namespace Trecs.Internal
         /// <c>Dispose</c> via <c>FreeTracked</c>.
         /// </summary>
         internal unsafe void BuildNativeComponentLookupEntries<T>(
-            LocalReadOnlyFastList<Group> groups,
+            LocalReadOnlyFastList<GroupIndex> groups,
             Allocator allocator,
             out NativeComponentLookupEntry* entries,
             out int count
@@ -722,7 +763,7 @@ namespace Trecs.Internal
                     var rawPtr = buffer.GetRawReadWritePointer(out _);
                     entries[writeIdx] = new NativeComponentLookupEntry
                     {
-                        GroupId = group.Id,
+                        GroupIndex = group,
                         DataPtr = (void*)rawPtr,
                         Count = entryCount,
                     };
@@ -768,7 +809,7 @@ namespace Trecs.Internal
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal bool SafeQueryEntityDictionary<T>(
-            Group group,
+            GroupIndex group,
             out IComponentArray typeSafeDictionary
         )
             where T : unmanaged, IEntityComponent
@@ -809,7 +850,7 @@ namespace Trecs.Internal
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void QueryOrCreateEntityDictionary<T>(
-            Group group,
+            GroupIndex group,
             out IComponentArray typeSafeDictionary
         )
             where T : unmanaged, IEntityComponent
@@ -832,7 +873,7 @@ namespace Trecs.Internal
             }
         }
 
-        internal NativeBuffer<T> QuerySingleBuffer<T>(Group group)
+        internal NativeBuffer<T> QuerySingleBuffer<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             if (
@@ -849,7 +890,7 @@ namespace Trecs.Internal
             return ((IComponentArray<T>)typeSafeDictionary).GetValues(out _);
         }
 
-        internal (NativeBuffer<T> buffer, int count) QuerySingleBufferWithCount<T>(Group group)
+        internal (NativeBuffer<T> buffer, int count) QuerySingleBufferWithCount<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             if (
@@ -887,7 +928,7 @@ namespace Trecs.Internal
             buffer = default;
             failReason = QueryFailReason.None;
 
-            if (!SafeQueryEntityDictionary<T>(entityGID.Group, out var safeDictionary))
+            if (!SafeQueryEntityDictionary<T>(entityGID.GroupIndex, out var safeDictionary))
             {
                 failReason = QueryFailReason.ComponentNotFound;
                 return false;
@@ -904,7 +945,7 @@ namespace Trecs.Internal
             return true;
         }
 
-        bool GroupHasAllComponents(Group group, ComponentId[] componentIds)
+        bool GroupHasAllComponents(GroupIndex group, ComponentId[] componentIds)
         {
             if (!_componentStore.GroupEntityComponentsDB.TryGetValue(group, out var componentMap))
                 return false;
@@ -916,7 +957,7 @@ namespace Trecs.Internal
             return true;
         }
 
-        IComponentArray GetComponentArrayUntyped(Group group, ComponentId componentId)
+        IComponentArray GetComponentArrayUntyped(GroupIndex group, ComponentId componentId)
         {
             if (!_componentStore.GroupEntityComponentsDB.TryGetValue(group, out var componentMap))
                 return null;
@@ -944,22 +985,22 @@ namespace Trecs.Internal
 
         struct GroupsList
         {
-            internal DenseDictionary<Group, Group> groups;
-            internal FastList<DenseDictionary<Group, IComponentArray>> listOfGroups;
-            public FastList<Group> GroupArray;
+            internal DenseDictionary<GroupIndex, GroupIndex> groups;
+            internal FastList<DenseDictionary<GroupIndex, IComponentArray>> listOfGroups;
+            public FastList<GroupIndex> GroupArray;
         }
 
         static readonly ThreadLocal<GroupsList> localgroups = new ThreadLocal<GroupsList>(() =>
         {
             GroupsList gl = default;
 
-            gl.groups = new DenseDictionary<Group, Group>();
-            gl.listOfGroups = FastList<DenseDictionary<Group, IComponentArray>>.PreInit(5);
-            gl.GroupArray = new FastList<Group>(1);
+            gl.groups = new DenseDictionary<GroupIndex, GroupIndex>();
+            gl.listOfGroups = FastList<DenseDictionary<GroupIndex, IComponentArray>>.PreInit(5);
+            gl.GroupArray = new FastList<GroupIndex>(1);
 
             return gl;
         });
 
-        static readonly DenseDictionary<Group, IComponentArray> EmptyDictionary = new();
+        static readonly DenseDictionary<GroupIndex, IComponentArray> EmptyDictionary = new();
     }
 }

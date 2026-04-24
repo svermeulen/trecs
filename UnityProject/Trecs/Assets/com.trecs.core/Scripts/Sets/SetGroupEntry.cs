@@ -11,16 +11,16 @@ namespace Trecs
     public struct SetGroupEntry
     {
         internal NativeDenseDictionary<int, int> _entityIdToDenseIndex;
-        readonly Group _group;
+        readonly GroupIndex _group;
 
-        internal SetGroupEntry(Group group)
+        internal SetGroupEntry(GroupIndex group)
             : this()
         {
             _entityIdToDenseIndex = new NativeDenseDictionary<int, int>(1, Allocator.Persistent);
             _group = group;
         }
 
-        public readonly Group Group => _group;
+        public readonly GroupIndex GroupIndex => _group;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Add(int index)

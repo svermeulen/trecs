@@ -12,7 +12,7 @@ namespace Trecs.Internal
     /// <c>NativeComponentLookupRead/Write&lt;T&gt;</c>).
     /// <para>
     /// Mirrors the design of Unity ECS's <c>EntityDataAccess.DependencyManager.Safety</c> pool.
-    /// One read handle and one write handle are kept per <c>(ResourceId, Group)</c> pair, lazily
+    /// One read handle and one write handle are kept per <c>(ResourceId, GroupIndex)</c> pair, lazily
     /// created the first time a job touches that pair. All wrapper structs that target the same
     /// <c>(resource, group)</c> share the same handle so that Unity's safety walker can detect
     /// cross-job conflicts at schedule time.
@@ -44,20 +44,20 @@ namespace Trecs.Internal
         /// same data.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AtomicSafetyHandle GetReadHandle(ResourceId resource, Group group)
+        public AtomicSafetyHandle GetReadHandle(ResourceId resource, GroupIndex group)
         {
             return GetHandle(resource, group);
         }
 
         /// <inheritdoc cref="GetReadHandle"/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public AtomicSafetyHandle GetWriteHandle(ResourceId resource, Group group)
+        public AtomicSafetyHandle GetWriteHandle(ResourceId resource, GroupIndex group)
         {
             return GetHandle(resource, group);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        AtomicSafetyHandle GetHandle(ResourceId resource, Group group)
+        AtomicSafetyHandle GetHandle(ResourceId resource, GroupIndex group)
         {
             Assert.That(!_disposed, "WorldSafetyManager is disposed");
             var key = MakeKey(resource, group);
@@ -110,9 +110,9 @@ namespace Trecs.Internal
 
         // Same packing scheme as RuntimeJobScheduler.MakeKey so that the two stay in lockstep.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static long MakeKey(ResourceId resource, Group group)
+        static long MakeKey(ResourceId resource, GroupIndex group)
         {
-            return ((long)resource.Value << 32) | (uint)group.Id;
+            return ((long)resource.Value << 32) | (uint)group.Value;
         }
     }
 }

@@ -8,13 +8,13 @@ namespace Trecs
     /// </summary>
     public readonly ref struct DenseGroupSlice
     {
-        public readonly Group Group;
+        public readonly GroupIndex GroupIndex;
         public readonly int Count;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal DenseGroupSlice(Group group, int count)
+        internal DenseGroupSlice(GroupIndex group, int count)
         {
-            Group = group;
+            GroupIndex = group;
             Count = count;
         }
     }

@@ -39,18 +39,21 @@ namespace Trecs.Internal
         const int ParallelJobThreshold = 500;
 
         static readonly Action<
-            DenseDictionary<Group, DenseDictionary<Group, DenseDictionary<int, MoveInfo>>>,
-            DenseDictionary<EntityIndex, (EntityIndex, Group)>,
+            DenseDictionary<
+                GroupIndex,
+                DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>
+            >,
+            DenseDictionary<EntityIndex, (EntityIndex, GroupIndex)>,
             EntitySubmitter
         > _moveEntities;
 
         static readonly Action<
-            DenseDictionary<Group, FastList<int>>,
+            DenseDictionary<GroupIndex, FastList<int>>,
             EntitySubmitter
         > _removeEntities;
 
-        static readonly Action<Group, EntitySubmitter> _removeGroup;
-        static readonly Action<Group, Group, EntitySubmitter> _swapGroup;
+        static readonly Action<GroupIndex, EntitySubmitter> _removeGroup;
+        static readonly Action<GroupIndex, GroupIndex, EntitySubmitter> _swapGroup;
 
         internal readonly ComponentStore _componentStore;
         readonly EntityQuerier _entitiesQuerier;
@@ -78,7 +81,7 @@ namespace Trecs.Internal
         readonly WorldSettings _trecsSettings;
 
 #if DEBUG && TRECS_IS_PROFILING
-        internal readonly HashSet<Group> _groupsWithEntitiesEverAdded = new();
+        internal readonly HashSet<GroupIndex> _groupsWithEntitiesEverAdded = new();
 #endif
 #if DEBUG && !TRECS_IS_PROFILING
         readonly EntityInitializationTracker _initTracker = new();
@@ -269,15 +272,13 @@ namespace Trecs.Internal
         ///--------------------------------------------
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public EntityInitializer AddEntity(
-            Group group,
+            GroupIndex group,
             IComponentBuilder[] componentsToBuild,
             string descriptorName,
             string callerFile = "",
             int callerLine = 0
         )
         {
-            Assert.That(!group.IsNull, "Invalid group provided to AddEntity");
-
 #if DEBUG && TRECS_IS_PROFILING
             _groupsWithEntitiesEverAdded.Add(group);
 #endif
@@ -331,7 +332,7 @@ namespace Trecs.Internal
         /// Preallocate memory to avoid the impact to resize arrays when many entities are submitted at once
         /// </summary>
         internal void Preallocate(
-            Group groupId,
+            GroupIndex groupId,
             int size,
             IComponentBuilder[] entityComponentsToBuild
         )
@@ -355,25 +356,25 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        DenseDictionary<ComponentId, IComponentArray> GetDBGroup(Group fromIdGroupId)
+        DenseDictionary<ComponentId, IComponentArray> GetDBGroup(GroupIndex fromIdGroupId)
         {
             return _componentStore.GetDBGroup(fromIdGroupId);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal DenseDictionary<ComponentId, IComponentArray> GetOrAddDBGroup(Group toGroupId)
+        internal DenseDictionary<ComponentId, IComponentArray> GetOrAddDBGroup(GroupIndex toGroupId)
         {
             return _componentStore.GetOrAddDBGroup(toGroupId);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void QueueRemoveGroupOperation(Group groupId, string caller)
+        void QueueRemoveGroupOperation(GroupIndex groupId, string caller)
         {
             _entitiesOperations.QueueRemoveGroupOperation(groupId, caller);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void QueueMoveGroupOperation(Group fromGroupId, Group toGroupId, string caller)
+        void QueueMoveGroupOperation(GroupIndex fromGroupId, GroupIndex toGroupId, string caller)
         {
             _entitiesOperations.QueueMoveGroupOperation(fromGroupId, toGroupId, caller);
         }
@@ -381,7 +382,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void QueueMoveEntityOperation(
             EntityIndex fromId,
-            Group toGroup,
+            GroupIndex toGroup,
             IComponentBuilder[] componentBuilders
         )
         {
@@ -413,7 +414,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void QueueRemoveAllInGroup(Group group, int entityCount)
+        public void QueueRemoveAllInGroup(GroupIndex group, int entityCount)
         {
             _entitiesOperations.QueueRemoveAllInGroup(group, entityCount);
         }
@@ -445,7 +446,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void RemoveGroup(Group groupId, EntitySubmitter ecsRoot)
+        static void RemoveGroup(GroupIndex groupId, EntitySubmitter ecsRoot)
         {
             using (TrecsProfiling.Start("remove whole group"))
             {
@@ -454,7 +455,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void SwapGroup(Group fromGroupId, Group toGroupId, EntitySubmitter ecsRoot)
+        static void SwapGroup(GroupIndex fromGroupId, GroupIndex toGroupId, EntitySubmitter ecsRoot)
         {
             using (TrecsProfiling.Start("swap whole group"))
             {
@@ -463,7 +464,7 @@ namespace Trecs.Internal
         }
 
         static void RemoveEntities(
-            DenseDictionary<Group, FastList<int>> removeOperations,
+            DenseDictionary<GroupIndex, FastList<int>> removeOperations,
             EntitySubmitter ecsRoot
         )
         {
@@ -481,7 +482,7 @@ namespace Trecs.Internal
         }
 
         static void ExecuteRemoveForGroup(
-            Group fromGroup,
+            GroupIndex fromGroup,
             FastList<int> entityHandlesToRemove,
             EntitySubmitter ecsRoot
         )
@@ -666,7 +667,7 @@ namespace Trecs.Internal
         }
 
         static void FireRemoveCallbacks(
-            DenseDictionary<Group, FastList<int>> removeOperations,
+            DenseDictionary<GroupIndex, FastList<int>> removeOperations,
             EntitySubmitter ecsRoot
         )
         {
@@ -736,10 +737,10 @@ namespace Trecs.Internal
 
         static void MoveEntities(
             DenseDictionary<
-                Group,
-                DenseDictionary<Group, DenseDictionary<int, MoveInfo>>
+                GroupIndex,
+                DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>
             > moveEntitiesOperations,
-            DenseDictionary<EntityIndex, (EntityIndex, Group)> entitiesIdSwaps,
+            DenseDictionary<EntityIndex, (EntityIndex, GroupIndex)> entitiesIdSwaps,
             EntitySubmitter ecsRoot
         )
         {
@@ -855,8 +856,8 @@ namespace Trecs.Internal
         }
 
         static void ExecuteMoveForToGroup(
-            Group fromGroup,
-            Group toGroup,
+            GroupIndex fromGroup,
+            GroupIndex toGroup,
             DenseDictionary<int, MoveInfo> fromEntityToEntityIDs,
             DenseDictionary<ComponentId, IComponentArray> fromGroupDictionary,
             EntitySubmitter ecsRoot
@@ -1031,8 +1032,8 @@ namespace Trecs.Internal
         }
 
         static void FireMoveCallbacks(
-            Group fromGroup,
-            DenseDictionary<Group, DenseDictionary<int, MoveInfo>> toGroupMoveInfos,
+            GroupIndex fromGroup,
+            DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>> toGroupMoveInfos,
             EntitySubmitter ecsRoot
         )
         {
@@ -1092,7 +1093,7 @@ namespace Trecs.Internal
                                     continue;
                                 }
 
-                                var groupId = groupToSubmit.Group;
+                                var groupId = groupToSubmit.GroupIndex;
                                 var groupDB = GetOrAddDBGroup(groupId);
 
                                 EntityRange? addedIndices = null;
@@ -1165,7 +1166,7 @@ namespace Trecs.Internal
                                     continue;
                                 }
 
-                                var groupId = groupToSubmit.Group;
+                                var groupId = groupToSubmit.GroupIndex;
                                 var groupDB = GetDBGroup(groupId);
 
                                 enumerator.MoveNext();
@@ -1205,7 +1206,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void RemoveEntitiesFromGroup(Group groupId)
+        void RemoveEntitiesFromGroup(GroupIndex groupId)
         {
             _entitiesQuerier._entityLocator.RemoveAllGroupReferenceLocators(groupId);
 
@@ -1242,7 +1243,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void SwapEntitiesBetweenGroups(Group fromGroupId, Group toGroupId)
+        void SwapEntitiesBetweenGroups(GroupIndex fromGroupId, GroupIndex toGroupId)
         {
             DenseDictionary<ComponentId, IComponentArray> fromGroup = GetDBGroup(fromGroupId);
             DenseDictionary<ComponentId, IComponentArray> toGroup = GetOrAddDBGroup(toGroupId);
@@ -1292,7 +1293,7 @@ namespace Trecs.Internal
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         IComponentArray GetOrAddTypeSafeDictionary(
-            Group groupId,
+            GroupIndex groupId,
             DenseDictionary<ComponentId, IComponentArray> groupPerComponentType,
             ComponentId typeId,
             IComponentArray fromDictionary
@@ -1435,19 +1436,19 @@ namespace Trecs.Internal
                 using (TrecsProfiling.Start("NatRemove Queue"))
                 {
 #if DEBUG && (!TRECS_IS_PROFILING || TRECS_INTERNAL_CHECKS)
-                    Group cachedGroup = default;
+                    GroupIndex cachedGroup = default;
                     ResolvedTemplate cachedTemplate = null;
 
                     foreach (var (entityHandlex, accessorId) in removals)
                     {
-                        if (entityHandlex.Group != cachedGroup)
+                        if (entityHandlex.GroupIndex != cachedGroup)
                         {
-                            cachedGroup = entityHandlex.Group;
+                            cachedGroup = entityHandlex.GroupIndex;
                             cachedTemplate = _worldInfo.GetResolvedTemplateForGroup(cachedGroup);
                         }
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                        CheckNativeOpsCanRemove(accessorId, entityHandlex.Group);
+                        CheckNativeOpsCanRemove(accessorId, entityHandlex.GroupIndex);
 #endif
                         CheckRemoveEntityHandle(entityHandlex, cachedTemplate.DebugName);
                     }
@@ -1462,7 +1463,7 @@ namespace Trecs.Internal
             {
                 var swapBuffersCount = _nativeMoveOperationQueue.Count;
 
-                var swaps = new NativeList<(EntityIndex, Group, int)>(Allocator.TempJob);
+                var swaps = new NativeList<(EntityIndex, GroupIndex, int)>(Allocator.TempJob);
 
                 using (TrecsProfiling.Start("NatSwap Dequeue"))
                 {
@@ -1484,7 +1485,7 @@ namespace Trecs.Internal
                             _log.Trace(
                                 "Swapping entity {} from group {} to {} (from native operation)",
                                 from.Index,
-                                from.Group,
+                                from.GroupIndex,
                                 toGroup
                             );
                             swaps.Add((from, toGroup, accessorId));
@@ -1503,19 +1504,19 @@ namespace Trecs.Internal
                 using (TrecsProfiling.Start("NatSwap Queue"))
                 {
 #if DEBUG && (!TRECS_IS_PROFILING || TRECS_INTERNAL_CHECKS)
-                    Group cachedGroup = default;
+                    GroupIndex cachedGroup = default;
                     ResolvedTemplate cachedTemplate = null;
 
                     foreach (var (fromEntityIndex, toGroup, accessorId) in swaps)
                     {
-                        if (fromEntityIndex.Group != cachedGroup)
+                        if (fromEntityIndex.GroupIndex != cachedGroup)
                         {
-                            cachedGroup = fromEntityIndex.Group;
+                            cachedGroup = fromEntityIndex.GroupIndex;
                             cachedTemplate = _worldInfo.GetResolvedTemplateForGroup(cachedGroup);
                         }
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                        CheckNativeOpsCanMove(accessorId, fromEntityIndex.Group);
+                        CheckNativeOpsCanMove(accessorId, fromEntityIndex.GroupIndex);
 #endif
                         CheckMoveEntityHandle(fromEntityIndex, toGroup, cachedTemplate.DebugName);
                     }
@@ -1535,7 +1536,7 @@ namespace Trecs.Internal
                 {
                     // Cache group dict + per-component arrays to avoid redundant dictionary
                     // lookups for consecutive entities in the same group (common pattern).
-                    Group cachedAddGroup = default;
+                    GroupIndex cachedAddGroup = default;
                     DenseDictionary<ComponentId, IComponentArray> cachedGroupDict = null;
                     IComponentBuilder[] cachedComponents = null;
                     var cachedComponentArrays = _cachedNativeAddComponentArrays;
@@ -1557,11 +1558,6 @@ namespace Trecs.Internal
                             _log.Trace(
                                 "Adding new entity to group {} (from native operation)",
                                 group
-                            );
-
-                            Assert.That(
-                                !group.IsNull,
-                                "invalid group detected, are you using new Group() instead of new ExclusiveGroup()?"
                             );
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
@@ -1676,17 +1672,17 @@ namespace Trecs.Internal
 #if !TRECS_INTERNAL_CHECKS || !DEBUG
         [Conditional("MEANINGLESS")]
 #endif
-        void CheckNativeOpsCanAdd(int accessorId, Group group) { }
+        void CheckNativeOpsCanAdd(int accessorId, GroupIndex group) { }
 
 #if !TRECS_INTERNAL_CHECKS || !DEBUG
         [Conditional("MEANINGLESS")]
 #endif
-        void CheckNativeOpsCanRemove(int accessorId, Group group) { }
+        void CheckNativeOpsCanRemove(int accessorId, GroupIndex group) { }
 
 #if !TRECS_INTERNAL_CHECKS || !DEBUG
         [Conditional("MEANINGLESS")]
 #endif
-        void CheckNativeOpsCanMove(int accessorId, Group group) { }
+        void CheckNativeOpsCanMove(int accessorId, GroupIndex group) { }
 
 #if !DEBUG || TRECS_IS_PROFILING
         [Conditional("MEANINGLESS")]
@@ -1706,7 +1702,7 @@ namespace Trecs.Internal
 #endif
         public void CheckMoveEntityHandle(
             EntityIndex fromEntityIndex,
-            Group toGroup,
+            GroupIndex toGroup,
             string entityDescriptorName
         )
         {

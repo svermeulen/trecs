@@ -275,7 +275,11 @@ namespace Trecs
                 setStore.RegisterSet(setDef, worldInfo);
             }
 
-            var entityQuerier = new EntityQuerier(componentStore, setStore);
+            var entityQuerier = new EntityQuerier(
+                componentStore,
+                setStore,
+                worldInfo.AllGroups.Count
+            );
 
             var jobScheduler = new RuntimeJobScheduler();
 

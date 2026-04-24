@@ -10,7 +10,7 @@ namespace Trecs
     /// </summary>
     public readonly ref struct EntityInitializer
     {
-        readonly Group _group;
+        readonly GroupIndex _group;
         readonly DenseDictionary<ComponentId, IComponentArray> _groupDictionary;
         readonly int _indexInTransientBuffer;
 #if DEBUG && !TRECS_IS_PROFILING
@@ -27,7 +27,7 @@ namespace Trecs
         /// Creates a new initializer targeting a specific entity in a transient component buffer.
         /// </summary>
         public EntityInitializer(
-            Group group,
+            GroupIndex group,
             DenseDictionary<ComponentId, IComponentArray> groupDictionary,
             in EntityHandle id,
             int indexInTransientBuffer

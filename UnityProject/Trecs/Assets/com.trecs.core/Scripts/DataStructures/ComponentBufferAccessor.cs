@@ -10,9 +10,9 @@ namespace Trecs
         where T : unmanaged, IEntityComponent
     {
         readonly WorldAccessor _world;
-        readonly Group _group;
+        readonly GroupIndex _group;
 
-        internal ComponentBufferAccessor(WorldAccessor world, Group group)
+        internal ComponentBufferAccessor(WorldAccessor world, GroupIndex group)
         {
             _world = world;
             _group = group;
@@ -30,6 +30,6 @@ namespace Trecs
             get => _world.GetBufferWrite<T>(_group);
         }
 
-        public Group Group => _group;
+        public GroupIndex GroupIndex => _group;
     }
 }

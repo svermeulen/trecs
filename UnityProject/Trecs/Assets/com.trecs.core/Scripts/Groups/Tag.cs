@@ -6,7 +6,7 @@ using Unity.Burst;
 namespace Trecs
 {
     /// <summary>
-    /// Lightweight semantic label used to classify entities into <see cref="Group"/>s.
+    /// Lightweight semantic label used to classify entities into <see cref="GroupIndex"/>s.
     /// Each tag type (an <see cref="ITag"/> struct) maps to a unique integer <see cref="Guid"/>.
     /// Tags are combined into <see cref="TagSet"/>s to define groups; entities with the same
     /// tag combination share a group and its contiguous component buffers.

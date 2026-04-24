@@ -22,7 +22,7 @@ namespace Trecs.Internal
 
         IComponentArray Create();
 
-        void AddEntitiesToDictionary(IComponentArray toDictionary, Group groupId);
+        void AddEntitiesToDictionary(IComponentArray toDictionary, GroupIndex groupId);
 
         /// <summary>
         /// Remove entities at the given indices from the array using swap-back.
@@ -38,8 +38,8 @@ namespace Trecs.Internal
         /// </summary>
         void SwapEntitiesBetweenDictionaries(
             in DenseDictionary<int, MoveInfo> infosToProcess,
-            Group fromGroup,
-            Group toGroup,
+            GroupIndex fromGroup,
+            GroupIndex toGroup,
             IComponentArray toComponentsDictionary
         );
 

@@ -14,11 +14,11 @@ namespace Trecs
     public ref struct QueryIterator
     {
         bool _done;
-        Group _currentGroup;
+        GroupIndex _currentGroup;
         int _entityIndex;
 
         readonly WorldAccessor _world;
-        readonly ReadOnlyFastList<Group> _groups;
+        readonly ReadOnlyFastList<GroupIndex> _groups;
         SetGroupLookup _singleSet;
         readonly bool _hasSet;
         int _groupIndex;
@@ -27,7 +27,7 @@ namespace Trecs
         int _slicePosition;
 
         /// <summary>No-set constructor — iterates all entities in every matched group.</summary>
-        internal QueryIterator(WorldAccessor world, ReadOnlyFastList<Group> resolvedGroups)
+        internal QueryIterator(WorldAccessor world, ReadOnlyFastList<GroupIndex> resolvedGroups)
         {
             _done = false;
             _currentGroup = default;
@@ -45,7 +45,7 @@ namespace Trecs
         /// <summary>Single-set constructor — iterates entities belonging to the given set.</summary>
         internal QueryIterator(
             WorldAccessor world,
-            ReadOnlyFastList<Group> resolvedGroups,
+            ReadOnlyFastList<GroupIndex> resolvedGroups,
             SetId set
         )
         {

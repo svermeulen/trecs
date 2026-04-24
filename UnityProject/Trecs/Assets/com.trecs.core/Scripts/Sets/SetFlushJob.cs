@@ -15,7 +15,7 @@ namespace Trecs
     /// and tracked as the new writer so readers naturally depend on it.
     ///
     /// When <see cref="RequireDeterministic"/> is true, entries are collected, sorted by
-    /// (Group, Index), then applied — ensuring deterministic iteration order regardless
+    /// (GroupIndex, Index), then applied — ensuring deterministic iteration order regardless
     /// of thread scheduling. Removes are always processed before adds.
     /// </summary>
     [BurstCompile]
@@ -23,7 +23,7 @@ namespace Trecs
     {
         public AtomicNativeBags AddQueue;
         public AtomicNativeBags RemoveQueue;
-        public NativeDenseDictionary<Group, SetGroupEntry> EntriesPerGroup;
+        public NativeDenseDictionary<GroupIndex, SetGroupEntry> EntriesPerGroup;
         public bool RequireDeterministic;
 
         public void Execute()
@@ -51,7 +51,7 @@ namespace Trecs
             for (int i = 0; i < allRemoves.Length; i++)
             {
                 var entityIndex = allRemoves[i];
-                EntriesPerGroup[entityIndex.Group].Remove(entityIndex.Index);
+                EntriesPerGroup[entityIndex.GroupIndex].Remove(entityIndex.Index);
             }
             allRemoves.Dispose();
 
@@ -66,7 +66,7 @@ namespace Trecs
             for (int i = 0; i < allAdds.Length; i++)
             {
                 var entityIndex = allAdds[i];
-                EntriesPerGroup[entityIndex.Group].Add(entityIndex.Index);
+                EntriesPerGroup[entityIndex.GroupIndex].Add(entityIndex.Index);
             }
             allAdds.Dispose();
         }
@@ -79,7 +79,7 @@ namespace Trecs
                 while (!bag.IsEmpty())
                 {
                     var entityIndex = bag.Dequeue<EntityIndex>();
-                    EntriesPerGroup[entityIndex.Group].Remove(entityIndex.Index);
+                    EntriesPerGroup[entityIndex.GroupIndex].Remove(entityIndex.Index);
                 }
             }
 
@@ -89,7 +89,7 @@ namespace Trecs
                 while (!bag.IsEmpty())
                 {
                     var entityIndex = bag.Dequeue<EntityIndex>();
-                    EntriesPerGroup[entityIndex.Group].Add(entityIndex.Index);
+                    EntriesPerGroup[entityIndex.GroupIndex].Add(entityIndex.Index);
                 }
             }
         }

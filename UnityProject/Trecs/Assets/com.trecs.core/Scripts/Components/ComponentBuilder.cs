@@ -10,7 +10,7 @@ namespace Trecs.Internal
         void Preallocate(IComponentArray dictionary, int size);
         IComponentArray CreateDictionary(int size);
 
-        void ResetInputs(EntityInputQueue inputManager, Group group);
+        void ResetInputs(EntityInputQueue inputManager, GroupIndex group);
 
         bool HasUserProvidedPrototype { get; }
 
@@ -73,7 +73,7 @@ namespace Trecs.Internal
             return new ComponentArray<T>(size);
         }
 
-        public void ResetInputs(EntityInputQueue inputQueue, Group group)
+        public void ResetInputs(EntityInputQueue inputQueue, GroupIndex group)
         {
             inputQueue.ResetInputs<T>(group);
         }

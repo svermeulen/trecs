@@ -6,7 +6,7 @@ namespace Trecs
     /// Thrown when a Trecs cross-entity container (e.g.
     /// <see cref="NativeComponentLookupRead{T}"/>, <see cref="NativeComponentLookupWrite{T}"/>)
     /// is asked for an entity whose
-    /// <see cref="Group"/> isn't in the container's permitted group set.
+    /// <see cref="GroupIndex"/> isn't in the container's permitted group set.
     /// <para>
     /// Inherits from <see cref="InvalidOperationException"/> so existing
     /// <c>catch (InvalidOperationException)</c> sites still work; the typed subclass lets

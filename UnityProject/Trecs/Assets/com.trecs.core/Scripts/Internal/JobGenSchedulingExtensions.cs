@@ -78,21 +78,21 @@ namespace Trecs.Internal
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static (NativeComponentBufferRead<T> buffer, int count) GetBufferReadForJob<T>(
             this WorldAccessor world,
-            Group group
+            GroupIndex group
         )
             where T : unmanaged, IEntityComponent => world.GetBufferReadForJobScheduling<T>(group);
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static (NativeComponentBufferWrite<T> buffer, int count) GetBufferWriteForJob<T>(
             this WorldAccessor world,
-            Group group
+            GroupIndex group
         )
             where T : unmanaged, IEntityComponent => world.GetBufferWriteForJobScheduling<T>(group);
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static NativeEntityHandleBuffer GetEntityHandleBufferForJob(
             this WorldAccessor world,
-            Group group
+            GroupIndex group
         ) => world.GetEntityHandleBufferForJobScheduling(group);
 
         [EditorBrowsable(EditorBrowsableState.Never)]
@@ -112,7 +112,7 @@ namespace Trecs.Internal
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static NativeComponentLookupRead<T> CreateNativeComponentLookupReadForJob<T>(
             this WorldAccessor world,
-            ReadOnlyFastList<Group> groups,
+            ReadOnlyFastList<GroupIndex> groups,
             Allocator allocator
         )
             where T : unmanaged, IEntityComponent =>
@@ -121,7 +121,7 @@ namespace Trecs.Internal
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static NativeComponentLookupWrite<T> CreateNativeComponentLookupWriteForJob<T>(
             this WorldAccessor world,
-            ReadOnlyFastList<Group> groups,
+            ReadOnlyFastList<GroupIndex> groups,
             Allocator allocator
         )
             where T : unmanaged, IEntityComponent =>
@@ -132,14 +132,14 @@ namespace Trecs.Internal
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static NativeComponentBufferRead<T> GetBufferForGroupForJob<T>(
             this NativeComponentLookupRead<T> lookup,
-            Group group
+            GroupIndex group
         )
             where T : unmanaged, IEntityComponent => lookup.GetBufferForGroupInternal(group);
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static NativeComponentBufferWrite<T> GetBufferForGroupForJob<T>(
             this NativeComponentLookupWrite<T> lookup,
-            Group group
+            GroupIndex group
         )
             where T : unmanaged, IEntityComponent => lookup.GetBufferForGroupInternal(group);
 
@@ -196,7 +196,7 @@ namespace Trecs.Internal
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static NativeEntitySetIndices<TSet> GetSetIndicesForJob<TSet>(
             this WorldAccessor world,
-            Group group
+            GroupIndex group
         )
             where TSet : struct, IEntitySet
         {
