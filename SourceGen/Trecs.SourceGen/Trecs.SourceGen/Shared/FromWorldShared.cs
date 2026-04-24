@@ -22,7 +22,7 @@ namespace Trecs.SourceGen.Shared
         NativeSetRead,
         NativeFactory,
         NativeWorldAccessor,
-        Group,
+        GroupIndex,
         NativeEntityHandleBuffer,
     }
 
@@ -31,7 +31,7 @@ namespace Trecs.SourceGen.Shared
         public string FieldName { get; }
         public FromWorldFieldKind Kind { get; }
         public INamedTypeSymbol FieldType { get; }
-        public ITypeSymbol? GenericArgument { get; } // null for non-generic types (NativeWorldAccessor, Group)
+        public ITypeSymbol? GenericArgument { get; } // null for non-generic types (NativeWorldAccessor, GroupIndex)
 
         /// <summary>
         /// Pre-parsed aspect data, populated only for <see cref="FromWorldFieldKind.NativeFactory"/>
@@ -334,8 +334,8 @@ namespace Trecs.SourceGen.Shared
                         inlineTagSetExpression: "",
                         tagSetExpression: ""
                     );
-                case FromWorldFieldKind.Group:
-                    // Group resolves to a single group via GetSingleGroupWithTags.
+                case FromWorldFieldKind.GroupIndex:
+                    // GroupIndex resolves to a single group via GetSingleGroupWithTags.
                     // With inline tags: optional TagSet? schedule parameter.
                     // Without inline tags: mandatory TagSet schedule parameter.
                     return new(
@@ -355,7 +355,7 @@ namespace Trecs.SourceGen.Shared
                     );
                 case FromWorldFieldKind.NativeEntityHandleBuffer:
                     // Resolves to a single group's entity handle buffer.
-                    // Same tag resolution pattern as Group/ComponentBuffer.
+                    // Same tag resolution pattern as GroupIndex/ComponentBuffer.
                     return new(
                         info.Kind,
                         info.FieldName,
@@ -414,7 +414,7 @@ namespace Trecs.SourceGen.Shared
                 return typeSymbol.Name switch
                 {
                     "NativeWorldAccessor" => FromWorldFieldKind.NativeWorldAccessor,
-                    "Group" => FromWorldFieldKind.Group,
+                    "GroupIndex" => FromWorldFieldKind.GroupIndex,
                     "NativeEntityHandleBuffer" => FromWorldFieldKind.NativeEntityHandleBuffer,
                     _ => FromWorldFieldKind.Unsupported,
                 };

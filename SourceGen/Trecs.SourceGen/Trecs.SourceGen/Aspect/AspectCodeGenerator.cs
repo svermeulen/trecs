@@ -207,7 +207,7 @@ namespace Trecs.SourceGen.Aspect
                 var suffix = (i == allTypes.Length - 1) ? ");" : ",";
                 sb.AppendLine(
                     indentLevel + 3,
-                    $"Trecs.Internal.JobGenSchedulingExtensions.GetBufferForGroupForJob(_lookup{i}, entityIndex.Group){suffix}"
+                    $"Trecs.Internal.JobGenSchedulingExtensions.GetBufferForGroupForJob(_lookup{i}, entityIndex.GroupIndex){suffix}"
                 );
             }
             sb.AppendLine(indentLevel + 1, "}");
@@ -300,8 +300,8 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel, "}");
             sb.AppendLine();
 
-            // Generate Group-only constructor (used by ForEachAspect hoisted iteration)
-            var groupConstructorParams = new List<string> { "Group group" };
+            // Generate GroupIndex-only constructor (used by ForEachAspect hoisted iteration)
+            var groupConstructorParams = new List<string> { "GroupIndex group" };
             groupConstructorParams.AddRange(
                 allTypes.Select(componentType =>
                 {
@@ -355,7 +355,7 @@ namespace Trecs.SourceGen.Aspect
                 sb,
                 indentLevel + 1,
                 allTypes,
-                "_entityIndex.Group",
+                "_entityIndex.GroupIndex",
                 "world",
                 type => $"_{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
                 isFieldAssignment: true,
@@ -684,7 +684,7 @@ namespace Trecs.SourceGen.Aspect
                 sb,
                 indentLevel + 2,
                 allTypes,
-                "__ei.Group",
+                "__ei.GroupIndex",
                 "__world",
                 type => $"{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
                 isFieldAssignment: false,
@@ -730,7 +730,7 @@ namespace Trecs.SourceGen.Aspect
                 sb,
                 indentLevel + 2,
                 allTypes,
-                "__ei.Group",
+                "__ei.GroupIndex",
                 "__world",
                 type => $"{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
                 isFieldAssignment: false,
@@ -862,7 +862,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 3, "return false;");
             sb.AppendLine();
             sb.AppendLine(indentLevel + 2, "var slice = _denseGroupIter.Current;");
-            sb.AppendLine(indentLevel + 2, "var __group = slice.Group;");
+            sb.AppendLine(indentLevel + 2, "var __group = slice.GroupIndex;");
             sb.AppendLine(indentLevel + 2, "_denseSliceCount = slice.Count;");
             sb.AppendLine();
 
@@ -926,7 +926,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 3, "if (_sparseCount > 0)");
             sb.AppendLine(indentLevel + 3, "{");
             sb.AppendLine(indentLevel + 4, "var idx = _indices[0];");
-            sb.AppendLine(indentLevel + 4, "var __group = slice.Group;");
+            sb.AppendLine(indentLevel + 4, "var __group = slice.GroupIndex;");
 
             foreach (var type in allTypes)
             {

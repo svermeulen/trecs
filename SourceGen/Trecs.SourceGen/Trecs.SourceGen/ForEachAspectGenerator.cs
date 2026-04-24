@@ -537,7 +537,7 @@ namespace Trecs.SourceGen
 
         /// <summary>
         /// Emits the inline dense iteration loop: foreach DenseGroupSlice → fetch buffers → for-loop
-        /// over entities. The slice already carries Group + Count from a single lookup so we don't
+        /// over entities. The slice already carries GroupIndex + Count from a single lookup so we don't
         /// need a separate CountEntitiesInGroup call per group.
         /// If <paramref name="worldVar"/> is null, declares a local <c>__world</c>; otherwise uses
         /// the supplied variable name (so the convenience overload's parameter doesn't shadow).
@@ -565,7 +565,7 @@ namespace Trecs.SourceGen
                 sb,
                 info,
                 indentLevel + 1,
-                groupVar: "__slice.Group",
+                groupVar: "__slice.GroupIndex",
                 worldVar: worldName
             );
             sb.AppendLine();
@@ -573,7 +573,7 @@ namespace Trecs.SourceGen
             var constructorArgs = string.Join(", ", BufferVarNamesFor(info));
             sb.AppendLine(
                 indentLevel + 1,
-                $"var __view = new {aspectTypeName}(__slice.Group, {constructorArgs});"
+                $"var __view = new {aspectTypeName}(__slice.GroupIndex, {constructorArgs});"
             );
             sb.AppendLine(indentLevel + 1, "for (int __i = 0; __i < __slice.Count; __i++)");
             sb.AppendLine(indentLevel + 1, "{");
@@ -582,7 +582,7 @@ namespace Trecs.SourceGen
             if (info.HasEntityIndexParameter)
                 sb.AppendLine(
                     indentLevel + 2,
-                    "var __entityIndex = new EntityIndex(__i, __slice.Group);"
+                    "var __entityIndex = new EntityIndex(__i, __slice.GroupIndex);"
                 );
 
             EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
@@ -618,7 +618,7 @@ namespace Trecs.SourceGen
                 sb,
                 info,
                 indentLevel + 1,
-                groupVar: "__slice.Group",
+                groupVar: "__slice.GroupIndex",
                 worldVar: worldName
             );
             sb.AppendLine();
@@ -626,7 +626,7 @@ namespace Trecs.SourceGen
             var constructorArgs = string.Join(", ", BufferVarNamesFor(info));
             sb.AppendLine(
                 indentLevel + 1,
-                $"var __view = new {aspectTypeName}(__slice.Group, {constructorArgs});"
+                $"var __view = new {aspectTypeName}(__slice.GroupIndex, {constructorArgs});"
             );
             sb.AppendLine(indentLevel + 1, "foreach (var __idx in __slice.Indices)");
             sb.AppendLine(indentLevel + 1, "{");
@@ -635,7 +635,7 @@ namespace Trecs.SourceGen
             if (info.HasEntityIndexParameter)
                 sb.AppendLine(
                     indentLevel + 2,
-                    "var __entityIndex = new EntityIndex(__idx, __slice.Group);"
+                    "var __entityIndex = new EntityIndex(__idx, __slice.GroupIndex);"
                 );
 
             EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
@@ -695,7 +695,7 @@ namespace Trecs.SourceGen
         {
             sb.AppendLine(
                 2,
-                $"{visibility} void {methodName}(Group __group, EntityRange __indices, WorldAccessor __world{customArgsDecStr})"
+                $"{visibility} void {methodName}(GroupIndex __group, EntityRange __indices, WorldAccessor __world{customArgsDecStr})"
             );
             sb.AppendLine(2, "{");
 

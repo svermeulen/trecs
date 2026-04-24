@@ -983,7 +983,7 @@ namespace Trecs.SourceGen
                 );
 
                 // Generic [FromWorld] types have exactly one type parameter.
-                // Non-generic types (NativeWorldAccessor, Group) have no generic argument.
+                // Non-generic types (NativeWorldAccessor, GroupIndex) have no generic argument.
                 ITypeSymbol? genericArg = typeSymbol.IsGenericType
                     ? typeSymbol.TypeArguments[0]
                     : null;
@@ -1158,12 +1158,12 @@ namespace Trecs.SourceGen
                 if (kind == FromWorldFieldKind.Unsupported)
                     continue;
 
-                // NativeWorldAccessor, Group, and NativeEntityHandleBuffer have no dependency
+                // NativeWorldAccessor, GroupIndex, and NativeEntityHandleBuffer have no dependency
                 // tracking — omitting [FromWorld] on them is less convenient but not a
                 // race-condition risk.
                 if (
                     kind == FromWorldFieldKind.NativeWorldAccessor
-                    || kind == FromWorldFieldKind.Group
+                    || kind == FromWorldFieldKind.GroupIndex
                     || kind == FromWorldFieldKind.NativeEntityHandleBuffer
                 )
                     continue;
@@ -1364,7 +1364,7 @@ namespace Trecs.SourceGen
             }
 
             if (info.NeedsGroupField)
-                sb.AppendLine($"{ind}private Group {FromWorldEmitter.GenPrefix}Group;");
+                sb.AppendLine($"{ind}private GroupIndex {FromWorldEmitter.GenPrefix}GroupIndex;");
 
             if (info.NeedsGlobalIndexOffset)
                 sb.AppendLine($"{ind}private int {FromWorldEmitter.GenPrefix}GlobalIndexOffset;");
@@ -1380,7 +1380,7 @@ namespace Trecs.SourceGen
             {
                 var ai = info.Aspect!;
                 sb.AppendLine(
-                    $"{body}var {FromWorldEmitter.GenPrefix}ei = new EntityIndex(i, {FromWorldEmitter.GenPrefix}Group);"
+                    $"{body}var {FromWorldEmitter.GenPrefix}ei = new EntityIndex(i, {FromWorldEmitter.GenPrefix}GroupIndex);"
                 );
                 var ctorArgs = string.Join(
                     ", ",
@@ -1409,7 +1409,7 @@ namespace Trecs.SourceGen
                 }
                 if (ci.HasEntityIndexParameter)
                     sb.AppendLine(
-                        $"{body}var {FromWorldEmitter.GenPrefix}ei = new EntityIndex(i, {FromWorldEmitter.GenPrefix}Group);"
+                        $"{body}var {FromWorldEmitter.GenPrefix}ei = new EntityIndex(i, {FromWorldEmitter.GenPrefix}GroupIndex);"
                     );
 
                 // Build call args in original parameter order so the user can mix
@@ -1565,7 +1565,7 @@ namespace Trecs.SourceGen
             string innerBody = body + "    ";
 
             sb.AppendLine(
-                $"{innerBody}var {FromWorldEmitter.GenPrefix}group = {FromWorldEmitter.GenPrefix}slice.Group;"
+                $"{innerBody}var {FromWorldEmitter.GenPrefix}group = {FromWorldEmitter.GenPrefix}slice.GroupIndex;"
             );
             sb.AppendLine(
                 $"{innerBody}var {FromWorldEmitter.GenPrefix}count = {FromWorldEmitter.GenPrefix}slice.Count;"
@@ -1655,7 +1655,7 @@ namespace Trecs.SourceGen
 
             if (info.NeedsGroupField)
                 sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}Group = {FromWorldEmitter.GenPrefix}group;"
+                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}GroupIndex = {FromWorldEmitter.GenPrefix}group;"
                 );
 
             if (info.NeedsGlobalIndexOffset)
@@ -1740,7 +1740,7 @@ namespace Trecs.SourceGen
             string innerBody = body + "    ";
 
             sb.AppendLine(
-                $"{innerBody}var {FromWorldEmitter.GenPrefix}group = {FromWorldEmitter.GenPrefix}slice.Group;"
+                $"{innerBody}var {FromWorldEmitter.GenPrefix}group = {FromWorldEmitter.GenPrefix}slice.GroupIndex;"
             );
             sb.AppendLine();
 
@@ -1819,7 +1819,7 @@ namespace Trecs.SourceGen
 
             if (info.NeedsGroupField)
                 sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}Group = {FromWorldEmitter.GenPrefix}group;"
+                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}GroupIndex = {FromWorldEmitter.GenPrefix}group;"
                 );
 
             if (info.NeedsGlobalIndexOffset)

@@ -510,7 +510,7 @@ namespace Trecs.SourceGen
                 var bufferSuffix = info.IsReadOnly(type) ? "Read" : "Write";
                 sb.AppendLine(
                     indentLevel,
-                    $"var {varName} = {worldName}.ComponentBuffer<{typeDisplay}>(__ei.Group).{bufferSuffix};"
+                    $"var {varName} = {worldName}.ComponentBuffer<{typeDisplay}>(__ei.GroupIndex).{bufferSuffix};"
                 );
             }
 

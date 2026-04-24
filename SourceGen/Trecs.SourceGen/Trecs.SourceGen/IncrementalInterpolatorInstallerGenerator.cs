@@ -86,7 +86,7 @@ namespace Trecs.SourceGen
                     $"[IncrementalInterpolatorInstallerGenerator] Processing {methodData.Length} interpolator methods"
                 );
 
-                // Group methods by group name (filter out nulls first)
+                // GroupIndex methods by group name (filter out nulls first)
                 var groups = methodData
                     .Where(m => m != null)
                     .GroupBy(m => GetGroupName(m!.AttributeData))

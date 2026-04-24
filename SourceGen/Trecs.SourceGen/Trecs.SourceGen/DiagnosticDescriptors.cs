@@ -668,7 +668,7 @@ namespace Trecs.SourceGen
                 + "For NativeWorldAccessor, NativeSetRead/Write use the first-class parameter support instead. "
                 + "For NativeComponentRead/Write use [PassThroughArgument]. "
                 + "Supported [FromWorld] types: Aspect.NativeFactory, NativeComponentLookupRead<T>, NativeComponentLookupWrite<T>, "
-                + "NativeComponentBufferRead<T>, NativeComponentBufferWrite<T>, NativeEntitySetIndices<T>, Group, NativeEntityHandleBuffer.",
+                + "NativeComponentBufferRead<T>, NativeComponentBufferWrite<T>, NativeEntitySetIndices<T>, GroupIndex, NativeEntityHandleBuffer.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true

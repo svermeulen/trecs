@@ -726,7 +726,7 @@ namespace Trecs.SourceGen
                         || fwKind == FromWorldFieldKind.NativeComponentLookupWrite
                         || fwKind == FromWorldFieldKind.NativeComponentBufferRead
                         || fwKind == FromWorldFieldKind.NativeComponentBufferWrite
-                        || fwKind == FromWorldFieldKind.Group
+                        || fwKind == FromWorldFieldKind.GroupIndex
                         || fwKind == FromWorldFieldKind.NativeEntitySetIndices
                         || fwKind == FromWorldFieldKind.NativeEntityHandleBuffer;
 
@@ -1055,10 +1055,10 @@ namespace Trecs.SourceGen
                 sb.AppendLine($"{fieldInd}internal {bufferType} {BufferFieldName(i)};");
             }
 
-            // Group field — always needed for aspect (for EntityIndex ctor), or for
+            // GroupIndex field — always needed for aspect (for EntityIndex ctor), or for
             // components when an EntityIndex parameter is present.
             if (info.NeedsGroupField)
-                sb.AppendLine($"{fieldInd}internal Group {GenPrefix}Group;");
+                sb.AppendLine($"{fieldInd}internal GroupIndex {GenPrefix}GroupIndex;");
 
             // NativeWorldAccessor field.
             if (info.HasNativeWorldAccessor)
@@ -1123,7 +1123,7 @@ namespace Trecs.SourceGen
             bool needsEntityIndex =
                 info.HasEntityIndex || info.IterKind == AutoJobIterationKind.Aspect;
             if (needsEntityIndex)
-                sb.AppendLine($"{body}var {GenPrefix}ei = new EntityIndex(i, {GenPrefix}Group);");
+                sb.AppendLine($"{body}var {GenPrefix}ei = new EntityIndex(i, {GenPrefix}GroupIndex);");
 
             if (info.IterKind == AutoJobIterationKind.Aspect)
             {
@@ -1302,7 +1302,7 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{body}{{");
             string innerBody = body + "    ";
 
-            sb.AppendLine($"{innerBody}var {GenPrefix}group = {GenPrefix}slice.Group;");
+            sb.AppendLine($"{innerBody}var {GenPrefix}group = {GenPrefix}slice.GroupIndex;");
             sb.AppendLine($"{innerBody}var {GenPrefix}count = {GenPrefix}slice.Count;");
             sb.AppendLine($"{innerBody}if ({GenPrefix}count == 0) continue;");
             sb.AppendLine();
@@ -1361,7 +1361,7 @@ namespace Trecs.SourceGen
                 );
 
             if (info.NeedsGroupField)
-                sb.AppendLine($"{innerBody}{GenPrefix}job.{GenPrefix}Group = {GenPrefix}group;");
+                sb.AppendLine($"{innerBody}{GenPrefix}job.{GenPrefix}GroupIndex = {GenPrefix}group;");
 
             if (info.HasNativeWorldAccessor)
                 sb.AppendLine(
@@ -1477,7 +1477,7 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{body}{{");
             string innerBody = body + "    ";
 
-            sb.AppendLine($"{innerBody}var {GenPrefix}group = {GenPrefix}slice.Group;");
+            sb.AppendLine($"{innerBody}var {GenPrefix}group = {GenPrefix}slice.GroupIndex;");
             sb.AppendLine();
 
             // Pre-walk the slice into a TempJob-backed sparse-indices buffer.
@@ -1545,7 +1545,7 @@ namespace Trecs.SourceGen
                 );
 
             if (info.NeedsGroupField)
-                sb.AppendLine($"{innerBody}{GenPrefix}job.{GenPrefix}Group = {GenPrefix}group;");
+                sb.AppendLine($"{innerBody}{GenPrefix}job.{GenPrefix}GroupIndex = {GenPrefix}group;");
 
             if (info.HasNativeWorldAccessor)
                 sb.AppendLine(
