@@ -44,6 +44,11 @@ namespace Trecs.Tests
         const int Version = 1;
         const ulong RngSeed = 0xFEEDC0FFEEBAD123ul;
 
+#if TRECS_IS_PROFILING
+        [Ignore(
+            "RecordingHandler skips checksum writes when TRECS_IS_PROFILING is defined, so the round-trip check is a no-op."
+        )]
+#endif
         [Test]
         public void RecordThenPlayback_DeterministicSim_NoDesync()
         {
@@ -133,6 +138,11 @@ namespace Trecs.Tests
             }
         }
 
+#if TRECS_IS_PROFILING
+        [Ignore(
+            "RecordingHandler skips checksum writes when TRECS_IS_PROFILING is defined, so the desync detector is a no-op."
+        )]
+#endif
         [Test]
         public void Playback_DesyncsWhenStateIsMutated()
         {
