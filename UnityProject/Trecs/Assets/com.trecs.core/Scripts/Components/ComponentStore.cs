@@ -16,15 +16,6 @@ namespace Trecs.Internal
         // replaces the old Dict<GroupIndex, ...> hash lookup on the hot path.
         readonly DenseDictionary<ComponentId, IComponentArray>[] _groupEntityComponentsDB;
 
-        //for each aspect type, return the groups (dictionary of entities indexed by entity id) where they are
-        //found indexed by group id. ComponentArray are never created, they instead point to the ones hold
-        //by _groupEntityComponentsDB
-        //                        <EntityComponentType                            <groupId  <entityHandle, EntityComponent>>>
-        readonly DenseDictionary<
-            ComponentId,
-            DenseDictionary<GroupIndex, IComponentArray>
-        > _groupsPerEntity;
-
         bool _configurationFrozen;
 
         public ComponentStore(int groupCount)
@@ -36,17 +27,10 @@ namespace Trecs.Internal
             {
                 _groupEntityComponentsDB[i] = new DenseDictionary<ComponentId, IComponentArray>();
             }
-            _groupsPerEntity =
-                new DenseDictionary<ComponentId, DenseDictionary<GroupIndex, IComponentArray>>();
         }
 
         public DenseDictionary<ComponentId, IComponentArray>[] GroupEntityComponentsDB =>
             _groupEntityComponentsDB;
-
-        public DenseDictionary<
-            ComponentId,
-            DenseDictionary<GroupIndex, IComponentArray>
-        > GroupsPerComponent => _groupsPerEntity;
 
         public bool ConfigurationFrozen => _configurationFrozen;
 
@@ -87,23 +71,6 @@ namespace Trecs.Internal
 
                 toEntitiesDictionary = fromDictionary.Create();
                 groupPerComponentType.Add(typeId, toEntitiesDictionary);
-            }
-
-            {
-                //update GroupsPerEntity
-                if (!_groupsPerEntity.TryGetValue(typeId, out var groupedGroup))
-                {
-                    Assert.That(
-                        !_configurationFrozen,
-                        "Attempted to add a new component dictionary {} after the configuration has been frozen",
-                        typeId
-                    );
-
-                    groupedGroup = _groupsPerEntity[typeId] =
-                        new DenseDictionary<GroupIndex, IComponentArray>();
-                }
-
-                groupedGroup[groupId] = toEntitiesDictionary;
             }
 
             return toEntitiesDictionary;
@@ -150,21 +117,6 @@ namespace Trecs.Internal
                 );
 
                 entityComponentBuilder.Preallocate(components, size);
-
-                if (!_groupsPerEntity.TryGetValue(entityComponentType, out var groupedGroup))
-                {
-                    groupedGroup = _groupsPerEntity[entityComponentType] =
-                        new DenseDictionary<GroupIndex, IComponentArray>();
-                }
-
-                if (groupedGroup.TryGetValue(groupId, out var existingComponents))
-                {
-                    Assert.That(existingComponents == components);
-                }
-                else
-                {
-                    groupedGroup.Add(groupId, components);
-                }
             }
 
             _log.Trace(
@@ -185,8 +137,6 @@ namespace Trecs.Internal
                 }
                 group.Clear();
             }
-
-            _groupsPerEntity.Clear();
         }
     }
 }

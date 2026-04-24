@@ -1224,8 +1224,6 @@ namespace Trecs.Internal
             foreach (var dictionaryOfEntities in dictionariesOfEntities)
             {
                 dictionaryOfEntities.Value.Clear();
-
-                _componentStore.GroupsPerComponent[dictionaryOfEntities.Key][groupId].Clear();
             }
         }
 
@@ -1273,8 +1271,6 @@ namespace Trecs.Internal
             foreach (var dictionaryOfEntities in fromGroup)
             {
                 dictionaryOfEntities.Value.Clear();
-
-                _componentStore.GroupsPerComponent[dictionaryOfEntities.Key][fromGroupId].Clear();
             }
         }
 
