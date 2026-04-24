@@ -26,16 +26,18 @@ namespace Trecs
         public readonly GroupIndex GroupIndex;
 
         /// <summary>
-        /// A sentinel value representing no entity.
+        /// A sentinel value representing no entity. Equals <c>default(EntityIndex)</c>
+        /// because <c>default(GroupIndex)</c> is <see cref="GroupIndex.Null"/>.
         /// </summary>
-        public static EntityIndex Null => new(-1, default);
+        public static EntityIndex Null => default;
 
         /// <summary>
         /// Returns true if this is the null sentinel value.
         /// </summary>
         public bool IsNull
         {
-            get { return Index < 0; }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return GroupIndex.IsNull; }
         }
 
         /// <inheritdoc/>
@@ -72,8 +74,10 @@ namespace Trecs
         public readonly int GetStableHashCode()
         {
             // we don't want to use HashCode.Combine or GetHashCode because
-            // it's not deterministic across restarts
-            return unchecked((int)math.hash(new int2(Index, GroupIndex.Value)));
+            // it's not deterministic across restarts.
+            // Uses GroupIndex.GetHashCode() (raw value) so null GroupIndex
+            // hashes correctly without throwing.
+            return unchecked((int)math.hash(new int2(Index, GroupIndex.GetHashCode())));
         }
 
         /// <inheritdoc/>
@@ -85,8 +89,9 @@ namespace Trecs
         /// <inheritdoc/>
         public int CompareTo(EntityIndex other)
         {
-            return GroupIndex.Value != other.GroupIndex.Value
-                ? GroupIndex.Value.CompareTo(other.GroupIndex.Value)
+            // Compare on raw (1-based) values — null sorts before all real groups.
+            return GroupIndex.CompareTo(other.GroupIndex) != 0
+                ? GroupIndex.CompareTo(other.GroupIndex)
                 : Index.CompareTo(other.Index);
         }
 

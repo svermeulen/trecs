@@ -55,7 +55,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static long MakeKey(ResourceId resourceType, GroupIndex group)
         {
-            return ((long)resourceType.Value << 32) | (uint)group.Value;
+            return ((long)resourceType.Value << 32) | (uint)group.GetHashCode();
         }
 
         [Conditional("DEBUG")]

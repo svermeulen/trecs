@@ -112,7 +112,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ExistsAndIsNotEmpty(GroupIndex gid)
         {
-            return _componentStore.GroupEntityComponentsDB[gid.Value].Count > 0;
+            return _componentStore.GroupEntityComponentsDB[gid.Index].Count > 0;
         }
 
         /// <summary>
@@ -152,7 +152,7 @@ namespace Trecs.Internal
         public bool EntityIndexExists(EntityIndex entityIndex)
         {
             var componentMap = _componentStore.GroupEntityComponentsDB[
-                entityIndex.GroupIndex.Value
+                entityIndex.GroupIndex.Index
             ];
 
             foreach (var (_, componentArray) in componentMap)
@@ -166,11 +166,11 @@ namespace Trecs.Internal
         public int CountEntitiesInGroup(GroupIndex group)
         {
             Assert.That(
-                group.Value < _componentStore.GroupEntityComponentsDB.Length,
+                !group.IsNull && group.Index < _componentStore.GroupEntityComponentsDB.Length,
                 "Attempted to get count for unrecognized group {}",
                 group
             );
-            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Value];
+            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
 
             int? count = null;
 
@@ -794,7 +794,7 @@ namespace Trecs.Internal
         )
             where T : unmanaged, IEntityComponent
         {
-            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Value];
+            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
 
             if (
                 !entitiesInGroupPerType.TryGetValue(
@@ -820,7 +820,7 @@ namespace Trecs.Internal
         {
             // Outer array is pre-populated at ComponentStore ctor; every GroupIndex
             // has an inner dict (initially empty).
-            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Value];
+            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
 
             var componentId = ComponentTypeId<T>.Value;
 
@@ -836,7 +836,7 @@ namespace Trecs.Internal
         internal NativeBuffer<T> QuerySingleBuffer<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
-            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Value];
+            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
 
             if (!SafeQueryEntityDictionary<T>(entitiesInGroupPerType, out var typeSafeDictionary))
                 return default;
@@ -847,7 +847,7 @@ namespace Trecs.Internal
         internal (NativeBuffer<T> buffer, int count) QuerySingleBufferWithCount<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
-            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Value];
+            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
 
             if (!SafeQueryEntityDictionary<T>(entitiesInGroupPerType, out var typeSafeDictionary))
                 return (default, 0);
@@ -895,7 +895,7 @@ namespace Trecs.Internal
 
         bool GroupHasAllComponents(GroupIndex group, ComponentId[] componentIds)
         {
-            var componentMap = _componentStore.GroupEntityComponentsDB[group.Value];
+            var componentMap = _componentStore.GroupEntityComponentsDB[group.Index];
             for (int i = 0; i < componentIds.Length; i++)
             {
                 if (!componentMap.TryGetValue(componentIds[i], out var arr) || arr.Count == 0)
@@ -906,7 +906,7 @@ namespace Trecs.Internal
 
         IComponentArray GetComponentArrayUntyped(GroupIndex group, ComponentId componentId)
         {
-            var componentMap = _componentStore.GroupEntityComponentsDB[group.Value];
+            var componentMap = _componentStore.GroupEntityComponentsDB[group.Index];
             if (!componentMap.TryGetValue(componentId, out var arr))
                 return null;
             return arr;

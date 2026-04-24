@@ -169,7 +169,7 @@ namespace Trecs.Tests
             );
             NAssert.IsNotNull(field, "Expected internal field _entityIndexToReferenceMap");
 
-            // The field is NativeList<UnsafeList<int>>, indexed by GroupIndex.Value.
+            // The field is NativeList<UnsafeList<int>>, indexed by GroupIndex.Index.
             // Inner is UnsafeList<int> (not NativeList) so the overall type is a single
             // NativeContainer wrapping non-NativeContainers — legal inside jobs.
             StringAssert.Contains(

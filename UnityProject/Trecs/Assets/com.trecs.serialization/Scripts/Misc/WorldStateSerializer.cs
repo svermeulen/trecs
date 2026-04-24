@@ -462,7 +462,7 @@ namespace Trecs.Serialization
                 var tagSet = reader.Read<TagSet>("group");
                 var group = _worldDef.ToGroupIndex(tagSet);
 
-                ref var groupList = ref entityIndexToReferenceMap.ElementAt(group.Value);
+                ref var groupList = ref entityIndexToReferenceMap.ElementAt(group.Index);
 
                 var listLength = reader.Read<int>("listLength");
                 groupList.Clear();

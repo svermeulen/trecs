@@ -1097,7 +1097,7 @@ namespace Trecs
         internal NativeEntityHandleBuffer GetEntityHandleBufferForJobScheduling(GroupIndex group)
         {
             var handleMap = GetEntityHandleMap();
-            var groupList = handleMap._entityIndexToReferenceMap[group.Value];
+            var groupList = handleMap._entityIndexToReferenceMap[group.Index];
             if (!groupList.IsCreated)
                 return default;
             unsafe
