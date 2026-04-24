@@ -81,7 +81,6 @@ namespace Trecs
             return CreateBlobImpl<T>(frame, handle.BlobId, handle.Handle);
         }
 
-
         /// <summary>
         /// Takes ownership of an existing native pointer.
         /// See <see cref="NativeUniqueHeap.AllocTakingOwnership{T}"/> for the contract.

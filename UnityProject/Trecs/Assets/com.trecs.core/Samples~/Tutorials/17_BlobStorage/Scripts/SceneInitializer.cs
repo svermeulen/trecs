@@ -41,11 +41,7 @@ namespace Trecs.Samples.BlobStorage
                         .AddEntity<SampleTags.Swatch>()
                         .Set(
                             new Position(
-                                new float3(
-                                    x * spacing - halfExtent,
-                                    0f,
-                                    z * spacing - halfExtent
-                                )
+                                new float3(x * spacing - halfExtent, 0f, z * spacing - halfExtent)
                             )
                         )
                         .Set(new UniformScale(1f))

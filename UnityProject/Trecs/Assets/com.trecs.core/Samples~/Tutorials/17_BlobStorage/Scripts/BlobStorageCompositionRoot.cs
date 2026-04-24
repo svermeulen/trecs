@@ -20,7 +20,9 @@ namespace Trecs.Samples.BlobStorage
                 .AddEntityType(SampleTemplates.SwatchEntity.Template)
                 .Build();
 
-            world.AddSystems(new ISystem[] { new PaletteCycleSystem(), new SwatchRendererSystem(registry) });
+            world.AddSystems(
+                new ISystem[] { new PaletteCycleSystem(), new SwatchRendererSystem(registry) }
+            );
 
             var seeder = new PaletteSeeder(world);
             var sceneInitializer = new SceneInitializer(world, registry);
