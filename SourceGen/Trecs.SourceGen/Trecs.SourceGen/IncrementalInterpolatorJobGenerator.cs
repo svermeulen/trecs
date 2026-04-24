@@ -136,8 +136,7 @@ namespace Trecs.SourceGen
 using Unity.Jobs;
 using Unity.Burst;
 using Unity.Collections;
-using Trecs;
-using Trecs.Internal;
+{CommonUsings.AsDirectives}
 
 namespace {nameSpace}
 {{
@@ -154,7 +153,7 @@ namespace {nameSpace}
         WorldAccessor Trecs.Internal.ISystemInternal.World
         {{
             get => _world;
-            set {{ Trecs.Internal.Assert.That(_world == null, ""World has already been set""); _world = value; }}
+            set {{ Assert.That(_world == null, ""World has already been set""); _world = value; }}
         }}
 
         public {className}()

@@ -158,9 +158,7 @@ namespace Trecs.SourceGen
             var sb = new StringBuilder();
 
             sb.AppendLine("using System;");
-            sb.AppendLine("using Trecs;");
-            sb.AppendLine("using Trecs.Internal;");
-            sb.AppendLine("using Trecs.Collections;");
+            CommonUsings.AppendTo(sb);
             sb.AppendLine();
 
             if (!string.IsNullOrEmpty(model.Namespace))

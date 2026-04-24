@@ -29,13 +29,7 @@ namespace Trecs.SourceGen.Aspect
             var containingTypes = SymbolAnalyzer.GetContainingTypeChain(symbol);
 
             // Generate using statements
-            sb.AppendUsings(
-                "System",
-                "System.Runtime.CompilerServices",
-                "Trecs.Collections",
-                "Trecs",
-                "Trecs.Internal"
-            );
+            sb.AppendUsings(CommonUsings.WithExtras("System", "System.Runtime.CompilerServices"));
 
             // Generate in namespace if needed
             return sb.WrapInNamespace(
@@ -1045,13 +1039,7 @@ namespace Trecs.SourceGen.Aspect
             var containingTypes = SymbolAnalyzer.GetContainingTypeChain(symbol);
 
             // Generate using statements
-            sb.AppendUsings(
-                "System",
-                "System.Runtime.CompilerServices",
-                "Trecs.Collections",
-                "Trecs",
-                "Trecs.Internal"
-            );
+            sb.AppendUsings(CommonUsings.WithExtras("System", "System.Runtime.CompilerServices"));
 
             // Generate in namespace if needed
             return sb.WrapInNamespace(

@@ -1123,7 +1123,9 @@ namespace Trecs.SourceGen
             bool needsEntityIndex =
                 info.HasEntityIndex || info.IterKind == AutoJobIterationKind.Aspect;
             if (needsEntityIndex)
-                sb.AppendLine($"{body}var {GenPrefix}ei = new EntityIndex(i, {GenPrefix}GroupIndex);");
+                sb.AppendLine(
+                    $"{body}var {GenPrefix}ei = new EntityIndex(i, {GenPrefix}GroupIndex);"
+                );
 
             if (info.IterKind == AutoJobIterationKind.Aspect)
             {
@@ -1361,7 +1363,9 @@ namespace Trecs.SourceGen
                 );
 
             if (info.NeedsGroupField)
-                sb.AppendLine($"{innerBody}{GenPrefix}job.{GenPrefix}GroupIndex = {GenPrefix}group;");
+                sb.AppendLine(
+                    $"{innerBody}{GenPrefix}job.{GenPrefix}GroupIndex = {GenPrefix}group;"
+                );
 
             if (info.HasNativeWorldAccessor)
                 sb.AppendLine(
@@ -1545,7 +1549,9 @@ namespace Trecs.SourceGen
                 );
 
             if (info.NeedsGroupField)
-                sb.AppendLine($"{innerBody}{GenPrefix}job.{GenPrefix}GroupIndex = {GenPrefix}group;");
+                sb.AppendLine(
+                    $"{innerBody}{GenPrefix}job.{GenPrefix}GroupIndex = {GenPrefix}group;"
+                );
 
             if (info.HasNativeWorldAccessor)
                 sb.AppendLine(

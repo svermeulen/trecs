@@ -37,13 +37,7 @@ namespace Trecs.SourceGen.Shared
             bool includeSystemNamespace = false
         )
         {
-            var namespaces = new HashSet<string>
-            {
-                "Unity.Jobs",
-                "Trecs",
-                "Trecs.Internal",
-                "Trecs.Collections",
-            };
+            var namespaces = new HashSet<string>(CommonUsings.Namespaces) { "Unity.Jobs" };
 
             if (includeSystemNamespace)
             {

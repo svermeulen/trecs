@@ -15,7 +15,7 @@ namespace Trecs.SourceGen.Template
         {
             var sb = new OptimizedStringBuilder();
 
-            sb.AppendUsings("System", "Trecs", "Trecs.Internal");
+            sb.AppendUsings(CommonUsings.WithExtras("System"));
 
             sb.WrapInNamespace(
                 data.NamespaceName,

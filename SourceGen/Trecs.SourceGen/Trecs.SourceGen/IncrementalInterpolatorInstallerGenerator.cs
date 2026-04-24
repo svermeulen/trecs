@@ -174,8 +174,7 @@ namespace Trecs.SourceGen
                 }
             }
 
-            return $@"using Trecs;
-using Trecs.Internal;
+            return $@"{CommonUsings.AsDirectives}
 
 namespace {nameSpace}
 {{

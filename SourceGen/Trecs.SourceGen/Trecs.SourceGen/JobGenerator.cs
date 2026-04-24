@@ -1240,11 +1240,9 @@ namespace Trecs.SourceGen
         {
             var sb = new StringBuilder();
             sb.AppendLine("using Unity.Collections;");
-            sb.AppendLine("using Trecs;");
-            sb.AppendLine("using Trecs.Internal;");
-            sb.AppendLine("using Trecs.Collections;");
             sb.AppendLine("using Unity.Jobs;");
             sb.AppendLine("using System;");
+            CommonUsings.AppendTo(sb);
             sb.AppendLine();
 
             var ns = PerformanceCache.GetDisplayString(info.Symbol.ContainingNamespace);

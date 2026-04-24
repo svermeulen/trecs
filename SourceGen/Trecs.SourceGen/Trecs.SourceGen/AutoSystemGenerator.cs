@@ -812,7 +812,7 @@ namespace Trecs.SourceGen
             sb.AppendLine(3, "get => _world;");
             sb.AppendLine(
                 3,
-                "set { Trecs.Internal.Assert.That(_world == null, \"World has already been set\"); _world = value; }"
+                "set { Assert.That(_world == null, \"World has already been set\"); _world = value; }"
             );
             sb.AppendLine(2, "}");
             sb.AppendLine();

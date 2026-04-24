@@ -391,7 +391,7 @@ namespace Trecs.SourceGen
 
             sb.AppendLine(
                 3,
-                $"Trecs.Internal.Assert.That(__builder.HasAnyCriteria, \"{methodName} requires query criteria — pass a builder with at least one tag, component, or set constraint, or specify Tag/Set/MatchByComponents on the [ForEachEntity] attribute.\");"
+                $"Assert.That(__builder.HasAnyCriteria, \"{methodName} requires query criteria — pass a builder with at least one tag, component, or set constraint, or specify Tag/Set/MatchByComponents on the [ForEachEntity] attribute.\");"
             );
 
             EmitDenseIterationBody(
