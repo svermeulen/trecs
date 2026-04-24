@@ -206,7 +206,7 @@ namespace Trecs.Serialization
 
             for (int i = 0; i < count; i++)
             {
-                var tagSet = _worldDef.ToTagSet(new GroupIndex((ushort)i));
+                var tagSet = _worldDef.ToTagSet(GroupIndex.FromIndex(i));
                 writer.Write("group", tagSet);
 
                 var list = entityIndexToReferenceMap[i];
@@ -266,7 +266,7 @@ namespace Trecs.Serialization
             {
                 var bytesBefore = writer.NumBytesWritten;
 
-                var group = new GroupIndex((ushort)i);
+                var group = GroupIndex.FromIndex(i);
                 writer.Write("group", _worldDef.ToTagSet(group));
 
                 var subMap = groupEntityComponentsDB[i];
@@ -501,7 +501,7 @@ namespace Trecs.Serialization
                 var tagSet = reader.Read<TagSet>("group");
                 var group = _worldDef.ToGroupIndex(tagSet);
 
-                Assert.IsEqual(new GroupIndex((ushort)i), group);
+                Assert.IsEqual(GroupIndex.FromIndex(i), group);
 
                 var subMap = groupEntityComponentsDB[i];
 
