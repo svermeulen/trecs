@@ -111,7 +111,7 @@ Pointers must be disposed when entities are removed:
 
 ```csharp
 world.Events.EntitiesWithTags<PatrolTags.Follower>()
-    .OnRemoved((Group group, EntityRange indices) =>
+    .OnRemoved((GroupIndex group, EntityRange indices) =>
     {
         for (int i = indices.Start; i < indices.End; i++)
         {

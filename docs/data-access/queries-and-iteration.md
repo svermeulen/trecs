@@ -122,7 +122,7 @@ foreach (var particle in ParticleView.Query(World).InSet<HighlightedParticles>()
 
 ### GroupSlices — Low-Level Bulk Access
 
-For advanced performance-critical scenarios, you can iterate per-group and access component buffers directly. See [Groups & TagSets — GroupSlices](../advanced/groups-and-tagsets.md#groupslices) for details.
+For advanced performance-critical scenarios, you can iterate per-group and access component buffers directly. See [Groups, GroupIndex & TagSets — GroupSlices](../advanced/groups-and-tagsets.md#groupslices) for details.
 
 ## Counting
 

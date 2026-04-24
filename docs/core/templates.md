@@ -62,7 +62,7 @@ Because every template declares at least one identity tag, tags effectively act 
 
 The pattern to internalize: **systems read tags, templates write tags.** When you introduce a new entity kind, you pick its tags (reusing role tags where it fits, adding a fresh identity tag if it's genuinely new), declare them via `IHasTags<>` / `IExtends<>`, and the rest of the codebase queries by those tags without needing to know which template produced the entity.
 
-See [Tags](tags.md) for the mechanics of declaring and querying tags, and [Groups & TagSets](../advanced/groups-and-tagsets.md) for how tag combinations map to storage.
+See [Tags](tags.md) for the mechanics of declaring and querying tags, and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md) for how tag combinations map to storage.
 
 ## Template Inheritance
 

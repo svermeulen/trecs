@@ -37,11 +37,11 @@ partial struct MyJob : IJobFor
 | `NativeSetRead<TSet>` | Read-only set access | No |
 | `NativeSetWrite<TSet>` | Writable set access | No |
 | `NativeWorldAccessor` | Job-safe world operations | No |
-| `Group` | Group identifier | Yes |
+| `GroupIndex` | Runtime handle for the resolved group | Yes |
 
 ### Tag Resolution
 
-Fields that require a tag scope (buffers, lookups, `Group`) can get their tags in two ways:
+Fields that require a tag scope (buffers, lookups, `GroupIndex`) can get their tags in two ways:
 
 - **Inline** — specify `Tag` or `Tags` directly on the attribute: `[FromWorld(Tag = typeof(GameTags.Player))]`. The tag is baked into the generated code.
 - **At schedule time** — omit `Tag`/`Tags`, and the generated `ScheduleParallel` method will include a `TagSet` parameter that the caller must provide:

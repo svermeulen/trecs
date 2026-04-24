@@ -12,7 +12,7 @@ Trecs provides two ways of referring to entities for different use cases:
 |---|---|---|
 | **Stability** | Stable across structural changes | Invalidated by structural changes |
 | **Use case** | Long-lived references (store in components) | Immediate access within a system tick |
-| **Fields** | `UniqueId`, `Version` | `Index`, `Group` |
+| **Fields** | `UniqueId`, `Version` | `Index`, `GroupIndex` |
 | **Performance** | Requires lookup to access components | Direct buffer access |
 
 Note that you can always convert between the two as needed:

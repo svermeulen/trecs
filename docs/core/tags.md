@@ -68,4 +68,4 @@ world.RemoveEntitiesWithTags<GameTags.Bullet>();
 
 Behind the scenes, entities with the same tag combination are stored together in contiguous memory for cache-friendly iteration. This means that iterating all entities with a given tag is fast — they are packed together, and unrelated entities are skipped entirely.
 
-For more on the underlying storage model and low-level APIs like `TagSet`, `Group`, and `Tag<T>`, see [Groups & TagSets](../advanced/groups-and-tagsets.md).
+For more on the underlying storage model and low-level APIs like `TagSet`, `GroupIndex`, and `Tag<T>`, see [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).
