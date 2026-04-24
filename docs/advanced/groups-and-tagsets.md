@@ -2,6 +2,19 @@
 
 This page covers the low-level storage model behind [tags](../core/tags.md). Most users interact with tags through templates and `[ForEachEntity]` attributes and don't need the APIs described here. These are useful for advanced scenarios like custom job scheduling, dynamic queries, or tooling.
 
+## Terminology at a Glance
+
+These four terms are related but distinct — the docs and source are careful about which is which:
+
+| Term | What it is | Example |
+|---|---|---|
+| **Group** | Concrete storage bucket. One per unique tag combination; holds the contiguous component arrays for entities with that exact tag set. | `{Player, VIP}` is a different group from `{Player}`. |
+| **Partition** | A group that an entity *moves between* at runtime to represent state, via `MoveTo<FromTag, ToTag>()`. "Partition" is the **role** a group plays in that pattern — the storage is still just a group. | An `Active` ball moves to the `Resting` partition without losing its components. |
+| **TagSet** | Stable identity for a tag combination — a 32-bit hash of the tag GUIDs. Portable across runs and serializable. | `TagSet<GameTags.Player>.Value` resolves to the same value every run. |
+| **Set** | Dynamic, per-frame entity subset — membership is toggled at runtime by code, independent of tags or groups. See [Sets](../entity-management/sets.md). | A `Highlighted` set that holds whichever entities are currently under the cursor. |
+
+Quick mental model: **tags** describe identity at creation; **groups** are where those tags place the entity in memory; **partitions** are groups that double as state; **tagsets** are portable handles naming a tag combination; **sets** are ad-hoc subsets you update yourself.
+
 ## Groups
 
 Groups are created **implicitly** from tag combinations. You never create groups directly — they emerge from how you use tags in templates and `AddEntity` calls.

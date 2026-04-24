@@ -17,6 +17,9 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 | 09 | [Interpolation](09-interpolation.md) | Fixed-to-variable timestep interpolation |
 | 10 | [Pointers](10-pointers.md) | SharedPtr, UniquePtr, managed data on the heap |
 | 14 | [Native Pointers](14-native-pointers.md) | NativeSharedPtr / NativeUniquePtr accessed from a Burst job |
+| 15 | [Aspect Interfaces](15-aspect-interfaces.md) | Shared aspect contracts via `partial interface` for reusable cross-species helpers |
+| 17 | [Blob Storage](17-blob-storage.md) | Content-pipeline-stable `BlobId`s for shared immutable assets on the heap |
+| 18 | [Reactive Events](18-reactive-events.md) | `OnAdded` / `OnRemoved` observers for cleanup and stat tracking |
 
 ## Game Samples
 

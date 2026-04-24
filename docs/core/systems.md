@@ -27,7 +27,7 @@ Key points:
 
 - Systems are `partial class` (source generation fills in boilerplate)
 - Systems are not created by Trecs. Instantiate them however you like and register with the world builder.
-- `World` is a source-generated property providing the `WorldAccessor`
+- `World` is a source-generated **instance property** providing the `WorldAccessor` — not the `World` class. It only exists inside types the source generator processes (systems, event handlers, and `[ForEachEntity]` hosts). In a plain helper class you need to inject a `WorldAccessor` explicitly (see [World Setup — WorldAccessor](world-setup.md#worldaccessor)).
 
 ## The Execute Method
 

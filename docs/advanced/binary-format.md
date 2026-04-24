@@ -40,7 +40,7 @@ These two are unrelated and must not be confused.
 
 ### `flags`
 
-Application-level bitmask propagated to every serializer via `ISerializationWriter.Flags` / `ISerializationReader.Flags`. Typical use: excluding non-deterministic state from checksums (see [Writer/reader flags](serialization.md#writer--reader-flags)).
+Application-level bitmask propagated to every serializer via `ISerializationWriter.Flags` / `ISerializationReader.Flags`. Typical use: excluding non-deterministic state from checksums (see [Writer/reader flags](serialization.md#writer-reader-flags)).
 
 ### `includeTypeChecks`
 

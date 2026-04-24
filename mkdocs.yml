@@ -81,6 +81,9 @@ nav:
       - 12 - Feeding Frenzy Benchmark: samples/12-feeding-frenzy-benchmark.md
       - 13 - Save Game: samples/13-save-game.md
       - 14 - Native Pointers: samples/14-native-pointers.md
+      - 15 - Aspect Interfaces: samples/15-aspect-interfaces.md
+      - 17 - Blob Storage: samples/17-blob-storage.md
+      - 18 - Reactive Events: samples/18-reactive-events.md
   - Recipes:
       - OOP Integration: recipes/oop-integration.md
       - Entity Subset Patterns: recipes/entity-subset-patterns.md
