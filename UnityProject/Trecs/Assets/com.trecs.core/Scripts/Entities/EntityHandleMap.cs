@@ -19,7 +19,7 @@ namespace Trecs
 
         bool _configurationFrozen;
 
-        // Reverse map: per-group NativeList of forward-map unique IDs (1-based),
+        // Reverse map: per-group list of forward-map unique IDs (1-based),
         // indexed by GroupIndex.Value. Allocated once at world init with length
         // equal to the number of groups.
         // We intentionally store just the UniqueId (4 bytes) instead of a full EntityHandle
@@ -29,7 +29,11 @@ namespace Trecs
         // Invariant: each group's list length equals the group's live entity count.
         // TrimGroupList is called after structural changes (remove, move swap-back) to
         // maintain this. Every index in [0, groupList.Length) resolves to a live entity.
-        internal NativeArray<NativeList<int>> _entityIndexToReferenceMap;
+        // Inner is UnsafeList<int> (not NativeList) so that the overall type is a
+        // NativeContainer holding a non-NativeContainer — legal inside jobs, unlike the
+        // nested NativeArray<NativeList<int>> which Unity's safety system rejects.
+        [NativeDisableContainerSafetyRestriction]
+        internal NativeList<UnsafeList<int>> _entityIndexToReferenceMap;
 
         // (SVKJ) notes
         // This method is designed to work safely across threads
@@ -167,15 +171,15 @@ namespace Trecs
                 reference.Version
             );
 
-            var groupList = GetGroupList(entityIndex.GroupIndex);
-            EnsureGroupListSize(groupList, entityIndex.Index + 1);
+            ref var groupList = ref GetGroupList(entityIndex.GroupIndex);
+            EnsureGroupListSize(ref groupList, entityIndex.Index + 1);
             groupList[entityIndex.Index] = reference.UniqueId;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void UpdateEntityHandle(EntityIndex from, EntityIndex to)
         {
-            var fromGroupList = _entityIndexToReferenceMap[from.GroupIndex.Value];
+            ref var fromGroupList = ref _entityIndexToReferenceMap.ElementAt(from.GroupIndex.Value);
             var uniqueId = fromGroupList[from.Index];
             fromGroupList[from.Index] = 0;
 
@@ -183,15 +187,15 @@ namespace Trecs
             element.Index = to.Index;
             element.GroupIndex = to.GroupIndex;
 
-            var toGroupList = GetGroupList(to.GroupIndex);
-            EnsureGroupListSize(toGroupList, to.Index + 1);
+            ref var toGroupList = ref GetGroupList(to.GroupIndex);
+            EnsureGroupListSize(ref toGroupList, to.Index + 1);
             toGroupList[to.Index] = uniqueId;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void UpdateIndexAfterSwapBack(GroupIndex group, int oldIndex, int newIndex)
         {
-            var groupList = _entityIndexToReferenceMap[group.Value];
+            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(group.Value);
 
             var uniqueId = groupList[oldIndex];
 
@@ -204,7 +208,7 @@ namespace Trecs
             }
 
             groupList[oldIndex] = 0;
-            EnsureGroupListSize(groupList, newIndex + 1);
+            EnsureGroupListSize(ref groupList, newIndex + 1);
             groupList[newIndex] = uniqueId;
 
             ref var element = ref _entityHandleMap.ElementAt(uniqueId - 1);
@@ -215,7 +219,9 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void RemoveEntityHandle(EntityIndex entityIndex)
         {
-            var groupList = _entityIndexToReferenceMap[entityIndex.GroupIndex.Value];
+            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(
+                entityIndex.GroupIndex.Value
+            );
             var uniqueId = groupList[entityIndex.Index];
             groupList[entityIndex.Index] = 0;
 
@@ -247,8 +253,8 @@ namespace Trecs
             GroupIndex toGroup
         )
         {
-            var fromGroupList = _entityIndexToReferenceMap[fromGroup.Value];
-            var toGroupList = GetGroupList(toGroup);
+            ref var fromGroupList = ref _entityIndexToReferenceMap.ElementAt(fromGroup.Value);
+            ref var toGroupList = ref GetGroupList(toGroup);
 
             var keys = entitiesToMove.UnsafeKeys;
             var values = entitiesToMove.UnsafeValues;
@@ -265,7 +271,7 @@ namespace Trecs
                         maxToIndex = values[i].ToIndex;
                     }
                 }
-                EnsureGroupListSize(toGroupList, maxToIndex + 1);
+                EnsureGroupListSize(ref toGroupList, maxToIndex + 1);
             }
 
             for (int i = 0; i < count; i++)
@@ -301,7 +307,7 @@ namespace Trecs
             GroupIndex fromGroup
         )
         {
-            var groupList = _entityIndexToReferenceMap[fromGroup.Value];
+            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(fromGroup.Value);
 
             for (int i = 0; i < entityHandlesToRemove.Count; i++)
             {
@@ -334,7 +340,7 @@ namespace Trecs
             GroupIndex group
         )
         {
-            var groupList = _entityIndexToReferenceMap[group.Value];
+            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(group.Value);
 
             foreach (var entry in swapBackMapping)
             {
@@ -361,7 +367,7 @@ namespace Trecs
         /// </summary>
         internal void ValidateGroupConsistency(GroupIndex group, int entityCount)
         {
-            var groupList = _entityIndexToReferenceMap[group.Value];
+            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(group.Value);
             if (!groupList.IsCreated)
                 return;
 
@@ -398,7 +404,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void RemoveAllGroupReferenceLocators(GroupIndex groupId)
         {
-            var groupList = _entityIndexToReferenceMap[groupId.Value];
+            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(groupId.Value);
 
             for (int i = 0; i < groupList.Length; i++)
             {
@@ -422,10 +428,10 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void UpdateAllGroupReferenceLocators(GroupIndex fromGroupId, GroupIndex toGroupId)
         {
-            var fromGroupList = _entityIndexToReferenceMap[fromGroupId.Value];
+            ref var fromGroupList = ref _entityIndexToReferenceMap.ElementAt(fromGroupId.Value);
 
-            var toGroupList = GetGroupList(toGroupId);
-            EnsureGroupListSize(toGroupList, fromGroupList.Length);
+            ref var toGroupList = ref GetGroupList(toGroupId);
+            EnsureGroupListSize(ref toGroupList, fromGroupList.Length);
 
             for (int i = 0; i < fromGroupList.Length; i++)
             {
@@ -519,8 +525,8 @@ namespace Trecs
         {
             Assert.That(!_configurationFrozen);
 
-            var groupList = GetGroupList(groupId);
-            EnsureGroupListSize(groupList, size);
+            ref var groupList = ref GetGroupList(groupId);
+            EnsureGroupListSize(ref groupList, size);
 
             if (size > _entityHandleMap.Capacity)
             {
@@ -532,13 +538,14 @@ namespace Trecs
         {
             _nextFreeIndex = SharedNativeInt.Create(0);
             _entityHandleMap = new NativeList<EntityHandleMapElement>(0, Allocator.Persistent);
-            _entityIndexToReferenceMap = new NativeArray<NativeList<int>>(
+            _entityIndexToReferenceMap = new NativeList<UnsafeList<int>>(
                 groupCount,
                 Allocator.Persistent
             );
+            _entityIndexToReferenceMap.Resize(groupCount, NativeArrayOptions.UninitializedMemory);
             for (int i = 0; i < groupCount; i++)
             {
-                _entityIndexToReferenceMap[i] = new NativeList<int>(0, Allocator.Persistent);
+                _entityIndexToReferenceMap[i] = new UnsafeList<int>(0, Allocator.Persistent);
             }
         }
 
@@ -554,7 +561,7 @@ namespace Trecs
 
             for (int i = 0; i < _entityIndexToReferenceMap.Length; i++)
             {
-                var list = _entityIndexToReferenceMap[i];
+                ref var list = ref _entityIndexToReferenceMap.ElementAt(i);
                 if (list.IsCreated)
                 {
                     list.Dispose();
@@ -578,7 +585,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void TrimGroupList(GroupIndex group, int newLength)
         {
-            var groupList = _entityIndexToReferenceMap[group.Value];
+            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(group.Value);
             if (groupList.Length > newLength)
             {
                 groupList.Resize(newLength, NativeArrayOptions.UninitializedMemory);
@@ -586,13 +593,13 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        NativeList<int> GetGroupList(GroupIndex group)
+        ref UnsafeList<int> GetGroupList(GroupIndex group)
         {
-            return _entityIndexToReferenceMap[group.Value];
+            return ref _entityIndexToReferenceMap.ElementAt(group.Value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void EnsureGroupListSize(NativeList<int> groupList, int requiredSize)
+        static void EnsureGroupListSize(ref UnsafeList<int> groupList, int requiredSize)
         {
             if (groupList.Length < requiredSize)
             {

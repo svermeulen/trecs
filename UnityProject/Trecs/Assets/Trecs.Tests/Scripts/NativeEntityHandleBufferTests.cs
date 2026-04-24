@@ -169,10 +169,11 @@ namespace Trecs.Tests
             );
             NAssert.IsNotNull(field, "Expected internal field _entityIndexToReferenceMap");
 
-            // The field is NativeArray<NativeList<int>>, indexed by GroupIndex.Value.
-            // The inner NativeList's element type must be int, not EntityHandle.
+            // The field is NativeList<UnsafeList<int>>, indexed by GroupIndex.Value.
+            // Inner is UnsafeList<int> (not NativeList) so the overall type is a single
+            // NativeContainer wrapping non-NativeContainers — legal inside jobs.
             StringAssert.Contains(
-                "NativeList`1[System.Int32]",
+                "UnsafeList`1[System.Int32]",
                 field.FieldType.ToString(),
                 "Reverse map must store int per entity, not EntityHandle"
             );

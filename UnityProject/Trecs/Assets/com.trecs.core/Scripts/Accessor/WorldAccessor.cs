@@ -1100,10 +1100,13 @@ namespace Trecs
             var groupList = handleMap._entityIndexToReferenceMap[group.Value];
             if (!groupList.IsCreated)
                 return default;
-            return new NativeEntityHandleBuffer(
-                new NativeBuffer<int>(groupList),
-                new NativeBuffer<EntityHandleMapElement>(handleMap._entityHandleMap)
-            );
+            unsafe
+            {
+                return new NativeEntityHandleBuffer(
+                    new NativeBuffer<int>(groupList.Ptr, groupList.Length),
+                    new NativeBuffer<EntityHandleMapElement>(handleMap._entityHandleMap)
+                );
+            }
         }
 
         internal NativeComponentLookupRead<T> CreateNativeComponentLookupRead<T>(

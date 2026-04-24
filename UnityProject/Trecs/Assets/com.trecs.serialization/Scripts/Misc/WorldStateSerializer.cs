@@ -197,7 +197,7 @@ namespace Trecs.Serialization
 
         void WriteEntityIndexToReferenceMap(
             ISerializationWriter writer,
-            in NativeArray<NativeList<int>> entityIndexToReferenceMap
+            in NativeList<UnsafeList<int>> entityIndexToReferenceMap
         )
         {
             var count = entityIndexToReferenceMap.Length;
@@ -449,7 +449,7 @@ namespace Trecs.Serialization
 
         void ReadEntityIndexToReferenceMap(
             ISerializationReader reader,
-            NativeArray<NativeList<int>> entityIndexToReferenceMap
+            NativeList<UnsafeList<int>> entityIndexToReferenceMap
         )
         {
             var count = reader.Read<int>("count");
@@ -462,7 +462,7 @@ namespace Trecs.Serialization
                 var tagSet = reader.Read<TagSet>("group");
                 var group = _worldDef.ToGroupIndex(tagSet);
 
-                var groupList = entityIndexToReferenceMap[group.Value];
+                ref var groupList = ref entityIndexToReferenceMap.ElementAt(group.Value);
 
                 var listLength = reader.Read<int>("listLength");
                 groupList.Clear();
