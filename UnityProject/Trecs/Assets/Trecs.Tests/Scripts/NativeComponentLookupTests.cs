@@ -7,7 +7,7 @@ namespace Trecs.Tests
     [TestFixture]
     public class NativeComponentLookupTests
     {
-        #region Read Lookup — Single Group
+        #region Read Lookup — Single GroupIndex
 
         [Test]
         public void ReadLookup_SingleGroup_ReadsCorrectValues()

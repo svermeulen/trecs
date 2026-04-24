@@ -79,8 +79,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                     .GroupSlices()
             )
             {
-                var velocities = World.ComponentBuffer<Velocity>(slice.Group).Read;
-                var positions = World.ComponentBuffer<Position>(slice.Group).Write;
+                var velocities = World.ComponentBuffer<Velocity>(slice.GroupIndex).Read;
+                var positions = World.ComponentBuffer<Position>(slice.GroupIndex).Write;
 
                 foreach (var i in slice.Indices)
                 {

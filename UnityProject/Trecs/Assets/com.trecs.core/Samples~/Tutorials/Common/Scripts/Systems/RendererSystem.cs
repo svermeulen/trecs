@@ -97,7 +97,7 @@ namespace Trecs.Samples
 
         partial void OnReady()
         {
-            var groupsProcessed = new HashSet<Group>();
+            var groupsProcessed = new HashSet<GroupIndex>();
 
             foreach (var info in _renderables)
             {

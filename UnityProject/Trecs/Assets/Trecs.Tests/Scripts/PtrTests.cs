@@ -10,7 +10,7 @@ namespace Trecs.Tests
     public partial class PtrTests
     {
         // ───────────────────────────────────────────────────────────
-        // Group 1: Pure Value-Type Tests (no DI needed)
+        // GroupIndex 1: Pure Value-Type Tests (no DI needed)
         // ───────────────────────────────────────────────────────────
 
         #region PtrHandle
@@ -289,7 +289,7 @@ namespace Trecs.Tests
         #endregion
 
         // ───────────────────────────────────────────────────────────
-        // Group 2: BlobCache + BlobPtr Integration Tests
+        // GroupIndex 2: BlobCache + BlobPtr Integration Tests
         // ───────────────────────────────────────────────────────────
 
         static BlobCache CreateBlobCache()
@@ -458,7 +458,7 @@ namespace Trecs.Tests
         }
 
         // ───────────────────────────────────────────────────────────
-        // Group 2b: NativeBlobPtr + BlobCache Integration Tests
+        // GroupIndex 2b: NativeBlobPtr + BlobCache Integration Tests
         // ───────────────────────────────────────────────────────────
 
         [Test]
@@ -568,7 +568,7 @@ namespace Trecs.Tests
         }
 
         // ───────────────────────────────────────────────────────────
-        // Group 3: SharedHeap Tests
+        // GroupIndex 3: SharedHeap Tests
         // ───────────────────────────────────────────────────────────
 
         static (SharedHeap heap, BlobCache blobCache) CreateSharedHeap()
@@ -671,7 +671,7 @@ namespace Trecs.Tests
         }
 
         // ───────────────────────────────────────────────────────────
-        // Group 3b: UniqueHeap Tests
+        // GroupIndex 3b: UniqueHeap Tests
         // ───────────────────────────────────────────────────────────
 
         static UniqueHeap CreateUniqueHeap()
@@ -802,7 +802,7 @@ namespace Trecs.Tests
         }
 
         // ───────────────────────────────────────────────────────────
-        // Group 3c: UniquePtr + UniqueHeap Integration Tests
+        // GroupIndex 3c: UniquePtr + UniqueHeap Integration Tests
         // ───────────────────────────────────────────────────────────
 
         [Test]
@@ -865,7 +865,7 @@ namespace Trecs.Tests
         }
 
         // ───────────────────────────────────────────────────────────
-        // Group 3b: NativeUniquePtr Value-Type Tests
+        // GroupIndex 3b: NativeUniquePtr Value-Type Tests
         // ───────────────────────────────────────────────────────────
 
         [Test]
@@ -905,7 +905,7 @@ namespace Trecs.Tests
         }
 
         // ───────────────────────────────────────────────────────────
-        // Group 4: NativeSharedHeap Tests
+        // GroupIndex 4: NativeSharedHeap Tests
         // ───────────────────────────────────────────────────────────
 
         static (NativeSharedHeap heap, BlobCache blobCache) CreateNativeSharedHeap()
@@ -1051,7 +1051,7 @@ namespace Trecs.Tests
         }
 
         // ───────────────────────────────────────────────────────────
-        // Group 5: NativeUniqueHeap Tests
+        // GroupIndex 5: NativeUniqueHeap Tests
         // ───────────────────────────────────────────────────────────
 
         static (
@@ -1206,7 +1206,7 @@ namespace Trecs.Tests
         }
 
         // ───────────────────────────────────────────────────────────
-        // Group 6: FrameScopedNativeUniqueHeap Tests
+        // GroupIndex 6: FrameScopedNativeUniqueHeap Tests
         // ───────────────────────────────────────────────────────────
 
         [Test]

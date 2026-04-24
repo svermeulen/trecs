@@ -169,8 +169,8 @@ namespace Trecs.Tests
             );
             NAssert.IsNotNull(field, "Expected internal field _entityIndexToReferenceMap");
 
-            // The field is NativeDenseDictionary<Group, NativeList<int>>. The inner
-            // NativeList's element type must be int, not EntityHandle.
+            // The field is NativeArray<NativeList<int>>, indexed by GroupIndex.Value.
+            // The inner NativeList's element type must be int, not EntityHandle.
             StringAssert.Contains(
                 "NativeList`1[System.Int32]",
                 field.FieldType.ToString(),
@@ -179,14 +179,14 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void EntityHandleMapElement_SizeIs12Bytes()
+        public void EntityHandleMapElement_SizeIs8Bytes()
         {
             NAssert.AreEqual(
-                12,
+                8,
                 UnsafeUtility.SizeOf<EntityHandleMapElement>(),
-                "EntityHandleMapElement is expected to be 12 bytes. If this changes, "
-                    + "update this assertion deliberately — e.g., the planned Change A "
-                    + "packs it to 8 bytes."
+                "EntityHandleMapElement is expected to be 8 bytes "
+                    + "(int Index + ushort GroupIndex + ushort Version). If this changes, "
+                    + "update this assertion deliberately."
             );
         }
 

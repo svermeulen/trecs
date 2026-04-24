@@ -85,7 +85,7 @@ namespace Trecs.Samples.Pointers
             cleanupAccessor
                 .Events.EntitiesWithTags<PatrolTags.Follower>()
                 .OnRemoved(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         for (int i = indices.Start; i < indices.End; i++)
                         {

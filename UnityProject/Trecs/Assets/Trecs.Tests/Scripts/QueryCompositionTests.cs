@@ -904,7 +904,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(0, _entityIndexResults[0].Index);
             NAssert.AreEqual(1, _entityIndexResults[1].Index);
             // Both should be in the same group
-            NAssert.AreEqual(_entityIndexResults[0].Group, _entityIndexResults[1].Group);
+            NAssert.AreEqual(_entityIndexResults[0].GroupIndex, _entityIndexResults[1].GroupIndex);
         }
 
         #endregion

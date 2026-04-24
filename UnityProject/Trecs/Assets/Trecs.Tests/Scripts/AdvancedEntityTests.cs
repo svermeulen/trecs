@@ -328,7 +328,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.AllEntities()
                 .OnAdded(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         callCount++;
                     }
@@ -361,13 +361,13 @@ namespace Trecs.Tests
 
             var sub1 = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
-                .OnAdded((Group g, EntityRange i) => count1++);
+                .OnAdded((GroupIndex g, EntityRange i) => count1++);
             var sub2 = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
-                .OnAdded((Group g, EntityRange i) => count2++);
+                .OnAdded((GroupIndex g, EntityRange i) => count2++);
             var sub3 = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
-                .OnAdded((Group g, EntityRange i) => count3++);
+                .OnAdded((GroupIndex g, EntityRange i) => count3++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.SubmitEntities();
@@ -392,10 +392,10 @@ namespace Trecs.Tests
 
             var sub1 = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
-                .OnAdded((Group g, EntityRange i) => count1++);
+                .OnAdded((GroupIndex g, EntityRange i) => count1++);
             var sub2 = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
-                .OnAdded((Group g, EntityRange i) => count2++);
+                .OnAdded((GroupIndex g, EntityRange i) => count2++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.SubmitEntities();

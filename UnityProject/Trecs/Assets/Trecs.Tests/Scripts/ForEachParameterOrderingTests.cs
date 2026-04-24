@@ -125,7 +125,7 @@ namespace Trecs.Tests
             _userIndexValues.Clear();
 
             // The user-supplied EntityIndex carries an arbitrary marker value (123).
-            // Group is irrelevant for this test — we only check the .Index round-trips.
+            // GroupIndex is irrelevant for this test — we only check the .Index round-trips.
             var fakeTarget = new EntityIndex(123, default);
             RunWithUserSuppliedEntityIndex(a, fakeTarget);
 
