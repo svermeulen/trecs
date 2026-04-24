@@ -17,7 +17,10 @@ namespace Trecs.Tests
 
         public void Dispose()
         {
-            World.Dispose();
+            if (!World.IsDisposed)
+            {
+                World.Dispose();
+            }
         }
 
         /// <summary>

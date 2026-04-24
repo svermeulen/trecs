@@ -220,7 +220,15 @@ namespace Trecs
         public World BuildAndInitialize()
         {
             var world = Build();
-            world.Initialize();
+            try
+            {
+                world.Initialize();
+            }
+            catch
+            {
+                world.Dispose();
+                throw;
+            }
             return world;
         }
 

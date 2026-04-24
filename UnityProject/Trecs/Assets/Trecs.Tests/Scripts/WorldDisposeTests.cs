@@ -9,7 +9,7 @@ namespace Trecs.Tests
         [Test]
         public void World_Dispose_AfterMixedOperations_DoesNotThrow()
         {
-            var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
 
             var partitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
@@ -47,7 +47,7 @@ namespace Trecs.Tests
         [Test]
         public void World_IsDisposed_TrueAfterDispose()
         {
-            var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var world = env.World;
 
             NAssert.IsFalse(world.IsDisposed);

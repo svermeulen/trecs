@@ -48,6 +48,7 @@ namespace Trecs
         readonly List<ISystem> _systems;
 
         bool _hasTriggeredAllRemoveEvents;
+        bool _initializeCompleted;
         bool _systemAddLocked;
         int _accessorIdCounter = 1; // Start at 1 because zero can be like null
         EntityHandle? _globalEntityHandle;
@@ -412,7 +413,7 @@ namespace Trecs
             }
 #endif
 
-            if (_settings.TriggerRemoveEventsOnDispose)
+            if (_settings.TriggerRemoveEventsOnDispose && _initializeCompleted)
             {
                 TriggerAllRemoveEvents();
             }
@@ -622,6 +623,8 @@ namespace Trecs
             {
                 _entitySubmitter.SubmitEntities();
             }
+
+            _initializeCompleted = true;
         }
 
         /// <summary>
