@@ -197,7 +197,7 @@ namespace Trecs.Serialization
 
         void WriteEntityIndexToReferenceMap(
             ISerializationWriter writer,
-            in NativeDenseDictionary<Group, NativeList<EntityHandle>> entityIndexToReferenceMap
+            in NativeDenseDictionary<Group, NativeList<int>> entityIndexToReferenceMap
         )
         {
             var count = entityIndexToReferenceMap.Count;
@@ -447,7 +447,7 @@ namespace Trecs.Serialization
 
         void ReadEntityIndexToReferenceMap(
             ISerializationReader reader,
-            NativeDenseDictionary<Group, NativeList<EntityHandle>> entityIndexToReferenceMap
+            NativeDenseDictionary<Group, NativeList<int>> entityIndexToReferenceMap
         )
         {
             var count = reader.Read<int>("count");
@@ -472,7 +472,7 @@ namespace Trecs.Serialization
                 groupList.Resize(listLength, NativeArrayOptions.ClearMemory);
                 for (int j = 0; j < listLength; j++)
                 {
-                    groupList[j] = reader.Read<EntityHandle>("ref");
+                    groupList[j] = reader.Read<int>("ref");
                 }
             }
         }
