@@ -33,12 +33,13 @@ namespace Trecs.Samples.AspectInterfaces
             );
 
             var sceneInitializer = new SceneInitializer(world, gameObjectRegistry, Settings);
+            var cleanup = new GameObjectCleanupHandler(world, gameObjectRegistry);
 
             initializables = new() { world.Initialize, sceneInitializer.Initialize };
 
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { world.Dispose };
+            disposables = new() { cleanup.Dispose, world.Dispose };
         }
     }
 }
