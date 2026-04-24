@@ -169,7 +169,9 @@ namespace Trecs.Internal
             WorldInfo worldInfo
         )
         {
-            GroupIndex cachedGroup = default;
+            // GroupIndex? so the first iteration always hits the cache-miss branch —
+            // default(GroupIndex) == GroupIndex(0) would collide with a real group.
+            GroupIndex? cachedGroup = null;
             FastList<int> cachedRemoveList = null;
 
             foreach (var (entityIdx, accessorId) in sortedRemovals)
@@ -185,7 +187,7 @@ namespace Trecs.Internal
                     cachedGroup = entityIdx.GroupIndex;
                     cachedRemoveList =
                         _thisSubmissionInfo._currentRemoveEntitiesOperations.RecycleOrAdd(
-                            cachedGroup,
+                            cachedGroup.Value,
                             _newList,
                             _clearList
                         );
@@ -204,8 +206,10 @@ namespace Trecs.Internal
             WorldInfo worldInfo
         )
         {
-            GroupIndex cachedFromGroup = default;
-            GroupIndex cachedToGroup = default;
+            // GroupIndex? so the first iteration always hits the cache-miss branch —
+            // default(GroupIndex) == GroupIndex(0) would collide with a real group.
+            GroupIndex? cachedFromGroup = null;
+            GroupIndex? cachedToGroup = null;
             DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>> cachedFromGroupDict = null;
             DenseDictionary<int, MoveInfo> cachedToGroupDict = null;
 
@@ -230,12 +234,12 @@ namespace Trecs.Internal
                     cachedFromGroup = fromEntityIndex.GroupIndex;
                     cachedFromGroupDict =
                         _thisSubmissionInfo._currentSwapEntitiesOperations.RecycleOrAdd(
-                            cachedFromGroup,
+                            cachedFromGroup.Value,
                             _newGroupDictionary,
                             _recycleDicitionaryWithCaller
                         );
                     // Reset toGroup cache when fromGroup changes
-                    cachedToGroup = default;
+                    cachedToGroup = null;
                     cachedToGroupDict = null;
                 }
 
@@ -243,7 +247,7 @@ namespace Trecs.Internal
                 {
                     cachedToGroup = toGroup;
                     cachedToGroupDict = cachedFromGroupDict.RecycleOrAdd(
-                        cachedToGroup,
+                        cachedToGroup.Value,
                         _newListWithCaller,
                         _clearListWithCaller
                     );
