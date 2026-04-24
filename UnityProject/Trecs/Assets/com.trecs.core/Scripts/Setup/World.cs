@@ -480,7 +480,7 @@ namespace Trecs
             {
                 foreach (var group in _worldInfo.AllGroups)
                 {
-                    var _ = _entitySubmitter.GetOrAddDBGroup(group);
+                    var _ = _entitySubmitter.GetDBGroup(group);
                     var template = _worldInfo.GetResolvedTemplateForGroup(group);
 
                     using (TrecsProfiling.Start("EntitySubmitter.Preallocate (group {})", group))

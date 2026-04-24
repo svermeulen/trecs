@@ -55,21 +55,15 @@ namespace Trecs.Internal
             _configurationFrozen = true;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public DenseDictionary<ComponentId, IComponentArray> GetDBGroup(GroupIndex fromIdGroupId)
-        {
-            return _groupEntityComponentsDB[fromIdGroupId.Index];
-        }
-
         /// <summary>
         /// Returns the per-component inner dictionary for a group. Every valid
-        /// GroupIndex is pre-populated with an empty dictionary at construction,
-        /// so this never creates — the "OrAdd" name is kept for API continuity.
+        /// GroupIndex has a pre-allocated (initially empty) inner dictionary
+        /// populated by <see cref="PreallocateDBGroup"/>.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public DenseDictionary<ComponentId, IComponentArray> GetOrAddDBGroup(GroupIndex toGroupId)
+        public DenseDictionary<ComponentId, IComponentArray> GetDBGroup(GroupIndex groupId)
         {
-            return _groupEntityComponentsDB[toGroupId.Index];
+            return _groupEntityComponentsDB[groupId.Index];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -142,7 +136,7 @@ namespace Trecs.Internal
             Assert.That(!_configurationFrozen);
 
             var numberOfEntityComponents = entityComponentsToBuild.Length;
-            DenseDictionary<ComponentId, IComponentArray> group = GetOrAddDBGroup(groupId);
+            DenseDictionary<ComponentId, IComponentArray> group = GetDBGroup(groupId);
             group.EnsureCapacity(numberOfEntityComponents);
 
             for (var index = 0; index < numberOfEntityComponents; index++)

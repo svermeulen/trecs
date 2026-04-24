@@ -73,16 +73,6 @@ namespace Trecs
             }
         }
 
-        /// <summary>
-        /// Raw 1-based value. For internal hashing/comparison paths that must be
-        /// null-safe; do not use as an array index (off by one).
-        /// </summary>
-        internal ushort RawValue
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _raw;
-        }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly bool Equals(GroupIndex other) => _raw == other._raw;
 

@@ -193,7 +193,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.NoInlining)]
         static ref NativeComponentLookupEntry ThrowGroupNotInLookup(GroupIndex group)
         {
-            ThrowGroupNotInLookupManaged(group.GetHashCode());
+            ThrowGroupNotInLookupManaged(group);
             throw new InvalidOperationException(
                 "NativeComponentLookupRead: entity's group is not in this lookup's permitted "
                     + "group set. Add the group to the lookup's [ForEachEntity] or schedule-time TagSet."
@@ -201,13 +201,13 @@ namespace Trecs
         }
 
         [BurstDiscard]
-        static void ThrowGroupNotInLookupManaged(int groupId)
+        static void ThrowGroupNotInLookupManaged(GroupIndex group)
         {
             var containerName = $"NativeComponentLookupRead<{typeof(T).Name}>";
             throw new GroupNotInContainerException(
                 containerName,
-                groupId,
-                $"{containerName}: entity belongs to group {groupId}, "
+                group.GetHashCode(),
+                $"{containerName}: entity belongs to {group}, "
                     + "which is not in this lookup's permitted group set. Add the group to the "
                     + "lookup's [ForEachEntity] or schedule-time TagSet."
             );
@@ -375,7 +375,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.NoInlining)]
         static ref NativeComponentLookupEntry ThrowGroupNotInLookup(GroupIndex group)
         {
-            ThrowGroupNotInLookupManaged(group.GetHashCode());
+            ThrowGroupNotInLookupManaged(group);
             throw new InvalidOperationException(
                 "NativeComponentLookupWrite: entity's group is not in this lookup's permitted "
                     + "group set. Add the group to the lookup's [ForEachEntity] or schedule-time TagSet."
@@ -383,13 +383,13 @@ namespace Trecs
         }
 
         [BurstDiscard]
-        static void ThrowGroupNotInLookupManaged(int groupId)
+        static void ThrowGroupNotInLookupManaged(GroupIndex group)
         {
             var containerName = $"NativeComponentLookupWrite<{typeof(T).Name}>";
             throw new GroupNotInContainerException(
                 containerName,
-                groupId,
-                $"{containerName}: entity belongs to group {groupId}, "
+                group.GetHashCode(),
+                $"{containerName}: entity belongs to {group}, "
                     + "which is not in this lookup's permitted group set. Add the group to the "
                     + "lookup's [ForEachEntity] or schedule-time TagSet."
             );

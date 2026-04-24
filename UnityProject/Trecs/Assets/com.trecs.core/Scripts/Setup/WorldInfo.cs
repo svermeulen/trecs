@@ -62,12 +62,12 @@ namespace Trecs
                     if (!tagSetToIndex.ContainsKey(tagSet))
                     {
                         // GroupIndex is 1-based; 0 is Null. Real groups occupy
-                        // raw values 1..ushort.MaxValue, so the 0-based index
-                        // must stay below ushort.MaxValue.
+                        // raw values 1..ushort.MaxValue, so at most 65535 real
+                        // groups can exist (0-based indices 0..65534).
                         Assert.That(
                             indexToTagSet.Count < ushort.MaxValue,
-                            "GroupIndex exhausted — world has more than {} groups",
-                            ushort.MaxValue - 1
+                            "GroupIndex exhausted — world cannot have more than {} groups",
+                            ushort.MaxValue
                         );
                         var idx = GroupIndex.FromIndex(indexToTagSet.Count);
                         tagSetToIndex.Add(tagSet, idx);
