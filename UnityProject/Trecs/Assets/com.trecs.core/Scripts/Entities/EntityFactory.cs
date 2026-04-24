@@ -18,10 +18,7 @@ namespace Trecs.Internal
 #endif
         )
         {
-            var group = groupEntitiesToAdd.currentComponentsToAddPerGroup.GetOrAdd(
-                groupId,
-                () => new DenseDictionary<ComponentId, IComponentArray>()
-            );
+            var group = groupEntitiesToAdd.GetOrCreateCurrentComponentsForGroup(groupId);
 
             //track the number of entities created so far in the group.
             groupEntitiesToAdd.IncrementEntityCount(groupId);

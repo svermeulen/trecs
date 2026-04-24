@@ -138,7 +138,7 @@ namespace Trecs.Internal
             _eventsManager = eventsManager;
 
             _componentStore = componentStore;
-            _groupedEntityToAdd = new DoubleBufferedEntitiesToAdd();
+            _groupedEntityToAdd = new DoubleBufferedEntitiesToAdd(worldInfo.AllGroups.Count);
             _setStore = setStore;
 
             _entitiesQuerier = entitiesQuerier;
@@ -1126,7 +1126,7 @@ namespace Trecs.Internal
 
                                 // Now that entities are in the DB, set up EntityHandleMap with correct DB indices
                                 if (
-                                    _groupedEntityToAdd.LastPendingReferences.TryGetValue(
+                                    _groupedEntityToAdd.TryGetLastPendingReferences(
                                         groupId,
                                         out var pendingRefs
                                     )
@@ -1558,10 +1558,7 @@ namespace Trecs.Internal
 
                                 // Cache the group's component dictionaries
                                 cachedGroupDict =
-                                    _groupedEntityToAdd.currentComponentsToAddPerGroup.GetOrAdd(
-                                        group,
-                                        () => new DenseDictionary<ComponentId, IComponentArray>()
-                                    );
+                                    _groupedEntityToAdd.GetOrCreateCurrentComponentsForGroup(group);
 
                                 // Cache per-component arrays (avoid GetOrAdd per entity)
                                 if (
