@@ -351,28 +351,6 @@ namespace Trecs
             return ptr;
         }
 
-        public IBlobAnchor CreateBlobAnchor(BlobId blobId, bool updateAccessTime = true)
-        {
-            Assert.That(!_hasDisposed);
-
-            if (
-                !TryGetManifestEntry(
-                    blobId,
-                    out var manifestEntry,
-                    updateAccessTime: updateAccessTime
-                )
-            )
-            {
-                throw Assert.CreateException(
-                    "Attempted to get blob anchor for unrecognized native blob {}",
-                    blobId
-                );
-            }
-
-            var handle = CreateHandle(blobId);
-            return new BlobAnchor(handle);
-        }
-
         public NativeBlobPtr<T> CreateNativeBlobPtr<T>(BlobId blobId)
             where T : unmanaged
         {

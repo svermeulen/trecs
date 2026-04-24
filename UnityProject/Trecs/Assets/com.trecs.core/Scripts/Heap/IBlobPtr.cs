@@ -2,10 +2,11 @@ namespace Trecs
 {
     /// <summary>
     /// Common interface for typed blob pointers (<see cref="BlobPtr{T}"/> and
-    /// <see cref="NativeBlobPtr{T}"/>), providing nullability checks, warm-up, and
-    /// asynchronous loading state queries against the <see cref="BlobCache"/>.
+    /// <see cref="NativeBlobPtr{T}"/>), providing nullability checks, warm-up,
+    /// asynchronous loading state queries, and disposal against the
+    /// <see cref="BlobCache"/>.
     /// </summary>
-    public interface IBlobPtr : IBlobAnchor
+    public interface IBlobPtr
     {
         bool IsNull { get; }
 
@@ -13,5 +14,7 @@ namespace Trecs
 
         void WarmUp(BlobCache blobCache);
         BlobLoadingState GetLoadingState(BlobCache blobCache);
+
+        void Dispose(BlobCache blobCache);
     }
 }
