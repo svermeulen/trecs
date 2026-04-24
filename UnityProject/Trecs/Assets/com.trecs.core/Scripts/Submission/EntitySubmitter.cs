@@ -1226,19 +1226,12 @@ namespace Trecs.Internal
                 }
             }
 
-            if (
-                _componentStore.GroupEntityComponentsDB.TryGetValue(
-                    groupId,
-                    out var dictionariesOfEntities
-                )
-            )
+            var dictionariesOfEntities = _componentStore.GroupEntityComponentsDB[groupId.Value];
+            foreach (var dictionaryOfEntities in dictionariesOfEntities)
             {
-                foreach (var dictionaryOfEntities in dictionariesOfEntities)
-                {
-                    dictionaryOfEntities.Value.Clear();
+                dictionaryOfEntities.Value.Clear();
 
-                    _componentStore.GroupsPerComponent[dictionaryOfEntities.Key][groupId].Clear();
-                }
+                _componentStore.GroupsPerComponent[dictionaryOfEntities.Key][groupId].Clear();
             }
         }
 

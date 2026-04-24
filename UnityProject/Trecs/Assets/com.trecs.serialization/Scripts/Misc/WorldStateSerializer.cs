@@ -258,7 +258,7 @@ namespace Trecs.Serialization
         {
             var groupEntityComponentsDB = _world.ComponentStore.GroupEntityComponentsDB;
 
-            var numItems = groupEntityComponentsDB.Count;
+            var numItems = groupEntityComponentsDB.Length;
 
             writer.Write("numItems", numItems);
 
@@ -266,10 +266,10 @@ namespace Trecs.Serialization
             {
                 var bytesBefore = writer.NumBytesWritten;
 
-                GroupIndex group = groupEntityComponentsDB.UnsafeKeys[i].key;
+                var group = new GroupIndex((ushort)i);
                 writer.Write("group", _worldDef.ToTagSet(group));
 
-                ref var subMap = ref groupEntityComponentsDB.UnsafeValues[i];
+                var subMap = groupEntityComponentsDB[i];
 
                 var numComponents = subMap.Count;
 
@@ -494,16 +494,16 @@ namespace Trecs.Serialization
             var numItems = reader.Read<int>("numItems");
             Assert.That(numItems >= 0);
 
-            Assert.IsEqual(groupEntityComponentsDB.Count, numItems);
+            Assert.IsEqual(groupEntityComponentsDB.Length, numItems);
 
             for (int i = 0; i < numItems; i++)
             {
                 var tagSet = reader.Read<TagSet>("group");
                 var group = _worldDef.ToGroupIndex(tagSet);
 
-                Assert.IsEqual(groupEntityComponentsDB.UnsafeKeys[i].key, group);
+                Assert.IsEqual(new GroupIndex((ushort)i), group);
 
-                ref var subMap = ref groupEntityComponentsDB.UnsafeValues[i];
+                var subMap = groupEntityComponentsDB[i];
 
                 var numComponents = reader.Read<int>("numComponents");
 

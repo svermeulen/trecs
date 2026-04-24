@@ -377,7 +377,7 @@ namespace Trecs
             // Note here that we do not actually remove in this case -
             // We just trigger the remove events
             Assert.That(
-                _componentStore.GroupEntityComponentsDB.ContainsKey(_worldInfo.GlobalGroup)
+                _worldInfo.GlobalGroup.Value < _componentStore.GroupEntityComponentsDB.Length
             );
 
             foreach (

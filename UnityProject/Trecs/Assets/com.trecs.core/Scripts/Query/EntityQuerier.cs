@@ -112,17 +112,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ExistsAndIsNotEmpty(GroupIndex gid)
         {
-            if (
-                _componentStore.GroupEntityComponentsDB.TryGetValue(
-                    gid,
-                    out DenseDictionary<ComponentId, IComponentArray> group
-                )
-            )
-            {
-                return group.Count > 0;
-            }
-
-            return false;
+            return _componentStore.GroupEntityComponentsDB[gid.Value].Count > 0;
         }
 
         /// <summary>
@@ -161,13 +151,9 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool EntityIndexExists(EntityIndex entityIndex)
         {
-            if (
-                !_componentStore.GroupEntityComponentsDB.TryGetValue(
-                    entityIndex.GroupIndex,
-                    out var componentMap
-                )
-            )
-                return false;
+            var componentMap = _componentStore.GroupEntityComponentsDB[
+                entityIndex.GroupIndex.Value
+            ];
 
             foreach (var (_, componentArray) in componentMap)
             {
@@ -179,18 +165,12 @@ namespace Trecs.Internal
 
         public int CountEntitiesInGroup(GroupIndex group)
         {
-            if (
-                !_componentStore.GroupEntityComponentsDB.TryGetValue(
-                    group,
-                    out var entitiesInGroupPerType
-                )
-            )
-            {
-                throw Assert.CreateException(
-                    "Attempted to get count for unrecognized group {}",
-                    group
-                );
-            }
+            Assert.That(
+                group.Value < _componentStore.GroupEntityComponentsDB.Length,
+                "Attempted to get count for unrecognized group {}",
+                group
+            );
+            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Value];
 
             int? count = null;
 
@@ -814,37 +794,20 @@ namespace Trecs.Internal
         )
             where T : unmanaged, IEntityComponent
         {
-            IComponentArray safeDictionary;
-            bool ret;
-            //search for the group
+            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Value];
+
             if (
-                !_componentStore.GroupEntityComponentsDB.TryGetValue(
-                    group,
-                    out DenseDictionary<ComponentId, IComponentArray> entitiesInGroupPerType
+                !entitiesInGroupPerType.TryGetValue(
+                    ComponentTypeId<T>.Value,
+                    out var safeDictionary
                 )
             )
-            {
-                safeDictionary = null;
-                ret = false;
-            }
-            else
-            {
-                ret = entitiesInGroupPerType.TryGetValue(
-                    ComponentTypeId<T>.Value,
-                    out safeDictionary
-                );
-            }
-
-            //search for the indexed entities in the group
-            if (!ret)
             {
                 typeSafeDictionary = default;
                 return false;
             }
 
-            //return the indexes entities if they exist
             typeSafeDictionary = safeDictionary;
-
             return true;
         }
 
@@ -855,12 +818,9 @@ namespace Trecs.Internal
         )
             where T : unmanaged, IEntityComponent
         {
-            //search for the group
-            DenseDictionary<ComponentId, IComponentArray> entitiesInGroupPerType =
-                _componentStore.GroupEntityComponentsDB.GetOrAdd(
-                    group,
-                    () => new DenseDictionary<ComponentId, IComponentArray>()
-                );
+            // Outer array is pre-populated at ComponentStore ctor; every GroupIndex
+            // has an inner dict (initially empty).
+            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Value];
 
             var componentId = ComponentTypeId<T>.Value;
 
@@ -876,13 +836,7 @@ namespace Trecs.Internal
         internal NativeBuffer<T> QuerySingleBuffer<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
-            if (
-                !_componentStore.GroupEntityComponentsDB.TryGetValue(
-                    group,
-                    out var entitiesInGroupPerType
-                )
-            )
-                return default;
+            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Value];
 
             if (!SafeQueryEntityDictionary<T>(entitiesInGroupPerType, out var typeSafeDictionary))
                 return default;
@@ -893,13 +847,7 @@ namespace Trecs.Internal
         internal (NativeBuffer<T> buffer, int count) QuerySingleBufferWithCount<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
-            if (
-                !_componentStore.GroupEntityComponentsDB.TryGetValue(
-                    group,
-                    out var entitiesInGroupPerType
-                )
-            )
-                return (default, 0);
+            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Value];
 
             if (!SafeQueryEntityDictionary<T>(entitiesInGroupPerType, out var typeSafeDictionary))
                 return (default, 0);
@@ -947,8 +895,7 @@ namespace Trecs.Internal
 
         bool GroupHasAllComponents(GroupIndex group, ComponentId[] componentIds)
         {
-            if (!_componentStore.GroupEntityComponentsDB.TryGetValue(group, out var componentMap))
-                return false;
+            var componentMap = _componentStore.GroupEntityComponentsDB[group.Value];
             for (int i = 0; i < componentIds.Length; i++)
             {
                 if (!componentMap.TryGetValue(componentIds[i], out var arr) || arr.Count == 0)
@@ -959,8 +906,7 @@ namespace Trecs.Internal
 
         IComponentArray GetComponentArrayUntyped(GroupIndex group, ComponentId componentId)
         {
-            if (!_componentStore.GroupEntityComponentsDB.TryGetValue(group, out var componentMap))
-                return null;
+            var componentMap = _componentStore.GroupEntityComponentsDB[group.Value];
             if (!componentMap.TryGetValue(componentId, out var arr))
                 return null;
             return arr;
