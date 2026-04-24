@@ -16,7 +16,9 @@ namespace Trecs.Samples
 
         static void UpdateTitle(ApplicationTitleDescriptor desc)
         {
-            var projectDir = new DirectoryInfo(Path.Combine(Application.dataPath, "../../..")).Name.ToUpper();
+            var projectDir = new DirectoryInfo(
+                Path.Combine(Application.dataPath, "../../..")
+            ).Name.ToUpper();
             var dot = Dots[(uint)projectDir.GetHashCode() % Dots.Length];
             desc.title = $"{dot} External Trecs {dot} - {projectDir}";
         }

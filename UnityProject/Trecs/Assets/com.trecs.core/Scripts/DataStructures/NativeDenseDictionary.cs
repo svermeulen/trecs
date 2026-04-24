@@ -5,6 +5,9 @@ using System.Runtime.CompilerServices;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+#if TRECS_INTERNAL_CHECKS && DEBUG
+using System.Collections.Generic;
+#endif
 
 namespace Trecs.Internal
 {

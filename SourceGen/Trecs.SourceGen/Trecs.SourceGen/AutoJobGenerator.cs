@@ -894,12 +894,9 @@ namespace Trecs.SourceGen
         static string GenerateSource(AutoJobInfo info)
         {
             var sb = new StringBuilder();
-            var usings = new HashSet<string>
+            var usings = new HashSet<string>(CommonUsings.Namespaces)
             {
                 "Unity.Collections",
-                "Trecs",
-                "Trecs.Internal",
-                "Trecs.Collections",
                 "Unity.Jobs",
             };
 

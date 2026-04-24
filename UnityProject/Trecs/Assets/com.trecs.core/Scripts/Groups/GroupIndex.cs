@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace Trecs
@@ -39,6 +40,16 @@ namespace Trecs
         /// Constructs a GroupIndex from a 0-based registry index.
         /// </summary>
         internal static GroupIndex FromIndex(int index) => new(checked((ushort)(index + 1)));
+
+        /// <summary>
+        /// Reconstructs a GroupIndex from its internal raw representation. Intended only
+        /// for interop bridges (e.g. Lua FFI) that need to round-trip a GroupIndex through
+        /// an opaque handle. Callers must have obtained <paramref name="raw"/> from a real
+        /// GroupIndex they received from this world — passing an arbitrary value is undefined
+        /// behavior.
+        /// </summary>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static GroupIndex FromRawInterop(ushort raw) => new(raw);
 
         /// <summary>
         /// The null sentinel. Equals <c>default(GroupIndex)</c>.

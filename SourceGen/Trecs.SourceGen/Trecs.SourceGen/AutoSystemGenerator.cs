@@ -727,7 +727,7 @@ namespace Trecs.SourceGen
             AutoSystemInfo autoSystemInfo
         )
         {
-            var namespaces = new HashSet<string>() { "Trecs", "Trecs.Internal", "System" };
+            var namespaces = new HashSet<string>(CommonUsings.Namespaces) { "System" };
 
             void AddNamespaceIfNeeded(ITypeSymbol typeSymbol)
             {

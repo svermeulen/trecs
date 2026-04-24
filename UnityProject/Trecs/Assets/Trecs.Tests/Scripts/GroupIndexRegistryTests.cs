@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using NUnit.Framework;
+using Unity.Collections.LowLevel.Unsafe;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -28,7 +30,7 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var info = env.Accessor.WorldInfo;
 
-            var seen = new System.Collections.Generic.HashSet<int>();
+            var seen = new HashSet<int>();
             foreach (var group in info.AllGroups)
             {
                 NAssert.IsFalse(group.IsNull, "Real groups must never be Null");
@@ -47,10 +49,7 @@ namespace Trecs.Tests
         [Test]
         public void GroupIndex_SizeIs2Bytes()
         {
-            NAssert.AreEqual(
-                2,
-                Unity.Collections.LowLevel.Unsafe.UnsafeUtility.SizeOf<GroupIndex>()
-            );
+            NAssert.AreEqual(2, UnsafeUtility.SizeOf<GroupIndex>());
         }
 
         [Test]
