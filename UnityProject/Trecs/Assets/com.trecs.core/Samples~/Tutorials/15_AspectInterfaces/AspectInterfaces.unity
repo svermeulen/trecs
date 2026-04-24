@@ -175,15 +175,35 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6a5b636f8dcd4ec5aae2777f1e7b06b4, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Samples::Trecs.Samples.AspectInterfaces.AspectInterfacesCompositionRoot
   Settings:
-    ZoneCenter: {x: 0, y: 0, z: 0}
-    ZoneRadius: 5
     DamagePerHit: 30
-    HitInterval: 0.5
-    BossEnragedRegenPerSecond: 25
-    EnemyOutOfZoneRegenPerSecond: 10
+    EnemyHitCooldown: 0.5
+    BossHitCooldown: 0.1
+    CollisionDistance: 1.2
+    EnemyRegenPerSecond: 5
+    MinFleeDuration: 0.1
+    MaxFleeDuration: 1
+    BossChaseSpeed: 0.5
+    EnemyArmors:
+    - 0
+    - 8
+    - 16
+    - 24
+    - 32
+    - 40
+    EnemyMaxHealth: 100
+    EnemyChaseSpeed: 3
+    BossMaxHealth: 400
+    BossArmor: 25
+    SpawnRingRadius: 4
+    EnemySpawnY: 0.3
+    BossScale: 1.2
+    EnemyScale: 0.6
+    BossBaseColor: {r: 0.6, g: 0.2, b: 0.8, a: 1}
+    EnemyBaseColor: {r: 1, g: 0, b: 0, a: 1}
+    HitFlashDuration: 0.15
 --- !u!1 &600000011
 GameObject:
   m_ObjectHideFlags: 0

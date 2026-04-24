@@ -4,62 +4,70 @@ namespace Trecs.Samples.AspectInterfaces
 {
     public partial class BossAiSystem : ISystem
     {
-        readonly float3 _zoneCenter;
-        readonly float _zoneRadius;
-        readonly float _damagePerHit;
-        readonly float _hitInterval;
-        readonly float _enragedRegenPerSecond;
+        readonly SampleSettings _settings;
 
-        public BossAiSystem(
-            float3 zoneCenter,
-            float zoneRadius,
-            float damagePerHit,
-            float hitInterval,
-            float enragedRegenPerSecond
-        )
+        public BossAiSystem(SampleSettings settings)
         {
-            _zoneCenter = zoneCenter;
-            _zoneRadius = zoneRadius;
-            _damagePerHit = damagePerHit;
-            _hitInterval = hitInterval;
-            _enragedRegenPerSecond = enragedRegenPerSecond;
+            _settings = settings;
         }
 
+        // [ForEachEntity] (not [SingleEntity]) so the system is a no-op
+        // after the boss dies — [SingleEntity] would assert on zero matches.
         [ForEachEntity(Tag = typeof(SampleTags.Boss))]
         void Execute(in BossView boss)
         {
-            float3 toCenter = _zoneCenter - boss.Position;
-            bool insideZone = math.lengthsq(toCenter) < _zoneRadius * _zoneRadius;
+            float collisionSqr = _settings.CollisionDistance * _settings.CollisionDistance;
+            float3 chaseTarget = default;
+            float? lowestHealth = null;
 
-            // Discrete damage pulses on the same cadence as enemies. Boss's
-            // Armor is higher so each pulse's net damage is smaller — combined
-            // with the enraged regen, health oscillates near the enrage
-            // threshold rather than dying outright.
-            if (insideZone && World.ElapsedTime - boss.HitFlashTime >= _hitInterval)
+            // Single pass over enemies: track the weakest (so the boss can
+            // chase it) and apply damage to the boss for each enemy in
+            // range. The enemy's own system handles the mirrored hit on
+            // its side — this loop doesn't touch enemy state at all.
+            foreach (var enemy in EnemyTargetView.Query(World).WithTags<SampleTags.Enemy>())
             {
-                Combat.TakeHit(boss, _damagePerHit, World.ElapsedTime);
+                if (lowestHealth == null || enemy.Health < lowestHealth)
+                {
+                    lowestHealth = enemy.Health;
+                    chaseTarget = enemy.Position;
+                }
+
+                if (math.distancesq(boss.Position, enemy.Position) <= collisionSqr)
+                {
+                    if (Combat.TryTakeHit(boss, _settings.DamagePerHit, _settings.BossHitCooldown, World))
+                    {
+                        break;
+                    }
+                }
             }
 
-            // Boss-specific: enrage scales 0..1 with damage taken. Uses the
-            // shared HealthRatio helper as a subroutine, but stores the result
-            // in a boss-only component so other systems (or the renderer) can
-            // read it.
-            boss.EnrageLevel = 1f - Combat.HealthRatio(boss);
-
-            // Boss-specific: once enraged, self-heal continuously. Regen is
-            // per-second (not per-pulse), so it's applied every frame — the
-            // tuning makes the combined regen outpace damage slightly when
-            // enraged, so the boss heals back across the threshold and
-            // disables its own regen, then takes damage back down, etc.
-            if (boss.EnrageLevel > 0.5f)
+            // Advance toward the weakest enemy, but stop just outside the
+            // collision radius — otherwise the boss can step onto the
+            // target exactly, after which normalizesafe(zero) pins both
+            // sides at the coincident position.
+            if (lowestHealth != null)
             {
-                Combat.Heal(boss, _enragedRegenPerSecond * World.DeltaTime);
+                // XZ-only direction — otherwise the Y delta between boss
+                // and enemies bakes into the step and the boss slowly
+                // drifts vertically.
+                float3 toTarget = chaseTarget - boss.Position;
+                toTarget.y = 0f;
+                float distSqr = math.lengthsq(toTarget);
+                if (distSqr > collisionSqr)
+                {
+                    float3 dir = toTarget * math.rsqrt(distSqr);
+                    boss.Position += dir * _settings.BossChaseSpeed * World.DeltaTime;
+                }
             }
         }
 
-        // Concrete aspect. IHittable contributes the shared combat substrate;
-        // the boss adds Position (stationary, read-only) and EnrageLevel
-        // (boss-only state the renderer can pick up).
-        partial struct BossView : IHittable, IRead<Position>, IWrite<EnrageLevel> { }
+        // Boss's own aspect. IHittable contributes the combat substrate;
+        // Position is written as the boss chases the weakest enemy.
+        partial struct BossView : IHittable, IWrite<Position> { }
+
+        // Read-only view of enemies — used to pick the weakest and to
+        // check collision distance. Damage application happens in the
+        // enemy's own system, so no IHittable here.
+        partial struct EnemyTargetView : IAspect, IRead<Position, Health> { }
     }
 }

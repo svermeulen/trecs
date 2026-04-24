@@ -25,8 +25,9 @@ namespace Trecs.Samples.AspectInterfaces
         public float Value;
     }
 
-    // Records the last time this entity was hit, so HitFlashRenderer can flash
-    // the GameObject briefly. Written by Combat.TakeHit.
+    // Time of the last hit this entity took. Serves two purposes — it's the
+    // cooldown clock TryTakeHit gates on, and it's the flash trigger the
+    // HitFlashRenderer reads to briefly tint the GameObject white.
     [Unwrap]
     public partial struct HitFlashTime : IEntityComponent
     {
@@ -40,38 +41,45 @@ namespace Trecs.Samples.AspectInterfaces
         public float Value;
     }
 
-    public enum EnemyMood
+    // Enemy-only: absolute ElapsedTime at which the current flee expires.
+    // Stamped in EnemyAiSystem when a hit lands, using a random duration
+    // sampled per-hit so each retreat lasts a different amount of time.
+    [Unwrap]
+    public partial struct FleeEndTime : IEntityComponent
     {
-        Calm = 0,
-        Angry = 1,
-        Fleeing = 2,
+        public float Value;
     }
 
-    // Enemy-only: current behavioral state, driven by AI decisions.
+    public enum EnemyMood
+    {
+        Charging = 0,
+        Fleeing = 1,
+    }
+
+    // Enemy-only: current behavioral state. BossAiSystem flips it to
+    // Fleeing when a hit lands; EnemyAiSystem flips it back to Charging
+    // once the enemy has healed to full.
     [Unwrap]
     public partial struct Mood : IEntityComponent
     {
         public EnemyMood Value;
     }
 
-    // Boss-only: 0 when full health, 1 when nearly dead. Derived from Health/MaxHealth
-    // by the boss AI each frame; used to gate the boss's self-heal.
-    [Unwrap]
-    public partial struct EnrageLevel : IEntityComponent
-    {
-        public float Value;
-    }
-
+    // Template defaults are all `default` — SceneInitializer populates
+    // every tunable from SampleSettings at spawn time, keeping the knobs
+    // in one place (the scene inspector) instead of splitting them
+    // between the template and settings.
     public static partial class SampleTemplates
     {
         public partial class EnemyEntity : ITemplate, IHasTags<SampleTags.Enemy>
         {
             public Position Position = default;
-            public Armor Armor = new() { Value = 15f };
-            public MaxHealth MaxHealth = new() { Value = 100f };
-            public Health Health = new() { Value = 100f };
+            public Armor Armor = default;
+            public MaxHealth MaxHealth = default;
+            public Health Health = default;
             public HitFlashTime HitFlashTime = default;
-            public ChaseSpeed ChaseSpeed = new() { Value = 2f };
+            public ChaseSpeed ChaseSpeed = default;
+            public FleeEndTime FleeEndTime = default;
             public Mood Mood = default;
             public ColorComponent ColorComponent = default;
             public GameObjectId GameObjectId;
@@ -80,11 +88,10 @@ namespace Trecs.Samples.AspectInterfaces
         public partial class BossEntity : ITemplate, IHasTags<SampleTags.Boss>
         {
             public Position Position = default;
-            public Armor Armor = new() { Value = 25f };
-            public MaxHealth MaxHealth = new() { Value = 200f };
-            public Health Health = new() { Value = 200f };
+            public Armor Armor = default;
+            public MaxHealth MaxHealth = default;
+            public Health Health = default;
             public HitFlashTime HitFlashTime = default;
-            public EnrageLevel EnrageLevel = default;
             public ColorComponent ColorComponent = default;
             public GameObjectId GameObjectId;
         }

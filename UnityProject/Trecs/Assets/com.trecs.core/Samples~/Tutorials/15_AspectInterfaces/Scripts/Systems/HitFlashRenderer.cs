@@ -5,20 +5,22 @@ namespace Trecs.Samples.AspectInterfaces
 {
     // Variable-update renderer shared by enemies and the boss. Syncs each
     // GameObject's position to ECS Position, and tints its color — white
-    // during the 0.15s after a hit, otherwise the entity's base color scaled
-    // by its current health ratio so low-HP things look faded.
+    // during the HitFlashDuration window after a hit, otherwise the
+    // entity's base color scaled by its current health ratio so low-HP
+    // things look faded.
     //
     // Iterates by MatchByComponents rather than by tag, so the same system
     // renders any entity with the shape below regardless of species.
     [VariableUpdate]
     public partial class HitFlashRenderer : ISystem
     {
-        const float FlashDuration = 0.15f;
         readonly GameObjectRegistry _gameObjectRegistry;
+        readonly SampleSettings _settings;
 
-        public HitFlashRenderer(GameObjectRegistry gameObjectRegistry)
+        public HitFlashRenderer(GameObjectRegistry gameObjectRegistry, SampleSettings settings)
         {
             _gameObjectRegistry = gameObjectRegistry;
+            _settings = settings;
         }
 
         [ForEachEntity(MatchByComponents = true)]
@@ -35,7 +37,7 @@ namespace Trecs.Samples.AspectInterfaces
             go.transform.position = (Vector3)position.Value;
 
             float sinceHit = World.ElapsedTime - hitFlashTime.Value;
-            if (sinceHit < FlashDuration)
+            if (sinceHit < _settings.HitFlashDuration)
             {
                 go.GetComponent<Renderer>().material.color = Color.white;
             }

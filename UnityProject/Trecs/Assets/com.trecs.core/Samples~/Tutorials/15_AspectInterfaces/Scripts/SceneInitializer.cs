@@ -5,9 +5,6 @@ namespace Trecs.Samples.AspectInterfaces
 {
     public class SceneInitializer
     {
-        static readonly Color EnemyBaseColor = Color.red;
-        static readonly Color BossBaseColor = new Color(0.6f, 0.2f, 0.8f);
-
         readonly WorldAccessor _world;
         readonly GameObjectRegistry _gameObjectRegistry;
         readonly SampleSettings _settings;
@@ -25,53 +22,69 @@ namespace Trecs.Samples.AspectInterfaces
 
         public void Initialize()
         {
-            // One boss, stationary at the zone center — takes damage forever,
-            // self-heals when enraged, visibly oscillates at ~50% HP.
-            var bossPos = _settings.ZoneCenter;
-            var bossGO = MakePrimitive(PrimitiveType.Cube, BossBaseColor, "Boss", bossPos);
-            bossGO.transform.localScale = Vector3.one * 1.2f;
+            // One boss at the origin. Every per-entity stat is pulled
+            // from SampleSettings so the scene inspector is the single
+            // source of truth.
+            var bossPos = float3.zero;
+            var bossGO = MakePrimitive(
+                PrimitiveType.Cube,
+                _settings.BossBaseColor,
+                "Boss",
+                bossPos,
+                _settings.BossScale
+            );
             _world
                 .AddEntity<SampleTags.Boss>()
                 .Set(new Position(bossPos))
-                .Set(new ColorComponent { Value = BossBaseColor })
+                .Set(new Armor { Value = _settings.BossArmor })
+                .Set(new MaxHealth { Value = _settings.BossMaxHealth })
+                .Set(new Health { Value = _settings.BossMaxHealth })
+                .Set(new ColorComponent { Value = _settings.BossBaseColor })
                 .Set(_gameObjectRegistry.Register(bossGO));
 
-            // Six enemies on a ring around the boss. Four start inside the
-            // zone (radius ZoneRadius = 5) and two start just outside. Each
-            // enemy's per-frame AI decides whether to charge, hold, or flee.
-            int count = 6;
-            float ringRadius = _settings.ZoneRadius * 0.8f;
+            // Enemies arranged on a ring around the boss. Each gets a
+            // different armor value so per-entity flee cadence visibly
+            // differs. EnemyArmors.Length drives the enemy count.
+            int count = _settings.EnemyArmors.Length;
             for (int i = 0; i < count; i++)
             {
                 float angle = i * (2f * math.PI / count);
-                float r = (i < 4) ? ringRadius : _settings.ZoneRadius * 1.3f;
-                var pos = new float3(r * math.cos(angle), 0.3f, r * math.sin(angle));
-                var go = MakePrimitive(PrimitiveType.Cube, EnemyBaseColor, $"Enemy_{i}", pos);
+                var pos = new float3(
+                    _settings.SpawnRingRadius * math.cos(angle),
+                    _settings.EnemySpawnY,
+                    _settings.SpawnRingRadius * math.sin(angle)
+                );
+                var go = MakePrimitive(
+                    PrimitiveType.Cube,
+                    _settings.EnemyBaseColor,
+                    $"Enemy_{i}",
+                    pos,
+                    _settings.EnemyScale
+                );
                 _world
                     .AddEntity<SampleTags.Enemy>()
                     .Set(new Position(pos))
-                    .Set(new ColorComponent { Value = EnemyBaseColor })
+                    .Set(new Armor { Value = _settings.EnemyArmors[i] })
+                    .Set(new MaxHealth { Value = _settings.EnemyMaxHealth })
+                    .Set(new Health { Value = _settings.EnemyMaxHealth })
+                    .Set(new ChaseSpeed { Value = _settings.EnemyChaseSpeed })
+                    .Set(new ColorComponent { Value = _settings.EnemyBaseColor })
                     .Set(_gameObjectRegistry.Register(go));
             }
-
-            // Visual marker for the damage zone (flat orange disc on the ground).
-            var marker = SampleUtil.CreatePrimitive(PrimitiveType.Cylinder);
-            marker.name = "DamageZone";
-            marker.transform.position = (Vector3)_settings.ZoneCenter;
-            marker.transform.localScale = new Vector3(
-                _settings.ZoneRadius * 2f,
-                0.05f,
-                _settings.ZoneRadius * 2f
-            );
-            marker.GetComponent<Renderer>().material.color = new Color(1f, 0.6f, 0f, 1f);
         }
 
-        static GameObject MakePrimitive(PrimitiveType type, Color color, string name, float3 pos)
+        static GameObject MakePrimitive(
+            PrimitiveType type,
+            Color color,
+            string name,
+            float3 pos,
+            float scale
+        )
         {
             var go = SampleUtil.CreatePrimitive(type);
             go.name = name;
             go.transform.position = (Vector3)pos;
-            go.transform.localScale = Vector3.one * 0.6f;
+            go.transform.localScale = Vector3.one * scale;
             go.GetComponent<Renderer>().material.color = color;
             return go;
         }

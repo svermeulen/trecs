@@ -1,83 +1,116 @@
 using Unity.Mathematics;
+using Random = Unity.Mathematics.Random;
 
 namespace Trecs.Samples.AspectInterfaces
 {
+    // Runs after the boss so each enemy sees the boss's post-move position
+    // for this frame's collision check.
+    [ExecutesAfter(typeof(BossAiSystem))]
     public partial class EnemyAiSystem : ISystem
     {
-        readonly float3 _zoneCenter;
-        readonly float _zoneRadius;
-        readonly float _damagePerHit;
-        readonly float _hitInterval;
-        readonly float _outOfZoneRegenPerSecond;
+        readonly SampleSettings _settings;
 
-        public EnemyAiSystem(
-            float3 zoneCenter,
-            float zoneRadius,
-            float damagePerHit,
-            float hitInterval,
-            float outOfZoneRegenPerSecond
-        )
+        public EnemyAiSystem(SampleSettings settings)
         {
-            _zoneCenter = zoneCenter;
-            _zoneRadius = zoneRadius;
-            _damagePerHit = damagePerHit;
-            _hitInterval = hitInterval;
-            _outOfZoneRegenPerSecond = outOfZoneRegenPerSecond;
+            _settings = settings;
+        }
+
+        public void Execute()
+        {
+            // Query the boss once per frame, then forward it to the
+            // per-entity method as a pass-through argument — each enemy
+            // iteration reads the same boss view without re-querying.
+            // TrySingle so that when the boss dies the whole system
+            // becomes a no-op instead of asserting.
+            if (!BossView.Query(World).WithTags<SampleTags.Boss>().TrySingle(out var boss))
+            {
+                return;
+            }
+            ExecuteImpl(in boss);
         }
 
         [ForEachEntity(Tag = typeof(SampleTags.Enemy))]
-        void Execute(in EnemyView enemy)
+        void ExecuteImpl(in EnemyView enemy, [PassThroughArgument] in BossView boss)
         {
-            // Enemy-specific: is this enemy currently inside the damage zone?
-            float3 toCenter = _zoneCenter - enemy.Position;
-            bool insideZone = math.lengthsq(toCenter) < _zoneRadius * _zoneRadius;
+            // Passive heal. Tuned so an enemy that just took a hit needs
+            // a few seconds of fleeing before it's topped up and ready
+            // to charge back in.
+            enemy.Health = math.min(
+                enemy.Health + _settings.EnemyRegenPerSecond * World.DeltaTime,
+                enemy.MaxHealth
+            );
 
-            // Discrete damage pulses: inside the zone, the enemy takes one hit
-            // every _hitInterval seconds, not one per frame. We gate on
-            // HitFlashTime (which Combat.TakeHit stamps) so each entity
-            // cooldown is self-contained — no scheduler state needed.
-            if (insideZone && World.ElapsedTime - enemy.HitFlashTime >= _hitInterval)
-            {
-                // Shared subroutine — armor-reduce, health-subtract, stamp flash time.
-                Combat.TakeHit(enemy, _damagePerHit, World.ElapsedTime);
-            }
-            else if (!insideZone)
-            {
-                // Shared subroutine — same helper the boss uses when enraged.
-                // Passive recovery out of the zone gives fled enemies a way to
-                // come back, keeping the scene cyclic instead of bleeding them
-                // off into the distance forever.
-                Combat.Heal(enemy, _outOfZoneRegenPerSecond * World.DeltaTime);
-            }
+            float3 toBoss = boss.Position - enemy.Position;
+            float collisionSqr = _settings.CollisionDistance * _settings.CollisionDistance;
+            bool inRange = math.lengthsq(toBoss) <= collisionSqr;
 
-            // Enemy-specific: pick behavior. The threshold check uses the
-            // shared IsLowHealth helper, but the *response* (which direction
-            // to move, what mood to store) is enemy-specific.
-            if (Combat.IsLowHealth(enemy))
+            // Detect collision with the boss and handle our own side of
+            // the exchange — take damage, flip to Fleeing, and pick a
+            // fresh random flee duration so every retreat lasts a
+            // slightly different amount of time.
+            if (inRange
+                && Combat.TryTakeHit(enemy, _settings.DamagePerHit, _settings.EnemyHitCooldown, World))
             {
                 enemy.Mood = EnemyMood.Fleeing;
-                // Enemy-specific: run away from the zone center.
-                float3 awayDir = math.normalizesafe(-toCenter);
-                enemy.Position += awayDir * enemy.ChaseSpeed * World.DeltaTime;
+
+                // Seed from frame + entity index so each hit gets a
+                // distinct random stream without any persistent RNG
+                // state on the system (Trecs systems avoid mutable
+                // member state).
+                uint seed =
+                    1u
+                    + (uint)World.Frame * 0x9E3779B9u
+                    + (uint)enemy.EntityIndex.Index * 0x85EBCA6Bu;
+                var rng = new Random(seed);
+                float duration = rng.NextFloat(
+                    _settings.MinFleeDuration,
+                    _settings.MaxFleeDuration
+                );
+                enemy.FleeEndTime = World.ElapsedTime + duration;
             }
-            else if (insideZone)
+
+            // Time-based flee: flip back to charging once the stamped
+            // end-time has passed. Repeated hits re-stamp FleeEndTime,
+            // so successive hits naturally extend the retreat.
+            if (enemy.Mood == EnemyMood.Fleeing && World.ElapsedTime >= enemy.FleeEndTime)
             {
-                enemy.Mood = EnemyMood.Angry;
-                // Enemy-specific: charge inward at half speed while tanking damage.
-                float3 inwardDir = math.normalizesafe(toCenter);
-                enemy.Position += inwardDir * enemy.ChaseSpeed * 0.5f * World.DeltaTime;
+                enemy.Mood = EnemyMood.Charging;
             }
-            else
+
+            // Charging enemies stop at the edge of the collision radius —
+            // otherwise, during the HitCooldown window after a hit, they'd
+            // keep walking forward into the boss's exact position, where
+            // normalizesafe goes to zero and everyone locks up. Fleeing
+            // enemies always move away.
+            if (enemy.Mood == EnemyMood.Charging && inRange)
             {
-                enemy.Mood = EnemyMood.Calm;
-                // Enemy-specific: creep slowly toward the zone to pick a fight.
-                float3 inwardDir = math.normalizesafe(toCenter);
-                enemy.Position += inwardDir * enemy.ChaseSpeed * 0.2f * World.DeltaTime;
+                return;
             }
+
+            // Keep movement in the XZ plane — otherwise the Y delta
+            // between boss and enemy (they spawn at different heights)
+            // bakes into the direction vector and enemies slowly drift
+            // vertically with every charge/flee step.
+            float3 toBossFlat = toBoss;
+            toBossFlat.y = 0f;
+            float3 unitToBoss = math.normalizesafe(toBossFlat);
+            float3 dir = enemy.Mood == EnemyMood.Fleeing ? -unitToBoss : unitToBoss;
+            enemy.Position += dir * enemy.ChaseSpeed * World.DeltaTime;
         }
 
-        // Concrete aspect. IHittable contributes Armor/MaxHealth/Health/HitFlashTime;
-        // the enemy adds Position (movement), ChaseSpeed (enemy-only), Mood (enemy-only).
-        partial struct EnemyView : IHittable, IWrite<Position>, IRead<ChaseSpeed>, IWrite<Mood> { }
+        // Read-only view of the boss, used for both the collision check
+        // and for picking a flee/chase direction.
+        partial struct BossView : IAspect, IRead<Position> { }
+
+        // Concrete enemy aspect. IHittable contributes the combat substrate
+        // that Combat.TryTakeHit needs, Position is written as the enemy
+        // moves, ChaseSpeed is the per-entity speed, and Mood gates
+        // charge-vs-flee.
+        partial struct EnemyView
+            : IHittable,
+                IWrite<Position>,
+                IRead<ChaseSpeed>,
+                IWrite<Mood>,
+                IWrite<FleeEndTime> { }
     }
 }
