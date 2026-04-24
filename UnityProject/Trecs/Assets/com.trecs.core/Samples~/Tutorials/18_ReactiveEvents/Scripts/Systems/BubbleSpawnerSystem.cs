@@ -4,16 +4,20 @@ using UnityEngine;
 namespace Trecs.Samples.ReactiveEvents
 {
     /// <summary>
-    /// Spawns a new Bubble entity every <see cref="_spawnInterval"/> seconds at
-    /// a random position. The accompanying GameObject is created here and
+    /// Spawns a new Bubble entity every <c>_spawnInterval</c> seconds at a
+    /// random position. The accompanying GameObject is created here and
     /// destroyed by the OnRemoved observer — a natural fit for the reactive
     /// pattern, since entity lifetime is the source of truth.
+    ///
+    /// Mutable per-tick state (the spawn cooldown) lives on a global
+    /// component, not a system member variable, so the world's state is
+    /// fully captured by its entities and globals. This is a prerequisite
+    /// for deterministic replay, serialization, and rollback.
     /// </summary>
     public partial class BubbleSpawnerSystem : ISystem
     {
         readonly float _spawnInterval;
         readonly GameObjectRegistry _registry;
-        float _timer;
 
         public BubbleSpawnerSystem(float spawnInterval, GameObjectRegistry registry)
         {
@@ -23,10 +27,12 @@ namespace Trecs.Samples.ReactiveEvents
 
         public void Execute()
         {
-            _timer += World.DeltaTime;
-            while (_timer >= _spawnInterval)
+            ref var state = ref World.GlobalComponent<State>().Write;
+
+            state.Cooldown -= World.DeltaTime;
+            while (state.Cooldown <= 0f)
             {
-                _timer -= _spawnInterval;
+                state.Cooldown += _spawnInterval;
                 Spawn();
             }
         }
@@ -54,8 +60,12 @@ namespace Trecs.Samples.ReactiveEvents
                 .Set(new Position(position))
                 .Set(new Velocity(velocity))
                 .Set(new Lifetime(lifetime))
-                .Set(_registry.Register(go))
-                .AssertComplete();
+                .Set(_registry.Register(go));
+        }
+
+        public partial struct State : IEntityComponent
+        {
+            public float Cooldown;
         }
     }
 }

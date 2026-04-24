@@ -2,12 +2,14 @@
 
 using System;
 using System.Collections.Generic;
+using TMPro;
 
 namespace Trecs.Samples.ReactiveEvents
 {
     public class ReactiveEventsCompositionRoot : CompositionRootBase
     {
         public float SpawnInterval = 0.3f;
+        public TMP_Text StatusText;
 
         public override void Construct(
             out List<Action> initializables,
@@ -19,7 +21,13 @@ namespace Trecs.Samples.ReactiveEvents
             var registry = new GameObjectRegistry();
 
             var world = new WorldBuilder()
-                .AddEntityType(SampleTemplates.BubbleEntity.Template)
+                .AddEntityTypes(
+                    new[]
+                    {
+                        SampleTemplates.Globals.Template,
+                        SampleTemplates.BubbleEntity.Template,
+                    }
+                )
                 .Build();
 
             world.AddSystems(
@@ -32,13 +40,11 @@ namespace Trecs.Samples.ReactiveEvents
                 }
             );
 
-            var observer = new EventObserverInstaller(world, registry);
+            var observer = new GameStatsUpdater(world, registry);
 
-            // The observer must be installed AFTER world.Initialize so that the
-            // world's accessor is ready, but BEFORE any entities are spawned
-            // so that the first submission fires OnAdded for us. Ordering it
-            // after world.Initialize in the initializables list gets this right.
-            initializables = new() { world.Initialize, observer.Install };
+            world.AddSystem(new TextDisplaySystem(StatusText));
+
+            initializables = new() { world.Initialize };
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
             disposables = new() { observer.Dispose, world.Dispose };

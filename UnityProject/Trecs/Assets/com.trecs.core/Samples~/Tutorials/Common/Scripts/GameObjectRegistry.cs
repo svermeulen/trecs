@@ -7,11 +7,12 @@ namespace Trecs.Samples
     {
         readonly Dictionary<int, GameObject> _registry = new();
 
-        int _idCounter;
+        // Reserve 0 for null
+        int _nextId = 1;
 
         public GameObjectId Register(GameObject obj)
         {
-            var id = _idCounter++;
+            var id = _nextId++;
             _registry.Add(id, obj);
             return new GameObjectId { Value = id };
         }
