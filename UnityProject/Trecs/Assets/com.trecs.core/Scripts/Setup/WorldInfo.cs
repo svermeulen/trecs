@@ -61,12 +61,15 @@ namespace Trecs
                 {
                     if (!tagSetToIndex.ContainsKey(tagSet))
                     {
+                        // GroupIndex is 1-based; 0 is Null. Real groups occupy
+                        // raw values 1..ushort.MaxValue, so the 0-based index
+                        // must stay below ushort.MaxValue.
                         Assert.That(
-                            indexToTagSet.Count <= ushort.MaxValue,
-                            "GroupIndex is ushort — world would have more than {} groups",
-                            ushort.MaxValue
+                            indexToTagSet.Count < ushort.MaxValue,
+                            "GroupIndex exhausted — world has more than {} groups",
+                            ushort.MaxValue - 1
                         );
-                        var idx = new GroupIndex((ushort)indexToTagSet.Count);
+                        var idx = GroupIndex.FromIndex(indexToTagSet.Count);
                         tagSetToIndex.Add(tagSet, idx);
                         indexToTagSet.Add(tagSet);
                     }
@@ -235,13 +238,14 @@ namespace Trecs
         /// </summary>
         public TagSet ToTagSet(GroupIndex groupIndex)
         {
+            Assert.That(!groupIndex.IsNull, "Cannot resolve Null GroupIndex to a TagSet");
             Assert.That(
-                groupIndex.Value < _indexToTagSet.Length,
+                groupIndex.Index < _indexToTagSet.Length,
                 "GroupIndex {} out of range [0, {})",
-                groupIndex.Value,
+                groupIndex.Index,
                 _indexToTagSet.Length
             );
-            return _indexToTagSet[groupIndex.Value];
+            return _indexToTagSet[groupIndex.Index];
         }
 
         static bool HasGlobalsTemplate(IReadOnlyList<Template> templates)

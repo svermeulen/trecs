@@ -10,7 +10,7 @@ namespace Trecs.Internal
     {
         static readonly TrecsLog _log = new(nameof(ComponentStore));
 
-        // Per-group component arrays, indexed directly by GroupIndex.Value.
+        // Per-group component arrays, indexed directly by GroupIndex.Index.
         // Pre-allocated at construction — every slot holds a (possibly empty)
         // DenseDictionary<ComponentId, IComponentArray>. A direct array index
         // replaces the old Dict<GroupIndex, ...> hash lookup on the hot path.
@@ -58,7 +58,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public DenseDictionary<ComponentId, IComponentArray> GetDBGroup(GroupIndex fromIdGroupId)
         {
-            return _groupEntityComponentsDB[fromIdGroupId.Value];
+            return _groupEntityComponentsDB[fromIdGroupId.Index];
         }
 
         /// <summary>
@@ -69,7 +69,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public DenseDictionary<ComponentId, IComponentArray> GetOrAddDBGroup(GroupIndex toGroupId)
         {
-            return _groupEntityComponentsDB[toGroupId.Value];
+            return _groupEntityComponentsDB[toGroupId.Index];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

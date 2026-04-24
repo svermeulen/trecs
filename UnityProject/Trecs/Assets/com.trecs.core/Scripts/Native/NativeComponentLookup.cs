@@ -193,7 +193,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.NoInlining)]
         static ref NativeComponentLookupEntry ThrowGroupNotInLookup(GroupIndex group)
         {
-            ThrowGroupNotInLookupManaged(group.Value);
+            ThrowGroupNotInLookupManaged(group.GetHashCode());
             throw new InvalidOperationException(
                 "NativeComponentLookupRead: entity's group is not in this lookup's permitted "
                     + "group set. Add the group to the lookup's [ForEachEntity] or schedule-time TagSet."
@@ -375,7 +375,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.NoInlining)]
         static ref NativeComponentLookupEntry ThrowGroupNotInLookup(GroupIndex group)
         {
-            ThrowGroupNotInLookupManaged(group.Value);
+            ThrowGroupNotInLookupManaged(group.GetHashCode());
             throw new InvalidOperationException(
                 "NativeComponentLookupWrite: entity's group is not in this lookup's permitted "
                     + "group set. Add the group to the lookup's [ForEachEntity] or schedule-time TagSet."

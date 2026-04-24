@@ -1226,7 +1226,7 @@ namespace Trecs.Internal
                 }
             }
 
-            var dictionariesOfEntities = _componentStore.GroupEntityComponentsDB[groupId.Value];
+            var dictionariesOfEntities = _componentStore.GroupEntityComponentsDB[groupId.Index];
             foreach (var dictionaryOfEntities in dictionariesOfEntities)
             {
                 dictionaryOfEntities.Value.Clear();
@@ -1429,9 +1429,7 @@ namespace Trecs.Internal
                 using (TrecsProfiling.Start("NatRemove Queue"))
                 {
 #if DEBUG && (!TRECS_IS_PROFILING || TRECS_INTERNAL_CHECKS)
-                    // GroupIndex? so the first iteration always hits the cache-miss branch —
-                    // default(GroupIndex) == GroupIndex(0) would collide with a real group.
-                    GroupIndex? cachedGroup = null;
+                    GroupIndex cachedGroup = default;
                     ResolvedTemplate cachedTemplate = null;
 
                     foreach (var (entityHandlex, accessorId) in removals)
@@ -1439,9 +1437,7 @@ namespace Trecs.Internal
                         if (entityHandlex.GroupIndex != cachedGroup)
                         {
                             cachedGroup = entityHandlex.GroupIndex;
-                            cachedTemplate = _worldInfo.GetResolvedTemplateForGroup(
-                                cachedGroup.Value
-                            );
+                            cachedTemplate = _worldInfo.GetResolvedTemplateForGroup(cachedGroup);
                         }
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
@@ -1501,7 +1497,7 @@ namespace Trecs.Internal
                 using (TrecsProfiling.Start("NatSwap Queue"))
                 {
 #if DEBUG && (!TRECS_IS_PROFILING || TRECS_INTERNAL_CHECKS)
-                    GroupIndex? cachedGroup = null;
+                    GroupIndex cachedGroup = default;
                     ResolvedTemplate cachedTemplate = null;
 
                     foreach (var (fromEntityIndex, toGroup, accessorId) in swaps)
@@ -1509,9 +1505,7 @@ namespace Trecs.Internal
                         if (fromEntityIndex.GroupIndex != cachedGroup)
                         {
                             cachedGroup = fromEntityIndex.GroupIndex;
-                            cachedTemplate = _worldInfo.GetResolvedTemplateForGroup(
-                                cachedGroup.Value
-                            );
+                            cachedTemplate = _worldInfo.GetResolvedTemplateForGroup(cachedGroup);
                         }
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
@@ -1535,9 +1529,7 @@ namespace Trecs.Internal
                 {
                     // Cache group dict + per-component arrays to avoid redundant dictionary
                     // lookups for consecutive entities in the same group (common pattern).
-                    // GroupIndex? so the first iteration always hits the cache-miss branch —
-                    // default(GroupIndex) == GroupIndex(0) would collide with a real group.
-                    GroupIndex? cachedAddGroup = null;
+                    GroupIndex cachedAddGroup = default;
                     DenseDictionary<ComponentId, IComponentArray> cachedGroupDict = null;
                     IComponentBuilder[] cachedComponents = null;
                     var cachedComponentArrays = _cachedNativeAddComponentArrays;

@@ -28,16 +28,17 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var info = env.Accessor.WorldInfo;
 
-            var seen = new System.Collections.Generic.HashSet<ushort>();
+            var seen = new System.Collections.Generic.HashSet<int>();
             foreach (var group in info.AllGroups)
             {
+                NAssert.IsFalse(group.IsNull, "Real groups must never be Null");
                 NAssert.IsTrue(
-                    group.Value < info.AllGroups.Count,
+                    group.Index < info.AllGroups.Count,
                     "GroupIndex {0} out of range [0, {1})",
-                    group.Value,
+                    group.Index,
                     info.AllGroups.Count
                 );
-                NAssert.IsTrue(seen.Add(group.Value), "Duplicate GroupIndex {0}", group.Value);
+                NAssert.IsTrue(seen.Add(group.Index), "Duplicate GroupIndex {0}", group.Index);
             }
 
             NAssert.AreEqual(info.AllGroups.Count, seen.Count);
@@ -50,6 +51,32 @@ namespace Trecs.Tests
                 2,
                 Unity.Collections.LowLevel.Unsafe.UnsafeUtility.SizeOf<GroupIndex>()
             );
+        }
+
+        [Test]
+        public void GroupIndex_Default_IsNull()
+        {
+            GroupIndex g = default;
+            NAssert.IsTrue(g.IsNull);
+            NAssert.AreEqual(GroupIndex.Null, g);
+        }
+
+        [Test]
+        public void GroupIndex_Index_ThrowsOnNull()
+        {
+            GroupIndex g = default;
+            NAssert.Throws<TrecsException>(() =>
+            {
+                var _ = g.Index;
+            });
+        }
+
+        [Test]
+        public void EntityIndex_Default_IsNull()
+        {
+            EntityIndex e = default;
+            NAssert.IsTrue(e.IsNull);
+            NAssert.AreEqual(EntityIndex.Null, e);
         }
     }
 }

@@ -764,7 +764,7 @@ namespace Trecs.Internal
             public override readonly int GetHashCode()
             {
                 return unchecked(
-                    (int)math.hash(new int2(GroupIndex.Value, ComponentType.GetHashCode()))
+                    (int)math.hash(new int2(GroupIndex.GetHashCode(), ComponentType.GetHashCode()))
                 );
             }
 
