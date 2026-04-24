@@ -76,7 +76,6 @@ namespace Trecs.Serialization
             // Entity serializers
             registry.RegisterBlit<EntityHandleMapElement>();
             registry.RegisterBlit<EntityHandle>();
-            registry.RegisterBlit<Group>();
             registry.RegisterBlit<TagSet>();
 
             // For EntityInputQueue
