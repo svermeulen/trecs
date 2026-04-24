@@ -23,38 +23,38 @@ namespace Trecs
         /// <summary>
         /// The group this entity belongs to.
         /// </summary>
-        public readonly Group Group;
+        public readonly GroupIndex GroupIndex;
 
         /// <summary>
         /// A sentinel value representing no entity.
         /// </summary>
-        public static EntityIndex Null => default;
+        public static EntityIndex Null => new(-1, default);
 
         /// <summary>
         /// Returns true if this is the null sentinel value.
         /// </summary>
         public bool IsNull
         {
-            get { return Group.IsNull; }
+            get { return Index < 0; }
         }
 
         /// <inheritdoc/>
         public static bool operator ==(EntityIndex obj1, EntityIndex obj2)
         {
-            return obj1.Index == obj2.Index && obj1.Group == obj2.Group;
+            return obj1.Index == obj2.Index && obj1.GroupIndex == obj2.GroupIndex;
         }
 
         /// <inheritdoc/>
         public static bool operator !=(EntityIndex obj1, EntityIndex obj2)
         {
-            return obj1.Index != obj2.Index || obj1.Group != obj2.Group;
+            return obj1.Index != obj2.Index || obj1.GroupIndex != obj2.GroupIndex;
         }
 
-        public EntityIndex(int index, Group groupId)
+        public EntityIndex(int index, GroupIndex groupIndex)
             : this()
         {
             this.Index = index;
-            this.Group = groupId;
+            this.GroupIndex = groupIndex;
         }
 
         /// <inheritdoc/>
@@ -66,14 +66,14 @@ namespace Trecs
         /// <inheritdoc/>
         public bool Equals(EntityIndex other)
         {
-            return other.Index == Index && other.Group == Group;
+            return other.Index == Index && other.GroupIndex == GroupIndex;
         }
 
         public readonly int GetStableHashCode()
         {
             // we don't want to use HashCode.Combine or GetHashCode because
             // it's not deterministic across restarts
-            return unchecked((int)math.hash(new int2(Index, Group.GetStableHashCode())));
+            return unchecked((int)math.hash(new int2(Index, GroupIndex.Value)));
         }
 
         /// <inheritdoc/>
@@ -85,17 +85,15 @@ namespace Trecs
         /// <inheritdoc/>
         public int CompareTo(EntityIndex other)
         {
-            return Group.Id != other.Group.Id
-                ? Group.Id.CompareTo(other.Group.Id)
+            return GroupIndex.Value != other.GroupIndex.Value
+                ? GroupIndex.Value.CompareTo(other.GroupIndex.Value)
                 : Index.CompareTo(other.Index);
         }
 
         /// <inheritdoc/>
         public override string ToString()
         {
-            var value = Group.ToString();
-
-            return $"index {Index} group {value}";
+            return $"index {Index} group {GroupIndex}";
         }
 
         /// <summary>
@@ -104,7 +102,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public EntityIndex WithIndex(int index)
         {
-            return new EntityIndex(index, Group);
+            return new EntityIndex(index, GroupIndex);
         }
 
         /// <summary>
