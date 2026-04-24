@@ -355,41 +355,57 @@ namespace Trecs.Serialization
         }
 
         void WriteSetRoutingIndex(
-            in NativeDenseDictionary<GroupIndex, NativeList<SetId>> routingIndex,
+            in NativeList<UnsafeList<SetId>> routingIndex,
             ISerializationWriter writer
         )
         {
-            writer.Write("numRoutingEntries", routingIndex.Count);
-
-            for (int i = 0; i < routingIndex.Count; i++)
+            // Emit only non-empty slots, keeping the wire format sparse.
+            int nonEmptyCount = 0;
+            for (int i = 0; i < routingIndex.Length; i++)
             {
-                writer.Write("group", _worldDef.ToTagSet(routingIndex.UnsafeKeys[i]));
-                writer.Write("filterIndices", routingIndex.UnsafeValues[i]);
+                if (routingIndex[i].Length > 0)
+                    nonEmptyCount++;
+            }
+            writer.Write("numRoutingEntries", nonEmptyCount);
+
+            for (int i = 0; i < routingIndex.Length; i++)
+            {
+                var list = routingIndex[i];
+                if (list.Length == 0)
+                    continue;
+                writer.Write("group", _worldDef.ToTagSet(GroupIndex.FromIndex(i)));
+                writer.Write("listLength", list.Length);
+                for (int j = 0; j < list.Length; j++)
+                {
+                    writer.Write("setId", list[j]);
+                }
             }
         }
 
         void ReadSetRoutingIndex(
-            NativeDenseDictionary<GroupIndex, NativeList<SetId>> routingIndex,
+            NativeList<UnsafeList<SetId>> routingIndex,
             ISerializationReader reader
         )
         {
             var numEntries = reader.Read<int>("numRoutingEntries");
 
-            // Clear existing routing entries
-            foreach (var entry in routingIndex)
+            // Clear existing contents of every slot (reset to empty).
+            for (int i = 0; i < routingIndex.Length; i++)
             {
-                entry.Value.Dispose();
+                routingIndex.ElementAt(i).Clear();
             }
-
-            routingIndex.Clear();
 
             for (int i = 0; i < numEntries; i++)
             {
                 var tagSet = reader.Read<TagSet>("group");
                 var group = _worldDef.ToGroupIndex(tagSet);
-                var setIndices = new NativeList<SetId>(1, Allocator.Persistent);
-                reader.Read("filterIndices", ref setIndices);
-                routingIndex.Add(group, setIndices);
+                var listLength = reader.Read<int>("listLength");
+                ref var list = ref routingIndex.ElementAt(group.Index);
+                list.Resize(listLength, NativeArrayOptions.UninitializedMemory);
+                for (int j = 0; j < listLength; j++)
+                {
+                    list[j] = reader.Read<SetId>("setId");
+                }
             }
         }
 
