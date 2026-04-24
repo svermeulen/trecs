@@ -65,6 +65,9 @@ nativeWorld.RemoveEntity(entityIndex);
 nativeWorld.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
 ```
 
+!!! warning "Structural changes are fixed-phase only"
+    `AddEntity`, `RemoveEntity`, and `MoveTo` on `NativeWorldAccessor` are **only valid from jobs scheduled by fixed-update systems**. Calling them from variable-phase or input-phase jobs will assert in debug builds. This keeps simulation state changes deterministic and aligned with submission boundaries.
+
 ### Sort Keys
 
 When `RequireDeterministicSubmission` is enabled, sort keys determine the order structural operations are applied. Use entity IDs or loop indices as sort keys for reproducible results.

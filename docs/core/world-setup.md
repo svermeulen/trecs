@@ -125,7 +125,7 @@ world.Dispose();
 `WorldAccessor` is the primary API for interacting with the world at runtime. Systems receive it automatically via source generation, but you can also create one manually:
 
 ```csharp
-var world = world.CreateAccessor();
+var worldAccessor = world.CreateAccessor();
 ```
 
 `WorldAccessor` provides access to:

@@ -124,7 +124,7 @@ When prey are removed, clean up their GameObjects using an `OnRemoved` event han
 public partial class CleanupHandlers
 {
     readonly GameObjectRegistry _gameObjectRegistry;
-    readonly DisposeCollection _disposables = new();
+    readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container
 
     public CleanupHandlers(World world, GameObjectRegistry gameObjectRegistry)
     {

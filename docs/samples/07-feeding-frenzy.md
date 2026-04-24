@@ -158,7 +158,7 @@ Bidirectional cleanup — when a fish is removed, its target meal is also remove
 ```csharp
 public partial class RemoveCleanupHandler : IDisposable
 {
-    readonly DisposeCollection _disposables = new();
+    readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container
 
     public RemoveCleanupHandler(World world)
     {

@@ -169,7 +169,7 @@ Native pointers stored in components must be disposed when entities are removed,
 ```csharp
 public partial class PointerCleanupHandler : IDisposable
 {
-    readonly DisposeCollection _disposables = new();
+    readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container
 
     public PointerCleanupHandler(World world)
     {

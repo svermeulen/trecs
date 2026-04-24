@@ -67,6 +67,8 @@ foreach (var boid in Boid.Query(World).MatchByComponents())
 }
 ```
 
+Aspect queries **do not auto-filter by the aspect's declared components** — you must explicitly call either `WithTags<…>()` to scope by tag, or `MatchByComponents()` to scope by the aspect's declared component types. Without one of these, the query has no group scope.
+
 This is useful when you need iteration logic in `Execute()` beyond what `[ForEachEntity]` supports (e.g., iterating multiple queries at once) or if you just prefer this kind of style.
 
 ## Single Entity Access

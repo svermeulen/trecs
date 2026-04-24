@@ -55,26 +55,28 @@ Each frame, determines which particles are inside each wave band and updates set
 ```csharp
 public void Execute()
 {
-    float waveXCenter = math.sin(World.ElapsedTime * 2f) * _gridSize * 0.6f;
-    float waveZCenter = math.cos(World.ElapsedTime * 1.5f) * _gridSize * 0.6f;
+    float waveCenterX = math.sin(World.ElapsedTime * _settings.WaveXSpeed) * _gridExtent;
+    float waveCenterZ = math.cos(World.ElapsedTime * _settings.WaveZSpeed) * _gridExtent;
 
-    foreach (var p in ParticleView.Query(World).WithTags<SampleTags.Particle>())
+    foreach (var particle in ParticleView.Query(World).WithTags<SampleTags.Particle>())
     {
-        p.WarmIntensity = 0;
-        p.CoolIntensity = 0;
+        // Reset intensities — downstream effect systems will overwrite
+        // for particles that are in their set.
+        particle.WarmIntensity = 0;
+        particle.CoolIntensity = 0;
 
-        float distX = math.abs(p.Position.x - waveXCenter);
-        float distZ = math.abs(p.Position.z - waveZCenter);
+        float distX = math.abs(particle.Position.x - waveCenterX);
+        float distZ = math.abs(particle.Position.z - waveCenterZ);
 
-        if (distX < waveBandWidth)
-            World.SetAdd<SampleSets.WaveX>(p.EntityIndex);
+        if (distX < _settings.WaveBandWidth)
+            World.SetAdd<SampleSets.WaveX>(particle.EntityIndex);
         else
-            World.SetRemove<SampleSets.WaveX>(p.EntityIndex);
+            World.SetRemove<SampleSets.WaveX>(particle.EntityIndex);
 
-        if (distZ < waveBandWidth)
-            World.SetAdd<SampleSets.WaveZ>(p.EntityIndex);
+        if (distZ < _settings.WaveBandWidth)
+            World.SetAdd<SampleSets.WaveZ>(particle.EntityIndex);
         else
-            World.SetRemove<SampleSets.WaveZ>(p.EntityIndex);
+            World.SetRemove<SampleSets.WaveZ>(particle.EntityIndex);
     }
 }
 ```
@@ -82,11 +84,15 @@ public void Execute()
 ### WaveXEffectSystem — Iterate Only WaveX Members
 
 ```csharp
-[ForEachEntity(Set = typeof(SampleSets.WaveX))]
-void Execute(in ParticleView p)
+[ForEachEntity(
+    Tags = new[] { typeof(SampleTags.Particle) },
+    Set = typeof(SampleSets.WaveX)
+)]
+void Execute(in WaveXView view)
 {
-    float distFromWave = math.abs(p.Position.x - waveCenter);
-    p.WarmIntensity = 1f - (distFromWave / waveBandWidth);
+    float waveCenterX = math.sin(World.ElapsedTime * _settings.WaveXSpeed) * _gridExtent;
+    float dist = math.abs(view.Position.x - waveCenterX);
+    view.WarmIntensity = math.saturate(1f - dist / _settings.WaveBandWidth);
 }
 ```
 

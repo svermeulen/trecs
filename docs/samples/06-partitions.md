@@ -50,10 +50,14 @@ void Execute(in ActiveBall ball)
     ball.Position += vel * World.DeltaTime;
     ball.Velocity = vel;
 
-    // Transition to Resting when energy is low
-    if (math.lengthsq(ball.Velocity) < RestThreshold * RestThreshold)
+    // Transition to Resting only when energy is low AND on the floor
+    if (
+        math.lengthsq(ball.Velocity) < RestThreshold * RestThreshold
+        && ball.Position.y <= FloorY + 0.01f
+    )
     {
         ball.Velocity = float3.zero;
+        ball.RestTimer = 2f + World.Rng.Next() * 3f; // rest 2-5 seconds
         ball.MoveTo<BallTags.Ball, BallTags.Resting>(World);
     }
 }

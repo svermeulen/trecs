@@ -89,7 +89,7 @@ Use [entity events](../entity-management/entity-events.md) with `[ForEachEntity]
 public partial class EnemyGameObjectManager : IDisposable
 {
     readonly GameObjectRegistry _registry;
-    readonly DisposeCollection _disposables = new();
+    readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container
 
     public EnemyGameObjectManager(World world, GameObjectRegistry registry)
     {

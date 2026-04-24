@@ -9,7 +9,7 @@ The recommended pattern is to use `[ForEachEntity]` on your event callback metho
 ```csharp
 public partial class RemoveCleanupHandler : IDisposable
 {
-    readonly DisposeCollection _disposables = new();
+    readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container (see note below)
 
     public RemoveCleanupHandler(World world)
     {
@@ -149,6 +149,12 @@ World.Events.OnFixedUpdateCompleted(() =>
 World.Events.OnVariableUpdateStarted(() =>
 {
     // Variable update phase is beginning
+});
+
+World.Events.OnPostApplyInputs(() =>
+{
+    // Inputs have been applied for this fixed step —
+    // runs inside the fixed phase, before systems execute
 });
 ```
 

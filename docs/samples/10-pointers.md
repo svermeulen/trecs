@@ -90,16 +90,23 @@ Reads the shared route and unique trail:
 [ForEachEntity(MatchByComponents = true)]
 void Execute(ref Position position, in Route route, in Trail trail)
 {
-    // Read shared route data
+    // Read shared route — same waypoint list for all followers of this route
     var patrolRoute = route.Value.Get(World);
+    var waypoints = patrolRoute.Waypoints;
 
-    // Compute position along waypoints
+    // Compute position from elapsed time + initial offset
     float totalProgress = route.Progress + World.ElapsedTime * patrolRoute.Speed;
-    position.Value = InterpolateWaypoints(patrolRoute.Waypoints, totalProgress);
+    float wrappedProgress = totalProgress % waypoints.Count;
 
-    // Write to unique trail
+    int indexA = (int)wrappedProgress;
+    int indexB = (indexA + 1) % waypoints.Count;
+    float t = wrappedProgress - indexA;
+
+    position.Value = math.lerp((float3)waypoints[indexA], (float3)waypoints[indexB], t);
+
+    // Record position in unique trail — each entity has its own list
     var trailHistory = trail.Value.Get(World);
-    trailHistory.Positions.Add(position.Value);
+    trailHistory.Positions.Add((Vector3)position.Value);
     while (trailHistory.Positions.Count > trailHistory.MaxLength)
         trailHistory.Positions.RemoveAt(0);
 }

@@ -26,6 +26,12 @@ public partial struct Position : IEntityComponent
     public float3 Value;
 }
 
+[Unwrap]
+public partial struct Velocity : IEntityComponent
+{
+    public float3 Value;
+}
+
 // Step 2: Define entity tags
 public struct PlayerTag : ITag { }
 
@@ -62,5 +68,7 @@ world.Tick();
 // Call this on MonoBehaviour OnDestroy or when complete
 world.Dispose();
 ```
+
+`[Unwrap]` lets aspects expose the inner field directly (so `player.Position` is a `float3`, not a `Position` wrapper). See [Components — the Unwrap Shorthand](core/components.md#the-unwrap-shorthand).
 
 See [Getting Started](getting-started.md) for a complete walkthrough.

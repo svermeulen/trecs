@@ -133,6 +133,8 @@ worldAccessor.AddEntity<Spinner>()
     .Set(new Rotation { Value = quaternion.identity });
 ```
 
+`AddEntity<Spinner>()` takes a **tag** — Trecs matches it to `SpinnerEntity.Template` via the template's `IHasTags<Spinner>` declaration. You pass tags, not template types, when adding entities.
+
 ### 6. Run the Game Loop
 
 ```csharp
