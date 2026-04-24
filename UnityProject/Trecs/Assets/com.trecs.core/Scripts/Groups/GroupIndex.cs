@@ -27,7 +27,10 @@ namespace Trecs
         // Kept private so callers can't accidentally treat it as a 0-based index.
         readonly ushort _raw;
 
-        internal GroupIndex(ushort raw)
+        // Private so all internal construction flows through FromIndex (for real
+        // groups) or default/Null (for the null sentinel). Prevents accidental
+        // `new GroupIndex((ushort)i)` with a 0-based `i` that would produce Null.
+        GroupIndex(ushort raw)
         {
             _raw = raw;
         }
