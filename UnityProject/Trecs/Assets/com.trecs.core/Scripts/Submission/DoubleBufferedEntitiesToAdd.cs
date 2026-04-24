@@ -51,12 +51,6 @@ namespace Trecs.Internal
 
     internal class DoubleBufferedEntitiesToAdd
     {
-        // When a group accumulates more than this many distinct component types,
-        // dispose and rebuild the inner dict on next frame rather than reusing.
-        // In practice a group's types are bounded by its template, so this is
-        // mostly a safety net for unusual configurations.
-        const int MAX_NUMBER_OF_TYPES_PER_GROUP_TO_CACHE = 100;
-
         public DoubleBufferedEntitiesToAdd(int groupCount)
         {
             currentComponentsToAddPerGroup = new DenseDictionary<ComponentId, IComponentArray>[
@@ -83,6 +77,8 @@ namespace Trecs.Internal
 
         public void ClearLastAddOperations()
         {
+            // Reuse IComponentArrays by clearing in place — retained allocations
+            // are bounded by template-defined component counts (fixed at config).
             for (int i = 0; i < lastComponentsToAddPerGroup.Length; i++)
             {
                 var inner = lastComponentsToAddPerGroup[i];
@@ -91,20 +87,8 @@ namespace Trecs.Internal
 
                 var componentTypesCount = inner.Count;
                 var componentTypesDictionary = inner.UnsafeValues;
-
-                if (componentTypesCount <= MAX_NUMBER_OF_TYPES_PER_GROUP_TO_CACHE)
-                {
-                    // Reuse the component arrays — clear their contents in place.
-                    for (int j = 0; j < componentTypesCount; j++)
-                        componentTypesDictionary[j].Clear();
-                }
-                else
-                {
-                    // Too many types accumulated — dispose and wipe the inner dict.
-                    for (int j = 0; j < componentTypesCount; j++)
-                        componentTypesDictionary[j].Dispose();
-                    inner.Clear();
-                }
+                for (int j = 0; j < componentTypesCount; j++)
+                    componentTypesDictionary[j].Clear();
             }
 
             Array.Clear(
@@ -348,6 +332,12 @@ namespace Trecs.Internal
                 var group = GroupIndex.FromIndex(gi);
                 var count = keys.Count;
                 var startIndex = _currentNativeAddStartIndices[gi];
+                Assert.That(
+                    startIndex >= 0,
+                    "Native add start index not set for group {} despite non-empty sort keys. "
+                        + "MarkNativeAddStartIfNeeded must be called before AddPendingNativeAddSortKey.",
+                    group
+                );
 
                 // Build sortable key+index pairs
                 _cachedSortBuffer.Clear();

@@ -18,7 +18,6 @@ namespace Trecs
         [NativeDisableContainerSafetyRestriction]
         readonly NativeList<SetGroupEntry> _entriesPerGroup;
 
-        [NativeDisableContainerSafetyRestriction]
         readonly NativeList<GroupIndex> _registeredGroups;
 
         internal SetRead(WorldAccessor world, in EntitySet set)
