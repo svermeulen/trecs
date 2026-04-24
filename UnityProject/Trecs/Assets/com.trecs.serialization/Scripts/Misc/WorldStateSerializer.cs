@@ -171,7 +171,7 @@ namespace Trecs.Serialization
                 for (int k = 0; k < numGroups; k++)
                 {
                     var group = groupMap.UnsafeKeys[k];
-                    writer.Write("group", group);
+                    writer.Write("group", group.AsTagSet());
 
                     ref readonly var groupEntities = ref groupMap.UnsafeValues[k];
 
@@ -207,7 +207,7 @@ namespace Trecs.Serialization
             for (int i = 0; i < count; i++)
             {
                 var group = entityIndexToReferenceMap.UnsafeKeys[i];
-                writer.Write("group", group);
+                writer.Write("group", group.AsTagSet());
 
                 var list = entityIndexToReferenceMap.UnsafeValues[i];
                 writer.Write("listLength", list.Length);
@@ -267,7 +267,7 @@ namespace Trecs.Serialization
                 var bytesBefore = writer.NumBytesWritten;
 
                 Group group = groupEntityComponentsDB.UnsafeKeys[i].key;
-                writer.Write("group", group);
+                writer.Write("group", group.AsTagSet());
 
                 ref var subMap = ref groupEntityComponentsDB.UnsafeValues[i];
 
@@ -363,7 +363,7 @@ namespace Trecs.Serialization
 
             for (int i = 0; i < routingIndex.Count; i++)
             {
-                writer.Write("group", routingIndex.UnsafeKeys[i]);
+                writer.Write("group", routingIndex.UnsafeKeys[i].AsTagSet());
                 writer.Write("filterIndices", routingIndex.UnsafeValues[i]);
             }
         }
@@ -385,7 +385,8 @@ namespace Trecs.Serialization
 
             for (int i = 0; i < numEntries; i++)
             {
-                var group = reader.Read<Group>("group");
+                var tagSet = reader.Read<TagSet>("group");
+                var group = new Group(tagSet.Id);
                 var setIndices = new NativeList<SetId>(1, Allocator.Persistent);
                 reader.Read("filterIndices", ref setIndices);
                 routingIndex.Add(group, setIndices);
@@ -413,7 +414,8 @@ namespace Trecs.Serialization
 
                 for (int k = 0; k < numGroups; k++)
                 {
-                    var group = reader.Read<Group>("group");
+                    var tagSet = reader.Read<TagSet>("group");
+                    var group = new Group(tagSet.Id);
 
                     var groupEntry = groupMap.GetSetGroupEntry(group);
 
@@ -457,7 +459,8 @@ namespace Trecs.Serialization
 
             for (int i = 0; i < count; i++)
             {
-                var group = reader.Read<Group>("group");
+                var tagSet = reader.Read<TagSet>("group");
+                var group = new Group(tagSet.Id);
 
                 Assert.That(
                     entityIndexToReferenceMap.ContainsKey(group),
@@ -501,7 +504,8 @@ namespace Trecs.Serialization
 
             for (int i = 0; i < numItems; i++)
             {
-                var group = reader.Read<Group>("group");
+                var tagSet = reader.Read<TagSet>("group");
+                var group = new Group(tagSet.Id);
 
                 Assert.IsEqual(groupEntityComponentsDB.UnsafeKeys[i].key, group);
 
