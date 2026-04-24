@@ -18,6 +18,8 @@ namespace Trecs
         readonly ReadOnlyDenseDictionary<Group, GroupInfo> _groupInfos;
         readonly Dictionary<Template, FastList<Group>> _templateGroupsMap;
         readonly ReadOnlyFastList<Group> _allGroups;
+        readonly Dictionary<TagSet, GroupIndex> _tagSetToIndex;
+        readonly TagSet[] _indexToTagSet;
         readonly ReadOnlyFastList<ResolvedTemplate> _resolvedTemplates;
         readonly HashSet<Template> _resolvedTemplateSet = new();
         readonly HashSet<Template> _allTemplatesSet = new();
@@ -168,7 +170,59 @@ namespace Trecs
             _resolvedTemplates = resolvedTemplatesList;
             _allTemplates = allTemplates;
 
+            Assert.That(
+                allGroups.Count <= ushort.MaxValue,
+                "GroupIndex is ushort — world has {} groups but limit is {}",
+                allGroups.Count,
+                ushort.MaxValue
+            );
+
+            _indexToTagSet = new TagSet[allGroups.Count];
+            _tagSetToIndex = new Dictionary<TagSet, GroupIndex>(allGroups.Count);
+
+            for (int i = 0; i < allGroups.Count; i++)
+            {
+                var tagSet = allGroups[i].AsTagSet();
+                var index = new GroupIndex((ushort)i);
+                _indexToTagSet[i] = tagSet;
+                _tagSetToIndex.Add(tagSet, index);
+            }
+
             _queryEngine = new WorldQueryEngine(_allGroups, _groupInfos, this);
+        }
+
+        /// <summary>
+        /// Resolves a <see cref="TagSet"/> to the sequential <see cref="GroupIndex"/>
+        /// assigned at world-build time. The mapping is fixed once the world is built.
+        /// </summary>
+        internal GroupIndex ToGroupIndex(TagSet tagSet)
+        {
+            if (_tagSetToIndex.TryGetValue(tagSet, out var index))
+            {
+                return index;
+            }
+
+            throw Assert.CreateException("No group registered for tag set {}", tagSet);
+        }
+
+        /// <summary>
+        /// Transitional bridge — resolves a <see cref="Group"/> to its
+        /// <see cref="GroupIndex"/>. Removed in Stage 3 when <c>Group</c> is deleted.
+        /// </summary>
+        internal GroupIndex ToGroupIndex(Group group) => ToGroupIndex(group.AsTagSet());
+
+        /// <summary>
+        /// Returns the <see cref="TagSet"/> associated with a <see cref="GroupIndex"/>.
+        /// </summary>
+        internal TagSet ToTagSet(GroupIndex groupIndex)
+        {
+            Assert.That(
+                groupIndex.Value < _indexToTagSet.Length,
+                "GroupIndex {} out of range [0, {})",
+                groupIndex.Value,
+                _indexToTagSet.Length
+            );
+            return _indexToTagSet[groupIndex.Value];
         }
 
         static bool HasGlobalsTemplate(IReadOnlyList<Template> templates)
