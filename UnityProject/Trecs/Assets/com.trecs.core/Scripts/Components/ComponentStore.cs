@@ -10,17 +10,11 @@ namespace Trecs.Internal
     {
         static readonly TrecsLog _log = new(nameof(ComponentStore));
 
-        //one datastructure rule them all:
-        //split by group
-        //split by type per group. It's possible to get all the entities of a give type T per group thanks
-        //to the DenseDictionary capabilities OR it's possible to get a specific entityComponent indexed by
-        //ID. This ID doesn't need to be the EntityIndex, it can be just the entityHandle
-        //for each group id, save a dictionary indexed by entity type of entities indexed by id
-        //                                        group                  EntityComponentType     entityHandle, EntityComponent
-        readonly DenseDictionary<
-            GroupIndex,
-            DenseDictionary<ComponentId, IComponentArray>
-        > _groupEntityComponentsDB;
+        // Per-group component arrays, indexed directly by GroupIndex.Value.
+        // Pre-allocated at construction — every slot holds a (possibly empty)
+        // DenseDictionary<ComponentId, IComponentArray>. A direct array index
+        // replaces the old Dict<GroupIndex, ...> hash lookup on the hot path.
+        readonly DenseDictionary<ComponentId, IComponentArray>[] _groupEntityComponentsDB;
 
         //for each aspect type, return the groups (dictionary of entities indexed by entity id) where they are
         //found indexed by group id. ComponentArray are never created, they instead point to the ones hold
@@ -33,18 +27,21 @@ namespace Trecs.Internal
 
         bool _configurationFrozen;
 
-        public ComponentStore()
+        public ComponentStore(int groupCount)
         {
-            _groupEntityComponentsDB =
-                new DenseDictionary<GroupIndex, DenseDictionary<ComponentId, IComponentArray>>();
+            _groupEntityComponentsDB = new DenseDictionary<ComponentId, IComponentArray>[
+                groupCount
+            ];
+            for (int i = 0; i < groupCount; i++)
+            {
+                _groupEntityComponentsDB[i] = new DenseDictionary<ComponentId, IComponentArray>();
+            }
             _groupsPerEntity =
                 new DenseDictionary<ComponentId, DenseDictionary<GroupIndex, IComponentArray>>();
         }
 
-        public DenseDictionary<
-            GroupIndex,
-            DenseDictionary<ComponentId, IComponentArray>
-        > GroupEntityComponentsDB => _groupEntityComponentsDB;
+        public DenseDictionary<ComponentId, IComponentArray>[] GroupEntityComponentsDB =>
+            _groupEntityComponentsDB;
 
         public DenseDictionary<
             ComponentId,
@@ -61,36 +58,18 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public DenseDictionary<ComponentId, IComponentArray> GetDBGroup(GroupIndex fromIdGroupId)
         {
-            if (
-                !_groupEntityComponentsDB.TryGetValue(
-                    fromIdGroupId,
-                    out DenseDictionary<ComponentId, IComponentArray> fromGroup
-                )
-            )
-            {
-                throw new TrecsException($"GroupIndex doesn't exist: {fromIdGroupId}");
-            }
-
-            return fromGroup;
+            return _groupEntityComponentsDB[fromIdGroupId.Value];
         }
 
+        /// <summary>
+        /// Returns the per-component inner dictionary for a group. Every valid
+        /// GroupIndex is pre-populated with an empty dictionary at construction,
+        /// so this never creates — the "OrAdd" name is kept for API continuity.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public DenseDictionary<ComponentId, IComponentArray> GetOrAddDBGroup(GroupIndex toGroupId)
         {
-            if (!_groupEntityComponentsDB.TryGetValue(toGroupId, out var fromGroup))
-            {
-                if (_configurationFrozen)
-                {
-                    throw new TrecsException(
-                        $"Attempted to add group {toGroupId} after group set has been frozen"
-                    );
-                }
-
-                fromGroup = new DenseDictionary<ComponentId, IComponentArray>();
-                _groupEntityComponentsDB.Add(toGroupId, fromGroup);
-            }
-
-            return fromGroup;
+            return _groupEntityComponentsDB[toGroupId.Value];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -203,15 +182,16 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            foreach (var groups in _groupEntityComponentsDB)
+            for (int i = 0; i < _groupEntityComponentsDB.Length; i++)
             {
-                foreach (var entityList in groups.Value)
+                var group = _groupEntityComponentsDB[i];
+                foreach (var entityList in group)
                 {
                     entityList.Value.Dispose();
                 }
+                group.Clear();
             }
 
-            _groupEntityComponentsDB.Clear();
             _groupsPerEntity.Clear();
         }
     }

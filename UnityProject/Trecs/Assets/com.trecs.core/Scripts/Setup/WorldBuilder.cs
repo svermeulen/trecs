@@ -267,7 +267,7 @@ namespace Trecs
 
             var eventsManager = new EventsManager();
 
-            var componentStore = new ComponentStore();
+            var componentStore = new ComponentStore(worldInfo.AllGroups.Count);
             var setStore = new SetStore();
 
             foreach (var setDef in _sets)
