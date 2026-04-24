@@ -39,18 +39,12 @@ namespace Trecs.Internal
         const int ParallelJobThreshold = 500;
 
         static readonly Action<
-            DenseDictionary<
-                GroupIndex,
-                DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>
-            >,
+            DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>[],
             DenseDictionary<EntityIndex, (EntityIndex, GroupIndex)>,
             EntitySubmitter
         > _moveEntities;
 
-        static readonly Action<
-            DenseDictionary<GroupIndex, FastList<int>>,
-            EntitySubmitter
-        > _removeEntities;
+        static readonly Action<FastList<int>[], EntitySubmitter> _removeEntities;
 
         static readonly Action<GroupIndex, EntitySubmitter> _removeGroup;
         static readonly Action<GroupIndex, GroupIndex, EntitySubmitter> _swapGroup;
@@ -121,7 +115,7 @@ namespace Trecs.Internal
             RuntimeJobScheduler jobScheduler
         )
         {
-            _entitiesOperations = new EntitiesOperations();
+            _entitiesOperations = new EntitiesOperations(worldInfo.AllGroups.Count);
 
             _jobScheduler = jobScheduler;
             _nativeSharedHeap = nativeSharedHeap;
@@ -457,18 +451,18 @@ namespace Trecs.Internal
             }
         }
 
-        static void RemoveEntities(
-            DenseDictionary<GroupIndex, FastList<int>> removeOperations,
-            EntitySubmitter ecsRoot
-        )
+        static void RemoveEntities(FastList<int>[] removeOperations, EntitySubmitter ecsRoot)
         {
             using (TrecsProfiling.Start("remove Entities"))
             {
                 ecsRoot._cachedRangeOfSubmittedIndices.Clear();
 
-                foreach (var entitiesToRemove in removeOperations)
+                for (int i = 0; i < removeOperations.Length; i++)
                 {
-                    ExecuteRemoveForGroup(entitiesToRemove.Key, entitiesToRemove.Value, ecsRoot);
+                    var list = removeOperations[i];
+                    if (list == null || list.Count == 0)
+                        continue;
+                    ExecuteRemoveForGroup(GroupIndex.FromIndex(i), list, ecsRoot);
                 }
 
                 FireRemoveCallbacks(removeOperations, ecsRoot);
@@ -660,10 +654,7 @@ namespace Trecs.Internal
             }
         }
 
-        static void FireRemoveCallbacks(
-            DenseDictionary<GroupIndex, FastList<int>> removeOperations,
-            EntitySubmitter ecsRoot
-        )
+        static void FireRemoveCallbacks(FastList<int>[] removeOperations, EntitySubmitter ecsRoot)
         {
             var rangeEnumerator = ecsRoot._cachedRangeOfSubmittedIndices.GetEnumerator();
 
@@ -676,8 +667,13 @@ namespace Trecs.Internal
             //going to iterate the array from the new count to the new count + the number of entities removed
             using (TrecsProfiling.Start("Execute remove Callbacks Fast"))
             {
-                foreach (var (group, _) in removeOperations)
+                for (int groupIdx = 0; groupIdx < removeOperations.Length; groupIdx++)
                 {
+                    var list = removeOperations[groupIdx];
+                    if (list == null || list.Count == 0)
+                        continue;
+
+                    var group = GroupIndex.FromIndex(groupIdx);
                     var fromGroupDictionary = ecsRoot.GetDBGroup(group);
 
                     if (fromGroupDictionary.Count == 0)
@@ -694,9 +690,9 @@ namespace Trecs.Internal
                         )
                     )
                     {
-                        for (var i = 0; i < groupRemovedObservers.Count; i++)
+                        for (var k = 0; k < groupRemovedObservers.Count; k++)
                         {
-                            groupRemovedObservers[i].Observer(group, rangeEnumerator.Current);
+                            groupRemovedObservers[k].Observer(group, rangeEnumerator.Current);
                         }
                     }
                 }
@@ -730,18 +726,24 @@ namespace Trecs.Internal
         }
 
         static void MoveEntities(
-            DenseDictionary<
-                GroupIndex,
-                DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>
-            > moveEntitiesOperations,
+            DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>[] moveEntitiesOperations,
             DenseDictionary<EntityIndex, (EntityIndex, GroupIndex)> entitiesIdSwaps,
             EntitySubmitter ecsRoot
         )
         {
             using (TrecsProfiling.Start("Swap entities between groups"))
             {
-                foreach (var (fromGroup, toGroupMoveInfos) in moveEntitiesOperations)
+                for (
+                    int fromGroupIdx = 0;
+                    fromGroupIdx < moveEntitiesOperations.Length;
+                    fromGroupIdx++
+                )
                 {
+                    var toGroupMoveInfos = moveEntitiesOperations[fromGroupIdx];
+                    if (toGroupMoveInfos == null || toGroupMoveInfos.Count == 0)
+                        continue;
+                    var fromGroup = GroupIndex.FromIndex(fromGroupIdx);
+
                     ecsRoot._cachedRangeOfSubmittedIndices.Clear();
 
                     using (TrecsProfiling.Start("Move RecycleSwapBack"))
