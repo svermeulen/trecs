@@ -1,4 +1,5 @@
 using System;
+using UnityEngine.Profiling;
 
 namespace Trecs.Internal
 {
@@ -13,7 +14,7 @@ namespace Trecs.Internal
 
     public static class TrecsProfiling
     {
-#if TRECS_PROFILING
+#if ENABLE_PROFILER
         class ProfilerScope : IDisposable
         {
             public void Dispose()
