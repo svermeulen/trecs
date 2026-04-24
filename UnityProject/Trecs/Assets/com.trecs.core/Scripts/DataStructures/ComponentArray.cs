@@ -11,7 +11,7 @@ namespace Trecs.Internal
     {
         internal static EntityIndexMapper<T> ToEntityIndexMapper<T>(
             this IComponentArray<T> dic,
-            Group groupStructId
+            GroupIndex groupStructId
         )
             where T : unmanaged, IEntityComponent
         {
@@ -172,7 +172,7 @@ namespace Trecs.Internal
         /// the following methods are executed during the submission of entities
         /// *********************************
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddEntitiesToDictionary(IComponentArray toDictionary, Group groupId)
+        public void AddEntitiesToDictionary(IComponentArray toDictionary, GroupIndex groupId)
         {
             if (_count == 0)
             {
@@ -251,8 +251,8 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SwapEntitiesBetweenDictionaries(
             in DenseDictionary<int, MoveInfo> entitiesIDsToSwap,
-            Group fromgroup,
-            Group togroup,
+            GroupIndex fromgroup,
+            GroupIndex togroup,
             IComponentArray toComponentsDictionary
         )
         {
@@ -276,7 +276,6 @@ namespace Trecs.Internal
                     ref MoveInfo swapInfo = ref entitiesToSwapInfo[i];
                     var indexToRemove = swapInfo.ResolvedFromIndex;
 
-                    Assert.That(!togroup.IsNull, "Invalid To Group");
                     Assert.That(
                         indexToRemove < _count,
                         "Swapping an entity at an index that is out of range"

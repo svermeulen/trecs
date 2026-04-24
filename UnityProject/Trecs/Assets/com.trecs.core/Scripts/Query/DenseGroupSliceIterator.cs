@@ -10,11 +10,14 @@ namespace Trecs
     public ref struct DenseGroupSliceIterator
     {
         readonly WorldAccessor _world;
-        readonly ReadOnlyFastList<Group> _validGroups;
+        readonly ReadOnlyFastList<GroupIndex> _validGroups;
         int _groupIndex;
         DenseGroupSlice _current;
 
-        internal DenseGroupSliceIterator(WorldAccessor world, ReadOnlyFastList<Group> validGroups)
+        internal DenseGroupSliceIterator(
+            WorldAccessor world,
+            ReadOnlyFastList<GroupIndex> validGroups
+        )
         {
             _world = world;
             _validGroups = validGroups;

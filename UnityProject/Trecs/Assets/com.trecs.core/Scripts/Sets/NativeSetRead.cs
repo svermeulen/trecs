@@ -15,7 +15,7 @@ namespace Trecs
     public struct NativeSetRead<TSet>
         where TSet : struct, IEntitySet
     {
-        readonly NativeDenseDictionary<Group, SetGroupEntry> _entriesPerGroup;
+        readonly NativeDenseDictionary<GroupIndex, SetGroupEntry> _entriesPerGroup;
 
         internal NativeSetRead(in EntitySet set)
         {
@@ -31,13 +31,13 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Exists(EntityIndex entityIndex)
         {
-            if (_entriesPerGroup.TryGetValue(entityIndex.Group, out var groupEntry))
+            if (_entriesPerGroup.TryGetValue(entityIndex.GroupIndex, out var groupEntry))
                 return groupEntry.Exists(entityIndex.Index);
             return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetGroupEntry(Group group, out SetGroupEntryRead groupEntry)
+        public bool TryGetGroupEntry(GroupIndex group, out SetGroupEntryRead groupEntry)
         {
             if (_entriesPerGroup.TryGetValue(group, out var entry))
             {

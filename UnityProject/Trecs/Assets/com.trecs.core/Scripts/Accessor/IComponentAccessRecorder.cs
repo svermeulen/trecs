@@ -11,7 +11,7 @@ namespace Trecs
     {
         void OnComponentAccess(
             string systemName,
-            Group group,
+            GroupIndex group,
             ComponentId componentType,
             bool isReadOnly
         );

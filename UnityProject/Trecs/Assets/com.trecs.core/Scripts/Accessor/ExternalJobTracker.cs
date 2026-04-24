@@ -41,7 +41,7 @@ namespace Trecs
         /// <summary>
         /// Declare that this external job writes to a component in a specific group.
         /// </summary>
-        public ExternalJobTracker Writes<TComponent>(Group group)
+        public ExternalJobTracker Writes<TComponent>(GroupIndex group)
             where TComponent : unmanaged, IEntityComponent
         {
             _scheduler.TrackJobWrite(
@@ -83,7 +83,7 @@ namespace Trecs
         /// <summary>
         /// Declare that this external job reads a component in a specific group.
         /// </summary>
-        public ExternalJobTracker Reads<TComponent>(Group group)
+        public ExternalJobTracker Reads<TComponent>(GroupIndex group)
             where TComponent : unmanaged, IEntityComponent
         {
             _scheduler.TrackJobRead(

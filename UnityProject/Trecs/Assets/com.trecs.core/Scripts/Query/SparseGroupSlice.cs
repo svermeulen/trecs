@@ -9,13 +9,13 @@ namespace Trecs
     /// </summary>
     public readonly ref struct SparseGroupSlice
     {
-        public readonly Group Group;
+        public readonly GroupIndex GroupIndex;
         public readonly EntitySetIndices Indices;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal SparseGroupSlice(Group group, EntitySetIndices indices)
+        internal SparseGroupSlice(GroupIndex group, EntitySetIndices indices)
         {
-            Group = group;
+            GroupIndex = group;
             Indices = indices;
         }
     }

@@ -34,7 +34,7 @@ namespace Trecs
         }
 
         internal EntityInitializer AddEntity(
-            Group group,
+            GroupIndex group,
             string callerFile = "",
             int callerLine = 0
         )
@@ -67,7 +67,7 @@ namespace Trecs
             }
         }
 
-        internal void MoveTo(EntityIndex fromEntityIndex, Group toGroupId)
+        internal void MoveTo(EntityIndex fromEntityIndex, GroupIndex toGroupId)
         {
             Assert.That(!_isDisposed);
 
@@ -75,19 +75,16 @@ namespace Trecs
             if (_entitySubmitter.IsScheduledForRemove(fromEntityIndex))
                 return;
 
-            var fromTemplate = _worldInfo.GetResolvedTemplateForGroup(fromEntityIndex.Group);
+            var fromTemplate = _worldInfo.GetResolvedTemplateForGroup(fromEntityIndex.GroupIndex);
             var toTemplate = _worldInfo.GetResolvedTemplateForGroup(toGroupId);
             Assert.That(fromTemplate == toTemplate);
 
             _log.Trace(
                 "Moving entity {} (group {}) to group {}",
                 fromEntityIndex.Index,
-                fromEntityIndex.Group,
+                fromEntityIndex.GroupIndex,
                 toGroupId
             );
-
-            Assert.That(!fromEntityIndex.Group.IsNull);
-            Assert.That(!toGroupId.IsNull);
 
             Assert.That(fromEntityIndex != EntityIndex.Null);
 
@@ -119,18 +116,16 @@ namespace Trecs
         {
             Assert.That(!_isDisposed);
             Assert.That(!entityIndex.IsNull);
-            Assert.That(!entityIndex.Group.IsNull);
 
-            var template = _worldInfo.GetResolvedTemplateForGroup(entityIndex.Group);
+            var template = _worldInfo.GetResolvedTemplateForGroup(entityIndex.GroupIndex);
 
             _entitySubmitter.CheckRemoveEntityHandle(entityIndex, template.DebugName);
             _entitySubmitter.QueueRemoveEntityOperation(entityIndex, template.ComponentBuilders);
         }
 
-        internal void RemoveAllEntitiesInGroup(Group group, int entityCount)
+        internal void RemoveAllEntitiesInGroup(GroupIndex group, int entityCount)
         {
             Assert.That(!_isDisposed);
-            Assert.That(!group.IsNull);
 
             _entitySubmitter.QueueRemoveAllInGroup(group, entityCount);
         }

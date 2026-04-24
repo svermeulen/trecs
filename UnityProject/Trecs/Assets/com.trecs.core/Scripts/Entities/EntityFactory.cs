@@ -9,7 +9,7 @@ namespace Trecs.Internal
             DenseDictionary<ComponentId, IComponentArray> group,
             int insertionIndex
         ) BuildGroupedEntities(
-            Group groupId,
+            GroupIndex groupId,
             DoubleBufferedEntitiesToAdd groupEntitiesToAdd,
             IComponentBuilder[] componentsToBuild
 #if DEBUG

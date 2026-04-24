@@ -5,7 +5,7 @@ namespace Trecs.Internal
 {
     /// <summary>
     /// Identifies a trackable resource in the job scheduler — either a component type or a set.
-    /// Used as part of a (ResourceId, Group) composite key for dependency tracking.
+    /// Used as part of a (ResourceId, GroupIndex) composite key for dependency tracking.
     /// </summary>
     public readonly struct ResourceId : IEquatable<ResourceId>
     {

@@ -50,7 +50,7 @@ namespace Trecs
     /// <item><term><see cref="NativeWorldAccessor"/></term>
     /// <description>(no extra parameter — wired via
     /// <c>world.ToNative()</c>). Tags are not supported.</description></item>
-    /// <item><term><see cref="Group"/></term>
+    /// <item><term><see cref="GroupIndex"/></term>
     /// <description><see cref="TagSet"/> — must resolve to exactly one
     /// group via <c>GetSingleGroupWithTags</c>.</description></item>
     /// </list>

@@ -6,13 +6,17 @@ using Trecs.Internal;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public delegate void EntitiesAddedObserver(Group group, EntityRange indices);
+    public delegate void EntitiesAddedObserver(GroupIndex group, EntityRange indices);
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public delegate void EntitiesRemovedObserver(Group group, EntityRange indices);
+    public delegate void EntitiesRemovedObserver(GroupIndex group, EntityRange indices);
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public delegate void EntitiesMovedObserver(Group fromGroup, Group toGroup, EntityRange indices);
+    public delegate void EntitiesMovedObserver(
+        GroupIndex fromGroup,
+        GroupIndex toGroup,
+        EntityRange indices
+    );
 }
 
 namespace Trecs
@@ -42,14 +46,14 @@ namespace Trecs
             _world = world;
         }
 
-        public EntityEventsSubscription InGroups(ReadOnlyFastList<Group> groups)
+        public EntityEventsSubscription InGroups(ReadOnlyFastList<GroupIndex> groups)
         {
             return new EntityEventsSubscription(_eventsManager, _world, groups);
         }
 
-        public EntityEventsSubscription InGroup(Group group)
+        public EntityEventsSubscription InGroup(GroupIndex group)
         {
-            return InGroups(new FastList<Group>(group));
+            return InGroups(new FastList<GroupIndex>(group));
         }
 
         public EntityEventsSubscription EntitiesWithTags(TagSet tagSet)
@@ -198,7 +202,7 @@ namespace Trecs
     {
         readonly EventsManager _eventsManager;
         readonly WorldAccessor _world;
-        readonly ReadOnlyFastList<Group> _groups;
+        readonly ReadOnlyFastList<GroupIndex> _groups;
         readonly string _debugName;
 
         EntitiesAddedObserver _addedObserver;
@@ -211,7 +215,7 @@ namespace Trecs
         internal EntityEventsSubscription(
             EventsManager eventsManager,
             WorldAccessor world,
-            ReadOnlyFastList<Group> groups
+            ReadOnlyFastList<GroupIndex> groups
         )
         {
             _eventsManager = eventsManager;
@@ -269,19 +273,23 @@ namespace Trecs
             return this;
         }
 
-        public EntityEventsSubscription OnAdded(Action<Group, EntityRange, WorldAccessor> observer)
+        public EntityEventsSubscription OnAdded(
+            Action<GroupIndex, EntityRange, WorldAccessor> observer
+        )
         {
             return OnAdded((group, indices) => observer(group, indices, _world));
         }
 
         public EntityEventsSubscription OnRemoved(
-            Action<Group, EntityRange, WorldAccessor> observer
+            Action<GroupIndex, EntityRange, WorldAccessor> observer
         )
         {
             return OnRemoved((group, indices) => observer(group, indices, _world));
         }
 
-        public EntityEventsSubscription OnMoved(Action<Group, EntityRange, WorldAccessor> observer)
+        public EntityEventsSubscription OnMoved(
+            Action<GroupIndex, EntityRange, WorldAccessor> observer
+        )
         {
             return OnMoved((from, to, indices) => observer(to, indices, _world));
         }

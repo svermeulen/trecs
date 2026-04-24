@@ -12,7 +12,7 @@ namespace Trecs
     [EditorBrowsable(EditorBrowsableState.Never)]
     internal readonly struct SetGroupLookup
     {
-        readonly NativeDenseDictionary<Group, SetGroupEntry> _entriesPerGroup;
+        readonly NativeDenseDictionary<GroupIndex, SetGroupEntry> _entriesPerGroup;
 
         internal SetGroupLookup(in EntitySet set)
         {
@@ -26,7 +26,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetGroupEntry(Group group, out SetGroupEntryRead groupEntry)
+        public bool TryGetGroupEntry(GroupIndex group, out SetGroupEntryRead groupEntry)
         {
             if (_entriesPerGroup.TryGetValue(group, out var entry))
             {

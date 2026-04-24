@@ -278,7 +278,7 @@ namespace Trecs
             return new QueryIterator(_world, groups, _set);
         }
 
-        readonly ReadOnlyFastList<Group> ResolveGroups()
+        readonly ReadOnlyFastList<GroupIndex> ResolveGroups()
         {
             var key = new GroupQueryKey(
                 _positiveTags,

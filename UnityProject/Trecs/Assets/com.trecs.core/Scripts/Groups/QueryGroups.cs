@@ -12,8 +12,8 @@ namespace Trecs.Internal
         {
             var group = new GroupsList();
 
-            group._groups = new FastList<Group>();
-            group._sets = new HashSet<Group>();
+            group._groups = new FastList<GroupIndex>();
+            group._sets = new HashSet<GroupIndex>();
 
             return group;
         }
@@ -23,24 +23,24 @@ namespace Trecs.Internal
             _sets.Clear();
         }
 
-        public void AddRange(Group[] groupsToAdd, int length)
+        public void AddRange(GroupIndex[] groupsToAdd, int length)
         {
             for (var i = 0; i < length; i++)
                 _sets.Add(groupsToAdd[i]);
         }
 
-        public void Add(Group group)
+        public void Add(GroupIndex group)
         {
             _sets.Add(group);
         }
 
-        public void Exclude(Group[] groupsToIgnore, int length)
+        public void Exclude(GroupIndex[] groupsToIgnore, int length)
         {
             for (var i = 0; i < length; i++)
                 _sets.Remove(groupsToIgnore[i]);
         }
 
-        public void Exclude(Group groupsToIgnore)
+        public void Exclude(GroupIndex groupsToIgnore)
         {
             _sets.Remove(groupsToIgnore);
         }
@@ -50,7 +50,7 @@ namespace Trecs.Internal
             _groups.EnsureCapacity(preparecount);
         }
 
-        public FastList<Group> Evaluate()
+        public FastList<GroupIndex> Evaluate()
         {
             _groups.Clear();
 
@@ -62,8 +62,8 @@ namespace Trecs.Internal
             return _groups;
         }
 
-        FastList<Group> _groups;
-        HashSet<Group> _sets;
+        FastList<GroupIndex> _groups;
+        HashSet<GroupIndex> _sets;
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -76,7 +76,7 @@ namespace Trecs.Internal
             groups = new ThreadLocal<GroupsList>(GroupsList.Init);
         }
 
-        public QueryGroups(LocalReadOnlyFastList<Group> groups)
+        public QueryGroups(LocalReadOnlyFastList<GroupIndex> groups)
         {
             var groupsValue = QueryGroups.groups.Value;
 
@@ -84,7 +84,7 @@ namespace Trecs.Internal
             groupsValue.AddRange(groups.ToArrayFast(out var count), count);
         }
 
-        public QueryGroups(Group group)
+        public QueryGroups(GroupIndex group)
         {
             var groupsValue = groups.Value;
 
@@ -101,7 +101,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public QueryGroups Union(Group group)
+        public QueryGroups Union(GroupIndex group)
         {
             var groupsValue = groups.Value;
 
@@ -111,7 +111,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public QueryGroups Union(LocalReadOnlyFastList<Group> groups)
+        public QueryGroups Union(LocalReadOnlyFastList<GroupIndex> groups)
         {
             var groupsValue = QueryGroups.groups.Value;
 
@@ -121,7 +121,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public QueryGroups Except(Group group)
+        public QueryGroups Except(GroupIndex group)
         {
             var groupsValue = groups.Value;
 
@@ -131,7 +131,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public QueryGroups Except(Group[] groupsToIgnore)
+        public QueryGroups Except(GroupIndex[] groupsToIgnore)
         {
             var groupsValue = groups.Value;
 
@@ -141,7 +141,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public QueryGroups Except(LocalReadOnlyFastList<Group> groupsToIgnore)
+        public QueryGroups Except(LocalReadOnlyFastList<GroupIndex> groupsToIgnore)
         {
             var groupsValue = groups.Value;
 
@@ -151,7 +151,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public QueryGroups Except(FastList<Group> groupsToIgnore)
+        public QueryGroups Except(FastList<GroupIndex> groupsToIgnore)
         {
             var groupsValue = groups.Value;
 
@@ -161,7 +161,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public QueryGroups Except(ReadOnlyFastList<Group> groupsToIgnore)
+        public QueryGroups Except(ReadOnlyFastList<GroupIndex> groupsToIgnore)
         {
             var groupsValue = groups.Value;
 
@@ -177,7 +177,7 @@ namespace Trecs.Internal
             return new QueryResult(groupsValue.Evaluate());
         }
 
-        public void Evaluate(FastList<Group> group)
+        public void Evaluate(FastList<GroupIndex> group)
         {
             var groupsValue = groups.Value;
 
@@ -188,14 +188,14 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public readonly ref struct QueryResult
     {
-        public QueryResult(FastList<Group> group)
+        public QueryResult(FastList<GroupIndex> group)
         {
             _group = group;
         }
 
-        public LocalReadOnlyFastList<Group> Result => _group;
+        public LocalReadOnlyFastList<GroupIndex> Result => _group;
 
-        readonly ReadOnlyFastList<Group> _group;
+        readonly ReadOnlyFastList<GroupIndex> _group;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Count<T>(EntityQuerier entitiesQuerier)

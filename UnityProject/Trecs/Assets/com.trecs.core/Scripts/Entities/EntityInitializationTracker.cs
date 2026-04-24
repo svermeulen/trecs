@@ -11,7 +11,7 @@ namespace Trecs.Internal
     {
         struct TrackedEntity
         {
-            public Group Group;
+            public GroupIndex GroupIndex;
             public string DescriptorName;
             public string CallerFile;
             public int CallerLine;
@@ -24,7 +24,7 @@ namespace Trecs.Internal
         readonly Stack<HashSet<ComponentId>> _hashSetPool = new();
 
         public int Register(
-            Group group,
+            GroupIndex group,
             IComponentBuilder[] builders,
             string descriptorName,
             string callerFile,
@@ -39,7 +39,7 @@ namespace Trecs.Internal
             _entries.Add(
                 new TrackedEntity
                 {
-                    Group = group,
+                    GroupIndex = group,
                     DescriptorName = descriptorName,
                     CallerFile = callerFile,
                     CallerLine = callerLine,
@@ -51,7 +51,7 @@ namespace Trecs.Internal
             return id;
         }
 
-        public void MarkComponentSet(int id, ComponentId componentId, Group group)
+        public void MarkComponentSet(int id, ComponentId componentId, GroupIndex group)
         {
             if (!_entries[id].InitializedComponents.Add(componentId))
             {
@@ -93,7 +93,7 @@ namespace Trecs.Internal
                 {
                     throw new TrecsException(
                         $"Entity created at {entry.CallerFile}:{entry.CallerLine} "
-                            + $"(group {entry.Group}, descriptor: {entry.DescriptorName}) "
+                            + $"(group {entry.GroupIndex}, descriptor: {entry.DescriptorName}) "
                             + "is missing initial values for the following components:\n"
                             + missingComponents
                     );

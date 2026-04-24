@@ -13,12 +13,14 @@ namespace Trecs.Internal
         Info _lastSubmittedInfo;
         Info _thisSubmissionInfo;
 
-        readonly Func<DenseDictionary<Group, DenseDictionary<int, MoveInfo>>> _newGroupDictionary;
+        readonly Func<
+            DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>
+        > _newGroupDictionary;
         readonly Func<FastList<int>> _newList;
         readonly ActionRef<FastList<int>> _clearList;
 
         readonly ActionRef<
-            DenseDictionary<Group, DenseDictionary<int, MoveInfo>>
+            DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>
         > _recycleDicitionaryWithCaller;
         readonly Func<DenseDictionary<int, MoveInfo>> _newListWithCaller;
         readonly ActionRef<DenseDictionary<int, MoveInfo>> _clearListWithCaller;
@@ -36,7 +38,7 @@ namespace Trecs.Internal
             _clearListWithCaller = ClearListWithCaller;
         }
 
-        public void QueueRemoveGroupOperation(Group groupId, string caller)
+        public void QueueRemoveGroupOperation(GroupIndex groupId, string caller)
         {
             _thisSubmissionInfo._groupsToRemove.Add((groupId, caller));
         }
@@ -64,7 +66,7 @@ namespace Trecs.Internal
 
             var removedComponentsPerType =
                 _thisSubmissionInfo._currentRemoveEntitiesOperations.RecycleOrAdd(
-                    fromEntityIndex.Group,
+                    fromEntityIndex.GroupIndex,
                     _newList,
                     _clearList
                 );
@@ -77,7 +79,7 @@ namespace Trecs.Internal
         /// QueueRemoveOperation calls because it skips per-entity Contains checks
         /// and amortizes dictionary lookups.
         /// </summary>
-        public void QueueRemoveAllInGroup(Group group, int entityCount)
+        public void QueueRemoveAllInGroup(GroupIndex group, int entityCount)
         {
             if (entityCount == 0)
                 return;
@@ -112,26 +114,30 @@ namespace Trecs.Internal
             if (
                 _thisSubmissionInfo._entitiesMoved.TryRemove(
                     fromEntityIndex,
-                    out (EntityIndex fromEntityIndex, Group toGroup) val
+                    out (EntityIndex fromEntityIndex, GroupIndex toGroup) val
                 )
             )
             {
                 var swappedComponentsPerType = _thisSubmissionInfo._currentSwapEntitiesOperations[
-                    fromEntityIndex.Group
+                    fromEntityIndex.GroupIndex
                 ];
 
                 swappedComponentsPerType[val.toGroup].RemoveMustExist(fromEntityIndex.Index);
             }
         }
 
-        public void QueueMoveGroupOperation(Group fromGroupId, Group toGroupId, string caller)
+        public void QueueMoveGroupOperation(
+            GroupIndex fromGroupId,
+            GroupIndex toGroupId,
+            string caller
+        )
         {
             _thisSubmissionInfo._groupsToMove.Add((fromGroupId, toGroupId, caller));
         }
 
         public void QueueMoveOperation(
             EntityIndex fromEntityIndex,
-            Group toGroup,
+            GroupIndex toGroup,
             IComponentBuilder[] componentBuilders
         )
         {
@@ -144,7 +150,7 @@ namespace Trecs.Internal
             //Get (or create) the dictionary that holds the entities that are swapping from fromEntityIndex group
             var swappedComponentsPerType =
                 _thisSubmissionInfo._currentSwapEntitiesOperations.RecycleOrAdd(
-                    fromEntityIndex.Group,
+                    fromEntityIndex.GroupIndex,
                     _newGroupDictionary,
                     _recycleDicitionaryWithCaller
                 );
@@ -163,7 +169,7 @@ namespace Trecs.Internal
             WorldInfo worldInfo
         )
         {
-            Group cachedGroup = default;
+            GroupIndex cachedGroup = default;
             FastList<int> cachedRemoveList = null;
 
             foreach (var (entityIdx, accessorId) in sortedRemovals)
@@ -174,9 +180,9 @@ namespace Trecs.Internal
                 _thisSubmissionInfo._entitiesRemoved.Add(entityIdx);
                 RevertMoveOperationIfPreviouslyQueued(entityIdx);
 
-                if (entityIdx.Group != cachedGroup)
+                if (entityIdx.GroupIndex != cachedGroup)
                 {
-                    cachedGroup = entityIdx.Group;
+                    cachedGroup = entityIdx.GroupIndex;
                     cachedRemoveList =
                         _thisSubmissionInfo._currentRemoveEntitiesOperations.RecycleOrAdd(
                             cachedGroup,
@@ -194,13 +200,13 @@ namespace Trecs.Internal
         /// Groups entities by (fromGroup, toGroup) to amortize dictionary lookups.
         /// </summary>
         public void QueueNativeMoveOperations(
-            NativeList<(EntityIndex, Group, int)> sortedSwaps,
+            NativeList<(EntityIndex, GroupIndex, int)> sortedSwaps,
             WorldInfo worldInfo
         )
         {
-            Group cachedFromGroup = default;
-            Group cachedToGroup = default;
-            DenseDictionary<Group, DenseDictionary<int, MoveInfo>> cachedFromGroupDict = null;
+            GroupIndex cachedFromGroup = default;
+            GroupIndex cachedToGroup = default;
+            DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>> cachedFromGroupDict = null;
             DenseDictionary<int, MoveInfo> cachedToGroupDict = null;
 
             foreach (var (fromEntityIndex, toGroup, accessorId) in sortedSwaps)
@@ -219,9 +225,9 @@ namespace Trecs.Internal
                 )
                     continue;
 
-                if (fromEntityIndex.Group != cachedFromGroup)
+                if (fromEntityIndex.GroupIndex != cachedFromGroup)
                 {
-                    cachedFromGroup = fromEntityIndex.Group;
+                    cachedFromGroup = fromEntityIndex.GroupIndex;
                     cachedFromGroupDict =
                         _thisSubmissionInfo._currentSwapEntitiesOperations.RecycleOrAdd(
                             cachedFromGroup,
@@ -252,7 +258,7 @@ namespace Trecs.Internal
         /// update any pending remove indices for that group so they target the correct positions.
         /// </summary>
         internal void UpdateRemoveIndicesAfterMoveSwapBack(
-            Group fromGroup,
+            GroupIndex fromGroup,
             DenseDictionary<int, int> swapBackMapping
         )
         {
@@ -290,13 +296,16 @@ namespace Trecs.Internal
 
         public void ExecuteRemoveAndSwappingOperations(
             Action<
-                DenseDictionary<Group, DenseDictionary<Group, DenseDictionary<int, MoveInfo>>>,
-                DenseDictionary<EntityIndex, (EntityIndex, Group)>,
+                DenseDictionary<
+                    GroupIndex,
+                    DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>
+                >,
+                DenseDictionary<EntityIndex, (EntityIndex, GroupIndex)>,
                 EntitySubmitter
             > moveEntities,
-            Action<DenseDictionary<Group, FastList<int>>, EntitySubmitter> removeEntities,
-            Action<Group, EntitySubmitter> removeGroup,
-            Action<Group, Group, EntitySubmitter> swapGroup,
+            Action<DenseDictionary<GroupIndex, FastList<int>>, EntitySubmitter> removeEntities,
+            Action<GroupIndex, EntitySubmitter> removeGroup,
+            Action<GroupIndex, GroupIndex, EntitySubmitter> swapGroup,
             EntitySubmitter ecsRoot
         )
         {
@@ -362,7 +371,7 @@ namespace Trecs.Internal
         }
 
         static void RecycleDicitionaryWithCaller(
-            ref DenseDictionary<Group, DenseDictionary<int, MoveInfo>> target
+            ref DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>> target
         )
         {
             target.Recycle();
@@ -378,28 +387,28 @@ namespace Trecs.Internal
             return new DenseDictionary<int, MoveInfo>();
         }
 
-        static DenseDictionary<Group, DenseDictionary<int, MoveInfo>> NewGroupDictionary()
+        static DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>> NewGroupDictionary()
         {
-            return new DenseDictionary<Group, DenseDictionary<int, MoveInfo>>();
+            return new DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>();
         }
 
         struct Info
         {
             //from group         //actual component type
             internal DenseDictionary<
-                Group,
-                DenseDictionary<Group, DenseDictionary<int, MoveInfo>>
+                GroupIndex,
+                DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>
             > _currentSwapEntitiesOperations;
 
-            internal DenseDictionary<Group, FastList<int>> _currentRemoveEntitiesOperations;
+            internal DenseDictionary<GroupIndex, FastList<int>> _currentRemoveEntitiesOperations;
 
             internal DenseDictionary<
                 EntityIndex,
-                (EntityIndex fromEntityIndex, Group toGroup)
+                (EntityIndex fromEntityIndex, GroupIndex toGroup)
             > _entitiesMoved;
             internal DenseHashSet<EntityIndex> _entitiesRemoved;
-            public FastList<(Group, Group, string)> _groupsToMove;
-            public FastList<(Group, string)> _groupsToRemove;
+            public FastList<(GroupIndex, GroupIndex, string)> _groupsToMove;
+            public FastList<(GroupIndex, string)> _groupsToRemove;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             internal bool AnyOperationQueued()
@@ -427,18 +436,18 @@ namespace Trecs.Internal
                 _entitiesMoved =
                     new DenseDictionary<
                         EntityIndex,
-                        (EntityIndex fromEntityIndex, Group toGroup)
+                        (EntityIndex fromEntityIndex, GroupIndex toGroup)
                     >();
                 _entitiesRemoved = new DenseHashSet<EntityIndex>();
-                _groupsToRemove = new FastList<(Group, string)>();
-                _groupsToMove = new FastList<(Group, Group, string)>();
+                _groupsToRemove = new FastList<(GroupIndex, string)>();
+                _groupsToMove = new FastList<(GroupIndex, GroupIndex, string)>();
 
                 _currentSwapEntitiesOperations =
                     new DenseDictionary<
-                        Group,
-                        DenseDictionary<Group, DenseDictionary<int, MoveInfo>>
+                        GroupIndex,
+                        DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>
                     >();
-                _currentRemoveEntitiesOperations = new DenseDictionary<Group, FastList<int>>();
+                _currentRemoveEntitiesOperations = new DenseDictionary<GroupIndex, FastList<int>>();
             }
         }
     }

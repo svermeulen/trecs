@@ -8,10 +8,10 @@ namespace Trecs.Internal
     {
         public OtherComponentsToAddPerGroupEnumerator(
             DenseDictionary<
-                Group,
+                GroupIndex,
                 DenseDictionary<ComponentId, IComponentArray>
             > lastComponentsToAddPerGroup,
-            DenseDictionary<Group, int> otherNumberEntitiesCreatedPerGroup
+            DenseDictionary<GroupIndex, int> otherNumberEntitiesCreatedPerGroup
         )
         {
             _lastComponentsToAddPerGroup = lastComponentsToAddPerGroup;
@@ -28,7 +28,7 @@ namespace Trecs.Internal
                 if (current.Value > 0) //there are entities in this group
                 {
                     var value = _lastComponentsToAddPerGroup[current.Key];
-                    Current = new GroupInfo() { Group = current.Key, Components = value };
+                    Current = new GroupInfo() { GroupIndex = current.Key, Components = value };
 
                     return true;
                 }
@@ -41,16 +41,16 @@ namespace Trecs.Internal
 
         //cannot be read only as they will be modified by MoveNext
         readonly DenseDictionary<
-            Group,
+            GroupIndex,
             DenseDictionary<ComponentId, IComponentArray>
         > _lastComponentsToAddPerGroup;
 
-        DenseDictionary<Group, int>.Enumerator _lastNumberEntitiesCreatedPerGroup;
+        DenseDictionary<GroupIndex, int>.Enumerator _lastNumberEntitiesCreatedPerGroup;
     }
 
     struct GroupInfo
     {
-        public Group Group;
+        public GroupIndex GroupIndex;
         public DenseDictionary<ComponentId, IComponentArray> Components;
     }
 
@@ -64,12 +64,12 @@ namespace Trecs.Internal
 
         public DoubleBufferedEntitiesToAdd()
         {
-            var entitiesCreatedPerGroupA = new DenseDictionary<Group, int>();
-            var entitiesCreatedPerGroupB = new DenseDictionary<Group, int>();
+            var entitiesCreatedPerGroupA = new DenseDictionary<GroupIndex, int>();
+            var entitiesCreatedPerGroupB = new DenseDictionary<GroupIndex, int>();
             var entityComponentsToAddBufferA =
-                new DenseDictionary<Group, DenseDictionary<ComponentId, IComponentArray>>();
+                new DenseDictionary<GroupIndex, DenseDictionary<ComponentId, IComponentArray>>();
             var entityComponentsToAddBufferB =
-                new DenseDictionary<Group, DenseDictionary<ComponentId, IComponentArray>>();
+                new DenseDictionary<GroupIndex, DenseDictionary<ComponentId, IComponentArray>>();
 
             _currentNumberEntitiesCreatedPerGroup = entitiesCreatedPerGroupA;
             _lastNumberEntitiesCreatedPerGroup = entitiesCreatedPerGroupB;
@@ -77,13 +77,13 @@ namespace Trecs.Internal
             currentComponentsToAddPerGroup = entityComponentsToAddBufferA;
             lastComponentsToAddPerGroup = entityComponentsToAddBufferB;
 
-            _currentPendingReferences = new DenseDictionary<Group, FastList<EntityHandle>>();
-            _lastPendingReferences = new DenseDictionary<Group, FastList<EntityHandle>>();
+            _currentPendingReferences = new DenseDictionary<GroupIndex, FastList<EntityHandle>>();
+            _lastPendingReferences = new DenseDictionary<GroupIndex, FastList<EntityHandle>>();
 
-            _currentNativeAddSortKeys = new DenseDictionary<Group, FastList<ulong>>();
-            _lastNativeAddSortKeys = new DenseDictionary<Group, FastList<ulong>>();
-            _currentNativeAddStartIndices = new DenseDictionary<Group, int>();
-            _lastNativeAddStartIndices = new DenseDictionary<Group, int>();
+            _currentNativeAddSortKeys = new DenseDictionary<GroupIndex, FastList<ulong>>();
+            _lastNativeAddSortKeys = new DenseDictionary<GroupIndex, FastList<ulong>>();
+            _currentNativeAddStartIndices = new DenseDictionary<GroupIndex, int>();
+            _lastNativeAddStartIndices = new DenseDictionary<GroupIndex, int>();
         }
 
         public void ClearLastAddOperations()
@@ -203,7 +203,7 @@ namespace Trecs.Internal
             return _lastNumberEntitiesCreatedPerGroup.Count > 0;
         }
 
-        internal void IncrementEntityCount(Group groupId)
+        internal void IncrementEntityCount(GroupIndex groupId)
         {
             _currentNumberEntitiesCreatedPerGroup.GetOrAdd(groupId)++;
             //   _totalEntitiesToAdd++;
@@ -220,7 +220,7 @@ namespace Trecs.Internal
         }
 
         internal void Preallocate(
-            Group groupId,
+            GroupIndex groupId,
             int numberOfEntities,
             IComponentBuilder[] entityComponentsToBuild
         )
@@ -232,7 +232,7 @@ namespace Trecs.Internal
             Assert.That(!_configurationFrozen);
 
             void PreallocateDictionaries(
-                DenseDictionary<Group, DenseDictionary<ComponentId, IComponentArray>> dic
+                DenseDictionary<GroupIndex, DenseDictionary<ComponentId, IComponentArray>> dic
             )
             {
                 //get the set of entities in the group ID
@@ -287,12 +287,12 @@ namespace Trecs.Internal
         //while group indices are sequential, they may not be used in a sequential order. Sparseset needs
         //entities to be created sequentially (the index cannot be managed externally)
         internal DenseDictionary<
-            Group,
+            GroupIndex,
             DenseDictionary<ComponentId, IComponentArray>
         > currentComponentsToAddPerGroup;
 
         DenseDictionary<
-            Group,
+            GroupIndex,
             DenseDictionary<ComponentId, IComponentArray>
         > lastComponentsToAddPerGroup;
 
@@ -301,13 +301,13 @@ namespace Trecs.Internal
         ///     to keep count of the number of entities built this frame. At the moment the actual number
         ///     of entities built is not used
         /// </summary>
-        DenseDictionary<Group, int> _currentNumberEntitiesCreatedPerGroup;
-        DenseDictionary<Group, int> _lastNumberEntitiesCreatedPerGroup;
+        DenseDictionary<GroupIndex, int> _currentNumberEntitiesCreatedPerGroup;
+        DenseDictionary<GroupIndex, int> _lastNumberEntitiesCreatedPerGroup;
 
         // Track EntityHandle references for entities being added, so we can
         // call SetEntityHandle with the correct DB index during submission
-        internal DenseDictionary<Group, FastList<EntityHandle>> _currentPendingReferences;
-        DenseDictionary<Group, FastList<EntityHandle>> _lastPendingReferences;
+        internal DenseDictionary<GroupIndex, FastList<EntityHandle>> _currentPendingReferences;
+        DenseDictionary<GroupIndex, FastList<EntityHandle>> _lastPendingReferences;
 
         static readonly Func<FastList<EntityHandle>> _newPendingRefList = () =>
             new FastList<EntityHandle>();
@@ -315,7 +315,7 @@ namespace Trecs.Internal
             ref FastList<EntityHandle> l
         ) => l.Clear();
 
-        internal void AddPendingReference(Group group, EntityHandle reference)
+        internal void AddPendingReference(GroupIndex group, EntityHandle reference)
         {
             var list = _currentPendingReferences.RecycleOrAdd(
                 group,
@@ -325,22 +325,22 @@ namespace Trecs.Internal
             list.Add(reference);
         }
 
-        internal DenseDictionary<Group, FastList<EntityHandle>> LastPendingReferences =>
+        internal DenseDictionary<GroupIndex, FastList<EntityHandle>> LastPendingReferences =>
             _lastPendingReferences;
 
         // Track composite sort keys for native adds (packed as (ulong)accessorId << 32 | sortKey)
-        DenseDictionary<Group, FastList<ulong>> _currentNativeAddSortKeys;
-        DenseDictionary<Group, FastList<ulong>> _lastNativeAddSortKeys;
+        DenseDictionary<GroupIndex, FastList<ulong>> _currentNativeAddSortKeys;
+        DenseDictionary<GroupIndex, FastList<ulong>> _lastNativeAddSortKeys;
 
         // Track where native adds start in each group's component arrays
-        DenseDictionary<Group, int> _currentNativeAddStartIndices;
-        DenseDictionary<Group, int> _lastNativeAddStartIndices;
+        DenseDictionary<GroupIndex, int> _currentNativeAddStartIndices;
+        DenseDictionary<GroupIndex, int> _lastNativeAddStartIndices;
 
         static readonly Func<FastList<ulong>> _newSortKeyList = () => new FastList<ulong>();
         static readonly ActionRef<FastList<ulong>> _clearSortKeyList = (ref FastList<ulong> l) =>
             l.Clear();
 
-        internal void AddPendingNativeAddSortKey(Group group, int accessorId, uint sortKey)
+        internal void AddPendingNativeAddSortKey(GroupIndex group, int accessorId, uint sortKey)
         {
             var list = _currentNativeAddSortKeys.RecycleOrAdd(
                 group,
@@ -351,7 +351,7 @@ namespace Trecs.Internal
             list.Add(compositeKey);
         }
 
-        internal void MarkNativeAddStartIfNeeded(Group group, int currentArrayCount)
+        internal void MarkNativeAddStartIfNeeded(GroupIndex group, int currentArrayCount)
         {
             if (!_currentNativeAddStartIndices.ContainsKey(group))
             {

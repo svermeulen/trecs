@@ -403,7 +403,7 @@ namespace Trecs
         /// Ensure it is safe to access a component on the main thread by completing outstanding
         /// jobs that read or write the given component in the given group.
         /// </summary>
-        public bool SyncMainThread<T>(Group group)
+        public bool SyncMainThread<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             return JobScheduler.SyncMainThread(
@@ -529,7 +529,7 @@ namespace Trecs
         /// <summary>
         /// NOTE: Get groups list from WorldInfo so that it is cached
         /// </summary>
-        public int CountEntitiesInGroups(LocalReadOnlyFastList<Group> groups)
+        public int CountEntitiesInGroups(LocalReadOnlyFastList<GroupIndex> groups)
         {
             var totalCount = 0;
 
@@ -613,7 +613,7 @@ namespace Trecs
             where T4 : struct, ITag =>
             AddEntity(TagSet<T1, T2, T3, T4>.Value, callerFile, callerLine);
 
-        public int CountEntitiesInGroup(Group group)
+        public int CountEntitiesInGroup(GroupIndex group)
         {
             return _entitiesDb.CountEntitiesInGroup(group);
         }
@@ -628,7 +628,7 @@ namespace Trecs
             return total;
         }
 
-        public ComponentBufferAccessor<T> ComponentBuffer<T>(Group group)
+        public ComponentBufferAccessor<T> ComponentBuffer<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             return new ComponentBufferAccessor<T>(this, group);
@@ -649,7 +649,7 @@ namespace Trecs
         public bool TryComponent<T>(EntityIndex entityIndex, out ComponentAccessor<T> componentRef)
             where T : unmanaged, IEntityComponent
         {
-            SyncAndRecordRead<T>(entityIndex.Group);
+            SyncAndRecordRead<T>(entityIndex.GroupIndex);
             if (_entitiesDb.TryQueryEntitiesAndIndex<T>(entityIndex, out _, out _))
             {
                 componentRef = new ComponentAccessor<T>(this, entityIndex);
@@ -839,7 +839,7 @@ namespace Trecs
             );
         }
 
-        internal NativeComponentBufferRead<T> GetBufferRead<T>(Group group)
+        internal NativeComponentBufferRead<T> GetBufferRead<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             SyncAndRecordRead<T>(group);
@@ -856,7 +856,7 @@ namespace Trecs
 #endif
         }
 
-        internal NativeComponentBufferWrite<T> GetBufferWrite<T>(Group group)
+        internal NativeComponentBufferWrite<T> GetBufferWrite<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             SyncAndRecord<T>(group);
@@ -874,12 +874,12 @@ namespace Trecs
         }
 
         [Conditional("DEBUG")]
-        void AssertGroupHasComponent<T1>(Group group)
+        void AssertGroupHasComponent<T1>(GroupIndex group)
             where T1 : unmanaged, IEntityComponent
         {
             Assert.That(
                 _worldInfo.GroupHasComponent<T1>(group),
-                "Group {} does not contain component {} (system {}). The query that resolved this group is missing a constraint that ensures every matched group contains {}. Add .WithComponents<{}>() to the query, narrow it via tags/sets, or set MatchByComponents = true on the iteration attribute.",
+                "GroupIndex {} does not contain component {} (system {}). The query that resolved this group is missing a constraint that ensures every matched group contains {}. Add .WithComponents<{}>() to the query, narrow it via tags/sets, or set MatchByComponents = true on the iteration attribute.",
                 group,
                 typeof(T1),
                 DebugName,
@@ -894,7 +894,7 @@ namespace Trecs
         // to compute dependencies and track the job handle instead.
 
         internal (NativeComponentBufferRead<T> buffer, int count) GetBufferReadForJobScheduling<T>(
-            Group group
+            GroupIndex group
         )
             where T : unmanaged, IEntityComponent
         {
@@ -914,7 +914,7 @@ namespace Trecs
         internal (
             NativeComponentBufferWrite<T> buffer,
             int count
-        ) GetBufferWriteForJobScheduling<T>(Group group)
+        ) GetBufferWriteForJobScheduling<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             AssertGroupHasComponent<T>(group);
@@ -931,7 +931,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void SyncAndRecord<T>(Group group)
+        void SyncAndRecord<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             if (_systemRunner.JobScheduler.HasOutstandingJobs)
@@ -962,7 +962,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void SyncAndRecordRead<T>(Group group)
+        void SyncAndRecordRead<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
             if (_systemRunner.JobScheduler.HasOutstandingJobs)
@@ -995,12 +995,12 @@ namespace Trecs
         internal NativeComponentRead<T> GetComponentRead<T>(EntityIndex entityIndex)
             where T : unmanaged, IEntityComponent
         {
-            SyncAndRecordRead<T>(entityIndex.Group);
+            SyncAndRecordRead<T>(entityIndex.GroupIndex);
             var buf = _entitiesDb.QueryEntitiesAndIndex<T>(entityIndex, out var index);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             var safety = SafetyManager.GetReadHandle(
                 ResourceId.Component(ComponentTypeId<T>.Value),
-                entityIndex.Group
+                entityIndex.GroupIndex
             );
             return new(new NativeComponentBufferRead<T>(buf, safety), (int)index);
 #else
@@ -1011,12 +1011,12 @@ namespace Trecs
         internal NativeComponentWrite<T> GetComponentWrite<T>(EntityIndex entityIndex)
             where T : unmanaged, IEntityComponent
         {
-            SyncAndRecord<T>(entityIndex.Group);
+            SyncAndRecord<T>(entityIndex.GroupIndex);
             var buf = _entitiesDb.QueryEntitiesAndIndex<T>(entityIndex, out var index);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             var safety = SafetyManager.GetWriteHandle(
                 ResourceId.Component(ComponentTypeId<T>.Value),
-                entityIndex.Group
+                entityIndex.GroupIndex
             );
             return new(new NativeComponentBufferWrite<T>(buf, safety), (int)index);
 #else
@@ -1094,10 +1094,11 @@ namespace Trecs
             return _entitiesDb.GetEntityHandleMap();
         }
 
-        internal NativeEntityHandleBuffer GetEntityHandleBufferForJobScheduling(Group group)
+        internal NativeEntityHandleBuffer GetEntityHandleBufferForJobScheduling(GroupIndex group)
         {
             var handleMap = GetEntityHandleMap();
-            if (!handleMap._entityIndexToReferenceMap.TryGetValue(group, out var groupList))
+            var groupList = handleMap._entityIndexToReferenceMap[group.Value];
+            if (!groupList.IsCreated)
                 return default;
             return new NativeEntityHandleBuffer(
                 new NativeBuffer<int>(groupList),
@@ -1118,7 +1119,7 @@ namespace Trecs
         }
 
         internal unsafe NativeComponentLookupRead<T> CreateNativeComponentLookupRead<T>(
-            ReadOnlyFastList<Group> groups,
+            ReadOnlyFastList<GroupIndex> groups,
             Allocator allocator
         )
             where T : unmanaged, IEntityComponent
@@ -1145,7 +1146,7 @@ namespace Trecs
         }
 
         internal unsafe NativeComponentLookupWrite<T> CreateNativeComponentLookupWrite<T>(
-            ReadOnlyFastList<Group> groups,
+            ReadOnlyFastList<GroupIndex> groups,
             Allocator allocator
         )
             where T : unmanaged, IEntityComponent
@@ -1351,7 +1352,7 @@ namespace Trecs.Internal // Unsupported internal APIs
         public static bool SyncMainThread(
             this WorldAccessor world,
             ComponentId componentId,
-            Group group
+            GroupIndex group
         )
         {
             return world.JobScheduler.SyncMainThread(ResourceId.Component(componentId), group);
