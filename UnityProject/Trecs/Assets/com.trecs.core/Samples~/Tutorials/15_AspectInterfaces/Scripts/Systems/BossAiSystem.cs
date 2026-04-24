@@ -34,7 +34,14 @@ namespace Trecs.Samples.AspectInterfaces
 
                 if (math.distancesq(boss.Position, enemy.Position) <= collisionSqr)
                 {
-                    if (Combat.TryTakeHit(boss, _settings.DamagePerHit, _settings.BossHitCooldown, World))
+                    if (
+                        Combat.TryTakeHit(
+                            boss,
+                            _settings.DamagePerHit,
+                            _settings.BossHitCooldown,
+                            World
+                        )
+                    )
                     {
                         break;
                     }

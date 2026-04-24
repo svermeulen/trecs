@@ -48,8 +48,15 @@ namespace Trecs.Samples.AspectInterfaces
             // the exchange — take damage, flip to Fleeing, and pick a
             // fresh random flee duration so every retreat lasts a
             // slightly different amount of time.
-            if (inRange
-                && Combat.TryTakeHit(enemy, _settings.DamagePerHit, _settings.EnemyHitCooldown, World))
+            if (
+                inRange
+                && Combat.TryTakeHit(
+                    enemy,
+                    _settings.DamagePerHit,
+                    _settings.EnemyHitCooldown,
+                    World
+                )
+            )
             {
                 enemy.Mood = EnemyMood.Fleeing;
 
