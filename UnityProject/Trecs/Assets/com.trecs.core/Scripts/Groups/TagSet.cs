@@ -11,6 +11,7 @@ namespace Trecs
     /// <see cref="Id"/>, regardless of the order the tags were specified. Use the generic helpers
     /// (e.g. <c>TagSet&lt;Red, Fast&gt;.Value</c>) for zero-allocation access in hot paths.
     /// </summary>
+    [TypeId(912438516)]
     public readonly struct TagSet : IEquatable<TagSet>, IComparable<TagSet>, IStableHashProvider
     {
         public readonly int Id;

@@ -77,6 +77,7 @@ namespace Trecs.Serialization
             registry.RegisterBlit<EntityHandleMapElement>();
             registry.RegisterBlit<EntityHandle>();
             registry.RegisterBlit<Group>();
+            registry.RegisterBlit<TagSet>();
 
             // For EntityInputQueue
             registry.RegisterSerializer<DenseHashSetSerializer<EntityHandle>>();
