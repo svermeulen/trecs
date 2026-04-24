@@ -632,8 +632,10 @@ namespace Trecs.Internal
                 );
             }
 
-#if TRECS_INTERNAL_CHECKS && DEBUG
             var postRemoveCount = originalCount - numRemovals;
+            ecsRoot._entitiesQuerier._entityLocator.TrimGroupList(fromGroup, postRemoveCount);
+
+#if TRECS_INTERNAL_CHECKS && DEBUG
             ecsRoot._entitiesQuerier._entityLocator.ValidateGroupConsistency(
                 fromGroup,
                 postRemoveCount
@@ -801,10 +803,12 @@ namespace Trecs.Internal
                         );
                     }
 
+                    var postMoveCount = GetGroupEntityCount(fromGroupDictionary);
+                    ecsRoot._entitiesQuerier._entityLocator.TrimGroupList(fromGroup, postMoveCount);
+
                     FireMoveCallbacks(fromGroup, toGroupMoveInfos, ecsRoot);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                    var postMoveCount = GetGroupEntityCount(fromGroupDictionary);
                     ecsRoot._entitiesQuerier._entityLocator.ValidateGroupConsistency(
                         fromGroup,
                         postMoveCount

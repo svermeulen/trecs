@@ -132,33 +132,21 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             var buffer = a.GetEntityHandleBufferForJob(group);
 
-            // The reverse-map list is grow-only, so buffer.Length is the high-water
-            // mark (3) and the trailing cleared slot returns a null handle. The
-            // contract we care about: both survivors are present, and every index
-            // in [0, Length) is safe to read.
-            NAssert.GreaterOrEqual(buffer.Length, 2);
+            NAssert.AreEqual(2, buffer.Length);
 
             bool has1 = false;
             bool has3 = false;
-            int liveCount = 0;
             for (int i = 0; i < buffer.Length; i++)
             {
-                var h = buffer[i];
-                if (h.IsNull)
-                {
-                    continue;
-                }
-                liveCount++;
-                if (h == handle1)
+                if (buffer[i] == handle1)
                 {
                     has1 = true;
                 }
-                if (h == handle3)
+                if (buffer[i] == handle3)
                 {
                     has3 = true;
                 }
             }
-            NAssert.AreEqual(2, liveCount, "Buffer should expose exactly two live handles");
             NAssert.IsTrue(has1, "Buffer should still contain handle1 after swap-back");
             NAssert.IsTrue(has3, "Buffer should still contain handle3 after swap-back");
         }

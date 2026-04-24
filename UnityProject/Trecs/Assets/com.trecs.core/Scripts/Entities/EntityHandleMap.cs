@@ -19,11 +19,14 @@ namespace Trecs
 
         bool _configurationFrozen;
 
-        // Reverse map: per-group NativeList of forward-map unique IDs (1-based; 0 = empty slot).
+        // Reverse map: per-group NativeList of forward-map unique IDs (1-based).
         // We intentionally store just the UniqueId (4 bytes) instead of a full EntityHandle
         // (8 bytes). The Version is authoritative in the forward map, so any consumer that
         // needs a full handle (e.g. GetEntityHandle, NativeEntityHandleBuffer indexing)
         // fetches Version from there.
+        // Invariant: each group's list length equals the group's live entity count.
+        // TrimGroupList is called after structural changes (remove, move swap-back) to
+        // maintain this. Every index in [0, groupList.Length) resolves to a live entity.
         internal NativeDenseDictionary<Group, NativeList<int>> _entityIndexToReferenceMap;
 
         // (SVKJ) notes
@@ -565,6 +568,30 @@ namespace Trecs
             }
 
             _entityIndexToReferenceMap.Dispose();
+        }
+
+        /// <summary>
+        /// Shrinks a group's reverse-map list to <paramref name="newLength"/>. Called after
+        /// structural changes (removals, moves) that reduce a group's live entity count so
+        /// that the list length always matches the live count — callers can then rely on
+        /// every index in [0, Length) being a live entity.
+        /// <para>
+        /// Safe to call unconditionally: trailing entries past the new count are guaranteed
+        /// to be 0-sentinels by the swap-back protocol (removed slots are zeroed, and the
+        /// tail entries from which entities were swapped back are zeroed too).
+        /// </para>
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void TrimGroupList(Group group, int newLength)
+        {
+            if (!_entityIndexToReferenceMap.TryGetValue(group, out var groupList))
+            {
+                return;
+            }
+            if (groupList.Length > newLength)
+            {
+                groupList.Resize(newLength, NativeArrayOptions.UninitializedMemory);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
