@@ -180,12 +180,12 @@ MonoBehaviour:
   Settings:
     DamagePerHit: 30
     EnemyHitCooldown: 0.5
-    BossHitCooldown: 0.1
+    BossHitCooldown: 0.15
     CollisionDistance: 1.2
-    EnemyRegenPerSecond: 5
+    EnemyRegenPerSecond: 2.5
     MinFleeDuration: 0.1
-    MaxFleeDuration: 1
-    BossChaseSpeed: 0.5
+    MaxFleeDuration: 0.8
+    BossChaseSpeed: 0.7
     EnemyArmors:
     - 0
     - 8
@@ -197,13 +197,16 @@ MonoBehaviour:
     EnemyChaseSpeed: 3
     BossMaxHealth: 400
     BossArmor: 25
-    SpawnRingRadius: 4
+    SpawnRingRadiusMin: 3
+    SpawnRingRadiusMax: 5
     EnemySpawnY: 0.3
     BossScale: 1.2
     EnemyScale: 0.6
     BossBaseColor: {r: 0.6, g: 0.2, b: 0.8, a: 1}
     EnemyBaseColor: {r: 1, g: 0, b: 0, a: 1}
-    HitFlashDuration: 0.15
+    HitFlashDuration: 0.1
+    DanceAmplitude: 1
+    DanceFrequency: 5
 --- !u!1 &600000011
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,5 +1,5 @@
 using System;
-using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace Trecs.Samples.AspectInterfaces
 {
@@ -19,12 +19,7 @@ namespace Trecs.Samples.AspectInterfaces
             var accessor = world.CreateAccessor();
 
             accessor
-                .Events.EntitiesWithTags<SampleTags.Enemy>()
-                .OnRemoved(OnEntityRemoved)
-                .AddTo(_disposables);
-
-            accessor
-                .Events.EntitiesWithTags<SampleTags.Boss>()
+                .Events.EntitiesWithComponents<GameObjectId>()
                 .OnRemoved(OnEntityRemoved)
                 .AddTo(_disposables);
         }
@@ -33,7 +28,7 @@ namespace Trecs.Samples.AspectInterfaces
         void OnEntityRemoved(in GameObjectId gameObjectId)
         {
             var go = _gameObjectRegistry.Resolve(gameObjectId);
-            UnityEngine.Object.Destroy(go);
+            Object.Destroy(go);
             _gameObjectRegistry.Unregister(gameObjectId);
         }
 

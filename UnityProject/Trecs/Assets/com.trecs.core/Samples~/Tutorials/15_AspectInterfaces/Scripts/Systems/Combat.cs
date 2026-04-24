@@ -21,14 +21,15 @@ namespace Trecs.Samples.AspectInterfaces
         // no hit lands if the target was hit less than `cooldown` seconds
         // ago. Reads Armor to reduce raw damage (floored at 0), subtracts
         // from Health, stamps HitFlashTime, and removes the entity if its
-        // health drops below zero. Returns true when the hit actually
-        // landed.
+        // health drops to zero or below. Returns true when the hit
+        // actually landed.
         //
-        // Having the cooldown check inside the helper (rather than at each
-        // call site) is the reason the aspect interface pays off — all four
-        // of the substrate's fields get touched here, and TryTakeHit can
-        // hand the caller a single in-T parameter instead of shuffling
-        // Armor/MaxHealth/Health/HitFlashTime through the signature.
+        // Three of IHittable's four fields are touched here (Armor, Health,
+        // HitFlashTime); MaxHealth rides along in the aspect for callers
+        // that need it (EnemyAiSystem's heal clamp, HitFlashRenderer's
+        // tint ratio). That's the payoff of the aspect interface — a
+        // single `in T` argument instead of shuffling four component refs
+        // through every helper and caller's signature.
         public static bool TryTakeHit<T>(
             in T target,
             float rawDamage,
@@ -46,7 +47,7 @@ namespace Trecs.Samples.AspectInterfaces
             target.Health -= reduced;
             target.HitFlashTime = world.ElapsedTime;
 
-            if (target.Health < 0f)
+            if (target.Health <= 0f)
             {
                 target.Remove(world);
             }

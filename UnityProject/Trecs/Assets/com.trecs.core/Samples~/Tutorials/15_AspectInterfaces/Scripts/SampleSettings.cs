@@ -53,7 +53,10 @@ namespace Trecs.Samples.AspectInterfaces
         public float BossArmor = 25f;
 
         // Enemy spawn ring around the origin (where the boss starts).
-        public float SpawnRingRadius = 4f;
+        // Each enemy's radius is sampled uniformly from [min, max] so the
+        // starting layout isn't a perfect ring.
+        public float SpawnRingRadiusMin = 3f;
+        public float SpawnRingRadiusMax = 5f;
         public float EnemySpawnY = 0.3f;
 
         // Per-entity render scale (set on the GameObjects, not on any
@@ -66,5 +69,11 @@ namespace Trecs.Samples.AspectInterfaces
 
         // Seconds the HitFlashRenderer tints an entity white after a hit.
         public float HitFlashDuration = 0.15f;
+
+        // Victory dance once the boss is gone — enemies bob up and down
+        // on Y like they're jumping for joy, with a per-entity phase so
+        // they don't all peak on the same frame.
+        public float DanceAmplitude = 1.5f;
+        public float DanceFrequency = 6f;
     }
 }

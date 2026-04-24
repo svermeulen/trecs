@@ -56,9 +56,9 @@ namespace Trecs.Samples.AspectInterfaces
         Fleeing = 1,
     }
 
-    // Enemy-only: current behavioral state. BossAiSystem flips it to
-    // Fleeing when a hit lands; EnemyAiSystem flips it back to Charging
-    // once the enemy has healed to full.
+    // Enemy-only: current behavioral state. Set and cleared by
+    // EnemyAiSystem — flipped to Fleeing when a hit lands on the enemy,
+    // back to Charging once the stamped FleeEndTime has elapsed.
     [Unwrap]
     public partial struct Mood : IEntityComponent
     {

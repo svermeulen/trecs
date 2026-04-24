@@ -1,5 +1,6 @@
 using Unity.Mathematics;
 using UnityEngine;
+using Random = Unity.Mathematics.Random;
 
 namespace Trecs.Samples.AspectInterfaces
 {
@@ -46,13 +47,18 @@ namespace Trecs.Samples.AspectInterfaces
             // different armor value so per-entity flee cadence visibly
             // differs. EnemyArmors.Length drives the enemy count.
             int count = _settings.EnemyArmors.Length;
+            var rng = new Random(0x9E3779B9u);
             for (int i = 0; i < count; i++)
             {
                 float angle = i * (2f * math.PI / count);
+                float radius = rng.NextFloat(
+                    _settings.SpawnRingRadiusMin,
+                    _settings.SpawnRingRadiusMax
+                );
                 var pos = new float3(
-                    _settings.SpawnRingRadius * math.cos(angle),
+                    radius * math.cos(angle),
                     _settings.EnemySpawnY,
-                    _settings.SpawnRingRadius * math.sin(angle)
+                    radius * math.sin(angle)
                 );
                 var go = MakePrimitive(
                     PrimitiveType.Cube,

@@ -20,13 +20,29 @@ namespace Trecs.Samples.AspectInterfaces
             // Query the boss once per frame, then forward it to the
             // per-entity method as a pass-through argument — each enemy
             // iteration reads the same boss view without re-querying.
-            // TrySingle so that when the boss dies the whole system
-            // becomes a no-op instead of asserting.
+            // When the boss is dead the enemies break into a victory
+            // dance instead of freezing in place.
             if (!BossView.Query(World).WithTags<SampleTags.Boss>().TrySingle(out var boss))
             {
+                DanceImpl();
                 return;
             }
             ExecuteImpl(in boss);
+        }
+
+        [ForEachEntity(Tag = typeof(SampleTags.Enemy))]
+        void DanceImpl(in EnemyView enemy)
+        {
+            // Per-entity phase from EntityIndex so each enemy bobs out
+            // of sync — half the flock on the way up while the other
+            // half is on the way down.
+            float phase = enemy.EntityIndex.Index * 1.7f;
+            float t = World.ElapsedTime * _settings.DanceFrequency + phase;
+            // abs(sin) so the bob bottoms out at the spawn height
+            // instead of dipping below the ground plane.
+            float3 pos = enemy.Position;
+            pos.y = _settings.EnemySpawnY + math.abs(math.sin(t)) * _settings.DanceAmplitude;
+            enemy.Position = pos;
         }
 
         [ForEachEntity(Tag = typeof(SampleTags.Enemy))]
