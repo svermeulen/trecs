@@ -57,6 +57,7 @@ nav:
       - Groups, GroupIndex & TagSets: advanced/groups-and-tagsets.md
       - Source Generator Reference: advanced/source-generator-reference.md
       - Heap: advanced/heap.md
+      - Heap Allocation Rules: advanced/heap-allocation-rules.md
       - Fixed Collections: advanced/fixed-collections.md
       - Interpolation: advanced/interpolation.md
       - Serialization: advanced/serialization.md
