@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using Trecs.Collections;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Internal
 {
@@ -11,22 +12,27 @@ namespace Trecs.Internal
         internal NativeDenseDictionary<SetId, EntitySet> EntitySets;
         internal NativeDenseDictionary<SetId, NativeSetDeferredQueues> DeferredQueues;
 
-        // Routing index: maps GroupIndex to set IDs registered for that group.
-        // When an entity in group G is removed/swapped, we look up all set IDs
-        // registered under G and update them.
-        internal NativeDenseDictionary<GroupIndex, NativeList<SetId>> SetIdsByGroup;
+        // Routing index: per-group list of set IDs registered for that group,
+        // indexed by GroupIndex.Index. When an entity in group G is
+        // removed/swapped, we look up all set IDs registered under G and
+        // update them. Inner is UnsafeList<SetId> so the outer NativeList holds
+        // non-NativeContainer values — same pattern as EntityHandleMap's reverse map.
+        [NativeDisableContainerSafetyRestriction]
+        internal NativeList<UnsafeList<SetId>> SetIdsByGroup;
 
-        public SetStore()
+        public SetStore(int groupCount)
         {
             EntitySets = new NativeDenseDictionary<SetId, EntitySet>(0, Allocator.Persistent);
             DeferredQueues = new NativeDenseDictionary<SetId, NativeSetDeferredQueues>(
                 0,
                 Allocator.Persistent
             );
-            SetIdsByGroup = new NativeDenseDictionary<GroupIndex, NativeList<SetId>>(
-                0,
-                Allocator.Persistent
-            );
+            SetIdsByGroup = new NativeList<UnsafeList<SetId>>(groupCount, Allocator.Persistent);
+            SetIdsByGroup.Resize(groupCount, NativeArrayOptions.UninitializedMemory);
+            for (int i = 0; i < groupCount; i++)
+            {
+                SetIdsByGroup[i] = new UnsafeList<SetId>(0, Allocator.Persistent);
+            }
         }
 
         /// <summary>
@@ -64,17 +70,8 @@ namespace Trecs.Internal
 
             foreach (var group in groups)
             {
-                if (!SetIdsByGroup.TryGetIndex(group, out var routingIdx))
-                {
-                    var newList = new NativeList<SetId>(1, Allocator.Persistent);
-                    newList.Add(setDef.Id);
-                    SetIdsByGroup.Add(group, newList);
-                }
-                else
-                {
-                    ref var list = ref SetIdsByGroup.GetValueAtIndexByRef(routingIdx);
-                    list.Add(setDef.Id);
-                }
+                ref var list = ref SetIdsByGroup.ElementAt(group.Index);
+                list.Add(setDef.Id);
             }
         }
 
@@ -202,9 +199,13 @@ namespace Trecs.Internal
                 queues.Value.RemoveQueue.Dispose();
             }
 
-            foreach (var entry in SetIdsByGroup)
+            for (int i = 0; i < SetIdsByGroup.Length; i++)
             {
-                entry.Value.Dispose();
+                ref var list = ref SetIdsByGroup.ElementAt(i);
+                if (list.IsCreated)
+                {
+                    list.Dispose();
+                }
             }
 
             EntitySets.Dispose();
@@ -222,12 +223,12 @@ namespace Trecs.Internal
             DenseDictionary<int, int> entityIdsAffectedByRemoveAtSwapBack
         )
         {
-            if (!SetIdsByGroup.TryGetValue(fromGroup, out NativeList<SetId> setIds))
+            var setIds = SetIdsByGroup[fromGroup.Index];
+            var numberOfSets = setIds.Length;
+            if (numberOfSets == 0)
             {
                 return;
             }
-
-            var numberOfSets = setIds.Length;
 
             for (int i = 0; i < numberOfSets; ++i)
             {
@@ -264,12 +265,12 @@ namespace Trecs.Internal
             DenseDictionary<int, int> entityIdsAffectedByRemoveAtSwapBack
         )
         {
-            if (!SetIdsByGroup.TryGetValue(fromGroup, out NativeList<SetId> setIds))
+            var setIds = SetIdsByGroup[fromGroup.Index];
+            var numberOfSets = setIds.Length;
+            if (numberOfSets == 0)
             {
                 return;
             }
-
-            var numberOfSets = setIds.Length;
 
             for (int i = 0; i < numberOfSets; ++i)
             {
@@ -318,7 +319,9 @@ namespace Trecs.Internal
             }
         }
 
-        public bool HasAnySets => SetIdsByGroup.Count > 0;
+        // Every registered set matches at least one group (asserted in RegisterSet),
+        // so "any registered set" is equivalent to the old "any routing entry".
+        public bool HasAnySets => EntitySets.Count > 0;
 
         public EntityQuerier.TrecsSets GetTrecsSets()
         {
