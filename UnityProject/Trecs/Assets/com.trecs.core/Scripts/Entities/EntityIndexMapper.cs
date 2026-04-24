@@ -8,7 +8,7 @@ namespace Trecs.Internal
     /// </summary>
     /// <typeparam name="T"></typeparam>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public readonly struct EntityIndexMapper<T> : IEntityIndexMapper
+    public readonly struct EntityIndexMapper<T>
         where T : unmanaged, IEntityComponent
     {
         public int Count => _map.Count;
@@ -68,16 +68,5 @@ namespace Trecs.Internal
         }
 
         internal readonly IComponentArray<T> _map;
-    }
-
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public interface IEntityIndexMapper
-    {
-        bool FindIndex(int valueKey, out int index);
-        int GetIndex(int index);
-        bool Exists(int index);
-
-        GroupIndex GroupId { get; }
-        Type Template { get; }
     }
 }

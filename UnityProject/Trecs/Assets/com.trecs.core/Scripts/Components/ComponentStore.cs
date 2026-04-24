@@ -76,21 +76,6 @@ namespace Trecs.Internal
             return toEntitiesDictionary;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static IComponentArray GetTypeSafeDictionary(
-            GroupIndex groupId,
-            DenseDictionary<ComponentId, IComponentArray> @group,
-            ComponentId refWrapper
-        )
-        {
-            if (!@group.TryGetValue(refWrapper, out IComponentArray fromTypeSafeDictionary))
-            {
-                throw new TrecsException($"no group found: {groupId}");
-            }
-
-            return fromTypeSafeDictionary;
-        }
-
         /// <summary>
         /// Preallocate the DB-side storage for a group with a given set of component builders.
         /// </summary>

@@ -106,25 +106,6 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// determine if group exists and is not empty
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool ExistsAndIsNotEmpty(GroupIndex gid)
-        {
-            return _componentStore.GroupEntityComponentsDB[gid.Index].Count > 0;
-        }
-
-        /// <summary>
-        /// determine if entities we specific components are found in group
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool HasAny<T>(GroupIndex groupStruct)
-            where T : unmanaged, IEntityComponent
-        {
-            return Count<T>(groupStruct) > 0;
-        }
-
-        /// <summary>
         /// count the number of components in a group
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -288,20 +269,6 @@ namespace Trecs.Internal
             where T : unmanaged, IEntityComponent
         {
             return TryGetEntity<T>(entityIndex.Index, entityIndex.GroupIndex, out value);
-        }
-
-        /// <summary>
-        /// Expects that only one entity of type T exists in the group
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T QueryUniqueEntity<T>(GroupIndex group)
-            where T : unmanaged, IEntityComponent
-        {
-            var (buffer, count) = QuerySingleBufferWithCount<T>(group);
-
-            Require.That(count != 0, "Unique entity not found '{}'", typeof(T));
-            Require.That(count == 1, "Unique entities must be unique! '{}'", typeof(T));
-            return ref buffer[0];
         }
 
         // ── NativeComponentLookup builders ────────────────────────

@@ -56,13 +56,6 @@ namespace Trecs
     public class InputSystemAttribute : Attribute { }
 
     /// <summary>
-    /// Suppresses the "no reference found" build warning for a component struct that is
-    /// only referenced indirectly (e.g. via source generation or generic template definitions).
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false)]
-    public class SuppressNoReferenceWarningAttribute : Attribute { }
-
-    /// <summary>
     /// Sets a numeric priority for tie-breaking when topological ordering is ambiguous.
     /// Higher values execute later within the same update phase. Default priority is 0.
     /// </summary>
