@@ -451,7 +451,7 @@ namespace Trecs.SourceGen
                 var bufferSuffix = param.IsRef ? "Write" : "Read";
                 sb.AppendLine(
                     indentLevel,
-                    $"var values{i + 1} = {worldName}.ComponentBuffer<{typeStr}>(__ei.Group).{bufferSuffix};"
+                    $"var values{i + 1} = {worldName}.ComponentBuffer<{typeStr}>(__ei.GroupIndex).{bufferSuffix};"
                 );
             }
 

@@ -321,7 +321,7 @@ namespace Trecs.SourceGen
             // their callback args + custom event args). Mirrors [ForEachAspect].
             sb.AppendLine(
                 2,
-                $"void {methodName}(Group __group, EntityRange __indices, WorldAccessor __world{customArgsDecStr})"
+                $"void {methodName}(GroupIndex __group, EntityRange __indices, WorldAccessor __world{customArgsDecStr})"
             );
             sb.AppendLine(2, "{");
             GenerateRangeIteration(sb, methodName, info, 3);
@@ -518,7 +518,7 @@ namespace Trecs.SourceGen
                 var bufferSuffix = param.IsRef ? "Write" : "Read";
                 sb.AppendLine(
                     indentLevel + 1,
-                    $"var values{i + 1} = {worldName}.ComponentBuffer<{typeStr}>(__slice.Group).{bufferSuffix};"
+                    $"var values{i + 1} = {worldName}.ComponentBuffer<{typeStr}>(__slice.GroupIndex).{bufferSuffix};"
                 );
             }
             sb.AppendLine();
@@ -539,7 +539,7 @@ namespace Trecs.SourceGen
             if (info.HasEntityIndexParameter)
                 sb.AppendLine(
                     indentLevel + 2,
-                    "var __entityIndex = new EntityIndex(__i, __slice.Group);"
+                    "var __entityIndex = new EntityIndex(__i, __slice.GroupIndex);"
                 );
 
             EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
@@ -576,7 +576,7 @@ namespace Trecs.SourceGen
                 var bufferSuffix = param.IsRef ? "Write" : "Read";
                 sb.AppendLine(
                     indentLevel + 1,
-                    $"var values{i + 1} = {worldName}.ComponentBuffer<{typeStr}>(__slice.Group).{bufferSuffix};"
+                    $"var values{i + 1} = {worldName}.ComponentBuffer<{typeStr}>(__slice.GroupIndex).{bufferSuffix};"
                 );
             }
             sb.AppendLine();
@@ -597,7 +597,7 @@ namespace Trecs.SourceGen
             if (info.HasEntityIndexParameter)
                 sb.AppendLine(
                     indentLevel + 2,
-                    "var __entityIndex = new EntityIndex(__i, __slice.Group);"
+                    "var __entityIndex = new EntityIndex(__i, __slice.GroupIndex);"
                 );
 
             EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);

@@ -97,7 +97,7 @@ namespace Trecs.SourceGen.Shared
                                 ? "IncludeReadDep"
                                 : "IncludeWriteDep";
                         sb.AppendLine(
-                            $"{body}{GenPrefix}deps = {GenPrefix}scheduler.{method}({GenPrefix}deps, {rid}, {e.ScheduleParamName}.Group);"
+                            $"{body}{GenPrefix}deps = {GenPrefix}scheduler.{method}({GenPrefix}deps, {rid}, {e.ScheduleParamName}.GroupIndex);"
                         );
                         break;
                     }
@@ -145,7 +145,7 @@ namespace Trecs.SourceGen.Shared
                         break;
                     }
                     case FromWorldFieldKind.NativeWorldAccessor:
-                    case FromWorldFieldKind.Group:
+                    case FromWorldFieldKind.GroupIndex:
                     case FromWorldFieldKind.NativeEntityHandleBuffer:
                         // No dependency registration — these are passive identifiers.
                         break;
@@ -336,7 +336,7 @@ namespace Trecs.SourceGen.Shared
                             $"{body}{GenPrefix}job.{e.FieldName} = {GenPrefix}world.ToNative();"
                         );
                         break;
-                    case FromWorldFieldKind.Group:
+                    case FromWorldFieldKind.GroupIndex:
                         sb.AppendLine(
                             $"{body}{GenPrefix}job.{e.FieldName} = {e.HoistedSingleGroupLocal};"
                         );
@@ -386,7 +386,7 @@ namespace Trecs.SourceGen.Shared
                                 ? "TrackJobRead"
                                 : "TrackJobWrite";
                         sb.AppendLine(
-                            $"{body}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {e.ScheduleParamName}.Group);"
+                            $"{body}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {e.ScheduleParamName}.GroupIndex);"
                         );
                         break;
                     }
@@ -435,7 +435,7 @@ namespace Trecs.SourceGen.Shared
                         // SubmitEntities processes those queues at the next phase boundary.
                         sb.AppendLine($"{body}{GenPrefix}scheduler.TrackJob({GenPrefix}handle);");
                         break;
-                    case FromWorldFieldKind.Group:
+                    case FromWorldFieldKind.GroupIndex:
                     case FromWorldFieldKind.NativeEntityHandleBuffer:
                         // No tracking — these are passive identifiers.
                         break;
