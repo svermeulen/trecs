@@ -156,13 +156,6 @@ namespace Trecs
             return AddBlobHandle<T>(blobId);
         }
 
-        public SharedPtr<T> CreateBlob<T>(T blob)
-            where T : class
-        {
-            var handle = _store.CreateBlobPtr<T>(blob);
-            return AddBlobEntry<T>(handle.BlobId, handle.Handle);
-        }
-
         public SharedPtr<T> CreateBlob<T>(BlobId blobId, T blob)
             where T : class
         {

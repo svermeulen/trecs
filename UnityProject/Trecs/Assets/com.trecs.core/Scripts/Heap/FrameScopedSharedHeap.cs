@@ -80,13 +80,6 @@ namespace Trecs
             return CreateBlobImpl<T>(frame, handle.BlobId, handle.Handle);
         }
 
-        internal SharedPtr<T> CreateBlob<T>(int frame, T blob)
-            where T : class
-        {
-            var handle = _store.CreateBlobPtr<T>(blob);
-            return CreateBlobImpl<T>(frame, handle.BlobId, handle.Handle);
-        }
-
         internal void ClearAtOrAfterFrame(int frame)
         {
             Assert.That(!_isDisposed);

@@ -143,20 +143,6 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Creates a new blob and returns a handle to it.
-        /// The blob is immediately resolvable from managed code (via WorldAccessor),
-        /// but will not be resolvable via NativeSharedPtrResolver (in Burst jobs)
-        /// until FlushPendingOperations is called (at submission time).
-        /// </summary>
-        public NativeSharedPtr<T> CreateBlob<T>(in T blob)
-            where T : unmanaged
-        {
-            Assert.That(!_isDisposed);
-            var handle = _store.CreateNativeBlobPtr(in blob);
-            return AddBlobEntry<T>(handle.BlobId, handle.Handle);
-        }
-
-        /// <summary>
         /// Creates a new blob with a specific BlobId and returns a handle to it.
         /// The blob is immediately resolvable from managed code (via WorldAccessor),
         /// but will not be resolvable via NativeSharedPtrResolver (in Burst jobs)
@@ -174,22 +160,6 @@ namespace Trecs
         /// Takes ownership of an existing native pointer and creates a blob from it without copying.
         /// See <see cref="NativeUniqueHeap.AllocTakingOwnership{T}"/> for the ownership contract.
         /// </summary>
-        public NativeSharedPtr<T> CreateBlobTakingOwnership<T>(
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
-        )
-            where T : unmanaged
-        {
-            Assert.That(!_isDisposed);
-            var handle = _store.CreateNativeBlobPtrTakingOwnership<T>(
-                ptr,
-                allocSize,
-                allocAlignment
-            );
-            return AddBlobEntry<T>(handle.BlobId, handle.Handle);
-        }
-
         public NativeSharedPtr<T> CreateBlobTakingOwnership<T>(
             BlobId blobId,
             IntPtr ptr,

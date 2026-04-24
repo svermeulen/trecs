@@ -78,38 +78,28 @@ namespace Trecs
         public NativeSharedPtr<T> AllocNativeShared<T>(in T blob)
             where T : unmanaged
         {
-            AssertNotInputSystem();
-
-            if (_isFixedSystem)
-            {
-                var fixedRngValue = _fixedRng.NextLong();
-                if (fixedRngValue == 0)
-                    fixedRngValue = 1;
-                var blobId = new BlobId(fixedRngValue);
-                return _heapAllocator.AllocNativeShared<T>(blobId, in blob);
-            }
-
-            return _heapAllocator.AllocNativeShared<T>(in blob);
+            AssertCanAllocatePersistent();
+            return _heapAllocator.AllocNativeShared<T>(MintBlobId(), in blob);
         }
 
         public bool TryAllocNativeShared<T>(BlobId blobId, out NativeSharedPtr<T> ptr)
             where T : unmanaged
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.TryAllocNativeShared<T>(blobId, out ptr);
         }
 
         public NativeSharedPtr<T> AllocNativeShared<T>(BlobId blobId)
             where T : unmanaged
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.AllocNativeShared<T>(blobId);
         }
 
         public NativeSharedPtr<T> AllocNativeShared<T>(BlobId blobId, in T value)
             where T : unmanaged
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.AllocNativeShared<T>(blobId, in value);
         }
 
@@ -126,23 +116,9 @@ namespace Trecs
         )
             where T : unmanaged
         {
-            AssertNotInputSystem();
-
-            if (_isFixedSystem)
-            {
-                var fixedRngValue = _fixedRng.NextLong();
-                if (fixedRngValue == 0)
-                    fixedRngValue = 1;
-                var blobId = new BlobId(fixedRngValue);
-                return _heapAllocator.AllocNativeSharedTakingOwnership<T>(
-                    blobId,
-                    ptr,
-                    allocSize,
-                    allocAlignment
-                );
-            }
-
+            AssertCanAllocatePersistent();
             return _heapAllocator.AllocNativeSharedTakingOwnership<T>(
+                MintBlobId(),
                 ptr,
                 allocSize,
                 allocAlignment
@@ -163,7 +139,7 @@ namespace Trecs
         )
             where T : unmanaged
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.AllocNativeSharedTakingOwnership<T>(
                 blobId,
                 ptr,
@@ -177,31 +153,34 @@ namespace Trecs
         public SharedPtr<T> AllocShared<T>(T blob)
             where T : class
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
+            return _heapAllocator.AllocShared<T>(MintBlobId(), blob);
+        }
 
-            if (_isFixedSystem)
-            {
-                var fixedRngValue = _fixedRng.NextLong();
-                if (fixedRngValue == 0)
-                    fixedRngValue = 1;
-                var blobId = new BlobId(fixedRngValue);
-                return _heapAllocator.AllocShared<T>(blobId, blob);
-            }
-
-            return _heapAllocator.AllocShared<T>(blob);
+        /// <summary>
+        /// Allocates a shared blob under an explicit, caller-supplied
+        /// <see cref="BlobId"/>. Use this for content-pipeline assets that
+        /// should have a stable identity independent of the call order at
+        /// startup — see docs/advanced/heap-allocation-rules.md.
+        /// </summary>
+        public SharedPtr<T> AllocShared<T>(BlobId blobId, T blob)
+            where T : class
+        {
+            AssertCanAllocatePersistent();
+            return _heapAllocator.AllocShared<T>(blobId, blob);
         }
 
         public SharedPtr<T> AllocShared<T>(BlobId blobId)
             where T : class
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.AllocShared<T>(blobId);
         }
 
         public bool TryAllocShared<T>(BlobId blobId, out SharedPtr<T> ptr)
             where T : class
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.TryAllocShared<T>(blobId, out ptr);
         }
 
@@ -210,14 +189,14 @@ namespace Trecs
         public UniquePtr<T> AllocUnique<T>()
             where T : class
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.AllocUnique<T>();
         }
 
         public UniquePtr<T> AllocUnique<T>(T value)
             where T : class
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.AllocUnique<T>(value);
         }
 
@@ -226,14 +205,14 @@ namespace Trecs
         public NativeUniquePtr<T> AllocNativeUnique<T>(in T value)
             where T : unmanaged
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.AllocNativeUnique<T>(in value);
         }
 
         public NativeUniquePtr<T> AllocNativeUnique<T>()
             where T : unmanaged
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.AllocNativeUnique<T>();
         }
 
@@ -258,7 +237,7 @@ namespace Trecs
         )
             where T : unmanaged
         {
-            AssertNotInputSystem();
+            AssertCanAllocatePersistent();
             return _heapAllocator.AllocNativeUniqueTakingOwnership<T>(
                 ptr,
                 allocSize,
@@ -301,6 +280,7 @@ namespace Trecs
             AssertCanAddInputsSystem();
             return _heapAllocator.AllocNativeSharedFrameScoped<T>(
                 _systemRunner.FixedFrame,
+                MintBlobId(),
                 in value
             );
         }
@@ -318,6 +298,7 @@ namespace Trecs
             AssertCanAddInputsSystem();
             return _heapAllocator.AllocNativeSharedFrameScopedTakingOwnership<T>(
                 _systemRunner.FixedFrame,
+                MintBlobId(),
                 ptr,
                 allocSize,
                 allocAlignment
@@ -348,7 +329,11 @@ namespace Trecs
             where T : class
         {
             AssertCanAddInputsSystem();
-            return _heapAllocator.AllocSharedFrameScoped<T>(_systemRunner.FixedFrame, value);
+            return _heapAllocator.AllocSharedFrameScoped<T>(
+                _systemRunner.FixedFrame,
+                MintBlobId(),
+                value
+            );
         }
 
         public SharedPtr<T> AllocSharedFrameScoped<T>(BlobId blobId, T value)
@@ -419,6 +404,25 @@ namespace Trecs
             );
         }
 
+        // ── ID minting ──────────────────────────────────────────────
+
+        // All auto-ID heap allocations mint their BlobId from _fixedRng,
+        // a single deterministic stream shared across initialization and
+        // all fixed-update systems. This guarantees stable IDs across runs
+        // as long as allocation order is itself deterministic — which is
+        // the same discipline rule that already applies to fixed-update
+        // code (see docs/advanced/heap-allocation-rules.md).
+        BlobId MintBlobId()
+        {
+            var value = _fixedRng.NextLong();
+            if (value == 0)
+            {
+                // Avoid colliding with BlobId.Null.
+                value = 1;
+            }
+            return new BlobId(value);
+        }
+
         // ── Assertions ──────────────────────────────────────────────
 
         [Conditional("DEBUG")]
@@ -431,14 +435,33 @@ namespace Trecs
             );
         }
 
+        // Persistent heap allocations are only allowed from initialization
+        // (outside system execution) and fixed-update systems. Variable-update
+        // and input systems are rejected — see docs/advanced/heap-allocation-rules.md.
         [Conditional("DEBUG")]
-        void AssertNotInputSystem()
+        void AssertCanAllocatePersistent()
         {
-            Assert.That(
-                !_systemRunner.IsExecutingSystems || !_isInputSystem,
-                "Cannot allocate persistent heap pointers from input system {}. Use the FrameScoped variant (e.g. AllocSharedFrameScoped) instead so that the pointer is frame scoped",
-                _debugName
-            );
+            if (!_systemRunner.IsExecutingSystems || _isFixedSystem)
+            {
+                return;
+            }
+
+            if (_isInputSystem)
+            {
+                Assert.That(
+                    false,
+                    "Cannot allocate persistent heap pointers from input system {}. Use the FrameScoped variant (e.g. AllocSharedFrameScoped) instead so that the pointer is frame scoped.",
+                    _debugName
+                );
+            }
+            else
+            {
+                Assert.That(
+                    false,
+                    "Cannot allocate heap pointers from variable-update system {}. Heap allocation is only allowed from initialization and fixed-update systems. See Heap Allocation Rules in the docs.",
+                    _debugName
+                );
+            }
         }
     }
 }

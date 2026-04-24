@@ -137,13 +137,6 @@ namespace Trecs
 
         /////////
 
-        internal NativeSharedPtr<T> AllocNativeShared<T>(in T blob)
-            where T : unmanaged
-        {
-            Assert.That(!_isDisposed);
-            return _nativeSharedHeap.CreateBlob(in blob);
-        }
-
         internal bool TryAllocNativeShared<T>(BlobId blobId, out NativeSharedPtr<T> ptr)
             where T : unmanaged
         {
@@ -163,13 +156,6 @@ namespace Trecs
         {
             Assert.That(!_isDisposed);
             return _nativeSharedHeap.CreateBlob<T>(blobId, in blob);
-        }
-
-        internal SharedPtr<T> AllocShared<T>(T blob)
-            where T : class
-        {
-            Assert.That(!_isDisposed);
-            return _sharedHeap.CreateBlob(blob);
         }
 
         internal SharedPtr<T> AllocShared<T>(BlobId blobId, T blob)
@@ -221,13 +207,6 @@ namespace Trecs
             return _frameScopedUniqueHeap.Alloc<T>(frame, value);
         }
 
-        internal SharedPtr<T> AllocSharedFrameScoped<T>(int frame, T value)
-            where T : class
-        {
-            Assert.That(!_isDisposed);
-            return _frameScopedSharedHeap.CreateBlob<T>(frame, value);
-        }
-
         internal SharedPtr<T> AllocSharedFrameScoped<T>(int frame, BlobId blobId, T value)
             where T : class
         {
@@ -247,13 +226,6 @@ namespace Trecs
         {
             Assert.That(!_isDisposed);
             return _frameScopedSharedHeap.TryGetBlob<T>(frame, blobId, out ptr);
-        }
-
-        internal NativeSharedPtr<T> AllocNativeSharedFrameScoped<T>(int frame, in T value)
-            where T : unmanaged
-        {
-            Assert.That(!_isDisposed);
-            return _nativeFrameScopedSharedHeap.CreateBlob<T>(frame, in value);
         }
 
         internal NativeSharedPtr<T> AllocNativeSharedFrameScoped<T>(
@@ -342,17 +314,6 @@ namespace Trecs
         }
 
         internal NativeSharedPtr<T> AllocNativeSharedTakingOwnership<T>(
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
-        )
-            where T : unmanaged
-        {
-            Assert.That(!_isDisposed);
-            return _nativeSharedHeap.CreateBlobTakingOwnership<T>(ptr, allocSize, allocAlignment);
-        }
-
-        internal NativeSharedPtr<T> AllocNativeSharedTakingOwnership<T>(
             BlobId blobId,
             IntPtr ptr,
             int allocSize,
@@ -371,6 +332,7 @@ namespace Trecs
 
         internal NativeSharedPtr<T> AllocNativeSharedFrameScopedTakingOwnership<T>(
             int frame,
+            BlobId blobId,
             IntPtr ptr,
             int allocSize,
             int allocAlignment
@@ -380,6 +342,7 @@ namespace Trecs
             Assert.That(!_isDisposed);
             return _nativeFrameScopedSharedHeap.CreateBlobTakingOwnership<T>(
                 frame,
+                blobId,
                 ptr,
                 allocSize,
                 allocAlignment

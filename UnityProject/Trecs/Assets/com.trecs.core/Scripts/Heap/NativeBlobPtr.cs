@@ -1,16 +1,22 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Trecs.Internal;
 using Unity.Mathematics;
 
-namespace Trecs
+namespace Trecs.Internal
 {
     /// <summary>
-    /// Pointer to a native (unmanaged) blob stored in the <see cref="BlobCache"/>. Resolves
-    /// to a <c>ref T</c> for direct access. Like <see cref="BlobPtr{T}"/> but for unmanaged
-    /// data backed by external <see cref="IBlobStore"/> storage.
+    /// Pointer to a native (unmanaged) blob stored in the <see cref="BlobCache"/>.
+    /// Resolves to a <c>ref T</c> for direct access. Lives in
+    /// <see cref="Trecs.Internal"/> because the supported public path for shared
+    /// native data is <see cref="NativeSharedPtr{T}"/> via
+    /// <see cref="HeapAccessor.AllocNativeShared{T}(BlobId, in T)"/>;
+    /// <see cref="NativeBlobPtr{T}"/> is only used by callers writing custom
+    /// <see cref="IBlobStore"/> backends.
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public readonly struct NativeBlobPtr<T> : IEquatable<NativeBlobPtr<T>>, IBlobPtr
         where T : unmanaged

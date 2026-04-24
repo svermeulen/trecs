@@ -1,16 +1,19 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
 using Unity.Mathematics;
 
-namespace Trecs
+namespace Trecs.Internal
 {
     /// <summary>
-    /// Pointer to a managed (class) blob stored in the <see cref="BlobCache"/>. Unlike
-    /// <see cref="SharedPtr{T}"/> which lives in the world's shared heap, blob pointers
-    /// reference data in external <see cref="IBlobStore"/> backends (e.g. disk, asset bundles)
-    /// and support asynchronous loading via <see cref="IBlobPtr.WarmUp"/>.
+    /// Pointer to a managed (class) blob stored in the <see cref="BlobCache"/>.
+    /// Lives in <see cref="Trecs.Internal"/> because the supported public path
+    /// for shared managed data is <see cref="SharedPtr{T}"/> via
+    /// <see cref="HeapAccessor.AllocShared{T}(BlobId, T)"/>; <see cref="BlobPtr{T}"/>
+    /// is only used by callers writing custom <see cref="IBlobStore"/> backends.
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public readonly struct BlobPtr<T> : IEquatable<BlobPtr<T>>, IBlobPtr
         where T : class
     {

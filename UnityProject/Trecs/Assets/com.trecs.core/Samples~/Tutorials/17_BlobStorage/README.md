@@ -1,53 +1,88 @@
-# 17 — Blob Storage
+# 17 — Shared Assets (Stable BlobIds)
 
-Shows how to store large, shared, read-heavy data **outside** entity components
-using the blob storage system. Blobs are managed data (anything `: class`) held
-in a pluggable `IBlobStore` backend; entities reference them through a
-16-byte `BlobPtr<T>` handle. The data lives once in the cache regardless of how
-many entities point at it.
+Shows how to seed large, immutable, shared data into the world's shared heap
+under stable, content-pipeline-controlled `BlobId`s, and then reference it
+from many entities via `SharedPtr<T>`. The blob lives once in the heap
+regardless of how many entities point at it, and survives across recordings /
+bookmarks because the IDs are caller-supplied rather than runtime-generated.
 
-**When to reach for this over `SharedPtr<T>`:**
-- You want a pluggable storage backend — the `IBlobStore` interface lets you
-  back blobs with disk files, asset bundles, or a network source.
-- You need asynchronous warm-up (`WarmUp` / `GetLoadingState`) for large assets.
-- Blobs are uniquely identified by a stable `BlobId`, useful for content
-  pipelines that reference assets by ID across sessions.
+For the simpler "allocate-and-go" `SharedPtr<T>` story (no stable IDs, IDs
+auto-minted), see [Sample 10 — Pointers](../10_Pointers/README.md). This
+sample is the content-pipeline variant.
 
-For a simpler, memory-only, ref-counted pointer to managed data, use
-`SharedPtr<T>` from sample 10 instead.
+## Why stable BlobIds
+
+`HeapAccessor.AllocShared(T blob)` mints `BlobId`s automatically from the
+world's deterministic RNG — fine when init code is itself deterministic, but
+can break in workflows where startup ordering varies (e.g. assets discovered
+on disk in non-deterministic order). Hand-authored IDs side-step that:
+
+```csharp
+public static class PaletteIds
+{
+    public static readonly BlobId Warm = new(1001);
+    public static readonly BlobId Cool = new(1002);
+}
+```
+
+The same identifier will always refer to the same blob, regardless of which
+order things were loaded.
+
+## The seeder pattern
+
+A long-lived "seeder" class allocates each blob once at startup using
+`AllocShared(stableId, blob)` and **holds the resulting `SharedPtr<T>` as a
+member field**. Without the anchor, the blob's refcount would drop to zero
+between init and the first entity spawn and the cache would evict it.
+
+```csharp
+public class PaletteSeeder
+{
+    SharedPtr<ColorPalette> _warm;
+    SharedPtr<ColorPalette> _cool;
+
+    public void Initialize(WorldAccessor world)
+    {
+        _warm = world.Heap.AllocShared(PaletteIds.Warm, BuildWarm());
+        _cool = world.Heap.AllocShared(PaletteIds.Cool, BuildCool());
+    }
+    // Dispose releases the seeder's anchor; entity-owned handles keep the
+    // blob alive until those are disposed too.
+}
+```
+
+Entity spawners then look up the blob by stable ID:
+
+```csharp
+.Set(new PaletteRef
+{
+    Value = world.Heap.AllocShared<ColorPalette>(PaletteIds.Warm),
+    CycleSpeed = 0.3f,
+})
+```
+
+`AllocShared(BlobId)` (the lookup-only overload) creates a fresh handle to
+the existing blob and bumps its reference count.
 
 ## What the sample does
 
-- Registers a `BlobStoreInMemory` with the world via `WorldBuilder.AddBlobStore`.
-- Creates two `ColorPalette` blobs (managed `class` holding a `List<Color>`).
-- Spawns a 6×6 grid of cubes, each referencing one of the two palettes via
-  `BlobPtr<ColorPalette>` on its `PaletteRef` component.
+- A `PaletteSeeder` allocates two `ColorPalette` blobs (managed `class`
+  holding a `List<Color>`) under stable BlobIds and holds them as members.
+- `SceneInitializer` spawns a 6×6 grid of cubes, each entity referencing one
+  of the two palettes via `SharedPtr<ColorPalette>` on its `PaletteRef`
+  component.
 - A `PaletteCycleSystem` reads each entity's blob each frame and samples the
   palette over time, driving the cube's colour.
 
-## Key APIs
+## Cleanup discipline
 
-- `WorldBuilder.AddBlobStore(IBlobStore)` — register a blob backend before
-  building the world.
-- `BlobStoreInMemory` — ready-made in-memory implementation of `IBlobStore`.
-  Implement `IBlobStore` yourself to back blobs with disk / asset bundles /
-  network.
-- `BlobCache.CreateBlobPtr<T>(T blob)` — store a blob and receive a
-  `BlobPtr<T>`. The cache auto-generates a `BlobId`. Use the overload
-  `CreateBlobPtr<T>(BlobId, T)` when you want a stable, content-pipeline-driven
-  ID.
-- `BlobPtr<T>.Get(BlobCache)` — retrieve the managed blob from a handle.
-- `BlobPtr<T>.Clone(BlobCache)` — mint a new handle pointing at the same blob;
-  each entity holds its own handle so the blob lives until all entities are
-  destroyed.
-- `BlobPtr<T>.Dispose(BlobCache)` — release a handle when you're done with it.
-
-## A note on BlobCache access
-
-`BlobCache` is currently reached via a `Trecs.Internal` extension method
-(`world.GetBlobCache()`). Add `using Trecs.Internal;` to reach it. This is the
-only sample that uses `Trecs.Internal` directly — expect this entry point to
-become a first-class public API in a future release.
+Pointers stored on components must be disposed when the entity is removed —
+the framework does **not** auto-dispose. This sample doesn't remove entities
+once spawned, so an `OnRemoved` cleanup observer isn't needed in the example
+code. If you adapt the pattern to entities that come and go, register one as
+shown in [Sample 10 — Pointers](../10_Pointers/README.md) or follow the
+template documented in
+[Heap Allocation Rules](../../../../docs/advanced/heap-allocation-rules.md).
 
 ## Setup (manual)
 

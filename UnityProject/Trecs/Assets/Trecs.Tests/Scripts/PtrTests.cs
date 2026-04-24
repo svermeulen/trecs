@@ -312,7 +312,7 @@ namespace Trecs.Tests
             var blobCache = CreateBlobCache();
 
             var blob = new List<string> { "hello" };
-            var ptr = blobCache.CreateBlobPtr(blob);
+            var ptr = blobCache.CreateBlobPtr(new BlobId(1), blob);
 
             NAssert.IsFalse(ptr.IsNull);
             NAssert.IsFalse(ptr.Handle.IsNull);
@@ -328,7 +328,7 @@ namespace Trecs.Tests
             var blobCache = CreateBlobCache();
 
             var blob = new List<string> { "world" };
-            var ptr = blobCache.CreateBlobPtr(blob);
+            var ptr = blobCache.CreateBlobPtr(new BlobId(1), blob);
 
             var retrieved = ptr.Get(blobCache);
             NAssert.AreSame(blob, retrieved);
@@ -343,7 +343,7 @@ namespace Trecs.Tests
             var blobCache = CreateBlobCache();
 
             var blob = new List<string> { "test" };
-            var ptr = blobCache.CreateBlobPtr(blob);
+            var ptr = blobCache.CreateBlobPtr(new BlobId(1), blob);
 
             NAssert.IsTrue(blobCache.HasBlob(ptr.BlobId));
 
@@ -367,7 +367,7 @@ namespace Trecs.Tests
             var blobCache = CreateBlobCache();
 
             var blob = new List<string> { "value" };
-            var ptr = blobCache.CreateBlobPtr(blob);
+            var ptr = blobCache.CreateBlobPtr(new BlobId(1), blob);
 
             var retrieved = ptr.Get(blobCache);
             NAssert.AreSame(blob, retrieved);
@@ -382,7 +382,7 @@ namespace Trecs.Tests
             var blobCache = CreateBlobCache();
 
             var blob = new List<string> { "tryget" };
-            var ptr = blobCache.CreateBlobPtr(blob);
+            var ptr = blobCache.CreateBlobPtr(new BlobId(1), blob);
 
             var result = ptr.TryGet(blobCache, out var val);
             NAssert.IsTrue(result);
@@ -398,7 +398,7 @@ namespace Trecs.Tests
             var blobCache = CreateBlobCache();
 
             var blob = new List<string> { "canget" };
-            var ptr = blobCache.CreateBlobPtr(blob);
+            var ptr = blobCache.CreateBlobPtr(new BlobId(1), blob);
 
             NAssert.IsTrue(ptr.CanGet(blobCache));
 
@@ -414,7 +414,7 @@ namespace Trecs.Tests
             var blobCache = CreateBlobCache();
 
             var blob = new List<string> { "clone" };
-            var ptr = blobCache.CreateBlobPtr(blob);
+            var ptr = blobCache.CreateBlobPtr(new BlobId(1), blob);
             var clone = ptr.Clone(blobCache);
 
             NAssert.IsFalse(clone.IsNull);
@@ -437,7 +437,7 @@ namespace Trecs.Tests
             var blobCache = CreateBlobCache();
 
             var blob = new List<string> { "dispose" };
-            var ptr = blobCache.CreateBlobPtr(blob);
+            var ptr = blobCache.CreateBlobPtr(new BlobId(1), blob);
 
             NAssert.IsTrue(ptr.CanGet(blobCache));
             ptr.Dispose(blobCache);
@@ -466,7 +466,7 @@ namespace Trecs.Tests
         {
             var blobCache = CreateBlobCache();
 
-            var ptr = blobCache.CreateNativeBlobPtr<int>(42);
+            var ptr = blobCache.CreateNativeBlobPtr<int>(new BlobId(1), 42);
 
             NAssert.IsFalse(ptr.IsNull);
             NAssert.IsFalse(ptr.Handle.IsNull);
@@ -481,7 +481,7 @@ namespace Trecs.Tests
         {
             var blobCache = CreateBlobCache();
 
-            var ptr = blobCache.CreateNativeBlobPtr<int>(42);
+            var ptr = blobCache.CreateNativeBlobPtr<int>(new BlobId(1), 42);
 
             ref int value = ref ptr.Get(blobCache);
             NAssert.AreEqual(42, value);
@@ -495,7 +495,7 @@ namespace Trecs.Tests
         {
             var blobCache = CreateBlobCache();
 
-            var ptr = blobCache.CreateNativeBlobPtr<int>(42);
+            var ptr = blobCache.CreateNativeBlobPtr<int>(new BlobId(1), 42);
 
             var result = ptr.TryGetPtr(blobCache, out var nativePtr);
             NAssert.IsTrue(result);
@@ -510,7 +510,7 @@ namespace Trecs.Tests
         {
             var blobCache = CreateBlobCache();
 
-            var ptr = blobCache.CreateNativeBlobPtr<int>(42);
+            var ptr = blobCache.CreateNativeBlobPtr<int>(new BlobId(1), 42);
 
             NAssert.IsTrue(ptr.CanGet(blobCache));
 
@@ -525,7 +525,7 @@ namespace Trecs.Tests
         {
             var blobCache = CreateBlobCache();
 
-            var ptr = blobCache.CreateNativeBlobPtr<int>(42);
+            var ptr = blobCache.CreateNativeBlobPtr<int>(new BlobId(1), 42);
             var clone = ptr.Clone(blobCache);
 
             NAssert.IsFalse(clone.IsNull);
@@ -558,7 +558,7 @@ namespace Trecs.Tests
         {
             var blobCache = CreateBlobCache();
 
-            var ptr = blobCache.CreateNativeBlobPtr<int>(42);
+            var ptr = blobCache.CreateNativeBlobPtr<int>(new BlobId(1), 42);
 
             NAssert.IsTrue(ptr.CanGet(blobCache));
             ptr.Dispose(blobCache);

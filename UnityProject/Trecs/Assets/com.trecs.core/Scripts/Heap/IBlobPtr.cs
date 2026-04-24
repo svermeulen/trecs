@@ -1,4 +1,6 @@
-namespace Trecs
+using System.ComponentModel;
+
+namespace Trecs.Internal
 {
     /// <summary>
     /// Common interface for typed blob pointers (<see cref="BlobPtr{T}"/> and
@@ -6,6 +8,7 @@ namespace Trecs
     /// asynchronous loading state queries, and disposal against the
     /// <see cref="BlobCache"/>.
     /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Never)]
     public interface IBlobPtr
     {
         bool IsNull { get; }

@@ -81,33 +81,11 @@ namespace Trecs
             return CreateBlobImpl<T>(frame, handle.BlobId, handle.Handle);
         }
 
-        internal NativeSharedPtr<T> CreateBlob<T>(int frame, in T blob)
-            where T : unmanaged
-        {
-            var handle = _store.CreateNativeBlobPtr(in blob);
-            return CreateBlobImpl<T>(frame, handle.BlobId, handle.Handle);
-        }
 
         /// <summary>
         /// Takes ownership of an existing native pointer.
         /// See <see cref="NativeUniqueHeap.AllocTakingOwnership{T}"/> for the contract.
         /// </summary>
-        internal NativeSharedPtr<T> CreateBlobTakingOwnership<T>(
-            int frame,
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
-        )
-            where T : unmanaged
-        {
-            var handle = _store.CreateNativeBlobPtrTakingOwnership<T>(
-                ptr,
-                allocSize,
-                allocAlignment
-            );
-            return CreateBlobImpl<T>(frame, handle.BlobId, handle.Handle);
-        }
-
         internal NativeSharedPtr<T> CreateBlobTakingOwnership<T>(
             int frame,
             BlobId blobId,

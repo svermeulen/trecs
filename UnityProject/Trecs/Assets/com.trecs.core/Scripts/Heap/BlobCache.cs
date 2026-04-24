@@ -45,7 +45,6 @@ namespace Trecs
         static readonly TrecsLog _log = new(nameof(BlobCache));
 
         readonly DenseHashSet<BlobId> _cleanBuffer1 = new();
-        readonly Rng _rng = new();
         readonly DenseDictionary<PtrHandle, BlobId> _handles = new();
         readonly BlobCacheSettings _settings;
         readonly List<IBlobStore> _stores;
@@ -291,15 +290,6 @@ namespace Trecs
             return (T)blob;
         }
 
-        public BlobPtr<T> CreateBlobPtr<T>(T blob)
-            where T : class
-        {
-            Assert.That(!_hasDisposed);
-            var id = CreateUniqueBlobId();
-            RequireWritableStore().CreateBlobImpl(id, blob, isNative: false);
-            return new BlobPtr<T>(CreateHandle(id), id);
-        }
-
         public BlobPtr<T> CreateBlobPtr<T>(BlobId id, T blob)
             where T : class
         {
@@ -537,23 +527,6 @@ namespace Trecs
             return false;
         }
 
-        BlobId CreateUniqueBlobId()
-        {
-            var value = _rng.NextLong();
-            if (value == 0)
-                value = 1; // Avoid colliding with BlobId.Null
-            var blobId = new BlobId(value);
-            _log.Trace("Created new blob id {}", blobId);
-            return blobId;
-        }
-
-        public NativeBlobPtr<T> CreateNativeBlobPtr<T>(in T value)
-            where T : unmanaged
-        {
-            Assert.That(!_hasDisposed);
-            return CreateNativeBlobPtr<T>(CreateUniqueBlobId(), in value);
-        }
-
         public NativeBlobPtr<T> CreateNativeBlobPtr<T>(BlobId id, in T value)
             where T : unmanaged
         {
@@ -579,22 +552,6 @@ namespace Trecs
         /// allocation is larger than sizeof(T).
         /// See <see cref="NativeUniqueHeap.AllocTakingOwnership{T}"/> for the ownership contract.
         /// </summary>
-        public NativeBlobPtr<T> CreateNativeBlobPtrTakingOwnership<T>(
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
-        )
-            where T : unmanaged
-        {
-            Assert.That(!_hasDisposed);
-            return CreateNativeBlobPtrTakingOwnership<T>(
-                CreateUniqueBlobId(),
-                ptr,
-                allocSize,
-                allocAlignment
-            );
-        }
-
         public NativeBlobPtr<T> CreateNativeBlobPtrTakingOwnership<T>(
             BlobId id,
             IntPtr ptr,

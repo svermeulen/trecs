@@ -4,24 +4,17 @@ using UnityEngine;
 namespace Trecs.Samples.BlobStorage
 {
     /// <summary>
-    /// Samples each entity's referenced palette over time and writes the result
-    /// into <see cref="ColorComponent"/>. Shows how a system consumes a blob:
-    /// receive the <see cref="BlobCache"/> via constructor, call
-    /// <c>ptr.Get(cache)</c> to retrieve the managed blob.
+    /// Samples each entity's referenced palette over time and writes the
+    /// result into <see cref="ColorComponent"/>. Demonstrates how a system
+    /// consumes a shared blob: <c>palette.Value.Get(World.Heap)</c> resolves
+    /// the handle through the world's heap accessor.
     /// </summary>
     public partial class PaletteCycleSystem : ISystem
     {
-        readonly BlobCache _blobCache;
-
-        public PaletteCycleSystem(BlobCache blobCache)
-        {
-            _blobCache = blobCache;
-        }
-
         [ForEachEntity(Tag = typeof(SampleTags.Swatch))]
         void Execute(in PaletteRef palette, ref ColorComponent color)
         {
-            var table = palette.Value.Get(_blobCache);
+            var table = palette.Value.Get(World.Heap);
             if (table.Colors.Count == 0)
             {
                 return;
