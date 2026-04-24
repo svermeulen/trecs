@@ -13,7 +13,9 @@ namespace Trecs
     public class WorldQueryEngine
     {
         readonly ReadOnlyFastList<GroupIndex> _allGroups;
-        readonly ReadOnlyDenseDictionary<GroupIndex, WorldInfo.GroupInfo> _groupInfos;
+
+        // Indexed by GroupIndex.Index; matches WorldInfo's _groupInfos layout.
+        readonly WorldInfo.GroupInfo[] _groupInfos;
         readonly WorldInfo _worldInfo;
 
         readonly Dictionary<TagSet, TagSetInfo> _tagSetInfos = new();
@@ -22,7 +24,7 @@ namespace Trecs
 
         internal WorldQueryEngine(
             ReadOnlyFastList<GroupIndex> allGroups,
-            ReadOnlyDenseDictionary<GroupIndex, WorldInfo.GroupInfo> groupInfos,
+            WorldInfo.GroupInfo[] groupInfos,
             WorldInfo worldInfo
         )
         {
@@ -127,8 +129,9 @@ namespace Trecs
             {
                 var groupsList = new FastList<GroupIndex>();
 
-                foreach (var (group, groupInfo) in _groupInfos)
+                for (int gi = 0; gi < _groupInfos.Length; gi++)
                 {
+                    var groupInfo = _groupInfos[gi];
                     var hasAllComponents = true;
 
                     foreach (var componentType in componentTypes)
@@ -142,7 +145,7 @@ namespace Trecs
 
                     if (hasAllComponents)
                     {
-                        groupsList.Add(group);
+                        groupsList.Add(GroupIndex.FromIndex(gi));
                     }
                 }
 

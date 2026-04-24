@@ -15,7 +15,9 @@ namespace Trecs
     {
         static readonly TrecsLog _log = new(nameof(WorldInfo));
 
-        readonly ReadOnlyDenseDictionary<GroupIndex, GroupInfo> _groupInfos;
+        // Indexed by GroupIndex.Index. Every group registered in _allGroups
+        // has a matching slot — pre-populated at construction, no null checks.
+        readonly GroupInfo[] _groupInfos;
         readonly Dictionary<Template, FastList<GroupIndex>> _templateGroupsMap;
         readonly ReadOnlyFastList<GroupIndex> _allGroups;
         readonly Dictionary<TagSet, GroupIndex> _tagSetToIndex;
@@ -87,7 +89,8 @@ namespace Trecs
                 resolvedTemplate.Groups = groups;
             }
 
-            var groupTemplateMap = new DenseDictionary<GroupIndex, GroupInfo>();
+            // Sized to the registry above; every registered GroupIndex gets a slot.
+            var groupInfos = new GroupInfo[indexToTagSet.Count];
             var templateGroupsMap = new Dictionary<Template, FastList<GroupIndex>>();
             var allGroups = new FastList<GroupIndex>();
             var allTemplates = new FastList<Template>();
@@ -142,15 +145,12 @@ namespace Trecs
                     var groupTagSet = resolvedTemplate.GroupTagSets[i];
 
                     Assert.That(
-                        !groupTemplateMap.ContainsKey(group),
+                        groupInfos[group.Index] == null,
                         "Found same group {} added multiple times.  Groups must be unique.",
                         group
                     );
 
-                    groupTemplateMap.Add(
-                        group,
-                        new GroupInfo(group, groupTagSet, resolvedTemplate)
-                    );
+                    groupInfos[group.Index] = new GroupInfo(group, groupTagSet, resolvedTemplate);
 
                     AddGroupToTemplate(resolvedTemplate.Template, group);
 
@@ -207,7 +207,7 @@ namespace Trecs
             _globalGroups = new FastList<GroupIndex>(new[] { globalGroup.Value });
             _globalEntityIndex = new(_globalEntitySlotIndex, _globalGroup);
 
-            _groupInfos = new(groupTemplateMap);
+            _groupInfos = groupInfos;
             _templateGroupsMap = templateGroupsMap;
             _allGroups = allGroups;
             _resolvedTemplates = resolvedTemplatesList;
@@ -481,9 +481,9 @@ namespace Trecs
 
         public ReadOnlyDenseHashSet<Tag> GetGroupTags(GroupIndex group)
         {
-            if (_groupInfos.TryGetValue(group, out var groupInfo))
+            if (!group.IsNull && group.Index < _groupInfos.Length)
             {
-                return groupInfo.Tags;
+                return _groupInfos[group.Index].Tags;
             }
 
             throw Assert.CreateException("Unrecognized group {}", group);
@@ -494,9 +494,9 @@ namespace Trecs
 
         public ResolvedTemplate GetResolvedTemplateForGroup(GroupIndex group)
         {
-            if (_groupInfos.TryGetValue(group, out var info))
+            if (!group.IsNull && group.Index < _groupInfos.Length)
             {
-                return info.ResolvedTemplate;
+                return _groupInfos[group.Index].ResolvedTemplate;
             }
 
             throw Assert.CreateException("No entity type found for group {}", group);
