@@ -171,7 +171,7 @@ namespace Trecs.Serialization
                 for (int k = 0; k < numGroups; k++)
                 {
                     var group = groupMap.UnsafeKeys[k];
-                    writer.Write("group", group.AsTagSet());
+                    writer.Write("group", _worldDef.ToTagSet(group));
 
                     ref readonly var groupEntities = ref groupMap.UnsafeValues[k];
 
@@ -197,19 +197,19 @@ namespace Trecs.Serialization
 
         void WriteEntityIndexToReferenceMap(
             ISerializationWriter writer,
-            in NativeDenseDictionary<Group, NativeList<int>> entityIndexToReferenceMap
+            in NativeArray<NativeList<int>> entityIndexToReferenceMap
         )
         {
-            var count = entityIndexToReferenceMap.Count;
+            var count = entityIndexToReferenceMap.Length;
 
             writer.Write("count", count);
 
             for (int i = 0; i < count; i++)
             {
-                var group = entityIndexToReferenceMap.UnsafeKeys[i];
-                writer.Write("group", group.AsTagSet());
+                var tagSet = _worldDef.ToTagSet(new GroupIndex((ushort)i));
+                writer.Write("group", tagSet);
 
-                var list = entityIndexToReferenceMap.UnsafeValues[i];
+                var list = entityIndexToReferenceMap[i];
                 writer.Write("listLength", list.Length);
                 for (int j = 0; j < list.Length; j++)
                 {
@@ -229,7 +229,7 @@ namespace Trecs.Serialization
             writer.Write("nextFreeIndex", nextFreeIndex);
         }
 
-        bool ShouldSkip(Group group, ComponentId componentId, ISerializationWriter writer)
+        bool ShouldSkip(GroupIndex group, ComponentId componentId, ISerializationWriter writer)
         {
             // We do not want to serialize variable update components during checksum checks
             // because they will always desync
@@ -266,8 +266,8 @@ namespace Trecs.Serialization
             {
                 var bytesBefore = writer.NumBytesWritten;
 
-                Group group = groupEntityComponentsDB.UnsafeKeys[i].key;
-                writer.Write("group", group.AsTagSet());
+                GroupIndex group = groupEntityComponentsDB.UnsafeKeys[i].key;
+                writer.Write("group", _worldDef.ToTagSet(group));
 
                 ref var subMap = ref groupEntityComponentsDB.UnsafeValues[i];
 
@@ -288,7 +288,7 @@ namespace Trecs.Serialization
                 }
 
                 _log.Trace(
-                    "Group {} serialized in {} kb",
+                    "GroupIndex {} serialized in {} kb",
                     group,
                     (writer.NumBytesWritten - bytesBefore) / 1024f
                 );
@@ -355,7 +355,7 @@ namespace Trecs.Serialization
         }
 
         void WriteSetRoutingIndex(
-            in NativeDenseDictionary<Group, NativeList<SetId>> routingIndex,
+            in NativeDenseDictionary<GroupIndex, NativeList<SetId>> routingIndex,
             ISerializationWriter writer
         )
         {
@@ -363,13 +363,13 @@ namespace Trecs.Serialization
 
             for (int i = 0; i < routingIndex.Count; i++)
             {
-                writer.Write("group", routingIndex.UnsafeKeys[i].AsTagSet());
+                writer.Write("group", _worldDef.ToTagSet(routingIndex.UnsafeKeys[i]));
                 writer.Write("filterIndices", routingIndex.UnsafeValues[i]);
             }
         }
 
         void ReadSetRoutingIndex(
-            NativeDenseDictionary<Group, NativeList<SetId>> routingIndex,
+            NativeDenseDictionary<GroupIndex, NativeList<SetId>> routingIndex,
             ISerializationReader reader
         )
         {
@@ -386,7 +386,7 @@ namespace Trecs.Serialization
             for (int i = 0; i < numEntries; i++)
             {
                 var tagSet = reader.Read<TagSet>("group");
-                var group = new Group(tagSet.Id);
+                var group = _worldDef.ToGroupIndex(tagSet);
                 var setIndices = new NativeList<SetId>(1, Allocator.Persistent);
                 reader.Read("filterIndices", ref setIndices);
                 routingIndex.Add(group, setIndices);
@@ -415,7 +415,7 @@ namespace Trecs.Serialization
                 for (int k = 0; k < numGroups; k++)
                 {
                     var tagSet = reader.Read<TagSet>("group");
-                    var group = new Group(tagSet.Id);
+                    var group = _worldDef.ToGroupIndex(tagSet);
 
                     var groupEntry = groupMap.GetSetGroupEntry(group);
 
@@ -449,26 +449,20 @@ namespace Trecs.Serialization
 
         void ReadEntityIndexToReferenceMap(
             ISerializationReader reader,
-            NativeDenseDictionary<Group, NativeList<int>> entityIndexToReferenceMap
+            NativeArray<NativeList<int>> entityIndexToReferenceMap
         )
         {
             var count = reader.Read<int>("count");
             Assert.That(count >= 0);
 
-            Assert.IsEqual(count, entityIndexToReferenceMap.Count);
+            Assert.IsEqual(count, entityIndexToReferenceMap.Length);
 
             for (int i = 0; i < count; i++)
             {
                 var tagSet = reader.Read<TagSet>("group");
-                var group = new Group(tagSet.Id);
+                var group = _worldDef.ToGroupIndex(tagSet);
 
-                Assert.That(
-                    entityIndexToReferenceMap.ContainsKey(group),
-                    "Expected group {} to already be added as a key",
-                    group
-                );
-
-                ref var groupList = ref entityIndexToReferenceMap.GetValueByRef(group);
+                var groupList = entityIndexToReferenceMap[group.Value];
 
                 var listLength = reader.Read<int>("listLength");
                 groupList.Clear();
@@ -505,7 +499,7 @@ namespace Trecs.Serialization
             for (int i = 0; i < numItems; i++)
             {
                 var tagSet = reader.Read<TagSet>("group");
-                var group = new Group(tagSet.Id);
+                var group = _worldDef.ToGroupIndex(tagSet);
 
                 Assert.IsEqual(groupEntityComponentsDB.UnsafeKeys[i].key, group);
 
