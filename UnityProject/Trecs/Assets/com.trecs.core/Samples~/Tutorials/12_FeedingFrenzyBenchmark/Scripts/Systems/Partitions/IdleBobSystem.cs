@@ -147,8 +147,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     .GroupSlices()
             )
             {
-                var positions = World.ComponentBuffer<Position>(slice.Group).Write;
-                var scales = World.ComponentBuffer<UniformScale>(slice.Group).Read;
+                var positions = World.ComponentBuffer<Position>(slice.GroupIndex).Write;
+                var scales = World.ComponentBuffer<UniformScale>(slice.GroupIndex).Read;
                 for (int i = 0; i < slice.Count; i++)
                 {
                     float baseY = _settings.BobBaseY * scales[i].Value;

@@ -107,7 +107,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
             var mealPositions = default(NativeComponentBufferRead<Position>);
             var mealApproachingFish = default(NativeComponentBufferWrite<ApproachingFish>);
-            var mealGroup = default(Group);
+            var mealGroup = default(GroupIndex);
             int mi = 0;
             int mealGroupCount = 0;
 
@@ -118,12 +118,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     .GroupSlices()
             )
             {
-                var positions = World.ComponentBuffer<Position>(slice.Group).Read;
-                var speeds = World.ComponentBuffer<Speed>(slice.Group).Read;
-                var meals = World.ComponentBuffer<TargetMeal>(slice.Group).Write;
-                var velocities = World.ComponentBuffer<Velocity>(slice.Group).Write;
-                var destPositions = World.ComponentBuffer<DestinationPosition>(slice.Group).Write;
-                var rotations = World.ComponentBuffer<Rotation>(slice.Group).Write;
+                var positions = World.ComponentBuffer<Position>(slice.GroupIndex).Read;
+                var speeds = World.ComponentBuffer<Speed>(slice.GroupIndex).Read;
+                var meals = World.ComponentBuffer<TargetMeal>(slice.GroupIndex).Write;
+                var velocities = World.ComponentBuffer<Velocity>(slice.GroupIndex).Write;
+                var destPositions = World
+                    .ComponentBuffer<DestinationPosition>(slice.GroupIndex)
+                    .Write;
+                var rotations = World.ComponentBuffer<Rotation>(slice.GroupIndex).Write;
 
                 for (int fi = 0; fi < slice.Count; fi++)
                 {
@@ -133,11 +135,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                             return;
 
                         var mealSlice = mealSliceIter.Current;
-                        mealPositions = World.ComponentBuffer<Position>(mealSlice.Group).Read;
+                        mealPositions = World.ComponentBuffer<Position>(mealSlice.GroupIndex).Read;
                         mealApproachingFish = World
-                            .ComponentBuffer<ApproachingFish>(mealSlice.Group)
+                            .ComponentBuffer<ApproachingFish>(mealSlice.GroupIndex)
                             .Write;
-                        mealGroup = mealSlice.Group;
+                        mealGroup = mealSlice.GroupIndex;
                         mealGroupCount = mealSlice.Count;
                         mi = 0;
                     }
@@ -145,7 +147,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     var mealEntityIndex = new EntityIndex(mi, mealGroup);
                     var mealPos = mealPositions[mi].Value;
 
-                    var fishEntityIndex = new EntityIndex(fi, slice.Group);
+                    var fishEntityIndex = new EntityIndex(fi, slice.GroupIndex);
 
                     meals[fi].Value = mealEntityIndex.ToHandle(World);
                     mealApproachingFish[mi].Value = fishEntityIndex.ToHandle(World);
@@ -210,10 +212,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             public NativeWorldAccessor World;
 
             [FromWorld(Tags = new[] { typeof(FrenzyTags.Meal), typeof(FrenzyTags.NotEating) })]
-            public Group MealGroup;
+            public GroupIndex MealGroup;
 
             [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
-            public Group FishGroup;
+            public GroupIndex FishGroup;
 
             public readonly void Execute(int i)
             {

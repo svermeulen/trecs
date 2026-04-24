@@ -30,7 +30,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             int removedCount = 0;
-            Group observedGroup = default;
+            GroupIndex observedGroup = default;
             var sub = a
                 .Events.EntitiesWithTags(PartitionA)
                 .OnRemoved(
@@ -155,7 +155,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             int observedValue = -1;
-            Group observedToGroup = default;
+            GroupIndex observedToGroup = default;
             EntityRange observedRange = default;
 
             var sub = a

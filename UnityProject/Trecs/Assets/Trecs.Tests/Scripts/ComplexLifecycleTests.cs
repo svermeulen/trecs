@@ -360,7 +360,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(PartitionB)
                 .OnAdded(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         addedCallCount++;
                     }
@@ -388,7 +388,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(PartitionA)
                 .OnRemoved(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         removedCallCount++;
                     }
@@ -412,12 +412,12 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             int movedCallCount = 0;
-            Group observedFrom = default;
-            Group observedTo = default;
+            GroupIndex observedFrom = default;
+            GroupIndex observedTo = default;
             var sub = a
                 .Events.EntitiesWithTags(PartitionB)
                 .OnMoved(
-                    (Group fromGroup, Group toGroup, EntityRange indices) =>
+                    (GroupIndex fromGroup, GroupIndex toGroup, EntityRange indices) =>
                     {
                         movedCallCount++;
                         observedFrom = fromGroup;
@@ -447,7 +447,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         callCount++;
                     }
@@ -880,7 +880,7 @@ namespace Trecs.Tests
             var addSub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
-                    (Group g, EntityRange i) =>
+                    (GroupIndex g, EntityRange i) =>
                     {
                         addedCount += i.End - i.Start;
                     }
@@ -888,7 +888,7 @@ namespace Trecs.Tests
             var removeSub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnRemoved(
-                    (Group g, EntityRange i) =>
+                    (GroupIndex g, EntityRange i) =>
                     {
                         removedCount += i.End - i.Start;
                     }

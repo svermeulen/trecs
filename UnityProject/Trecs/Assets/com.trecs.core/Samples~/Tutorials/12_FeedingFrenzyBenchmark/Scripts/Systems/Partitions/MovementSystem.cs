@@ -78,8 +78,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     .GroupSlices()
             )
             {
-                var velocities = World.ComponentBuffer<Velocity>(slice.Group).Read;
-                var positions = World.ComponentBuffer<Position>(slice.Group).Write;
+                var velocities = World.ComponentBuffer<Velocity>(slice.GroupIndex).Read;
+                var positions = World.ComponentBuffer<Position>(slice.GroupIndex).Write;
                 for (int i = 0; i < slice.Count; i++)
                 {
                     positions[i].Value += World.DeltaTime * velocities[i].Value;

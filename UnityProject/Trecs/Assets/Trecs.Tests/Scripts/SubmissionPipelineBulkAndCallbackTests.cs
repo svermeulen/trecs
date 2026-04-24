@@ -357,7 +357,7 @@ namespace Trecs.Tests
             // And the index should point to the new group
             var idx = handle.ToIndex(a);
             var groupB = a.WorldInfo.GetSingleGroupWithTags(PartitionB);
-            NAssert.AreEqual(groupB, idx.Group);
+            NAssert.AreEqual(groupB, idx.GroupIndex);
         }
 
         [Test]

@@ -107,9 +107,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     .GroupSlices()
             )
             {
-                var positions = World.ComponentBuffer<Position>(slice.Group).Read;
-                var destPositions = World.ComponentBuffer<DestinationPosition>(slice.Group).Read;
-                var meals = World.ComponentBuffer<TargetMeal>(slice.Group).Write;
+                var positions = World.ComponentBuffer<Position>(slice.GroupIndex).Read;
+                var destPositions = World
+                    .ComponentBuffer<DestinationPosition>(slice.GroupIndex)
+                    .Read;
+                var meals = World.ComponentBuffer<TargetMeal>(slice.GroupIndex).Write;
                 for (int i = 0; i < slice.Count; i++)
                 {
                     var distanceSqr = math.lengthsq(destPositions[i].Value - positions[i].Value);
@@ -119,7 +121,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                         meals[i].Value = EntityHandle.Null;
                         World.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(
-                            new EntityIndex(i, slice.Group)
+                            new EntityIndex(i, slice.GroupIndex)
                         );
                     }
                 }
@@ -258,7 +260,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
         partial struct ConsumeMealRawBuffersJob
         {
             [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.Eating) })]
-            public Group FishGroup;
+            public GroupIndex FishGroup;
 
             [FromWorld]
             public NativeWorldAccessor World;

@@ -69,7 +69,7 @@ namespace Trecs.Tests
             var entityIndex = entityHandle.ToIndex(a);
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
 
-            NAssert.AreEqual(group, entityIndex.Group);
+            NAssert.AreEqual(group, entityIndex.GroupIndex);
         }
 
         [Test]

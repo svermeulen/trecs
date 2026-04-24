@@ -114,9 +114,9 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
         {
             foreach (var slice in World.Query().WithTags<FrenzyTags.Fish>().GroupSlices())
             {
-                var positions = World.ComponentBuffer<Position>(slice.Group).Write;
-                var targetMeals = World.ComponentBuffer<TargetMeal>(slice.Group).Read;
-                var scales = World.ComponentBuffer<UniformScale>(slice.Group).Read;
+                var positions = World.ComponentBuffer<Position>(slice.GroupIndex).Write;
+                var targetMeals = World.ComponentBuffer<TargetMeal>(slice.GroupIndex).Read;
+                var scales = World.ComponentBuffer<UniformScale>(slice.GroupIndex).Read;
 
                 for (int fi = 0; fi < slice.Count; fi++)
                 {

@@ -18,7 +18,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         callCount++;
                     }
@@ -41,7 +41,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         totalAdded += indices.End - indices.Start;
                     }
@@ -70,7 +70,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         alphaCallCount++;
                     }
@@ -101,7 +101,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnRemoved(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         callCount++;
                     }
@@ -131,7 +131,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnRemoved(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         totalRemoved += indices.End - indices.Start;
                     }
@@ -164,7 +164,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(partitionB)
                 .OnMoved(
-                    (Group fromGroup, Group toGroup, EntityRange indices) =>
+                    (GroupIndex fromGroup, GroupIndex toGroup, EntityRange indices) =>
                     {
                         callCount++;
                     }
@@ -193,13 +193,13 @@ namespace Trecs.Tests
             var expectedGroupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
             var expectedGroupB = a.WorldInfo.GetSingleGroupWithTags(partitionB);
 
-            Group observedFrom = default;
-            Group observedTo = default;
+            GroupIndex observedFrom = default;
+            GroupIndex observedTo = default;
 
             var sub = a
                 .Events.EntitiesWithTags(partitionB)
                 .OnMoved(
-                    (Group fromGroup, Group toGroup, EntityRange indices) =>
+                    (GroupIndex fromGroup, GroupIndex toGroup, EntityRange indices) =>
                     {
                         observedFrom = fromGroup;
                         observedTo = toGroup;
@@ -228,7 +228,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         for (int i = indices.Start; i < indices.End; i++)
                         {
@@ -266,7 +266,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(partitionB)
                 .OnMoved(
-                    (Group fromGroup, Group toGroup, EntityRange indices) =>
+                    (GroupIndex fromGroup, GroupIndex toGroup, EntityRange indices) =>
                     {
                         for (int i = indices.Start; i < indices.End; i++)
                         {
@@ -303,7 +303,7 @@ namespace Trecs.Tests
             var sub = a
                 .Events.EntitiesWithTags(TestTags.Alpha)
                 .OnAdded(
-                    (Group group, EntityRange indices) =>
+                    (GroupIndex group, EntityRange indices) =>
                     {
                         callCount++;
                     }

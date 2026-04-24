@@ -211,7 +211,7 @@ namespace Trecs.Tests
             // Global entity exists after init - verify via WorldInfo
             NAssert.IsNotNull(a.WorldInfo.GlobalTemplate);
             var globalEntityIndex = a.WorldInfo.GlobalEntityIndex;
-            NAssert.AreEqual(a.WorldInfo.GlobalGroup, globalEntityIndex.Group);
+            NAssert.AreEqual(a.WorldInfo.GlobalGroup, globalEntityIndex.GroupIndex);
         }
 
         #endregion
@@ -301,8 +301,8 @@ namespace Trecs.Tests
             int totalEntities = 0;
             foreach (var slice in a.Query().WithTags(tags).GroupSlices())
             {
-                var intBuf = a.ComponentBuffer<TestInt>(slice.Group).Read;
-                var vecBuf = a.ComponentBuffer<TestVec>(slice.Group).Read;
+                var intBuf = a.ComponentBuffer<TestInt>(slice.GroupIndex).Read;
+                var vecBuf = a.ComponentBuffer<TestVec>(slice.GroupIndex).Read;
                 for (int i = 0; i < slice.Count; i++)
                 {
                     NAssert.AreEqual(
@@ -506,8 +506,8 @@ namespace Trecs.Tests
 
             foreach (var slice in a.Query().WithTags(TestTags.Beta).GroupSlices())
             {
-                var buf1 = a.ComponentBuffer<TestInt>(slice.Group).Read;
-                var buf2 = a.ComponentBuffer<TestFloat>(slice.Group).Read;
+                var buf1 = a.ComponentBuffer<TestInt>(slice.GroupIndex).Read;
+                var buf2 = a.ComponentBuffer<TestFloat>(slice.GroupIndex).Read;
                 groupCount++;
                 NAssert.AreEqual(1, (int)slice.Count);
                 NAssert.AreEqual(5, buf1[0].Value);

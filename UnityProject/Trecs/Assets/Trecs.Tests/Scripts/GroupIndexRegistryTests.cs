@@ -14,24 +14,11 @@ namespace Trecs.Tests
 
             foreach (var group in info.AllGroups)
             {
-                var tagSet = group.AsTagSet();
+                var tagSet = info.ToTagSet(group);
                 var index = info.ToGroupIndex(tagSet);
                 var roundTripped = info.ToTagSet(index);
                 NAssert.AreEqual(tagSet, roundTripped);
-            }
-        }
-
-        [Test]
-        public void ToGroupIndex_ViaGroup_MatchesViaTagSet()
-        {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var info = env.Accessor.WorldInfo;
-
-            foreach (var group in info.AllGroups)
-            {
-                var viaGroup = info.ToGroupIndex(group);
-                var viaTagSet = info.ToGroupIndex(group.AsTagSet());
-                NAssert.AreEqual(viaGroup, viaTagSet);
+                NAssert.AreEqual(group, index);
             }
         }
 
@@ -44,17 +31,25 @@ namespace Trecs.Tests
             var seen = new System.Collections.Generic.HashSet<ushort>();
             foreach (var group in info.AllGroups)
             {
-                var index = info.ToGroupIndex(group.AsTagSet());
                 NAssert.IsTrue(
-                    index.Value < info.AllGroups.Count,
+                    group.Value < info.AllGroups.Count,
                     "GroupIndex {0} out of range [0, {1})",
-                    index.Value,
+                    group.Value,
                     info.AllGroups.Count
                 );
-                NAssert.IsTrue(seen.Add(index.Value), "Duplicate GroupIndex {0}", index.Value);
+                NAssert.IsTrue(seen.Add(group.Value), "Duplicate GroupIndex {0}", group.Value);
             }
 
             NAssert.AreEqual(info.AllGroups.Count, seen.Count);
+        }
+
+        [Test]
+        public void GroupIndex_SizeIs2Bytes()
+        {
+            NAssert.AreEqual(
+                2,
+                Unity.Collections.LowLevel.Unsafe.UnsafeUtility.SizeOf<GroupIndex>()
+            );
         }
     }
 }
