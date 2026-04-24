@@ -356,15 +356,9 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        DenseDictionary<ComponentId, IComponentArray> GetDBGroup(GroupIndex fromIdGroupId)
+        internal DenseDictionary<ComponentId, IComponentArray> GetDBGroup(GroupIndex fromIdGroupId)
         {
             return _componentStore.GetDBGroup(fromIdGroupId);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal DenseDictionary<ComponentId, IComponentArray> GetOrAddDBGroup(GroupIndex toGroupId)
-        {
-            return _componentStore.GetOrAddDBGroup(toGroupId);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -866,7 +860,7 @@ namespace Trecs.Internal
             var numEntities = fromEntityToEntityIDs.Count;
             Assert.That(numEntities > 0, "something went wrong, no entities to swap");
 
-            var toGroupDB = ecsRoot.GetOrAddDBGroup(toGroup);
+            var toGroupDB = ecsRoot.GetDBGroup(toGroup);
             var hasFilters = ecsRoot._setStore.HasAnySets;
             var numComponents = fromGroupDictionary.Count;
 
@@ -1094,7 +1088,7 @@ namespace Trecs.Internal
                                 }
 
                                 var groupId = groupToSubmit.GroupIndex;
-                                var groupDB = GetOrAddDBGroup(groupId);
+                                var groupDB = GetDBGroup(groupId);
 
                                 EntityRange? addedIndices = null;
 
@@ -1239,7 +1233,7 @@ namespace Trecs.Internal
         void SwapEntitiesBetweenGroups(GroupIndex fromGroupId, GroupIndex toGroupId)
         {
             DenseDictionary<ComponentId, IComponentArray> fromGroup = GetDBGroup(fromGroupId);
-            DenseDictionary<ComponentId, IComponentArray> toGroup = GetOrAddDBGroup(toGroupId);
+            DenseDictionary<ComponentId, IComponentArray> toGroup = GetDBGroup(toGroupId);
 
             _entitiesQuerier._entityLocator.UpdateAllGroupReferenceLocators(fromGroupId, toGroupId);
 
