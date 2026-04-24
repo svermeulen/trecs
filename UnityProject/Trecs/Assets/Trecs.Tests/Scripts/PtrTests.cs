@@ -584,7 +584,7 @@ namespace Trecs.Tests
             var (heap, blobCache) = CreateSharedHeap();
 
             var blob = new List<object> { "shared" };
-            var ptr = heap.CreateBlob(blob);
+            var ptr = heap.CreateBlob(new BlobId(1), blob);
 
             NAssert.IsFalse(ptr.IsNull);
             NAssert.IsFalse(ptr.Handle.IsNull);
@@ -600,7 +600,7 @@ namespace Trecs.Tests
             var (heap, blobCache) = CreateSharedHeap();
 
             var blob = new List<object> { "getblob" };
-            var ptr = heap.CreateBlob(blob);
+            var ptr = heap.CreateBlob(new BlobId(1), blob);
 
             var retrieved = heap.GetBlob<List<object>>(ptr.Handle);
             NAssert.AreSame(blob, retrieved);
@@ -615,7 +615,7 @@ namespace Trecs.Tests
             var (heap, blobCache) = CreateSharedHeap();
 
             var blob = new List<object> { "remove" };
-            var ptr = heap.CreateBlob(blob);
+            var ptr = heap.CreateBlob(new BlobId(1), blob);
 
             NAssert.AreEqual(1, heap.NumEntries);
 
@@ -632,7 +632,7 @@ namespace Trecs.Tests
             var (heap, blobCache) = CreateSharedHeap();
 
             var blob = new List<object> { "cloneshared" };
-            var ptr = heap.CreateBlob(blob);
+            var ptr = heap.CreateBlob(new BlobId(1), blob);
 
             heap.TryClone<List<object>>(ptr.Handle, out var clone);
             NAssert.IsFalse(clone.IsNull);
@@ -654,10 +654,10 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(0, heap.NumEntries);
 
-            var ptr1 = heap.CreateBlob(new List<object> { "a" });
+            var ptr1 = heap.CreateBlob(new BlobId(1), new List<object> { "a" });
             NAssert.AreEqual(1, heap.NumEntries);
 
-            var ptr2 = heap.CreateBlob(new List<object> { "b" });
+            var ptr2 = heap.CreateBlob(new BlobId(2), new List<object> { "b" });
             NAssert.AreEqual(2, heap.NumEntries);
 
             heap.DisposeHandle(ptr1.Handle);
@@ -920,7 +920,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(42);
+            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
 
             NAssert.IsFalse(ptr.IsNull);
             NAssert.IsFalse(ptr.Handle.IsNull);
@@ -935,7 +935,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(42);
+            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
 
             // Native resolve (NativeSharedPtrResolver) requires flush first
             heap.FlushPendingOperations();
@@ -951,7 +951,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(42);
+            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
 
             NAssert.AreEqual(1, heap.NumEntries);
 
@@ -967,7 +967,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(42);
+            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
 
             heap.TryClone<int>(ptr.Handle, out var clone);
             NAssert.IsFalse(clone.IsNull);
@@ -987,7 +987,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(42);
+            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
             NAssert.AreEqual(1, heap.NumEntries);
 
             heap.DisposeHandle(ptr.Handle);
@@ -1018,7 +1018,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            var ptr = heap.CreateBlob<int>(42);
+            var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
             heap.DisposeHandle(ptr.Handle);
 
             NAssert.Throws<TrecsException>(() => heap.DisposeHandle(ptr.Handle));
@@ -1034,10 +1034,10 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(0, heap.NumEntries);
 
-            var ptr1 = heap.CreateBlob<int>(10);
+            var ptr1 = heap.CreateBlob<int>(new BlobId(10), 10);
             NAssert.AreEqual(1, heap.NumEntries);
 
-            var ptr2 = heap.CreateBlob<int>(20);
+            var ptr2 = heap.CreateBlob<int>(new BlobId(20), 20);
             NAssert.AreEqual(2, heap.NumEntries);
 
             heap.DisposeHandle(ptr1.Handle);

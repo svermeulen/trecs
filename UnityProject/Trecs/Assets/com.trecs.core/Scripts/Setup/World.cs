@@ -343,21 +343,6 @@ namespace Trecs
             }
         }
 
-        // Keep for external callers (SceneInitializer, etc.)
-        internal SharedPtr<T> AllocShared<T>(T blob)
-            where T : class
-        {
-            Assert.That(!_isDisposed);
-            return _heapAllocator.AllocShared(blob);
-        }
-
-        internal UniquePtr<T> AllocUnique<T>(T value)
-            where T : class
-        {
-            Assert.That(!_isDisposed);
-            return _heapAllocator.AllocUnique(value);
-        }
-
         ~World()
         {
             _log.Warning("World class has been garbage collected, don't forget to call Dispose()!");
