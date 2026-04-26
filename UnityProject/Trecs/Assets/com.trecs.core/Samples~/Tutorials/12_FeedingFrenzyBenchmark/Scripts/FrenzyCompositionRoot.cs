@@ -117,7 +117,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             world.AddSystem(renderer);
 
-            // NOTE: This list determines OnReady call order
             world.AddSystems(
                 new ISystem[]
                 {

@@ -304,6 +304,42 @@ public partial class LateSystem : ISystem { ... }
 
 `[ExecutesAfter]` and `[ExecutesBefore]` constraints always take precedence over priority — priority only breaks ties among systems with no ordering constraints between them.
 
+## OnReady Hook
+
+A system can declare `partial void OnReady()` to run one-time setup once the world is fully built but before the first tick. This is the right place to cache references, validate world state, or precompute data that depends on the registered entity types.
+
+```csharp
+public partial class RendererSystem : ISystem
+{
+    readonly List<RenderInfo> _renderables = new();
+
+    partial void OnReady()
+    {
+        // World, World.WorldInfo, queries, and other systems' state are all available here.
+        foreach (var info in _renderables)
+        {
+            foreach (var group in World.WorldInfo.GetGroupsWithTags(info.Tags))
+            {
+                // ...
+            }
+        }
+    }
+
+    public void Execute() { /* ... */ }
+}
+```
+
+`OnReady` is wired by source generation — declare it as a `partial void` and leave the implementation in the system's main partial. If you don't need it, simply don't declare it.
+
+### OnReady Ordering
+
+`OnReady` runs in the same order systems will execute, so a system can rely on any state set up by systems that run before it:
+
+1. **By phase** — Input → Fixed → Variable → LateVariable
+2. **Within each phase** — `[ExecutesAfter]`, `[ExecutesBefore]`, and `[ExecutePriority]` are honored, exactly as they are at execution time
+
+Order is *not* tied to the order systems were passed to `AddSystem` / `AddSystems`. If you need one system's `OnReady` to run after another's, declare it with `[ExecutesAfter]` (or place both in the appropriate phases) — the same constraint that controls runtime order also controls `OnReady` order.
+
 ## Entity Operations in Systems
 
 Systems access the world via the source-generated `World` property:
