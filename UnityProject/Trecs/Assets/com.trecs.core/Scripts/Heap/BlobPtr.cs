@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using Trecs.Internal;
 using Unity.Mathematics;
 
 namespace Trecs.Internal

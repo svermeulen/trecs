@@ -122,7 +122,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             _sb.AppendLine($"<i><color={SecondaryColor}>{text}</color></i>");
         }
 
-        const float RefreshInterval = 0.5f;
+        const float RefreshInterval = 0.2f;
 
         const string LabelColor = "#E0E0E0";
         const string ValueColor = "#00E5FF";

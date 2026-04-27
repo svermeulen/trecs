@@ -384,7 +384,10 @@ namespace Trecs
                 }
             }
 
-            _log.Debug("Called all ECS remove callbacks for all {} groups", _worldInfo.AllGroups);
+            _log.Debug(
+                "Called all ECS remove callbacks for all {} groups",
+                _worldInfo.AllGroups.Count
+            );
         }
 
         void Dispose(bool _)
@@ -540,8 +543,34 @@ namespace Trecs
                 {
                     systemInternal.World = CreateAccessor(system.GetType());
                 }
+            }
+        }
 
+        // OnReady runs in execute order: Input → Fixed → Variable → LateVariable,
+        // with [ExecutesAfter]/[ExecutesBefore]/[ExecutePriority] applied within each phase.
+        void CallSystemReadyHooks(SystemLoader.LoadInfo loadInfo)
+        {
+            void CallReady(int globalIndex)
+            {
+                var systemInternal = (ISystemInternal)loadInfo.Systems[globalIndex].System;
                 systemInternal.Ready();
+            }
+
+            foreach (var globalIndex in loadInfo.SortedInputSystems)
+            {
+                CallReady(globalIndex);
+            }
+            foreach (var globalIndex in loadInfo.SortedFixedSystems)
+            {
+                CallReady(globalIndex);
+            }
+            foreach (var globalIndex in loadInfo.SortedVariableSystems)
+            {
+                CallReady(globalIndex);
+            }
+            foreach (var globalIndex in loadInfo.SortedLateVariableSystems)
+            {
+                CallReady(globalIndex);
             }
         }
 
@@ -586,6 +615,8 @@ namespace Trecs
             _accessorRegistry.Close();
 
             var loadInfo = _systemLoader.LoadSystems(this, _systems);
+
+            CallSystemReadyHooks(loadInfo);
 
             using (TrecsProfiling.Start("SystemRunner.Initialize"))
             {

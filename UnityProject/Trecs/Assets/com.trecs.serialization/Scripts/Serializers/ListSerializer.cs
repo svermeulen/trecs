@@ -14,12 +14,6 @@ namespace Trecs.Serialization
         public void Deserialize(ref List<T> value, ISerializationReader reader)
         {
             var numItems = reader.Read<int>("numItems");
-            if (numItems < 0 || numItems > SerializationConstants.MaxCollectionLength)
-            {
-                throw new SerializationException(
-                    $"Invalid List<{typeof(T).Name}> length {numItems} (max {SerializationConstants.MaxCollectionLength}) — truncated or corrupt stream"
-                );
-            }
 
             if (value == null)
             {

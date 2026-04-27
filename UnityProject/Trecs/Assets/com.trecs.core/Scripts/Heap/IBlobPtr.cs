@@ -9,7 +9,7 @@ namespace Trecs.Internal
     /// <see cref="BlobCache"/>.
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public interface IBlobPtr
+    public interface IBlobPtr : IBlobAnchor
     {
         bool IsNull { get; }
 
@@ -17,7 +17,5 @@ namespace Trecs.Internal
 
         void WarmUp(BlobCache blobCache);
         BlobLoadingState GetLoadingState(BlobCache blobCache);
-
-        void Dispose(BlobCache blobCache);
     }
 }

@@ -32,12 +32,6 @@ namespace Trecs.Serialization
         public void Deserialize(ref T value, ISerializationReader reader)
         {
             var length = reader.Read<int>("length");
-            if (length < 0 || length > SerializationConstants.MaxCollectionLength)
-            {
-                throw new SerializationException(
-                    $"Invalid {typeof(TElem).Name}[] length {length} (max {SerializationConstants.MaxCollectionLength}) — truncated or corrupt stream"
-                );
-            }
 
             if (length == 0)
             {

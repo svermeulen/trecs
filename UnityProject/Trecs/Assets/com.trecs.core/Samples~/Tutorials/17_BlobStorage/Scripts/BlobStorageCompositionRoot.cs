@@ -16,8 +16,14 @@ namespace Trecs.Samples.BlobStorage
         {
             var registry = new GameObjectRegistry();
 
+            var blobStore = new BlobStoreInMemory(
+                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
+                null
+            );
+
             var world = new WorldBuilder()
                 .AddEntityType(SampleTemplates.SwatchEntity.Template)
+                .AddBlobStore(blobStore)
                 .Build();
 
             world.AddSystems(

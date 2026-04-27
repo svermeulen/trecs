@@ -42,12 +42,6 @@ namespace Trecs.Serialization
             {
                 // Fallback to element-by-element serialization
                 var numItems = reader.Read<int>("count");
-                if (numItems < 0 || numItems > SerializationConstants.MaxCollectionLength)
-                {
-                    throw new SerializationException(
-                        $"Invalid DenseDictionary<{typeof(TKey).Name},{typeof(TValue).Name}> count {numItems} (max {SerializationConstants.MaxCollectionLength}) — truncated or corrupt stream"
-                    );
-                }
 
                 if (dict == null)
                 {
