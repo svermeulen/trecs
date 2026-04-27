@@ -38,7 +38,7 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           projectPath: UnityProject/Trecs
-          testMode: editmode
+          testMode: all
           unityVersion: 6000.3.10f1
           customImage: unityci/editor:ubuntu-6000.3.10f1-base-3
           githubToken: ${{ secrets.GITHUB_TOKEN }}
