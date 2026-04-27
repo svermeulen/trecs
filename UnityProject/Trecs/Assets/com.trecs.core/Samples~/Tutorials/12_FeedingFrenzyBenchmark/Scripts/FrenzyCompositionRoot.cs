@@ -1,9 +1,9 @@
 // Companion docs: https://svermeulen.github.io/trecs/samples/12-feeding-frenzy-benchmark/
+//
 
 using System;
 using System.Collections.Generic;
 using TMPro;
-using Trecs.Internal;
 using Trecs.Samples.FeedingFrenzyBenchmark.Branching;
 using Unity.Mathematics;
 using UnityEngine;
@@ -12,14 +12,16 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
     public class FrenzyCompositionRoot : CompositionRootBase
     {
-        static readonly TrecsLog _log = new(nameof(FrenzyCompositionRoot));
-
         public FrenzyConfigSettings Config;
         public SampleSettings Settings;
-        public GameObject ProfilerRunner;
         public TMP_Text DisplayText;
+        public GameObject ProfilerRunner;
 
         public static FrenzyConfigSettings ConfigOverride;
+
+        // Set during Construct so play-mode tests can drive runtime config
+        // (e.g. cycling IterationStyle without needing a scene reload).
+        public static WorldAccessor CurrentWorld;
 
         public override void Construct(
             out List<Action> initializables,
@@ -67,6 +69,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             }
 
             var world = worldBuilder.Build();
+            CurrentWorld = world.CreateAccessor();
 
             var subsetApproachDynamicSwitcher = new SubsetApproachDynamicSwitcher(world);
 
@@ -150,6 +153,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 removeCleanupHandler.Dispose,
                 perfStats.Dispose,
                 world.Dispose,
+                () => CurrentWorld = null,
                 renderer.Dispose,
             };
         }

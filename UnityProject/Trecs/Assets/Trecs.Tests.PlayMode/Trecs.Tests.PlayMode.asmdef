@@ -1,0 +1,25 @@
+{
+    "name": "Trecs.Tests.PlayMode",
+    "rootNamespace": "",
+    "references": [
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+        "GUID:281cd1989f6948c4aeefd4731e3a1aec",
+        "GUID:cf43fa3ec7554c93ac1dc7bbbcb6c323",
+        "GUID:ca113807f121449999e1498c70dd263b",
+        "GUID:d10e13b391d1f4dd9bb249dd4a93d433"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
