@@ -119,64 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &60163906
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 60163909}
-  - component: {fileID: 60163908}
-  - component: {fileID: 60163907}
-  m_Layer: 0
-  m_Name: ProfileRunner
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &60163907
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 60163906}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b321de44d7bc742da834022101b4f857, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Trecs.Profiling::Trecs.Internal.CsProfilerRunnerLateTicker
-  _impl: {fileID: 60163908}
---- !u!114 &60163908
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 60163906}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 64108860f6e6d42ef919baa5aae2a4ef, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Trecs.Profiling::Trecs.Internal.CsProfilerRunner
---- !u!4 &60163909
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 60163906}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 317.65573, y: 428.3556, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &198587753
 GameObject:
   m_ObjectHideFlags: 0
@@ -265,7 +207,7 @@ MonoBehaviour:
       BobFrequency: 4.5
       BobBaseY: -2
   DisplayText: {fileID: 665378650}
-  ProfilerRunner: {fileID: 60163906}
+  ProfilerRunner: {fileID: 0}
 --- !u!1 &391647590
 GameObject:
   m_ObjectHideFlags: 0
@@ -1115,4 +1057,3 @@ SceneRoots:
   - {fileID: 1567691869}
   - {fileID: 391647594}
   - {fileID: 1390398514}
-  - {fileID: 60163909}
