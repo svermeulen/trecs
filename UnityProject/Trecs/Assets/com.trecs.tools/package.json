@@ -1,0 +1,12 @@
+{
+  "name": "com.trecs.tools",
+  "version": "0.0.1",
+  "description": "tbd",
+  "dependencies": {
+    "com.trecs.core": "<local>",
+    "com.trecs.serialization": "<local>",
+    "com.trecs.svkj": "<local>",
+    "com.svkj.unity.core": "<local>",
+    "com.svkj.unity.util": "<local>"
+  }
+}
