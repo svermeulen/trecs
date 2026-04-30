@@ -15,7 +15,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         public FrenzyConfigSettings Config;
         public SampleSettings Settings;
         public TMP_Text DisplayText;
-        public GameObject ProfilerRunner;
 
         public static FrenzyConfigSettings ConfigOverride;
 
