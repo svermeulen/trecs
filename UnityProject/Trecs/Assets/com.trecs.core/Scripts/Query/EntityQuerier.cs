@@ -146,6 +146,14 @@ namespace Trecs.Internal
             );
             var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
 
+            // Zero-component templates (e.g. tag/filter-only) have no
+            // component arrays, so we can't sample from one. They also can't
+            // hold per-entity data, so the live count is always 0.
+            if (entitiesInGroupPerType.Count == 0)
+            {
+                return 0;
+            }
+
             int? count = null;
 
             foreach (var (key, value) in entitiesInGroupPerType)
@@ -163,7 +171,6 @@ namespace Trecs.Internal
                 }
             }
 
-            Assert.That(count.HasValue);
             return count.Value;
         }
 

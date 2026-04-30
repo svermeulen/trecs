@@ -105,7 +105,7 @@ public partial class CullingSystem : ISystem
     partial struct Renderable : IAspect, IRead<Bounds> { }
 }
 
-[ExecutesAfter(typeof(CullingSystem))]
+[ExecuteAfter(typeof(CullingSystem))]
 public partial class RenderSystem : ISystem
 {
     // Iterates only the entities CullingSystem flagged this frame.

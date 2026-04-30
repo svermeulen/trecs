@@ -32,6 +32,7 @@ namespace Trecs
         readonly SystemRunner _systemRunner;
         readonly EntitySubmitter _entitySubmitter;
         readonly WorldAccessorRegistry _accessorRegistry;
+        IComponentAccessRecorder _accessRecorder;
         readonly WorldSettings _settings;
         readonly Rng _fixedRng;
         readonly Rng _variableUpdateRng;
@@ -124,6 +125,13 @@ namespace Trecs
         {
             get { return _isDisposed; }
         }
+
+        /// <summary>
+        /// Optional human-readable name for this world. Surfaced by editor tooling
+        /// (e.g. the World dropdown in <c>TrecsTimeTravelWindow</c>) when present.
+        /// Null by default.
+        /// </summary>
+        public string DebugName { get; set; }
 
         internal BlobCache BlobCache
         {
@@ -394,6 +402,8 @@ namespace Trecs
         {
             Assert.That(!_isDisposed, "Attempted to dispose WorldAccessor multiple times");
 
+            WorldRegistry.Unregister(this);
+
 #if DEBUG && TRECS_IS_PROFILING
             if (_settings.WarnOnUnusedTemplates)
             {
@@ -546,8 +556,8 @@ namespace Trecs
             }
         }
 
-        // OnReady runs in execute order: Input → Fixed → Variable → LateVariable,
-        // with [ExecutesAfter]/[ExecutesBefore]/[ExecutePriority] applied within each phase.
+        // OnReady runs in execute order: Input → Fixed → EarlyPresentation → Presentation → LatePresentation,
+        // with [ExecuteAfter]/[ExecuteBefore]/[ExecutePriority] applied within each phase.
         void CallSystemReadyHooks(SystemLoader.LoadInfo loadInfo)
         {
             void CallReady(int globalIndex)
@@ -564,11 +574,15 @@ namespace Trecs
             {
                 CallReady(globalIndex);
             }
-            foreach (var globalIndex in loadInfo.SortedVariableSystems)
+            foreach (var globalIndex in loadInfo.SortedEarlyPresentationSystems)
             {
                 CallReady(globalIndex);
             }
-            foreach (var globalIndex in loadInfo.SortedLateVariableSystems)
+            foreach (var globalIndex in loadInfo.SortedPresentationSystems)
+            {
+                CallReady(globalIndex);
+            }
+            foreach (var globalIndex in loadInfo.SortedLatePresentationSystems)
             {
                 CallReady(globalIndex);
             }
@@ -641,6 +655,13 @@ namespace Trecs
             }
 
             _initializeCompleted = true;
+
+            // Register only after Initialize completes so editor-tool listeners
+            // (TrecsEntitiesWindow et al.) never see a partially-built world.
+            // CountEntitiesInGroup and similar queries assume per-group
+            // component dictionaries have been preallocated by WarmupGroups,
+            // which runs above.
+            WorldRegistry.Register(this);
         }
 
         /// <summary>
@@ -694,52 +715,36 @@ namespace Trecs
 #else
             debugName ??= callerMember;
 #endif
-            return CreateAccessorImpl(
-                isInputSystem: false,
-                isFixedSystem: false,
-                debugName: debugName
-            );
+            return CreateAccessorImpl(phase: null, debugName: debugName);
         }
 
         /// <summary>
         /// Creates a <see cref="WorldAccessor"/> configured for the given system type, inspecting
-        /// its attributes to determine update phase (fixed, variable, or input).
+        /// its <see cref="PhaseAttribute"/> to determine the update phase. Defaults to
+        /// <see cref="SystemPhase.Fixed"/> when no <see cref="PhaseAttribute"/> is present.
         /// </summary>
         public WorldAccessor CreateAccessor(Type ownerType)
         {
             var debugName = ownerType.GetPrettyName();
 
-            var isVariableUpdate =
-                ownerType.GetCustomAttributes(typeof(VariableUpdateAttribute), true).Length > 0
-                || ownerType.GetCustomAttributes(typeof(LateVariableUpdateAttribute), true).Length
-                    > 0;
+            var phaseAttribute = (PhaseAttribute)
+                ownerType.GetCustomAttributes(typeof(PhaseAttribute), true).SingleOrDefault();
 
-            var isInputSystem =
-                ownerType.GetCustomAttributes(typeof(InputSystemAttribute), true).Length > 0;
+            var phase = phaseAttribute?.Phase ?? SystemPhase.Fixed;
 
-            var isFixedSystem = !isVariableUpdate && !isInputSystem;
-
-            return CreateAccessorImpl(
-                isInputSystem: isInputSystem,
-                isFixedSystem: isFixedSystem,
-                debugName: debugName
-            );
+            return CreateAccessorImpl(phase: phase, debugName: debugName);
         }
 
         /// <summary>
-        /// Creates an accessor configured for the given system type, inspecting its attributes
-        /// to determine update phase (fixed, variable, input).
+        /// Creates an accessor configured for the given system type, inspecting its
+        /// <see cref="PhaseAttribute"/> to determine the update phase.
         /// </summary>
         public WorldAccessor CreateAccessor<T>()
         {
             return CreateAccessor(typeof(T));
         }
 
-        internal WorldAccessor CreateAccessorImpl(
-            bool isInputSystem,
-            bool isFixedSystem,
-            string debugName
-        )
+        internal WorldAccessor CreateAccessorImpl(SystemPhase? phase, string debugName)
         {
             Assert.IsNotNull(debugName);
 
@@ -755,14 +760,33 @@ namespace Trecs
                 fixedRng: _fixedRng,
                 variableRng: _variableUpdateRng,
                 entityInputQueue: _entityInputQueue,
-                isFixedSystem: isFixedSystem,
-                isInputSystem: isInputSystem,
+                phase: phase,
                 debugName: debugName
             );
 
             _accessorRegistry.RegisterById(accessor);
 
+            if (_accessRecorder != null)
+            {
+                accessor.AccessRecorder = _accessRecorder;
+            }
+
             return accessor;
+        }
+
+        /// <summary>
+        /// Installs (or removes, if <c>null</c>) an
+        /// <see cref="IComponentAccessRecorder"/> that the world hands to every
+        /// accessor — current and future. Intended for editor / debug tooling
+        /// that wants a per-system read/write map. Pass <c>null</c> to detach.
+        /// </summary>
+        public void SetComponentAccessRecorder(IComponentAccessRecorder recorder)
+        {
+            _accessRecorder = recorder;
+            foreach (var kvp in _accessorRegistry.AllAccessors)
+            {
+                kvp.Value.AccessRecorder = recorder;
+            }
         }
     }
 }
@@ -873,16 +897,11 @@ namespace Trecs.Internal
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static WorldAccessor CreateAccessorExplicit(
             this World world,
-            bool isInputSystem,
-            bool isFixedSystem,
+            SystemPhase? phase,
             string debugName
         )
         {
-            return world.CreateAccessorImpl(
-                isInputSystem: isInputSystem,
-                isFixedSystem: isFixedSystem,
-                debugName: debugName
-            );
+            return world.CreateAccessorImpl(phase: phase, debugName: debugName);
         }
     }
 }

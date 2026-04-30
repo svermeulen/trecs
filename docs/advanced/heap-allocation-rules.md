@@ -9,24 +9,23 @@ For an introduction to the pointer types themselves (`SharedPtr<T>`, `UniquePtr<
 | Phase | Heap allocation | Entity creation |
 |------|-----------------|-----------------|
 | **Initialization** (no system context — e.g. `SceneInitializer`) | ✅ Allowed | ✅ Allowed |
-| **Fixed update** systems | ✅ Allowed | ✅ Allowed |
-| **Input** systems | ❌ Not allowed | Use `AddInput<T>()` instead |
-| **Variable update** systems | ❌ Not allowed | ❌ Not allowed |
-| **Late variable update** systems | ❌ Not allowed | ❌ Not allowed |
+| `Fixed` systems | ✅ Allowed | ✅ Allowed |
+| `Input` systems | ❌ Not allowed | Use `AddInput<T>()` instead |
+| `EarlyPresentation` / `Presentation` / `LatePresentation` systems | ❌ Not allowed | ❌ Not allowed |
 
-Variable-update systems are intentionally restricted to **reading** simulation state and writing to render-only data (typically `[VariableUpdateOnly]` components). They cannot allocate from the heap or create entities — both would introduce non-deterministic state into the simulation.
+Presentation-phase systems are intentionally restricted to **reading** simulation state and writing to render-only data (typically `[VariableUpdateOnly]` components). They cannot allocate from the heap or create entities — both would introduce non-deterministic state into the simulation.
 
-The framework asserts these rules at the call site. Calling `world.Heap.AllocShared(...)` from a variable-update system throws an immediate, clear exception rather than producing silent desync later.
+The framework asserts these rules at the call site. Calling `world.Heap.AllocShared(...)` from a presentation-phase system throws an immediate, clear exception rather than producing silent desync later.
 
-## Why variable-update systems can't allocate or spawn entities
+## Why presentation-phase systems can't allocate or spawn entities
 
 Two reasons:
 
-1. **Heap allocation IDs.** Trecs draws all allocation IDs from a single deterministic RNG (`_fixedRng`) shared across initialization and all fixed systems. If variable-update systems were allowed to mint IDs, they'd either pollute that stream (breaking determinism for fixed systems) or need a non-deterministic fallback (silently breaking replay for any handle stored in a fixed component).
+1. **Heap allocation IDs.** Trecs draws all allocation IDs from a single deterministic RNG (`_fixedRng`) shared across initialization and all fixed systems. If presentation-phase systems were allowed to mint IDs, they'd either pollute that stream (breaking determinism for fixed systems) or need a non-deterministic fallback (silently breaking replay for any handle stored in a fixed component).
 
-2. **Entity creation is structural.** Adding an entity changes group counts and component arrays — that's part of the simulation state that gets serialized in bookmarks and checked for desyncs in replay. Variable systems run at a per-render-frame cadence that isn't deterministic across runs (frame rate varies), so structural changes from them would break those guarantees.
+2. **Entity creation is structural.** Adding an entity changes group counts and component arrays — that's part of the simulation state that gets serialized in bookmarks and checked for desyncs in replay. Presentation systems run at a per-render-frame cadence that isn't deterministic across runs (frame rate varies), so structural changes from them would break those guarantees.
 
-If you find yourself wanting to allocate or spawn from a variable system, the data probably belongs in a fixed component or a `[VariableUpdateOnly]` component populated by the variable system from existing fixed state.
+If you find yourself wanting to allocate or spawn from a presentation system, the data probably belongs in a fixed component or a `[VariableUpdateOnly]` component populated by the presentation system from existing fixed state.
 
 ## ID minting — how auto-IDs work
 
@@ -114,9 +113,9 @@ See [Sample 10 — Pointers](../samples/10-pointers.md) for a complete reference
 
 ## Cheat sheet
 
-- **Allocate from init or fixed systems.** Don't allocate from variable, late-variable, or input systems.
+- **Allocate from init or `Fixed` systems.** Don't allocate from `Input`, `EarlyPresentation`, `Presentation`, or `LatePresentation` systems.
 - **Auto-IDs are deterministic** when init and fixed code is deterministic — same rule that already applies for replay.
 - **Use explicit `BlobId`s** when you want stable identity independent of startup ordering — particularly for content-pipeline assets.
 - **Seeder pattern**: a long-lived class holds `SharedPtr<T>` members for shared assets, allocated once at init with a stable `BlobId`, looked up by entities via `AllocShared(BlobId)`.
 - **Always dispose** pointers stored on components from an `OnRemoved` observer.
-- **Variable systems read; they don't allocate or spawn.** If a variable system needs new state, populate it from a `[VariableUpdateOnly]` component or a fixed system.
+- **Presentation systems read; they don't allocate or spawn.** If a presentation system needs new state, populate it from a `[VariableUpdateOnly]` component or a fixed system.

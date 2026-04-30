@@ -5,7 +5,7 @@ Best practices for building with Trecs.
 ## Systems
 
 - **Keep fixed update systems stateless.** Use constructor parameters for immutable configuration, but don't store mutable state in system fields. All mutable state belongs in components.
-- **Declare system dependencies explicitly.** Use [`[ExecutesAfter]` and `[ExecutesBefore]`](../core/systems.md#system-ordering) to make ordering requirements clear.
+- **Declare system dependencies explicitly.** Use [`[ExecuteAfter]` and `[ExecuteBefore]`](../core/systems.md#system-ordering) to make ordering requirements clear.
 
 ## Components
 
@@ -35,4 +35,4 @@ Best practices for building with Trecs.
 | Logic in components | Breaks data/logic separation | Move to systems or util classes |
 | Mutable fixed system fields | Non-deterministic, not serialized, inconsistent | Store all dynamic state in components |
 | `UnityEngine.Random` in ECS | Breaks determinism | Use `World.Rng`.  |
-| Tight coupling between systems | Fragile ordering, hidden dependencies | Explicit `[ExecutesAfter]`/`[ExecutesBefore]` |
+| Tight coupling between systems | Fragile ordering, hidden dependencies | Explicit `[ExecuteAfter]`/`[ExecuteBefore]` |

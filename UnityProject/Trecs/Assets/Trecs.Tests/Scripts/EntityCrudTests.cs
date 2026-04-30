@@ -77,21 +77,6 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void EntityCrud_AddZeroComponents_Throws()
-        {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.ZeroComponents);
-            var a = env.Accessor;
-
-            a.AddEntity(TestTags.Epsilon).AssertComplete();
-            a.SubmitEntities();
-
-            NAssert.Catch(() =>
-            {
-                a.CountEntitiesWithTags(TestTags.Epsilon);
-            });
-        }
-
-        [Test]
         public void EntityCrud_Add_NotVisibleBeforeSubmit()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);

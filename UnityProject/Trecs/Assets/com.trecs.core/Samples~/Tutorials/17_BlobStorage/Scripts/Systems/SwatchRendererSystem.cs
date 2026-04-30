@@ -6,7 +6,7 @@ namespace Trecs.Samples.BlobStorage
     /// Syncs ECS state to Unity transforms and material colours. Runs in the
     /// variable update phase because it touches scene-side state.
     /// </summary>
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class SwatchRendererSystem : ISystem
     {
         readonly GameObjectRegistry _registry;

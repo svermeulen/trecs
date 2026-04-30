@@ -5,7 +5,7 @@ using Unity.Collections;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 {
-    [ExecutesAfter(typeof(IConsumingMeal))]
+    [ExecuteAfter(typeof(IConsumingMeal))]
     public partial class MovementSystem : IMovement, ISystem
     {
         static readonly TrecsLog _log = new(nameof(MovementSystem));

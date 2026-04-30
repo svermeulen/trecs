@@ -6,7 +6,7 @@ namespace Trecs.Samples.Sets
     /// Iterates only the WaveX set — not every particle in the grid.
     /// Writes a smooth intensity value based on distance from the wave center.
     /// </summary>
-    [ExecutesAfter(typeof(WaveMembershipSystem))]
+    [ExecuteAfter(typeof(WaveMembershipSystem))]
     public partial class WaveXEffectSystem : ISystem
     {
         readonly SampleSettings _settings;

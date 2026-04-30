@@ -3,7 +3,7 @@ using TMPro;
 
 namespace Trecs.Samples.ReactiveEvents
 {
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class TextDisplaySystem : ISystem
     {
         readonly TMP_Text _displayText;

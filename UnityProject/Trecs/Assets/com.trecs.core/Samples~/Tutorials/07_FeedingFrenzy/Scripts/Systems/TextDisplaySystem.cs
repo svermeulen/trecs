@@ -3,7 +3,7 @@ using TMPro;
 
 namespace Trecs.Samples.FeedingFrenzy101
 {
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class TextDisplaySystem : ISystem
     {
         readonly TMP_Text _displayText;

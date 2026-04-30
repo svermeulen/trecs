@@ -129,15 +129,6 @@ namespace Trecs.Tests
                 localTags: new Tag[] { TestTags.Gamma }
             );
 
-        public static Template ZeroComponents =>
-            new Template(
-                debugName: "TestZeroComponents",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
-                localTags: new Tag[] { TestTags.Epsilon }
-            );
-
         public static Template WithDefaults =>
             new Template(
                 debugName: "TestWithDefaults",

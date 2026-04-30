@@ -141,8 +141,8 @@ Key points:
 ### PatrolRendererSystem — Main Thread
 
 ```csharp
-[VariableUpdate]
-[ExecutesAfter(typeof(PatrolMovementSystem))]
+[Phase(SystemPhase.Presentation)]
+[ExecuteAfter(typeof(PatrolMovementSystem))]
 public partial class PatrolRendererSystem : ISystem
 {
     [ForEachEntity(MatchByComponents = true)]

@@ -7,9 +7,9 @@ namespace Trecs
     /// The system scheduler topologically sorts systems using these constraints; cycles cause an assertion failure.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-    public class ExecutesAfterAttribute : Attribute
+    public class ExecuteAfterAttribute : Attribute
     {
-        public ExecutesAfterAttribute(params Type[] systems)
+        public ExecuteAfterAttribute(params Type[] systems)
         {
             Systems = systems;
         }
@@ -22,9 +22,9 @@ namespace Trecs
     /// The system scheduler topologically sorts systems using these constraints; cycles cause an assertion failure.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-    public class ExecutesBeforeAttribute : Attribute
+    public class ExecuteBeforeAttribute : Attribute
     {
-        public ExecutesBeforeAttribute(params Type[] systems)
+        public ExecuteBeforeAttribute(params Type[] systems)
         {
             Systems = systems;
         }
@@ -33,27 +33,19 @@ namespace Trecs
     }
 
     /// <summary>
-    /// Assigns a system to the variable-update phase, which runs once per rendered frame
-    /// with a variable time step. Without this attribute, systems default to fixed-update.
+    /// Assigns a system to a specific <see cref="SystemPhase"/>. Without this attribute, systems
+    /// default to <see cref="SystemPhase.Fixed"/>.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class VariableUpdateAttribute : Attribute { }
+    public class PhaseAttribute : Attribute
+    {
+        public PhaseAttribute(SystemPhase phase)
+        {
+            Phase = phase;
+        }
 
-    /// <summary>
-    /// Assigns a system to the late-variable-update phase, which runs after all
-    /// variable-update systems each rendered frame. Useful for post-render corrections.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class LateVariableUpdateAttribute : Attribute { }
-
-    /// <summary>
-    /// Marks a system as an input system, which runs at the start of every
-    /// fixed-update tick (so zero-to-many times per rendered frame, matching
-    /// the fixed-tick cadence). Input systems can call <see cref="WorldAccessor.AddInput{T}"/>
-    /// to enqueue input that the fixed-update simulation will consume deterministically.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class InputSystemAttribute : Attribute { }
+        public SystemPhase Phase { get; }
+    }
 
     /// <summary>
     /// Sets a numeric priority for tie-breaking when topological ordering is ambiguous.
@@ -95,7 +87,7 @@ namespace Trecs
     }
 
     /// <summary>
-    /// Placed on a static interpolation method to source-generate a variable-update system
+    /// Placed on a static interpolation method to source-generate a presentation-phase system
     /// that interpolates a component between fixed-update snapshots each rendered frame.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]

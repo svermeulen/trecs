@@ -68,7 +68,7 @@ partial struct ActiveBall : IAspect, IWrite<Position, Velocity, RestTimer> { }
 ### WakeUpSystem — Resting Balls Only
 
 ```csharp
-[ExecutesAfter(typeof(PhysicsSystem))]
+[ExecuteAfter(typeof(PhysicsSystem))]
 public partial class WakeUpSystem : ISystem
 {
     [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Resting) })]
@@ -93,7 +93,7 @@ public partial class WakeUpSystem : ISystem
 Two `[ForEachEntity]` methods with different tag filters:
 
 ```csharp
-[VariableUpdate]
+[Phase(SystemPhase.Presentation)]
 public partial class BallRendererSystem : ISystem
 {
     [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]

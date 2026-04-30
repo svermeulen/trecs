@@ -26,6 +26,7 @@ namespace Trecs
         readonly HashSet<Template> _resolvedTemplateSet = new();
         readonly HashSet<Template> _allTemplatesSet = new();
         readonly ReadOnlyFastList<Template> _allTemplates;
+        readonly IReadOnlyList<SetDef> _allSets;
         readonly ResolvedTemplate _globalTemplate;
         readonly WorldQueryEngine _queryEngine;
 
@@ -35,8 +36,9 @@ namespace Trecs
         readonly EntityIndex _globalEntityIndex;
         readonly ReadOnlyFastList<GroupIndex> _globalGroups;
 
-        public WorldInfo(IReadOnlyList<Template> templatesList)
+        public WorldInfo(IReadOnlyList<Template> templatesList, IReadOnlyList<SetDef> sets)
         {
+            _allSets = sets ?? Array.Empty<SetDef>();
             if (!HasGlobalsTemplate(templatesList))
             {
                 templatesList = new List<Template>(templatesList)
@@ -457,6 +459,11 @@ namespace Trecs
         public ReadOnlyFastList<Template> AllTemplates
         {
             get { return _allTemplates; }
+        }
+
+        public IReadOnlyList<SetDef> AllSets
+        {
+            get { return _allSets; }
         }
 
         public EntityIndex GlobalEntityIndex

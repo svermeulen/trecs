@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
-    [InputSystem]
+    [Phase(SystemPhase.Input)]
     public partial class FishCountPresetInputSystem : ISystem
     {
         readonly int[] _presets;

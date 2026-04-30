@@ -1,6 +1,6 @@
 namespace Trecs.Samples.ReactiveEvents
 {
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class BubbleRendererSystem : ISystem
     {
         readonly GameObjectRegistry _registry;

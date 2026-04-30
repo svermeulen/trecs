@@ -34,7 +34,7 @@ Trecs has a deliberately small API surface — a handful of core concepts you ca
 |---|---|
 | `ISystem` with `Execute()` | `ISystem` with `OnUpdate()` |
 | `[ForEachEntity]` source generation | `SystemAPI.Query<T>()` |
-| `[ExecutesAfter]` / `[ExecutesBefore]` | `[UpdateAfter]` / `[UpdateBefore]` |
+| `[ExecuteAfter]` / `[ExecuteBefore]` | `[UpdateAfter]` / `[UpdateBefore]` |
 | Four phases (Input, Fixed, Variable, Late) | System groups (`InitializationSystemGroup`, etc.) |
 | User instantiates systems explicitly (`new FooSystem(dep1, dep2)`) and registers them with the world (typically `world.AddSystem(...)` after `Build()`, so constructors can take a live `World`) | Framework discovers and instantiates systems via reflection; setup goes in `OnCreate()` |
 | Systems are managed classes; Burst is opt-in per job via `[WrapAsJob]` | Struct `ISystem` can be Burst-compiled wholesale; class `SystemBase` is managed |

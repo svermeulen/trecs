@@ -15,7 +15,7 @@ namespace Trecs.Serialization.Samples.SaveGame
     /// No rate-limiting: PlayerInputSystem uses GetKeyDown so at most one
     /// move is queued per keypress.
     /// </summary>
-    [ExecutesAfter(typeof(PlayerInputSystem))]
+    [ExecuteAfter(typeof(PlayerInputSystem))]
     public partial class PlayerMovementSystem : ISystem
     {
         public void Execute()

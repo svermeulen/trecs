@@ -54,7 +54,7 @@ namespace Trecs
 
             TagSet tags = ExtractTags(setType);
 
-            return new SetDef(setId, tags, setType.Name);
+            return new SetDef(setId, tags, setType.Name, setType);
         }
 
         static int ComputeSetId(Type setType)

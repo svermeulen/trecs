@@ -14,7 +14,7 @@ namespace Trecs.Samples.Interpolation
     /// fixed-update boundaries (10 Hz). Between fixed frames, the position
     /// stays constant, causing visible stutter when rendering at 60+ fps.
     /// </summary>
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class OrbitRendererSystem : ISystem
     {
         readonly GameObjectRegistry _registry;

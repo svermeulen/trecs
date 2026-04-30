@@ -6,7 +6,7 @@ using Unity.Mathematics;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 {
-    [ExecutesAfter(typeof(ILookingForMeal))]
+    [ExecuteAfter(typeof(ILookingForMeal))]
     public partial class ConsumingMealSystem : IConsumingMeal, ISystem
     {
         static readonly TrecsLog _log = new(nameof(ConsumingMealSystem));

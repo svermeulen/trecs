@@ -31,72 +31,72 @@ namespace Trecs.Tests
         public void Execute() => TestSystemLog.ExecutionLog.Add("C");
     }
 
-    [ExecutesAfter(typeof(SystemA))]
+    [ExecuteAfter(typeof(SystemA))]
     partial class SystemAfterA : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("AfterA");
     }
 
-    [ExecutesBefore(typeof(SystemA))]
+    [ExecuteBefore(typeof(SystemA))]
     partial class SystemBeforeA : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("BeforeA");
     }
 
-    [ExecutesAfter(typeof(SystemA))]
-    [ExecutesBefore(typeof(SystemC))]
+    [ExecuteAfter(typeof(SystemA))]
+    [ExecuteBefore(typeof(SystemC))]
     partial class SystemBetweenAC : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("BetweenAC");
     }
 
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     partial class VariableSystemA : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("VarA");
     }
 
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     partial class VariableSystemB : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("VarB");
     }
 
-    [VariableUpdate]
-    [ExecutesAfter(typeof(VariableSystemA))]
+    [Phase(SystemPhase.Presentation)]
+    [ExecuteAfter(typeof(VariableSystemA))]
     partial class VariableSystemAfterA : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("VarAfterA");
     }
 
-    [LateVariableUpdate]
+    [Phase(SystemPhase.LatePresentation)]
     partial class LateVarSystem : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("LateVar");
     }
 
     [ExecutePriority(10)]
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     partial class PrioritySystem10 : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("P10");
     }
 
     [ExecutePriority(20)]
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     partial class PrioritySystem20 : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("P20");
     }
 
     [ExecutePriority(5)]
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     partial class PrioritySystem5 : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("P5");
     }
 
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     partial class EnableDisableSystem : ISystem
     {
         public int ExecuteCount;
@@ -108,7 +108,7 @@ namespace Trecs.Tests
         }
     }
 
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     partial class WorldAccessSystem : ISystem
     {
         public bool HasAccessor;
@@ -148,7 +148,7 @@ namespace Trecs.Tests
             TestSystemLog.Clear();
         }
 
-        #region ExecutesAfter / ExecutesBefore
+        #region ExecuteAfter / ExecuteBefore
 
         [Test]
         public void System_ExecutesAfter_RunsInOrder()

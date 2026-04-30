@@ -5,7 +5,7 @@ using Unity.Mathematics;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
-    [ExecutesAfter(typeof(FishAdderAndRemover))]
+    [ExecuteAfter(typeof(FishAdderAndRemover))]
     public partial class MealAdderAndRemover : IManageMealCount, ISystem
     {
         readonly CommonSettings _settings;

@@ -5,7 +5,7 @@ namespace Trecs.Serialization.Samples.Snake
     /// new cell contains a food entity. If so: destroy the food, increment
     /// snake length and score.
     /// </summary>
-    [ExecutesAfter(typeof(SnakeMovementSystem))]
+    [ExecuteAfter(typeof(SnakeMovementSystem))]
     public partial class FoodConsumeSystem : ISystem
     {
         public void Execute()

@@ -33,10 +33,10 @@ world.AddInput(entityIndex, new MoveInput { Direction = dir });
 
 ## Reading Input in Systems
 
-Input systems run first, before the fixed update phase. Mark them with `[InputSystem]`:
+Input systems run first, before the fixed update phase. Mark them with `[Phase(SystemPhase.Input)]`:
 
 ```csharp
-[InputSystem]
+[Phase(SystemPhase.Input)]
 public partial class ProcessInputSystem : ISystem
 {
     [SingleEntity(Tag = typeof(GlobalTag))]

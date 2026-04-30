@@ -20,11 +20,11 @@ This page is a **cross-reference index**, not a tutorial. Each row links to the 
 
 | Attribute | Target | See |
 |---|---|---|
-| `[ExecutesAfter(typeof(…))]`, `[ExecutesBefore(typeof(…))]` | `ISystem` / `IJobSystem` class | [Systems — Ordering](../core/systems.md) |
+| `[ExecuteAfter(typeof(…))]`, `[ExecuteBefore(typeof(…))]` | `ISystem` / `IJobSystem` class | [Systems — Ordering](../core/systems.md) |
 | `[ExecutePriority(int)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
-| `[VariableUpdate]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
-| `[LateVariableUpdate]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
-| `[InputSystem]` | `ISystem` class | [Input System](input-system.md) |
+| `[Phase(SystemPhase.Presentation)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
+| `[Phase(SystemPhase.LatePresentation)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
+| `[Phase(SystemPhase.Input)]` | `ISystem` class | [Input System](input-system.md) |
 
 ### Components and templates
 

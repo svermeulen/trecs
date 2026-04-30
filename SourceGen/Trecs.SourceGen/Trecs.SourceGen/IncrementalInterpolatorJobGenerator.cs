@@ -140,9 +140,8 @@ using Unity.Collections;
 
 namespace {nameSpace}
 {{
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     [ExecutePriority(-1000)]
-    [ExecutesAfter(typeof(FixedUpdateSystem))]
     [AllowMultiple]
     public class {className} : ISystem, Trecs.Internal.ISystemInternal
     {{

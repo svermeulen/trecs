@@ -87,7 +87,7 @@ world.AddEntity<MyTags.Smooth>()
 In your variable-update rendering system, read from `Interpolated<T>` instead of the raw component:
 
 ```csharp
-[VariableUpdate]
+[Phase(SystemPhase.Presentation)]
 public partial class RenderSystem : ISystem
 {
     [ForEachEntity(Tag = typeof(MyTags.Smooth))]

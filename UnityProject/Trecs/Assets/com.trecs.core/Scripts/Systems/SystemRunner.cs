@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace Trecs.Internal
@@ -35,11 +36,11 @@ namespace Trecs.Internal
         List<ExecutableSystemInfo> _systems;
         List<SystemRuntimeInfo> _systemRuntimeInfos;
         List<int> _sortedInputSystems;
-        List<int> _sortedVariableSystems;
-        List<int> _sortedLateVariableSystems;
         List<int> _sortedFixedSystems;
+        List<int> _sortedEarlyPresentationSystems;
+        List<int> _sortedPresentationSystems;
+        List<int> _sortedLatePresentationSystems;
         int[] _systemSortIndex;
-        int? _fixedUpdateGlobalIndex;
         int _lastTickFrame;
 
         internal int _currentFixedFrameCount;
@@ -53,8 +54,27 @@ namespace Trecs.Internal
         bool _stepFixedFrame = false;
         bool _desiredFixedIsPaused = false;
         int? _lastSpiralOfDeathWarningVariableFrame;
-        float? _fastForwardTime;
-        bool _postFastForwardSkipFrame;
+
+        // External fast-forward request: set by callers via the public
+        // FastForwardTargetFrame property, consumed at the start of the next
+        // variable tick when the catch-up loop kicks off (see Tick()).
+        // Frame-typed (not time-typed) because _elapsedFixedTime can drift
+        // away from _currentFixedFrameCount * FixedTimeStep when
+        // MaxSecondsPerFixedUpdate forces a skip-forward; a time-typed target
+        // then maps to the wrong frame.
+        int? _pendingFastForwardRequest;
+
+        // While a fast-forward request is being serviced the catch-up loop
+        // needs two adjustments: (1) bypass MaxSecondsPerFixedUpdate so we
+        // actually run all the fixed frames the caller asked for, and (2)
+        // stop at exactly the target frame instead of overshooting by ≥1.
+        // The variable-time-based loop bound otherwise overshoots because
+        // endOfFrameTime is _elapsedVariableTime + a delta, so we'd run one
+        // extra frame past target — which then fires FixedFrameChangeEvent
+        // for a frame > target, causing downstream listeners (debug
+        // recorder) to mistake it for user-driven progress. Mirroring the
+        // request frame here lets us cleanly bound the loop.
+        int? _fastForwardCatchupTargetFrame;
         float _timeScale = 1f;
 
         bool _hasDisposed;
@@ -99,17 +119,29 @@ namespace Trecs.Internal
             }
         }
 
-        public float? FastForwardTime
+        /// <summary>
+        /// The next variable tick will fast-forward fixed updates until
+        /// <see cref="FixedFrame"/> reaches this value, then auto-pause.
+        /// Requires <see cref="FixedIsPaused"/> to be false at the start of
+        /// that tick. No-op if the target is at or below the current frame.
+        ///
+        /// Frame-typed (not time-typed): when MaxSecondsPerFixedUpdate forces
+        /// a skip-forward, _elapsedFixedTime can drift away from
+        /// FixedFrame * FixedTimeStep. A time-based target then computes the
+        /// wrong number of frames to advance and lands a few frames short of
+        /// the user's intent.
+        /// </summary>
+        public int? FastForwardTargetFrame
         {
             get
             {
                 Assert.That(!_hasDisposed);
-                return _fastForwardTime;
+                return _pendingFastForwardRequest;
             }
             set
             {
                 Assert.That(!_hasDisposed);
-                _fastForwardTime = value;
+                _pendingFastForwardRequest = value;
             }
         }
 
@@ -119,15 +151,6 @@ namespace Trecs.Internal
             {
                 Assert.That(!_hasDisposed);
                 return _readyToApplyInputs;
-            }
-        }
-
-        public int FixedUpdateIndex
-        {
-            get
-            {
-                Assert.That(!_hasDisposed);
-                return _fixedUpdateGlobalIndex.Value;
             }
         }
 
@@ -307,15 +330,6 @@ namespace Trecs.Internal
             }
         }
 
-        public IReadOnlyList<int> SortedVariableSystems
-        {
-            get
-            {
-                Assert.That(!_hasDisposed);
-                return _sortedVariableSystems;
-            }
-        }
-
         public IReadOnlyList<int> SortedInputSystems
         {
             get
@@ -325,12 +339,30 @@ namespace Trecs.Internal
             }
         }
 
-        public IReadOnlyList<int> SortedLateVariableSystems
+        public IReadOnlyList<int> SortedEarlyPresentationSystems
         {
             get
             {
                 Assert.That(!_hasDisposed);
-                return _sortedLateVariableSystems;
+                return _sortedEarlyPresentationSystems;
+            }
+        }
+
+        public IReadOnlyList<int> SortedPresentationSystems
+        {
+            get
+            {
+                Assert.That(!_hasDisposed);
+                return _sortedPresentationSystems;
+            }
+        }
+
+        public IReadOnlyList<int> SortedLatePresentationSystems
+        {
+            get
+            {
+                Assert.That(!_hasDisposed);
+                return _sortedLatePresentationSystems;
             }
         }
 
@@ -387,62 +419,39 @@ namespace Trecs.Internal
             _systems = new List<ExecutableSystemInfo>(loadInfo.Systems.Count);
             Assert.IsNull(_systemRuntimeInfos);
             _systemRuntimeInfos = new List<SystemRuntimeInfo>(loadInfo.Systems.Count);
-            Assert.IsNull(_sortedVariableSystems);
-            _sortedVariableSystems = loadInfo.SortedVariableSystems;
             Assert.IsNull(_sortedInputSystems);
             _sortedInputSystems = loadInfo.SortedInputSystems;
-            Assert.IsNull(_sortedLateVariableSystems);
-            _sortedLateVariableSystems = loadInfo.SortedLateVariableSystems;
             Assert.IsNull(_sortedFixedSystems);
             _sortedFixedSystems = loadInfo.SortedFixedSystems;
+            Assert.IsNull(_sortedEarlyPresentationSystems);
+            _sortedEarlyPresentationSystems = loadInfo.SortedEarlyPresentationSystems;
+            Assert.IsNull(_sortedPresentationSystems);
+            _sortedPresentationSystems = loadInfo.SortedPresentationSystems;
+            Assert.IsNull(_sortedLatePresentationSystems);
+            _sortedLatePresentationSystems = loadInfo.SortedLatePresentationSystems;
             _systemSortIndex = new int[loadInfo.Systems.Count];
 
-            for (int i = 0; i < _sortedVariableSystems.Count; i++)
+            void IndexPhase(List<int> sorted)
             {
-                var globalIndex = _sortedVariableSystems[i];
-                Assert.That(_systemSortIndex[globalIndex] == 0);
-                _systemSortIndex[globalIndex] = i;
+                for (int i = 0; i < sorted.Count; i++)
+                {
+                    var globalIndex = sorted[i];
+                    Assert.That(_systemSortIndex[globalIndex] == 0);
+                    _systemSortIndex[globalIndex] = i;
+                }
             }
 
-            for (int i = 0; i < _sortedInputSystems.Count; i++)
-            {
-                var globalIndex = _sortedInputSystems[i];
-                Assert.That(_systemSortIndex[globalIndex] == 0);
-                _systemSortIndex[globalIndex] = i;
-            }
-
-            for (int i = 0; i < _sortedLateVariableSystems.Count; i++)
-            {
-                var globalIndex = _sortedLateVariableSystems[i];
-                Assert.That(_systemSortIndex[globalIndex] == 0);
-                _systemSortIndex[globalIndex] = i;
-            }
-
-            for (int i = 0; i < _sortedFixedSystems.Count; i++)
-            {
-                var globalIndex = _sortedFixedSystems[i];
-                Assert.That(_systemSortIndex[globalIndex] == 0);
-                _systemSortIndex[globalIndex] = i;
-            }
-
-            Assert.That(!_fixedUpdateGlobalIndex.HasValue);
+            IndexPhase(_sortedInputSystems);
+            IndexPhase(_sortedFixedSystems);
+            IndexPhase(_sortedEarlyPresentationSystems);
+            IndexPhase(_sortedPresentationSystems);
+            IndexPhase(_sortedLatePresentationSystems);
 
             for (int i = 0; i < loadInfo.Systems.Count; i++)
             {
                 var info = loadInfo.Systems[i];
 
-                if (info.System is FixedUpdateSystem fixedUpdateSystem)
-                {
-                    Assert.That(!_fixedUpdateGlobalIndex.HasValue);
-                    _fixedUpdateGlobalIndex = i;
-                    fixedUpdateSystem.FixedTickHandler = FixedUpdateSystemExecute;
-                }
-
-                if (
-                    _log.IsTraceEnabled()
-                    && info.Querier == null
-                    && info.System is not FixedUpdateSystem
-                )
+                if (_log.IsTraceEnabled() && info.Querier == null)
                 {
                     // This is fairly common actually, in cases where we add to input queue, or just create/remove entities, etc.
                     _log.Trace(
@@ -457,8 +466,6 @@ namespace Trecs.Internal
                     new ExecutableSystemInfo(info.System, info.Metadata, info.DeclarationIndex)
                 );
             }
-
-            Assert.That(_fixedUpdateGlobalIndex.HasValue);
 
             _log.Debug(
                 "SystemRunner initialization complete. Loaded {} trecs systems in total",
@@ -511,8 +518,20 @@ namespace Trecs.Internal
             // so we can interpolate to get the current time
             while (_elapsedFixedTime <= endOfFrameTime)
             {
+                // Stop FF catch-up exactly at target — the variable-time
+                // bound above would otherwise let one extra iteration
+                // through, firing FixedFrameChangeEvent for a frame past
+                // the target frame.
                 if (
-                    _maxSecondsPerFixedUpdate.HasValue
+                    _fastForwardCatchupTargetFrame.HasValue
+                    && _currentFixedFrameCount >= _fastForwardCatchupTargetFrame.Value
+                )
+                {
+                    break;
+                }
+                if (
+                    !_fastForwardCatchupTargetFrame.HasValue
+                    && _maxSecondsPerFixedUpdate.HasValue
                     && _fixedUpdateStopwatch.Elapsed.TotalSeconds >= _maxSecondsPerFixedUpdate
                 )
                 {
@@ -520,19 +539,13 @@ namespace Trecs.Internal
                     break;
                 }
 
-                _jobScheduler.CompleteAllOutstanding();
-                _entitySubmitter._setStore.FlushAllSetJobWrites();
+                SyncJobsAndFlushWrites();
 
                 using (TrecsProfiling.Start("Input Tick"))
                 {
-                    for (int localIndex = 0; localIndex < _sortedInputSystems.Count; localIndex++)
-                    {
-                        var globalIndex = _sortedInputSystems[localIndex];
-                        ExecuteSystem(globalIndex);
-                    }
+                    ExecuteSystemGroup(_sortedInputSystems);
 
-                    _jobScheduler.CompleteAllOutstanding();
-                    _entitySubmitter._setStore.FlushAllSetJobWrites();
+                    SyncJobsAndFlushWrites();
                 }
 
                 Assert.That(_isExecutingSystems);
@@ -564,11 +577,7 @@ namespace Trecs.Internal
                     Assert.That(!_isExecutingSystems);
                     _isExecutingSystems = true;
 
-                    for (int localIndex = 0; localIndex < _sortedFixedSystems.Count; localIndex++)
-                    {
-                        var globalIndex = _sortedFixedSystems[localIndex];
-                        ExecuteSystem(globalIndex);
-                    }
+                    ExecuteSystemGroup(_sortedFixedSystems);
 
                     _currentFixedFrameCount += 1;
                     _fixedCurrentFrameChangeEvent.Invoke(_currentFixedFrameCount);
@@ -594,15 +603,7 @@ namespace Trecs.Internal
                     // resulting in one frame where the object appears to have disappeared
                     // This is because it's often required that variable update runs in
                     // order to actually enable the linked game objects
-                    using (TrecsProfiling.Start("CompleteAllJobs"))
-                    {
-                        _jobScheduler.CompleteAllOutstanding();
-                    }
-
-                    using (TrecsProfiling.Start("FlushSetJobWrites"))
-                    {
-                        _entitySubmitter._setStore.FlushAllSetJobWrites();
-                    }
+                    SyncJobsAndFlushWrites();
 
                     Assert.That(_isExecutingSystems);
                     _isExecutingSystems = false;
@@ -641,6 +642,10 @@ namespace Trecs.Internal
                     );
                 }
             }
+
+            // The target covers exactly one catch-up: clear whether the loop
+            // ran to completion or hit some other early-exit path.
+            _fastForwardCatchupTargetFrame = null;
 
             if (
                 !_maxSecondsPerFixedUpdate.HasValue
@@ -720,6 +725,32 @@ namespace Trecs.Internal
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void ExecuteSystemGroup(List<int> sortedSystems)
+        {
+            for (int localIndex = 0; localIndex < sortedSystems.Count; localIndex++)
+            {
+                ExecuteSystem(sortedSystems[localIndex]);
+            }
+        }
+
+        // Phase boundary: drain all in-flight jobs and flush any pending writes
+        // they made into set membership. Both calls together form the canonical
+        // "I am about to make structural changes" sync point. Always paired.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void SyncJobsAndFlushWrites()
+        {
+            using (TrecsProfiling.Start("CompleteAllJobs"))
+            {
+                _jobScheduler.CompleteAllOutstanding();
+            }
+
+            using (TrecsProfiling.Start("FlushSetJobWrites"))
+            {
+                _entitySubmitter.FlushAllSetJobWrites();
+            }
+        }
+
         public void StepFrame()
         {
             if (!_fixedIsPaused)
@@ -768,34 +799,35 @@ namespace Trecs.Internal
                 _variableUpdateStarted.Invoke();
             }
 
-            if (_postFastForwardSkipFrame)
+            if (_pendingFastForwardRequest.HasValue && !_fixedIsPaused)
             {
-                _postFastForwardSkipFrame = false;
-                _log.Debug("Skipping post fast forward frame with delta time {}", Time.deltaTime);
-            }
-
-            if (_fastForwardTime.HasValue && !_fixedIsPaused)
-            {
-                var newVariableTime = Mathf.Max(0, _fastForwardTime.Value - Time.deltaTime);
-                _fastForwardTime = null;
+                var targetFrame = _pendingFastForwardRequest.Value;
+                _pendingFastForwardRequest = null;
                 _desiredFixedIsPaused = true;
 
-                if (newVariableTime < _elapsedVariableTime)
+                if (targetFrame <= _currentFixedFrameCount)
                 {
-                    _log.Warning("Ignored fast forward request since given time is in the past");
+                    _log.Trace(
+                        "Ignored fast forward to frame {} since current frame is already {}",
+                        targetFrame,
+                        _currentFixedFrameCount
+                    );
                 }
                 else
                 {
-                    _postFastForwardSkipFrame = true;
-                    _elapsedVariableTime = newVariableTime;
+                    _fastForwardCatchupTargetFrame = targetFrame;
+                    // Bump variable time so the catch-up loop's
+                    // `_elapsedFixedTime <= endOfFrameTime` bound permits all
+                    // (targetFrame - currentFrame) iterations. Subtract one
+                    // Time.deltaTime so endOfFrameTime (= _elapsedVariableTime
+                    // + _variableDeltaTime) lands at the desired final
+                    // elapsed-fixed-time without overshooting.
+                    var framesToAdvance = targetFrame - _currentFixedFrameCount;
+                    _elapsedVariableTime =
+                        _elapsedFixedTime
+                        + framesToAdvance * _settings.FixedTimeStep
+                        - Time.deltaTime;
                     _elapsedVariableTimeChangeEvent.Invoke(_elapsedVariableTime);
-
-                    if (_maxSecondsPerFixedUpdate.HasValue)
-                    {
-                        _log.Warning(
-                            "Fast forwarding while also using MaxSecondsPerFixedUpdate - this can create desyncs"
-                        );
-                    }
                 }
             }
 
@@ -816,16 +848,19 @@ namespace Trecs.Internal
 
             try
             {
-                for (int localIndex = 0; localIndex < _sortedVariableSystems.Count; localIndex++)
-                {
-                    var globalIndex = _sortedVariableSystems[localIndex];
-                    ExecuteSystem(globalIndex);
-                }
+                ExecuteSystemGroup(_sortedEarlyPresentationSystems);
+
+                // Drives the Input + Fixed loop, running 0..N times based on
+                // accumulated variable time and the fixed time step. Manages
+                // _isExecutingSystems internally around its inner phases and
+                // restores it to true on exit.
+                FixedUpdateSystemExecute();
+
+                ExecuteSystemGroup(_sortedPresentationSystems);
             }
             finally
             {
-                _jobScheduler.CompleteAllOutstanding();
-                _entitySubmitter._setStore.FlushAllSetJobWrites();
+                SyncJobsAndFlushWrites();
 
                 // Don't shadow other exceptions here
                 // Assert.That(_isExecutingSystems);
@@ -851,20 +886,11 @@ namespace Trecs.Internal
 
             try
             {
-                for (
-                    int localIndex = 0;
-                    localIndex < _sortedLateVariableSystems.Count;
-                    localIndex++
-                )
-                {
-                    var globalIndex = _sortedLateVariableSystems[localIndex];
-                    ExecuteSystem(globalIndex);
-                }
+                ExecuteSystemGroup(_sortedLatePresentationSystems);
             }
             finally
             {
-                _jobScheduler.CompleteAllOutstanding();
-                _entitySubmitter._setStore.FlushAllSetJobWrites();
+                SyncJobsAndFlushWrites();
 
                 // Don't shadow other exceptions here
                 // Assert.That(_isExecutingSystems);

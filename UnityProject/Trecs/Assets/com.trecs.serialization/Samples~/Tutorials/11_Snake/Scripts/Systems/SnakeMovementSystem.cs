@@ -6,7 +6,7 @@ namespace Trecs.Serialization.Samples.Snake
     /// current position, and advances the head one cell in its current
     /// direction (wrapping at the grid edges).
     /// </summary>
-    [ExecutesAfter(typeof(SnakeInputSystem))]
+    [ExecuteAfter(typeof(SnakeInputSystem))]
     public partial class SnakeMovementSystem : ISystem
     {
         readonly SnakeSettings _settings;

@@ -6,7 +6,7 @@ namespace Trecs.Serialization.Samples.Snake
     /// counts the head). Sorts segments by SegmentAge.FrameSpawned each
     /// frame so age order survives bookmark loads cleanly.
     /// </summary>
-    [ExecutesAfter(typeof(FoodConsumeSystem))]
+    [ExecuteAfter(typeof(FoodConsumeSystem))]
     public partial class SegmentTrimSystem : ISystem
     {
         public void Execute()

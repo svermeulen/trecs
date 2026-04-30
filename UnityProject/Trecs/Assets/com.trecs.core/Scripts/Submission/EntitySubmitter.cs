@@ -161,6 +161,12 @@ namespace Trecs.Internal
             _submitCompleteEvent.Invoke();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void FlushAllSetJobWrites()
+        {
+            _setStore.FlushAllSetJobWrites();
+        }
+
         void FlushAllDeferredOps()
         {
             // Deferred heap flushes apply swap-back removals to containers that

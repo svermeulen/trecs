@@ -50,15 +50,15 @@ namespace Trecs.Internal
             var systemType = system.GetType();
 
             var beforeAttributes = systemType.GetCustomAttributes(
-                typeof(ExecutesBeforeAttribute),
+                typeof(ExecuteBeforeAttribute),
                 true
             );
             var afterAttributes = systemType.GetCustomAttributes(
-                typeof(ExecutesAfterAttribute),
+                typeof(ExecuteAfterAttribute),
                 true
             );
 
-            foreach (ExecutesBeforeAttribute beforeAttribute in beforeAttributes)
+            foreach (ExecuteBeforeAttribute beforeAttribute in beforeAttributes)
             {
                 foreach (var systemTypeBefore in beforeAttribute.Systems)
                 {
@@ -66,7 +66,7 @@ namespace Trecs.Internal
                 }
             }
 
-            foreach (ExecutesAfterAttribute afterAttribute in afterAttributes)
+            foreach (ExecuteAfterAttribute afterAttribute in afterAttributes)
             {
                 foreach (var systemTypeAfter in afterAttribute.Systems)
                 {
@@ -200,39 +200,10 @@ namespace Trecs.Internal
                     directDepsIndices = new List<int>();
                 }
 
-                var runInVariableUpdate = systemType
-                    .GetCustomAttributes(typeof(VariableUpdateAttribute), true)
-                    .Any();
+                var phaseAttribute = (PhaseAttribute)
+                    systemType.GetCustomAttributes(typeof(PhaseAttribute), true).SingleOrDefault();
 
-                var runInVariableLateUpdate = systemType
-                    .GetCustomAttributes(typeof(LateVariableUpdateAttribute), true)
-                    .Any();
-
-                var runInInputUpdate = systemType
-                    .GetCustomAttributes(typeof(InputSystemAttribute), true)
-                    .Any();
-
-                SystemRunPhase runPhase;
-
-                if (runInVariableUpdate)
-                {
-                    Assert.That(!runInVariableLateUpdate);
-                    Assert.That(!runInInputUpdate);
-                    runPhase = SystemRunPhase.Variable;
-                }
-                else if (runInVariableLateUpdate)
-                {
-                    Assert.That(!runInInputUpdate);
-                    runPhase = SystemRunPhase.LateVariable;
-                }
-                else if (runInInputUpdate)
-                {
-                    runPhase = SystemRunPhase.Input;
-                }
-                else
-                {
-                    runPhase = SystemRunPhase.Fixed;
-                }
+                var phase = phaseAttribute?.Phase ?? SystemPhase.Fixed;
 
                 var priorityAttribute = (ExecutePriorityAttribute)
                     systemType
@@ -245,7 +216,7 @@ namespace Trecs.Internal
                     new SystemMetadata(
                         system,
                         directDepsIndices,
-                        runPhase: runPhase,
+                        phase: phase,
                         accessor: accessor,
                         debugName: systemType.GetPrettyName(),
                         executionPriority: priorityAttribute?.Priority

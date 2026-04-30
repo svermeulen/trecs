@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Trecs.Samples.SpawnAndDestroy
 {
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class SphereRendererSystem : ISystem
     {
         readonly GameObjectRegistry _gameObjectRegistry;

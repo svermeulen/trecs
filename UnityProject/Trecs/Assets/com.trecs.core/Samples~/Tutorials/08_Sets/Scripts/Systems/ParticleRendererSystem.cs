@@ -9,8 +9,8 @@ namespace Trecs.Samples.Sets
     /// systems and composites a final color, height offset, and scale.
     /// Particles in both waves show a purple blend with combined effects.
     /// </summary>
-    [ExecutesAfter(typeof(WaveXEffectSystem))]
-    [ExecutesAfter(typeof(WaveZEffectSystem))]
+    [ExecuteAfter(typeof(WaveXEffectSystem))]
+    [ExecuteAfter(typeof(WaveZEffectSystem))]
     public partial class ParticleRendererSystem : ISystem
     {
         static readonly Color WarmColor = new(1.0f, 0.5f, 0.1f);

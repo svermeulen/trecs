@@ -33,8 +33,7 @@ namespace Trecs
         readonly Rng _fixedRng;
         readonly Rng _variableRng;
         readonly EntityInputQueue _entityInputQueue;
-        readonly bool _isFixedSystem;
-        readonly bool _isInputSystem;
+        readonly SystemPhase? _phase;
         readonly string _debugName;
 
         internal IComponentAccessRecorder AccessRecorder;
@@ -53,13 +52,10 @@ namespace Trecs
             Rng fixedRng,
             Rng variableRng,
             EntityInputQueue entityInputQueue,
-            bool isInputSystem,
-            bool isFixedSystem,
+            SystemPhase? phase,
             string debugName
         )
         {
-            Assert.That(!(isInputSystem && isFixedSystem));
-
             _world = world;
             _systemRunner = systemRunnerInfo;
             _structuralOps = structuralOps;
@@ -69,30 +65,24 @@ namespace Trecs
             _fixedRng = fixedRng;
             _variableRng = variableRng;
             _entityInputQueue = entityInputQueue;
-            _isInputSystem = isInputSystem;
-            _isFixedSystem = isFixedSystem;
+            _phase = phase;
             _debugName = debugName;
 
             Id = id;
-            Heap = new HeapAccessor(
-                heapAllocator,
-                systemRunnerInfo,
-                isFixedSystem,
-                isInputSystem,
-                fixedRng,
-                debugName
-            );
+            Heap = new HeapAccessor(heapAllocator, systemRunnerInfo, phase, fixedRng, debugName);
         }
 
-        public bool IsFixedSystem
+        /// <summary>
+        /// The <see cref="SystemPhase"/> this accessor's owning system runs in,
+        /// or <c>null</c> for standalone accessors not bound to a system.
+        /// </summary>
+        public SystemPhase? Phase
         {
-            get { return _isFixedSystem; }
+            get { return _phase; }
         }
 
-        public bool IsInputSystem
-        {
-            get { return _isInputSystem; }
-        }
+        bool IsFixedPhase => _phase == SystemPhase.Fixed;
+        bool IsInputPhase => _phase == SystemPhase.Input;
 
         public bool IsExecutingSystems
         {
@@ -357,27 +347,24 @@ namespace Trecs
             }
         }
 
-        internal IReadOnlyList<int> SortedVariableSystems
-        {
-            get
-            {
-
-                return _systemRunner.SortedVariableSystems;
-            }
-        }
-
         internal IReadOnlyList<int> SortedInputSystems
         {
-            get
-            {
-
-                return _systemRunner.SortedInputSystems;
-            }
+            get { return _systemRunner.SortedInputSystems; }
         }
 
-        internal IReadOnlyList<int> SortedLateVariableSystems
+        internal IReadOnlyList<int> SortedEarlyPresentationSystems
         {
-            get { return _systemRunner.SortedLateVariableSystems; }
+            get { return _systemRunner.SortedEarlyPresentationSystems; }
+        }
+
+        internal IReadOnlyList<int> SortedPresentationSystems
+        {
+            get { return _systemRunner.SortedPresentationSystems; }
+        }
+
+        internal IReadOnlyList<int> SortedLatePresentationSystems
+        {
+            get { return _systemRunner.SortedLatePresentationSystems; }
         }
 
         internal RuntimeJobScheduler JobScheduler => _systemRunner.JobScheduler;
@@ -385,7 +372,7 @@ namespace Trecs
         internal bool RequireDeterministicSubmission =>
             _systemRunner.RequireDeterministicSubmission;
 
-        bool CanMakeStructuralChanges => !_systemRunner.IsExecutingSystems || _isFixedSystem;
+        bool CanMakeStructuralChanges => !_systemRunner.IsExecutingSystems || IsFixedPhase;
 
         /// <summary>
         /// Track an externally-scheduled job (not scheduled through Trecs).
@@ -618,6 +605,12 @@ namespace Trecs
             return _entitiesDb.CountEntitiesInGroup(group);
         }
 
+        public int CountEntitiesInSet(SetId setId)
+        {
+            SyncSetForRead(setId);
+            return _structuralOps.GetSet(setId).ComputeFinalCount();
+        }
+
         public int CountAllEntities()
         {
             int total = 0;
@@ -816,7 +809,7 @@ namespace Trecs
 
         /// <summary>
         /// Enqueues an input component value for the next fixed-update frame. Only callable from
-        /// <see cref="InputSystemAttribute"/> systems. The value is applied to the entity's
+        /// <see cref="SystemPhase.Input"/> systems. The value is applied to the entity's
         /// <see cref="InputAttribute"/> component at the start of the next fixed-update tick.
         /// </summary>
         public void AddInput<T>(EntityHandle entityHandle, in T value)
@@ -1179,7 +1172,7 @@ namespace Trecs
         void AssertCanAddInputsSystem()
         {
             Assert.That(
-                !_systemRunner.IsExecutingSystems || _isInputSystem,
+                !_systemRunner.IsExecutingSystems || IsInputPhase,
                 "Attempted to use input system only functionality from a non-input system {}",
                 DebugName
             );
@@ -1227,7 +1220,7 @@ namespace Trecs
         void AssertCanAccessVariableData()
         {
             Assert.That(
-                !_systemRunner.IsExecutingSystems || !_isFixedSystem,
+                !_systemRunner.IsExecutingSystems || !IsFixedPhase,
                 "Attempted to use variable update only functionality from fixed context {}",
                 DebugName
             );
@@ -1259,7 +1252,7 @@ namespace Trecs
                 return PhaseDefault.None;
             }
 
-            if (_isFixedSystem)
+            if (IsFixedPhase)
             {
                 return PhaseDefault.Fixed;
             }
@@ -1324,21 +1317,27 @@ namespace Trecs.Internal // Unsupported internal APIs
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static IReadOnlyList<int> GetSortedVariableSystems(this WorldAccessor world)
-        {
-            return world.SortedVariableSystems;
-        }
-
-        [EditorBrowsable(EditorBrowsableState.Never)]
         public static IReadOnlyList<int> GetSortedInputSystems(this WorldAccessor world)
         {
             return world.SortedInputSystems;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static IReadOnlyList<int> GetSortedLateVariableSystems(this WorldAccessor world)
+        public static IReadOnlyList<int> GetSortedEarlyPresentationSystems(this WorldAccessor world)
         {
-            return world.SortedLateVariableSystems;
+            return world.SortedEarlyPresentationSystems;
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static IReadOnlyList<int> GetSortedPresentationSystems(this WorldAccessor world)
+        {
+            return world.SortedPresentationSystems;
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static IReadOnlyList<int> GetSortedLatePresentationSystems(this WorldAccessor world)
+        {
+            return world.SortedLatePresentationSystems;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]

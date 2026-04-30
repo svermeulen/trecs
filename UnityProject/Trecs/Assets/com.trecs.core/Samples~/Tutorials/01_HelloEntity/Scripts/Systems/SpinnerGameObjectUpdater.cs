@@ -5,7 +5,7 @@ namespace Trecs.Samples.HelloEntity
     // This is because fixed update should be deterministic and not rely on outside state
     // so that we can serialize, bookmark, make recordings, playback recordings
     // Determinism might be important for other reasons as well
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class SpinnerGameObjectUpdater : ISystem
     {
         readonly GameObjectRegistry _gameObjectRegistry;

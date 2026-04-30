@@ -1,13 +1,12 @@
 namespace Trecs
 {
     /// <summary>
-    /// Variable-update system that blends <see cref="InterpolatedPrevious{T}"/> and the current
+    /// Presentation-phase system that blends <see cref="InterpolatedPrevious{T}"/> and the current
     /// value of <typeparamref name="T"/> into <see cref="Interpolated{T}"/> each render frame,
     /// using a caller-supplied <see cref="Interpolator"/> delegate.
     /// </summary>
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     [ExecutePriority(-1000)]
-    [ExecutesAfter(typeof(FixedUpdateSystem))]
     [AllowMultiple]
     public partial class InterpolatedUpdater<T> : ISystem
         where T : unmanaged, IEntityComponent

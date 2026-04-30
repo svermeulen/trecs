@@ -117,7 +117,7 @@ See [Sets](../entity-management/sets.md) for more on defining and using sets.
 A system can have multiple iteration methods for different entity groups:
 
 ```csharp
-[VariableUpdate]
+[Phase(SystemPhase.Presentation)]
 public partial class BallRendererSystem : ISystem
 {
     [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
@@ -207,34 +207,35 @@ void Execute(ref Score score)
 
 ## Update Phases
 
-Systems run in one of four phases, controlled by attributes:
+Systems run in one of five phases, controlled by `[Phase(...)]`. Phases execute in this order each rendered frame:
 
 | Phase | Attribute | Typical Use |
 |-------|-----------|-------------|
-| Input | `[InputSystem]` | Reading player input |
-| Fixed Update | *(default)* | Simulation, physics, game logic |
-| Variable Update | `[VariableUpdate]` | Rendering, visual updates |
-| Late Variable Update | `[LateVariableUpdate]` | Final frame cleanup |
+| `EarlyPresentation` | `[Phase(SystemPhase.EarlyPresentation)]` | Variable-cadence sampling that needs to feed into the fixed loop (e.g. raw mouse delta accumulation) |
+| `Input` | `[Phase(SystemPhase.Input)]` | Reading player input — runs just-in-time before each fixed step (0..N times per frame) |
+| `Fixed` | *(default)* | Deterministic simulation, physics, game logic |
+| `Presentation` | `[Phase(SystemPhase.Presentation)]` | Rendering, transform sync, interpolation reads |
+| `LatePresentation` | `[Phase(SystemPhase.LatePresentation)]` | Post-animation corrections — runs in Unity's `LateUpdate` |
 
 ```csharp
-// Fixed update (default — no attribute needed)
+// Fixed (default — no attribute needed)
 public partial class PhysicsSystem : ISystem { ... }
 
-// Variable update
-[VariableUpdate]
+// Presentation
+[Phase(SystemPhase.Presentation)]
 public partial class RenderSystem : ISystem { ... }
 
-// Input phase
-[InputSystem]
-public partial class InputSystem : ISystem { ... }
+// Input
+[Phase(SystemPhase.Input)]
+public partial class KeyboardInputSystem : ISystem { ... }
 ```
 
-Fixed update runs at a fixed timestep (default 1/60s) and may run multiple times per frame to catch up (or zero times at fast variable frame rates). Variable update runs once per frame at the actual frame rate. See [Input System](../advanced/input-system.md) for details on the input phase.
+The fixed phase runs at a fixed timestep (default 1/60s) and may run multiple times per frame to catch up (or zero times at fast variable frame rates). Each fixed step is preceded by the input phase. Presentation and LatePresentation run once per rendered frame. See [Input System](../advanced/input-system.md) for details on the input phase.
 
 Trecs does not hook into Unity's update loop automatically — you drive it by calling these methods on the world each frame:
 
-- **`world.Tick()`** — Runs variable-update systems and some number of fixed update ticks
-- **`world.LateTick()`** — Runs late-variable-update systems.
+- **`world.Tick()`** — Runs `EarlyPresentation`, the input/fixed loop, and `Presentation` phases.
+- **`world.LateTick()`** — Runs the `LatePresentation` phase. Call from `MonoBehaviour.LateUpdate`.
 
 Typically these are called from a MonoBehaviour like this:
 
@@ -272,13 +273,13 @@ All outstanding jobs are completed at the boundary between phases. See [Dependen
 
 ## System Ordering
 
-Control execution order within a phase using `[ExecutesAfter]` and `[ExecutesBefore]`:
+Control execution order within a phase using `[ExecuteAfter]` and `[ExecuteBefore]`:
 
 ```csharp
-[ExecutesAfter(typeof(SpawnSystem))]
+[ExecuteAfter(typeof(SpawnSystem))]
 public partial class LifetimeSystem : ISystem { ... }
 
-[ExecutesBefore(typeof(RenderSystem))]
+[ExecuteBefore(typeof(RenderSystem))]
 public partial class PhysicsSystem : ISystem { ... }
 ```
 
@@ -302,7 +303,7 @@ public partial class EarlySystem : ISystem { ... }
 public partial class LateSystem : ISystem { ... }
 ```
 
-`[ExecutesAfter]` and `[ExecutesBefore]` constraints always take precedence over priority — priority only breaks ties among systems with no ordering constraints between them.
+`[ExecuteAfter]` and `[ExecuteBefore]` constraints always take precedence over priority — priority only breaks ties among systems with no ordering constraints between them.
 
 ## OnReady Hook
 
@@ -335,10 +336,10 @@ public partial class RendererSystem : ISystem
 
 `OnReady` runs in the same order systems will execute, so a system can rely on any state set up by systems that run before it:
 
-1. **By phase** — Input → Fixed → Variable → LateVariable
-2. **Within each phase** — `[ExecutesAfter]`, `[ExecutesBefore]`, and `[ExecutePriority]` are honored, exactly as they are at execution time
+1. **By phase** — `EarlyPresentation` → `Input` → `Fixed` → `Presentation` → `LatePresentation`
+2. **Within each phase** — `[ExecuteAfter]`, `[ExecuteBefore]`, and `[ExecutePriority]` are honored, exactly as they are at execution time
 
-Order is *not* tied to the order systems were passed to `AddSystem` / `AddSystems`. If you need one system's `OnReady` to run after another's, declare it with `[ExecutesAfter]` (or place both in the appropriate phases) — the same constraint that controls runtime order also controls `OnReady` order.
+Order is *not* tied to the order systems were passed to `AddSystem` / `AddSystems`. If you need one system's `OnReady` to run after another's, declare it with `[ExecuteAfter]` (or place both in the appropriate phases) — the same constraint that controls runtime order also controls `OnReady` order.
 
 ## Entity Operations in Systems
 

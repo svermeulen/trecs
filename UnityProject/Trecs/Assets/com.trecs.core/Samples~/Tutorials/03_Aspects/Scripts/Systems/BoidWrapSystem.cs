@@ -1,6 +1,6 @@
 namespace Trecs.Samples.Aspects
 {
-    [ExecutesAfter(typeof(BoidMovementSystem))]
+    [ExecuteAfter(typeof(BoidMovementSystem))]
     public partial class BoidWrapSystem : ISystem
     {
         readonly float _halfSize;

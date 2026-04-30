@@ -7,7 +7,7 @@ namespace Trecs.Serialization.Samples.Snake
     /// matching GameObject's transform. Runs in the variable update phase
     /// so visuals stay smooth even when fixed updates are scarce.
     /// </summary>
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class SnakeRendererSystem : ISystem
     {
         readonly RenderableGameObjectManager _goManager;

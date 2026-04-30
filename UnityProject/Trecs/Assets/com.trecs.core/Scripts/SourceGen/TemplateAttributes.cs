@@ -186,7 +186,7 @@ namespace Trecs
 
     /// <summary>
     /// Marks a template component field as externally-driven input. Input components are
-    /// written by <see cref="InputSystemAttribute"/> systems via <see cref="WorldAccessor.AddInput{T}"/>
+    /// written by <see cref="SystemPhase.Input"/> systems via <see cref="WorldAccessor.AddInput{T}"/>
     /// and consumed by fixed-update systems. See <see cref="MissingInputFrameBehaviour"/> for
     /// what happens when no input is provided for a frame.
     /// </summary>

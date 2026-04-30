@@ -6,8 +6,8 @@ namespace Trecs.Samples.Pointers
     /// Variable-update renderer that syncs ECS state to GameObjects.
     /// Reads UniquePtr&lt;TrailHistory&gt; to update each entity's LineRenderer trail.
     /// </summary>
-    [VariableUpdate]
-    [ExecutesAfter(typeof(PatrolMovementSystem))]
+    [Phase(SystemPhase.Presentation)]
+    [ExecuteAfter(typeof(PatrolMovementSystem))]
     public partial class PatrolRendererSystem : ISystem
     {
         readonly GameObjectRegistry _registry;

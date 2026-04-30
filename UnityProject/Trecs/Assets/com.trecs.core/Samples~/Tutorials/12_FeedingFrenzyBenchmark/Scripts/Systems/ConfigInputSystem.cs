@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
-    [InputSystem]
+    [Phase(SystemPhase.Input)]
     public partial class ConfigInputSystem : ISystem
     {
         int _pendingIterationStyleDelta;

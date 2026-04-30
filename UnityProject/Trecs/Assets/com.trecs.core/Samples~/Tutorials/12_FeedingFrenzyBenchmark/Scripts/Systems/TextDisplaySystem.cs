@@ -5,7 +5,7 @@ using Unity.Mathematics;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class TextDisplaySystem : ISystem
     {
         readonly TMP_Text _displayText;

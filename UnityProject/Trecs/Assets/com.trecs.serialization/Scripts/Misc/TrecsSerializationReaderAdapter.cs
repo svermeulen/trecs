@@ -2,7 +2,7 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
-    internal struct TrecsSerializationReaderAdapter : ITrecsSerializationReader
+    public struct TrecsSerializationReaderAdapter : ITrecsSerializationReader
     {
         readonly ISerializationReader _inner;
 

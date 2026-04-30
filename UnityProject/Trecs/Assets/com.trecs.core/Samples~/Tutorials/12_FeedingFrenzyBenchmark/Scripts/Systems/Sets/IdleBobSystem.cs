@@ -6,7 +6,7 @@ using Unity.Mathematics;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
 {
-    [ExecutesAfter(typeof(IConsumingMeal))]
+    [ExecuteAfter(typeof(IConsumingMeal))]
     public partial class IdleBobSystem : IIdleBob, ISystem
     {
         static readonly TrecsLog _log = new(nameof(IdleBobSystem));

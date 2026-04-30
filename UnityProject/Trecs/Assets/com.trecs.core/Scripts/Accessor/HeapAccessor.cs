@@ -13,27 +13,27 @@ namespace Trecs
     {
         readonly EcsHeapAllocator _heapAllocator;
         readonly SystemRunner _systemRunner;
-        readonly bool _isFixedSystem;
-        readonly bool _isInputSystem;
+        readonly SystemPhase? _phase;
         readonly Rng _fixedRng;
         readonly string _debugName;
 
         internal HeapAccessor(
             EcsHeapAllocator heapAllocator,
             SystemRunner systemRunner,
-            bool isFixedSystem,
-            bool isInputSystem,
+            SystemPhase? phase,
             Rng fixedRng,
             string debugName
         )
         {
             _heapAllocator = heapAllocator;
             _systemRunner = systemRunner;
-            _isFixedSystem = isFixedSystem;
-            _isInputSystem = isInputSystem;
+            _phase = phase;
             _fixedRng = fixedRng;
             _debugName = debugName;
         }
+
+        bool IsFixedPhase => _phase == SystemPhase.Fixed;
+        bool IsInputPhase => _phase == SystemPhase.Input;
 
         internal int FixedFrame => _systemRunner.FixedFrame;
 
@@ -429,7 +429,7 @@ namespace Trecs
         void AssertCanAddInputsSystem()
         {
             Assert.That(
-                !_systemRunner.IsExecutingSystems || _isInputSystem,
+                !_systemRunner.IsExecutingSystems || IsInputPhase,
                 "Attempted to use input system only functionality from a non-input system {}",
                 _debugName
             );
@@ -441,12 +441,12 @@ namespace Trecs
         [Conditional("DEBUG")]
         void AssertCanAllocatePersistent()
         {
-            if (!_systemRunner.IsExecutingSystems || _isFixedSystem)
+            if (!_systemRunner.IsExecutingSystems || IsFixedPhase)
             {
                 return;
             }
 
-            if (_isInputSystem)
+            if (IsInputPhase)
             {
                 Assert.That(
                     false,

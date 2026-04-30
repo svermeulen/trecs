@@ -68,6 +68,14 @@ namespace Trecs.SourceGen
                 TrecsAttributeNames.Unwrap,
                 TrecsNamespaces.Trecs
             );
+            // [Serializable] has AllowMultiple=false, so applying it twice
+            // (once by the user, once by us) is a CS0579 error. Skip emission
+            // when the user already wrote it on any partial half.
+            var isSerializable = PerformanceCache.HasAttributeByName(
+                symbol,
+                "SerializableAttribute",
+                "System"
+            );
 
             string? unwrapFieldName = null;
             string? unwrapFieldTypeDisplay = null;
@@ -110,6 +118,7 @@ namespace Trecs.SourceGen
                 Accessibility: GetAccessibility(symbol),
                 IsPartial: isPartial,
                 IsUnwrap: isUnwrap,
+                IsSerializable: isSerializable,
                 UnwrapFieldName: unwrapFieldName,
                 UnwrapFieldTypeDisplay: unwrapFieldTypeDisplay,
                 HasUnwrapConstructor: hasUnwrapConstructor,
@@ -179,6 +188,16 @@ namespace Trecs.SourceGen
             }
 
             var structIndent = new string(' ', indentLevel * 4);
+            // Emit [Serializable] so Unity's SerializedObject machinery (and
+            // any [SerializeField] holding the component) can navigate the
+            // type's fields — required for editor inspectors that drive
+            // PropertyField. Skipped when the user has already applied it to
+            // a hand-written partial; SerializableAttribute has AllowMultiple
+            // = false and would otherwise break the build.
+            if (!model.IsSerializable)
+            {
+                sb.AppendLine($"{structIndent}[global::System.Serializable]");
+            }
             sb.AppendLine($"{structIndent}{model.Accessibility} partial struct {model.TypeName}");
             sb.AppendLine($"{structIndent}{{");
             indentLevel++;
@@ -271,6 +290,7 @@ namespace Trecs.SourceGen
         string Accessibility,
         bool IsPartial,
         bool IsUnwrap,
+        bool IsSerializable,
         string? UnwrapFieldName,
         string? UnwrapFieldTypeDisplay,
         bool HasUnwrapConstructor,
@@ -284,6 +304,7 @@ namespace Trecs.SourceGen
             && Accessibility == other.Accessibility
             && IsPartial == other.IsPartial
             && IsUnwrap == other.IsUnwrap
+            && IsSerializable == other.IsSerializable
             && UnwrapFieldName == other.UnwrapFieldName
             && UnwrapFieldTypeDisplay == other.UnwrapFieldTypeDisplay
             && HasUnwrapConstructor == other.HasUnwrapConstructor
@@ -300,6 +321,7 @@ namespace Trecs.SourceGen
                 h = h * 31 + (Accessibility?.GetHashCode() ?? 0);
                 h = h * 31 + IsPartial.GetHashCode();
                 h = h * 31 + IsUnwrap.GetHashCode();
+                h = h * 31 + IsSerializable.GetHashCode();
                 h = h * 31 + (UnwrapFieldName?.GetHashCode() ?? 0);
                 h = h * 31 + (UnwrapFieldTypeDisplay?.GetHashCode() ?? 0);
                 h = h * 31 + HasUnwrapConstructor.GetHashCode();

@@ -24,11 +24,24 @@ namespace Trecs
         BlobCacheSettings _blobCacheSettings;
         WorldSettings _settings;
         ITrecsPoolManager _poolManager;
+        string _debugName;
 
         /// <summary>
         /// Creates a new empty WorldBuilder.
         /// </summary>
         public WorldBuilder() { }
+
+        /// <summary>
+        /// Sets a human-readable debug name on the resulting <see cref="World.DebugName"/>.
+        /// Surfaced by editor tooling (e.g. the World dropdown in <c>TrecsTimeTravelWindow</c>).
+        /// </summary>
+        public WorldBuilder SetDebugName(string debugName)
+        {
+            Require.That(debugName != null, "debugName must not be null");
+            Require.That(_debugName == null, "DebugName has already been set");
+            _debugName = debugName;
+            return this;
+        }
 
         /// <summary>
         /// Sets the <see cref="WorldSettings"/> for the world being built.
@@ -246,7 +259,7 @@ namespace Trecs
 
             var settings = _settings ?? new WorldSettings();
 
-            var worldInfo = new WorldInfo(_templates);
+            var worldInfo = new WorldInfo(_templates, _sets);
 
             var uniqueHeap = new UniqueHeap(_poolManager);
             var blobCache = new BlobCache(_blobStores, _blobCacheSettings);
@@ -264,8 +277,6 @@ namespace Trecs
                 _systemOrderConstraints,
                 accessorRegistry
             );
-
-            _systems.Add(new FixedUpdateSystem());
 
             var systemLoader = new SystemLoader(
                 accessorRegistry,
@@ -325,7 +336,7 @@ namespace Trecs
                 worldInfo
             );
 
-            return new World(
+            var world = new World(
                 entityInputQueue: entityInputQueue,
                 systemRunner: systemRunner,
                 uniqueHeap: uniqueHeap,
@@ -349,6 +360,8 @@ namespace Trecs
                 componentStore: componentStore,
                 systems: _systems
             );
+            world.DebugName = _debugName;
+            return world;
         }
     }
 }

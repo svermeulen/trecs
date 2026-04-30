@@ -1,6 +1,6 @@
 namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
-    // This interfaces are just used so we can control ordering with ExecutesBefore / ExecutesAfter
+    // This interfaces are just used so we can control ordering with ExecuteBefore / ExecuteAfter
     public interface ILookingForMeal { }
 
     public interface IConsumingMeal { }

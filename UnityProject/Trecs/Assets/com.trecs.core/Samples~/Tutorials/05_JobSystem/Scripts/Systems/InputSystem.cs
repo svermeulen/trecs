@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Trecs.Samples.JobSystem
 {
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class InputSystem : ISystem
     {
         readonly int _minCount;

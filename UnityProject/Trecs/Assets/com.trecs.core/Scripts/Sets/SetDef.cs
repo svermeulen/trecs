@@ -13,11 +13,18 @@ namespace Trecs
         public readonly TagSet Tags;
         public readonly string DebugName;
 
-        public SetDef(SetId id, TagSet tags, string debugName)
+        // The IEntitySet struct type the set was registered with via
+        // WorldBuilder.AddSet&lt;T&gt;(). Reflection-only — runtime never
+        // touches it — but useful for editor tooling that wants to show
+        // FullName / Namespace alongside the debug name.
+        public readonly Type SetType;
+
+        public SetDef(SetId id, TagSet tags, string debugName, Type setType)
         {
             Id = id;
             Tags = tags;
             DebugName = debugName;
+            SetType = setType;
         }
 
         public override bool Equals(object obj)

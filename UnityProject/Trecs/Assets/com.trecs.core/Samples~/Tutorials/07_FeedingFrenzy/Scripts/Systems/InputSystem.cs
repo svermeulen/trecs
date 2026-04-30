@@ -9,7 +9,7 @@ namespace Trecs.Samples.FeedingFrenzy101
     /// Up arrow doubles the count, Down arrow halves it (min 10).
     /// Displays current target and actual counts in the console.
     /// </summary>
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class InputSystem : ISystem
     {
         readonly int _minCount;

@@ -130,12 +130,12 @@ static void ExecuteImpl(
 }
 ```
 
-### VisualSmoothingSystem (`[VariableUpdate]`)
+### VisualSmoothingSystem (`[Phase(SystemPhase.Presentation)]`)
 
 Lerps `Position`/`Rotation` toward `SimPosition`/`SimRotation` each visual frame. This creates smooth movement at the display frame rate even though the simulation runs at a lower fixed timestep:
 
 ```csharp
-[VariableUpdate]
+[Phase(SystemPhase.Presentation)]
 public partial class VisualSmoothingSystem : ISystem
 {
     [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]

@@ -7,11 +7,11 @@ namespace Trecs.Samples.FeedingFrenzy101
     /// simulation values, making visuals fluid even at low fixed
     /// timestep rates.
     ///
-    /// Runs as [VariableUpdate] before the RendererSystem. Writes to
+    /// Runs in the Presentation phase before the RendererSystem. Writes to
     /// Position/Rotation (read by RendererSystem) by lerping toward
     /// SimPosition/SimRotation (written by fixed-update systems).
     /// </summary>
-    [VariableUpdate]
+    [Phase(SystemPhase.Presentation)]
     public partial class VisualSmoothingSystem : ISystem
     {
         const float ChaseSpeed = 15f;

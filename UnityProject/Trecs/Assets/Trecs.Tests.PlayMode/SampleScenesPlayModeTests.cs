@@ -5,7 +5,6 @@ using NUnit.Framework;
 using Trecs.Samples.FeedingFrenzyBenchmark;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
-using Assert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests.PlayMode
 {

@@ -369,7 +369,7 @@ namespace Trecs.Serialization
             {
                 var system = _world.GetSystems()[i];
 
-                if (system.Metadata.RunPhase == SystemRunPhase.Input)
+                if (system.Metadata.Phase == SystemPhase.Input)
                 {
                     Assert.That(_world.IsSystemEnabled(i) == !enable);
                     _world.SetSystemEnabled(i, enable);

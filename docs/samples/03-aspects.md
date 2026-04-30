@@ -57,10 +57,10 @@ The `Boid` aspect provides:
 
 ### BoidWrapSystem
 
-Wraps boids that go out of bounds. Uses `[ExecutesAfter]` to run after movement:
+Wraps boids that go out of bounds. Uses `[ExecuteAfter]` to run after movement:
 
 ```csharp
-[ExecutesAfter(typeof(BoidMovementSystem))]
+[ExecuteAfter(typeof(BoidMovementSystem))]
 public partial class BoidWrapSystem : ISystem
 {
     readonly float _halfSize;

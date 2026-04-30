@@ -6,7 +6,7 @@ namespace Trecs.Samples.Partitions
     /// Counts down the rest timer on Resting balls. When the timer expires,
     /// the ball is launched upward and transitions back to the Active partition.
     /// </summary>
-    [ExecutesAfter(typeof(PhysicsSystem))]
+    [ExecuteAfter(typeof(PhysicsSystem))]
     public partial class WakeUpSystem : ISystem
     {
         const float LaunchSpeed = 8f;

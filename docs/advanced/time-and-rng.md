@@ -34,7 +34,7 @@ public partial class PhysicsSystem : ISystem
 }
 
 // In a variable update system: DeltaTime == VariableDeltaTime
-[VariableUpdate]
+[Phase(SystemPhase.Presentation)]
 public partial class AnimationSystem : ISystem
 {
     [ForEachEntity(MatchByComponents = true)]

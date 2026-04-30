@@ -9,7 +9,7 @@ namespace Trecs.Serialization.Samples.Snake
     /// identically across recordings — try to keep the seed stable in
     /// WorldSettings or recordings will desync.
     /// </summary>
-    [ExecutesAfter(typeof(SegmentTrimSystem))]
+    [ExecuteAfter(typeof(SegmentTrimSystem))]
     public partial class FoodSpawnSystem : ISystem
     {
         readonly SnakeSettings _settings;

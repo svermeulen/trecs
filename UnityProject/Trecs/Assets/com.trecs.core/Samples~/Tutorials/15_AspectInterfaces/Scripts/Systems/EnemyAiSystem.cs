@@ -5,7 +5,7 @@ namespace Trecs.Samples.AspectInterfaces
 {
     // Runs after the boss so each enemy sees the boss's post-move position
     // for this frame's collision check.
-    [ExecutesAfter(typeof(BossAiSystem))]
+    [ExecuteAfter(typeof(BossAiSystem))]
     public partial class EnemyAiSystem : ISystem
     {
         readonly SampleSettings _settings;
