@@ -19,7 +19,7 @@ namespace Trecs
             typeof(IEntitySet<,,,>),
         };
 
-        public static SetDef CreateSet(Type setType)
+        public static EntitySet CreateSet(Type setType)
         {
             Assert.That(UnityThreadHelper.IsMainThread);
             Assert.That(
@@ -54,7 +54,7 @@ namespace Trecs
 
             TagSet tags = ExtractTags(setType);
 
-            return new SetDef(setId, tags, setType.Name, setType);
+            return new EntitySet(setId, tags, setType.Name, setType);
         }
 
         static int ComputeSetId(Type setType)

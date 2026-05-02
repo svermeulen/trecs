@@ -17,7 +17,7 @@ namespace Trecs
 
         internal readonly List<IInterpolatedPreviousSaver> _interpolatedPreviousSavers = new();
         readonly List<Template> _templates = new();
-        readonly List<SetDef> _sets = new();
+        readonly List<EntitySet> _sets = new();
         internal ISystemMetadataProvider _systemMetadataProvider;
 
         bool _hasBuilt;
@@ -74,7 +74,7 @@ namespace Trecs
         public WorldBuilder AddSet<T>()
             where T : struct, IEntitySet
         {
-            var setDef = EntitySet<T>.Value;
+            var entitySet = EntitySet<T>.Value;
 
             // Force EntitySetId<T> static constructor to run on the main thread,
             // so the SharedStatic is populated before any Burst job accesses it.
@@ -83,11 +83,11 @@ namespace Trecs
             _ = EntitySetId<T>.Value;
 
             Require.That(
-                !_sets.Any(f => f.Id == setDef.Id),
+                !_sets.Any(f => f.Id == entitySet.Id),
                 "Set '{}' is already added to the WorldBuilder",
-                setDef.DebugName
+                entitySet.DebugName
             );
-            _sets.Add(setDef);
+            _sets.Add(entitySet);
 
             return this;
         }
@@ -289,9 +289,9 @@ namespace Trecs
             var componentStore = new ComponentStore(worldInfo.AllGroups.Count);
             var setStore = new SetStore(worldInfo.AllGroups.Count);
 
-            foreach (var setDef in _sets)
+            foreach (var entitySet in _sets)
             {
-                setStore.RegisterSet(setDef, worldInfo);
+                setStore.RegisterSet(entitySet, worldInfo);
             }
 
             var entityQuerier = new EntityQuerier(

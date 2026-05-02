@@ -9,7 +9,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public class SetStore : IDisposable
     {
-        internal NativeDenseDictionary<SetId, EntitySet> EntitySets;
+        internal NativeDenseDictionary<SetId, EntitySetStorage> EntitySets;
         internal NativeDenseDictionary<SetId, NativeSetDeferredQueues> DeferredQueues;
 
         // Routing index: per-group list of set IDs registered for that group,
@@ -22,7 +22,10 @@ namespace Trecs.Internal
 
         public SetStore(int groupCount)
         {
-            EntitySets = new NativeDenseDictionary<SetId, EntitySet>(0, Allocator.Persistent);
+            EntitySets = new NativeDenseDictionary<SetId, EntitySetStorage>(
+                0,
+                Allocator.Persistent
+            );
             DeferredQueues = new NativeDenseDictionary<SetId, NativeSetDeferredQueues>(
                 0,
                 Allocator.Persistent
@@ -36,24 +39,24 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// Registers a set during world initialization. Creates the EntitySet,
+        /// Registers a set during world initialization. Creates the EntitySetStorage,
         /// pre-populates group entries, and populates the group-based routing index.
         /// </summary>
-        public void RegisterSet(SetDef setDef, WorldInfo worldInfo)
+        public void RegisterSet(EntitySet entitySet, WorldInfo worldInfo)
         {
             Assert.That(
-                !EntitySets.ContainsKey(setDef.Id),
+                !EntitySets.ContainsKey(entitySet.Id),
                 "Set '{}' is already registered",
-                setDef.DebugName
+                entitySet.DebugName
             );
 
-            var groups = setDef.Tags.IsNull
+            var groups = entitySet.Tags.IsNull
                 ? worldInfo.AllGroups
-                : worldInfo.GetGroupsWithTags(setDef.Tags);
+                : worldInfo.GetGroupsWithTags(entitySet.Tags);
             Assert.That(
                 groups.Count > 0,
                 "Set '{}' matched no groups. Are the tags used by a template added to the WorldBuilder?",
-                setDef.DebugName
+                entitySet.DebugName
             );
 
             var validGroups = new DenseHashSet<GroupIndex>(groups.Count);
@@ -63,22 +66,22 @@ namespace Trecs.Internal
             }
 
             EntitySets.Add(
-                setDef.Id,
-                new EntitySet(setDef.Id, worldInfo.AllGroups.Count, validGroups)
+                entitySet.Id,
+                new EntitySetStorage(entitySet.Id, worldInfo.AllGroups.Count, validGroups)
             );
             DeferredQueues.Add(
-                setDef.Id,
+                entitySet.Id,
                 new NativeSetDeferredQueues(AtomicNativeBags.Create(), AtomicNativeBags.Create())
             );
 
             foreach (var group in groups)
             {
                 ref var list = ref SetIdsByGroup.ElementAt(group.Index);
-                list.Add(setDef.Id);
+                list.Add(entitySet.Id);
             }
         }
 
-        internal ref EntitySet GetSet(SetId setId)
+        internal ref EntitySetStorage GetSet(SetId setId)
         {
             var success = EntitySets.TryGetIndex(setId, out var index);
             Assert.That(
@@ -89,9 +92,9 @@ namespace Trecs.Internal
             return ref EntitySets.GetValueAtIndexByRef(index);
         }
 
-        internal ref EntitySet GetSet(SetDef setDef)
+        internal ref EntitySetStorage GetSet(EntitySet entitySet)
         {
-            return ref EntitySets.GetValueByRef(setDef.Id);
+            return ref EntitySets.GetValueByRef(entitySet.Id);
         }
 
         internal ref NativeSetDeferredQueues GetDeferredQueues(SetId setId)
@@ -128,7 +131,7 @@ namespace Trecs.Internal
         }
 
         static void FlushDeferredOpsForSet(
-            ref EntitySet set,
+            ref EntitySetStorage set,
             ref NativeSetDeferredQueues queues,
             bool requireDeterministic
         )
@@ -140,7 +143,7 @@ namespace Trecs.Internal
         }
 
         static void FlushDeferredOpsNonDeterministic(
-            ref EntitySet set,
+            ref EntitySetStorage set,
             ref NativeSetDeferredQueues queues
         )
         {
@@ -160,7 +163,7 @@ namespace Trecs.Internal
         }
 
         static void FlushDeferredOpsDeterministic(
-            ref EntitySet set,
+            ref EntitySetStorage set,
             ref NativeSetDeferredQueues queues
         )
         {

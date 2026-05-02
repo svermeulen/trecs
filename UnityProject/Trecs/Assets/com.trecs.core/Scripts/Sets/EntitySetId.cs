@@ -6,7 +6,7 @@ namespace Trecs
 {
     /// <summary>
     /// Burst-compatible cache for SetId values derived from IEntitySet struct types.
-    /// Uses SharedStatic to avoid exposing managed types (SetDef contains a string)
+    /// Uses SharedStatic to avoid exposing managed types (EntitySet contains a string)
     /// to the Burst compiler.
     /// </summary>
     public static class EntitySetId<T>

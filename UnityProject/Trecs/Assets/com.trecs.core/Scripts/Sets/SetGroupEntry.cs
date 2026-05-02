@@ -6,7 +6,7 @@ namespace Trecs
 {
     /// <summary>
     /// Tracks a set of entity indices for a single group within an entity set.
-    /// Used by <see cref="EntitySet"/>.
+    /// Used by <see cref="EntitySetStorage"/>.
     /// </summary>
     public struct SetGroupEntry
     {

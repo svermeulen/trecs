@@ -90,6 +90,29 @@ namespace Trecs
         }
 
         /// <summary>
+        /// When true, all updates (fixed, variable, input, presentation) are skipped.
+        /// Distinct from <see cref="FixedIsPaused"/>, which only halts the fixed-update phase.
+        /// </summary>
+        public bool IsPaused
+        {
+            get { return _systemRunner.IsPaused; }
+            set { _systemRunner.IsPaused = value; }
+        }
+
+        /// <summary>
+        /// When true, the fixed-update phase is halted; variable, input, and presentation
+        /// updates continue. Changes fire <see cref="FixedIsPausedChangedEvent"/>.
+        /// </summary>
+        public bool FixedIsPaused
+        {
+            get { return _systemRunner.FixedIsPaused; }
+            set { _systemRunner.FixedIsPaused = value; }
+        }
+
+        public ISimpleObservable<bool> FixedIsPausedChangedEvent =>
+            _systemRunner.FixedIsPausedChangedEvent;
+
+        /// <summary>
         /// Phase-aware time step. Returns <see cref="FixedDeltaTime"/> in fixed-update systems
         /// or <see cref="VariableDeltaTime"/> in variable-update systems. Throws if called from
         /// an ambiguous context (e.g. a standalone accessor).
@@ -1017,22 +1040,22 @@ namespace Trecs
 #endif
         }
 
-        internal ref EntitySet GetSetDirect(SetDef setDef)
+        internal ref EntitySetStorage GetSetDirect(EntitySet entitySet)
         {
-            return ref _structuralOps.GetSet(setDef);
+            return ref _structuralOps.GetSet(entitySet);
         }
 
         /// <summary>
         /// Returns a set reference for job scheduling (no sync).
         /// Used by generated scheduling code to avoid unnecessary sync points.
         /// </summary>
-        internal ref EntitySet GetSetForJobScheduling<T>()
+        internal ref EntitySetStorage GetSetForJobScheduling<T>()
             where T : struct, IEntitySet
         {
             return ref _structuralOps.GetSet(EntitySet<T>.Value);
         }
 
-        internal ref EntitySet GetSetForJobScheduling(SetId setId)
+        internal ref EntitySetStorage GetSetForJobScheduling(SetId setId)
         {
             return ref _structuralOps.GetSet(setId);
         }
@@ -1079,7 +1102,7 @@ namespace Trecs
             setCollection.FlushJobWrites();
         }
 
-        internal ref EntitySet GetSetCollection(SetId setId)
+        internal ref EntitySetStorage GetSetCollection(SetId setId)
         {
             return ref _structuralOps.GetSet(setId);
         }

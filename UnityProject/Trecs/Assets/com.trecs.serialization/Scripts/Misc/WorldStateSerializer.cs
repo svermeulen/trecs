@@ -153,7 +153,10 @@ namespace Trecs.Serialization
             }
         }
 
-        void WriteSets(in NativeDenseDictionary<SetId, EntitySet> sets, ISerializationWriter writer)
+        void WriteSets(
+            in NativeDenseDictionary<SetId, EntitySetStorage> sets,
+            ISerializationWriter writer
+        )
         {
             var numSets = sets.Count;
             writer.Write("numSets", numSets);
@@ -410,7 +413,10 @@ namespace Trecs.Serialization
             }
         }
 
-        void ReadSets(NativeDenseDictionary<SetId, EntitySet> sets, ISerializationReader reader)
+        void ReadSets(
+            NativeDenseDictionary<SetId, EntitySetStorage> sets,
+            ISerializationReader reader
+        )
         {
             var numSets = reader.Read<int>("numSets");
             Assert.That(numSets >= 0);

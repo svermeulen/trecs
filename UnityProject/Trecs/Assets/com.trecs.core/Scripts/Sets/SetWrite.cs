@@ -22,7 +22,7 @@ namespace Trecs
 
         readonly NativeList<GroupIndex> _registeredGroups;
 
-        internal SetWrite(WorldAccessor world, SetId setId, in EntitySet set)
+        internal SetWrite(WorldAccessor world, SetId setId, in EntitySetStorage set)
         {
             _world = world;
             _setId = setId;

@@ -619,13 +619,13 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "}");
             sb.AppendLine();
 
-            sb.AppendLine(indentLevel + 1, "public AspectQuery InSet(SetDef setDef)");
+            sb.AppendLine(indentLevel + 1, "public AspectQuery InSet(EntitySet entitySet)");
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
                 "Assert.That(!_hasSet, \"Only one set per query is supported.\");"
             );
-            sb.AppendLine(indentLevel + 2, "_set = setDef.Id;");
+            sb.AppendLine(indentLevel + 2, "_set = entitySet.Id;");
             sb.AppendLine(indentLevel + 2, "_hasSet = true;");
             sb.AppendLine(indentLevel + 2, "return this;");
             sb.AppendLine(indentLevel + 1, "}");

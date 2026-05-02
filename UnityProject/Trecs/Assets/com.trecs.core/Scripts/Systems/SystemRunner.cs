@@ -101,6 +101,27 @@ namespace Trecs.Internal
             _log.Trace("Using Trecs Settings: {@}", settings);
         }
 
+        public bool IsPaused
+        {
+            get { return _isPaused; }
+            set { _isPaused = value; }
+        }
+
+        public bool FixedIsPaused
+        {
+            get { return _desiredFixedIsPaused; }
+            set
+            {
+                if (_desiredFixedIsPaused != value)
+                {
+                    _desiredFixedIsPaused = value;
+                    _fixedIsPausedChangedEvent.Invoke(_desiredFixedIsPaused);
+                }
+            }
+        }
+
+        public ISimpleObservable<bool> FixedIsPausedChangedEvent => _fixedIsPausedChangedEvent;
+
         /// <summary>
         /// Note that this is different from unity's Time.timeScale
         /// Changing either one will affect the variable delta time
@@ -682,27 +703,6 @@ namespace Trecs.Internal
             Assert.That(!_hasDisposed);
             Assert.That(index >= 0 && index < _systemRuntimeInfos.Count);
             _systemRuntimeInfos[index].IsEnabled = enabled;
-        }
-
-        public bool IsPaused
-        {
-            get { return _isPaused; }
-            set { _isPaused = value; }
-        }
-
-        public ISimpleObservable<bool> FixedIsPausedChangedEvent => _fixedIsPausedChangedEvent;
-
-        public bool FixedIsPaused
-        {
-            get { return _desiredFixedIsPaused; }
-            set
-            {
-                if (_desiredFixedIsPaused != value)
-                {
-                    _desiredFixedIsPaused = value;
-                    _fixedIsPausedChangedEvent.Invoke(_desiredFixedIsPaused);
-                }
-            }
         }
 
         void ExecuteSystem(int globalIndex)

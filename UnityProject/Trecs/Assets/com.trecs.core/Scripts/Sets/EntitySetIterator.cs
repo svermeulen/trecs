@@ -19,7 +19,7 @@ namespace Trecs
 
         SetGroupEntry _current;
 
-        internal EntitySetIterator(in EntitySet set)
+        internal EntitySetIterator(in EntitySetStorage set)
             : this(set._entriesPerGroup, set._registeredGroups) { }
 
         internal EntitySetIterator(

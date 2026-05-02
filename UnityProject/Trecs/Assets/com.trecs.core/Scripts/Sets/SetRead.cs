@@ -20,7 +20,7 @@ namespace Trecs
 
         readonly NativeList<GroupIndex> _registeredGroups;
 
-        internal SetRead(WorldAccessor world, in EntitySet set)
+        internal SetRead(WorldAccessor world, in EntitySetStorage set)
         {
             _world = world;
             _entriesPerGroup = set._entriesPerGroup;

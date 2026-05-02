@@ -210,7 +210,7 @@ namespace Trecs.Internal
                         .GetCustomAttributes(typeof(ExecutePriorityAttribute), true)
                         .SingleOrDefault();
 
-                _accessorRegistry.ExecuteAccessors.TryGetValue(system, out var accessor);
+                var accessor = ((ISystemInternal)system).World;
 
                 result.Add(
                     new SystemMetadata(

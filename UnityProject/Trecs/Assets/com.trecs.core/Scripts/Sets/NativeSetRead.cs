@@ -20,7 +20,7 @@ namespace Trecs
         [NativeDisableContainerSafetyRestriction]
         readonly NativeList<SetGroupEntry> _entriesPerGroup;
 
-        internal NativeSetRead(in EntitySet set)
+        internal NativeSetRead(in EntitySetStorage set)
         {
             _entriesPerGroup = set._entriesPerGroup;
         }

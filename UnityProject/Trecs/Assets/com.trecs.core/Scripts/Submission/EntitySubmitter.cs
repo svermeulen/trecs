@@ -69,7 +69,7 @@ namespace Trecs.Internal
         readonly AtomicNativeBags _nativeRemoveOperationQueue;
         readonly AtomicNativeBags _nativeMoveOperationQueue;
 
-        // Per-set deferred bags are now on EntitySet; no centralized set queues needed.
+        // Per-set deferred bags are now on EntitySetStorage; no centralized set queues needed.
         readonly WorldInfo _worldInfo;
         readonly WorldAccessorRegistry _accessorRegistry;
         readonly WorldSettings _trecsSettings;
@@ -134,7 +134,7 @@ namespace Trecs.Internal
             _nativeAddOperationQueue = AtomicNativeBags.Create();
             _nativeRemoveOperationQueue = AtomicNativeBags.Create();
             _nativeMoveOperationQueue = AtomicNativeBags.Create();
-            // Per-set deferred bags are allocated in EntitySet.
+            // Per-set deferred bags are allocated in EntitySetStorage.
             _eventsManager = eventsManager;
 
             _componentStore = componentStore;

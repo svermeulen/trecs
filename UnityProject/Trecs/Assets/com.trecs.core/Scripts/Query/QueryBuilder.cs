@@ -224,7 +224,7 @@ namespace Trecs
             );
         }
 
-        public readonly SparseQueryBuilder InSet(SetDef setDef)
+        public readonly SparseQueryBuilder InSet(EntitySet entitySet)
         {
             return new SparseQueryBuilder(
                 _world,
@@ -232,7 +232,7 @@ namespace Trecs
                 _negativeTags,
                 _positiveComps,
                 _negativeComps,
-                setDef.Id
+                entitySet.Id
             );
         }
 

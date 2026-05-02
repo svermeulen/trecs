@@ -112,8 +112,22 @@ namespace Trecs.SourceGen
             }
             containingTypes.Reverse();
 
+            // Capture the type parameter list (e.g. "<T>" or "<TKey, TValue>")
+            // so the emitted partial matches the original declaration —
+            // partial declarations are matched on the full name including
+            // arity + parameter names, so dropping "<T>" silently emits a
+            // phantom non-generic type that nothing merges into. Empty for
+            // non-generic structs.
+            string typeParameterList = "";
+            if (symbol.TypeParameters.Length > 0)
+            {
+                typeParameterList =
+                    "<" + string.Join(", ", symbol.TypeParameters.Select(p => p.Name)) + ">";
+            }
+
             return new EntityComponentModel(
                 TypeName: symbol.Name,
+                TypeParameterList: typeParameterList,
                 Namespace: PerformanceCache.GetDisplayString(symbol.ContainingNamespace),
                 Accessibility: GetAccessibility(symbol),
                 IsPartial: isPartial,
@@ -198,7 +212,9 @@ namespace Trecs.SourceGen
             {
                 sb.AppendLine($"{structIndent}[global::System.Serializable]");
             }
-            sb.AppendLine($"{structIndent}{model.Accessibility} partial struct {model.TypeName}");
+            sb.AppendLine(
+                $"{structIndent}{model.Accessibility} partial struct {model.TypeName}{model.TypeParameterList}"
+            );
             sb.AppendLine($"{structIndent}{{");
             indentLevel++;
 
@@ -222,7 +238,9 @@ namespace Trecs.SourceGen
 
             sb.AppendLine($"{methodIndent}public override bool Equals(object obj)");
             sb.AppendLine($"{methodIndent}{{");
-            sb.AppendLine($"{methodIndent}    if (obj is {model.TypeName} other)");
+            sb.AppendLine(
+                $"{methodIndent}    if (obj is {model.TypeName}{model.TypeParameterList} other)"
+            );
             sb.AppendLine($"{methodIndent}    {{");
             sb.AppendLine(
                 $"{methodIndent}        return UnmanagedUtil.BlittableEquals(this, other);"
@@ -242,7 +260,7 @@ namespace Trecs.SourceGen
             sb.AppendLine();
 
             sb.AppendLine(
-                $"{methodIndent}public static bool operator ==(in {model.TypeName} left, in {model.TypeName} right)"
+                $"{methodIndent}public static bool operator ==(in {model.TypeName}{model.TypeParameterList} left, in {model.TypeName}{model.TypeParameterList} right)"
             );
             sb.AppendLine($"{methodIndent}{{");
             sb.AppendLine($"{methodIndent}    return UnmanagedUtil.BlittableEquals(left, right);");
@@ -250,7 +268,7 @@ namespace Trecs.SourceGen
             sb.AppendLine();
 
             sb.AppendLine(
-                $"{methodIndent}public static bool operator !=(in {model.TypeName} left, in {model.TypeName} right)"
+                $"{methodIndent}public static bool operator !=(in {model.TypeName}{model.TypeParameterList} left, in {model.TypeName}{model.TypeParameterList} right)"
             );
             sb.AppendLine($"{methodIndent}{{");
             sb.AppendLine($"{methodIndent}    return !UnmanagedUtil.BlittableEquals(left, right);");
@@ -286,6 +304,7 @@ namespace Trecs.SourceGen
     /// </summary>
     internal readonly record struct EntityComponentModel(
         string TypeName,
+        string TypeParameterList,
         string Namespace,
         string Accessibility,
         bool IsPartial,
@@ -300,6 +319,7 @@ namespace Trecs.SourceGen
     {
         public bool Equals(EntityComponentModel other) =>
             TypeName == other.TypeName
+            && TypeParameterList == other.TypeParameterList
             && Namespace == other.Namespace
             && Accessibility == other.Accessibility
             && IsPartial == other.IsPartial
@@ -317,6 +337,7 @@ namespace Trecs.SourceGen
             {
                 int h = 17;
                 h = h * 31 + (TypeName?.GetHashCode() ?? 0);
+                h = h * 31 + (TypeParameterList?.GetHashCode() ?? 0);
                 h = h * 31 + (Namespace?.GetHashCode() ?? 0);
                 h = h * 31 + (Accessibility?.GetHashCode() ?? 0);
                 h = h * 31 + IsPartial.GetHashCode();

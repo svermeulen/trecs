@@ -130,12 +130,12 @@ namespace Trecs
             _entitySubmitter.QueueRemoveAllInGroup(group, entityCount);
         }
 
-        internal ref EntitySet GetSet(SetDef setDef)
+        internal ref EntitySetStorage GetSet(EntitySet entitySet)
         {
-            return ref GetSet(setDef.Id);
+            return ref GetSet(entitySet.Id);
         }
 
-        internal ref EntitySet GetSet(SetId setId)
+        internal ref EntitySetStorage GetSet(SetId setId)
         {
             Assert.That(!_isDisposed);
 

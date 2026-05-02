@@ -520,14 +520,14 @@ namespace Trecs.Internal
         /// </summary>
         public readonly struct TrecsSets
         {
-            internal TrecsSets(NativeDenseDictionary<SetId, EntitySet> entitySets)
+            internal TrecsSets(NativeDenseDictionary<SetId, EntitySetStorage> entitySets)
             {
                 _entitySets = entitySets;
             }
 
-            internal NativeDenseDictionary<SetId, EntitySet> EntitySets => _entitySets;
+            internal NativeDenseDictionary<SetId, EntitySetStorage> EntitySets => _entitySets;
 
-            readonly NativeDenseDictionary<SetId, EntitySet> _entitySets;
+            readonly NativeDenseDictionary<SetId, EntitySetStorage> _entitySets;
         }
     }
 }
