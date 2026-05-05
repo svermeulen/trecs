@@ -65,7 +65,10 @@ namespace Trecs.Tests
             using var env = CreateEnv();
             var a = env.Accessor;
 
-            a.AddEntity(Tag<QId1>.Value).Set(new TestInt { Value = 7 }).AssertComplete();
+            a.AddEntity(Tag<QId1>.Value)
+                .Set(new TestInt { Value = 7 })
+                .Set(new TestFloat())
+                .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 35 }).AssertComplete();
             a.SubmitEntities();
 
@@ -95,7 +98,10 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             for (int i = 1; i <= 3; i++)
-                a.AddEntity(Tag<QId1>.Value).Set(new TestInt { Value = i }).AssertComplete();
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 100 }).AssertComplete();
             a.SubmitEntities();
 
@@ -128,7 +134,10 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             for (int i = 1; i <= 3; i++)
-                a.AddEntity(Tag<QId1>.Value).Set(new TestInt { Value = i }).AssertComplete();
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 1000 }).AssertComplete();
             a.SubmitEntities();
 
@@ -156,7 +165,10 @@ namespace Trecs.Tests
             using var env = CreateEnv();
             var a = env.Accessor;
 
-            a.AddEntity(Tag<QId1>.Value).Set(new TestInt { Value = 999 }).AssertComplete();
+            a.AddEntity(Tag<QId1>.Value)
+                .Set(new TestInt { Value = 999 })
+                .Set(new TestFloat())
+                .AssertComplete();
             a.SubmitEntities();
 
             _runOnceComponentSeen = 0;
@@ -254,7 +266,10 @@ namespace Trecs.Tests
             );
             var a = env.Accessor;
             for (int i = 0; i < 3; i++)
-                a.AddEntity(Tag<QId1>.Value).Set(new TestInt { Value = i + 1 }).AssertComplete();
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i + 1 })
+                    .Set(new TestFloat())
+                    .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 100 }).AssertComplete();
             a.SubmitEntities();
 
@@ -277,7 +292,10 @@ namespace Trecs.Tests
             );
             var a = env.Accessor;
             for (int i = 0; i < 3; i++)
-                a.AddEntity(Tag<QId1>.Value).Set(new TestInt { Value = i + 1 }).AssertComplete();
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i + 1 })
+                    .Set(new TestFloat())
+                    .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 1000 }).AssertComplete();
             a.SubmitEntities();
 
@@ -307,7 +325,10 @@ namespace Trecs.Tests
 
             var a = env.Accessor;
             for (int i = 0; i < 3; i++)
-                a.AddEntity(Tag<QId1>.Value).Set(new TestInt { Value = i + 1 }).AssertComplete();
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i + 1 })
+                    .Set(new TestFloat())
+                    .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 100 }).AssertComplete();
             a.SubmitEntities();
 
@@ -332,7 +353,10 @@ namespace Trecs.Tests
 
             var a = env.Accessor;
             for (int i = 0; i < 3; i++)
-                a.AddEntity(Tag<QId1>.Value).Set(new TestInt { Value = i + 1 }).AssertComplete();
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i + 1 })
+                    .Set(new TestFloat())
+                    .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 1000 }).AssertComplete();
             a.SubmitEntities();
 
