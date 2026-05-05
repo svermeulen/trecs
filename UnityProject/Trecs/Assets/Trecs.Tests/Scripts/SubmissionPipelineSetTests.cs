@@ -16,8 +16,8 @@ namespace Trecs.Tests
             IHasPartition<SPPartitionA>,
             IHasPartition<SPPartitionB>
     {
-        public TestInt TestInt;
-        public TestVec TestVec;
+        TestInt TestInt;
+        TestVec TestVec;
     }
 
     public struct SPSet : IEntitySet<SPTag> { }

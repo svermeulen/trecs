@@ -11,21 +11,21 @@ namespace Trecs.Serialization.Samples
     {
         public SerializerRegistry Registry { get; }
         public WorldStateSerializer WorldStateSerializer { get; }
-        public BookmarkSerializer Bookmarks { get; }
+        public SnapshotSerializer Snapshots { get; }
         public RecordingHandler Recorder { get; }
         public PlaybackHandler Playback { get; }
 
         public SerializationServices(
             SerializerRegistry registry,
             WorldStateSerializer worldStateSerializer,
-            BookmarkSerializer bookmarks,
+            SnapshotSerializer snapshots,
             RecordingHandler recorder,
             PlaybackHandler playback
         )
         {
             Registry = registry;
             WorldStateSerializer = worldStateSerializer;
-            Bookmarks = bookmarks;
+            Snapshots = snapshots;
             Recorder = recorder;
             Playback = playback;
         }
@@ -34,7 +34,7 @@ namespace Trecs.Serialization.Samples
         {
             Playback.Dispose();
             Recorder.Dispose();
-            Bookmarks.Dispose();
+            Snapshots.Dispose();
         }
     }
 }

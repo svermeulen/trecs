@@ -30,16 +30,16 @@ namespace Trecs.Samples.ReactiveEvents
     {
         public partial class BubbleEntity : ITemplate, IHasTags<SampleTags.Bubble>
         {
-            public Position Position;
-            public Velocity Velocity;
-            public Lifetime Lifetime;
-            public GameObjectId GameObjectId;
+            Position Position;
+            Velocity Velocity;
+            Lifetime Lifetime;
+            GameObjectId GameObjectId;
         }
 
         public partial class Globals : ITemplate, IExtends<TrecsTemplates.Globals>
         {
-            public BubbleSpawnerSystem.State BubbleSpawnerState = default;
-            public GameStats GameStats = default;
+            BubbleSpawnerSystem.State BubbleSpawnerState = default;
+            GameStats GameStats = default;
         }
     }
 }

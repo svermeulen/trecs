@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using Trecs.Collections;
 
 namespace Trecs.Internal
 {

@@ -1375,9 +1375,9 @@ namespace Trecs.Internal
 
             static bool HasAnyNonEmpty(AtomicNativeBags queue)
             {
-                for (int i = 0; i < queue.Count; i++)
+                for (int i = 0; i < queue.Length; i++)
                 {
-                    if (!queue.GetBag(i).IsEmpty())
+                    if (!queue.GetBag(i).IsEmpty)
                         return true;
                 }
                 return false;
@@ -1391,7 +1391,7 @@ namespace Trecs.Internal
 
             using (TrecsProfiling.Start("Native Remove Operations"))
             {
-                var removeBuffersCount = _nativeRemoveOperationQueue.Count;
+                var removeBuffersCount = _nativeRemoveOperationQueue.Length;
 
                 var removals = new NativeList<(EntityIndex, int)>(Allocator.TempJob);
 
@@ -1401,7 +1401,7 @@ namespace Trecs.Internal
                     {
                         ref var buffer = ref _nativeRemoveOperationQueue.GetBag(i);
 
-                        while (!buffer.IsEmpty())
+                        while (!buffer.IsEmpty)
                         {
 #if TRECS_INTERNAL_CHECKS && DEBUG
                             var accessorId = buffer.Dequeue<int>();
@@ -1452,7 +1452,7 @@ namespace Trecs.Internal
 
             using (TrecsProfiling.Start("Native Swap Operations"))
             {
-                var swapBuffersCount = _nativeMoveOperationQueue.Count;
+                var swapBuffersCount = _nativeMoveOperationQueue.Length;
 
                 var swaps = new NativeList<(EntityIndex, GroupIndex, int)>(Allocator.TempJob);
 
@@ -1462,7 +1462,7 @@ namespace Trecs.Internal
                     {
                         ref var buffer = ref _nativeMoveOperationQueue.GetBag(i);
 
-                        while (!buffer.IsEmpty())
+                        while (!buffer.IsEmpty)
                         {
 #if TRECS_INTERNAL_CHECKS && DEBUG
                             var accessorId = buffer.Dequeue<int>();
@@ -1532,11 +1532,11 @@ namespace Trecs.Internal
                     IComponentBuilder[] cachedComponents = null;
                     var cachedComponentArrays = _cachedNativeAddComponentArrays;
 
-                    var addBuffersCount = _nativeAddOperationQueue.Count;
+                    var addBuffersCount = _nativeAddOperationQueue.Length;
                     for (int i = 0; i < addBuffersCount; i++)
                     {
                         ref var buffer = ref _nativeAddOperationQueue.GetBag(i);
-                        while (!buffer.IsEmpty())
+                        while (!buffer.IsEmpty)
                         {
                             // accessorId is always present for adds (needed for deterministic composite sort key)
                             var accessorId = buffer.Dequeue<int>();

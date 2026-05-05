@@ -4,7 +4,7 @@ Shows how to seed large, immutable, shared data into the world's shared heap
 under stable, content-pipeline-controlled `BlobId`s, and then reference it
 from many entities via `SharedPtr<T>`. The blob lives once in the heap
 regardless of how many entities point at it, and survives across recordings /
-bookmarks because the IDs are caller-supplied rather than runtime-generated.
+snapshots because the IDs are caller-supplied rather than runtime-generated.
 
 For the simpler "allocate-and-go" `SharedPtr<T>` story (no stable IDs, IDs
 auto-minted), see [Sample 10 — Pointers](../10_Pointers/README.md). This

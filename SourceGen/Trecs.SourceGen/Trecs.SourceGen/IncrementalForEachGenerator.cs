@@ -485,6 +485,10 @@ namespace Trecs.SourceGen
                             : "";
                         args.Add($"{prefix}{p.Name}");
                         break;
+                    case ParamSlotKind.HoistedSingleton:
+                        var hs = info.HoistedSingletons[slot.Index];
+                        args.Add(hs.IsRef ? $"ref __{hs.ParamName}" : $"in __{hs.ParamName}");
+                        break;
                 }
             }
             return string.Join(", ", args);
@@ -504,6 +508,7 @@ namespace Trecs.SourceGen
                 sb.AppendLine(indentLevel, $"var {worldName} = {builderVar}.World;");
 
             NamespaceCollector.EmitSetAccessorDeclarations(sb, info, indentLevel, worldName);
+            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, info.HoistedSingletons);
 
             sb.AppendLine(indentLevel, $"foreach (var __slice in {builderVar}.GroupSlices())");
             sb.AppendLine(indentLevel, "{");
@@ -562,6 +567,7 @@ namespace Trecs.SourceGen
                 sb.AppendLine(indentLevel, $"var {worldName} = {builderVar}.World;");
 
             NamespaceCollector.EmitSetAccessorDeclarations(sb, info, indentLevel, worldName);
+            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, info.HoistedSingletons);
 
             sb.AppendLine(indentLevel, $"foreach (var __slice in {builderVar}.GroupSlices())");
             sb.AppendLine(indentLevel, "{");
@@ -630,6 +636,12 @@ namespace Trecs.SourceGen
                 validatedParamsInfo,
                 indentLevel,
                 "__world"
+            );
+            HoistedSingleEmitter.Emit(
+                sb,
+                indentLevel,
+                worldVar: "__world",
+                validatedParamsInfo.HoistedSingletons
             );
 
             var componentParams = validatedParamsInfo.ComponentParameters;
@@ -786,6 +798,7 @@ namespace Trecs.SourceGen
                     SetAccessorParameters = classified.SetAccessorParameters.ToList(),
                     SetReadParameters = classified.SetReadParameters.ToList(),
                     SetWriteParameters = classified.SetWriteParameters.ToList(),
+                    HoistedSingletons = classified.HoistedSingletons.ToList(),
                 };
             }
 

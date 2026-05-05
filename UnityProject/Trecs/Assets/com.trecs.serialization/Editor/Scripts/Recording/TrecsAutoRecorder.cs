@@ -3,8 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Trecs.Collections;
 using Trecs.Internal;
+using UnityEditor;
 using UnityEngine;
 #if ENABLE_DESYNC_DEBUGGING
 using Newtonsoft.Json;
@@ -13,13 +13,13 @@ using Newtonsoft.Json;
 namespace Trecs.Serialization
 {
     /// <summary>
-    /// Periodically captures full-state bookmarks of a Trecs <see cref="World"/>
-    /// while running. Bookmarks are kept in memory only — no disk I/O. Designed
+    /// Periodically captures full-state snapshots of a Trecs <see cref="World"/>
+    /// while running. Snapshots are kept in memory only — no disk I/O. Designed
     /// to be enabled on demand by editor tooling (see <c>TrecsTimeTravelWindow</c>).
     /// </summary>
     public class TrecsAutoRecorder : IDisposable, IInputHistoryLocker
     {
-        // v3: each bookmark also stores a uint checksum of its frame's world
+        // v3: each snapshot also stores a uint checksum of its frame's world
         // state (computed via IWorldStateSerializer with IsForChecksum) so
         // we can detect desyncs when the simulation re-runs the same frame.
         // v2 files are still accepted but lack checksums — desync detection
@@ -29,7 +29,7 @@ namespace Trecs.Serialization
         const int RecordingFileMagic = 0x43455254; // "TREC" little-endian
 #if ENABLE_DESYNC_DEBUGGING
         // JSON snapshots for diff-driven desync diagnosis. One file per
-        // captured live bookmark and one per replay verification, in the
+        // captured live snapshot and one per replay verification, in the
         // same directory the old DebugRecordingHandler used so the diff
         // workflow is identical (`diff recording_snapshot<frame>.json
         // playback_snapshot<frame>.json` after the first reported desync).
@@ -42,8 +42,8 @@ namespace Trecs.Serialization
         readonly IWorldStateSerializer _stateSerializer;
         readonly SerializerRegistry _serializerRegistry;
         readonly TrecsAutoRecorderSettings _settings;
-        readonly BookmarkSerializer _bookmarkSerializer;
-        readonly List<AutoRecordingBookmark> _bookmarks = new();
+        readonly SnapshotSerializer _snapshotSerializer;
+        readonly List<AutoRecordingSnapshot> _snapshots = new();
 
         WorldAccessor _accessor;
         RecordingChecksumCalculator _checksumCalculator;
@@ -52,11 +52,11 @@ namespace Trecs.Serialization
 
         bool _isRecording;
         int _startFrame;
-        int _lastBookmarkFrame;
+        int _lastSnapshotFrame;
         long _totalBytes;
 
         // The frame the user has most-recently scrubbed to (post-fast-forward
-        // if applicable). While set, any bookmarks past this frame are
+        // if applicable). While set, any snapshots past this frame are
         // *tentatively* stale — the user can keep scrubbing freely without
         // losing them. They get truncated only on the first user-driven
         // (non-fast-forward) fixed-update tick that advances the simulation
@@ -76,10 +76,10 @@ namespace Trecs.Serialization
 
         // True iff the current in-memory buffer was loaded from a saved
         // recording file (LoadRecordingFromFile). While set:
-        //   * Trailing bookmarks past the divergence point are NOT trimmed
+        //   * Trailing snapshots past the divergence point are NOT trimmed
         //     when simulation advances — the loaded recording's "future" is
         //     preserved so the user can scrub it again.
-        //   * When the simulation reaches the last loaded bookmark, fixed
+        //   * When the simulation reaches the last loaded snapshot, fixed
         //     phase auto-pauses (the recording's content is exhausted).
         // Cleared on Start, Reset, and ForkAtCurrentFrame so the buffer
         // becomes a regular auto-recording.
@@ -101,21 +101,21 @@ namespace Trecs.Serialization
             IWorldStateSerializer stateSerializer,
             SerializerRegistry serializerRegistry,
             TrecsAutoRecorderSettings settings,
-            BookmarkSerializer bookmarkSerializer
+            SnapshotSerializer snapshotSerializer
         )
         {
             _world = world;
             _stateSerializer = stateSerializer;
             _serializerRegistry = serializerRegistry;
             _settings = settings;
-            _bookmarkSerializer = bookmarkSerializer;
+            _snapshotSerializer = snapshotSerializer;
         }
 
         public World World => _world;
         public bool IsRecording => _isRecording;
         public int StartFrame => _startFrame;
-        public int LastBookmarkFrame => _lastBookmarkFrame;
-        public IReadOnlyList<AutoRecordingBookmark> Bookmarks => _bookmarks;
+        public int LastSnapshotFrame => _lastSnapshotFrame;
+        public IReadOnlyList<AutoRecordingSnapshot> Snapshots => _snapshots;
         public long TotalBytes => _totalBytes;
 
         /// <summary>
@@ -123,22 +123,22 @@ namespace Trecs.Serialization
         /// no pending divergence from a prior scrub-back. Transitions to false
         /// when <see cref="JumpToFrame"/> rewinds the world; transitions back
         /// to true when the simulation advances past the divergence point with
-        /// live input (truncating the trailing bookmarks). Drives the
+        /// live input (truncating the trailing snapshots). Drives the
         /// Recording vs Playback distinction in the controller.
         /// </summary>
         public bool IsAtLiveEdge =>
             !_pendingDivergenceFrame.HasValue && !_fastForwardTargetFrame.HasValue;
 
         /// <summary>
-        /// Interval (in simulated seconds) between bookmark captures. Reads
-        /// and writes <see cref="TrecsAutoRecorderSettings.BookmarkIntervalSeconds"/>
+        /// Interval (in simulated seconds) between snapshot captures. Reads
+        /// and writes <see cref="TrecsAutoRecorderSettings.SnapshotIntervalSeconds"/>
         /// directly so UI can tune it at runtime. Larger values save memory
         /// but slow scrubbing (more resim per JumpToFrame).
         /// </summary>
-        public float BookmarkIntervalSeconds
+        public float SnapshotIntervalSeconds
         {
-            get => _settings.BookmarkIntervalSeconds;
-            set => _settings.BookmarkIntervalSeconds = Mathf.Max(0.001f, value);
+            get => _settings.SnapshotIntervalSeconds;
+            set => _settings.SnapshotIntervalSeconds = Mathf.Max(0.001f, value);
         }
 
         /// <summary>True iff the most recent EnforceCapacityLimits pass paused
@@ -149,24 +149,50 @@ namespace Trecs.Serialization
 
         /// <summary>
         /// True iff the in-memory buffer came from a loaded recording file.
-        /// Loaded buffers preserve their trailing bookmarks (the recording's
+        /// Loaded buffers preserve their trailing snapshots (the recording's
         /// future) when simulation advances, and auto-pause when the loaded
         /// buffer is exhausted. Cleared by Start/Reset/Fork.
         /// </summary>
         public bool IsLoadedRecording => _isLoadedRecording;
 
-        /// <summary>Configured maximum bookmark count (0 = unbounded).</summary>
-        public int MaxBookmarkCount
+        /// <summary>
+        /// Absolute path of the on-disk file backing the in-memory buffer,
+        /// or null if the buffer has not been saved or loaded (fresh
+        /// auto-recording, post-Reset, post-Fork). Updated by both
+        /// <see cref="LoadRecordingFromFile"/> and
+        /// <see cref="SaveRecordingToFile"/> so that "Save" can overwrite
+        /// the same slot after a "Save As", and that loading via the Saves
+        /// window propagates the name to the Player surface.
+        /// </summary>
+        public string LoadedRecordingPath { get; private set; }
+
+        /// <summary>
+        /// Detach from the on-disk file backing the in-memory buffer iff
+        /// it matches <paramref name="filePath"/>. Called by the controller
+        /// after deleting a recording from disk so the Player no longer
+        /// pretends the buffer is "Saved" against a file that no longer
+        /// exists.
+        /// </summary>
+        public void ClearLoadedPathIfMatches(string filePath)
         {
-            get => _settings.MaxBookmarkCount;
-            set => _settings.MaxBookmarkCount = Mathf.Max(0, value);
+            if (string.Equals(LoadedRecordingPath, filePath, StringComparison.Ordinal))
+            {
+                LoadedRecordingPath = null;
+            }
         }
 
-        /// <summary>Configured maximum bookmark byte budget (0 = unbounded).</summary>
-        public long MaxBookmarkMemoryBytes
+        /// <summary>Configured maximum snapshot count (0 = unbounded).</summary>
+        public int MaxSnapshotCount
         {
-            get => _settings.MaxBookmarkMemoryBytes;
-            set => _settings.MaxBookmarkMemoryBytes = Math.Max(0, value);
+            get => _settings.MaxSnapshotCount;
+            set => _settings.MaxSnapshotCount = Mathf.Max(0, value);
+        }
+
+        /// <summary>Configured maximum snapshot byte budget (0 = unbounded).</summary>
+        public long MaxSnapshotMemoryBytes
+        {
+            get => _settings.MaxSnapshotMemoryBytes;
+            set => _settings.MaxSnapshotMemoryBytes = Math.Max(0, value);
         }
 
         /// <summary>What the recorder does when a capacity cap is reached.</summary>
@@ -174,6 +200,25 @@ namespace Trecs.Serialization
         {
             get => _settings.OverflowAction;
             set => _settings.OverflowAction = value;
+        }
+
+        // Session-local: when true, reaching the loaded recording's tail
+        // jumps back to the start frame instead of pausing. Reset to false
+        // any time we transition out of "loaded recording" state (Start /
+        // LoadRecording / ForkAtCurrentFrame / Reset) so the user has to opt
+        // back in for each recording session — Loop is a transient "I'm
+        // watching this on repeat" mode, not a persisted preference.
+        bool _isLoopingPlayback;
+
+        /// <summary>
+        /// Session-local toggle. When true, reaching the last snapshot of a
+        /// loaded recording rewinds to the start frame and continues playing
+        /// instead of pausing.
+        /// </summary>
+        public bool LoopPlayback
+        {
+            get => _isLoopingPlayback;
+            set => _isLoopingPlayback = value;
         }
 
         /// <summary>
@@ -185,12 +230,12 @@ namespace Trecs.Serialization
             get
             {
                 var byCount =
-                    _settings.MaxBookmarkCount > 0
-                        ? _bookmarks.Count / (float)_settings.MaxBookmarkCount
+                    _settings.MaxSnapshotCount > 0
+                        ? _snapshots.Count / (float)_settings.MaxSnapshotCount
                         : 0f;
                 var byBytes =
-                    _settings.MaxBookmarkMemoryBytes > 0
-                        ? _totalBytes / (float)_settings.MaxBookmarkMemoryBytes
+                    _settings.MaxSnapshotMemoryBytes > 0
+                        ? _totalBytes / (float)_settings.MaxSnapshotMemoryBytes
                         : 0f;
                 return Mathf.Clamp01(Mathf.Max(byCount, byBytes));
             }
@@ -206,7 +251,7 @@ namespace Trecs.Serialization
         /// <summary>
         /// Set to the frame where a desync was first detected during the
         /// current Playback walk — i.e. the simulation re-ran from an earlier
-        /// bookmark and produced a state whose checksum did not match the
+        /// snapshot and produced a state whose checksum did not match the
         /// originally captured one. Null when the buffer is consistent (or
         /// no checksums are available, see <see cref="ChecksumsAvailable"/>).
         /// Cleared whenever the buffer "moves" — Start, Reset, Fork,
@@ -235,10 +280,10 @@ namespace Trecs.Serialization
                 {
                     return null;
                 }
-                // Use the earliest scrubbable frame: the first bookmark, or
-                // (pre-first-bookmark) the recording start frame. Inputs at
+                // Use the earliest scrubbable frame: the first snapshot, or
+                // (pre-first-snapshot) the recording start frame. Inputs at
                 // frames < this are no longer needed.
-                var earliest = _bookmarks.Count > 0 ? _bookmarks[0].Frame : _startFrame;
+                var earliest = _snapshots.Count > 0 ? _snapshots[0].Frame : _startFrame;
                 return earliest - 1;
             }
         }
@@ -264,20 +309,25 @@ namespace Trecs.Serialization
                 return;
             }
 
-            _bookmarks.Clear();
+            _snapshots.Clear();
             _totalBytes = 0;
             _startFrame = _accessor.FixedFrame;
             // Force the first FixedUpdateCompleted tick to capture immediately.
             // We don't capture here in Start() because the activator may invoke
             // us during Layer.Initialize, before downstream serializers (e.g.
             // Orca's LuaStateSerializer) have finished their own init.
-            _lastBookmarkFrame = _startFrame - int.MaxValue / 2;
+            _lastSnapshotFrame = _startFrame - int.MaxValue / 2;
             _pendingDivergenceFrame = null;
             _fastForwardTargetFrame = null;
             _isPausedByCapacity = false;
             _isLoadedRecording = false;
+            _isLoopingPlayback = false;
             _desyncedFrame = null;
             _isRecording = true;
+            // Fresh recording — discard any prior backing-file name so a
+            // subsequent "Save" prompts for a new name rather than
+            // overwriting the previously-loaded slot.
+            LoadedRecordingPath = null;
 
 #if ENABLE_DESYNC_DEBUGGING
             // Wipe stale snapshots from a previous run so the diff workflow
@@ -313,22 +363,22 @@ namespace Trecs.Serialization
             EnsureLockerRegistered(false);
 
             _log.Debug(
-                "Auto recording stopped — captured {} bookmarks ({} bytes total)",
-                _bookmarks.Count,
+                "Auto recording stopped — captured {} snapshots ({} bytes total)",
+                _snapshots.Count,
                 _totalBytes
             );
         }
 
         /// <summary>
         /// Restore the world state to <paramref name="targetFrame"/> by loading
-        /// the latest bookmark whose frame is <c>&lt;= targetFrame</c>, and (if
+        /// the latest snapshot whose frame is <c>&lt;= targetFrame</c>, and (if
         /// needed) fast-forwarding the simulation up to <paramref name="targetFrame"/>.
-        /// Bookmarks past <paramref name="targetFrame"/> are kept (tentatively
+        /// Snapshots past <paramref name="targetFrame"/> are kept (tentatively
         /// stale) so the user can keep scrubbing forward and back while paused;
         /// they get truncated only when the simulation actually progresses past
         /// the load point with live (user-driven) input. The world is left
         /// fixed-paused at the target so the user can inspect.
-        /// Returns false if there is no bookmark at or before <paramref name="targetFrame"/>.
+        /// Returns false if there is no snapshot at or before <paramref name="targetFrame"/>.
         /// </summary>
         public bool JumpToFrame(int targetFrame)
         {
@@ -342,24 +392,24 @@ namespace Trecs.Serialization
                 return false;
             }
 
-            var bookmarkIdx = FindBookmarkIndexAtOrBefore(targetFrame);
-            if (bookmarkIdx < 0)
+            var snapshotIdx = FindSnapshotIndexAtOrBefore(targetFrame);
+            if (snapshotIdx < 0)
             {
-                if (_bookmarks.Count == 0)
+                if (_snapshots.Count == 0)
                 {
-                    _log.Warning("No bookmarks recorded yet — cannot jump");
+                    _log.Warning("No snapshots recorded yet — cannot jump");
                     return false;
                 }
-                // Target precedes the earliest bookmark. This typically happens
+                // Target precedes the earliest snapshot. This typically happens
                 // for the leftmost slider position or jump-to-start: StartFrame
-                // is the frame recording started at, but the first bookmark
-                // arrives one frame later. Snap up to the first bookmark —
+                // is the frame recording started at, but the first snapshot
+                // arrives one frame later. Snap up to the first snapshot —
                 // it's the earliest scrubbable frame in the buffer.
-                bookmarkIdx = 0;
-                targetFrame = _bookmarks[0].Frame;
+                snapshotIdx = 0;
+                targetFrame = _snapshots[0].Frame;
             }
 
-            var bookmark = _bookmarks[bookmarkIdx];
+            var snapshot = _snapshots[snapshotIdx];
             var runner = _accessor.GetSystemRunner();
 
             // Detach from frame events so we don't capture a "snapshot" of the
@@ -369,9 +419,9 @@ namespace Trecs.Serialization
 
             try
             {
-                using (var stream = new MemoryStream(bookmark.Data, writable: false))
+                using (var stream = new MemoryStream(snapshot.Data, writable: false))
                 {
-                    _bookmarkSerializer.LoadBookmark(stream);
+                    _snapshotSerializer.LoadSnapshot(stream);
                 }
 
                 // NOTE: we deliberately do NOT clear future inputs here.
@@ -396,7 +446,7 @@ namespace Trecs.Serialization
                 else
                 {
                     // Already at the loaded frame; that frame is now the user's
-                    // scrub position. Bookmarks past it are tentatively stale.
+                    // scrub position. Snapshots past it are tentatively stale.
                     _fastForwardTargetFrame = null;
                     _pendingDivergenceFrame = _accessor.FixedFrame;
                     runner.FixedIsPaused = true;
@@ -408,7 +458,7 @@ namespace Trecs.Serialization
                 // and watch for it again, or jump elsewhere and observe.
                 _desyncedFrame = null;
 
-                // Re-subscribe so further frames continue to bookmark normally.
+                // Re-subscribe so further frames continue to snapshot normally.
                 _frameSubscription = _accessor.Events.OnFixedUpdateCompleted(OnFixedFrameChange);
             }
             catch (Exception e)
@@ -417,22 +467,56 @@ namespace Trecs.Serialization
                 // would silently capture corrupt snapshots. Stop cleanly so the
                 // user sees auto-recording as inactive and can decide to
                 // restart.
-                _log.Error("JumpToFrame to bookmark @ frame {} failed: {}", bookmark.Frame, e);
+                _log.Error("JumpToFrame to snapshot @ frame {} failed: {}", snapshot.Frame, e);
                 _isRecording = false;
                 _fastForwardTargetFrame = null;
                 _pendingDivergenceFrame = null;
                 return false;
             }
 
-            _log.Debug("Jumped to frame {} via bookmark at frame {}", targetFrame, bookmark.Frame);
+            _log.Debug("Jumped to frame {} via snapshot at frame {}", targetFrame, snapshot.Frame);
             return true;
         }
 
         /// <summary>
-        /// Persist the current in-memory bookmark list, plus the live
+        /// Lightweight inspection of a saved recording's header — frame span and
+        /// tick rate, without loading the snapshot or input-queue payloads.
+        /// Cheap enough to call per-file when listing the saves library.
+        /// Returns false if the file is missing, not a Trecs recording, or is
+        /// an unsupported version.
+        /// </summary>
+        public static bool TryReadRecordingHeader(string filePath, out RecordingHeader header)
+        {
+            header = default;
+            if (!File.Exists(filePath))
+                return false;
+            try
+            {
+                using var fs = File.OpenRead(filePath);
+                using var br = new BinaryReader(fs);
+                if (br.ReadInt32() != RecordingFileMagic)
+                    return false;
+                var version = br.ReadInt32();
+                if (version != RecordingFileVersion && version != RecordingFileVersionLegacyV2)
+                    return false;
+                br.ReadInt32(); // schemaVersion — informational here.
+                var startFrame = br.ReadInt32();
+                var endFrame = br.ReadInt32();
+                var fixedDeltaTime = br.ReadSingle();
+                header = new RecordingHeader(startFrame, endFrame, fixedDeltaTime);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Persist the current in-memory snapshot list, plus the live
         /// EntityInputQueue covering its frame range, to <paramref name="filePath"/>.
         /// The recorder must currently be running and have at least one
-        /// bookmark.
+        /// snapshot.
         /// </summary>
         public bool SaveRecordingToFile(string filePath)
         {
@@ -441,9 +525,9 @@ namespace Trecs.Serialization
                 _log.Warning("SaveRecordingToFile called while not recording");
                 return false;
             }
-            if (_bookmarks.Count == 0)
+            if (_snapshots.Count == 0)
             {
-                _log.Warning("SaveRecordingToFile: no bookmarks to save");
+                _log.Warning("SaveRecordingToFile: no snapshots to save");
                 return false;
             }
 
@@ -454,12 +538,12 @@ namespace Trecs.Serialization
             }
 
             // RecordingMetadata-style header. start/end frame span the
-            // first/last bookmarks; fixedDeltaTime lets the loader detect
+            // first/last snapshots; fixedDeltaTime lets the loader detect
             // tick-rate mismatches before applying inputs to a freshly
             // started world. Blob IDs are recorded so a loader could (in
             // future) verify the heap has them, though we don't enforce
             // that yet.
-            var endFrame = _bookmarks[_bookmarks.Count - 1].Frame;
+            var endFrame = _snapshots[_snapshots.Count - 1].Frame;
             var fixedDeltaTime = _accessor.GetSystemRunner().FixedDeltaTime;
             var blobs = new DenseHashSet<BlobId>();
             _world.GetBlobCache().GetAllActiveBlobIds(blobs);
@@ -497,10 +581,10 @@ namespace Trecs.Serialization
                 bw.Write(blob.Value);
             }
 
-            // Bookmarks. v3 adds a per-bookmark checksum so loaded recordings
+            // Snapshots. v3 adds a per-snapshot checksum so loaded recordings
             // can also surface desyncs during playback.
-            bw.Write(_bookmarks.Count);
-            foreach (var b in _bookmarks)
+            bw.Write(_snapshots.Count);
+            foreach (var b in _snapshots)
             {
                 bw.Write(b.Frame);
                 bw.Write(b.Checksum);
@@ -512,9 +596,14 @@ namespace Trecs.Serialization
             bw.Write(queueBytes.Length);
             bw.Write(queueBytes);
 
+            // Mark this file as the buffer's backing slot so a follow-up
+            // "Save" overwrites it without reprompting (and so the Player
+            // header shows the name).
+            LoadedRecordingPath = filePath;
+
             _log.Debug(
-                "Saved recording: {} bookmarks, {} blob refs, {} bytes input queue",
-                _bookmarks.Count,
+                "Saved recording: {} snapshots, {} blob refs, {} bytes input queue",
+                _snapshots.Count,
                 blobs.Count,
                 queueBytes.Length
             );
@@ -522,10 +611,10 @@ namespace Trecs.Serialization
         }
 
         /// <summary>
-        /// Replace the in-memory bookmark list with one read from
+        /// Replace the in-memory snapshot list with one read from
         /// <paramref name="filePath"/>, restore world state to the earliest
-        /// loaded bookmark, and leave the world fixed-paused there. Re-attaches
-        /// the FixedUpdateCompleted subscription so further bookmarks will be
+        /// loaded snapshot, and leave the world fixed-paused there. Re-attaches
+        /// the FixedUpdateCompleted subscription so further snapshots will be
         /// captured when the user steps or unpauses.
         /// </summary>
         public bool LoadRecordingFromFile(string filePath)
@@ -537,7 +626,7 @@ namespace Trecs.Serialization
             }
 
             int startFrame;
-            List<AutoRecordingBookmark> loadedBookmarks;
+            List<AutoRecordingSnapshot> loadedSnapshots;
             byte[] queueBytes;
             try
             {
@@ -577,7 +666,7 @@ namespace Trecs.Serialization
                     );
                 }
                 startFrame = br.ReadInt32();
-                br.ReadInt32(); // endFrame — informational; recomputed from loaded bookmarks.
+                br.ReadInt32(); // endFrame — informational; recomputed from loaded snapshots.
                 var fixedDeltaTime = br.ReadSingle();
                 var currentFixedDeltaTime = _accessor.GetSystemRunner().FixedDeltaTime;
                 if (!Mathf.Approximately(fixedDeltaTime, currentFixedDeltaTime))
@@ -599,14 +688,14 @@ namespace Trecs.Serialization
                 }
 
                 var count = br.ReadInt32();
-                loadedBookmarks = new List<AutoRecordingBookmark>(count);
+                loadedSnapshots = new List<AutoRecordingSnapshot>(count);
                 for (int i = 0; i < count; i++)
                 {
                     var frame = br.ReadInt32();
                     var checksum = hasChecksums ? br.ReadUInt32() : 0u;
                     var len = br.ReadInt32();
                     var data = br.ReadBytes(len);
-                    loadedBookmarks.Add(new AutoRecordingBookmark(frame, data, checksum));
+                    loadedSnapshots.Add(new AutoRecordingSnapshot(frame, data, checksum));
                 }
 
                 var queueLen = br.ReadInt32();
@@ -618,9 +707,9 @@ namespace Trecs.Serialization
                 return false;
             }
 
-            if (loadedBookmarks.Count == 0)
+            if (loadedSnapshots.Count == 0)
             {
-                _log.Warning("Loaded recording has no bookmarks");
+                _log.Warning("Loaded recording has no snapshots");
                 return false;
             }
 
@@ -630,11 +719,11 @@ namespace Trecs.Serialization
 
             try
             {
-                // Restore world state to the earliest loaded bookmark.
-                var earliest = loadedBookmarks[0];
+                // Restore world state to the earliest loaded snapshot.
+                var earliest = loadedSnapshots[0];
                 using (var stream = new MemoryStream(earliest.Data, writable: false))
                 {
-                    _bookmarkSerializer.LoadBookmark(stream);
+                    _snapshotSerializer.LoadSnapshot(stream);
                 }
 
                 // Wipe the live queue and replace it with the recording's
@@ -654,21 +743,23 @@ namespace Trecs.Serialization
                 }
 
                 // Replace in-memory state with the loaded recording.
-                _bookmarks.Clear();
-                _bookmarks.AddRange(loadedBookmarks);
+                _snapshots.Clear();
+                _snapshots.AddRange(loadedSnapshots);
                 _totalBytes = 0;
-                foreach (var b in _bookmarks)
+                foreach (var b in _snapshots)
                 {
                     _totalBytes += b.Data.LongLength;
                 }
                 _startFrame = startFrame;
-                _lastBookmarkFrame = _bookmarks[_bookmarks.Count - 1].Frame;
+                _lastSnapshotFrame = _snapshots[_snapshots.Count - 1].Frame;
                 _pendingDivergenceFrame = earliest.Frame;
                 _fastForwardTargetFrame = null;
                 _isPausedByCapacity = false;
                 _isLoadedRecording = true;
+                _isLoopingPlayback = false;
                 _desyncedFrame = null;
                 _isRecording = true;
+                LoadedRecordingPath = filePath;
 
                 // Hold input history for the loaded buffer's frame range so
                 // the deserialized inputs aren't pruned by the queue's
@@ -685,33 +776,34 @@ namespace Trecs.Serialization
                 // Same recovery as JumpToFrame: world state may be partially
                 // loaded; stop recording cleanly so the user can decide.
                 _log.Error("LoadRecordingFromFile from {} failed: {}", filePath, e);
-                _bookmarks.Clear();
+                _snapshots.Clear();
                 _totalBytes = 0;
                 _isRecording = false;
                 _fastForwardTargetFrame = null;
                 _pendingDivergenceFrame = null;
                 _isLoadedRecording = false;
                 _desyncedFrame = null;
+                LoadedRecordingPath = null;
                 EnsureLockerRegistered(false);
                 return false;
             }
 
             _log.Debug(
-                "Loaded recording with {} bookmarks (frames {} .. {})",
-                _bookmarks.Count,
-                _bookmarks[0].Frame,
-                _bookmarks[_bookmarks.Count - 1].Frame
+                "Loaded recording with {} snapshots (frames {} .. {})",
+                _snapshots.Count,
+                _snapshots[0].Frame,
+                _snapshots[_snapshots.Count - 1].Frame
             );
             return true;
         }
 
         /// <summary>
-        /// Truncate any bookmarks past the world's current frame and clear
+        /// Truncate any snapshots past the world's current frame and clear
         /// pending divergence so the recorder is at the live edge again.
         /// Used by the controller's "Fork &amp; resume" gesture: the user has
         /// scrubbed into Playback, decides to commit at this point, and wants
         /// new live input to extend the buffer from here. The recorder must
-        /// currently be running and have at least one bookmark at or before
+        /// currently be running and have at least one snapshot at or before
         /// the current frame.
         /// </summary>
         public bool ForkAtCurrentFrame()
@@ -721,32 +813,36 @@ namespace Trecs.Serialization
                 return false;
             }
             var current = _accessor.FixedFrame;
-            if (FindBookmarkIndexAtOrBefore(current) < 0)
+            if (FindSnapshotIndexAtOrBefore(current) < 0)
             {
                 _log.Warning(
-                    "ForkAtCurrentFrame: no bookmark at or before frame {} — cannot fork",
+                    "ForkAtCurrentFrame: no snapshot at or before frame {} — cannot fork",
                     current
                 );
                 return false;
             }
-            TrimBookmarksAfter(current);
+            TrimSnapshotsAfter(current);
             DropAbandonedTimelineInputs();
             _pendingDivergenceFrame = null;
             _isPausedByCapacity = false;
             _isLoadedRecording = false;
+            _isLoopingPlayback = false;
             _desyncedFrame = null;
-            _log.Debug("Forked recording at frame {}; trailing bookmarks dropped", current);
+            // Forking diverges from the loaded recording — the post-fork
+            // buffer is no longer faithful to the on-disk file, so detach.
+            LoadedRecordingPath = null;
+            _log.Debug("Forked recording at frame {}; trailing snapshots dropped", current);
             return true;
         }
 
         /// <summary>
-        /// Drop bookmarks whose frame is strictly less than <paramref name="frame"/>,
-        /// preserving the closest bookmark at-or-before <paramref name="frame"/> (so
+        /// Drop snapshots whose frame is strictly less than <paramref name="frame"/>,
+        /// preserving the closest snapshot at-or-before <paramref name="frame"/> (so
         /// <see cref="JumpToFrame"/> at the trim point still works). The new earliest
-        /// bookmark becomes the recording's start frame; queued inputs prior to it
-        /// are pruned in lockstep. Returns the count of dropped bookmarks (0 if no
+        /// snapshot becomes the recording's start frame; queued inputs prior to it
+        /// are pruned in lockstep. Returns the count of dropped snapshots (0 if no
         /// trim happened — recorder not running, no candidates to drop, or the trim
-        /// point is at-or-before the current earliest bookmark).
+        /// point is at-or-before the current earliest snapshot).
         /// </summary>
         public int TrimRecordingBefore(int frame)
         {
@@ -754,7 +850,7 @@ namespace Trecs.Serialization
             {
                 return 0;
             }
-            var keepFrom = FindBookmarkIndexAtOrBefore(frame);
+            var keepFrom = FindSnapshotIndexAtOrBefore(frame);
             if (keepFrom <= 0)
             {
                 return 0;
@@ -762,17 +858,17 @@ namespace Trecs.Serialization
             long droppedBytes = 0;
             for (var i = 0; i < keepFrom; i++)
             {
-                droppedBytes += _bookmarks[i].Data.Length;
+                droppedBytes += _snapshots[i].Data.Length;
             }
-            _bookmarks.RemoveRange(0, keepFrom);
+            _snapshots.RemoveRange(0, keepFrom);
             _totalBytes -= droppedBytes;
-            _startFrame = _bookmarks[0].Frame;
+            _startFrame = _snapshots[0].Frame;
             if (!_world.IsDisposed)
             {
                 _accessor.GetEntityInputQueue().ClearInputsBeforeOrAt(_startFrame - 1);
             }
             _log.Debug(
-                "Trimmed {} bookmarks before frame {} ({} bytes dropped)",
+                "Trimmed {} snapshots before frame {} ({} bytes dropped)",
                 keepFrom,
                 frame,
                 droppedBytes
@@ -781,11 +877,11 @@ namespace Trecs.Serialization
         }
 
         /// <summary>
-        /// Drop bookmarks whose frame is strictly greater than <paramref name="frame"/>.
+        /// Drop snapshots whose frame is strictly greater than <paramref name="frame"/>.
         /// Other recorder state (divergence, loaded-recording flag, desync) is
         /// intentionally preserved — this is a pure data trim, distinct from
         /// <see cref="ForkAtCurrentFrame"/> which also commits the current scrub
-        /// frame as the new live edge. Returns the count of dropped bookmarks.
+        /// frame as the new live edge. Returns the count of dropped snapshots.
         /// </summary>
         public int TrimRecordingAfter(int frame)
         {
@@ -793,10 +889,10 @@ namespace Trecs.Serialization
             {
                 return 0;
             }
-            var countBefore = _bookmarks.Count;
+            var countBefore = _snapshots.Count;
             var bytesBefore = _totalBytes;
-            TrimBookmarksAfter(frame);
-            var dropped = countBefore - _bookmarks.Count;
+            TrimSnapshotsAfter(frame);
+            var dropped = countBefore - _snapshots.Count;
             if (dropped == 0)
             {
                 return 0;
@@ -812,7 +908,7 @@ namespace Trecs.Serialization
                 _accessor.GetEntityInputQueue().ClearFutureInputsAfterOrAt(frame + 1);
             }
             _log.Debug(
-                "Trimmed {} bookmarks after frame {} ({} bytes dropped)",
+                "Trimmed {} snapshots after frame {} ({} bytes dropped)",
                 dropped,
                 frame,
                 bytesBefore - _totalBytes
@@ -821,7 +917,7 @@ namespace Trecs.Serialization
         }
 
         /// <summary>
-        /// Discard all in-memory bookmark history and start a fresh recording
+        /// Discard all in-memory snapshot history and start a fresh recording
         /// from the world's current frame. The recorder must currently be
         /// running.
         /// </summary>
@@ -832,70 +928,72 @@ namespace Trecs.Serialization
                 _log.Warning("Reset called while not recording");
                 return;
             }
-            _bookmarks.Clear();
+            _snapshots.Clear();
             _totalBytes = 0;
             _startFrame = _accessor.FixedFrame;
-            _lastBookmarkFrame = _startFrame - int.MaxValue / 2;
+            _lastSnapshotFrame = _startFrame - int.MaxValue / 2;
             _pendingDivergenceFrame = null;
             _fastForwardTargetFrame = null;
             _isPausedByCapacity = false;
             _isLoadedRecording = false;
+            _isLoopingPlayback = false;
             _desyncedFrame = null;
+            LoadedRecordingPath = null;
             DropAbandonedTimelineInputs();
             _log.Debug("Auto recording reset at frame {}", _startFrame);
         }
 
         /// <summary>
-        /// Find the nearest bookmark whose frame is strictly less than the
+        /// Find the nearest snapshot whose frame is strictly less than the
         /// world's current frame and JumpToFrame to it. No-op if the recorder
-        /// is not running or there is no such bookmark.
+        /// is not running or there is no such snapshot.
         /// </summary>
-        public bool JumpToPreviousBookmark()
+        public bool JumpToPreviousSnapshot()
         {
             if (!_isRecording || _world.IsDisposed)
             {
                 return false;
             }
             var current = _accessor.FixedFrame;
-            for (int i = _bookmarks.Count - 1; i >= 0; i--)
+            for (int i = _snapshots.Count - 1; i >= 0; i--)
             {
-                if (_bookmarks[i].Frame < current)
+                if (_snapshots[i].Frame < current)
                 {
-                    return JumpToFrame(_bookmarks[i].Frame);
+                    return JumpToFrame(_snapshots[i].Frame);
                 }
             }
-            _log.Debug("No previous bookmark before frame {}", current);
+            _log.Debug("No previous snapshot before frame {}", current);
             return false;
         }
 
         /// <summary>
-        /// Find the nearest bookmark whose frame is strictly greater than the
+        /// Find the nearest snapshot whose frame is strictly greater than the
         /// world's current frame and JumpToFrame to it. Useful while paused
-        /// after a rewind, so the user can step through bookmarks.
+        /// after a rewind, so the user can step through snapshots.
         /// </summary>
-        public bool JumpToNextBookmark()
+        public bool JumpToNextSnapshot()
         {
             if (!_isRecording || _world.IsDisposed)
             {
                 return false;
             }
             var current = _accessor.FixedFrame;
-            for (int i = 0; i < _bookmarks.Count; i++)
+            for (int i = 0; i < _snapshots.Count; i++)
             {
-                if (_bookmarks[i].Frame > current)
+                if (_snapshots[i].Frame > current)
                 {
-                    return JumpToFrame(_bookmarks[i].Frame);
+                    return JumpToFrame(_snapshots[i].Frame);
                 }
             }
-            _log.Debug("No next bookmark past frame {}", current);
+            _log.Debug("No next snapshot past frame {}", current);
             return false;
         }
 
-        int FindBookmarkIndexAtOrBefore(int frame)
+        int FindSnapshotIndexAtOrBefore(int frame)
         {
-            for (int i = _bookmarks.Count - 1; i >= 0; i--)
+            for (int i = _snapshots.Count - 1; i >= 0; i--)
             {
-                if (_bookmarks[i].Frame <= frame)
+                if (_snapshots[i].Frame <= frame)
                 {
                     return i;
                 }
@@ -930,27 +1028,27 @@ namespace Trecs.Serialization
             _lockerRegistered = registered;
         }
 
-        void TrimBookmarksAfter(int frame)
+        void TrimSnapshotsAfter(int frame)
         {
-            while (_bookmarks.Count > 0 && _bookmarks[_bookmarks.Count - 1].Frame > frame)
+            while (_snapshots.Count > 0 && _snapshots[_snapshots.Count - 1].Frame > frame)
             {
-                var last = _bookmarks[_bookmarks.Count - 1];
+                var last = _snapshots[_snapshots.Count - 1];
                 _totalBytes -= last.Data.Length;
-                _bookmarks.RemoveAt(_bookmarks.Count - 1);
+                _snapshots.RemoveAt(_snapshots.Count - 1);
             }
-            _lastBookmarkFrame =
-                _bookmarks.Count > 0
-                    ? _bookmarks[_bookmarks.Count - 1].Frame
+            _lastSnapshotFrame =
+                _snapshots.Count > 0
+                    ? _snapshots[_snapshots.Count - 1].Frame
                     : _startFrame - int.MaxValue / 2;
         }
 
         // Subscribed via Events.OnFixedUpdateCompleted so capture happens AFTER
         // `_elapsedFixedTime += step`, keeping (frame, elapsed) in lockstep.
         // FixedFrameChangeEvent (the obvious-looking alternative) fires between
-        // counter++ and elapsed+=step, so a bookmark captured there would store
-        // elapsed one tick behind the frame counter — and after LoadBookmark the
+        // counter++ and elapsed+=step, so a snapshot captured there would store
+        // elapsed one tick behind the frame counter — and after LoadSnapshot the
         // resimulation could never reproduce that off-by-one state, leading to a
-        // checksum mismatch on the very first verified bookmark.
+        // checksum mismatch on the very first verified snapshot.
         void OnFixedFrameChange()
         {
             var frame = _accessor.FixedFrame;
@@ -958,7 +1056,7 @@ namespace Trecs.Serialization
             // want to capture mid-FF snapshots and we don't want the truncation
             // logic to interpret FF advancement as user-driven progression.
             // When the FF reaches its target, the user has stably scrubbed to
-            // that frame — bookmarks past it are tentatively stale (auto-rec)
+            // that frame — snapshots past it are tentatively stale (auto-rec)
             // or just preserved playback content (loaded).
             if (_fastForwardTargetFrame.HasValue)
             {
@@ -968,7 +1066,7 @@ namespace Trecs.Serialization
                 // a single click-and-jump catch divergence anywhere in the
                 // skipped range — without this, only frames the user
                 // explicitly Plays through afterwards would be checked.
-                VerifyChecksumIfBookmarked(frame);
+                VerifyChecksumAtSnapshotFrame(frame);
                 if (frame >= _fastForwardTargetFrame.Value)
                 {
                     _pendingDivergenceFrame = frame;
@@ -979,7 +1077,7 @@ namespace Trecs.Serialization
 
             if (_isLoadedRecording)
             {
-                // Loaded recordings: don't truncate trailing bookmarks (they
+                // Loaded recordings: don't truncate trailing snapshots (they
                 // are the recording's content). Clear divergence on first
                 // forward step so the controller's mode flips to Recording-
                 // adjacent (still IsLoadedRecording though).
@@ -987,67 +1085,126 @@ namespace Trecs.Serialization
                 {
                     _pendingDivergenceFrame = null;
                 }
-                if (frame < _lastBookmarkFrame)
+                if (frame < _lastSnapshotFrame)
                 {
                     // Still inside the loaded buffer — let it play through.
-                    VerifyChecksumIfBookmarked(frame);
+                    VerifyChecksumAtSnapshotFrame(frame);
                     return;
                 }
-                if (frame == _lastBookmarkFrame)
+                if (frame == _lastSnapshotFrame)
                 {
                     // First arrival at the loaded buffer's tail. Verify the
-                    // tail bookmark before pausing — if a desync occurred
-                    // between the previous bookmark and here, this is the
-                    // user's last chance to catch it within this buffer.
-                    VerifyChecksumIfBookmarked(frame);
-                    // Pause so the user notices we've reached the end and can
-                    // decide to Fork (commit + continue) or scrub back. They
-                    // can press Play again to push past — see below.
-                    if (!_world.IsDisposed)
+                    // tail snapshot first — if a desync occurred between the
+                    // previous snapshot and here, this is the user's last
+                    // chance to catch it within this buffer.
+                    VerifyChecksumAtSnapshotFrame(frame);
+                    if (_world.IsDisposed)
                     {
-                        _accessor.GetSystemRunner().FixedIsPaused = true;
+                        return;
                     }
+                    if (_isLoopingPlayback)
+                    {
+                        BeginLoopRewind();
+                        return;
+                    }
+                    // Default: stop so the user notices we've reached the
+                    // end. From here the user can scrub back, click Record
+                    // (Fork) to commit + go live, or press Play to promote
+                    // past the tail.
+                    _accessor.GetSystemRunner().FixedIsPaused = true;
                     return;
                 }
-                // frame > _lastBookmarkFrame: user explicitly resumed past the
+                // frame > _lastSnapshotFrame: user explicitly resumed past the
                 // recording's tail. Promote to regular auto-recording from
                 // here so capture continues live without a pause-loop.
                 _isLoadedRecording = false;
                 DropAbandonedTimelineInputs();
-                CaptureBookmarkIfDue();
+                CaptureSnapshotIfDue();
                 return;
             }
 
             // Pending divergence means the user scrubbed back into the
             // buffer; pressing Play walks forward through the existing
-            // bookmarks rather than overwriting them. The Fork button is
-            // the explicit "commit + go live" action.
-            // Unlike the loaded-recording branch above, we don't pause at
-            // the tail — for auto-recording the tail IS the live edge, so
-            // pausing there interrupts the user instead of marking a real
-            // end-of-content. Just promote to live the moment we reach or
-            // pass the tail.
+            // snapshots rather than overwriting them. At the tail, three
+            // possible actions:
+            //   * Loop on  → rewind to the start, keep playing.
+            //   * Loop off → pause. Symmetric with the loaded-recording
+            //                branch above; the user has to press Record
+            //                (which Forks during Playback) to commit and
+            //                go live. Auto-promoting at the tail used to
+            //                be the default here, but that's exactly what
+            //                the explicit Record/Fork action does, so
+            //                making it implicit just confused the
+            //                interaction with the Loop toggle.
             if (_pendingDivergenceFrame.HasValue)
             {
-                if (frame < _lastBookmarkFrame)
+                if (frame < _lastSnapshotFrame)
                 {
                     // Still inside the buffer — let it play through.
-                    // Don't capture (we already have a bookmark for this
+                    // Don't capture (we already have a snapshot for this
                     // region) and don't trim.
-                    VerifyChecksumIfBookmarked(frame);
+                    VerifyChecksumAtSnapshotFrame(frame);
                     return;
                 }
-                // frame >= _lastBookmarkFrame: caught up to the live edge.
-                // Verify the tail bookmark first (last chance to catch a
-                // desync inside the existing buffer), then promote to live
-                // recording — keep the existing buffer (no trim) and let
-                // CaptureBookmarkIfDue resume.
-                VerifyChecksumIfBookmarked(frame);
-                _pendingDivergenceFrame = null;
-                DropAbandonedTimelineInputs();
+                // frame >= _lastSnapshotFrame: caught up to the live edge.
+                // Verify the tail snapshot first (last chance to catch a
+                // desync inside the existing buffer).
+                VerifyChecksumAtSnapshotFrame(frame);
+                if (_world.IsDisposed)
+                {
+                    return;
+                }
+                if (_isLoopingPlayback)
+                {
+                    BeginLoopRewind();
+                    return;
+                }
+                // Pause at the tail. User picks the next action: scrub
+                // back, press Record to Fork (commit + go live), or
+                // toggle Loop on to repeat.
+                _accessor.GetSystemRunner().FixedIsPaused = true;
+                return;
             }
 
-            CaptureBookmarkIfDue();
+            CaptureSnapshotIfDue();
+        }
+
+        // Pause the runner now, then schedule a JumpToFrame(<start>) on
+        // the next editor tick. Two reasons to defer via
+        // EditorApplication.delayCall: (1) JumpToFrame disposes and
+        // re-creates _frameSubscription, which is the very subscription
+        // dispatching the OnFixedFrameChange call that triggered this; (2)
+        // the current tick needs to unwind cleanly. *Critical*: the pause
+        // must happen *before* scheduling — otherwise the next fixed
+        // update fires before delayCall lands, advancing frame past
+        // _lastSnapshotFrame and hitting the "promote past tail" branch,
+        // which clears _isLoadedRecording / _pendingDivergenceFrame. By
+        // the time delayCall runs, the recorder is in live capture and
+        // the loop silently fails (the bug we shipped initially).
+        void BeginLoopRewind()
+        {
+            // Loop target is the earliest snapshot in the current buffer,
+            // not _startFrame: when MaxSnapshotCount has rolled the buffer
+            // (DropOldest), _startFrame can predate the actual earliest
+            // snapshot, in which case JumpToFrame would clamp anyway —
+            // but reading the live floor here is clearer than relying on
+            // that clamp. We're called only from the tail branches so
+            // _snapshots is guaranteed non-empty.
+            _accessor.GetSystemRunner().FixedIsPaused = true;
+            var loopTarget = _snapshots[0].Frame;
+            EditorApplication.delayCall += () =>
+            {
+                if (!_isRecording || _world.IsDisposed)
+                {
+                    return;
+                }
+                if (JumpToFrame(loopTarget))
+                {
+                    // JumpToFrame pauses on a backward seek; un-pause so
+                    // the loop keeps playing.
+                    _accessor.GetSystemRunner().FixedIsPaused = false;
+                }
+            };
         }
 
         // Called whenever the recorder commits to a new live edge — fork,
@@ -1060,7 +1217,7 @@ namespace Trecs.Serialization
         // *before* the current frame's input phase has run in the new
         // (post-scrub or post-load) timeline — JumpToFrame's FF break
         // happens just past the increment to target, and JumpToFrame's
-        // no-FF branch pauses immediately after LoadBookmark. Either way
+        // no-FF branch pauses immediately after LoadSnapshot. Either way
         // the queued input at the current frame is leftover from the
         // abandoned timeline and would assert ("input already exists")
         // when the next live tick's input-phase system AddInputs.
@@ -1073,7 +1230,7 @@ namespace Trecs.Serialization
             _accessor.GetEntityInputQueue().ClearFutureInputsAfterOrAt(_accessor.FixedFrame);
         }
 
-        void CaptureBookmarkIfDue()
+        void CaptureSnapshotIfDue()
         {
             if (_world.IsDisposed)
             {
@@ -1081,23 +1238,23 @@ namespace Trecs.Serialization
             }
 
             var fixedDeltaTime = _accessor.GetSystemRunner().FixedDeltaTime;
-            var elapsedSinceLast = (_accessor.FixedFrame - _lastBookmarkFrame) * fixedDeltaTime;
+            var elapsedSinceLast = (_accessor.FixedFrame - _lastSnapshotFrame) * fixedDeltaTime;
 
-            if (elapsedSinceLast < _settings.BookmarkIntervalSeconds)
+            if (elapsedSinceLast < _settings.SnapshotIntervalSeconds)
             {
                 return;
             }
 
             using var stream = new MemoryStream();
-            var metadata = _bookmarkSerializer.SaveBookmark(
+            var metadata = _snapshotSerializer.SaveSnapshot(
                 _settings.Version,
                 stream,
                 includeTypeChecks: true
             );
             var data = stream.ToArray();
-            // Capture a deterministic checksum alongside the bookmark so a
+            // Capture a deterministic checksum alongside the snapshot so a
             // future re-run of this same frame (after JumpToFrame) can verify
-            // the world reached the same state. Bookmark bytes themselves
+            // the world reached the same state. Snapshot bytes themselves
             // include type-check tags and other transient framing, so we use
             // the IsForChecksum-flavored serialization which strips those.
             var checksum = _checksumCalculator.CalculateCurrentChecksum(
@@ -1105,8 +1262,8 @@ namespace Trecs.Serialization
                 _checksumBuffer,
                 SerializationFlags.IsForChecksum
             );
-            _bookmarks.Add(new AutoRecordingBookmark(metadata.FixedFrame, data, checksum));
-            _lastBookmarkFrame = metadata.FixedFrame;
+            _snapshots.Add(new AutoRecordingSnapshot(metadata.FixedFrame, data, checksum));
+            _lastSnapshotFrame = metadata.FixedFrame;
             _totalBytes += data.Length;
 
 #if ENABLE_DESYNC_DEBUGGING
@@ -1140,22 +1297,22 @@ namespace Trecs.Serialization
         // walking forward inside the buffer (Playback mode). Sets the desync
         // marker on first mismatch and stops checking — once desynced the
         // same buffer can't trust further checksums anyway.
-        void VerifyChecksumIfBookmarked(int frame)
+        void VerifyChecksumAtSnapshotFrame(int frame)
         {
             if (_desyncedFrame.HasValue || _world.IsDisposed)
             {
                 return;
             }
-            // Bookmarks are sparse (every BookmarkIntervalSeconds); a binary
+            // Snapshots are sparse (every SnapshotIntervalSeconds); a binary
             // search would be cleaner but the list is small (capped) so a
             // tail-walk is fine and matches the rest of this file's style.
-            for (int i = _bookmarks.Count - 1; i >= 0; i--)
+            for (int i = _snapshots.Count - 1; i >= 0; i--)
             {
-                var bm = _bookmarks[i];
+                var bm = _snapshots[i];
                 if (bm.Frame == frame)
                 {
                     // Checksum 0 is the sentinel for "missing" — used by
-                    // bookmarks loaded from a v2 file (pre-checksum format)
+                    // snapshots loaded from a v2 file (pre-checksum format)
                     // or for the rare actual hash collision with 0. Skip
                     // verification rather than report a phantom desync.
                     if (bm.Checksum == 0u)
@@ -1175,7 +1332,7 @@ namespace Trecs.Serialization
                         _desyncedFrame = frame;
                         _log.Warning(
                             "Desync at frame {}: expected checksum {} but got {} "
-                                + "(simulation re-run from an earlier bookmark produced "
+                                + "(simulation re-run from an earlier snapshot produced "
                                 + "different state — non-determinism in your code or data).",
                             frame,
                             bm.Checksum,
@@ -1193,8 +1350,8 @@ namespace Trecs.Serialization
 
         void EnforceCapacityLimits()
         {
-            var maxCount = _settings.MaxBookmarkCount;
-            var maxBytes = _settings.MaxBookmarkMemoryBytes;
+            var maxCount = _settings.MaxSnapshotCount;
+            var maxBytes = _settings.MaxSnapshotMemoryBytes;
             var unbounded = maxCount <= 0 && maxBytes <= 0;
             if (unbounded)
             {
@@ -1202,7 +1359,7 @@ namespace Trecs.Serialization
                 return;
             }
 
-            var overCount = maxCount > 0 && _bookmarks.Count > maxCount;
+            var overCount = maxCount > 0 && _snapshots.Count > maxCount;
             var overBytes = maxBytes > 0 && _totalBytes > maxBytes;
             if (!overCount && !overBytes)
             {
@@ -1213,26 +1370,26 @@ namespace Trecs.Serialization
             switch (_settings.OverflowAction)
             {
                 case CapacityOverflowAction.DropOldest:
-                    while (_bookmarks.Count > 0)
+                    while (_snapshots.Count > 0)
                     {
-                        overCount = maxCount > 0 && _bookmarks.Count > maxCount;
+                        overCount = maxCount > 0 && _snapshots.Count > maxCount;
                         overBytes = maxBytes > 0 && _totalBytes > maxBytes;
                         if (!overCount && !overBytes)
                         {
                             break;
                         }
-                        var oldest = _bookmarks[0];
+                        var oldest = _snapshots[0];
                         _totalBytes -= oldest.Data.Length;
-                        _bookmarks.RemoveAt(0);
+                        _snapshots.RemoveAt(0);
                     }
-                    if (_bookmarks.Count > 0)
+                    if (_snapshots.Count > 0)
                     {
-                        // Reflect the new earliest available bookmark so the
+                        // Reflect the new earliest available snapshot so the
                         // timeline slider's range stays accurate.
-                        _startFrame = _bookmarks[0].Frame;
+                        _startFrame = _snapshots[0].Frame;
                         // Trim queued inputs in lockstep with the dropped
-                        // bookmarks. MaxClearFrame already returns
-                        // bookmarks[0].Frame - 1 so the queue's next OnReadyForInputs
+                        // snapshots. MaxClearFrame already returns
+                        // snapshots[0].Frame - 1 so the queue's next OnReadyForInputs
                         // would prune anyway — but doing it eagerly here keeps
                         // memory bounded within the same frame the cap was hit,
                         // and stops the queue growing unbounded under sustained
@@ -1241,7 +1398,7 @@ namespace Trecs.Serialization
                         {
                             _accessor
                                 .GetEntityInputQueue()
-                                .ClearInputsBeforeOrAt(_bookmarks[0].Frame - 1);
+                                .ClearInputsBeforeOrAt(_snapshots[0].Frame - 1);
                         }
                     }
                     _isPausedByCapacity = false;
@@ -1251,9 +1408,9 @@ namespace Trecs.Serialization
                     if (!_isPausedByCapacity)
                     {
                         _log.Warning(
-                            "Recorder hit capacity ({} bookmarks, {} bytes) — pausing fixed phase. "
+                            "Recorder hit capacity ({} snapshots, {} bytes) — pausing fixed phase. "
                                 + "Save, fork, or reset before resuming.",
-                            _bookmarks.Count,
+                            _snapshots.Count,
                             _totalBytes
                         );
                     }
@@ -1265,5 +1422,27 @@ namespace Trecs.Serialization
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// Header summary parsed from a saved recording file. Exposed so editor
+    /// tooling can inspect frame span / tick rate without loading the full
+    /// snapshot list. See <see cref="TrecsAutoRecorder.TryReadRecordingHeader"/>.
+    /// </summary>
+    public readonly struct RecordingHeader
+    {
+        public readonly int StartFrame;
+        public readonly int EndFrame;
+        public readonly float FixedDeltaTime;
+
+        public RecordingHeader(int startFrame, int endFrame, float fixedDeltaTime)
+        {
+            StartFrame = startFrame;
+            EndFrame = endFrame;
+            FixedDeltaTime = fixedDeltaTime;
+        }
+
+        public int FrameCount => EndFrame - StartFrame + 1;
+        public float DurationSeconds => FrameCount * FixedDeltaTime;
     }
 }

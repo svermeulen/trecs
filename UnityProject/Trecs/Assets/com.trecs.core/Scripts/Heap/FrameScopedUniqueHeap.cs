@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs

@@ -1,5 +1,4 @@
 using System;
-using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization
@@ -24,7 +23,7 @@ namespace Trecs.Serialization
             }
             else
             {
-                Assert.That(dict.IsEmpty());
+                Assert.That(dict.IsEmpty);
 
                 dict.Clear();
                 dict.EnsureCapacity(numItems);

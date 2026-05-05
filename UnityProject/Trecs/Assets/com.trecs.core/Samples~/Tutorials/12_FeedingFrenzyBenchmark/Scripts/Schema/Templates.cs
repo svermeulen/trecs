@@ -11,18 +11,18 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         public partial class Globals : ITemplate, IExtends<TrecsTemplates.Globals>
         {
             [Input(MissingInputFrameBehaviour.RetainCurrent)]
-            public DesiredPreset DesiredPreset = default;
+            DesiredPreset DesiredPreset = default;
 
-            public DesiredFishCount DesiredFishCount = default;
-            public DesiredMealCount DesiredMealCount = default;
-
-            [VariableUpdateOnly]
-            public PerformanceStats PerformanceStats = default;
+            DesiredFishCount DesiredFishCount = default;
+            DesiredMealCount DesiredMealCount = default;
 
             [VariableUpdateOnly]
-            public PerfStatsIntermediate PerfStatsIntermediate = default;
+            PerformanceStats PerformanceStats = default;
 
-            public FrenzyConfig FrenzyConfig = default;
+            [VariableUpdateOnly]
+            PerfStatsIntermediate PerfStatsIntermediate = default;
+
+            FrenzyConfig FrenzyConfig = default;
         }
 
         public partial class FishEntity
@@ -30,12 +30,12 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 IExtends<CommonTemplates.Renderable>,
                 IHasTags<FrenzyTags.Fish>
         {
-            public Position Position;
-            public Rotation Rotation = new(quaternion.identity);
-            public Velocity Velocity = default;
-            public TargetMeal TargetMeal = default;
-            public Speed Speed;
-            public DestinationPosition DestinationPosition = default;
+            Position Position;
+            Rotation Rotation = new(quaternion.identity);
+            Velocity Velocity = default;
+            TargetMeal TargetMeal = default;
+            Speed Speed;
+            DestinationPosition DestinationPosition = default;
         }
 
         // Partitions variant - adds partition tags for group-based partition tracking
@@ -51,9 +51,9 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 IExtends<CommonTemplates.Renderable>,
                 IHasTags<FrenzyTags.Meal>
         {
-            public Rotation Rotation = new(quaternion.identity);
-            public Position Position;
-            public ApproachingFish ApproachingFish = default;
+            Rotation Rotation = new(quaternion.identity);
+            Position Position;
+            ApproachingFish ApproachingFish = default;
         }
 
         // Partitions meal variant - adds partition tags

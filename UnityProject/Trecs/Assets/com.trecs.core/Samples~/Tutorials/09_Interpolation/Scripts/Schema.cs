@@ -25,12 +25,12 @@ namespace Trecs.Samples.Interpolation
         public partial class SmoothOrbitEntity : ITemplate, IHasTags<OrbitTags.Smooth>
         {
             [Interpolated]
-            public Position Position = default;
+            Position Position = default;
 
             [Interpolated]
-            public Rotation Rotation = default;
-            public OrbitParams OrbitParams;
-            public GameObjectId GameObjectId;
+            Rotation Rotation = default;
+            OrbitParams OrbitParams;
+            GameObjectId GameObjectId;
         }
 
         /// <summary>
@@ -40,10 +40,10 @@ namespace Trecs.Samples.Interpolation
         /// </summary>
         public partial class RawOrbitEntity : ITemplate, IHasTags<OrbitTags.Raw>
         {
-            public Position Position = default;
-            public Rotation Rotation = default;
-            public OrbitParams OrbitParams;
-            public GameObjectId GameObjectId;
+            Position Position = default;
+            Rotation Rotation = default;
+            OrbitParams OrbitParams;
+            GameObjectId GameObjectId;
         }
     }
 }

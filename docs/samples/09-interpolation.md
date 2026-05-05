@@ -31,21 +31,21 @@ public partial struct OrbitParams : IEntityComponent
 public partial class SmoothOrbitEntity : ITemplate, IHasTags<OrbitTags.Smooth>
 {
     [Interpolated]
-    public Position Position = default;
+    Position Position = default;
 
     [Interpolated]
-    public Rotation Rotation = default;
-    public OrbitParams OrbitParams;
-    public GameObjectId GameObjectId;
+    Rotation Rotation = default;
+    OrbitParams OrbitParams;
+    GameObjectId GameObjectId;
 }
 
 // Not interpolated — jittery
 public partial class RawOrbitEntity : ITemplate, IHasTags<OrbitTags.Raw>
 {
-    public Position Position = default;
-    public Rotation Rotation = default;
-    public OrbitParams OrbitParams;
-    public GameObjectId GameObjectId;
+    Position Position = default;
+    Rotation Rotation = default;
+    OrbitParams OrbitParams;
+    GameObjectId GameObjectId;
 }
 ```
 

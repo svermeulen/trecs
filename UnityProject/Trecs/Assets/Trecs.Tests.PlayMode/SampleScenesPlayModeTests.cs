@@ -5,6 +5,7 @@ using NUnit.Framework;
 using Trecs.Samples.FeedingFrenzyBenchmark;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using Assert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests.PlayMode
 {
@@ -134,6 +135,9 @@ namespace Trecs.Tests.PlayMode
 
         [UnityTest]
         public IEnumerator ReactiveEvents() => RunScene("ReactiveEvents");
+
+        [UnityTest]
+        public IEnumerator MultipleWorlds() => RunScene("MultipleWorlds");
 
         static IEnumerator RunScene(string sceneName)
         {

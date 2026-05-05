@@ -32,12 +32,12 @@ public partial class FishEntity : ITemplate,
     IHasPartition<FrenzyTags.NotEating>,
     IHasPartition<FrenzyTags.Eating>
 {
-    public Velocity Velocity;
-    public Speed Speed;
-    public SimPosition SimPosition;
-    public SimRotation SimRotation;
-    public TargetMeal TargetMeal;
-    public DestinationPosition DestinationPosition;
+    Velocity Velocity;
+    Speed Speed;
+    SimPosition SimPosition;
+    SimRotation SimRotation;
+    TargetMeal TargetMeal;
+    DestinationPosition DestinationPosition;
 }
 ```
 

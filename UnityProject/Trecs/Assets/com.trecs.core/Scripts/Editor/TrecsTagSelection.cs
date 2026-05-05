@@ -8,50 +8,13 @@ namespace Trecs
 {
     /// <summary>
     /// ScriptableObject proxy used as <see cref="Selection.activeObject"/> when
-    /// the user picks a tag row in <see cref="TrecsHierarchyWindow"/>. Tags
-    /// are identified by their stable <see cref="Tag.Guid"/>.
+    /// the user picks a tag row in <see cref="TrecsHierarchyWindow"/>. Carries
+    /// only a serialized <see cref="TrecsSelectionProxy.Identity"/> string
+    /// (e.g. <c>"tag:Player"</c>); the inspector resolves the live
+    /// <see cref="TagRef"/> dynamically against
+    /// <see cref="TrecsHierarchyWindow.ActiveSource"/> on every refresh.
     /// </summary>
-    public class TrecsTagSelection : ScriptableObject
-    {
-        [NonSerialized]
-        WeakReference<World> _worldRef;
-
-        [NonSerialized]
-        public Tag Tag;
-
-        [NonSerialized]
-        public TrecsSchema CacheSchema;
-
-        [NonSerialized]
-        public TrecsSchemaTag CacheTag;
-
-        public World GetWorld()
-        {
-            if (_worldRef == null)
-            {
-                return null;
-            }
-            return _worldRef.TryGetTarget(out var w) ? w : null;
-        }
-
-        public void Set(World world, Tag tag)
-        {
-            _worldRef = world == null ? null : new WeakReference<World>(world);
-            Tag = tag;
-            CacheSchema = null;
-            CacheTag = null;
-            name = tag.ToString() ?? "Tag";
-        }
-
-        public void SetCache(TrecsSchema schema, TrecsSchemaTag entry)
-        {
-            _worldRef = null;
-            Tag = default;
-            CacheSchema = schema;
-            CacheTag = entry;
-            name = entry?.Name ?? "Tag";
-        }
-    }
+    public class TrecsTagSelection : TrecsSelectionProxy { }
 
     [CustomEditor(typeof(TrecsTagSelection))]
     public class TrecsTagSelectionInspector : Editor
@@ -65,10 +28,8 @@ namespace Trecs
         Foldout _accessorsFoldout;
         Label _accessorsCaveat;
 
-        // Tracks the identity of whatever entry we last rendered so the
-        // static section only rebuilds when the underlying tag changes
-        // (Tag.Guid in live mode, TrecsSchemaTag ref in cache mode).
-        object _renderedEntryKey;
+        // Composite render key — identity + source mode + source name.
+        string _renderedKey;
         int _lastAccessorHash;
 
         public override VisualElement CreateInspectorGUI()
@@ -94,13 +55,9 @@ namespace Trecs
 
             // Shift+hover the heading → hierarchy scrolls back to this tag's
             // tree row.
-            TrecsInspectorLinks.WireHoverPreviewTag(
+            TrecsInspectorLinks.WireHoverPreview(
                 _headerLabel,
-                () =>
-                {
-                    var sel = target as TrecsTagSelection;
-                    return (sel?.GetWorld(), sel?.Tag ?? default);
-                }
+                () => (target as TrecsTagSelection)?.Identity
             );
 
             _idValue = AddRow(_bodyContainer, "Guid", "");
@@ -165,19 +122,18 @@ namespace Trecs
                 return;
             }
 
-            // Resolve the identity (Tag.Guid in live mode, schema entry ref
-            // in cache mode) and the live context. Entry is built only when
-            // the identity actually changes — avoids reallocating the
-            // schema entry every 250ms for the same tag.
-            ResolveIdentity(selection, out var liveWorld, out var liveTag, out var identity);
-
-            if (identity == null)
+            var src = TrecsHierarchyWindow.ActiveSource;
+            if (src == null || string.IsNullOrEmpty(selection.Identity))
             {
-                var w = selection.GetWorld();
+                ShowStatus("No tag selected.");
+                return;
+            }
+
+            var tref = src.ResolveTag(selection.Identity);
+            if (tref == null)
+            {
                 ShowStatus(
-                    w == null || w.IsDisposed
-                        ? "No tag selected — world unavailable."
-                        : "No tag selected."
+                    $"Tag '{selection.name}' not found in {(src.IsLive ? "live world" : "cached schema")} '{src.DisplayName}'."
                 );
                 return;
             }
@@ -185,45 +141,26 @@ namespace Trecs
             _statusLabel.style.display = DisplayStyle.None;
             _bodyContainer.style.display = DisplayStyle.Flex;
 
-            if (!Equals(identity, _renderedEntryKey))
+            var renderKey = src.RenderKey(selection.Identity);
+            if (renderKey != _renderedKey)
             {
-                _renderedEntryKey = identity;
+                _renderedKey = renderKey;
                 _lastAccessorHash = 0;
-                var entry =
-                    liveWorld != null ? BuildEntryFromLive(liveWorld, liveTag) : selection.CacheTag;
-                var linker =
-                    liveWorld != null
-                        ? (InspectorLinker)new LiveInspectorLinker(liveWorld)
-                        : new CacheInspectorLinker(selection.CacheSchema);
+                var entry = BuildEntryFromRef(src, tref);
+                var linker = new InspectorLinker(src);
                 RenderStatic(entry, linker);
             }
 
-            UpdateRuntimeFields(liveWorld, liveTag);
+            UpdateRuntimeFields(src, tref);
         }
 
-        static void ResolveIdentity(
-            TrecsTagSelection selection,
-            out World liveWorld,
-            out Tag liveTag,
-            out object identity
-        )
+        static TrecsSchemaTag BuildEntryFromRef(ITrecsSchemaSource src, TagRef tref)
         {
-            liveWorld = null;
-            liveTag = default;
-            identity = null;
-
-            var world = selection.GetWorld();
-            if (world != null && !world.IsDisposed && selection.Tag.Guid != 0)
+            if (tref.CacheNative != null)
             {
-                liveWorld = world;
-                liveTag = selection.Tag;
-                identity = selection.Tag.Guid;
-                return;
+                return tref.CacheNative;
             }
-            if (selection.CacheTag != null)
-            {
-                identity = selection.CacheTag;
-            }
+            return BuildEntryFromLive((src as LiveSchemaSource)?.World, tref.LiveTag);
         }
 
         // Walks the live world's templates + sets to gather everything
@@ -277,8 +214,10 @@ namespace Trecs
         // Live-only: walk groups containing the tag, ask the tracker which
         // systems touched any of them, render their links. In cache mode
         // there's no tracker so the foldout shows a not-available marker.
-        void UpdateRuntimeFields(World world, Tag tag)
+        void UpdateRuntimeFields(ITrecsSchemaSource src, TagRef tref)
         {
+            var world = (src as LiveSchemaSource)?.World;
+            var tag = tref.HasLiveTag ? tref.LiveTag : default;
             // Strip everything except the caveat (the foldout's first child).
             for (int i = _accessorsFoldout.childCount - 1; i >= 0; i--)
             {
@@ -288,7 +227,7 @@ namespace Trecs
                 break;
             }
 
-            if (world == null || world.IsDisposed)
+            if (world == null || world.IsDisposed || tag.Guid == 0)
             {
                 if (_lastAccessorHash != -1)
                 {
@@ -354,7 +293,7 @@ namespace Trecs
             }
             var sorted = new List<string>(systems);
             sorted.Sort(StringComparer.OrdinalIgnoreCase);
-            var linker = new LiveInspectorLinker(world);
+            var linker = new InspectorLinker(src);
             foreach (var name in sorted)
             {
                 _accessorsFoldout.Add(linker.AccessorLink(name));
@@ -397,7 +336,7 @@ namespace Trecs
             _statusLabel.text = text;
             _statusLabel.style.display = DisplayStyle.Flex;
             _bodyContainer.style.display = DisplayStyle.None;
-            _renderedEntryKey = null;
+            _renderedKey = null;
         }
 
         static bool TagSetContains(TagSet ts, Tag tag)

@@ -33,7 +33,7 @@ TRECS030 | Trecs | Error | Template must be partial
 TRECS031 | Trecs | Error | Template must be a class
 TRECS032 | Trecs | Error | Invalid attribute combination on template component field
 TRECS033 | Trecs | Error | Template field must implement IEntityComponent
-TRECS034 | Trecs | Error | Template field must be public
+TRECS034 | Trecs | Error | Template field must not have an access modifier
 TRECS036 | Trecs | Error | Component contains managed (reference type) fields
 TRECS037 | Trecs | Error | Globals template field must have an explicit default
 TRECS040 | Trecs | Error | AutoSystem class must be partial
@@ -44,7 +44,6 @@ TRECS046 | Trecs | Error | System already defines _world field
 TRECS047 | Trecs | Error | System has no Execute method
 TRECS050 | Trecs | Error | Iteration method cannot be static
 TRECS051 | Trecs | Error | Iteration method cannot be abstract
-TRECS052 | Trecs | Error | Method has multiple iteration attributes
 TRECS053 | Trecs | Error | Both Tag and Tags specified
 TRECS060 | Trecs | Error | Old-style DeclareDependencies hook detected
 TRECS061 | Trecs | Error | Old-style Ready hook detected
@@ -77,5 +76,9 @@ TRECS101 | Trecs | Error | Unsupported [FromWorld] parameter type on [WrapAsJob]
 TRECS102 | Trecs | Error | [FromWorld] on [WrapAsJob] requires inline Tag/Tags
 TRECS110 | Trecs | Error | NativeUniquePtr must not be copied to a by-value local
 TRECS111 | Trecs | Error | NativeUniquePtr must not be passed by value
+TRECS112 | Trecs | Error | [SingleEntity] parameter or field must be an aspect or component
+TRECS113 | Trecs | Error | [SingleEntity] parameter has wrong modifier
+TRECS114 | Trecs | Error | [SingleEntity] requires inline Tag or Tags
+TRECS115 | Trecs | Error | [SingleEntity] conflicts with [FromWorld] or [PassThroughArgument]
 TRECS996 | Trecs | Error | Source generation error
 TRECS999 | Trecs | Error | Source generation error

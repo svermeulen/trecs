@@ -26,7 +26,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public struct NativeBag : IDisposable
     {
-        public uint Count
+        public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -34,12 +34,12 @@ namespace Trecs.Internal
                 unsafe
                 {
                     BasicTests();
-                    return _queue->size;
+                    return (int)_queue->size;
                 }
             }
         }
 
-        public uint capacity
+        public int Capacity
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -47,7 +47,7 @@ namespace Trecs.Internal
                 unsafe
                 {
                     BasicTests();
-                    return _queue->capacity;
+                    return (int)_queue->capacity;
                 }
             }
         }
@@ -66,18 +66,21 @@ namespace Trecs.Internal
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsEmpty()
+        public bool IsEmpty
         {
-            unsafe
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
             {
-                BasicTests();
+                unsafe
+                {
+                    BasicTests();
 
-                if (_queue == null || _queue->ptr == null)
-                    return true;
+                    if (_queue == null || _queue->ptr == null)
+                        return true;
+                }
+
+                return Length == 0;
             }
-
-            return Count == 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

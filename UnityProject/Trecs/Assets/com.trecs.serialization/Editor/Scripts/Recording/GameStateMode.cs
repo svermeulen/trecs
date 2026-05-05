@@ -12,14 +12,14 @@ namespace Trecs.Serialization
 
         /// <summary>
         /// Recorder running and the world is at the live edge of its buffer
-        /// (no pending divergence). Bookmarks are being captured as time
+        /// (no pending divergence). Snapshots are being captured as time
         /// advances.
         /// </summary>
         Recording,
 
         /// <summary>
         /// Recorder running but the world has been scrubbed back into the
-        /// buffer. Bookmarks past the scrub point are tentatively preserved
+        /// buffer. Snapshots past the scrub point are tentatively preserved
         /// and only get truncated when the simulation actually advances past
         /// the divergence with live input.
         /// </summary>

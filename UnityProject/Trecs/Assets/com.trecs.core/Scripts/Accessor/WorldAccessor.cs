@@ -26,6 +26,7 @@ namespace Trecs
 
         readonly World _world;
         readonly SystemRunner _systemRunner;
+        readonly SystemEnableState _systemEnableState;
         readonly EcsStructuralOps _structuralOps;
         readonly EntityQuerier _entitiesDb;
         readonly WorldInfo _worldInfo;
@@ -35,6 +36,8 @@ namespace Trecs
         readonly EntityInputQueue _entityInputQueue;
         readonly SystemPhase? _phase;
         readonly string _debugName;
+        readonly string _createdAtFile;
+        readonly int _createdAtLine;
 
         internal IComponentAccessRecorder AccessRecorder;
 
@@ -44,6 +47,7 @@ namespace Trecs
             int id,
             World world,
             SystemRunner systemRunnerInfo,
+            SystemEnableState systemEnableState,
             EcsHeapAllocator heapAllocator,
             EcsStructuralOps structuralOps,
             EntityQuerier entitiesDb,
@@ -53,11 +57,14 @@ namespace Trecs
             Rng variableRng,
             EntityInputQueue entityInputQueue,
             SystemPhase? phase,
-            string debugName
+            string debugName,
+            string createdAtFile,
+            int createdAtLine
         )
         {
             _world = world;
             _systemRunner = systemRunnerInfo;
+            _systemEnableState = systemEnableState;
             _structuralOps = structuralOps;
             _entitiesDb = entitiesDb;
             _worldInfo = worldInfo;
@@ -67,9 +74,34 @@ namespace Trecs
             _entityInputQueue = entityInputQueue;
             _phase = phase;
             _debugName = debugName;
+            _createdAtFile = createdAtFile ?? string.Empty;
+            _createdAtLine = createdAtLine;
 
             Id = id;
             Heap = new HeapAccessor(heapAllocator, systemRunnerInfo, phase, fixedRng, debugName);
+        }
+
+        /// <summary>
+        /// Source file path of the <c>CreateAccessor</c> call that produced
+        /// this accessor, captured via <see cref="CallerFilePathAttribute"/>
+        /// in DEBUG builds. Empty in release builds and for accessors made
+        /// from non-source-tracked callsites (system-owned accessors take
+        /// their identity from the system type instead). Editor tooling
+        /// surfaces this so users can jump back to where a manual accessor
+        /// was created.
+        /// </summary>
+        public string CreatedAtFile
+        {
+            get { return _createdAtFile; }
+        }
+
+        /// <summary>
+        /// Source line of the <c>CreateAccessor</c> callsite. Pairs with
+        /// <see cref="CreatedAtFile"/>; <c>0</c> when unavailable.
+        /// </summary>
+        public int CreatedAtLine
+        {
+            get { return _createdAtLine; }
         }
 
         /// <summary>
@@ -1181,14 +1213,73 @@ namespace Trecs
             return new NativeComponentLookupWrite<T>(entries, count, allocator);
         }
 
-        internal bool IsSystemEnabledImpl(int i)
+        /// <summary>
+        /// Total number of systems registered in this world. Stable for the lifetime of
+        /// the world; system indices are in the range <c>[0, SystemCount)</c> and can be
+        /// used with <see cref="GetSystemMetadata"/> and <see cref="SetSystemPaused"/>.
+        /// </summary>
+        public int SystemCount
         {
-            return _systemRunner.IsSystemEnabled(i);
+            get { return _systemRunner.Systems.Count; }
         }
 
-        internal void SetSystemEnabledImpl(int index, bool enabled)
+        /// <summary>
+        /// Returns metadata for the system at <paramref name="systemIndex"/>. Use this to
+        /// iterate systems and build custom groupings (e.g. "all systems matching some
+        /// game tag") that drive <see cref="SetSystemPaused"/> calls.
+        /// </summary>
+        public SystemMetadata GetSystemMetadata(int systemIndex)
         {
-            _systemRunner.SetSystemEnabled(index, enabled);
+            var systems = _systemRunner.Systems;
+            Assert.That(
+                systemIndex >= 0 && systemIndex < systems.Count,
+                "System index {} out of range [0, {})",
+                systemIndex,
+                systems.Count
+            );
+            return systems[systemIndex].Metadata;
+        }
+
+        /// <summary>
+        /// Pauses or resumes a system as part of deterministic game state. Paused state is
+        /// included in world snapshots and recordings, so this survives save/restore and
+        /// recording playback.
+        /// <para>
+        /// For non-deterministic toggles (editor inspector, recording-replay input silencing,
+        /// debug menus), use <see cref="World.SetSystemEnabled"/> with an
+        /// <see cref="EnableChannel"/> instead.
+        /// </para>
+        /// <para>
+        /// Must be called from a context that can mutate deterministic state — i.e. from a
+        /// fixed-update system, a reactive event handler, or initialization. Calling from a
+        /// variable / input system would change the simulation behind the recording's back.
+        /// </para>
+        /// </summary>
+        public void SetSystemPaused(int systemIndex, bool paused)
+        {
+            AssertCanMakeStructuralChanges();
+            _systemEnableState.SetSystemPaused(systemIndex, paused);
+        }
+
+        /// <summary>
+        /// Returns whether the system at <paramref name="systemIndex"/> is currently paused.
+        /// Note: a system runs only when no <see cref="EnableChannel"/> has it disabled AND
+        /// it is not paused.
+        /// </summary>
+        public bool IsSystemPaused(int systemIndex)
+        {
+            return _systemEnableState.IsSystemPaused(systemIndex);
+        }
+
+        /// <summary>
+        /// Returns true iff the system would run on the next tick — i.e. no
+        /// <see cref="EnableChannel"/> has it disabled and it is not paused.
+        /// Convenience for debug UIs and tests that want a single "is this system
+        /// actually live" query.
+        /// </summary>
+        public bool IsSystemEffectivelyEnabled(int systemIndex)
+        {
+            return _systemEnableState.IsSystemEffectivelyEnabled(systemIndex);
         }
 
         [Conditional("DEBUG")]
@@ -1361,18 +1452,6 @@ namespace Trecs.Internal // Unsupported internal APIs
         public static IReadOnlyList<int> GetSortedLatePresentationSystems(this WorldAccessor world)
         {
             return world.SortedLatePresentationSystems;
-        }
-
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        public static bool IsSystemEnabled(this WorldAccessor world, int systemIndex)
-        {
-            return world.IsSystemEnabledImpl(systemIndex);
-        }
-
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        public static void SetSystemEnabled(this WorldAccessor world, int systemIndex, bool enabled)
-        {
-            world.SetSystemEnabledImpl(systemIndex, enabled);
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]

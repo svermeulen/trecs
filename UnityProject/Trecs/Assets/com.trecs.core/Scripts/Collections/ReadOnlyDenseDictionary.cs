@@ -1,8 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
-using Trecs.Internal;
 
-namespace Trecs.Collections
+namespace Trecs.Internal // not part of public api atm
 {
     ///   NOTE: accessing via IEnumerable is less performant and may contain boxing
     public readonly struct ReadOnlyDenseDictionary<TKey, TValue>
@@ -29,10 +28,7 @@ namespace Trecs.Collections
 
         public bool ContainsKey(TKey key) => _dictionary.ContainsKey(key);
 
-        public bool IsEmpty()
-        {
-            return _dictionary.Count == 0;
-        }
+        public bool IsEmpty => _dictionary.Count == 0;
 
         public bool TryGetValue(TKey key, out TValue result) =>
             _dictionary.TryGetValue(key, out result);

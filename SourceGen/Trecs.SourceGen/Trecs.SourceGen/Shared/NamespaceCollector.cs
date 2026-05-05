@@ -139,6 +139,14 @@ namespace Trecs.SourceGen.Shared
                 }
             }
 
+            // Hoisted [SingleEntity] singletons — tag types, aspect/component types,
+            // aspect's read/write component types.
+            HoistedSingleEmitter.CollectNamespaces(
+                namespaces,
+                info.HoistedSingletons,
+                globalNamespaceName
+            );
+
             return namespaces;
         }
 

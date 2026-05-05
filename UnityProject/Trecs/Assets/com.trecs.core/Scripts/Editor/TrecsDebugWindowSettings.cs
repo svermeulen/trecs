@@ -19,7 +19,7 @@ namespace Trecs
         [SerializeField, Min(50)]
         [Tooltip(
             "How often the windows poll the live World for stats updates "
-                + "(fixed frame, entity counts, recorder bookmark count, etc.). "
+                + "(fixed frame, entity counts, recorder snapshot count, etc.). "
                 + "Lower = snappier UI but more main-thread overhead."
         )]
         int _refreshIntervalMs = 250;

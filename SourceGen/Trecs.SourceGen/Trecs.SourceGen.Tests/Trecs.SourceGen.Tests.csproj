@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference the source-gen project as a normal library assembly (not plugged in as an
+         analyzer on *this* project). Tests instantiate the generator manually via
+         CSharpGeneratorDriver so they can inspect its diagnostics on controlled sources. -->
+    <ProjectReference Include="..\Trecs.SourceGen\Trecs.SourceGen.csproj" />
+  </ItemGroup>
+</Project>

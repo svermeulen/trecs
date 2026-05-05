@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using Trecs.Collections;
 using Unity.Collections;
 using Unity.Mathematics;
 
@@ -286,7 +285,7 @@ namespace Trecs.Internal
             if (info.EntityHandleSetPool.Count > 0)
             {
                 var result = info.EntityHandleSetPool.Pop();
-                Assert.That(result.IsEmpty());
+                Assert.That(result.IsEmpty);
                 return result;
             }
 
@@ -301,7 +300,7 @@ namespace Trecs.Internal
             DenseHashSet<EntityHandle> entityHandleSet
         )
         {
-            Assert.That(entityHandleSet.IsEmpty());
+            Assert.That(entityHandleSet.IsEmpty);
             info.EntityHandleSetPool.Push(entityHandleSet);
         }
 
@@ -343,7 +342,7 @@ namespace Trecs.Internal
         }
 
         // Note: these Serialize/Deserialize methods are used by the recording system
-        // for deterministic replay, not by bookmark serialization. Bookmarks don't need
+        // for deterministic replay, not by snapshot serialization. Snapshots don't need
         // input queue state because the component values themselves (which include the
         // last-applied input for RetainCurrent components) are already captured in the
         // WorldStateSerializer snapshot.
@@ -651,7 +650,7 @@ namespace Trecs.Internal
                     {
                         info.Helper.ApplyInputs(this, entityHandles, frame);
 
-                        if (entityHandles.IsEmpty())
+                        if (entityHandles.IsEmpty)
                         {
                             info.FrameEntries.RemoveMustExist(frame);
                             DespawnEntityHandleSet(info, entityHandles);

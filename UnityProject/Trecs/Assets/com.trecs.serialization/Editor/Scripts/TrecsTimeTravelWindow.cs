@@ -12,12 +12,12 @@ namespace Trecs.Serialization
     /// Editor UI for <see cref="TrecsGameStateController"/>. Layout:
     /// <list type="bullet">
     /// <item>World dropdown (one row per registered <see cref="World"/>).</item>
-    /// <item>Recording header row — current name, New / Save / Save As… /
-    /// Load… / Delete actions for the in-memory recording.</item>
-    /// <item>Transport panel — state badge, ⏮ ◀ ⏯ ▶ ⏭ buttons, Fork
-    /// (visible only in Playback), inline Speed slider. Slider with adaptive
-    /// time ruler underneath. Capacity banner when the recorder is paused
-    /// against its memory cap.</item>
+    /// <item>Recording header row — current recording name, state badge
+    /// (LIVE/REC/PLAY), Speed dropdown, Actions ▾ menu.</item>
+    /// <item>Transport row — Record button, ⏮ ◂ ▶ ▸ ⏭ navigation, Loop
+    /// button (enabled in Playback only). Slider with adaptive time ruler
+    /// underneath. Capacity banner when the recorder is paused against
+    /// its memory cap.</item>
     /// </list>
     /// The slider commits a JumpToFrame on pointer release; while dragging
     /// the throttled commit fires at most every <c>ScrubThrottleSeconds</c>
@@ -37,49 +37,112 @@ namespace Trecs.Serialization
         // 0.83×.
         static readonly float[] SpeedPresets = { 0.1f, 0.25f, 0.5f, 1f, 2f };
 
+        // Shared "this transport control is active" tint — Loop ON, Play
+        // when paused. One color so the visual vocabulary stays consistent;
+        // darker than Unity's stock green so the white caption / icon pops
+        // against it.
+        static readonly Color ActiveTransportButtonColor = new Color(0.10f, 0.45f, 0.18f);
+
+        // Label shown for the recording-name slot when an in-memory buffer
+        // is being captured but hasn't been saved to disk yet.
         const string UnsavedRecordingDisplayName = "(unsaved)";
+
+        // Label shown when the recorder is stopped (no controller, the
+        // Record button hasn't been pressed yet, or just-stopped) — no
+        // in-memory buffer exists, so "(unsaved)" would falsely imply
+        // there's something to save.
+        const string NoRecordingDisplayName = "(no recording)";
 
         const string DefaultBadgeTooltip =
             "Recorder state.\n"
-            + "LIVE — no recording session active.\n"
+            + "LIVE — not recording (Record hasn't been pressed, or "
+            + "Auto-record on start is off).\n"
             + "REC — recording at the live edge of the buffer.\n"
-            + "PLAY — scrubbed back into the buffer (auto-recorder) or "
-            + "playing through a loaded recording. ⏸ suffix means paused.";
+            + "PLAY — scrubbed back into the buffer or playing through a "
+            + "loaded recording. Pauses at the tail by default; press "
+            + "Record (R) to fork and go live, or Loop (L) to repeat.\n"
+            + "⏸ suffix means paused.";
+
+        // Tooltips for the context-sensitive Record button. UpdateRecordButton
+        // swaps between these per tick so the text always describes what
+        // clicking will actually do right now.
+        const string RecordButtonNoControllerTooltip =
+            "Record (disabled): no Trecs world is loaded yet. Enter play "
+            + "mode and a TrecsGameStateController will register itself.";
+        const string RecordButtonIdleTooltip =
+            "Record (R) — start capturing snapshots from the current frame.";
+        const string RecordButtonRecordingTooltip =
+            "Stop recording (R) — drop the buffer and return to live " + "(no capture).";
+        const string RecordButtonPlaybackTooltip =
+            "Fork at current frame (R) — commit snapshots up to here as the "
+            + "new recording and continue capturing live past this point. "
+            + "Trailing snapshots are dropped.";
+        const string LoopButtonInactiveTooltip =
+            "Loop playback (L) — when on, the playhead jumps back to the "
+            + "first snapshot on reaching the end instead of pausing.";
+        const string LoopButtonActiveTooltip =
+            "Loop playback ON (L) — click to disable. Reaching the end "
+            + "will rewind to the first snapshot; turn off to pause at "
+            + "the end instead.";
+        const string LoopButtonDisabledTooltip =
+            "Loop playback (L) — only available during Playback (scrub "
+            + "back from the live edge or load a saved recording first).";
 
         DropdownField _worldDropdown;
         Label _emptyState;
-        Button _helpButton;
-        Button _settingsButton;
+
+        // Help opens via the Actions ▾ menu's Help… item — see ShowHelp().
+        // Recording start/stop is the transport-row Record button (not a
+        // header toggle anymore); the auto-on-play preference lives in
+        // Player Settings as "Auto-record on start" backed by
+        // TrecsGameStateActivator.AutoRecordEnabled.
 
         // Recording header row: current-recording name + persistence actions.
         VisualElement _recordingHeaderRow;
         Label _recordingNameLabel;
-        Button _newButton;
-        Button _saveButton;
-        Button _saveAsButton;
-        Button _loadButton;
-        Button _deleteButton;
+
+        // Single "Actions ▾" dropdown that replaces the older
+        // New/Save/Save As/Load/Delete button row — those took too much
+        // horizontal real estate. The button opens a GenericMenu with the
+        // same actions; Save/Delete go disabled when they don't apply.
+        Button _recordingActionsButton;
         Label _recordingStatusLabel;
         IVisualElementScheduledItem _recordingStatusClearTask;
         const long RecordingStatusClearDelayMs = 4000;
 
-        // Name of the on-disk file backing the in-memory buffer, or null when
-        // the buffer has not been saved (or has been New'd / world-switched).
-        // Drives the header label, "Save" overwrite-vs-prompt branching, and
-        // whether Delete is enabled.
-        string _currentRecordingName;
+        // The "current recording name" is owned by the recorder (set on
+        // load / save, cleared on reset / fork / fresh-start) so that any
+        // surface acting on the same controller — the Saves window's
+        // load, the Player's save / save-as, etc. — stays in sync. Read
+        // through this helper rather than caching it.
+        string CurrentRecordingName => GetController()?.LoadedRecordingName;
 
-        // Transport panel: state badge, 5 transport buttons, fork button.
+        // Controller we're currently subscribed to for LoadedRecordingChanged.
+        // Tracked separately from _selectedWorld because the controller for
+        // a world can register/unregister independently of selection.
+        TrecsGameStateController _subscribedController;
+
+        // Transport row: Record button, 5 nav buttons, Loop button (always
+        // visible, enabled in Playback only). The Record button is context-
+        // sensitive: Idle→start, Recording→stop, Playback→fork (the Fork
+        // action moved out of the Actions ▾ menu now that there's a
+        // transport-row home for it). Loop is a session-local toggle on the
+        // recorder; see TrecsAutoRecorder.LoopPlayback. The state badge and
+        // Speed dropdown live up in the recording header row; see
+        // BuildRecordingHeaderRow.
         VisualElement _transportPanel;
         Label _stateBadge;
+        Button _recordButton;
         Button _jumpStartButton;
         Button _stepBackButton;
         Button _playPauseButton;
         Image _playPauseIcon;
         Button _stepForwardButton;
         Button _jumpEndButton;
-        Button _forkButton;
-        Button _trimButton;
+        Button _loopButton;
+
+        // Trim lives in the Actions ▾ menu (Playback-only); see
+        // OnRecordingActionsClicked.
 
         // Cached editor icons for the transport buttons. Loaded lazily once
         // per domain reload via EditorGUIUtility.IconContent so we get the
@@ -90,6 +153,12 @@ namespace Trecs.Serialization
         static Texture2D _iconPause;
         static Texture2D _iconStepForward;
         static Texture2D _iconJumpEnd;
+        static Texture2D _iconMenu;
+        static Texture2D _iconRecord;
+
+        // Unity has no clean "loop" icon in the public icon set; we fall
+        // back to a Unicode "↻" if the lookup fails.
+        static Texture2D _iconLoop;
 
         // Scrubber: slider with hover-cursor indicator + adaptive time ruler.
         SliderInt _timelineSlider;
@@ -100,14 +169,14 @@ namespace Trecs.Serialization
         // current frame. Cleaner than a static text label below the timeline.
         Label _hoverTooltipLabel;
 
-        // Subtle bottom-right stats line: bookmark count, frame span, byte
+        // Subtle bottom-right stats line: snapshot count, frame span, byte
         // size. Tucked away so it doesn't dominate the UI but available for
         // a glance at the buffer's footprint.
         Label _bufferInfoLabel;
         Label _capacityBanner;
 
         // Surfaces a desync detected during Playback (simulation re-ran from
-        // an earlier bookmark and produced a different state at a frame where
+        // an earlier snapshot and produced a different state at a frame where
         // we had captured one). Sticks until the buffer "moves" (Reset, Fork,
         // JumpToFrame, load) so the user has time to notice and inspect.
         Label _desyncBanner;
@@ -141,9 +210,11 @@ namespace Trecs.Serialization
         // a much wider tooltip without affecting transport-button tooltips.
         readonly Dictionary<VisualElement, float> _tooltipMaxWidths = new();
 
-        // Pending open of the help popup window. Cancelled if the cursor
-        // leaves "?" before the delay elapses.
-        IVisualElementScheduledItem _pendingHelpShow;
+        // Per-target tooltip text. Stored here rather than on
+        // element.tooltip because setting that property activates Unity's
+        // native tooltip flow, which double-fires alongside our manual
+        // floating-Label dispatch (two overlapping tooltips on hover).
+        readonly Dictionary<VisualElement, string> _tooltipTexts = new();
 
         // Speed dropdown: a single button labelled with the current
         // multiplier ("1×") that opens a GenericMenu of preset speeds.
@@ -155,11 +226,11 @@ namespace Trecs.Serialization
 
         bool _suppressControlEvents;
 
-        [MenuItem("Window/Trecs/Replay")]
+        [MenuItem("Window/Trecs/Player")]
         public static void ShowWindow()
         {
             var window = GetWindow<TrecsTimeTravelWindow>();
-            window.titleContent = new GUIContent("Trecs Replay");
+            window.titleContent = new GUIContent("Trecs Player");
             window.minSize = new Vector2(320, 260);
         }
 
@@ -185,7 +256,35 @@ namespace Trecs.Serialization
             TrecsGameStateRegistry.ControllerRegistered -= OnControllerRegisteredOrUnregistered;
             TrecsGameStateRegistry.ControllerUnregistered -= OnControllerRegisteredOrUnregistered;
             TrecsEditorSelection.ActiveWorldChanged -= OnSharedActiveWorldChanged;
+            UnsubscribeFromController();
+            TrecsReplayHelpPopup.CloseIfOpen();
             ClearAccessor();
+        }
+
+        // Keep _subscribedController in sync with the controller for the
+        // currently-selected world. Called whenever world selection or
+        // controller registration changes.
+        void RefreshControllerSubscription()
+        {
+            var controller = GetController();
+            if (_subscribedController == controller)
+                return;
+            UnsubscribeFromController();
+            _subscribedController = controller;
+            if (_subscribedController != null)
+            {
+                _subscribedController.LoadedRecordingChanged += UpdateRecordingHeader;
+            }
+            UpdateRecordingHeader();
+        }
+
+        void UnsubscribeFromController()
+        {
+            if (_subscribedController != null)
+            {
+                _subscribedController.LoadedRecordingChanged -= UpdateRecordingHeader;
+                _subscribedController = null;
+            }
         }
 
         void OnSharedActiveWorldChanged(World world)
@@ -205,7 +304,8 @@ namespace Trecs.Serialization
         {
             // Header label may need to flip between "(unsaved)" and any
             // backing-file name once a controller appears or disappears.
-            UpdateRecordingHeader();
+            // Re-subscribing covers both transitions and refreshes the label.
+            RefreshControllerSubscription();
         }
 
         void CreateGUI()
@@ -256,9 +356,24 @@ namespace Trecs.Serialization
             _bufferInfoLabel.style.color = Color.white;
             _bufferInfoLabel.pickingMode = PickingMode.Ignore;
             _bufferInfoLabel.tooltip =
-                "In-memory buffer summary: source mode · bookmark count · "
+                "In-memory buffer summary: source mode · snapshot count · "
                 + "frame span (and elapsed seconds) · total bytes.";
             rootVisualElement.Add(_bufferInfoLabel);
+
+            // Bottom-left transient status overlay (mirrors _bufferInfoLabel
+            // on the opposite corner). Used for action feedback like
+            // "Saved 'foo'" or "Recording disabled" — text auto-clears after
+            // RecordingStatusClearDelayMs. Sits on rootVisualElement so the
+            // header row no longer reserves vertical space for an
+            // empty-most-of-the-time status line.
+            _recordingStatusLabel = new Label();
+            _recordingStatusLabel.style.position = Position.Absolute;
+            _recordingStatusLabel.style.bottom = 4;
+            _recordingStatusLabel.style.left = 8;
+            _recordingStatusLabel.style.fontSize = 10;
+            _recordingStatusLabel.style.opacity = 0.7f;
+            _recordingStatusLabel.pickingMode = PickingMode.Ignore;
+            rootVisualElement.Add(_recordingStatusLabel);
 
             RebuildDropdown();
             UpdateRecordingHeader();
@@ -271,7 +386,7 @@ namespace Trecs.Serialization
 
         void OnKeyDown(KeyDownEvent evt)
         {
-            // Don't steal keys when a TextField has focus (bookmark/recording
+            // Don't steal keys when a TextField has focus (snapshot/recording
             // name typing). The event target is usually the TextField's
             // internal TextElement so walk up for the ancestor check.
             if (evt.target is VisualElement target && IsInsideTextField(target))
@@ -295,7 +410,7 @@ namespace Trecs.Serialization
                 case KeyCode.LeftArrow:
                     if (evt.shiftKey)
                     {
-                        GetController()?.JumpToPreviousBookmark();
+                        GetController()?.JumpToPreviousSnapshot();
                     }
                     else
                     {
@@ -306,11 +421,31 @@ namespace Trecs.Serialization
                 case KeyCode.RightArrow:
                     if (evt.shiftKey)
                     {
-                        GetController()?.JumpToNextBookmark();
+                        GetController()?.JumpToNextSnapshot();
                     }
                     else
                     {
                         OnStepForwardClicked();
+                    }
+                    evt.StopPropagation();
+                    break;
+                case KeyCode.R:
+                    // R routes to the same context-sensitive handler as the
+                    // Record button: Idle→start, Recording→stop, Playback→
+                    // fork. Same enable/refuse semantics so the keyboard
+                    // and the click do exactly the same thing.
+                    OnRecordButtonClicked();
+                    evt.StopPropagation();
+                    break;
+                case KeyCode.L:
+                    // L mirrors the Loop button — only act when the button
+                    // would be enabled (Playback). Setting LoopPlayback
+                    // outside Playback would be silently honoured by the
+                    // recorder but the visible button would stay greyed,
+                    // which would be a confusing state mismatch.
+                    if (GetController()?.CurrentMode == GameStateMode.Playback)
+                    {
+                        OnLoopButtonClicked();
                     }
                     evt.StopPropagation();
                     break;
@@ -326,31 +461,23 @@ namespace Trecs.Serialization
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
 
-            _stateBadge = new Label("LIVE");
-            _stateBadge.tooltip = DefaultBadgeTooltip;
-            _stateBadge.style.unityFontStyleAndWeight = FontStyle.Bold;
-            _stateBadge.style.fontSize = 10;
-            _stateBadge.style.minWidth = 56;
-            _stateBadge.style.unityTextAlign = TextAnchor.MiddleCenter;
-            _stateBadge.style.paddingLeft = 6;
-            _stateBadge.style.paddingRight = 6;
-            _stateBadge.style.paddingTop = 2;
-            _stateBadge.style.paddingBottom = 2;
-            _stateBadge.style.marginRight = 6;
-            _stateBadge.style.borderTopLeftRadius = 3;
-            _stateBadge.style.borderTopRightRadius = 3;
-            _stateBadge.style.borderBottomLeftRadius = 3;
-            _stateBadge.style.borderBottomRightRadius = 3;
-            row.Add(_stateBadge);
-
             EnsureTransportIcons();
+
+            // Record button sits left of the navigation buttons because it's
+            // the primary state-changing action — start, stop, or fork
+            // depending on current mode. Tooltip is updated per-tick from
+            // UpdateRecordButton so it always describes the action that will
+            // happen if you click *now*.
+            _recordButton = MakeIconTransportButton(_iconRecord, "●", OnRecordButtonClicked);
+            ApplyTooltip(_recordButton, RecordButtonIdleTooltip);
+            row.Add(_recordButton);
 
             _jumpStartButton = MakeIconTransportButton(_iconJumpStart, "⏮", OnJumpStartClicked);
             ApplyTooltip(_jumpStartButton, "Jump to start of buffer (Home)");
             _stepBackButton = MakeIconTransportButton(_iconStepBack, "◂", OnStepBackClicked);
             ApplyTooltip(
                 _stepBackButton,
-                "Step back one frame (←)\nShift+← jumps to previous bookmark"
+                "Step back one frame (←)\nShift+← jumps to previous snapshot"
             );
             _playPauseButton = MakeIconTransportButton(_iconPlay, "▶", OnPlayPauseClicked);
             _playPauseIcon = _playPauseButton.Q<Image>();
@@ -362,7 +489,7 @@ namespace Trecs.Serialization
             );
             ApplyTooltip(
                 _stepForwardButton,
-                "Step forward one frame (→)\nShift+→ jumps to next bookmark"
+                "Step forward one frame (→)\nShift+→ jumps to next snapshot"
             );
             _jumpEndButton = MakeIconTransportButton(_iconJumpEnd, "⏭", OnJumpEndClicked);
             ApplyTooltip(_jumpEndButton, "Go to live edge (End)");
@@ -372,53 +499,20 @@ namespace Trecs.Serialization
             row.Add(_stepForwardButton);
             row.Add(_jumpEndButton);
 
-            _forkButton = new Button(OnForkClicked) { text = "Fork" };
-            ApplyTooltip(
-                _forkButton,
-                "Commit the current scrub frame as the new branch point and resume "
-                    + "live Recording from here. Auto-recording: trailing buffer is "
-                    + "truncated. Loaded recording: saved file is untouched; only the "
-                    + "in-memory tail is dropped. (Plain Play just walks forward through "
-                    + "the buffer — Fork is the explicit commit.)"
-            );
-            _forkButton.style.marginLeft = 8;
-            _forkButton.style.display = DisplayStyle.None;
-            row.Add(_forkButton);
+            // Loop controls whether the playhead jumps back to the start
+            // when it reaches the end of the loaded recording, instead of
+            // pausing. Always visible so the layout is stable; disabled
+            // outside Playback (where it has no effect since the recorder
+            // only consults LoopPlayback at the loaded recording's tail).
+            _loopButton = MakeIconTransportButton(_iconLoop, "↻", OnLoopButtonClicked);
+            ApplyTooltip(_loopButton, LoopButtonDisabledTooltip);
+            _loopButton.SetEnabled(false);
+            row.Add(_loopButton);
 
-            // Drop-down for "Trim before" / "Trim after" the current frame.
-            // Both operations modify the in-memory buffer only; saved files on
-            // disk are untouched. Useful for reducing recording size before
-            // saving (drop lead-in / tail) without forking & re-recording.
-            _trimButton = new Button(OnTrimButtonClicked) { text = "Trim ▾" };
-            ApplyTooltip(
-                _trimButton,
-                "Drop bookmarks from before or after the current frame. "
-                    + "Saved files on disk are untouched. Useful for shrinking the "
-                    + "in-memory buffer before saving."
-            );
-            _trimButton.style.marginLeft = 4;
-            row.Add(_trimButton);
-
-            // Spacer so the speed button sits on the right edge of the row
-            // (matching the layout the speed slider used to provide).
-            var spacer = new VisualElement();
-            spacer.style.flexGrow = 1;
-            row.Add(spacer);
-
-            // Speed dropdown — discrete presets cover the realistic debug
-            // range (frame-step-like 0.1× through 2× fast-forward); finer
-            // control isn't actually useful when the goal is "watch this
-            // moment slowly" or "skip ahead a bit". Click opens a menu of
-            // presets via GenericMenu (matches the Load… menu's style).
-            _speedButton = new Button(OnSpeedButtonClicked) { text = FormatSpeedLabel(1f) };
-            _speedButton.style.minWidth = 44;
-            _speedButton.style.marginLeft = 4;
-            ApplyTooltip(
-                _speedButton,
-                "Simulation speed. Click for presets (0.1×, 0.25×, 0.5×, 1×, 2×). "
-                    + "Shown amber when not at real-time."
-            );
-            row.Add(_speedButton);
+            // State badge and Speed dropdown live in the recording header
+            // row, not here — see BuildRecordingHeaderRow. That keeps this
+            // row tight to its purpose (transport-only, directly above the
+            // slider).
 
             panel.Add(row);
 
@@ -426,7 +520,7 @@ namespace Trecs.Serialization
             _timelineSlider.tooltip =
                 "Drag to scrub through the buffer. Click anywhere on the track "
                 + "to jump there. Type a frame in the input field on the right "
-                + "to jump exactly. Blue ticks mark stored bookmarks.";
+                + "to jump exactly. Blue ticks mark stored snapshots.";
             _timelineSlider.style.marginTop = 6;
             _timelineSlider.RegisterValueChangedCallback(OnTimelineValueChanged);
             _timelineSlider.RegisterCallback<PointerDownEvent>(
@@ -549,16 +643,20 @@ namespace Trecs.Serialization
         // empirically: even an explicit TooltipEvent callback never sees
         // events in this window). Instead we listen for PointerEnter/Leave
         // ourselves, run a delay-and-show against rootVisualElement.schedule,
-        // and reposition a single floating Label. The .tooltip property is
-        // still set so any caller mutating it (e.g. the play/pause text
-        // swapping with state) is picked up automatically on next show.
+        // and reposition a single floating Label.
+        //
+        // Important: we deliberately do NOT set element.tooltip — Unity's
+        // native tooltip path DOES fire for some elements (verified
+        // empirically too), and when both fire we get two overlapping
+        // tooltips on hover. The text lives in _tooltipTexts so dynamic
+        // updates (e.g. play/pause swap) just call ApplyTooltip again.
         void ApplyTooltip(
             VisualElement element,
             string text,
             float maxWidth = DefaultTooltipMaxWidth
         )
         {
-            element.tooltip = text;
+            _tooltipTexts[element] = text;
             _tooltipMaxWidths[element] = maxWidth;
             if (element.userData is string s && s == "manual-tooltip-attached")
             {
@@ -582,8 +680,11 @@ namespace Trecs.Serialization
 
         void ShowTooltipNow(VisualElement target)
         {
-            var text = target?.tooltip;
-            if (string.IsNullOrEmpty(text) || target.panel == null)
+            if (target?.panel == null)
+            {
+                return;
+            }
+            if (!_tooltipTexts.TryGetValue(target, out var text) || string.IsNullOrEmpty(text))
             {
                 return;
             }
@@ -679,6 +780,11 @@ namespace Trecs.Serialization
             _iconPause ??= LoadEditorIcon("PauseButton");
             _iconStepForward ??= LoadEditorIcon("Animation.NextKey");
             _iconJumpEnd ??= LoadEditorIcon("Animation.LastKey");
+            _iconMenu ??= LoadEditorIcon("_Menu");
+            _iconRecord ??= LoadEditorIcon("Animation.Record");
+            // No reliable cross-version Unity loop icon; "↻" text fallback
+            // is fine. preAudioLoopOff/On are internal and not always present.
+            _iconLoop ??= LoadEditorIcon("preAudioLoopOff");
         }
 
         static Texture2D LoadEditorIcon(string name)
@@ -694,63 +800,51 @@ namespace Trecs.Serialization
             }
         }
 
-        // ---- Help popup (hover-driven) ----
+        // ---- Help popup ----
         //
         // The body lives in its own EditorWindow (TrecsReplayHelpPopup)
         // because the manual-tooltip plumbing is bounded by the editor
-        // window's rectangle, and 70 lines of help just don't fit. Hover
-        // semantics mirror native tooltips: open after the standard delay
-        // on PointerEnter, close shortly after PointerLeave — but
-        // cancellable while the cursor is over the popup itself so the
-        // user can scroll and read.
+        // window's rectangle, and 70 lines of help just don't fit. Opens
+        // anchored just below the Actions ▾ button.
 
-        void OnHelpHoverEnter(PointerEnterEvent evt)
+        void ShowHelp()
         {
-            // Cursor came back onto "?" — kill any pending dismiss.
-            TrecsReplayHelpPopup.CancelHide();
-            if (TrecsReplayHelpPopup.IsOpen)
-            {
-                return;
-            }
-            // Capture the mouse position now (in screen coords) so the
-            // popup opens above where the user actually is, even if their
-            // cursor drifts during the show delay. evt.position is panel-
-            // local; window.position is the editor window's screen rect.
-            // Adding them yields a screen-space mouse position that
-            // works on multi-monitor setups (no clamping to ≥ 0).
-            var mouseScreenPos = new Vector2(
-                position.x + evt.position.x,
-                position.y + evt.position.y
-            );
-            _pendingHelpShow?.Pause();
-            _pendingHelpShow = rootVisualElement
-                .schedule.Execute(() =>
-                    TrecsReplayHelpPopup.ShowAtMouse(mouseScreenPos, HelpBodyText)
-                )
-                .StartingIn(TooltipDelayMs);
-        }
-
-        void OnHelpHoverLeave()
-        {
-            // Cancel any not-yet-fired open; if the popup is already open,
-            // ask it to dismiss itself shortly. The popup's own
-            // PointerEnter handler will cancel that schedule if the user
-            // moves the cursor onto it.
-            _pendingHelpShow?.Pause();
-            _pendingHelpShow = null;
-            TrecsReplayHelpPopup.ScheduleHide();
+            // ShowAtMouse takes a screen-space anchor; aim it just under the
+            // Actions button so the popup appears in a predictable place
+            // (close to the menu the user just opened) instead of wherever
+            // the cursor happened to be.
+            var anchor =
+                _recordingActionsButton != null
+                    ? _recordingActionsButton.worldBound
+                    : rootVisualElement.worldBound;
+            var screenPos = new Vector2(position.x + anchor.x, position.y + anchor.yMax + 4f);
+            TrecsReplayHelpPopup.ShowAtMouse(screenPos, HelpBodyText);
         }
 
         const string HelpBodyText =
             "Record your simulation, scrub back to any earlier moment, and "
             + "replay forward — useful for diagnosing transient bugs.\n\n"
+            + "<b>Transport row</b>\n"
+            + "  ●  Record    Context-sensitive (R):\n"
+            + "                LIVE → start capturing,\n"
+            + "                REC  → stop capturing,\n"
+            + "                PLAY → fork at the scrub frame (commit "
+            + "snapshots up to here as the new live edge; trailing "
+            + "snapshots are dropped).\n"
+            + "  ⏮ ◂ ▶ ▸ ⏭   Standard transport.\n"
+            + "  ↻  Loop (L)  Enabled in PLAY only. When on, reaching "
+            + "the end of the recording rewinds to the first snapshot "
+            + "instead of pausing. Resets each playback session.\n\n"
             + "<b>Keyboard shortcuts</b>\n"
             + "  Space          Play / Pause\n"
             + "  Home / End     Jump to buffer start / live edge\n"
             + "  ← / →          Step back / forward one frame\n"
-            + "  Shift+← / →    Jump to previous / next bookmark\n\n"
+            + "  Shift+← / →    Jump to previous / next snapshot\n"
+            + "  R              Record (start / stop / fork — see above)\n"
+            + "  L              Loop (PLAY only)\n\n"
             + "<b>State badge</b>\n"
-            + "  LIVE  No recording active\n"
+            + "  LIVE  Not recording (Record hasn't been pressed, or "
+            + "Auto-record on start is off)\n"
             + "  REC   Recording at the live edge\n"
             + "  PLAY  Scrubbed back, or playing a loaded recording\n"
             + "(The play/pause button turns green when paused.)\n\n"
@@ -759,23 +853,42 @@ namespace Trecs.Serialization
             + "live edge or loaded a recording from disk. Live input "
             + "systems are silenced; the inputs captured during recording "
             + "drive the world instead, so pressing Play replays the "
-            + "session verbatim until the buffer's tail.\n\n"
-            + "<b>Fork (Playback only)</b>\n"
-            + "Plain Play walks through the buffer without changing it. "
-            + "Fork is the explicit \"this timeline, not that one\" "
-            + "gesture: it commits the current scrub position as a new "
-            + "branch point and resumes live recording from there, "
-            + "dropping the trailing buffer.\n\n"
-            + "<b>Auto-recording vs loaded recording</b>\n"
-            + "  Auto: live in-memory buffer; header shows '(unsaved)' "
-            + "until you Save.\n"
-            + "  Loaded: a saved recording from disk; trailing bookmarks "
+            + "session verbatim. At the recording's tail the playhead "
+            + "always pauses (unless Loop is on) — to continue past it "
+            + "into live capture, press Record (Fork).\n\n"
+            + "<b>Auto-record on start</b>\n"
+            + "Settings → 'Auto-record on start' controls whether the "
+            + "recorder begins capturing the moment a Trecs world appears "
+            + "in play mode (window must be open). Off → press Record to "
+            + "begin capturing on demand. State persists across editor "
+            + "sessions.\n\n"
+            + "<b>Trim (Playback only)</b>\n"
+            + "Trim drops snapshots before or after the current frame to "
+            + "shrink the in-memory buffer (saved files on disk are "
+            + "untouched). Lives in the ▾ menu.\n\n"
+            + "<b>Live vs loaded recording</b>\n"
+            + "  Live: in-memory buffer; header shows '(unsaved)' until "
+            + "you Save Recording.\n"
+            + "  Loaded: a saved recording from disk; trailing snapshots "
             + "are preserved during scrub so you can replay the same "
-            + "moment repeatedly.";
+            + "moment repeatedly.\n\n"
+            + "<b>Recordings vs snapshots</b>\n"
+            + "  Recording: a time-range capture you can scrub through.\n"
+            + "  Snapshot: a single-frame world state, useful as a QA "
+            + "repro fixture or a 'revert here later' pin. Loading a "
+            + "snapshot stops the current recording and (if Auto-record on "
+            + "start is on) starts a fresh one from the snapshot's frame.\n\n"
+            + "<b>▾ menu</b>\n"
+            + "Recording actions (New / Save / Load / Delete), Snapshot "
+            + "actions (Save / Load), Trim, Settings, and this Help.\n\n"
+            + "<b>Trecs Saves window</b>\n"
+            + "Library view of all on-disk saves (recordings + snapshots) "
+            + "with search, rename, and delete. Open from "
+            + "Window ▸ Trecs ▸ Saves.";
 
         // Top-level header row showing the in-memory recording's name (or
         // "(unsaved)") with persistence actions. Replaces the older Saved
-        // Recordings + Named Bookmarks foldouts; standalone bookmarks are
+        // Recordings + Named Snapshots foldouts; standalone snapshots are
         // intentionally dropped — the recording is the single unit users
         // think about.
         VisualElement BuildRecordingHeaderRow()
@@ -807,77 +920,88 @@ namespace Trecs.Serialization
             );
             row.Add(_recordingNameLabel);
 
-            _newButton = new Button(OnNewClicked) { text = "New" };
+            // Recording start/stop now lives in the transport row's Record
+            // button (context-sensitive: starts in Idle, stops in Recording,
+            // forks in Playback). The "auto-record on start" preference
+            // moved into Player Settings — TrecsGameStateActivator.
+            // AutoRecordEnabled is still the underlying EditorPref.
+
+            // State badge sits on the right of the header rather than
+            // inline with the transport row — keeps the play buttons
+            // tight against the slider, and the LIVE/REC/PLAY status
+            // ends up in a more glanceable corner-of-window position.
+            _stateBadge = new Label("LIVE");
+            _stateBadge.tooltip = DefaultBadgeTooltip;
+            _stateBadge.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _stateBadge.style.fontSize = 10;
+            _stateBadge.style.minWidth = 56;
+            _stateBadge.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _stateBadge.style.paddingLeft = 6;
+            _stateBadge.style.paddingRight = 6;
+            _stateBadge.style.paddingTop = 2;
+            _stateBadge.style.paddingBottom = 2;
+            _stateBadge.style.marginRight = 4;
+            _stateBadge.style.borderTopLeftRadius = 3;
+            _stateBadge.style.borderTopRightRadius = 3;
+            _stateBadge.style.borderBottomLeftRadius = 3;
+            _stateBadge.style.borderBottomRightRadius = 3;
+            row.Add(_stateBadge);
+
+            // Speed dropdown also moves up here — it's a session-rate
+            // setting, not a per-frame control, so grouping it with the
+            // other "header-level" affordances reads better than burying
+            // it beside the play buttons.
+            EnsureTransportIcons();
+            _speedButton = new Button(OnSpeedButtonClicked) { text = FormatSpeedLabel(1f) };
+            _speedButton.style.minWidth = 44;
+            _speedButton.style.marginRight = 4;
             ApplyTooltip(
-                _newButton,
-                "Discard the current in-memory recording and start fresh "
-                    + "from the current frame. Saved files on disk are not affected."
+                _speedButton,
+                "Simulation speed. Click for presets (0.1×, 0.25×, 0.5×, 1×, 2×). "
+                    + "Shown amber when not at real-time."
             );
-            row.Add(_newButton);
+            row.Add(_speedButton);
 
-            _saveButton = new Button(OnSaveClicked) { text = "Save" };
-            _saveButton.style.marginLeft = 2;
-            ApplyTooltip(
-                _saveButton,
-                "Save the in-memory recording. Prompts for a name on the "
-                    + "first save; later saves overwrite the same file."
-            );
-            row.Add(_saveButton);
+            // Unity's built-in _Menu icon (the kebab/three-dot glyph used
+            // throughout the editor for "more options" menus). Users seek
+            // this menu for the less-frequent file operations and Trim;
+            // the primary recording controls live in the transport row.
+            // Falls back to a text "▾" if the icon couldn't load.
+            _recordingActionsButton = new Button(OnRecordingActionsClicked);
+            _recordingActionsButton.style.marginLeft = 6;
+            _recordingActionsButton.style.minWidth = 22;
+            _recordingActionsButton.style.height = 22;
+            _recordingActionsButton.style.paddingLeft = 0;
+            _recordingActionsButton.style.paddingRight = 0;
+            _recordingActionsButton.style.paddingTop = 0;
+            _recordingActionsButton.style.paddingBottom = 0;
+            _recordingActionsButton.style.alignItems = Align.Center;
+            _recordingActionsButton.style.justifyContent = Justify.Center;
+            if (_iconMenu != null)
+            {
+                var img = new Image
+                {
+                    image = _iconMenu,
+                    scaleMode = ScaleMode.ScaleToFit,
+                    pickingMode = PickingMode.Ignore,
+                };
+                img.style.width = 14;
+                img.style.height = 14;
+                _recordingActionsButton.Add(img);
+            }
+            else
+            {
+                _recordingActionsButton.text = "▾";
+            }
+            ApplyTooltip(_recordingActionsButton, "More actions");
+            row.Add(_recordingActionsButton);
 
-            _saveAsButton = new Button(OnSaveAsClicked) { text = "Save As…" };
-            _saveAsButton.style.marginLeft = 2;
-            ApplyTooltip(_saveAsButton, "Save the in-memory recording under a new name.");
-            row.Add(_saveAsButton);
-
-            _loadButton = new Button(OnLoadClicked) { text = "Load…" };
-            _loadButton.style.marginLeft = 2;
-            ApplyTooltip(_loadButton, "Load a saved recording from disk.");
-            row.Add(_loadButton);
-
-            _deleteButton = new Button(OnDeleteClicked) { text = "Delete" };
-            _deleteButton.style.marginLeft = 2;
-            ApplyTooltip(
-                _deleteButton,
-                "Delete the current recording's saved file from disk. "
-                    + "The in-memory buffer is left untouched."
-            );
-            row.Add(_deleteButton);
-
-            // Settings cog opens a modal popup for tuning recorder knobs
-            // (interval, capacity caps, overflow action) without leaving
-            // the timeline window.
-            _settingsButton = new Button(OnSettingsClicked) { text = "⚙" };
-            _settingsButton.style.minWidth = 22;
-            _settingsButton.style.marginLeft = 6;
-            ApplyTooltip(
-                _settingsButton,
-                "Recorder settings: bookmark interval, capacity caps, overflow action."
-            );
-            row.Add(_settingsButton);
-
-            // Help "?" lives at the far right of the header so it's the
-            // last item users scan past before the action buttons end.
-            // Hover (with a 450 ms delay matching native tooltip cadence)
-            // opens a TrecsReplayHelpPopup in its own window, since UI
-            // Toolkit clips a normal in-window tooltip at the editor
-            // window's bounds and the help body doesn't fit.
-            _helpButton = new Button() { text = "?" };
-            _helpButton.style.minWidth = 22;
-            _helpButton.style.marginLeft = 4;
-            _helpButton.tooltip = "Hover for keyboard shortcuts and help.";
-            _helpButton.RegisterCallback<PointerEnterEvent>(OnHelpHoverEnter);
-            _helpButton.RegisterCallback<PointerLeaveEvent>(_ => OnHelpHoverLeave());
-            _helpButton.RegisterCallback<DetachFromPanelEvent>(_ =>
-                TrecsReplayHelpPopup.CloseIfOpen()
-            );
-            row.Add(_helpButton);
+            // Settings, Help, and (in Playback) Trim live in the Actions ▾
+            // menu — see OnRecordingActionsClicked. Header row layout:
+            // recording name (left, flex) | state badge | speed | Actions ▾.
+            // Recording start/stop and Loop are transport-row controls.
 
             panel.Add(row);
-
-            _recordingStatusLabel = new Label();
-            _recordingStatusLabel.style.marginTop = 2;
-            _recordingStatusLabel.style.opacity = 0.7f;
-            panel.Add(_recordingStatusLabel);
 
             return panel;
         }
@@ -955,11 +1079,9 @@ namespace Trecs.Serialization
             }
             ClearAccessor();
             _selectedWorld = world;
-            // Backing-file-name is per-session, per-window. The previous
-            // world's name doesn't apply to whatever buffer the new world's
-            // recorder is on, so reset to "(unsaved)".
-            _currentRecordingName = null;
-            UpdateRecordingHeader();
+            // Re-bind LoadedRecordingChanged to the new world's controller
+            // (and refresh the header through it).
+            RefreshControllerSubscription();
             if (world != null)
             {
                 TrecsEditorSelection.ActiveWorld = world;
@@ -1015,6 +1137,8 @@ namespace Trecs.Serialization
                     recorder: null,
                     controllerInstalled: true
                 );
+                UpdateRecordButton(controller: null, GameStateMode.Idle);
+                UpdateLoopButton(GameStateMode.Idle, recorder: null);
                 return;
             }
 
@@ -1035,6 +1159,8 @@ namespace Trecs.Serialization
                     recorder: null,
                     controllerInstalled: false
                 );
+                UpdateRecordButton(controller: null, GameStateMode.Idle);
+                UpdateLoopButton(GameStateMode.Idle, recorder: null);
                 return;
             }
             controller.PollModeChanged();
@@ -1045,7 +1171,8 @@ namespace Trecs.Serialization
             var byCapacity = recorder?.IsPausedByCapacity ?? false;
 
             UpdateBadge(mode, paused, byCapacity, recorder, controllerInstalled: true);
-            UpdateForkButton(mode);
+            UpdateRecordButton(controller, mode);
+            UpdateLoopButton(mode, recorder);
             SyncTimeScaleFromRunner();
             RefreshScrubber(controller, recorder);
             RefreshBufferInfo(recorder);
@@ -1092,7 +1219,7 @@ namespace Trecs.Serialization
             // Skip for the capacity-pause state — it already has its own
             // banner + disabled-control treatment.
             _playPauseButton.style.backgroundColor =
-                paused && !byCapacity ? new Color(0.15f, 0.6f, 0.25f) : StyleKeyword.Null;
+                paused && !byCapacity ? ActiveTransportButtonColor : StyleKeyword.Null;
         }
 
         void ResetTransportUI()
@@ -1100,13 +1227,32 @@ namespace Trecs.Serialization
             _bufferInfoLabel.text = string.Empty;
             _capacityBanner.style.display = DisplayStyle.None;
             _desyncBanner.style.display = DisplayStyle.None;
-            _forkButton.style.display = DisplayStyle.None;
             _hoverIndicator.style.display = DisplayStyle.None;
             HideHoverTooltip();
             _timelineRuler.Clear();
+            ResetTimelineSliderValues();
             _timelineSlider.SetEnabled(false);
             SetTransportEnabled(false);
             SetTimeScaleEnabled(false);
+        }
+
+        // Snap the slider's range and value back to a clean "empty" state so
+        // the disabled control doesn't display stale frame numbers from the
+        // last active recording. Match the constructor's initial values
+        // (range 0..1, value 0) so the rendering is identical to first-show.
+        void ResetTimelineSliderValues()
+        {
+            _suppressControlEvents = true;
+            try
+            {
+                _timelineSlider.lowValue = 0;
+                _timelineSlider.highValue = 1;
+                _timelineSlider.SetValueWithoutNotify(0);
+            }
+            finally
+            {
+                _suppressControlEvents = false;
+            }
         }
 
         void UpdateBadge(
@@ -1167,23 +1313,80 @@ namespace Trecs.Serialization
             _stateBadge.style.backgroundColor = bg;
         }
 
-        void UpdateForkButton(GameStateMode mode)
+        // Mode-driven Record-button refresher. Called every poll tick so the
+        // tooltip always describes the action that will fire on the *next*
+        // click — no stale text after a Recording → Playback transition the
+        // user didn't trigger from the button itself.
+        void UpdateRecordButton(TrecsGameStateController controller, GameStateMode mode)
         {
-            var visible = mode == GameStateMode.Playback;
-            _forkButton.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
-            if (!visible)
+            if (_recordButton == null)
             {
                 return;
             }
-            var recorder = GetController()?.AutoRecorder;
-            _forkButton.tooltip =
-                recorder?.IsLoadedRecording == true
-                    ? "Commit & go live from here. Drops the rest of the loaded recording from "
-                        + "memory; the saved file is untouched. (Plain Play walks through "
-                        + "the buffer without committing.)"
-                    : "Commit & go live: truncate trailing bookmarks at this frame and "
-                        + "resume Recording from here. (Plain Play walks through the "
-                        + "buffer without truncating.)";
+            if (controller == null)
+            {
+                _recordButton.SetEnabled(false);
+                ApplyTooltip(_recordButton, RecordButtonNoControllerTooltip);
+                UpdateRecordButtonActive(false);
+                return;
+            }
+            _recordButton.SetEnabled(true);
+            switch (mode)
+            {
+                case GameStateMode.Recording:
+                    ApplyTooltip(_recordButton, RecordButtonRecordingTooltip);
+                    UpdateRecordButtonActive(true);
+                    break;
+                case GameStateMode.Playback:
+                    ApplyTooltip(_recordButton, RecordButtonPlaybackTooltip);
+                    UpdateRecordButtonActive(false);
+                    break;
+                default:
+                    ApplyTooltip(_recordButton, RecordButtonIdleTooltip);
+                    UpdateRecordButtonActive(false);
+                    break;
+            }
+        }
+
+        // Active state == "currently capturing snapshots". Saturated red
+        // background mirrors the REC badge so the two cues reinforce each
+        // other; cleared via StyleKeyword.Null so the editor's default
+        // button background returns when the recorder stops.
+        void UpdateRecordButtonActive(bool active)
+        {
+            _recordButton.style.backgroundColor = active
+                ? new Color(0.55f, 0.1f, 0.1f)
+                : StyleKeyword.Null;
+        }
+
+        // Loop stays visible at all times (stable layout) but is enabled
+        // only in Playback mode, where the recorder actually consults
+        // LoopPlayback at the loaded recording's tail. Outside Playback
+        // we clear the active highlight and swap to a disabled-state
+        // tooltip explaining when the button becomes usable.
+        void UpdateLoopButton(GameStateMode mode, TrecsAutoRecorder recorder)
+        {
+            if (_loopButton == null)
+            {
+                return;
+            }
+            var enabled = mode == GameStateMode.Playback;
+            _loopButton.SetEnabled(enabled);
+            if (!enabled)
+            {
+                _loopButton.style.backgroundColor = StyleKeyword.Null;
+                ApplyTooltip(_loopButton, LoopButtonDisabledTooltip);
+                return;
+            }
+            UpdateLoopButtonActive(recorder?.LoopPlayback ?? false);
+        }
+
+        void UpdateLoopButtonActive(bool active)
+        {
+            _loopButton.style.backgroundColor = active
+                ? ActiveTransportButtonColor
+                : StyleKeyword.Null;
+            ApplyTooltip(_loopButton, active ? LoopButtonActiveTooltip : LoopButtonInactiveTooltip);
         }
 
         void RefreshScrubber(TrecsGameStateController controller, TrecsAutoRecorder recorder)
@@ -1191,8 +1394,9 @@ namespace Trecs.Serialization
             var recordingActive = recorder != null && recorder.IsRecording;
             SetTransportEnabled(recordingActive);
 
-            if (!recordingActive || recorder.Bookmarks.Count == 0)
+            if (!recordingActive || recorder.Snapshots.Count == 0)
             {
+                ResetTimelineSliderValues();
                 _timelineSlider.SetEnabled(false);
                 _hoverIndicator.style.display = DisplayStyle.None;
                 _timelineRuler.Clear();
@@ -1203,7 +1407,7 @@ namespace Trecs.Serialization
 
             var startFrame = recorder.StartFrame;
             var currentFrame = _selectedAccessor.FixedFrame;
-            var maxFrame = Math.Max(currentFrame, recorder.LastBookmarkFrame);
+            var maxFrame = Math.Max(currentFrame, recorder.LastSnapshotFrame);
 
             _suppressControlEvents = true;
             try
@@ -1345,15 +1549,15 @@ namespace Trecs.Serialization
                 _bufferInfoLabel.text = "idle";
                 return;
             }
-            if (recorder.Bookmarks.Count == 0)
+            if (recorder.Snapshots.Count == 0)
             {
-                _bufferInfoLabel.text = "awaiting first bookmark";
+                _bufferInfoLabel.text = "awaiting first snapshot";
                 return;
             }
-            var span = recorder.LastBookmarkFrame - recorder.StartFrame;
+            var span = recorder.LastSnapshotFrame - recorder.StartFrame;
             var seconds = TryGetFixedDeltaTime(out var dt) ? span * dt : 0f;
             _bufferInfoLabel.text =
-                $"{recorder.Bookmarks.Count} bookmarks · "
+                $"{recorder.Snapshots.Count} snapshots · "
                 + $"{span} frames ({FormatDuration(seconds)}) · "
                 + $"{FormatBytes(recorder.TotalBytes)}";
         }
@@ -1379,7 +1583,7 @@ namespace Trecs.Serialization
             {
                 _capacityBanner.text =
                     "Recording paused — capacity reached "
-                    + $"({recorder.Bookmarks.Count} bookmarks, {FormatBytes(recorder.TotalBytes)}). "
+                    + $"({recorder.Snapshots.Count} snapshots, {FormatBytes(recorder.TotalBytes)}). "
                     + "Save, fork, reset, or raise the cap before resuming.";
                 _capacityBanner.style.display = DisplayStyle.Flex;
             }
@@ -1395,7 +1599,7 @@ namespace Trecs.Serialization
             {
                 _desyncBanner.text =
                     $"Desync at frame {recorder.DesyncedFrame.Value} — re-running the simulation "
-                    + "from an earlier bookmark produced different state than originally "
+                    + "from an earlier snapshot produced different state than originally "
                     + "captured. Check the editor log for the checksum mismatch.";
                 _desyncBanner.style.display = DisplayStyle.Flex;
             }
@@ -1419,14 +1623,20 @@ namespace Trecs.Serialization
         // discoverable instead of replaced by a single empty-state label.
         void SetMainPanelsEnabled(bool enabled)
         {
-            _recordingHeaderRow.SetEnabled(enabled);
+            // Leave the recording header row alone (just the recording
+            // name + Actions ▾ button) — the Actions menu hosts Help /
+            // Settings / pre-load actions that should remain reachable
+            // even without a world. Each menu item gates itself on the
+            // current recorder/controller state. Only the transport panel
+            // (frame controls + Record + Loop buttons) is gated here,
+            // since none of its operations make sense without a world.
             _transportPanel.SetEnabled(enabled);
-            _recordingHeaderRow.style.opacity = enabled ? 1f : 0.4f;
             _transportPanel.style.opacity = enabled ? 1f : 0.4f;
-            // Buffer-info sits on rootVisualElement (above the scroll) and
-            // shows live stats — meaningless without a world, so hide it
-            // entirely rather than gray it.
+            // Buffer-info / status sit on rootVisualElement (above the
+            // scroll) and only make sense with a world — hide them entirely
+            // rather than gray them.
             _bufferInfoLabel.style.display = enabled ? DisplayStyle.Flex : DisplayStyle.None;
+            _recordingStatusLabel.style.display = enabled ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         void SetTimeScaleEnabled(bool enabled)
@@ -1486,7 +1696,31 @@ namespace Trecs.Serialization
         void OnStepForwardClicked()
         {
             var controller = GetController();
-            controller?.StepFrame();
+            if (controller == null)
+            {
+                return;
+            }
+            // Refuse to step past the recording's tail in Playback.
+            // runner.StepFrame() bypasses the pause-at-tail logic in
+            // OnFixedFrameChange, so without this gate the next handler
+            // tick lands in the "frame > _lastSnapshotFrame" branch — the
+            // loaded-recording side silently flips to live capture, and
+            // the scrubbed-back side advances into territory the buffer
+            // doesn't cover. Force Record/Fork as the only path out.
+            var recorder = controller.AutoRecorder;
+            if (
+                recorder != null
+                && controller.CurrentMode == GameStateMode.Playback
+                && _selectedAccessor != null
+                && _selectedAccessor.FixedFrame >= recorder.LastSnapshotFrame
+            )
+            {
+                SetRecordingStatus(
+                    "At the end of the recording — press Record to fork and continue live."
+                );
+                return;
+            }
+            controller.StepFrame();
         }
 
         void OnStepBackClicked()
@@ -1504,7 +1738,7 @@ namespace Trecs.Serialization
         {
             var controller = GetController();
             var recorder = controller?.AutoRecorder;
-            if (controller == null || recorder == null || recorder.Bookmarks.Count == 0)
+            if (controller == null || recorder == null || recorder.Snapshots.Count == 0)
             {
                 return;
             }
@@ -1515,71 +1749,115 @@ namespace Trecs.Serialization
         {
             var controller = GetController();
             var recorder = controller?.AutoRecorder;
-            if (controller == null || recorder == null || recorder.Bookmarks.Count == 0)
+            if (controller == null || recorder == null || recorder.Snapshots.Count == 0)
             {
                 return;
             }
-            controller.JumpToFrame(recorder.LastBookmarkFrame);
+            controller.JumpToFrame(recorder.LastSnapshotFrame);
         }
 
-        void OnForkClicked()
+        // Context-sensitive Record button. Behaves differently depending on
+        // CurrentMode — see UpdateRecordButton for the matching tooltip
+        // text. Idle starts capture, Recording stops it, Playback forks at
+        // the current scrub frame. Status text confirms the action took
+        // effect (especially Fork, which is destructive but otherwise
+        // invisible — the badge change alone could be missed).
+        void OnRecordButtonClicked()
         {
             var controller = GetController();
-            controller?.ForkAtCurrentFrame();
+            if (controller == null)
+            {
+                return;
+            }
+            switch (controller.CurrentMode)
+            {
+                case GameStateMode.Idle:
+                    controller.StartAutoRecording();
+                    SetRecordingStatus("Recording started.");
+                    break;
+                case GameStateMode.Recording:
+                    controller.StopAutoRecording();
+                    SetRecordingStatus("Recording stopped.");
+                    break;
+                case GameStateMode.Playback:
+                    var forkFrame = _selectedAccessor?.FixedFrame ?? 0;
+                    if (controller.ForkAtCurrentFrame())
+                    {
+                        SetRecordingStatus($"Forked at frame {forkFrame} — continuing live.");
+                    }
+                    else
+                    {
+                        SetRecordingStatus(
+                            "Fork failed: no snapshot at or before the current frame."
+                        );
+                    }
+                    break;
+            }
+            // Tick once so the button's tooltip + active-state visuals
+            // refresh immediately rather than waiting for the next poll.
+            RefreshTick();
         }
 
-        void OnSettingsClicked()
+        // Loop is purely session-local — the recorder owns the flag and
+        // resets it on Start / LoadRecording / Fork / Reset, so the user
+        // re-opts in for each playback session. We don't persist it via
+        // EditorPrefs.
+        void OnLoopButtonClicked()
         {
             var recorder = GetController()?.AutoRecorder;
             if (recorder == null)
             {
-                SetRecordingStatus("No active recorder to configure.");
                 return;
             }
-            TrecsRecorderSettingsWindow.Show(recorder, this);
+            recorder.LoopPlayback = !recorder.LoopPlayback;
+            UpdateLoopButtonActive(recorder.LoopPlayback);
         }
 
-        void OnTrimButtonClicked()
+        void OnSettingsClicked()
         {
-            var controller = GetController();
-            var recorder = controller?.AutoRecorder;
-            if (recorder == null || !recorder.IsRecording || recorder.Bookmarks.Count == 0)
-            {
-                SetRecordingStatus("Nothing to trim — no recording.");
-                return;
-            }
-            if (_selectedAccessor == null)
-            {
-                SetRecordingStatus("Nothing to trim — no active world.");
-                return;
-            }
+            // Settings are EditorPrefs-backed (see TrecsPlayerSettingsStore),
+            // so the window is reachable any time — no live recorder
+            // required. Save propagates onto any live recorders too.
+            TrecsPlayerSettingsWindow.Show(this);
+        }
 
+        // Adds the Trim Before / Trim After items into a parent menu under the
+        // "Trim" submenu path. Counts the snapshots that would drop so the
+        // labels reflect what each action will actually do; disables an
+        // option when there's nothing on that side to drop.
+        void AddTrimMenuItems(GenericMenu menu, TrecsAutoRecorder recorder)
+        {
+            if (_selectedAccessor == null || recorder == null || recorder.Snapshots.Count == 0)
+            {
+                menu.AddDisabledItem(new GUIContent("Trim/Before current frame"));
+                menu.AddDisabledItem(new GUIContent("Trim/After current frame"));
+                return;
+            }
             var current = _selectedAccessor.FixedFrame;
             var strictlyBefore = 0;
-            var hasExactBookmark = false;
+            var hasExactSnapshot = false;
             var after = 0;
-            for (var i = 0; i < recorder.Bookmarks.Count; i++)
+            for (var i = 0; i < recorder.Snapshots.Count; i++)
             {
-                var f = recorder.Bookmarks[i].Frame;
+                var f = recorder.Snapshots[i].Frame;
                 if (f < current)
                     strictlyBefore++;
                 else if (f > current)
                     after++;
                 else
-                    hasExactBookmark = true;
+                    hasExactSnapshot = true;
             }
-            // TrimRecordingBefore preserves the closest bookmark at-or-before
+            // TrimRecordingBefore preserves the closest snapshot at-or-before
             // `current` so JumpToFrame(current) still resolves. If `current` is
-            // itself a bookmark frame, that's the anchor and all strictly-prior
-            // bookmarks drop. Otherwise the anchor is the last strictly-prior
-            // bookmark, so one fewer drops.
-            var before = hasExactBookmark ? strictlyBefore : Math.Max(0, strictlyBefore - 1);
+            // itself a snapshot frame, that's the anchor and all strictly-prior
+            // snapshots drop. Otherwise the anchor is the last strictly-prior
+            // snapshot, so one fewer drops.
+            var before = hasExactSnapshot ? strictlyBefore : Math.Max(0, strictlyBefore - 1);
 
-            var menu = new GenericMenu();
             var beforeLabel =
-                $"Trim ◀ before frame {current} (drops {before} bookmark{(before == 1 ? "" : "s")})";
+                $"Trim/Before frame {current} (drops {before} snapshot{(before == 1 ? "" : "s")})";
             var afterLabel =
-                $"Trim ▶ after frame {current} (drops {after} bookmark{(after == 1 ? "" : "s")})";
+                $"Trim/After frame {current} (drops {after} snapshot{(after == 1 ? "" : "s")})";
             if (before > 0)
             {
                 menu.AddItem(
@@ -1604,7 +1882,6 @@ namespace Trecs.Serialization
             {
                 menu.AddDisabledItem(new GUIContent(afterLabel));
             }
-            menu.DropDown(_trimButton.worldBound);
         }
 
         void DoTrim(bool trimBefore, int frame)
@@ -1617,7 +1894,7 @@ namespace Trecs.Serialization
             if (
                 !EditorUtility.DisplayDialog(
                     "Trim recording?",
-                    $"Drop bookmarks {direction} frame {frame} from the in-memory buffer? "
+                    $"Drop snapshots {direction} frame {frame} from the in-memory buffer? "
                         + "Saved files on disk are not affected.",
                     "Trim",
                     "Cancel"
@@ -1635,7 +1912,7 @@ namespace Trecs.Serialization
                 return;
             }
             SetRecordingStatus(
-                $"Trimmed {dropped} bookmark{(dropped == 1 ? "" : "s")} {direction} frame {frame}."
+                $"Trimmed {dropped} snapshot{(dropped == 1 ? "" : "s")} {direction} frame {frame}."
             );
             RefreshTick();
         }
@@ -1671,16 +1948,17 @@ namespace Trecs.Serialization
             // Skip the confirm if the buffer is trivially small (just hit
             // Play, no data to lose) — same threshold used by the old
             // "Reset auto-recording" advanced button.
-            var hasRealData = recorder != null && recorder.Bookmarks.Count > 4;
+            var hasRealData = recorder != null && recorder.Snapshots.Count > 4;
             if (hasRealData)
             {
-                var diskNote = string.IsNullOrEmpty(_currentRecordingName)
+                var savedName = CurrentRecordingName;
+                var diskNote = string.IsNullOrEmpty(savedName)
                     ? " The unsaved buffer will be lost."
-                    : $" Saved file '{_currentRecordingName}' on disk is not affected.";
+                    : $" Saved file '{savedName}' on disk is not affected.";
                 if (
                     !EditorUtility.DisplayDialog(
                         "Start a new recording?",
-                        $"Discard {recorder.Bookmarks.Count} in-memory bookmarks "
+                        $"Discard {recorder.Snapshots.Count} in-memory snapshots "
                             + $"({FormatBytes(recorder.TotalBytes)})?"
                             + diskNote,
                         "Discard & start fresh",
@@ -1692,8 +1970,8 @@ namespace Trecs.Serialization
                 }
             }
             controller.ResetAutoRecording();
-            _currentRecordingName = null;
-            UpdateRecordingHeader();
+            // Reset clears the recorder's backing path; LoadedRecordingChanged
+            // fires from the controller's poll so the header updates itself.
             SetRecordingStatus("Started a new recording.");
             RefreshTick();
         }
@@ -1706,7 +1984,7 @@ namespace Trecs.Serialization
                 SetRecordingStatus("No active world.");
                 return;
             }
-            var name = _currentRecordingName;
+            var name = CurrentRecordingName;
             if (string.IsNullOrEmpty(name))
             {
                 name = TrecsTextPromptWindow.Prompt(
@@ -1732,9 +2010,8 @@ namespace Trecs.Serialization
                 SetRecordingStatus("No active world.");
                 return;
             }
-            var suggested = string.IsNullOrEmpty(_currentRecordingName)
-                ? SuggestRecordingName()
-                : _currentRecordingName;
+            var existing = CurrentRecordingName;
+            var suggested = string.IsNullOrEmpty(existing) ? SuggestRecordingName() : existing;
             var name = TrecsTextPromptWindow.Prompt(
                 "Save recording as",
                 "Save as:",
@@ -1754,13 +2031,13 @@ namespace Trecs.Serialization
             {
                 if (controller.SaveNamedRecording(name))
                 {
-                    _currentRecordingName = name;
-                    UpdateRecordingHeader();
+                    // Save updates the recorder's backing path; the header
+                    // refreshes via LoadedRecordingChanged.
                     SetRecordingStatus($"Saved '{name}'.");
                 }
                 else
                 {
-                    SetRecordingStatus("Save failed (no bookmarks to save?).");
+                    SetRecordingStatus("Save failed (no snapshots to save?).");
                 }
             }
             catch (Exception e)
@@ -1769,30 +2046,155 @@ namespace Trecs.Serialization
             }
         }
 
-        void OnLoadClicked()
+        void OnRecordingActionsClicked()
         {
-            // GenericMenu drops down right under the Load button — matches
-            // editor convention for "pick from a list" affordances and avoids
-            // a separate browser window.
+            var controller = GetController();
+            var recorder = controller?.AutoRecorder;
+            var isRecording = recorder?.IsRecording ?? false;
+            var hasBuffer = isRecording && recorder.Snapshots.Count > 0;
+            var savedName = CurrentRecordingName;
+            var hasSavedName = !string.IsNullOrEmpty(savedName);
+            var inPlayback = controller != null && controller.CurrentMode == GameStateMode.Playback;
+
             var menu = new GenericMenu();
-            var names = TrecsGameStateController.GetSavedRecordingNames();
-            if (names.Count == 0)
+
+            // ── Recording group ──
+            // New resets the in-memory buffer — only meaningful while the
+            // recorder is actually running. With the recorder stopped
+            // (no capture has been started, or it was stopped via the
+            // Record button), New is disabled until capture resumes.
+            if (isRecording)
             {
-                menu.AddDisabledItem(new GUIContent("(no saved recordings)"));
+                menu.AddItem(new GUIContent("New Recording"), false, OnNewClicked);
             }
             else
             {
-                foreach (var n in names)
+                menu.AddDisabledItem(new GUIContent("New Recording"));
+            }
+
+            // Save / Save As require something in the buffer to write.
+            if (hasBuffer)
+            {
+                menu.AddItem(new GUIContent("Save Recording"), false, OnSaveClicked);
+                menu.AddItem(new GUIContent("Save Recording As…"), false, OnSaveAsClicked);
+            }
+            else
+            {
+                menu.AddDisabledItem(new GUIContent("Save Recording"));
+                menu.AddDisabledItem(new GUIContent("Save Recording As…"));
+            }
+
+            // Load Recording cascade — needs a controller to load into,
+            // but does NOT require the recorder to already be running.
+            if (controller == null)
+            {
+                menu.AddDisabledItem(new GUIContent("Load Recording/(no active world)"));
+            }
+            else
+            {
+                var names = TrecsGameStateController.GetSavedRecordingNames();
+                if (names.Count == 0)
                 {
-                    var captured = n;
-                    menu.AddItem(
-                        new GUIContent(captured),
-                        captured == _currentRecordingName,
-                        () => DoLoadRecording(captured)
-                    );
+                    menu.AddDisabledItem(new GUIContent("Load Recording/(none saved)"));
+                }
+                else
+                {
+                    foreach (var n in names)
+                    {
+                        var captured = n;
+                        menu.AddItem(
+                            new GUIContent($"Load Recording/{captured}"),
+                            captured == savedName,
+                            () => DoLoadRecording(captured)
+                        );
+                    }
                 }
             }
-            menu.DropDown(_loadButton.worldBound);
+
+            // Delete operates on the on-disk recording file, independent
+            // of whether the recorder is running.
+            if (hasSavedName)
+            {
+                menu.AddItem(
+                    new GUIContent($"Delete Recording '{savedName}'"),
+                    false,
+                    OnDeleteClicked
+                );
+            }
+            else
+            {
+                menu.AddDisabledItem(new GUIContent("Delete Recording"));
+            }
+
+            menu.AddSeparator(string.Empty);
+
+            // ── Snapshot group ──
+            // Snapshots are single-frame world states distinct from
+            // recordings (which are time-ranges). SaveSnapshot doesn't
+            // require an active recorder; LoadSnapshot stops the
+            // recorder, restores world state to the snapshot frame, and
+            // (if recording was active) restarts a fresh buffer there.
+            if (controller != null)
+            {
+                menu.AddItem(new GUIContent("Save Snapshot…"), false, OnSaveSnapshotClicked);
+            }
+            else
+            {
+                menu.AddDisabledItem(new GUIContent("Save Snapshot…"));
+            }
+
+            if (controller == null)
+            {
+                menu.AddDisabledItem(new GUIContent("Load Snapshot/(no active world)"));
+            }
+            else
+            {
+                var snapNames = TrecsGameStateController.GetSavedSnapshotNames();
+                if (snapNames.Count == 0)
+                {
+                    menu.AddDisabledItem(new GUIContent("Load Snapshot/(none saved)"));
+                }
+                else
+                {
+                    foreach (var n in snapNames)
+                    {
+                        var captured = n;
+                        menu.AddItem(
+                            new GUIContent($"Load Snapshot/{captured}"),
+                            false,
+                            () => DoLoadSnapshot(captured)
+                        );
+                    }
+                }
+            }
+
+            menu.AddSeparator(string.Empty);
+
+            // ── Playback-only group ──
+            // Trim operates on the current scrub frame, which only makes
+            // sense once the user has rewound. Disabled (rather than
+            // hidden) so the affordance stays discoverable. Fork moved to
+            // the transport-row Record button — pressing Record while in
+            // Playback forks at the current frame.
+            if (inPlayback)
+            {
+                AddTrimMenuItems(menu, recorder);
+            }
+            else
+            {
+                menu.AddDisabledItem(new GUIContent("Trim/Before current frame"));
+                menu.AddDisabledItem(new GUIContent("Trim/After current frame"));
+            }
+
+            menu.AddSeparator(string.Empty);
+
+            // Settings is EditorPrefs-backed and always reachable — even
+            // outside play mode — so users can pre-tune defaults before
+            // starting a session.
+            menu.AddItem(new GUIContent("Settings…"), false, OnSettingsClicked);
+            menu.AddItem(new GUIContent("Help…"), false, ShowHelp);
+
+            menu.DropDown(_recordingActionsButton.worldBound);
         }
 
         void DoLoadRecording(string name)
@@ -1807,8 +2209,7 @@ namespace Trecs.Serialization
             {
                 if (controller.LoadNamedRecording(name))
                 {
-                    _currentRecordingName = name;
-                    UpdateRecordingHeader();
+                    // LoadedRecordingChanged updates the header.
                     SetRecordingStatus($"Loaded '{name}'.");
                     RefreshTick();
                 }
@@ -1823,9 +2224,114 @@ namespace Trecs.Serialization
             }
         }
 
+        // Same EditorPrefs key used by TrecsSavesWindow so a "Don't ask
+        // again" dismissal there silences the Player too. Key still spells
+        // "Bookmarks" — predates the bookmark→snapshot rename; keeping the
+        // original spelling so existing user dismissals carry over.
+        const string SuppressLoadSnapshotConfirmKey = "Trecs.Bookmarks.SuppressLoadConfirm";
+
+        void OnSaveSnapshotClicked()
+        {
+            var controller = GetController();
+            if (controller == null)
+            {
+                SetRecordingStatus("No active world.");
+                return;
+            }
+            var name = TrecsTextPromptWindow.Prompt(
+                "Save snapshot",
+                "Snapshot name:",
+                SuggestSnapshotName(),
+                anchor: this
+            );
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return;
+            }
+            name = name.Trim();
+            if (File.Exists(TrecsGameStateController.GetSnapshotPath(name)))
+            {
+                if (
+                    !EditorUtility.DisplayDialog(
+                        "Overwrite snapshot?",
+                        $"A snapshot named '{name}' already exists. Overwrite?",
+                        "Overwrite",
+                        "Cancel"
+                    )
+                )
+                {
+                    return;
+                }
+            }
+            if (controller.SaveSnapshot(name))
+            {
+                SetRecordingStatus($"Saved snapshot '{name}'.");
+            }
+            else
+            {
+                SetRecordingStatus($"Failed to save snapshot '{name}'.");
+            }
+        }
+
+        void DoLoadSnapshot(string name)
+        {
+            var controller = GetController();
+            if (controller == null)
+            {
+                SetRecordingStatus("No active world to load into.");
+                return;
+            }
+            // Loading a snapshot stops the in-memory recording (see
+            // TrecsGameStateController.LoadSnapshot), so warn before
+            // discarding the buffer. EditorPrefs key matches the Snapshots
+            // window so "Don't ask again" carries between both surfaces.
+            if (
+                controller.AutoRecorder.IsRecording
+                && !EditorPrefs.GetBool(SuppressLoadSnapshotConfirmKey, false)
+            )
+            {
+                var choice = EditorUtility.DisplayDialogComplex(
+                    "Load snapshot?",
+                    "Loading a snapshot will discard the current in-memory "
+                        + "recording buffer (saved files on disk are not "
+                        + "affected) and start a fresh recording from the "
+                        + "snapshot's frame.",
+                    "Load",
+                    "Cancel",
+                    "Load and don't ask again"
+                );
+                if (choice == 1)
+                    return;
+                if (choice == 2)
+                    EditorPrefs.SetBool(SuppressLoadSnapshotConfirmKey, true);
+            }
+            try
+            {
+                if (controller.LoadSnapshot(name))
+                {
+                    // LoadSnapshot stops the recorder and starts a fresh
+                    // recording from the snapshot frame; the recorder's
+                    // backing path is reset by Start() and the header
+                    // refreshes through LoadedRecordingChanged.
+                    SetRecordingStatus($"Loaded snapshot '{name}'.");
+                    RefreshTick();
+                }
+                else
+                {
+                    SetRecordingStatus($"Failed to load snapshot '{name}'.");
+                }
+            }
+            catch (Exception e)
+            {
+                SetRecordingStatus($"Load snapshot failed: {e.Message}");
+            }
+        }
+
+        static string SuggestSnapshotName() => $"snapshot-{DateTime.Now:yyyyMMdd-HHmmss}";
+
         void OnDeleteClicked()
         {
-            var name = _currentRecordingName;
+            var name = CurrentRecordingName;
             if (string.IsNullOrEmpty(name))
             {
                 SetRecordingStatus("No saved file to delete (current recording is unsaved).");
@@ -1848,14 +2354,15 @@ namespace Trecs.Serialization
             {
                 if (controller != null)
                 {
+                    // The controller clears the recorder's backing path
+                    // when it deletes the matching file; LoadedRecordingChanged
+                    // updates the header.
                     controller.DeleteNamedRecording(name);
                 }
                 else
                 {
                     DeleteFileIfExists(TrecsGameStateController.GetRecordingPath(name));
                 }
-                _currentRecordingName = null;
-                UpdateRecordingHeader();
                 SetRecordingStatus($"Deleted '{name}' from disk.");
             }
             catch (Exception e)
@@ -1872,28 +2379,51 @@ namespace Trecs.Serialization
             {
                 return;
             }
-            var saved = !string.IsNullOrEmpty(_currentRecordingName);
-            var displayName = saved ? _currentRecordingName : UnsavedRecordingDisplayName;
+            var name = CurrentRecordingName;
+            var saved = !string.IsNullOrEmpty(name);
+            var recorder = GetController()?.AutoRecorder;
+            var isRecording = recorder?.IsRecording ?? false;
+
+            // Three states: Saved (named on disk) → bold blue file name.
+            // Recording with no save → dimmed italic "(unsaved)".
+            // Stopped recorder → dimmed italic "(no recording)" — avoids
+            // implying there's an unsaved buffer when in fact nothing is
+            // being captured.
+            string displayName;
+            string tooltip;
+            if (saved)
+            {
+                displayName = name;
+                tooltip = $"Recording: {displayName}\n(file backing the in-memory recording)";
+            }
+            else if (isRecording)
+            {
+                displayName = UnsavedRecordingDisplayName;
+                tooltip = "Recording is unsaved — Save to persist to disk.";
+            }
+            else
+            {
+                displayName = NoRecordingDisplayName;
+                tooltip =
+                    "Recorder is stopped — press the Record button to start "
+                    + "capturing or load a saved recording from the Actions menu.";
+            }
+
             _recordingNameLabel.text = displayName;
             _recordingNameLabel.style.unityFontStyleAndWeight = saved
                 ? FontStyle.Bold
                 : FontStyle.Italic;
             _recordingNameLabel.style.opacity = saved ? 1f : 0.7f;
             // Highlight the saved name so it reads as the header's identity
-            // without needing a "Recording:" prefix label. Unsaved falls back
-            // to the default text color (dimmed via opacity above).
+            // without needing a "Recording:" prefix label. Unsaved /
+            // no-recording fall back to the default text color (dimmed via
+            // opacity above).
             _recordingNameLabel.style.color = saved
                 ? new StyleColor(new Color(0.55f, 0.85f, 1f))
                 : new StyleColor(StyleKeyword.Null);
             // Surface the full name via the hover tooltip so the user can
             // still read it when the label gets ellipsised by the row.
-            ApplyTooltip(
-                _recordingNameLabel,
-                saved
-                    ? $"Recording: {displayName}\n(file backing the in-memory recording)"
-                    : "Recording is unsaved — Save to persist to disk."
-            );
-            _deleteButton?.SetEnabled(saved);
+            ApplyTooltip(_recordingNameLabel, tooltip);
         }
 
         // ---- Scrubber callbacks ----
@@ -2234,6 +2764,9 @@ namespace Trecs.Serialization
             if (File.Exists(path))
             {
                 File.Delete(path);
+                // Fallback path bypasses the controller, so notify the
+                // library event manually so other observers refresh.
+                TrecsGameStateController.NotifySavesChanged();
             }
         }
 

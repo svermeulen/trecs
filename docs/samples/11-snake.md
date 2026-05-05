@@ -12,10 +12,10 @@ Classic Snake — a head moves on a grid, eats food to grow, and leaves a trail 
 |---|---|
 | F5 | Toggle recording |
 | F6 | Toggle playback |
-| F8 | Save bookmark |
-| F9 | Load bookmark |
+| F8 | Save snapshot |
+| F9 | Load snapshot |
 
-Recordings and bookmarks are written under `{Application.persistentDataPath}/Snake/Recordings/`.
+Recordings and snapshots are written under `{Application.persistentDataPath}/Snake/Recordings/`.
 
 ## Schema
 
@@ -45,10 +45,10 @@ public struct SnakeFood : ITag { }
 public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
     [Input(MissingInputFrameBehaviour.RetainCurrent)]
-    public MoveInput MoveInput;
-    public SnakeLength SnakeLength = new(4);
-    public Score Score;
-    public MoveTickCounter MoveTickCounter;
+    MoveInput MoveInput;
+    SnakeLength SnakeLength = new(4);
+    Score Score;
+    MoveTickCounter MoveTickCounter;
 }
 ```
 
@@ -161,7 +161,7 @@ new WorldBuilder()
     // ...
 ```
 
-Serialization is wired in via the sample-side `SerializationFactory.CreateAll(world)` helper (in `Samples/Common/Scripts/`), which composes a registry + `WorldStateSerializer` + `BookmarkSerializer` + `RecordingHandler` + `PlaybackHandler`. The `RecordAndPlaybackController` reads keyboard input and drives `SaveBookmark(path)` / `LoadBookmark(path)` / `EndRecording(path)` / `StartPlayback(path, ...)` against file paths under `persistentDataPath`.
+Serialization is wired in via the sample-side `SerializationFactory.CreateAll(world)` helper (in `Samples/Common/Scripts/`), which composes a registry + `WorldStateSerializer` + `SnapshotSerializer` + `RecordingHandler` + `PlaybackHandler`. The `RecordAndPlaybackController` reads keyboard input and drives `SaveSnapshot(path)` / `LoadSnapshot(path)` / `EndRecording(path)` / `StartPlayback(path, ...)` against file paths under `persistentDataPath`.
 
 See [Serialization](../advanced/serialization.md) for custom-serializer authoring and [Recording & Playback](../advanced/recording-and-playback.md) for the full handler API.
 

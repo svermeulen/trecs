@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using Trecs.Collections;
+using Trecs.Internal;
 using UnityEngine;
 using NAssert = NUnit.Framework.Assert;
 

@@ -9,7 +9,7 @@ namespace Trecs.Serialization
 {
     /// <summary>
     /// Coordinates the game-state-serialization features that touch the World's
-    /// input queue and component state: auto-recording, named bookmarks/recordings,
+    /// input queue and component state: auto-recording, named snapshots/recordings,
     /// scrub-back playback. Editor tooling and runtime callers go through this
     /// controller rather than driving <see cref="TrecsAutoRecorder"/> directly,
     /// so transitions stay valid.
@@ -27,21 +27,22 @@ namespace Trecs.Serialization
 
         readonly World _world;
         readonly TrecsAutoRecorder _autoRecorder;
-        readonly BookmarkSerializer _bookmarkSerializer;
+        readonly SnapshotSerializer _snapshotSerializer;
 
         WorldAccessor _accessor;
         GameStateMode _lastBroadcastMode = GameStateMode.Idle;
+        string _lastBroadcastLoadedRecordingName;
         IDisposable _frameSubscription;
 
         public TrecsGameStateController(
             World world,
             TrecsAutoRecorder autoRecorder,
-            BookmarkSerializer bookmarkSerializer
+            SnapshotSerializer snapshotSerializer
         )
         {
             _world = world;
             _autoRecorder = autoRecorder;
-            _bookmarkSerializer = bookmarkSerializer;
+            _snapshotSerializer = snapshotSerializer;
         }
 
         public World World => _world;
@@ -95,6 +96,45 @@ namespace Trecs.Serialization
         /// </summary>
         public event Action<GameStateMode> ModeChanged;
 
+        /// <summary>
+        /// Name (without extension) of the on-disk file backing the
+        /// recorder's in-memory buffer, or null when the buffer is fresh,
+        /// post-Reset, or post-Fork. Drives the Player window's header
+        /// label and the "Save vs Save As" branching, plus the loaded-row
+        /// highlight in the Saves window.
+        /// </summary>
+        public string LoadedRecordingName
+        {
+            get
+            {
+                var path = _autoRecorder.LoadedRecordingPath;
+                return string.IsNullOrEmpty(path) ? null : Path.GetFileNameWithoutExtension(path);
+            }
+        }
+
+        /// <summary>
+        /// Fires whenever <see cref="LoadedRecordingName"/> changes — load,
+        /// save, reset, fork, fresh-start, world dispose. Detected by the
+        /// same polling loop as <see cref="ModeChanged"/>.
+        /// </summary>
+        public event Action LoadedRecordingChanged;
+
+        /// <summary>
+        /// Fires whenever the on-disk save library changes — a recording or
+        /// snapshot was saved, deleted, or renamed. Lets the Saves window
+        /// (and any other library views) refresh without polling. Static so
+        /// any controller's edits notify all observers.
+        /// </summary>
+        public static event Action SavesChanged;
+
+        /// <summary>
+        /// Fire <see cref="SavesChanged"/>. Public-static so the editor
+        /// windows can notify subscribers after fallback paths that don't
+        /// route through the controller (e.g. deleting a file from the
+        /// Saves window when no live world exists).
+        /// </summary>
+        public static void NotifySavesChanged() => SavesChanged?.Invoke();
+
         public void Initialize()
         {
             _accessor = _world.CreateAccessor("TrecsGameStateController");
@@ -145,6 +185,18 @@ namespace Trecs.Serialization
                 ApplyInputSystemsForMode(previous, current);
                 ModeChanged?.Invoke(current);
             }
+            var currentName = LoadedRecordingName;
+            if (
+                !string.Equals(
+                    currentName,
+                    _lastBroadcastLoadedRecordingName,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                _lastBroadcastLoadedRecordingName = currentName;
+                LoadedRecordingChanged?.Invoke();
+            }
         }
 
         // Toggles SystemPhase.Input systems based on the mode transition.
@@ -172,16 +224,15 @@ namespace Trecs.Serialization
             {
                 return;
             }
-            var systems = _accessor.GetSystems();
-            for (int i = 0; i < systems.Count; i++)
+            for (int i = 0; i < _world.SystemCount; i++)
             {
-                if (systems[i].Metadata.Phase != SystemPhase.Input)
+                if (_world.GetSystemMetadata(i).Phase != SystemPhase.Input)
                 {
                     continue;
                 }
-                if (_accessor.IsSystemEnabled(i) != enable)
+                if (_world.IsSystemEnabled(i, EnableChannel.Playback) != enable)
                 {
-                    _accessor.SetSystemEnabled(i, enable);
+                    _world.SetSystemEnabled(i, EnableChannel.Playback, enable);
                 }
             }
         }
@@ -218,30 +269,30 @@ namespace Trecs.Serialization
             return ok;
         }
 
-        public bool JumpToPreviousBookmark()
+        public bool JumpToPreviousSnapshot()
         {
             if (!_autoRecorder.IsRecording)
             {
                 return false;
             }
-            var ok = _autoRecorder.JumpToPreviousBookmark();
+            var ok = _autoRecorder.JumpToPreviousSnapshot();
             PollModeChanged();
             return ok;
         }
 
-        public bool JumpToNextBookmark()
+        public bool JumpToNextSnapshot()
         {
             if (!_autoRecorder.IsRecording)
             {
                 return false;
             }
-            var ok = _autoRecorder.JumpToNextBookmark();
+            var ok = _autoRecorder.JumpToNextSnapshot();
             PollModeChanged();
             return ok;
         }
 
         /// <summary>
-        /// Truncate any bookmarks past the current frame and resume Recording
+        /// Truncate any snapshots past the current frame and resume Recording
         /// from here. Use when the user has scrubbed into Playback and wants
         /// to commit the buffer at this point (dropping the "future" the
         /// recorder is holding speculatively). After this call the recorder
@@ -301,7 +352,7 @@ namespace Trecs.Serialization
         }
 
         /// <summary>
-        /// Persist the current auto-recording (the in-memory bookmark list) to
+        /// Persist the current auto-recording (the in-memory snapshot list) to
         /// disk under <paramref name="name"/>. Saved recordings live under
         /// <c>&lt;project&gt;/svkj_temp/trecs_debug/recordings/</c>.
         /// </summary>
@@ -319,12 +370,17 @@ namespace Trecs.Serialization
                 return false;
             }
             _log.Info("Saved recording '{}' to {}", name, path);
+            // Save sets the recorder's LoadedRecordingPath so a subsequent
+            // "Save" overwrites the same slot. Poll so subscribers learn
+            // about the new name without waiting for the next fixed tick.
+            PollModeChanged();
+            NotifySavesChanged();
             return true;
         }
 
         /// <summary>
         /// Replace the current auto-recording in memory with a previously-saved
-        /// one and pause the world at its earliest bookmark so the user can
+        /// one and pause the world at its earliest snapshot so the user can
         /// scrub through it.
         /// </summary>
         public bool LoadNamedRecording(string name)
@@ -361,7 +417,12 @@ namespace Trecs.Serialization
                 return false;
             }
             File.Delete(path);
+            // If the buffer was backed by this file, detach so the Player
+            // header doesn't keep showing a stale name.
+            _autoRecorder.ClearLoadedPathIfMatches(path);
+            PollModeChanged();
             _log.Info("Deleted recording '{}'", name);
+            NotifySavesChanged();
             return true;
         }
 
@@ -391,6 +452,7 @@ namespace Trecs.Serialization
             }
             File.Move(src, dst);
             _log.Info("Renamed '{}' → '{}' in {}", oldName, newName, directory);
+            NotifySavesChanged();
             return true;
         }
 
@@ -409,22 +471,22 @@ namespace Trecs.Serialization
             return Path.Combine(GetRecordingsDirectory(), name + ".bin");
         }
 
-        // ---- Snapshots (standalone single-frame bookmarks) ----
+        // ---- Snapshots (standalone single-frame snapshots) ----
         //
         // Snapshots are loose save-states distinct from recordings: a single
         // captured world state, no input timeline. They serve as QA repro
         // fixtures or "revert here later" pins. Storage uses the same
-        // BookmarkSerializer format as the recording's per-frame bookmarks
-        // so loading a snapshot is just LoadBookmark(stream). Capturing
+        // SnapshotSerializer format as the recording's per-frame snapshots
+        // so loading a snapshot is just LoadSnapshot(stream). Capturing
         // works in any mode (including while auto-recording) without
         // disturbing the live recording — we only read the world's current
-        // state; we never write back into the recorder's bookmark list.
+        // state; we never write back into the recorder's snapshot list.
         // Loading jumps the world's frame, which would corrupt an active
         // recording's continuity, so we stop the recorder around the load
         // and start a fresh one rooted at the snapshot's frame if the user
         // was recording before.
 
-        const int SnapshotBookmarkVersion = 1;
+        const int SnapshotFileVersion = 1;
 
         public bool SaveSnapshot(string name)
         {
@@ -438,12 +500,13 @@ namespace Trecs.Serialization
             try
             {
                 Directory.CreateDirectory(GetSnapshotsDirectory());
-                _bookmarkSerializer.SaveBookmark(
-                    SnapshotBookmarkVersion,
+                _snapshotSerializer.SaveSnapshot(
+                    SnapshotFileVersion,
                     path,
                     includeTypeChecks: true
                 );
                 _log.Info("Saved snapshot '{}' to {}", name, path);
+                NotifySavesChanged();
                 return true;
             }
             catch (Exception e)
@@ -462,7 +525,7 @@ namespace Trecs.Serialization
                 _log.Warning("Snapshot '{}' does not exist at {}", name, path);
                 return false;
             }
-            // Loading a bookmark restores world state to a different frame, which
+            // Loading a snapshot restores world state to a different frame, which
             // would corrupt the existing recording's continuity. Stop it first;
             // if the user was recording, restart fresh from the loaded frame
             // afterwards so they don't land in LIVE limbo (the Replay window's
@@ -472,8 +535,8 @@ namespace Trecs.Serialization
             StopAutoRecording();
             try
             {
-                _bookmarkSerializer.LoadBookmark(path);
-                // LoadBookmark only restores component state; the input queue
+                _snapshotSerializer.LoadSnapshot(path);
+                // LoadSnapshot only restores component state; the input queue
                 // still has the abandoned timeline's inputs at >= the loaded
                 // frame. The next tick's input-phase AddInput would trip an
                 // "Input already exists" assert. Same pattern as the auto-
@@ -509,6 +572,7 @@ namespace Trecs.Serialization
             }
             File.Delete(path);
             _log.Info("Deleted snapshot '{}'", name);
+            NotifySavesChanged();
             return true;
         }
 
@@ -533,7 +597,7 @@ namespace Trecs.Serialization
         }
 
         /// <summary>
-        /// Discard all current auto-recording bookmarks and start fresh from
+        /// Discard all current auto-recording snapshots and start fresh from
         /// the world's current frame. Useful when the user wants to shape a
         /// recording before saving it (e.g. play a bit, reset, then capture
         /// the interesting part).

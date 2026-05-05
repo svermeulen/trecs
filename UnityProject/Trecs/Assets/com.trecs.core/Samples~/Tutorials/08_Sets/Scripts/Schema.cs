@@ -34,10 +34,10 @@ namespace Trecs.Samples.Sets
     {
         public partial class ParticleEntity : ITemplate, IHasTags<SampleTags.Particle>
         {
-            public Position Position = default;
-            public WarmIntensity WarmIntensity = default;
-            public CoolIntensity CoolIntensity = default;
-            public GameObjectId GameObjectId;
+            Position Position = default;
+            WarmIntensity WarmIntensity = default;
+            CoolIntensity CoolIntensity = default;
+            GameObjectId GameObjectId;
         }
     }
 }

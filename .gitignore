@@ -21,3 +21,4 @@ site/
 svkj-local
 svkj-local.meta
 svkj_set_up_local.sh
+.unity_shadow/

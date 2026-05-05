@@ -15,8 +15,8 @@ namespace Trecs.Tests
 
     public partial class TestGlobalsTemplate : ITemplate, IExtends<TrecsTemplates.Globals>
     {
-        public TestGlobalInt GlobalInt = new TestGlobalInt { Value = 0 };
-        public TestGlobalFloat GlobalFloat = new TestGlobalFloat { Value = 0f };
+        TestGlobalInt GlobalInt = new TestGlobalInt { Value = 0 };
+        TestGlobalFloat GlobalFloat = new TestGlobalFloat { Value = 0f };
     }
 
     [TestFixture]

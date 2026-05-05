@@ -108,7 +108,8 @@ namespace Trecs.Internal
         /// </summary>
         public void FlushAllSetJobWrites()
         {
-            var sets = EntitySets.GetValuesWrite(out var count);
+            var sets = EntitySets.UnsafeValues;
+            var count = EntitySets.Count;
             for (int i = 0; i < count; i++)
             {
                 sets[i].FlushJobWrites();
@@ -147,17 +148,17 @@ namespace Trecs.Internal
             ref NativeSetDeferredQueues queues
         )
         {
-            for (int i = 0; i < queues.RemoveQueue.Count; i++)
+            for (int i = 0; i < queues.RemoveQueue.Length; i++)
             {
                 ref var bag = ref queues.RemoveQueue.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                     set.RemoveImmediateUnchecked(bag.Dequeue<EntityIndex>());
             }
 
-            for (int i = 0; i < queues.AddQueue.Count; i++)
+            for (int i = 0; i < queues.AddQueue.Length; i++)
             {
                 ref var bag = ref queues.AddQueue.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                     set.AddImmediateUnchecked(bag.Dequeue<EntityIndex>());
             }
         }
@@ -168,10 +169,10 @@ namespace Trecs.Internal
         )
         {
             var allRemoves = new NativeList<EntityIndex>(64, Allocator.Temp);
-            for (int i = 0; i < queues.RemoveQueue.Count; i++)
+            for (int i = 0; i < queues.RemoveQueue.Length; i++)
             {
                 ref var bag = ref queues.RemoveQueue.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                     allRemoves.Add(bag.Dequeue<EntityIndex>());
             }
             allRemoves.Sort();
@@ -180,10 +181,10 @@ namespace Trecs.Internal
             allRemoves.Dispose();
 
             var allAdds = new NativeList<EntityIndex>(64, Allocator.Temp);
-            for (int i = 0; i < queues.AddQueue.Count; i++)
+            for (int i = 0; i < queues.AddQueue.Length; i++)
             {
                 ref var bag = ref queues.AddQueue.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                     allAdds.Add(bag.Dequeue<EntityIndex>());
             }
             allAdds.Sort();

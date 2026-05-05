@@ -82,6 +82,11 @@ namespace Trecs
                 ? (IReadOnlyCollection<GroupIndex>)s
                 : Array.Empty<GroupIndex>();
 
+        // Every accessor debug name the tracker has seen at least one
+        // (component or group) access for. Used by TrecsSchemaCache to walk
+        // accessors when persisting per-accessor data like tags-touched.
+        public IReadOnlyCollection<string> GetAllTrackedAccessorNames() => _systemGroups.Keys;
+
         public IReadOnlyCollection<string> GetSystemsTouchingGroup(GroupIndex group) =>
             _groupSystems.TryGetValue(group, out var s)
                 ? (IReadOnlyCollection<string>)s
@@ -122,6 +127,14 @@ namespace Trecs
     {
         static readonly Dictionary<World, TrecsAccessTracker> _trackers = new();
 
+        // Fires inside OnWorldUnregistered, before the tracker is detached
+        // and cleared. Subscribers (e.g. TrecsSchemaCache) can read the
+        // tracker's accumulated data here and persist it — using the plain
+        // WorldRegistry.WorldUnregistered event would race with this class's
+        // own handler, since [InitializeOnLoad] subscription order is
+        // implementation-defined.
+        public static event Action<World> WorldAccessTrackerWillClear;
+
         static TrecsAccessRegistry()
         {
             WorldRegistry.WorldRegistered += OnWorldRegistered;
@@ -149,6 +162,15 @@ namespace Trecs
         {
             if (_trackers.TryGetValue(world, out var existing))
             {
+                try
+                {
+                    WorldAccessTrackerWillClear?.Invoke(world);
+                }
+                catch (Exception)
+                {
+                    // A subscriber blowing up shouldn't strand the world
+                    // with a live recorder pointer.
+                }
                 if (!world.IsDisposed)
                 {
                     world.SetComponentAccessRecorder(null);

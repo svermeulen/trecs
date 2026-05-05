@@ -17,7 +17,7 @@ namespace Trecs.Tests
 
             NAssert.IsTrue(dict.IsCreated);
             NAssert.AreEqual(0, dict.Count);
-            NAssert.IsTrue(dict.IsEmpty());
+            NAssert.IsTrue(dict.IsEmpty);
 
             dict.Dispose();
         }
@@ -34,7 +34,7 @@ namespace Trecs.Tests
             dict.Add(1, 1.5f);
 
             NAssert.AreEqual(1, dict.Count);
-            NAssert.IsFalse(dict.IsEmpty());
+            NAssert.IsFalse(dict.IsEmpty);
 
             dict.Dispose();
         }
@@ -272,7 +272,7 @@ namespace Trecs.Tests
             dict.Clear();
 
             NAssert.AreEqual(0, dict.Count);
-            NAssert.IsTrue(dict.IsEmpty());
+            NAssert.IsTrue(dict.IsEmpty);
             NAssert.IsFalse(dict.ContainsKey(1));
 
             dict.Dispose();

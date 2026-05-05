@@ -10,7 +10,7 @@ namespace Trecs.Tests
     public class SerializationRoundTripTests
     {
         [Test]
-        public void Bookmark_RoundTripsEntityState()
+        public void Snapshot_RoundTripsEntityState()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
@@ -21,10 +21,10 @@ namespace Trecs.Tests
 
             var registry = TrecsSerialization.CreateSerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
             using var stream = new MemoryStream();
-            var savedMetadata = bookmarks.SaveBookmark(version: 1, stream: stream);
+            var savedMetadata = snapshots.SaveSnapshot(version: 1, stream: stream);
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
 
             // Mutate after saving so we can verify the load reverts state
@@ -33,14 +33,14 @@ namespace Trecs.Tests
             NAssert.AreEqual(3, a.CountEntitiesWithTags(TestTags.Alpha));
 
             stream.Position = 0;
-            var loadedMetadata = bookmarks.LoadBookmark(stream);
+            var loadedMetadata = snapshots.LoadSnapshot(stream);
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
             NAssert.AreEqual(savedMetadata.FixedFrame, loadedMetadata.FixedFrame);
         }
 
         [Test]
-        public void Bookmark_PeekMetadata_DoesNotMutateWorld()
+        public void Snapshot_PeekMetadata_DoesNotMutateWorld()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
@@ -50,20 +50,20 @@ namespace Trecs.Tests
 
             var registry = TrecsSerialization.CreateSerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
             using var stream = new MemoryStream();
-            var saved = bookmarks.SaveBookmark(version: 1, stream: stream);
+            var saved = snapshots.SaveSnapshot(version: 1, stream: stream);
 
             stream.Position = 0;
-            var peeked = bookmarks.PeekMetadata(stream);
+            var peeked = snapshots.PeekMetadata(stream);
 
             NAssert.AreEqual(saved.FixedFrame, peeked.FixedFrame);
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
         }
 
         [Test]
-        public void Bookmark_RoundTripsViaFile()
+        public void Snapshot_RoundTripsViaFile()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
@@ -73,12 +73,12 @@ namespace Trecs.Tests
 
             var registry = TrecsSerialization.CreateSerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
             var path = Path.Combine(Path.GetTempPath(), $"trecs_test_{Guid.NewGuid():N}.bin");
             try
             {
-                bookmarks.SaveBookmark(version: 1, filePath: path);
+                snapshots.SaveSnapshot(version: 1, filePath: path);
                 NAssert.IsTrue(File.Exists(path));
 
                 a.Query().WithTags(TestTags.Alpha).Single().Get<TestInt>().Write.Value = 0;
@@ -87,7 +87,7 @@ namespace Trecs.Tests
                     a.Query().WithTags(TestTags.Alpha).Single().Get<TestInt>().Read.Value
                 );
 
-                bookmarks.LoadBookmark(path);
+                snapshots.LoadSnapshot(path);
 
                 NAssert.AreEqual(
                     13,
@@ -128,79 +128,79 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Bookmark_VersionIsPreservedInMetadata()
+        public void Snapshot_VersionIsPreservedInMetadata()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var registry = TrecsSerialization.CreateSerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
             using var stream = new MemoryStream();
-            var saved = bookmarks.SaveBookmark(version: 42, stream: stream);
+            var saved = snapshots.SaveSnapshot(version: 42, stream: stream);
 
             NAssert.AreEqual(42, saved.Version);
 
             stream.Position = 0;
-            var peeked = bookmarks.PeekMetadata(stream);
+            var peeked = snapshots.PeekMetadata(stream);
             NAssert.AreEqual(42, peeked.Version);
 
             stream.Position = 0;
-            var loaded = bookmarks.LoadBookmark(stream);
+            var loaded = snapshots.LoadSnapshot(stream);
             NAssert.AreEqual(42, loaded.Version);
         }
 
         [Test]
-        public void Bookmark_LoadingEmptyStream_Throws_SerializationException()
+        public void Snapshot_LoadingEmptyStream_Throws_SerializationException()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var registry = TrecsSerialization.CreateSerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
             using var empty = new MemoryStream();
-            NAssert.Throws<SerializationException>(() => bookmarks.LoadBookmark(empty));
+            NAssert.Throws<SerializationException>(() => snapshots.LoadSnapshot(empty));
         }
 
         [Test]
-        public void Bookmark_ArgumentValidation()
+        public void Snapshot_ArgumentValidation()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var registry = TrecsSerialization.CreateSerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
             NAssert.Throws<ArgumentNullException>(() =>
-                bookmarks.SaveBookmark(version: 1, stream: (Stream)null)
+                snapshots.SaveSnapshot(version: 1, stream: (Stream)null)
             );
             NAssert.Throws<ArgumentException>(() =>
-                bookmarks.SaveBookmark(version: 1, filePath: "")
+                snapshots.SaveSnapshot(version: 1, filePath: "")
             );
-            NAssert.Throws<ArgumentNullException>(() => bookmarks.LoadBookmark((Stream)null));
+            NAssert.Throws<ArgumentNullException>(() => snapshots.LoadSnapshot((Stream)null));
             NAssert.Throws<FileNotFoundException>(() =>
-                bookmarks.LoadBookmark(
+                snapshots.LoadSnapshot(
                     Path.Combine(Path.GetTempPath(), $"trecs_nonexistent_{Guid.NewGuid():N}.bin")
                 )
             );
         }
 
         [Test]
-        public void Bookmark_PostDispose_Throws_ObjectDisposedException()
+        public void Snapshot_PostDispose_Throws_ObjectDisposedException()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var registry = TrecsSerialization.CreateSerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
-            var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
-            bookmarks.Dispose();
+            var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            snapshots.Dispose();
 
             NAssert.Throws<ObjectDisposedException>(() =>
-                bookmarks.SaveBookmark(version: 1, stream: new MemoryStream())
+                snapshots.SaveSnapshot(version: 1, stream: new MemoryStream())
             );
             NAssert.Throws<ObjectDisposedException>(() =>
-                bookmarks.LoadBookmark(new MemoryStream(new byte[] { 0 }))
+                snapshots.LoadSnapshot(new MemoryStream(new byte[] { 0 }))
             );
 
             // Idempotent Dispose.
-            bookmarks.Dispose();
+            snapshots.Dispose();
         }
 
         struct CustomMarker

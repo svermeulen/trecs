@@ -6,35 +6,26 @@ using Trecs.SourceGen.Performance;
 namespace Trecs.SourceGen.Shared
 {
     /// <summary>
-    /// Phase 5 routing helper for the unified <c>[ForEachEntity]</c> /
-    /// <c>[SingleEntity]</c> iteration markers.
+    /// Routing helper for the <c>[ForEachEntity]</c> / <c>[SingleEntity]</c> markers.
     /// <para>
-    /// In Phase 5, <c>[ForEachEntity]</c> replaces <c>[ForEachAspect]</c> /
-    /// <c>[ForEachComponents]</c>, and <c>[SingleEntity]</c> replaces
-    /// <c>[ForSingleAspect]</c> / <c>[ForSingleComponents]</c>. The aspect-vs-components
-    /// kind is no longer carried by the attribute name; it's determined by inspecting
-    /// the method's parameter types.
+    /// <c>[ForEachEntity]</c> is a method-level iteration attribute. The aspect-vs-components
+    /// kind is determined by inspecting the method's parameter types.
     /// </para>
     /// <para>
-    /// During the migration period the old attributes still work. Each existing
-    /// generator extends its predicate to also accept the new attribute name(s) and
-    /// uses these helpers to decide whether to claim a method based on parameter shape.
+    /// <c>[SingleEntity]</c> is a per-parameter (and per-field) attribute that resolves to
+    /// the unique entity matching the inline tag(s). A method whose only iteration parameters
+    /// are <c>[SingleEntity]</c>-annotated runs once (RunOnceGenerator). A method that mixes
+    /// <c>[SingleEntity]</c> parameters with <c>[ForEachEntity]</c> hoists the singletons
+    /// before the iteration loop.
     /// </para>
     /// </summary>
     internal static class IterationAttributeRouting
     {
         /// <summary>
         /// Returns true if the method has at least one iteration-target parameter whose
-        /// type implements <c>Trecs.IAspect</c>. Used by aspect-iteration generators to
-        /// claim <c>[ForEachEntity]</c> / <c>[SingleEntity]</c> methods that have an
-        /// aspect parameter, and by component-iteration generators to skip them.
-        /// <para>
-        /// Parameters marked <c>[PassThroughArgument]</c> are skipped — they're forwarded
-        /// from the call site verbatim and aren't iteration targets, even if their type
-        /// happens to implement <c>IAspect</c>. Without this skip, a user-supplied
-        /// pass-through aspect param would mis-route the method into the aspect generator
-        /// and break code-gen.
-        /// </para>
+        /// type implements <c>Trecs.IAspect</c> AND is not marked <c>[SingleEntity]</c> /
+        /// <c>[PassThroughArgument]</c>. Used by aspect-iteration generators to decide
+        /// whether to claim a method.
         /// </summary>
         public static bool HasAspectParameter(IMethodSymbol method)
         {
@@ -48,6 +39,14 @@ namespace Trecs.SourceGen.Shared
                     )
                 )
                     continue;
+                if (
+                    PerformanceCache.HasAttributeByName(
+                        p,
+                        TrecsAttributeNames.SingleEntity,
+                        TrecsNamespaces.Trecs
+                    )
+                )
+                    continue;
                 if (SymbolAnalyzer.ImplementsInterface(p.Type, "IAspect", TrecsNamespaces.Trecs))
                     return true;
             }
@@ -55,7 +54,7 @@ namespace Trecs.SourceGen.Shared
         }
 
         /// <summary>
-        /// True if the method carries the modern <c>[ForEachEntity]</c> attribute.
+        /// True if the method carries the <c>[ForEachEntity]</c> attribute.
         /// </summary>
         public static bool HasEntityFilter(IMethodSymbol method) =>
             PerformanceCache.HasAttributeByName(
@@ -65,27 +64,47 @@ namespace Trecs.SourceGen.Shared
             );
 
         /// <summary>
-        /// True if the method carries the modern <c>[SingleEntity]</c> attribute.
+        /// True if any parameter on the method carries <c>[SingleEntity]</c>.
         /// </summary>
-        public static bool HasSingleEntity(IMethodSymbol method) =>
-            PerformanceCache.HasAttributeByName(
-                method,
-                TrecsAttributeNames.SingleEntity,
-                TrecsNamespaces.Trecs
-            );
+        public static bool HasSingleEntityParameter(IMethodSymbol method)
+        {
+            foreach (var p in method.Parameters)
+            {
+                if (
+                    PerformanceCache.HasAttributeByName(
+                        p,
+                        TrecsAttributeNames.SingleEntity,
+                        TrecsNamespaces.Trecs
+                    )
+                )
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// True if the method should be claimed by RunOnceGenerator: has at least one
+        /// <c>[SingleEntity]</c> parameter, no <c>[ForEachEntity]</c>, no <c>[WrapAsJob]</c>.
+        /// Such a method is generated as a single-shot (<c>WorldAccessor</c>) overload that
+        /// hoists each singleton then calls the user method exactly once.
+        /// </summary>
+        public static bool IsRunOnceMethod(IMethodSymbol method) =>
+            HasSingleEntityParameter(method)
+            && !HasEntityFilter(method)
+            && !HasWrapAsJobAttribute(method);
 
         /// <summary>
         /// True if a method that wears <c>[ForEachEntity]</c> should be claimed by an
-        /// aspect-iteration generator. Returns true iff at least one parameter
-        /// implements <c>IAspect</c>.
+        /// aspect-iteration generator. Returns true iff at least one non-singleton
+        /// parameter implements <c>IAspect</c>.
         /// </summary>
         public static bool RoutesToAspectGenerator(IMethodSymbol method) =>
             HasAspectParameter(method);
 
         /// <summary>
         /// True if a method that wears <c>[ForEachEntity]</c> should be claimed by a
-        /// component-iteration generator. Returns true iff no parameter implements
-        /// <c>IAspect</c>.
+        /// component-iteration generator. Returns true iff no non-singleton parameter
+        /// implements <c>IAspect</c>.
         /// </summary>
         public static bool RoutesToComponentsGenerator(IMethodSymbol method) =>
             !HasAspectParameter(method);

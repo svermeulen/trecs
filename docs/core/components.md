@@ -70,19 +70,19 @@ When declaring components in a [template](templates.md), fields can be annotated
 public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 {
     [Interpolated]
-    public Position Position = default;               // Smoothed between fixed frames
+    Position Position = default;               // Smoothed between fixed frames
 
     [FixedUpdateOnly]
-    public Velocity Velocity;                          // Only writable in fixed update
+    Velocity Velocity;                          // Only writable in fixed update
 
     [VariableUpdateOnly]
-    public RenderState RenderState;                    // Only writable in variable update
+    RenderState RenderState;                    // Only writable in variable update
 
     [Constant]
-    public PlayerId PlayerId;                          // Immutable after creation
+    PlayerId PlayerId;                          // Immutable after creation
 
     [Input(MissingInputFrameBehaviour.RetainCurrent)]
-    public MoveInput MoveInput;                        // Player input, retains last value
+    MoveInput MoveInput;                        // Player input, retains last value
 }
 ```
 

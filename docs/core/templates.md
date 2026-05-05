@@ -7,8 +7,8 @@ Templates define the component layout and tag identity of an entity — like a b
 ```csharp
 public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
 {
-    public Rotation Rotation = new(quaternion.identity);  // Default value
-    public GameObjectId GameObjectId;                      // No default (must be set)
+    Rotation Rotation = new(quaternion.identity);  // Default value
+    GameObjectId GameObjectId;                      // No default (must be set)
 }
 ```
 
@@ -20,6 +20,8 @@ A template is a `partial class` that:
 
 Fields with default values provide fallback initialization. Fields without defaults must be set via `EntityInitializer.Set()`.
 
+> **Field visibility:** template fields must be declared with **no access modifier** — write `Rotation Rotation;`, not `public Rotation Rotation;`. Template fields are a config DSL read by the source generator at compile time, not an API surface, so the modifier would be misleading. The compiler enforces this with diagnostic `TRECS034`.
+
 ## Tags
 
 Every template declares one or more tags via `IHasTags`:
@@ -28,16 +30,16 @@ Every template declares one or more tags via `IHasTags`:
 // Single tag
 public partial class BulletEntity : ITemplate, IHasTags<GameTags.Bullet>
 {
-    public Position Position;
-    public Velocity Velocity;
+    Position Position;
+    Velocity Velocity;
 }
 
 // Multiple tags
 public partial class PlayerBullet : ITemplate, IHasTags<GameTags.Bullet, GameTags.Player>
 {
-    public Position Position;
-    public Velocity Velocity;
-    public Damage Damage;
+    Position Position;
+    Velocity Velocity;
+    Damage Damage;
 }
 ```
 
@@ -72,10 +74,10 @@ Use `IExtends<T>` to inherit components and tags from a base template:
 // Base template
 public partial class Renderable : ITemplate, IHasTags<CommonTags.Renderable>
 {
-    public Position Position;
-    public Rotation Rotation;
-    public UniformScale Scale;
-    public ColorComponent Color = new(Color.white);
+    Position Position;
+    Rotation Rotation;
+    UniformScale Scale;
+    ColorComponent Color = new(Color.white);
 }
 
 // Extended template — inherits Position, Rotation, Scale, Color
@@ -83,8 +85,8 @@ public partial class FishEntity : ITemplate,
     IExtends<Renderable>,
     IHasTags<FrenzyTags.Fish>
 {
-    public Velocity Velocity;
-    public Speed Speed;
+    Velocity Velocity;
+    Speed Speed;
 }
 ```
 
@@ -95,7 +97,7 @@ public partial class ComplexEntity : ITemplate,
     IExtends<Renderable, Moveable>,
     IHasTags<GameTags.Complex>
 {
-    public Health Health;
+    Health Health;
 }
 ```
 
@@ -118,20 +120,20 @@ When the same component appears in more than one base template:
 // attributes and defaults are compatible
 public partial class Renderable : ITemplate, IHasTags<CommonTags.Renderable>
 {
-    public Position Position = new(float3.zero);  // Has default
+    Position Position = new(float3.zero);  // Has default
 }
 
 public partial class Moveable : ITemplate, IHasTags<CommonTags.Moveable>
 {
-    public Position Position;   // No default — OK, Renderable's default is used
-    public Velocity Velocity;
+    Position Position;   // No default — OK, Renderable's default is used
+    Velocity Velocity;
 }
 
 public partial class Player : ITemplate,
     IExtends<Renderable, Moveable>,
     IHasTags<GameTags.Player>
 {
-    public Health Health;
+    Health Health;
     // Inherits Position (with default from Renderable) and Velocity from Moveable
 }
 ```
@@ -146,10 +148,10 @@ public partial class BallEntity : ITemplate,
     IHasPartition<BallTags.Active>,
     IHasPartition<BallTags.Resting>
 {
-    public Position Position;
-    public Velocity Velocity;
-    public RestTimer RestTimer;
-    public GameObjectId GameObjectId;
+    Position Position;
+    Velocity Velocity;
+    RestTimer RestTimer;
+    GameObjectId GameObjectId;
 }
 ```
 
@@ -210,11 +212,11 @@ Extend the framework's global template to add world-wide components:
 ```csharp
 public partial class MyGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
-    public Score Score = default;
-    public DesiredFishCount DesiredFishCount = new() { Value = 100 };
+    Score Score = default;
+    DesiredFishCount DesiredFishCount = new() { Value = 100 };
 
     [Input(MissingInputFrameBehaviour.RetainCurrent)]
-    public MoveInput MoveInput = default;
+    MoveInput MoveInput = default;
 }
 ```
 

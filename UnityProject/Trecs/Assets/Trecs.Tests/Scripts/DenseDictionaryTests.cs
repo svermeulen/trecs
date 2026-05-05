@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using Trecs.Collections;
+using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -101,7 +101,7 @@ namespace Trecs.Tests
         {
             var dict = new DenseDictionary<int, string>(10);
             NAssert.AreEqual(0, dict.Count);
-            NAssert.IsTrue(dict.IsEmpty(), "Dictionary should be empty");
+            NAssert.IsTrue(dict.IsEmpty, "Dictionary should be empty");
         }
 
         [Test]
@@ -109,7 +109,7 @@ namespace Trecs.Tests
         {
             var dict = new DenseDictionary<int, string>();
             NAssert.AreEqual(0, dict.Count);
-            NAssert.IsTrue(dict.IsEmpty(), "Dictionary should be empty");
+            NAssert.IsTrue(dict.IsEmpty, "Dictionary should be empty");
         }
 
         #endregion
@@ -123,7 +123,7 @@ namespace Trecs.Tests
             dict.Add(1, "one");
 
             NAssert.AreEqual(1, dict.Count);
-            NAssert.IsFalse(dict.IsEmpty(), "Dictionary should not be empty");
+            NAssert.IsFalse(dict.IsEmpty, "Dictionary should not be empty");
             NAssert.IsTrue(dict.ContainsKey(1), "Dictionary should contain key 1");
             NAssert.AreEqual("one", dict[1]);
         }
@@ -378,7 +378,7 @@ namespace Trecs.Tests
             dict.Clear();
 
             NAssert.AreEqual(0, dict.Count);
-            NAssert.IsTrue(dict.IsEmpty(), "Dictionary should be empty after clear");
+            NAssert.IsTrue(dict.IsEmpty, "Dictionary should be empty after clear");
             NAssert.IsFalse(dict.ContainsKey(1), "Dictionary should not contain key 1 after clear");
             NAssert.IsFalse(dict.ContainsKey(2), "Dictionary should not contain key 2 after clear");
         }
@@ -393,7 +393,7 @@ namespace Trecs.Tests
             dict.Recycle();
 
             NAssert.AreEqual(0, dict.Count);
-            NAssert.IsTrue(dict.IsEmpty(), "Dictionary should be empty after recycle");
+            NAssert.IsTrue(dict.IsEmpty, "Dictionary should be empty after recycle");
         }
 
         #endregion

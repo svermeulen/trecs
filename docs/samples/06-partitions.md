@@ -26,10 +26,10 @@ public partial class BallEntity : ITemplate,
     IHasPartition<BallTags.Active>,
     IHasPartition<BallTags.Resting>
 {
-    public Position Position;
-    public Velocity Velocity;
-    public RestTimer RestTimer;
-    public GameObjectId GameObjectId;
+    Position Position;
+    Velocity Velocity;
+    RestTimer RestTimer;
+    GameObjectId GameObjectId;
 }
 ```
 

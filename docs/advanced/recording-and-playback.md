@@ -1,6 +1,6 @@
 # Recording & Playback
 
-Trecs supports full-state bookmarks, deterministic recording/playback, and checksum-based desync detection — the features behind networked rollback, save games, debugging, and QA replay tooling.
+Trecs supports full-state snapshots, deterministic recording/playback, and checksum-based desync detection — the features behind networked rollback, save games, debugging, and QA replay tooling.
 
 This page assumes you have read [Serialization](serialization.md), which covers `SerializerRegistry` and `WorldStateSerializer`.
 
@@ -10,11 +10,11 @@ Three handlers, composed independently:
 
 | Handler | Purpose |
 |---|---|
-| `BookmarkSerializer` | Capture a single full-state snapshot and write it to a stream/file. Restore later. |
+| `SnapshotSerializer` | Capture a single full-state snapshot and write it to a stream/file. Restore later. |
 | `RecordingHandler` | Capture every input + periodic checksums for a span of fixed frames, then write the recording to a stream/file. |
 | `PlaybackHandler` | Replay a recording, verifying checksums per frame and surfacing desyncs. |
 
-You can use any subset. Save-game projects only need `BookmarkSerializer`; debug-only QA tooling needs all three.
+You can use any subset. Save-game projects only need `SnapshotSerializer`; debug-only QA tooling needs all three.
 
 ## Composing the handlers
 
@@ -22,32 +22,32 @@ You can use any subset. Save-game projects only need `BookmarkSerializer`; debug
 var registry = TrecsSerialization.CreateSerializerRegistry();
 var worldStateSer = new WorldStateSerializer(world);
 
-var bookmarks = new BookmarkSerializer(worldStateSer, registry, world);
+var snapshots = new SnapshotSerializer(worldStateSer, registry, world);
 var recorder  = new RecordingHandler(worldStateSer, registry, world);
-var playback  = new PlaybackHandler(worldStateSer, bookmarks, registry, world);
+var playback  = new PlaybackHandler(worldStateSer, snapshots, registry, world);
 ```
 
-## Bookmarks (save games)
+## Snapshots (save games)
 
 ```csharp
 // Save the current world state to a file (creates parent directories).
-var metadata = bookmarks.SaveBookmark(version: 1, filePath: "save.bin");
+var metadata = snapshots.SaveSnapshot(version: 1, filePath: "save.bin");
 
 // ...later, possibly across editor restarts...
 
 // Restore that saved state into the live world.
-var loaded = bookmarks.LoadBookmark("save.bin");
+var loaded = snapshots.LoadSnapshot("save.bin");
 ```
 
 Stream overloads exist for both calls if you need to write/read from somewhere other than a file (e.g. a network socket or in-memory buffer).
 
-`BookmarkSerializer.PeekMetadata(stream)` (or `(path)`) reads only the bookmark header without restoring full state — handy for "Last saved at frame X" displays in a save-slot UI. `RecordingHandler` exposes the same pair of overloads for replay-list tooling that wants to show duration, frame range, or schema version without loading a full recording.
+`SnapshotSerializer.PeekMetadata(stream)` (or `(path)`) reads only the snapshot header without restoring full state — handy for "Last saved at frame X" displays in a save-slot UI. `RecordingHandler` exposes the same pair of overloads for replay-list tooling that wants to show duration, frame range, or schema version without loading a full recording.
 
-### `BookmarkMetadata`
+### `SnapshotMetadata`
 
-The returned `BookmarkMetadata` carries:
+The returned `SnapshotMetadata` carries:
 
-- `Version` — the schema version you passed to `SaveBookmark`
+- `Version` — the schema version you passed to `SaveSnapshot`
 - `FixedFrame` — the world's fixed frame at capture time
 - `BlobIds` — references to all heap blobs the snapshot relies on
 
@@ -90,12 +90,12 @@ A `Stream` overload of `EndRecording` is also available.
 
 ## Playback
 
-Recording and playback are two halves of the same workflow. Playback typically follows three steps: load an initial-state bookmark to start from a known point, start playback against the recording stream, and call `TickPlayback()` once per fixed update to verify checksums.
+Recording and playback are two halves of the same workflow. Playback typically follows three steps: load an initial-state snapshot to start from a known point, start playback against the recording stream, and call `TickPlayback()` once per fixed update to verify checksums.
 
 ```csharp
-// (Optional but recommended) restore the bookmark captured when the recording started.
+// (Optional but recommended) restore the snapshot captured when the recording started.
 playback.LoadInitialState(
-    bookmarkPath: "bookmark.bin",
+    snapshotPath: "snapshot.bin",
     expectedInitialChecksum: null
 );
 
@@ -137,7 +137,7 @@ public struct PlaybackTickResult
 
 ### `InputsOnly` mode
 
-Setting `PlaybackStartParams.InputsOnly = true` re-anchors the recorded input frame numbers to the world's *current* fixed frame at start-of-playback. Useful when you have already restored state via some other path (e.g. a deterministic replay from a different bookmark) and just want to inject the recorded inputs starting "now".
+Setting `PlaybackStartParams.InputsOnly = true` re-anchors the recorded input frame numbers to the world's *current* fixed frame at start-of-playback. Useful when you have already restored state via some other path (e.g. a deterministic replay from a different snapshot) and just want to inject the recorded inputs starting "now".
 
 ## Determinism requirements
 
@@ -166,11 +166,11 @@ All three handlers implement `IDisposable`. They will gracefully end any in-flig
 ```csharp
 disposables.Add(playback.Dispose);
 disposables.Add(recorder.Dispose);
-disposables.Add(bookmarks.Dispose);
+disposables.Add(snapshots.Dispose);
 ```
 
 ## See also
 
 - [Serialization](serialization.md) — `SerializerRegistry`, `WorldStateSerializer`, custom serializers.
-- [Binary Format Reference](binary-format.md) — on-disk layout of recordings and bookmarks.
+- [Binary Format Reference](binary-format.md) — on-disk layout of recordings and snapshots.
 - [Sample 11 — Snake](../samples/11-snake.md) — full record/replay flow wired to keyboard hotkeys.

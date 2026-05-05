@@ -1,20 +1,21 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-#if TRECS_INTERNAL_CHECKS && DEBUG
-using System.Collections.Generic;
-#endif
+using Unity.Jobs;
 
 namespace Trecs.Internal
 {
     // Similar to NativeHashMap but allows iterating over values and key
     // in contiguous memory
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct NativeDenseDictionary<TKey, TValue> : IDisposable
+    [DebuggerDisplay("Count = {Count}, IsCreated = {IsCreated}, IsEmpty = {IsEmpty}")]
+    [DebuggerTypeProxy(typeof(NativeDenseDictionaryDebugView<,>))]
+    public struct NativeDenseDictionary<TKey, TValue> : INativeDisposable
         where TKey : unmanaged, IEquatable<TKey>
         where TValue : unmanaged
     {
@@ -27,7 +28,7 @@ namespace Trecs.Internal
         [NativeDisableContainerSafetyRestriction]
         NativeList<TKey> _keys;
 
-        public NativeDenseDictionary(int size, Allocator allocator)
+        public NativeDenseDictionary(int size, AllocatorManager.AllocatorHandle allocator)
             : this()
         {
             Assert.That(size >= 0, "NativeDenseDictionary size must be non-negative");
@@ -43,10 +44,10 @@ namespace Trecs.Internal
             get => _values.IsCreated;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool IsEmpty()
+        public readonly bool IsEmpty
         {
-            return Count == 0;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => Count == 0;
         }
 
         internal readonly void SerializeValues(ITrecsSerializationWriter writer)
@@ -110,20 +111,6 @@ namespace Trecs.Internal
                     _keyToIndex.Add(_keys[i], i);
                 }
             }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly NativeBuffer<TValue> GetValuesRead(out int count)
-        {
-            count = Count;
-            return new NativeBuffer<TValue>(_values);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly NativeBuffer<TValue> GetValuesWrite(out int count)
-        {
-            count = Count;
-            return new NativeBuffer<TValue>(_values);
         }
 
         public readonly NativeBuffer<TKey> UnsafeKeys
@@ -475,6 +462,15 @@ namespace Trecs.Internal
             _keys.Dispose();
         }
 
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return JobHandle.CombineDependencies(
+                _keyToIndex.Dispose(inputDeps),
+                _values.Dispose(inputDeps),
+                _keys.Dispose(inputDeps)
+            );
+        }
+
         public readonly struct KeyEnumerable
         {
             readonly NativeDenseDictionary<TKey, TValue> _dic;
@@ -620,6 +616,38 @@ namespace Trecs.Internal
                         );
                     }
                 }
+            }
+        }
+    }
+
+    internal sealed class NativeDenseDictionaryDebugView<TKey, TValue>
+        where TKey : unmanaged, IEquatable<TKey>
+        where TValue : unmanaged
+    {
+        readonly NativeDenseDictionary<TKey, TValue> _data;
+
+        public NativeDenseDictionaryDebugView(NativeDenseDictionary<TKey, TValue> data)
+        {
+            _data = data;
+        }
+
+        public KeyValuePair<TKey, TValue>[] Items
+        {
+            get
+            {
+                if (!_data.IsCreated)
+                {
+                    return Array.Empty<KeyValuePair<TKey, TValue>>();
+                }
+                var count = _data.Count;
+                var result = new KeyValuePair<TKey, TValue>[count];
+                var keys = _data.UnsafeKeys;
+                var values = _data.UnsafeValues;
+                for (var i = 0; i < count; i++)
+                {
+                    result[i] = new KeyValuePair<TKey, TValue>(keys[i], values[i]);
+                }
+                return result;
             }
         }
     }

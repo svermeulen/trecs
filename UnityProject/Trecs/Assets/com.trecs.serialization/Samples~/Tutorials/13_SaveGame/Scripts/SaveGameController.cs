@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Trecs.Serialization.Samples.SaveGame
 {
     /// <summary>
-    /// Sample save-game controller that demonstrates the BookmarkSerializer
+    /// Sample save-game controller that demonstrates the SnapshotSerializer
     /// file API in isolation from record/replay: three named slots that
     /// can be saved to and loaded from independently.
     ///
@@ -24,7 +24,7 @@ namespace Trecs.Serialization.Samples.SaveGame
         const int SerializationVersion = 1;
         const int SlotCount = 3;
 
-        readonly BookmarkSerializer _bookmarks;
+        readonly SnapshotSerializer _snapshots;
         readonly string _saveDir;
         readonly SlotInfo[] _slots;
 
@@ -33,7 +33,7 @@ namespace Trecs.Serialization.Samples.SaveGame
 
         public SaveGameController(SerializationServices serialization)
         {
-            _bookmarks = serialization.Bookmarks;
+            _snapshots = serialization.Snapshots;
 
             _saveDir = Path.Combine(Application.persistentDataPath, "SaveGame");
             Directory.CreateDirectory(_saveDir);
@@ -80,7 +80,7 @@ namespace Trecs.Serialization.Samples.SaveGame
             var slot = _slots[slotIndex];
             try
             {
-                var metadata = _bookmarks.SaveBookmark(
+                var metadata = _snapshots.SaveSnapshot(
                     version: SerializationVersion,
                     filePath: slot.FilePath
                 );
@@ -104,7 +104,7 @@ namespace Trecs.Serialization.Samples.SaveGame
             }
             try
             {
-                var metadata = _bookmarks.LoadBookmark(slot.FilePath);
+                var metadata = _snapshots.LoadSnapshot(slot.FilePath);
                 SetMessage($"Loaded slot {slotIndex + 1} (frame {metadata.FixedFrame})");
             }
             catch (Exception ex)

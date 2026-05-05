@@ -17,7 +17,7 @@ namespace Trecs.Internal
         [NativeDisableUnsafePtrRestriction]
         NativeBag* _data;
 
-        public int Count => _threadsCount;
+        public int Length => _threadsCount;
 
         public static AtomicNativeBags Create()
         {

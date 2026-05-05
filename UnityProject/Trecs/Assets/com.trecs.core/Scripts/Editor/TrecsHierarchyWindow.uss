@@ -1,0 +1,23 @@
+.trecs-help-panel {
+    margin: 4px 8px 4px 8px;
+    padding: 6px 8px 6px 8px;
+    border-radius: 3px;
+    background-color: #2E384D8C;
+}
+
+.trecs-help-panel__heading {
+    -unity-font-style: bold;
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.trecs-help-panel__body {
+    white-space: normal;
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.trecs-help-panel__dismiss {
+    align-self: flex-end;
+    margin-top: 4px;
+}

@@ -149,7 +149,7 @@ Neither layout is universally better — chunk-based storage shines when you hav
 
 - **Template system** — explicit entity blueprints with inheritance
 - **Tag-based groups** — entities grouped by identity, not just component set
-- **Built-in recording/playback** — with checksum validation and bookmark seeking
+- **Built-in recording/playback** — with checksum validation and snapshot seeking
 - **Deterministic RNG** — framework-level `Rng` with fork support
 - **Input system** — frame-isolated input queuing for replay
 - **Interpolation** — built-in fixed-to-variable timestep smoothing

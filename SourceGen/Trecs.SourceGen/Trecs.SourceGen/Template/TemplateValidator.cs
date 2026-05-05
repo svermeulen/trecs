@@ -71,12 +71,15 @@ namespace Trecs.SourceGen.Template
             {
                 if (member is IFieldSymbol field && !field.IsStatic && !field.IsConst)
                 {
-                    // Must be public
-                    if (field.DeclaredAccessibility != Accessibility.Public)
+                    // Must have no access modifier — template fields are a
+                    // config DSL, not an API surface. The check is
+                    // syntax-level because Roslyn reports both `private T X;`
+                    // and bare `T X;` as Accessibility.Private.
+                    if (HasExplicitAccessModifier(field))
                     {
                         reportDiagnostic(
                             Diagnostic.Create(
-                                DiagnosticDescriptors.TemplateFieldMustBePublic,
+                                DiagnosticDescriptors.TemplateFieldMustHaveNoAccessModifier,
                                 field.Locations.FirstOrDefault() ?? declaration.GetLocation(),
                                 field.Name,
                                 symbol.Name
@@ -273,6 +276,31 @@ namespace Trecs.SourceGen.Template
                     i.Name == "IEntityComponent"
                     && SymbolAnalyzer.IsInNamespace(i.ContainingNamespace, "Trecs")
                 );
+            }
+            return false;
+        }
+
+        private static bool HasExplicitAccessModifier(IFieldSymbol field)
+        {
+            foreach (var syntaxRef in field.DeclaringSyntaxReferences)
+            {
+                if (
+                    syntaxRef.GetSyntax() is VariableDeclaratorSyntax declarator
+                    && declarator.Parent?.Parent is FieldDeclarationSyntax fieldDecl
+                )
+                {
+                    foreach (var modifier in fieldDecl.Modifiers)
+                    {
+                        switch (modifier.RawKind)
+                        {
+                            case (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.PublicKeyword:
+                            case (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.PrivateKeyword:
+                            case (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.InternalKeyword:
+                            case (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.ProtectedKeyword:
+                                return true;
+                        }
+                    }
+                }
             }
             return false;
         }

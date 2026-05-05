@@ -52,7 +52,7 @@ namespace Trecs
         }
 #endif
 
-        public int Capacity
+        public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -60,7 +60,7 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-                return _nb.Capacity;
+                return _nb.Length;
             }
         }
 
@@ -77,12 +77,12 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal IntPtr GetRawPointer(out int capacity)
+        internal IntPtr GetRawPointer(out int length)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-            return _nb.GetRawReadOnlyPointer(out capacity);
+            return new IntPtr(_nb.GetRawPointer(out length));
         }
     }
 
@@ -123,7 +123,7 @@ namespace Trecs
         }
 #endif
 
-        public int Capacity
+        public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -131,7 +131,7 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-                return _nb.Capacity;
+                return _nb.Length;
             }
         }
 
@@ -148,12 +148,12 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal IntPtr GetRawPointer(out int capacity)
+        internal IntPtr GetRawPointer(out int length)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-            return _nb.GetRawReadWritePointer(out capacity);
+            return new IntPtr(_nb.GetRawPointer(out length));
         }
     }
 }

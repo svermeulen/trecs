@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Trecs.Internal;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -10,51 +9,12 @@ namespace Trecs
     /// <summary>
     /// ScriptableObject proxy used as <see cref="Selection.activeObject"/> when
     /// the user picks a component type row in <see cref="TrecsHierarchyWindow"/>.
-    /// Identifies the component by its <see cref="System.Type"/>; the world
-    /// reference is held weakly so we can list its templates / accessors at
-    /// inspect time without keeping it alive.
+    /// Carries only a serialized <see cref="TrecsSelectionProxy.Identity"/>
+    /// string (e.g. <c>"component:HealthData"</c>); the inspector resolves
+    /// the live <see cref="ComponentTypeRef"/> dynamically against
+    /// <see cref="TrecsHierarchyWindow.ActiveSource"/> on every refresh.
     /// </summary>
-    public class TrecsComponentTypeSelection : ScriptableObject
-    {
-        [NonSerialized]
-        WeakReference<World> _worldRef;
-
-        [NonSerialized]
-        public Type ComponentType;
-
-        [NonSerialized]
-        public TrecsSchema CacheSchema;
-
-        [NonSerialized]
-        public TrecsSchemaComponentType CacheComponent;
-
-        public World GetWorld()
-        {
-            if (_worldRef == null)
-            {
-                return null;
-            }
-            return _worldRef.TryGetTarget(out var w) ? w : null;
-        }
-
-        public void Set(World world, Type componentType)
-        {
-            _worldRef = world == null ? null : new WeakReference<World>(world);
-            ComponentType = componentType;
-            CacheSchema = null;
-            CacheComponent = null;
-            name = componentType?.Name ?? "Component";
-        }
-
-        public void SetCache(TrecsSchema schema, TrecsSchemaComponentType entry)
-        {
-            _worldRef = null;
-            ComponentType = null;
-            CacheSchema = schema;
-            CacheComponent = entry;
-            name = entry?.DisplayName ?? "Component";
-        }
-    }
+    public class TrecsComponentTypeSelection : TrecsSelectionProxy { }
 
     [CustomEditor(typeof(TrecsComponentTypeSelection))]
     public class TrecsComponentTypeSelectionInspector : Editor
@@ -74,9 +34,9 @@ namespace Trecs
         Foldout _readByFoldout;
         Foldout _writtenByFoldout;
 
-        // Identity of the currently-rendered entry: Type ref in live mode,
-        // TrecsSchemaComponentType ref in cache mode.
-        object _renderedEntryKey;
+        // Composite render key — identity + source mode + source name.
+        // Static section re-renders when any of these change.
+        string _renderedKey;
         int _lastReaderHash;
         int _lastWriterHash;
 
@@ -103,13 +63,9 @@ namespace Trecs
 
             // Shift+hover the heading → hierarchy scrolls back to this
             // component-type's tree row.
-            TrecsInspectorLinks.WireHoverPreviewComponentType(
+            TrecsInspectorLinks.WireHoverPreview(
                 _headerLabel,
-                () =>
-                {
-                    var sel = target as TrecsComponentTypeSelection;
-                    return (sel?.GetWorld(), sel?.ComponentType);
-                }
+                () => (target as TrecsComponentTypeSelection)?.Identity
             );
 
             _typeLabel = new Label();
@@ -155,15 +111,18 @@ namespace Trecs
                 return;
             }
 
-            ResolveIdentity(selection, out var liveWorld, out var liveType, out var identity);
-
-            if (identity == null)
+            var src = TrecsHierarchyWindow.ActiveSource;
+            if (src == null || string.IsNullOrEmpty(selection.Identity))
             {
-                var w = selection.GetWorld();
+                ShowStatus("No component type selected.");
+                return;
+            }
+
+            var cref = src.ResolveComponentType(selection.Identity);
+            if (cref == null)
+            {
                 ShowStatus(
-                    w == null || w.IsDisposed
-                        ? "No component type selected — world unavailable."
-                        : "No component type selected."
+                    $"Component '{selection.name}' not found in {(src.IsLive ? "live world" : "cached schema")} '{src.DisplayName}'."
                 );
                 return;
             }
@@ -171,65 +130,34 @@ namespace Trecs
             _statusLabel.style.display = DisplayStyle.None;
             _bodyContainer.style.display = DisplayStyle.Flex;
 
-            if (!Equals(identity, _renderedEntryKey))
+            var renderKey = src.RenderKey(selection.Identity);
+            if (renderKey != _renderedKey)
             {
-                _renderedEntryKey = identity;
+                _renderedKey = renderKey;
                 _lastReaderHash = 0;
                 _lastWriterHash = 0;
-                var entry =
-                    liveWorld != null
-                        ? BuildEntryFromLive(liveWorld, liveType)
-                        : selection.CacheComponent;
-                var linker =
-                    liveWorld != null
-                        ? (InspectorLinker)new LiveInspectorLinker(liveWorld)
-                        : new CacheInspectorLinker(selection.CacheSchema);
-                var attributes = liveType != null ? CollectAttributes(liveType) : null;
-                var owningTemplates = ResolveOwningTemplates(
-                    entry,
-                    liveWorld,
-                    selection.CacheSchema
-                );
+                var entry = BuildEntryFromRef(cref);
+                var linker = new InspectorLinker(src);
+                var attributes = cref.LiveType != null ? CollectAttributes(cref.LiveType) : null;
+                var owningTemplates = ResolveOwningTemplates(src, cref.DisplayName);
                 RenderStatic(entry, linker, attributes, owningTemplates);
             }
 
-            UpdateRuntimeFields(
-                liveWorld,
-                liveType,
-                selection.CacheSchema,
-                selection.CacheComponent
-            );
+            UpdateRuntimeFields(src, cref);
         }
 
-        static void ResolveIdentity(
-            TrecsComponentTypeSelection selection,
-            out World liveWorld,
-            out Type liveType,
-            out object identity
-        )
+        static TrecsSchemaComponentType BuildEntryFromRef(ComponentTypeRef cref)
         {
-            liveWorld = null;
-            liveType = null;
-            identity = null;
-
-            var world = selection.GetWorld();
-            if (world != null && !world.IsDisposed && selection.ComponentType != null)
+            if (cref.CacheNative != null)
             {
-                liveWorld = world;
-                liveType = selection.ComponentType;
-                identity = selection.ComponentType;
-                return;
+                return cref.CacheNative;
             }
-            if (selection.CacheComponent != null)
-            {
-                identity = selection.CacheComponent;
-            }
+            return BuildEntryFromLive(cref.LiveType);
         }
 
-        // Walks the live world's resolved templates to gather every template
-        // that owns this component, then folds the cross-links into a
-        // TrecsSchemaComponentType entry — same shape as the cache.
-        static TrecsSchemaComponentType BuildEntryFromLive(World world, Type t)
+        // Folds a live System.Type into the cache schema shape so the
+        // RenderStatic path stays mode-agnostic.
+        static TrecsSchemaComponentType BuildEntryFromLive(Type t)
         {
             var entry = new TrecsSchemaComponentType
             {
@@ -304,48 +232,42 @@ namespace Trecs
             }
         }
 
-        // Both modes derive owning-templates from the relevant source: live
-        // walks ResolvedTemplates, cache walks schema.Templates. Returned
-        // sorted so the foldout is stable.
-        static List<string> ResolveOwningTemplates(
-            TrecsSchemaComponentType entry,
-            World liveWorld,
-            TrecsSchema cacheSchema
-        )
+        // Walks the source's templates to gather every template that
+        // owns this component. Live and cache produce the same answer
+        // because LiveSchemaSource projects ComponentTypeNames identically
+        // to the cache writer; the inspector reads from whichever native
+        // form the ref carries.
+        static List<string> ResolveOwningTemplates(ITrecsSchemaSource src, string componentName)
         {
             var names = new List<string>();
-            if (liveWorld != null && !liveWorld.IsDisposed)
+            foreach (var tref in src.Templates)
             {
-                try
-                {
-                    foreach (var rt in liveWorld.WorldInfo.ResolvedTemplates)
-                    {
-                        foreach (var d in rt.ComponentDeclarations)
-                        {
-                            if (
-                                d.ComponentType != null
-                                && TrecsHierarchyWindow.ComponentTypeDisplayName(d.ComponentType)
-                                    == entry.DisplayName
-                            )
-                            {
-                                names.Add(rt.DebugName ?? "(unnamed)");
-                                break;
-                            }
-                        }
-                    }
-                }
-                catch (Exception) { }
-            }
-            else if (cacheSchema?.Templates != null)
-            {
-                foreach (var st in cacheSchema.Templates)
+                if (tref.CacheNative != null)
                 {
                     if (
-                        st.ComponentTypeNames != null
-                        && st.ComponentTypeNames.Contains(entry.DisplayName)
+                        tref.CacheNative.ComponentTypeNames != null
+                        && tref.CacheNative.ComponentTypeNames.Contains(componentName)
                     )
                     {
-                        names.Add(st.DebugName ?? "(unnamed)");
+                        names.Add(tref.DebugName ?? "(unnamed)");
+                    }
+                    continue;
+                }
+                var rt = tref.LiveResolved;
+                if (rt == null)
+                {
+                    continue;
+                }
+                foreach (var d in rt.ComponentDeclarations)
+                {
+                    if (
+                        d.ComponentType != null
+                        && TrecsHierarchyWindow.ComponentTypeDisplayName(d.ComponentType)
+                            == componentName
+                    )
+                    {
+                        names.Add(tref.DebugName ?? "(unnamed)");
+                        break;
                     }
                 }
             }
@@ -353,48 +275,19 @@ namespace Trecs
             return names;
         }
 
-        // Per-tick refresh of read-by / written-by lists. Live mode pulls
-        // current names from the access tracker (changes as systems run);
-        // cache mode pulls a frozen list from schema.Access.
-        void UpdateRuntimeFields(
-            World world,
-            Type t,
-            TrecsSchema cacheSchema,
-            TrecsSchemaComponentType cacheEntry
-        )
+        // Per-tick refresh of read-by / written-by lists. Both modes go
+        // through src.AccessTracker — live wraps the live runtime tracker,
+        // cache wraps schema.Access.
+        void UpdateRuntimeFields(ITrecsSchemaSource src, ComponentTypeRef cref)
         {
             IReadOnlyCollection<string> readers = null;
             IReadOnlyCollection<string> writers = null;
-            InspectorLinker linker;
+            var linker = new InspectorLinker(src);
 
-            if (world != null && !world.IsDisposed && t != null)
+            if (!string.IsNullOrEmpty(cref.DisplayName))
             {
-                var tracker = TrecsAccessRegistry.GetTracker(world);
-                if (tracker != null)
-                {
-                    var componentId = new ComponentId(TypeIdProvider.GetTypeId(t));
-                    readers = tracker.GetReadersOf(componentId);
-                    writers = tracker.GetWritersOf(componentId);
-                }
-                linker = new LiveInspectorLinker(world);
-            }
-            else
-            {
-                TrecsSchemaAccessInfo access = null;
-                if (cacheSchema?.Access != null && cacheEntry != null)
-                {
-                    foreach (var a in cacheSchema.Access)
-                    {
-                        if (a.ComponentDisplayName == cacheEntry.DisplayName)
-                        {
-                            access = a;
-                            break;
-                        }
-                    }
-                }
-                readers = access?.ReadBySystems;
-                writers = access?.WrittenBySystems;
-                linker = new CacheInspectorLinker(cacheSchema);
+                readers = src.AccessTracker.GetReadersOfComponent(cref.DisplayName);
+                writers = src.AccessTracker.GetWritersOfComponent(cref.DisplayName);
             }
 
             ApplyNameList(_readByFoldout, readers, ref _lastReaderHash, linker);
@@ -447,7 +340,7 @@ namespace Trecs
             _statusLabel.text = text;
             _statusLabel.style.display = DisplayStyle.Flex;
             _bodyContainer.style.display = DisplayStyle.None;
-            _renderedEntryKey = null;
+            _renderedKey = null;
         }
 
         static Label MakeMutedLine(string text)

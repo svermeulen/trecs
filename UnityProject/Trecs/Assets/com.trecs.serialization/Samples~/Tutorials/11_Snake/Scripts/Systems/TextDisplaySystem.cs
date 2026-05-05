@@ -52,8 +52,8 @@ namespace Trecs.Serialization.Samples.Snake
             AppendControl("WASD", "Move Snake");
             AppendControl("F5", "Start / stop recording");
             AppendControl("F6", "Start / stop playback");
-            AppendControl("F8", "Save bookmark");
-            AppendControl("F9", "Load bookmark");
+            AppendControl("F8", "Save snapshot");
+            AppendControl("F9", "Load snapshot");
 
             _displayText.text = _sb.ToString();
         }

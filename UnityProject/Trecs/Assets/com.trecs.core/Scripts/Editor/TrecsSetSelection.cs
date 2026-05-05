@@ -7,54 +7,13 @@ namespace Trecs
 {
     /// <summary>
     /// ScriptableObject proxy used as <see cref="Selection.activeObject"/> when
-    /// the user picks a set row in <see cref="TrecsHierarchyWindow"/>. The
-    /// inspector resolves the <see cref="EntitySet"/> back to live state on the
-    /// owning <see cref="World"/> each refresh.
+    /// the user picks a set row in <see cref="TrecsHierarchyWindow"/>. Carries
+    /// only a serialized <see cref="TrecsSelectionProxy.Identity"/> string
+    /// (e.g. <c>"set:Players"</c>); the inspector resolves the live
+    /// <see cref="SetRef"/> dynamically against
+    /// <see cref="TrecsHierarchyWindow.ActiveSource"/> on every refresh.
     /// </summary>
-    public class TrecsSetSelection : ScriptableObject
-    {
-        [NonSerialized]
-        WeakReference<World> _worldRef;
-
-        [NonSerialized]
-        public EntitySet EntitySet;
-
-        // Cache-mode payload — populated when the hierarchy is rendering
-        // from a TrecsSchema rather than a live world. Live-mode setters
-        // null these out, so the inspector can switch on World presence.
-        [NonSerialized]
-        public TrecsSchema CacheSchema;
-
-        [NonSerialized]
-        public TrecsSchemaSet CacheSet;
-
-        public World GetWorld()
-        {
-            if (_worldRef == null)
-            {
-                return null;
-            }
-            return _worldRef.TryGetTarget(out var w) ? w : null;
-        }
-
-        public void Set(World world, EntitySet entitySet)
-        {
-            _worldRef = world == null ? null : new WeakReference<World>(world);
-            EntitySet = entitySet;
-            CacheSchema = null;
-            CacheSet = null;
-            name = entitySet.DebugName ?? "Set";
-        }
-
-        public void SetCache(TrecsSchema schema, TrecsSchemaSet entry)
-        {
-            _worldRef = null;
-            EntitySet = default;
-            CacheSchema = schema;
-            CacheSet = entry;
-            name = entry?.DebugName ?? "Set";
-        }
-    }
+    public class TrecsSetSelection : TrecsSelectionProxy { }
 
     [CustomEditor(typeof(TrecsSetSelection))]
     public class TrecsSetSelectionInspector : Editor
@@ -76,10 +35,8 @@ namespace Trecs
         WorldAccessor _accessor;
         World _accessorWorld;
 
-        // Tracks identity of the currently-rendered entry so RenderStatic
-        // only fires when the underlying set actually changes. SetId.Id
-        // (boxed int) for live; TrecsSchemaSet ref for cache.
-        object _renderedEntryKey;
+        // Composite render key — identity + source mode + source name.
+        string _renderedKey;
 
         public override VisualElement CreateInspectorGUI()
         {
@@ -104,13 +61,9 @@ namespace Trecs
 
             // Shift+hover the heading → hierarchy scrolls back to this set's
             // tree row.
-            TrecsInspectorLinks.WireHoverPreviewSet(
+            TrecsInspectorLinks.WireHoverPreview(
                 _headerLabel,
-                () =>
-                {
-                    var sel = target as TrecsSetSelection;
-                    return (sel?.GetWorld(), sel?.EntitySet.Id ?? default);
-                }
+                () => (target as TrecsSetSelection)?.Identity
             );
 
             _idValue = AddRow(_bodyContainer, "Id", "");
@@ -157,18 +110,18 @@ namespace Trecs
                 return;
             }
 
-            // Resolve identity first; entry is rebuilt only when identity
-            // actually changes — avoids reallocating the schema entry every
-            // 250ms for the same set.
-            ResolveIdentity(selection, out var liveWorld, out var liveEntitySet, out var identity);
-
-            if (identity == null)
+            var src = TrecsHierarchyWindow.ActiveSource;
+            if (src == null || string.IsNullOrEmpty(selection.Identity))
             {
-                var w = selection.GetWorld();
+                ShowStatus("No set selected.");
+                return;
+            }
+
+            var sref = src.ResolveSet(selection.Identity);
+            if (sref == null)
+            {
                 ShowStatus(
-                    w == null || w.IsDisposed
-                        ? "No set selected — world unavailable."
-                        : "No set selected."
+                    $"Set '{selection.name}' not found in {(src.IsLive ? "live world" : "cached schema")} '{src.DisplayName}'."
                 );
                 return;
             }
@@ -176,40 +129,24 @@ namespace Trecs
             _statusLabel.style.display = DisplayStyle.None;
             _bodyContainer.style.display = DisplayStyle.Flex;
 
-            if (!Equals(identity, _renderedEntryKey))
+            var renderKey = src.RenderKey(selection.Identity);
+            if (renderKey != _renderedKey)
             {
-                _renderedEntryKey = identity;
-                var entry =
-                    liveWorld != null ? BuildEntryFromLive(liveEntitySet) : selection.CacheSet;
+                _renderedKey = renderKey;
+                var entry = BuildEntryFromRef(sref);
                 RenderStatic(entry);
             }
 
-            UpdateRuntimeFields(liveWorld, liveEntitySet);
+            UpdateRuntimeFields(src, sref);
         }
 
-        static void ResolveIdentity(
-            TrecsSetSelection selection,
-            out World liveWorld,
-            out EntitySet liveEntitySet,
-            out object identity
-        )
+        static TrecsSchemaSet BuildEntryFromRef(SetRef sref)
         {
-            liveWorld = null;
-            liveEntitySet = default;
-            identity = null;
-
-            var world = selection.GetWorld();
-            if (world != null && !world.IsDisposed && selection.EntitySet.Id.Id != 0)
+            if (sref.CacheNative != null)
             {
-                liveWorld = world;
-                liveEntitySet = selection.EntitySet;
-                identity = selection.EntitySet.Id.Id;
-                return;
+                return sref.CacheNative;
             }
-            if (selection.CacheSet != null)
-            {
-                identity = selection.CacheSet;
-            }
+            return BuildEntryFromLive(sref.LiveSet);
         }
 
         static TrecsSchemaSet BuildEntryFromLive(EntitySet entitySet)
@@ -251,14 +188,22 @@ namespace Trecs
             }
         }
 
-        void UpdateRuntimeFields(World world, EntitySet entitySet)
+        void UpdateRuntimeFields(ITrecsSchemaSource src, SetRef sref)
         {
-            if (world == null || world.IsDisposed)
+            if (!src.IsLive || !sref.HasLiveSet)
             {
                 _groupsValue.text = "(cached — N/A)";
                 _entitiesValue.text = "(cached — N/A)";
                 return;
             }
+            var world = (src as LiveSchemaSource)?.World;
+            if (world == null || world.IsDisposed)
+            {
+                _groupsValue.text = "(unavailable)";
+                _entitiesValue.text = "(unavailable)";
+                return;
+            }
+            var entitySet = sref.LiveSet;
             try
             {
                 var info = world.WorldInfo;
@@ -291,7 +236,7 @@ namespace Trecs
             _statusLabel.text = text;
             _statusLabel.style.display = DisplayStyle.Flex;
             _bodyContainer.style.display = DisplayStyle.None;
-            _renderedEntryKey = null;
+            _renderedKey = null;
         }
     }
 }

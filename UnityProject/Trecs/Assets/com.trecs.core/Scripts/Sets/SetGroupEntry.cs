@@ -40,8 +40,8 @@ namespace Trecs
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                var values = _entityIdToDenseIndex.GetValuesRead(out var count);
-                return new EntitySetIndices(values, count);
+                var values = _entityIdToDenseIndex.UnsafeValues;
+                return new EntitySetIndices(values, _entityIdToDenseIndex.Count);
             }
         }
 

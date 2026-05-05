@@ -24,6 +24,9 @@ jobs:
       - name: Build
         run: dotnet build SourceGen/Trecs.SourceGen/Trecs.SourceGen.sln -c Release --no-restore
 
+      - name: Test
+        run: dotnet test SourceGen/Trecs.SourceGen/Trecs.SourceGen.sln -c Release --no-build --logger "console;verbosity=normal"
+
   format-check:
     name: Check Formatting
     runs-on: ubuntu-latest

@@ -33,6 +33,7 @@ namespace Trecs.Internal
         SimpleSubject _fixedUpdateStarted;
         SimpleSubject _variableUpdateStarted;
 
+        SystemEnableState _enableState;
         List<ExecutableSystemInfo> _systems;
         List<SystemRuntimeInfo> _systemRuntimeInfos;
         List<int> _sortedInputSystems;
@@ -428,14 +429,20 @@ namespace Trecs.Internal
             return _systemSortIndex[i];
         }
 
-        public void Initialize(World world, SystemLoader.LoadInfo loadInfo)
+        public void Initialize(
+            World world,
+            SystemLoader.LoadInfo loadInfo,
+            SystemEnableState enableState
+        )
         {
             Assert.That(!_hasDisposed);
             Assert.IsNotNull(
                 _fixedUpdateStarted,
                 "SetEventSubjects must be called before Initialize"
             );
+            Assert.IsNotNull(enableState);
 
+            _enableState = enableState;
             Assert.IsNull(_systems);
             _systems = new List<ExecutableSystemInfo>(loadInfo.Systems.Count);
             Assert.IsNull(_systemRuntimeInfos);
@@ -482,7 +489,7 @@ namespace Trecs.Internal
                     );
                 }
 
-                _systemRuntimeInfos.Add(new SystemRuntimeInfo() { IsEnabled = true });
+                _systemRuntimeInfos.Add(new SystemRuntimeInfo());
                 _systems.Add(
                     new ExecutableSystemInfo(info.System, info.Metadata, info.DeclarationIndex)
                 );
@@ -692,19 +699,6 @@ namespace Trecs.Internal
             // _dbg.Text("Fixed Update Ticks", numUpdates);
         }
 
-        public bool IsSystemEnabled(int i)
-        {
-            Assert.That(!_hasDisposed);
-            return _systemRuntimeInfos[i].IsEnabled;
-        }
-
-        public void SetSystemEnabled(int index, bool enabled)
-        {
-            Assert.That(!_hasDisposed);
-            Assert.That(index >= 0 && index < _systemRuntimeInfos.Count);
-            _systemRuntimeInfos[index].IsEnabled = enabled;
-        }
-
         void ExecuteSystem(int globalIndex)
         {
             Assert.That(!_hasDisposed);
@@ -714,7 +708,7 @@ namespace Trecs.Internal
 
             systemRuntimeInfo.LastUpdateFrame = _variableFrameCount;
 
-            if (!systemRuntimeInfo.IsEnabled)
+            if (_enableState.ShouldSkipSystem(globalIndex))
             {
                 return;
             }
@@ -922,7 +916,6 @@ namespace Trecs.Internal
         class SystemRuntimeInfo
         {
             public int LastUpdateFrame;
-            public bool IsEnabled;
         }
 
         const int MinVariableFramesBetweenSpiralOfDeathWarnings = 300;

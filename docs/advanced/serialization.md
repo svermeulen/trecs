@@ -11,7 +11,7 @@ Compose just the pieces you need:
 
 - **`SerializerRegistry`** — maps types to their serializers.
 - **`WorldStateSerializer`** — reads/writes the entire ECS world (components, sets, heaps, entity handles).
-- **`BookmarkSerializer`** — captures and restores full state snapshots.
+- **`SnapshotSerializer`** — captures and restores full state snapshots.
 - **`RecordingHandler` / `PlaybackHandler`** — capture and replay simulation history (covered in the next page).
 
 The static helper `TrecsSerialization` provides preset registrations so the common path is one line. Users that only need partial setup (e.g. save-game-only projects that skip the recording machinery) can call individual `Register*Serializers` helpers instead.
@@ -28,10 +28,10 @@ var registry = TrecsSerialization.CreateSerializerRegistry();
 
 // 3. Compose only the handlers you actually use.
 var worldStateSerializer = new WorldStateSerializer(world);
-var bookmarks = new BookmarkSerializer(worldStateSerializer, registry, world);
+var snapshots = new SnapshotSerializer(worldStateSerializer, registry, world);
 ```
 
-For a save-game flow you stop here and use `BookmarkSerializer.SaveBookmark`/`LoadBookmark`. For deterministic record/replay also construct `RecordingHandler` and `PlaybackHandler` (see the [Recording & Playback](recording-and-playback.md) page).
+For a save-game flow you stop here and use `SnapshotSerializer.SaveSnapshot`/`LoadSnapshot`. For deterministic record/replay also construct `RecordingHandler` and `PlaybackHandler` (see the [Recording & Playback](recording-and-playback.md) page).
 
 ## Granular registration
 
@@ -125,14 +125,14 @@ public sealed class MyGameStateSerializer : WorldStateSerializer
     }
 }
 
-// Pass the subclass to BookmarkSerializer / RecordingHandler / PlaybackHandler.
+// Pass the subclass to SnapshotSerializer / RecordingHandler / PlaybackHandler.
 var worldStateSer = new MyGameStateSerializer(world, lua);
-var bookmarks = new BookmarkSerializer(worldStateSer, registry, world);
+var snapshots = new SnapshotSerializer(worldStateSer, registry, world);
 ```
 
 ## Buffer reuse
 
-`SerializationBuffer` is the shared write/read buffer used internally by every handler. Most users never touch it directly — `BookmarkSerializer.SaveBookmark(stream)` and friends manage it for you. Power users who need to drive the binary reader/writer themselves can construct one explicitly:
+`SerializationBuffer` is the shared write/read buffer used internally by every handler. Most users never touch it directly — `SnapshotSerializer.SaveSnapshot(stream)` and friends manage it for you. Power users who need to drive the binary reader/writer themselves can construct one explicitly:
 
 ```csharp
 using var buffer = new SerializationBuffer(registry);
@@ -171,7 +171,7 @@ See [Recording & Playback](recording-and-playback.md) for the determinism-sensit
 
 ## Threading
 
-All `BookmarkSerializer`, `RecordingHandler`, and `PlaybackHandler` methods
+All `SnapshotSerializer`, `RecordingHandler`, and `PlaybackHandler` methods
 are **main-thread only**. The underlying `SerializationBuffer` and the
 blit fast-path use a shared static byte buffer, and every read/write
 path asserts `UnityThreadUtil.IsMainThread`. Do not call save/load from
@@ -182,15 +182,15 @@ a background thread.
 The binary layout is **version-sensitive** and not forward-compatible:
 
 - Adding, removing, or reordering fields on a blittable component changes
-  the byte layout, invalidating every previously saved bookmark or
+  the byte layout, invalidating every previously saved snapshot or
   recording that used the old shape.
-- The `version` integer you pass to `SaveBookmark(version, …)` /
+- The `version` integer you pass to `SaveSnapshot(version, …)` /
   `StartRecording(version, …)` is stored in the file header and exposed
-  on `BookmarkMetadata.Version` / `RecordingMetadata.Version`. Trecs does
+  on `SnapshotMetadata.Version` / `RecordingMetadata.Version`. Trecs does
   not interpret it — bumping `version` on a breaking change is a
   convention you own.
-- Use `BookmarkSerializer.PeekMetadata(path)` (or `(stream)`) to inspect
-  the saved version before committing to a full `LoadBookmark`, and
+- Use `SnapshotSerializer.PeekMetadata(path)` (or `(stream)`) to inspect
+  the saved version before committing to a full `LoadSnapshot`, and
   surface a user-facing error for incompatible saves.
 
 !!! note "Two different 'versions'"
@@ -241,7 +241,7 @@ included.
 
 ### Versioned custom serializers
 
-The `version` integer you pass to `SaveBookmark` / `StartRecording` is stamped into the file header *and* exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). Because the header records the version the file was written with, the deserializer can recognize older saves and read them with the layout they were written in. As long as you bump the version every time you change the on-disk layout, a single serializer can keep handling all prior versions:
+The `version` integer you pass to `SaveSnapshot` / `StartRecording` is stamped into the file header *and* exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). Because the header records the version the file was written with, the deserializer can recognize older saves and read them with the layout they were written in. As long as you bump the version every time you change the on-disk layout, a single serializer can keep handling all prior versions:
 
 ```csharp
 public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
@@ -284,7 +284,7 @@ public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
 
 The example only adds a field, but `Version` lets you handle removals and reorderings too — branch the deserializer on `reader.Version` and read the appropriate layout for each historical version. The constraint is that you have to keep the read-side code for every old version you still want to support, and bump `version` every time the layout changes.
 
-If your game needs long-term save compatibility across deeper schema changes (renamed types, restructured aggregates, splitting one component into two), wrap the Trecs bookmark inside your own versioned format and perform migrations before calling `LoadBookmark`.
+If your game needs long-term save compatibility across deeper schema changes (renamed types, restructured aggregates, splitting one component into two), wrap the Trecs snapshot inside your own versioned format and perform migrations before calling `LoadSnapshot`.
 
 For the exact on-disk layout (header fields, stream guards, endianness, integrity caveats), see the [Binary Format Reference](binary-format.md).
 

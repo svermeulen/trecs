@@ -63,7 +63,7 @@ namespace Trecs.Serialization
         /// <summary>
         /// Registers serializers for Trecs ECS internals — entity handles, blob
         /// references, heap manifests, and the entity input queue's underlying types.
-        /// Required by <see cref="WorldStateSerializer"/>, <see cref="BookmarkSerializer"/>,
+        /// Required by <see cref="WorldStateSerializer"/>, <see cref="SnapshotSerializer"/>,
         /// <see cref="RecordingHandler"/>, and <see cref="PlaybackHandler"/>.
         /// </summary>
         static void RegisterTrecsSerializers(SerializerRegistry registry)
@@ -86,7 +86,7 @@ namespace Trecs.Serialization
             registry.RegisterSerializer<NativeDenseDictionarySerializer<uint, uint>>();
             registry.RegisterSerializer<NativeArraySerializer<uint>>();
 
-            BookmarkMetadata.RegisterSerializers(registry);
+            SnapshotMetadata.RegisterSerializers(registry);
             RecordingMetadata.RegisterSerializers(registry);
         }
 

@@ -7,7 +7,7 @@ namespace Trecs.Serialization.Samples.Snake
     /// Spawns the initial snake state at startup: one head entity at the
     /// grid center, plus <c>InitialSnakeLength - 1</c> segments trailing
     /// behind it. Also creates a flat ground plane for visual context;
-    /// the ground is not tied to any entity and is unaffected by bookmark
+    /// the ground is not tied to any entity and is unaffected by snapshot
     /// loads.
     /// </summary>
     public class SnakeSceneInitializer

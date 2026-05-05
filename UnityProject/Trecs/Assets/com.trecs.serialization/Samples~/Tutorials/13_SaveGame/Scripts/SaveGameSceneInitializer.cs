@@ -5,7 +5,7 @@ namespace Trecs.Serialization.Samples.SaveGame
     /// <summary>
     /// Parses the hardcoded Sokoban level string into wall, box, target,
     /// and player entities. Level geometry (walls, targets) is part of
-    /// ECS state and participates in bookmark save/load — load a bookmark
+    /// ECS state and participates in snapshot save/load — load a snapshot
     /// and the whole level reverts.
     ///
     /// Legend: '#' wall, '.' empty, 'P' player, 'B' box, 'T' target.

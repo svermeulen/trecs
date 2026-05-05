@@ -3,9 +3,10 @@ using System;
 namespace Trecs
 {
     /// <summary>
-    /// Marks a parameter on a system <c>[ForEachEntity]</c> or <c>[SingleEntity]</c>
-    /// method as a user-supplied pass-through argument that should be forwarded by the
-    /// generated overloads, rather than auto-detected as an iteration parameter.
+    /// Marks a parameter on a system <c>[ForEachEntity]</c> method (or a method with
+    /// per-parameter <c>[SingleEntity]</c>) as a user-supplied pass-through argument
+    /// that should be forwarded by the generated overloads, rather than auto-detected
+    /// as an iteration parameter.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -19,7 +20,7 @@ namespace Trecs
     /// value" from "loop-supplied value".
     /// </para>
     /// <para>
-    /// Parameters in a <c>[ForEachEntity]</c> or <c>[SingleEntity]</c> method may appear in any order — the generator
+    /// Parameters in an iteration method may appear in any order — the generator
     /// emits the call to the user method preserving the original declaration order.
     /// </para>
     /// </remarks>

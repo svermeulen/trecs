@@ -6,7 +6,7 @@ A high-performance Entity Component System framework for Unity, designed for det
 
 - **High-performance storage** — Components are stored in contiguous arrays (structure-of-arrays), grouped by explicit tags for cache-friendly iteration
 - **Serialization** — Full world state serialization out of the box, including all entities, components, and heap data
-- **Bookmarks, Recording & Playback** — Save and load snapshots of full game state, record and replay inputs deterministically with checksum-based desync detection, or use for network rollbacks
+- **Snapshots, Recording & Playback** — Save and load snapshots of full game state, record and replay inputs deterministically with checksum-based desync detection, or use for network rollbacks
 - **Burst & Jobs** — First-class support for Unity's job system and Burst compiler with automatic dependency tracking based on component access
 - **Source generation** — Roslyn-powered code generation eliminates boilerplate for systems, aspects, and templates
 - **Aspects** — Bundled component access that groups related read/write operations into a single reusable struct
@@ -38,8 +38,8 @@ public struct PlayerTag : ITag { }
 // Step 3: Define entity types
 public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 {
-    public Position Position;
-    public Velocity Velocity;
+    Position Position;
+    Velocity Velocity;
 }
 
 // Step 4: Define systems to operate on entities

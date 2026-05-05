@@ -45,10 +45,10 @@ namespace Trecs
         void FlushDeterministic()
         {
             var allRemoves = new NativeList<EntityIndex>(64, Allocator.Temp);
-            for (int i = 0; i < RemoveQueue.Count; i++)
+            for (int i = 0; i < RemoveQueue.Length; i++)
             {
                 ref var bag = ref RemoveQueue.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                     allRemoves.Add(bag.Dequeue<EntityIndex>());
             }
             allRemoves.Sort();
@@ -60,10 +60,10 @@ namespace Trecs
             allRemoves.Dispose();
 
             var allAdds = new NativeList<EntityIndex>(64, Allocator.Temp);
-            for (int i = 0; i < AddQueue.Count; i++)
+            for (int i = 0; i < AddQueue.Length; i++)
             {
                 ref var bag = ref AddQueue.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                     allAdds.Add(bag.Dequeue<EntityIndex>());
             }
             allAdds.Sort();
@@ -77,20 +77,20 @@ namespace Trecs
 
         void FlushNonDeterministic()
         {
-            for (int i = 0; i < RemoveQueue.Count; i++)
+            for (int i = 0; i < RemoveQueue.Length; i++)
             {
                 ref var bag = ref RemoveQueue.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                 {
                     var entityIndex = bag.Dequeue<EntityIndex>();
                     EntriesPerGroup[entityIndex.GroupIndex.Index].Remove(entityIndex.Index);
                 }
             }
 
-            for (int i = 0; i < AddQueue.Count; i++)
+            for (int i = 0; i < AddQueue.Length; i++)
             {
                 ref var bag = ref AddQueue.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                 {
                     var entityIndex = bag.Dequeue<EntityIndex>();
                     EntriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);

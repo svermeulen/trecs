@@ -21,10 +21,10 @@ public struct Boid : ITag { }
 
 public partial class BoidEntity : ITemplate, IHasTags<SampleTags.Boid>
 {
-    public Position Position = Position.Default;
-    public Velocity Velocity;
-    public Speed Speed;
-    public GameObjectId GameObjectId;
+    Position Position = Position.Default;
+    Velocity Velocity;
+    Speed Speed;
+    GameObjectId GameObjectId;
 }
 ```
 

@@ -48,11 +48,11 @@ namespace Trecs.Samples.BlobStorage
     {
         public partial class SwatchEntity : ITemplate, IHasTags<SampleTags.Swatch>
         {
-            public Position Position;
-            public UniformScale Scale = new(1f);
-            public ColorComponent Color;
-            public PaletteRef Palette;
-            public GameObjectId GameObjectId;
+            Position Position;
+            UniformScale Scale = new(1f);
+            ColorComponent Color;
+            PaletteRef Palette;
+            GameObjectId GameObjectId;
         }
     }
 }

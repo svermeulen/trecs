@@ -67,20 +67,13 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public IntPtr GetRawReadWritePointer(out int capacity)
+        public T* GetRawPointer(out int length)
         {
-            capacity = _length;
-            return new IntPtr(_data);
+            length = _length;
+            return _data;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public IntPtr GetRawReadOnlyPointer(out int capacity)
-        {
-            capacity = _length;
-            return new IntPtr(_data);
-        }
-
-        public int Capacity
+        public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _length;
@@ -92,7 +85,7 @@ namespace Trecs.Internal
             if (index < 0 || index >= _length)
             {
                 throw new IndexOutOfRangeException(
-                    $"NativeBuffer - out of bound access: index {index} - capacity {Capacity}"
+                    $"NativeBuffer - out of bound access: index {index} - length {Length}"
                 );
             }
 
@@ -107,7 +100,7 @@ namespace Trecs.Internal
                 if (index < 0 || index >= _length)
                 {
                     throw new IndexOutOfRangeException(
-                        $"NativeBuffer - out of bound access: index {index} - capacity {Capacity}"
+                        $"NativeBuffer - out of bound access: index {index} - length {Length}"
                     );
                 }
 

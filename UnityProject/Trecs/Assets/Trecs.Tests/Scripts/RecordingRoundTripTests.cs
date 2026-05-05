@@ -31,7 +31,7 @@ namespace Trecs.Tests
     /// <summary>
     /// End-to-end record → playback determinism: runs a deterministic fixed-update
     /// simulation, records checksums every few frames, then replays against a fresh
-    /// world (seeded identically and loaded from the same bookmark) and verifies no
+    /// world (seeded identically and loaded from the same snapshot) and verifies no
     /// desync. This is the canary for the whole recording/playback story — any
     /// non-determinism in the simulation, checksum path, or serialization round-trip
     /// surfaces as <see cref="PlaybackHandler.HasDesynced"/>.
@@ -53,7 +53,7 @@ namespace Trecs.Tests
         public void RecordThenPlayback_DeterministicSim_NoDesync()
         {
             byte[] recordingBytes;
-            byte[] bookmarkBytes;
+            byte[] snapshotBytes;
 
             // ── Record phase ────────────────────────────────────────────────────
             using (var env = CreateEnv())
@@ -62,15 +62,15 @@ namespace Trecs.Tests
 
                 var registry = TrecsSerialization.CreateSerializerRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
+                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var recorder = new RecordingHandler(worldStateSer, registry, env.World);
 
-                // Save the bookmark BEFORE any recorded ticks so playback has a matching
+                // Save the snapshot BEFORE any recorded ticks so playback has a matching
                 // initial state.
-                using (var bookmarkStream = new MemoryStream())
+                using (var snapshotStream = new MemoryStream())
                 {
-                    bookmarks.SaveBookmark(version: Version, stream: bookmarkStream);
-                    bookmarkBytes = bookmarkStream.ToArray();
+                    snapshots.SaveSnapshot(version: Version, stream: snapshotStream);
+                    snapshotBytes = snapshotStream.ToArray();
                 }
 
                 recorder.StartRecording(
@@ -97,16 +97,16 @@ namespace Trecs.Tests
             {
                 // Note: the playback world is pre-populated with the SAME entities as
                 // the recording world and then overwritten by LoadInitialState.
-                // LoadBookmark handles entity-count reconciliation, but starting from
+                // LoadSnapshot handles entity-count reconciliation, but starting from
                 // an identical template is the simplest path.
                 SpawnEntities(env);
 
                 var registry = TrecsSerialization.CreateSerializerRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
+                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var playback = new PlaybackHandler(
                     worldStateSer,
-                    bookmarks,
+                    snapshots,
                     registry,
                     env.World
                 );
@@ -117,9 +117,9 @@ namespace Trecs.Tests
                     new PlaybackStartParams { InputsOnly = false, Version = Version }
                 );
 
-                using (var bookmarkStream = new MemoryStream(bookmarkBytes))
+                using (var snapshotStream = new MemoryStream(snapshotBytes))
                 {
-                    playback.LoadInitialState(bookmarkStream, expectedInitialChecksum: null);
+                    playback.LoadInitialState(snapshotStream, expectedInitialChecksum: null);
                 }
 
                 for (int i = 0; i < FramesToRun; i++)
@@ -150,7 +150,7 @@ namespace Trecs.Tests
             // detected. This sibling test corrupts playback state mid-flight and
             // asserts the handler actually notices — proving the check is live.
             byte[] recordingBytes;
-            byte[] bookmarkBytes;
+            byte[] snapshotBytes;
 
             using (var env = CreateEnv())
             {
@@ -158,13 +158,13 @@ namespace Trecs.Tests
 
                 var registry = TrecsSerialization.CreateSerializerRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
+                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var recorder = new RecordingHandler(worldStateSer, registry, env.World);
 
-                using (var bookmarkStream = new MemoryStream())
+                using (var snapshotStream = new MemoryStream())
                 {
-                    bookmarks.SaveBookmark(version: Version, stream: bookmarkStream);
-                    bookmarkBytes = bookmarkStream.ToArray();
+                    snapshots.SaveSnapshot(version: Version, stream: snapshotStream);
+                    snapshotBytes = snapshotStream.ToArray();
                 }
 
                 recorder.StartRecording(
@@ -184,10 +184,10 @@ namespace Trecs.Tests
 
                 var registry = TrecsSerialization.CreateSerializerRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var bookmarks = new BookmarkSerializer(worldStateSer, registry, env.World);
+                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var playback = new PlaybackHandler(
                     worldStateSer,
-                    bookmarks,
+                    snapshots,
                     registry,
                     env.World
                 );
@@ -198,9 +198,9 @@ namespace Trecs.Tests
                     new PlaybackStartParams { InputsOnly = false, Version = Version }
                 );
 
-                using (var bookmarkStream = new MemoryStream(bookmarkBytes))
+                using (var snapshotStream = new MemoryStream(snapshotBytes))
                 {
-                    playback.LoadInitialState(bookmarkStream, expectedInitialChecksum: null);
+                    playback.LoadInitialState(snapshotStream, expectedInitialChecksum: null);
                 }
 
                 // Corrupt the state mid-playback — mutate entities so the next checksum

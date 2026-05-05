@@ -17,8 +17,8 @@ namespace Trecs.Tests
             IHasPartition<FMPartitionA>,
             IHasPartition<FMPartitionB>
     {
-        public TestInt TestInt;
-        public TestFloat TestFloat;
+        TestInt TestInt;
+        TestFloat TestFloat;
     }
 
     // Set scoped to the FMTag (valid for both partition groups)

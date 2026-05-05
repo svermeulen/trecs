@@ -7,11 +7,11 @@ namespace Trecs.Serialization.Samples
 {
     /// <summary>
     /// Sample-side helper that wires Unity keyboard input to the Trecs
-    /// recording, playback, and bookmark serialization APIs.
+    /// recording, playback, and snapshot serialization APIs.
     ///
-    /// Keys: F5=Toggle Record, F6=Toggle Playback, F8=Save Bookmark, F9=Load Bookmark.
+    /// Keys: F5=Toggle Record, F6=Toggle Playback, F8=Save Snapshot, F9=Load Snapshot.
     ///
-    /// Recordings and bookmarks are written under
+    /// Recordings and snapshots are written under
     /// <c>{Application.persistentDataPath}/{sampleName}/Recordings/</c>.
     /// </summary>
     public class RecordAndPlaybackController : IDisposable
@@ -20,11 +20,11 @@ namespace Trecs.Serialization.Samples
 
         readonly RecordingHandler _recordingHandler;
         readonly PlaybackHandler _playbackHandler;
-        readonly BookmarkSerializer _bookmarkSerializer;
+        readonly SnapshotSerializer _snapshotSerializer;
         readonly WorldAccessor _world;
         readonly int _serializationVersion;
         readonly string _recordingPath;
-        readonly string _bookmarkPath;
+        readonly string _snapshotPath;
 
         ControllerState _state;
 
@@ -39,7 +39,7 @@ namespace Trecs.Serialization.Samples
 
             _recordingHandler = serialization.Recorder;
             _playbackHandler = serialization.Playback;
-            _bookmarkSerializer = serialization.Bookmarks;
+            _snapshotSerializer = serialization.Snapshots;
             _world = world.CreateAccessor(nameof(RecordAndPlaybackController));
             _serializationVersion = serializationVersion;
 
@@ -49,12 +49,12 @@ namespace Trecs.Serialization.Samples
                 "Recordings"
             );
             _recordingPath = Path.Combine(recordingDir, "recording.bin");
-            _bookmarkPath = Path.Combine(recordingDir, "bookmark.bin");
+            _snapshotPath = Path.Combine(recordingDir, "snapshot.bin");
 
             Directory.CreateDirectory(recordingDir);
 
             _log.Info(
-                "Recording controller ready. Keys: F5=Toggle Record, F6=Toggle Playback, F8=Save Bookmark, F9=Load Bookmark"
+                "Recording controller ready. Keys: F5=Toggle Record, F6=Toggle Playback, F8=Save Snapshot, F9=Load Snapshot"
             );
         }
 
@@ -72,11 +72,11 @@ namespace Trecs.Serialization.Samples
             }
             else if (Input.GetKeyDown(KeyCode.F8))
             {
-                HandleSaveBookmark();
+                HandleSaveSnapshot();
             }
             else if (Input.GetKeyDown(KeyCode.F9))
             {
-                HandleLoadBookmark();
+                HandleLoadSnapshot();
             }
         }
 
@@ -122,10 +122,10 @@ namespace Trecs.Serialization.Samples
                 checksumFrameInterval: 30
             );
 
-            // Save initial state bookmark so playback can start from the correct point
-            _bookmarkSerializer.SaveBookmark(
+            // Save initial state snapshot so playback can start from the correct point
+            _snapshotSerializer.SaveSnapshot(
                 version: _serializationVersion,
-                filePath: _bookmarkPath
+                filePath: _snapshotPath
             );
 
             _state = ControllerState.Recording;
@@ -159,15 +159,15 @@ namespace Trecs.Serialization.Samples
                 new PlaybackStartParams { InputsOnly = false, Version = _serializationVersion }
             );
 
-            if (File.Exists(_bookmarkPath))
+            if (File.Exists(_snapshotPath))
             {
-                _playbackHandler.LoadInitialState(_bookmarkPath, expectedInitialChecksum: null);
-                _log.Info("Loaded initial state from bookmark");
+                _playbackHandler.LoadInitialState(_snapshotPath, expectedInitialChecksum: null);
+                _log.Info("Loaded initial state from snapshot");
             }
             else
             {
                 _log.Warning(
-                    "No initial state bookmark found, starting playback from current state"
+                    "No initial state snapshot found, starting playback from current state"
                 );
             }
 
@@ -179,32 +179,32 @@ namespace Trecs.Serialization.Samples
             );
         }
 
-        void HandleSaveBookmark()
+        void HandleSaveSnapshot()
         {
-            _bookmarkSerializer.SaveBookmark(
+            _snapshotSerializer.SaveSnapshot(
                 version: _serializationVersion,
-                filePath: _bookmarkPath
+                filePath: _snapshotPath
             );
 
-            _log.Info("Bookmark saved at frame {}", _world.FixedFrame);
+            _log.Info("Snapshot saved at frame {}", _world.FixedFrame);
         }
 
-        void HandleLoadBookmark()
+        void HandleLoadSnapshot()
         {
             if (_state == ControllerState.Recording)
             {
-                _log.Warning("Cannot load bookmark while recording");
+                _log.Warning("Cannot load snapshot while recording");
                 return;
             }
 
-            if (!File.Exists(_bookmarkPath))
+            if (!File.Exists(_snapshotPath))
             {
-                _log.Warning("No bookmark found at {}", _bookmarkPath);
+                _log.Warning("No snapshot found at {}", _snapshotPath);
                 return;
             }
 
-            _bookmarkSerializer.LoadBookmark(_bookmarkPath);
-            _log.Info("Bookmark loaded, now at frame {}", _world.FixedFrame);
+            _snapshotSerializer.LoadSnapshot(_snapshotPath);
+            _log.Info("Snapshot loaded, now at frame {}", _world.FixedFrame);
         }
 
         public void Dispose()

@@ -26,13 +26,13 @@ public partial class ParticleEntity : ITemplate,
     IExtends<CommonTemplates.Renderable>,
     IHasTags<SampleTags.Particle>
 {
-    public Velocity Velocity;
+    Velocity Velocity;
 }
 
 public partial class Globals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
-    public DesiredNumParticles DesiredNumParticles;
-    public IsJobsEnabled IsJobsEnabled;
+    DesiredNumParticles DesiredNumParticles;
+    IsJobsEnabled IsJobsEnabled;
 }
 ```
 

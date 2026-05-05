@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using Trecs.Collections;
 
 namespace Trecs.Internal
 {

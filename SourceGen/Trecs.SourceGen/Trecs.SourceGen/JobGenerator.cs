@@ -342,6 +342,10 @@ namespace Trecs.SourceGen
             if (fromWorldFields == null)
                 return null;
 
+            var singleEntityFields = ScanSingleEntityFields(context, structDecl, semanticModel);
+            if (singleEntityFields == null)
+                return null;
+
             // Decide aspect-vs-components routing: aspect path iff the first parameter
             // implements IAspect, otherwise components path. (The aspect parameter is
             // always first by convention; the source-gen rejects mixed signatures via
@@ -393,7 +397,8 @@ namespace Trecs.SourceGen
                     JobKind.Aspect,
                     aspectInfo,
                     null,
-                    fromWorldFields
+                    fromWorldFields,
+                    singleEntityFields
                 );
             }
             else
@@ -413,7 +418,8 @@ namespace Trecs.SourceGen
                     JobKind.Components,
                     null,
                     componentsInfo,
-                    fromWorldFields
+                    fromWorldFields,
+                    singleEntityFields
                 );
             }
         }
@@ -820,13 +826,18 @@ namespace Trecs.SourceGen
             if (fromWorldFields == null)
                 return null;
 
+            var singleEntityFields = ScanSingleEntityFields(context, structDecl, semanticModel);
+            if (singleEntityFields == null)
+                return null;
+
             return new JobInfo(
                 symbol,
                 structDecl,
                 JobKind.CustomNonIteration,
                 aspect: null,
                 components: null,
-                fromWorldFields: fromWorldFields
+                fromWorldFields: fromWorldFields,
+                singleEntityFields: singleEntityFields
             );
         }
 
@@ -901,13 +912,18 @@ namespace Trecs.SourceGen
             if (fromWorldFields == null)
                 return null;
 
+            var singleEntityFields = ScanSingleEntityFields(context, structDecl, semanticModel);
+            if (singleEntityFields == null)
+                return null;
+
             return new JobInfo(
                 symbol,
                 structDecl,
                 JobKind.CustomParallelIteration,
                 aspect: null,
                 components: null,
-                fromWorldFields: fromWorldFields
+                fromWorldFields: fromWorldFields,
+                singleEntityFields: singleEntityFields
             );
         }
 
@@ -1127,6 +1143,324 @@ namespace Trecs.SourceGen
         }
 
         /// <summary>
+        /// Scans the job struct for fields decorated with <c>[SingleEntity(Tag/Tags)]</c>.
+        /// Each entry becomes a hidden hoist + assignment in the generated <c>ScheduleParallel</c>
+        /// path. Validates: type is an <c>IAspect</c> or a <c>NativeComponentRead/Write&lt;T&gt;</c>;
+        /// inline tags are present; not stacked with <c>[FromWorld]</c>.
+        /// </summary>
+        static List<SingleEntityFieldEntry>? ScanSingleEntityFields(
+            SourceProductionContext context,
+            StructDeclarationSyntax structDecl,
+            SemanticModel semanticModel
+        )
+        {
+            var result = new List<SingleEntityFieldEntry>();
+            foreach (var field in structDecl.Members.OfType<FieldDeclarationSyntax>())
+            {
+                bool hasSingleEntity = field
+                    .AttributeLists.SelectMany(al => al.Attributes)
+                    .Any(attr =>
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == TrecsAttributeNames.SingleEntity
+                    );
+                if (!hasSingleEntity)
+                    continue;
+
+                bool hasFromWorld = field
+                    .AttributeLists.SelectMany(al => al.Attributes)
+                    .Any(attr =>
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == TrecsAttributeNames.FromWorld
+                    );
+                if (hasFromWorld)
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.SingleEntityConflictingAttributes,
+                            field.GetLocation(),
+                            field.Declaration.Variables[0].Identifier.Text,
+                            "FromWorld"
+                        )
+                    );
+                    return null;
+                }
+
+                if (field.Declaration.Variables.Count != 1)
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.MultiVariableFromWorldFieldNotSupported,
+                            field.GetLocation(),
+                            field.Declaration.Variables[0].Identifier.Text
+                        )
+                    );
+                    return null;
+                }
+
+                var v = field.Declaration.Variables[0];
+                var typeSyntax = field.Declaration.Type;
+                var typeSymbol = semanticModel.GetTypeInfo(typeSyntax).Type as INamedTypeSymbol;
+                if (typeSymbol == null)
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.CouldNotResolveSymbol,
+                            typeSyntax.GetLocation(),
+                            typeSyntax.ToString()
+                        )
+                    );
+                    return null;
+                }
+
+                var fieldSymbol = semanticModel.GetDeclaredSymbol(v) as IFieldSymbol;
+                if (fieldSymbol == null)
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.CouldNotResolveSymbol,
+                            field.GetLocation(),
+                            v.Identifier.Text
+                        )
+                    );
+                    return null;
+                }
+                var tagTypes = InlineTagsParser.ParseFromSymbol(
+                    fieldSymbol,
+                    "SingleEntity",
+                    field.GetLocation(),
+                    v.Identifier.Text,
+                    context.ReportDiagnostic
+                );
+                if (tagTypes == null)
+                    return null;
+                if (tagTypes.Count == 0)
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.SingleEntityRequiresInlineTags,
+                            field.GetLocation(),
+                            v.Identifier.Text
+                        )
+                    );
+                    return null;
+                }
+
+                // Classify the field type. Aspect → store the materialized aspect.
+                // NativeComponentRead<T> / NativeComponentWrite<T> → store the wrapper.
+                bool isAspect = SymbolAnalyzer.ImplementsInterface(
+                    typeSymbol,
+                    "IAspect",
+                    TrecsNamespaces.Trecs
+                );
+                bool isComponentRead =
+                    typeSymbol.Name == "NativeComponentRead"
+                    && typeSymbol.IsGenericType
+                    && typeSymbol.TypeArguments.Length == 1
+                    && PerformanceCache.GetDisplayString(typeSymbol.ContainingNamespace) == "Trecs";
+                bool isComponentWrite =
+                    typeSymbol.Name == "NativeComponentWrite"
+                    && typeSymbol.IsGenericType
+                    && typeSymbol.TypeArguments.Length == 1
+                    && PerformanceCache.GetDisplayString(typeSymbol.ContainingNamespace) == "Trecs";
+
+                if (!isAspect && !isComponentRead && !isComponentWrite)
+                {
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.SingleEntityWrongType,
+                            field.GetLocation(),
+                            v.Identifier.Text,
+                            PerformanceCache.GetDisplayString(typeSymbol)
+                        )
+                    );
+                    return null;
+                }
+
+                if (isAspect)
+                {
+                    var aspectData = AspectAttributeParser.ParseAspectData(typeSymbol);
+                    result.Add(
+                        new SingleEntityFieldEntry(
+                            fieldName: v.Identifier.Text,
+                            isAspect: true,
+                            tagTypes: tagTypes,
+                            aspectTypeDisplay: PerformanceCache.GetDisplayString(typeSymbol),
+                            aspectData: aspectData
+                        )
+                    );
+                }
+                else
+                {
+                    var compType = typeSymbol.TypeArguments[0];
+                    result.Add(
+                        new SingleEntityFieldEntry(
+                            fieldName: v.Identifier.Text,
+                            isAspect: false,
+                            tagTypes: tagTypes,
+                            componentTypeDisplay: PerformanceCache.GetDisplayString(compType),
+                            componentTypeSymbol: compType,
+                            isRef: isComponentWrite
+                        )
+                    );
+                }
+            }
+            return result;
+        }
+
+        // ─── [SingleEntity] field emit helpers ─────────────────────────────────
+        //
+        // Used by all four schedule overload paths (iteration jobs dense/sparse,
+        // custom non-iteration, custom parallel iteration). Hoisting runs once per
+        // schedule call (the singleton's EntityIndex is fixed for the call). Dep
+        // registration / field assignment / tracking run per-job-instance (which is
+        // per-iteration-group for iteration jobs, once for custom jobs).
+
+        static string SingleEntityWithTags(SingleEntityFieldEntry e) =>
+            $"WithTags<{string.Join(", ", e.TagTypes.Select(PerformanceCache.GetDisplayString))}>()";
+
+        static string SingleEntityEiLocal(SingleEntityFieldEntry e) =>
+            FromWorldEmitter.GenPrefix + "se_" + e.FieldName + "_ei";
+
+        static void EmitSingleEntityFieldsHoistedSetup(
+            StringBuilder sb,
+            string body,
+            List<SingleEntityFieldEntry> entries
+        )
+        {
+            foreach (var e in entries)
+            {
+                var ei = SingleEntityEiLocal(e);
+                sb.AppendLine(
+                    $"{body}var {ei} = {FromWorldEmitter.GenPrefix}world.Query().{SingleEntityWithTags(e)}.SingleEntityIndex();"
+                );
+            }
+        }
+
+        static void EmitSingleEntityFieldsDepRegistration(
+            StringBuilder sb,
+            string body,
+            List<SingleEntityFieldEntry> entries
+        )
+        {
+            foreach (var e in entries)
+            {
+                var ei = SingleEntityEiLocal(e);
+                if (e.IsAspect)
+                {
+                    foreach (var comp in e.AspectData!.ReadTypes)
+                    {
+                        var n = PerformanceCache.GetDisplayString(comp);
+                        sb.AppendLine(
+                            $"{body}{FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}scheduler.IncludeReadDep({FromWorldEmitter.GenPrefix}deps, ResourceId.Component(ComponentTypeId<{n}>.Value), {ei}.GroupIndex);"
+                        );
+                    }
+                    foreach (var comp in e.AspectData!.WriteTypes)
+                    {
+                        var n = PerformanceCache.GetDisplayString(comp);
+                        sb.AppendLine(
+                            $"{body}{FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}scheduler.IncludeWriteDep({FromWorldEmitter.GenPrefix}deps, ResourceId.Component(ComponentTypeId<{n}>.Value), {ei}.GroupIndex);"
+                        );
+                    }
+                }
+                else
+                {
+                    var method = e.IsRef ? "IncludeWriteDep" : "IncludeReadDep";
+                    sb.AppendLine(
+                        $"{body}{FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}scheduler.{method}({FromWorldEmitter.GenPrefix}deps, ResourceId.Component(ComponentTypeId<{e.ComponentTypeDisplay}>.Value), {ei}.GroupIndex);"
+                    );
+                }
+            }
+        }
+
+        /// <summary>
+        /// Emits the field assignments for [SingleEntity] fields on the per-job-instance
+        /// (typically named <c>_trecs_job</c>). For aspect fields, fetches per-component
+        /// buffers and constructs the aspect; for component-{Read,Write} wrappers, calls
+        /// the runtime helper that resolves the wrapper from the EntityIndex.
+        /// </summary>
+        static void EmitSingleEntityFieldsAssignment(
+            StringBuilder sb,
+            string body,
+            List<SingleEntityFieldEntry> entries
+        )
+        {
+            foreach (var e in entries)
+            {
+                var ei = SingleEntityEiLocal(e);
+                if (e.IsAspect)
+                {
+                    // Use AspectAttributeData.AllComponentTypes — same canonical order
+                    // the aspect's generated EntityIndex constructor uses, so the
+                    // positional buffer args line up by construction.
+                    var aspectData = e.AspectData!;
+                    var allComponents = aspectData.AllComponentTypes;
+                    var bufferLocals = new List<string>(allComponents.Length);
+                    for (int i = 0; i < allComponents.Length; i++)
+                    {
+                        var compType = allComponents[i];
+                        bool inWrite = aspectData.WriteTypes.Any(w =>
+                            SymbolEqualityComparer.Default.Equals(w, compType)
+                        );
+                        var ext = inWrite ? "GetBufferWriteForJob" : "GetBufferReadForJob";
+                        var local = $"{FromWorldEmitter.GenPrefix}se_{e.FieldName}_b{i}";
+                        bufferLocals.Add(local);
+                        sb.AppendLine(
+                            $"{body}var ({local}, _) = {FromWorldEmitter.GenPrefix}world.{ext}<{PerformanceCache.GetDisplayString(compType)}>({ei}.GroupIndex);"
+                        );
+                    }
+                    sb.AppendLine(
+                        $"{body}{FromWorldEmitter.GenPrefix}job.{e.FieldName} = new {e.AspectTypeDisplay}({ei}, {string.Join(", ", bufferLocals)});"
+                    );
+                }
+                else
+                {
+                    var method = e.IsRef
+                        ? "GetNativeComponentWriteForJob"
+                        : "GetNativeComponentReadForJob";
+                    sb.AppendLine(
+                        $"{body}{FromWorldEmitter.GenPrefix}job.{e.FieldName} = {FromWorldEmitter.GenPrefix}world.{method}<{e.ComponentTypeDisplay}>({ei});"
+                    );
+                }
+            }
+        }
+
+        static void EmitSingleEntityFieldsTracking(
+            StringBuilder sb,
+            string body,
+            List<SingleEntityFieldEntry> entries
+        )
+        {
+            foreach (var e in entries)
+            {
+                var ei = SingleEntityEiLocal(e);
+                if (e.IsAspect)
+                {
+                    foreach (var comp in e.AspectData!.ReadTypes)
+                    {
+                        var n = PerformanceCache.GetDisplayString(comp);
+                        sb.AppendLine(
+                            $"{body}{FromWorldEmitter.GenPrefix}scheduler.TrackJobRead({FromWorldEmitter.GenPrefix}handle, ResourceId.Component(ComponentTypeId<{n}>.Value), {ei}.GroupIndex);"
+                        );
+                    }
+                    foreach (var comp in e.AspectData!.WriteTypes)
+                    {
+                        var n = PerformanceCache.GetDisplayString(comp);
+                        sb.AppendLine(
+                            $"{body}{FromWorldEmitter.GenPrefix}scheduler.TrackJobWrite({FromWorldEmitter.GenPrefix}handle, ResourceId.Component(ComponentTypeId<{n}>.Value), {ei}.GroupIndex);"
+                        );
+                    }
+                }
+                else
+                {
+                    var method = e.IsRef ? "TrackJobWrite" : "TrackJobRead";
+                    sb.AppendLine(
+                        $"{body}{FromWorldEmitter.GenPrefix}scheduler.{method}({FromWorldEmitter.GenPrefix}handle, ResourceId.Component(ComponentTypeId<{e.ComponentTypeDisplay}>.Value), {ei}.GroupIndex);"
+                    );
+                }
+            }
+        }
+
+        /// <summary>
         /// Emits TRECS081 for any field on a Trecs job struct whose type is a recognized
         /// Trecs container (NativeComponentBufferRead, NativeComponentLookupWrite, etc.) but
         /// is NOT marked [FromWorld]. Such fields bypass the scheduler's dependency
@@ -1146,7 +1480,13 @@ namespace Trecs.SourceGen
                         IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
                         == TrecsAttributeNames.FromWorld
                     );
-                if (hasFromWorld)
+                bool hasSingleEntity = field
+                    .AttributeLists.SelectMany(al => al.Attributes)
+                    .Any(attr =>
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == TrecsAttributeNames.SingleEntity
+                    );
+                if (hasFromWorld || hasSingleEntity)
                     continue;
 
                 var typeSyntax = field.Declaration.Type;
@@ -1555,6 +1895,7 @@ namespace Trecs.SourceGen
                 sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}queryIndexOffset = 0;");
 
             FromWorldEmitter.EmitFromWorldHoistedSetup(sb, body, orderedEmits);
+            EmitSingleEntityFieldsHoistedSetup(sb, body, info.SingleEntityFields);
 
             sb.AppendLine(
                 $"{body}foreach (var {FromWorldEmitter.GenPrefix}slice in {FromWorldEmitter.GenPrefix}builder.GroupSlices())"
@@ -1631,6 +1972,7 @@ namespace Trecs.SourceGen
 
             // [FromWorld] dep registration.
             FromWorldEmitter.EmitFromWorldDepRegistration(sb, body, orderedEmits);
+            EmitSingleEntityFieldsDepRegistration(sb, body, info.SingleEntityFields);
 
             // Materialise iteration buffers.
             for (int i = 0; i < buffers.Count; i++)
@@ -1663,6 +2005,7 @@ namespace Trecs.SourceGen
 
             // Assign [FromWorld] field values.
             FromWorldEmitter.EmitFromWorldFieldAssignments(sb, body, orderedEmits);
+            EmitSingleEntityFieldsAssignment(sb, body, info.SingleEntityFields);
 
             // Schedule via Unity's IJobFor extension.
             sb.AppendLine(
@@ -1681,6 +2024,7 @@ namespace Trecs.SourceGen
                 );
             }
             FromWorldEmitter.EmitFromWorldTracking(sb, body, orderedEmits);
+            EmitSingleEntityFieldsTracking(sb, body, info.SingleEntityFields);
 
             sb.AppendLine(
                 $"{body}{FromWorldEmitter.GenPrefix}allJobs = JobHandle.CombineDependencies({FromWorldEmitter.GenPrefix}allJobs, {FromWorldEmitter.GenPrefix}handle);"
@@ -1730,6 +2074,7 @@ namespace Trecs.SourceGen
                 sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}queryIndexOffset = 0;");
 
             FromWorldEmitter.EmitFromWorldHoistedSetup(sb, body, orderedEmits);
+            EmitSingleEntityFieldsHoistedSetup(sb, body, info.SingleEntityFields);
 
             sb.AppendLine(
                 $"{body}foreach (var {FromWorldEmitter.GenPrefix}slice in {FromWorldEmitter.GenPrefix}builder.GroupSlices())"
@@ -1795,6 +2140,7 @@ namespace Trecs.SourceGen
 
             // [FromWorld] dep registration.
             FromWorldEmitter.EmitFromWorldDepRegistration(sb, body, orderedEmits);
+            EmitSingleEntityFieldsDepRegistration(sb, body, info.SingleEntityFields);
 
             // Materialise iteration buffers.
             for (int i = 0; i < buffers.Count; i++)
@@ -1827,6 +2173,7 @@ namespace Trecs.SourceGen
 
             // Assign [FromWorld] field values.
             FromWorldEmitter.EmitFromWorldFieldAssignments(sb, body, orderedEmits);
+            EmitSingleEntityFieldsAssignment(sb, body, info.SingleEntityFields);
 
             // Wrap the configured user-job copy in the sparse shim and schedule. The shim
             // forwards Execute(int i) to job.Execute(Indices[i]), giving us a sparse
@@ -1850,6 +2197,7 @@ namespace Trecs.SourceGen
                 );
             }
             FromWorldEmitter.EmitFromWorldTracking(sb, body, orderedEmits);
+            EmitSingleEntityFieldsTracking(sb, body, info.SingleEntityFields);
 
             // Schedule disposal of the indices list AFTER the job completes. Track the
             // dispose handle so the framework completes it at the next phase boundary
@@ -1891,16 +2239,19 @@ namespace Trecs.SourceGen
             // Hoist [FromWorld] groups (single-group / multi-group resolutions). Same
             // helper as the iteration paths.
             FromWorldEmitter.EmitFromWorldHoistedSetup(sb, body, orderedEmits);
+            EmitSingleEntityFieldsHoistedSetup(sb, body, info.SingleEntityFields);
 
             // Single, flat dep accumulation — no per-group loop.
             sb.AppendLine(
                 $"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;"
             );
             FromWorldEmitter.EmitFromWorldDepRegistration(sb, body, orderedEmits);
+            EmitSingleEntityFieldsDepRegistration(sb, body, info.SingleEntityFields);
 
             // Configure a job copy with materialised [FromWorld] field values.
             sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}job = this;");
             FromWorldEmitter.EmitFromWorldFieldAssignments(sb, body, orderedEmits);
+            EmitSingleEntityFieldsAssignment(sb, body, info.SingleEntityFields);
 
             // Schedule via Unity's IJobExtensions.Schedule(JobHandle).
             sb.AppendLine(
@@ -1909,6 +2260,7 @@ namespace Trecs.SourceGen
 
             // Track outputs against the user job's resource accesses.
             FromWorldEmitter.EmitFromWorldTracking(sb, body, orderedEmits);
+            EmitSingleEntityFieldsTracking(sb, body, info.SingleEntityFields);
 
             sb.AppendLine($"{body}return {FromWorldEmitter.GenPrefix}handle;");
             sb.AppendLine($"{ind}}}");
@@ -1943,16 +2295,19 @@ namespace Trecs.SourceGen
             // Hoist [FromWorld] groups (single-group / multi-group resolutions). Same
             // helper as the iteration paths.
             FromWorldEmitter.EmitFromWorldHoistedSetup(sb, body, orderedEmits);
+            EmitSingleEntityFieldsHoistedSetup(sb, body, info.SingleEntityFields);
 
             // Single, flat dep accumulation — no per-group loop.
             sb.AppendLine(
                 $"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;"
             );
             FromWorldEmitter.EmitFromWorldDepRegistration(sb, body, orderedEmits);
+            EmitSingleEntityFieldsDepRegistration(sb, body, info.SingleEntityFields);
 
             // Configure a job copy with materialised [FromWorld] field values.
             sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}job = this;");
             FromWorldEmitter.EmitFromWorldFieldAssignments(sb, body, orderedEmits);
+            EmitSingleEntityFieldsAssignment(sb, body, info.SingleEntityFields);
 
             // Schedule via Unity's IJobForExtensions.ScheduleParallel.
             sb.AppendLine(
@@ -1961,6 +2316,7 @@ namespace Trecs.SourceGen
 
             // Track outputs against the user job's resource accesses.
             FromWorldEmitter.EmitFromWorldTracking(sb, body, orderedEmits);
+            EmitSingleEntityFieldsTracking(sb, body, info.SingleEntityFields);
 
             sb.AppendLine($"{body}return {FromWorldEmitter.GenPrefix}handle;");
             sb.AppendLine($"{ind}}}");
@@ -2057,6 +2413,16 @@ namespace Trecs.SourceGen
             public AspectIterationInfo? Aspect { get; }
             public ComponentsIterationInfo? Components { get; }
             public List<FromWorldFieldInfo> FromWorldFields { get; }
+
+            /// <summary>
+            /// <c>[SingleEntity]</c>-decorated fields on the job struct. Each entry is
+            /// resolved at schedule time via <c>Query().WithTags&lt;...&gt;().SingleEntityIndex()</c>
+            /// and assigned into the per-group job instance. Aspect-typed fields are
+            /// constructed from the singleton's group buffers; component fields use
+            /// <c>NativeComponentRead/Write&lt;T&gt;</c>.
+            /// </summary>
+            public List<SingleEntityFieldEntry> SingleEntityFields { get; }
+
             public IterationCriteria IterationCriteria =>
                 Kind switch
                 {
@@ -2084,7 +2450,8 @@ namespace Trecs.SourceGen
                 JobKind kind,
                 AspectIterationInfo? aspect,
                 ComponentsIterationInfo? components,
-                List<FromWorldFieldInfo> fromWorldFields
+                List<FromWorldFieldInfo> fromWorldFields,
+                List<SingleEntityFieldEntry> singleEntityFields
             )
             {
                 Symbol = symbol;
@@ -2093,6 +2460,54 @@ namespace Trecs.SourceGen
                 Aspect = aspect;
                 Components = components;
                 FromWorldFields = fromWorldFields;
+                SingleEntityFields = singleEntityFields;
+            }
+        }
+
+        /// <summary>
+        /// Field on a hand-written Trecs job struct that carries <c>[SingleEntity(Tag/Tags)]</c>.
+        /// </summary>
+        internal class SingleEntityFieldEntry
+        {
+            public string FieldName { get; }
+            public bool IsAspect { get; }
+            public List<ITypeSymbol> TagTypes { get; }
+
+            // Aspect:
+            public string? AspectTypeDisplay { get; }
+
+            /// <summary>
+            /// Parsed aspect data — used for IRead/IWrite component lists and the canonical
+            /// <c>AllComponentTypes</c> ordering shared with the aspect's generated
+            /// EntityIndex constructor. Null for component fields.
+            /// </summary>
+            public Aspect.AspectAttributeData? AspectData { get; }
+
+            // Component (the field type is NativeComponentRead<T> or NativeComponentWrite<T>;
+            // ComponentTypeSymbol is the inner T, ComponentTypeDisplay is its display string):
+            public string? ComponentTypeDisplay { get; }
+            public ITypeSymbol? ComponentTypeSymbol { get; }
+            public bool IsRef { get; }
+
+            public SingleEntityFieldEntry(
+                string fieldName,
+                bool isAspect,
+                List<ITypeSymbol> tagTypes,
+                string? aspectTypeDisplay = null,
+                Aspect.AspectAttributeData? aspectData = null,
+                string? componentTypeDisplay = null,
+                ITypeSymbol? componentTypeSymbol = null,
+                bool isRef = false
+            )
+            {
+                FieldName = fieldName;
+                IsAspect = isAspect;
+                TagTypes = tagTypes;
+                AspectTypeDisplay = aspectTypeDisplay;
+                AspectData = aspectData;
+                ComponentTypeDisplay = componentTypeDisplay;
+                ComponentTypeSymbol = componentTypeSymbol;
+                IsRef = isRef;
             }
         }
 

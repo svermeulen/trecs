@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization
@@ -24,9 +23,10 @@ namespace Trecs.Serialization
 
         readonly IWorldStateSerializer _worldStateSerializer;
         readonly RecordingChecksumCalculator _checksumCalculator;
-        readonly BookmarkSerializer _bookmarkSerializer;
+        readonly SnapshotSerializer _snapshotSerializer;
         readonly SerializationBuffer _buffer;
         readonly SerializationBuffer _checksumBuffer;
+        readonly World _worldOwner;
         readonly WorldAccessor _world;
 
         PlaybackState _state = PlaybackState.Idle;
@@ -37,15 +37,15 @@ namespace Trecs.Serialization
 
         public PlaybackHandler(
             IWorldStateSerializer worldStateSerializer,
-            BookmarkSerializer bookmarkSerializer,
+            SnapshotSerializer snapshotSerializer,
             SerializerRegistry registry,
             World world
         )
         {
             if (worldStateSerializer == null)
                 throw new ArgumentNullException(nameof(worldStateSerializer));
-            if (bookmarkSerializer == null)
-                throw new ArgumentNullException(nameof(bookmarkSerializer));
+            if (snapshotSerializer == null)
+                throw new ArgumentNullException(nameof(snapshotSerializer));
             if (registry == null)
                 throw new ArgumentNullException(nameof(registry));
             if (world == null)
@@ -53,10 +53,11 @@ namespace Trecs.Serialization
 
             _worldStateSerializer = worldStateSerializer;
             _checksumCalculator = new RecordingChecksumCalculator(worldStateSerializer);
-            _bookmarkSerializer = bookmarkSerializer;
+            _snapshotSerializer = snapshotSerializer;
             _buffer = new SerializationBuffer(registry);
             _checksumBuffer = new SerializationBuffer(registry);
 
+            _worldOwner = world;
             _world = world.CreateAccessor();
         }
 
@@ -90,29 +91,29 @@ namespace Trecs.Serialization
         }
 
         /// <summary>
-        /// Load an initial-state bookmark and restore it into the live world,
+        /// Load an initial-state snapshot and restore it into the live world,
         /// optionally verifying a post-deserialization checksum against the
         /// value stored in the active recording's metadata.
         /// <see cref="StartPlayback"/> must have been called first so the
         /// checksum flags and schema version are known.
         /// </summary>
-        /// <exception cref="ArgumentNullException"><paramref name="bookmarkStream"/> is null.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="snapshotStream"/> is null.</exception>
         /// <exception cref="InvalidOperationException">Playback is not active.</exception>
-        /// <exception cref="SerializationException">The bookmark payload is invalid, or
+        /// <exception cref="SerializationException">The snapshot payload is invalid, or
         /// <paramref name="expectedInitialChecksum"/> was supplied and the post-load
         /// checksum did not match — indicating a serialization/deserialization defect.</exception>
         /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
-        public void LoadInitialState(Stream bookmarkStream, uint? expectedInitialChecksum)
+        public void LoadInitialState(Stream snapshotStream, uint? expectedInitialChecksum)
         {
             ThrowIfDisposed();
-            if (bookmarkStream == null)
-                throw new ArgumentNullException(nameof(bookmarkStream));
+            if (snapshotStream == null)
+                throw new ArgumentNullException(nameof(snapshotStream));
             if (!IsPlaying)
                 throw new InvalidOperationException(
                     "Cannot LoadInitialState: playback is not active. Call StartPlayback first."
                 );
 
-            _bookmarkSerializer.LoadBookmark(bookmarkStream);
+            _snapshotSerializer.LoadSnapshot(snapshotStream);
 
             if (expectedInitialChecksum.HasValue)
             {
@@ -121,23 +122,23 @@ namespace Trecs.Serialization
         }
 
         /// <summary>
-        /// Load an initial-state bookmark from a file path.
+        /// Load an initial-state snapshot from a file path.
         /// </summary>
-        /// <exception cref="ArgumentException"><paramref name="bookmarkPath"/> is null or empty.</exception>
-        /// <exception cref="FileNotFoundException">No file at <paramref name="bookmarkPath"/>.</exception>
+        /// <exception cref="ArgumentException"><paramref name="snapshotPath"/> is null or empty.</exception>
+        /// <exception cref="FileNotFoundException">No file at <paramref name="snapshotPath"/>.</exception>
         /// <exception cref="InvalidOperationException">Playback is not active.</exception>
-        /// <exception cref="SerializationException">The bookmark payload is invalid, or the
+        /// <exception cref="SerializationException">The snapshot payload is invalid, or the
         /// post-load checksum did not match <paramref name="expectedInitialChecksum"/>.</exception>
         /// <exception cref="ObjectDisposedException">The handler has been disposed.</exception>
-        public void LoadInitialState(string bookmarkPath, uint? expectedInitialChecksum)
+        public void LoadInitialState(string snapshotPath, uint? expectedInitialChecksum)
         {
             ThrowIfDisposed();
-            if (string.IsNullOrEmpty(bookmarkPath))
-                throw new ArgumentException("bookmarkPath must be non-empty", nameof(bookmarkPath));
-            if (!File.Exists(bookmarkPath))
-                throw new FileNotFoundException("Bookmark file not found", bookmarkPath);
+            if (string.IsNullOrEmpty(snapshotPath))
+                throw new ArgumentException("snapshotPath must be non-empty", nameof(snapshotPath));
+            if (!File.Exists(snapshotPath))
+                throw new FileNotFoundException("Snapshot file not found", snapshotPath);
 
-            using var fs = File.OpenRead(bookmarkPath);
+            using var fs = File.OpenRead(snapshotPath);
             LoadInitialState(fs, expectedInitialChecksum);
         }
 
@@ -365,15 +366,14 @@ namespace Trecs.Serialization
 
         void SetInputsEnabled(bool enable)
         {
-            for (int i = 0; i < _world.GetSystems().Count; i++)
+            for (int i = 0; i < _worldOwner.SystemCount; i++)
             {
-                var system = _world.GetSystems()[i];
-
-                if (system.Metadata.Phase == SystemPhase.Input)
+                if (_worldOwner.GetSystemMetadata(i).Phase != SystemPhase.Input)
                 {
-                    Assert.That(_world.IsSystemEnabled(i) == !enable);
-                    _world.SetSystemEnabled(i, enable);
+                    continue;
                 }
+                Assert.That(_worldOwner.IsSystemEnabled(i, EnableChannel.Playback) == !enable);
+                _worldOwner.SetSystemEnabled(i, EnableChannel.Playback, enable);
             }
         }
 

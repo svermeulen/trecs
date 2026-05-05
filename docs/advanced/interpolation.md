@@ -19,12 +19,12 @@ In your template, use the `[Interpolated]` attribute:
 public partial class SmoothEntity : ITemplate, IHasTags<MyTags.Smooth>
 {
     [Interpolated]
-    public Position Position = default;
+    Position Position = default;
 
     [Interpolated]
-    public Rotation Rotation = default;
+    Rotation Rotation = default;
 
-    public OrbitParams OrbitParams;
+    OrbitParams OrbitParams;
 }
 ```
 
@@ -116,7 +116,7 @@ For comparison, entities without interpolation update visually only at fixed tim
 ```csharp
 public partial class RawEntity : ITemplate, IHasTags<MyTags.Raw>
 {
-    public Position Position = default;  // No [Interpolated]
+    Position Position = default;  // No [Interpolated]
 }
 ```
 

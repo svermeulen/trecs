@@ -30,7 +30,7 @@ namespace Trecs
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _uniqueIds.Capacity;
+            get => _uniqueIds.Length;
         }
 
         public EntityHandle this[int index]

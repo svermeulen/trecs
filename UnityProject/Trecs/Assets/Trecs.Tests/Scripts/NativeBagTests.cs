@@ -14,8 +14,8 @@ namespace Trecs.Tests
         {
             var bag = NativeBag.Create();
 
-            NAssert.IsTrue(bag.IsEmpty());
-            NAssert.AreEqual(0u, bag.Count);
+            NAssert.IsTrue(bag.IsEmpty);
+            NAssert.AreEqual(0, bag.Length);
 
             bag.Dispose();
         }
@@ -41,8 +41,8 @@ namespace Trecs.Tests
             bag.Enqueue(42);
 
             // count is in bytes (int = 4 bytes), not item count
-            NAssert.IsFalse(bag.IsEmpty());
-            NAssert.Greater(bag.Count, 0u);
+            NAssert.IsFalse(bag.IsEmpty);
+            NAssert.Greater(bag.Length, 0);
 
             bag.Dispose();
         }
@@ -86,7 +86,7 @@ namespace Trecs.Tests
             bag.Dequeue<int>();
             bag.Dequeue<int>();
 
-            NAssert.IsTrue(bag.IsEmpty());
+            NAssert.IsTrue(bag.IsEmpty);
 
             bag.Dispose();
         }
@@ -145,7 +145,7 @@ namespace Trecs.Tests
 
             bag.Clear();
 
-            NAssert.IsTrue(bag.IsEmpty());
+            NAssert.IsTrue(bag.IsEmpty);
 
             bag.Dispose();
         }
@@ -221,7 +221,7 @@ namespace Trecs.Tests
                 bag.Enqueue(i);
             }
 
-            NAssert.IsFalse(bag.IsEmpty());
+            NAssert.IsFalse(bag.IsEmpty);
 
             // Dequeue all and verify order
             for (int i = 0; i < 100; i++)
@@ -229,7 +229,7 @@ namespace Trecs.Tests
                 NAssert.AreEqual(i, bag.Dequeue<int>());
             }
 
-            NAssert.IsTrue(bag.IsEmpty());
+            NAssert.IsTrue(bag.IsEmpty);
 
             bag.Dispose();
         }
@@ -244,7 +244,7 @@ namespace Trecs.Tests
                 bag.Enqueue(new TestVec { X = i, Y = i * 2 });
             }
 
-            NAssert.IsFalse(bag.IsEmpty());
+            NAssert.IsFalse(bag.IsEmpty);
 
             for (int i = 0; i < 50; i++)
             {
@@ -271,7 +271,7 @@ namespace Trecs.Tests
             for (int i = 0; i < 20; i++)
                 NAssert.AreEqual(i, bag.Dequeue<int>());
 
-            NAssert.IsTrue(bag.IsEmpty());
+            NAssert.IsTrue(bag.IsEmpty);
 
             // Re-enqueue after full drain (wraps around internal buffer)
             for (int i = 100; i < 120; i++)
@@ -279,7 +279,7 @@ namespace Trecs.Tests
             for (int i = 100; i < 120; i++)
                 NAssert.AreEqual(i, bag.Dequeue<int>());
 
-            NAssert.IsTrue(bag.IsEmpty());
+            NAssert.IsTrue(bag.IsEmpty);
 
             bag.Dispose();
         }

@@ -34,8 +34,8 @@ public partial class EnemyEntity : ITemplate,
     IHasPartition<GameTags.Alive>,
     IHasPartition<GameTags.Dead>
 {
-    public Health Health;
-    public Position Position;
+    Health Health;
+    Position Position;
 }
 
 // Transition

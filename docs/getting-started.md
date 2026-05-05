@@ -10,7 +10,7 @@ With the [openupm-cli](https://openupm.com/):
 
 ```bash
 openupm add com.trecs.core
-# Optional: serialization features (bookmarks, recording/playback, save/load)
+# Optional: serialization features (snapshots, recording/playback, save/load)
 openupm add com.trecs.serialization
 ```
 
@@ -78,7 +78,7 @@ Templates are blueprints that declare which components and tags an entity has. T
 ```csharp
 public partial class SpinnerEntity : ITemplate, IHasTags<Spinner>
 {
-    public Rotation Rotation;
+    Rotation Rotation;
 }
 ```
 

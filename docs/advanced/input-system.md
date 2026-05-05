@@ -10,7 +10,7 @@ Mark component fields with `[Input]` in a template:
 public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
     [Input(MissingInputFrameBehaviour.RetainCurrent)]
-    public MoveInput MoveInput;
+    MoveInput MoveInput;
 }
 ```
 

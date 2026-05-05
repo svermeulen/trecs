@@ -1,6 +1,6 @@
 # Heap Allocation Rules
 
-This article covers **when and where** you're allowed to allocate heap pointers and create entities, and how Trecs assigns stable IDs to allocations. These rules exist because Trecs is built around deterministic simulation — for replay, networked rollback, and bookmark/restore to work, the same code must produce the same world state on every run.
+This article covers **when and where** you're allowed to allocate heap pointers and create entities, and how Trecs assigns stable IDs to allocations. These rules exist because Trecs is built around deterministic simulation — for replay, networked rollback, and snapshot/restore to work, the same code must produce the same world state on every run.
 
 For an introduction to the pointer types themselves (`SharedPtr<T>`, `UniquePtr<T>`, native variants), see [Heap](heap.md).
 
@@ -23,7 +23,7 @@ Two reasons:
 
 1. **Heap allocation IDs.** Trecs draws all allocation IDs from a single deterministic RNG (`_fixedRng`) shared across initialization and all fixed systems. If presentation-phase systems were allowed to mint IDs, they'd either pollute that stream (breaking determinism for fixed systems) or need a non-deterministic fallback (silently breaking replay for any handle stored in a fixed component).
 
-2. **Entity creation is structural.** Adding an entity changes group counts and component arrays — that's part of the simulation state that gets serialized in bookmarks and checked for desyncs in replay. Presentation systems run at a per-render-frame cadence that isn't deterministic across runs (frame rate varies), so structural changes from them would break those guarantees.
+2. **Entity creation is structural.** Adding an entity changes group counts and component arrays — that's part of the simulation state that gets serialized in snapshots and checked for desyncs in replay. Presentation systems run at a per-render-frame cadence that isn't deterministic across runs (frame rate varies), so structural changes from them would break those guarantees.
 
 If you find yourself wanting to allocate or spawn from a presentation system, the data probably belongs in a fixed component or a `[VariableUpdateOnly]` component populated by the presentation system from existing fixed state.
 
@@ -37,7 +37,7 @@ Every allocation has a `BlobId` that uniquely identifies the underlying blob. Th
 
 This is the same determinism discipline that already applies to fixed-update systems. If your initialization logic conditionally allocates based on `UnityEngine.Random` or `DateTime.Now`, the auto-IDs change between runs — the same way fixed-update systems with non-deterministic code would desync. The rule is: **init and fixed code must be deterministic.**
 
-When this is satisfied, bookmarks and replays work transparently — the IDs assigned at startup match across runs because the same code runs in the same order against the same RNG seed.
+When this is satisfied, snapshots and replays work transparently — the IDs assigned at startup match across runs because the same code runs in the same order against the same RNG seed.
 
 ## Stable BlobIds — when init isn't deterministic
 

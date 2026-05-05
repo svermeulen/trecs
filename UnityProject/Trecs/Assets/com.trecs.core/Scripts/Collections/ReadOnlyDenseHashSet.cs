@@ -1,8 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
-using Trecs.Internal;
 
-namespace Trecs.Collections
+namespace Trecs.Internal // not part of public api atm
 {
     /// <summary>
     /// Read-only wrapper for DenseHashSet.
@@ -33,10 +32,7 @@ namespace Trecs.Collections
 
         public bool Contains(T item) => _set.Contains(item);
 
-        public bool IsEmpty()
-        {
-            return _set.Count == 0;
-        }
+        public bool IsEmpty => _set.Count == 0;
 
         public DenseHashSet<T>.Enumerator GetEnumerator()
         {

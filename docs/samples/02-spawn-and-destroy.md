@@ -29,9 +29,9 @@ public struct Sphere : ITag { }
 
 public partial class SphereEntity : ITemplate, IHasTags<SampleTags.Sphere>
 {
-    public Position Position = default;
-    public Lifetime Lifetime;
-    public GameObjectId GameObjectId;
+    Position Position = default;
+    Lifetime Lifetime;
+    GameObjectId GameObjectId;
 }
 ```
 

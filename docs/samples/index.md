@@ -20,6 +20,7 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 | 15 | [Aspect Interfaces](15-aspect-interfaces.md) | Shared aspect contracts via `partial interface` for reusable cross-species helpers |
 | 17 | [Blob Storage](17-blob-storage.md) | Content-pipeline-stable `BlobId`s for shared immutable assets on the heap |
 | 18 | [Reactive Events](18-reactive-events.md) | `OnAdded` / `OnRemoved` observers for cleanup and stat tracking |
+| 19 | [Multiple Worlds](19-multiple-worlds.md) | Two independent `World` instances ticking side-by-side |
 
 ## Game Samples
 
@@ -27,7 +28,7 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 |---|--------|-------------|
 | 11 | [Snake](11-snake.md) | Complete grid-based game with input handling and recording/playback |
 | 12 | [Feeding Frenzy Benchmark](12-feeding-frenzy-benchmark.md) | Performance benchmark comparing partition approaches and iteration styles |
-| 13 | [Save Game](13-save-game.md) | Sokoban puzzle demonstrating bookmark-based save/load slots |
+| 13 | [Save Game](13-save-game.md) | Sokoban puzzle demonstrating snapshot-based save/load slots |
 
 ## Running the Samples
 
@@ -73,7 +74,7 @@ The `Common/` directory contains utilities shared across samples:
 
 - **GameObjectRegistry** — maps `GameObjectId` components to Unity GameObjects
 - **RendererSystem** — GPU-instanced indirect rendering for high entity counts
-- **RecordAndPlaybackController** — recording/replay with bookmark support
+- **RecordAndPlaybackController** — recording/replay with snapshot support
 - Common components, templates, tags
 
 Note that the samples use some of this helper code in Common/ and that this code is not part of the Trecs library itself. So if you copy code from the samples, be sure to also copy any dependencies from Common

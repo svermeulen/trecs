@@ -10,50 +10,12 @@ namespace Trecs
     /// <summary>
     /// ScriptableObject proxy used as <see cref="Selection.activeObject"/> when
     /// the user picks a template row in <see cref="TrecsHierarchyWindow"/>.
-    /// Identifies the template by its <see cref="Trecs.Template"/> reference
-    /// captured weakly via the owning <see cref="World"/>.
+    /// Carries only a serialized <see cref="TrecsSelectionProxy.Identity"/>
+    /// string (e.g. <c>"template:MealEntity"</c>); the inspector resolves
+    /// the live <see cref="TemplateRef"/> dynamically against
+    /// <see cref="TrecsHierarchyWindow.ActiveSource"/> on every refresh.
     /// </summary>
-    public class TrecsTemplateSelection : ScriptableObject
-    {
-        [NonSerialized]
-        WeakReference<World> _worldRef;
-
-        [NonSerialized]
-        public Template Template;
-
-        [NonSerialized]
-        public TrecsSchema CacheSchema;
-
-        [NonSerialized]
-        public TrecsSchemaTemplate CacheTemplate;
-
-        public World GetWorld()
-        {
-            if (_worldRef == null)
-            {
-                return null;
-            }
-            return _worldRef.TryGetTarget(out var w) ? w : null;
-        }
-
-        public void Set(World world, Template template)
-        {
-            _worldRef = world == null ? null : new WeakReference<World>(world);
-            Template = template;
-            CacheSchema = null;
-            CacheTemplate = null;
-            name = template?.DebugName ?? "Template";
-        }
-
-        public void SetCache(TrecsSchema schema, TrecsSchemaTemplate entry)
-        {
-            _worldRef = null;
-            Template = null;
-            CacheSchema = schema;
-            CacheTemplate = entry;
-            name = entry?.DebugName ?? "Template";
-        }
-    }
+    public class TrecsTemplateSelection : TrecsSelectionProxy { }
 
     [CustomEditor(typeof(TrecsTemplateSelection))]
     public class TrecsTemplateSelectionInspector : Editor
@@ -75,9 +37,12 @@ namespace Trecs
         Foldout _inheritedComponentsFoldout;
         Foldout _partitionsFoldout;
 
-        // Identity tracker — Template ref (live) or TrecsSchemaTemplate ref
-        // (cache). Static section is rebuilt only when this changes.
-        object _renderedEntryKey;
+        // Composite key of (identity, source-mode-and-name) — the static
+        // section gets re-rendered when EITHER the user picks a different
+        // proxy OR the active source flips between live and cache. The
+        // proxy itself only carries identity; the source is the
+        // window-side context that decides which native handle backs it.
+        string _renderedKey;
 
         // Cache the accessor so UpdateEntityCount doesn't allocate a new
         // one on every refresh tick. Without this, the world's accessor
@@ -110,14 +75,11 @@ namespace Trecs
             _bodyContainer.Add(_headerLabel);
 
             // Shift+hover the heading → hierarchy scrolls back to this
-            // template's tree row.
-            TrecsInspectorLinks.WireHoverPreviewTemplate(
+            // template's tree row. Window resolves the identity against
+            // its row map regardless of live/cache mode.
+            TrecsInspectorLinks.WireHoverPreview(
                 _headerLabel,
-                () =>
-                {
-                    var sel = target as TrecsTemplateSelection;
-                    return (sel?.GetWorld(), sel?.Template);
-                }
+                () => (target as TrecsTemplateSelection)?.Identity
             );
 
             _worldLabel = new Label();
@@ -173,21 +135,18 @@ namespace Trecs
                 return;
             }
 
-            ResolveIdentity(
-                selection,
-                out var liveWorld,
-                out var liveTemplate,
-                out var liveResolved,
-                out var identity
-            );
-
-            if (identity == null)
+            var src = TrecsHierarchyWindow.ActiveSource;
+            if (src == null || string.IsNullOrEmpty(selection.Identity))
             {
-                var w = selection.GetWorld();
+                ShowStatus("No template selected.");
+                return;
+            }
+
+            var tref = src.ResolveTemplate(selection.Identity);
+            if (tref == null)
+            {
                 ShowStatus(
-                    w == null || w.IsDisposed
-                        ? "No template selected — world unavailable."
-                        : "No template selected."
+                    $"Template '{selection.name}' not found in {(src.IsLive ? "live world" : "cached schema")} '{src.DisplayName}'."
                 );
                 return;
             }
@@ -195,65 +154,36 @@ namespace Trecs
             _statusLabel.style.display = DisplayStyle.None;
             _bodyContainer.style.display = DisplayStyle.Flex;
 
-            if (!Equals(identity, _renderedEntryKey))
+            // Re-render the static section when identity OR source-mode
+            // changes (live → cache transitions need a fresh render even
+            // for the same template).
+            var renderKey = src.RenderKey(selection.Identity);
+            if (renderKey != _renderedKey)
             {
-                _renderedEntryKey = identity;
-                var entry =
-                    liveWorld != null
-                        ? BuildEntryFromLive(liveWorld, liveTemplate, liveResolved)
-                        : selection.CacheTemplate;
-                var linker =
-                    liveWorld != null
-                        ? (InspectorLinker)new LiveInspectorLinker(liveWorld)
-                        : new CacheInspectorLinker(selection.CacheSchema);
-                var worldName = liveWorld?.DebugName ?? selection.CacheSchema?.WorldName;
-                bool isCache = liveWorld == null;
-                RenderStatic(entry, linker, worldName, isCache);
+                _renderedKey = renderKey;
+                var entry = BuildEntryFromRef(src, tref);
+                var linker = new InspectorLinker(src);
+                RenderStatic(entry, linker, src.DisplayName, !src.IsLive);
             }
 
-            UpdateRuntimeFields(liveWorld, liveResolved);
+            UpdateRuntimeFields(src, tref);
         }
 
-        static void ResolveIdentity(
-            TrecsTemplateSelection selection,
-            out World liveWorld,
-            out Template liveTemplate,
-            out ResolvedTemplate liveResolved,
-            out object identity
-        )
+        // Folds the source's TemplateRef into the cache schema shape so
+        // RenderStatic stays mode-agnostic. Live mode also walks the
+        // world for derived-template lookup; cache mode reads the
+        // pre-computed list off TrecsSchemaTemplate.
+        static TrecsSchemaTemplate BuildEntryFromRef(ITrecsSchemaSource src, TemplateRef tref)
         {
-            liveWorld = null;
-            liveTemplate = null;
-            liveResolved = null;
-            identity = null;
-
-            var world = selection.GetWorld();
-            if (world != null && !world.IsDisposed && selection.Template != null)
+            if (tref.CacheNative != null)
             {
-                liveWorld = world;
-                liveTemplate = selection.Template;
-                identity = selection.Template;
-                try
-                {
-                    if (world.WorldInfo.IsResolvedTemplate(selection.Template))
-                    {
-                        foreach (var rt in world.WorldInfo.ResolvedTemplates)
-                        {
-                            if (rt.Template == selection.Template)
-                            {
-                                liveResolved = rt;
-                                break;
-                            }
-                        }
-                    }
-                }
-                catch (Exception) { }
-                return;
+                return tref.CacheNative;
             }
-            if (selection.CacheTemplate != null)
-            {
-                identity = selection.CacheTemplate;
-            }
+            return BuildEntryFromLive(
+                (src as LiveSchemaSource)?.World,
+                tref.LiveTemplate,
+                tref.LiveResolved
+            );
         }
 
         // Folds live Template + ResolvedTemplate into the same shape the
@@ -469,17 +399,22 @@ namespace Trecs
             }
         }
 
-        void UpdateRuntimeFields(World world, ResolvedTemplate rt)
+        void UpdateRuntimeFields(ITrecsSchemaSource src, TemplateRef tref)
         {
-            if (world == null || world.IsDisposed)
+            if (!src.IsLive)
             {
-                _entityCountLabel.text =
-                    _renderedEntryKey is TrecsSchemaTemplate ct && ct.IsResolved
-                        ? "Entities: (cached — N/A)"
-                        : "Entities: (abstract template — none)";
+                _entityCountLabel.text = tref.IsResolved
+                    ? "Entities: (cached — N/A)"
+                    : "Entities: (abstract template — none)";
                 return;
             }
-            if (rt == null)
+            var world = (src as LiveSchemaSource)?.World;
+            if (world == null || world.IsDisposed)
+            {
+                _entityCountLabel.text = "Entities: (world unavailable)";
+                return;
+            }
+            if (tref.LiveResolved == null)
             {
                 _entityCountLabel.text =
                     "Entities: (template not registered as a resolved template)";
@@ -493,7 +428,7 @@ namespace Trecs
                     _accessorWorld = world;
                 }
                 int total = 0;
-                foreach (var g in rt.Groups)
+                foreach (var g in tref.LiveResolved.Groups)
                 {
                     total += _accessor.CountEntitiesInGroup(g);
                 }
@@ -510,7 +445,7 @@ namespace Trecs
             _statusLabel.text = text;
             _statusLabel.style.display = DisplayStyle.Flex;
             _bodyContainer.style.display = DisplayStyle.None;
-            _renderedEntryKey = null;
+            _renderedKey = null;
         }
 
         static Label MakeMutedLine(string text)

@@ -6,6 +6,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Trecs.SourceGen.Aspect;
 using Trecs.SourceGen.Performance;
 
 namespace Trecs.SourceGen.Shared
@@ -59,6 +60,13 @@ namespace Trecs.SourceGen.Shared
 
         /// <summary>Custom/PassThrough parameters.</summary>
         public List<ParameterInfo> CustomParameters { get; } = new();
+
+        /// <summary>
+        /// <c>[SingleEntity]</c> parameters that are hoisted out of the iteration loop.
+        /// Each entry is referenced by a <see cref="ParamSlotKind.HoistedSingleton"/>
+        /// slot in <see cref="ParameterSlots"/>.
+        /// </summary>
+        public List<HoistedSingletonInfo> HoistedSingletons { get; } = new();
     }
 
     /// <summary>
@@ -144,6 +152,60 @@ namespace Trecs.SourceGen.Shared
                         TrecsAttributeNames.PassThroughArgument,
                         TrecsNamespaces.Trecs
                     );
+                bool hasSingleEntity =
+                    paramSymbol != null
+                    && PerformanceCache.HasAttributeByName(
+                        paramSymbol,
+                        TrecsAttributeNames.SingleEntity,
+                        TrecsNamespaces.Trecs
+                    );
+
+                // [SingleEntity] params are hoisted out of the loop. Validate and
+                // record before any iteration-target classification, so a [SingleEntity]
+                // aspect/component param is never mis-classified as a loop aspect/component.
+                if (hasSingleEntity)
+                {
+                    bool hasFromWorld =
+                        paramSymbol != null
+                        && PerformanceCache.HasAttributeByName(
+                            paramSymbol,
+                            TrecsAttributeNames.FromWorld,
+                            TrecsNamespaces.Trecs
+                        );
+                    if (hasFromWorld || isPassThrough)
+                    {
+                        reportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.SingleEntityConflictingAttributes,
+                                param.GetLocation(),
+                                param.Identifier.Text,
+                                hasFromWorld ? "FromWorld" : "PassThroughArgument"
+                            )
+                        );
+                        isValid = false;
+                        continue;
+                    }
+
+                    var hoisted = ClassifyHoistedSingleton(
+                        param,
+                        paramType,
+                        paramSymbol!,
+                        isRef,
+                        isIn,
+                        reportDiagnostic
+                    );
+                    if (hoisted == null)
+                    {
+                        isValid = false;
+                        continue;
+                    }
+                    var hoistedIndex = result.HoistedSingletons.Count;
+                    result.HoistedSingletons.Add(hoisted);
+                    result.ParameterSlots.Add(
+                        new ParamSlot(ParamSlotKind.HoistedSingleton, hoistedIndex)
+                    );
+                    continue;
+                }
 
                 // NativeSetRead<T> / NativeSetWrite<T> detection — these are job-only,
                 // forbidden in main-thread iteration methods.
@@ -454,6 +516,114 @@ namespace Trecs.SourceGen.Shared
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Classifies a parameter marked <c>[SingleEntity]</c>. Validates type
+        /// (TRECS112), modifier (TRECS113), inline tags (TRECS114), and parses
+        /// the aspect's read/write component types when applicable. Returns
+        /// <c>null</c> on any validation failure (with diagnostics already reported).
+        /// <para>
+        /// Exposed as <c>internal</c> so generators that do their own parameter
+        /// walk (e.g. RunOnceGenerator) can route singleton classification through
+        /// the same code path as the iteration-style generators.
+        /// </para>
+        /// </summary>
+        internal static HoistedSingletonInfo? ClassifyHoistedSingleton(
+            ParameterSyntax param,
+            ITypeSymbol paramType,
+            IParameterSymbol paramSymbol,
+            bool isRef,
+            bool isIn,
+            System.Action<Diagnostic> reportDiagnostic
+        )
+        {
+            var tagTypes = InlineTagsParser.ParseFromSymbol(
+                paramSymbol,
+                "SingleEntity",
+                param.GetLocation(),
+                param.Identifier.Text,
+                reportDiagnostic
+            );
+            if (tagTypes == null)
+                return null;
+            if (tagTypes.Count == 0)
+            {
+                reportDiagnostic(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.SingleEntityRequiresInlineTags,
+                        param.GetLocation(),
+                        param.Identifier.Text
+                    )
+                );
+                return null;
+            }
+
+            bool isAspect = SymbolAnalyzer.ImplementsInterface(
+                paramType,
+                "IAspect",
+                TrecsNamespaces.Trecs
+            );
+            bool isComponent = paramType.AllInterfaces.Any(i => i.Name == "IEntityComponent");
+            if (!isAspect && !isComponent)
+            {
+                reportDiagnostic(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.SingleEntityWrongType,
+                        param.GetLocation(),
+                        param.Identifier.Text,
+                        PerformanceCache.GetDisplayString(paramType)
+                    )
+                );
+                return null;
+            }
+
+            if (isAspect)
+            {
+                if (!isIn || isRef)
+                {
+                    reportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.SingleEntityWrongModifier,
+                            param.GetLocation(),
+                            param.Identifier.Text
+                        )
+                    );
+                    return null;
+                }
+                if (paramType is not INamedTypeSymbol aspectType)
+                    return null;
+                var aspectData = AspectAttributeParser.ParseAspectData(aspectType);
+                return new HoistedSingletonInfo(
+                    paramName: param.Identifier.ToString(),
+                    isAspect: true,
+                    tagTypes: tagTypes,
+                    aspectTypeDisplay: PerformanceCache.GetDisplayString(paramType),
+                    aspectData: aspectData,
+                    aspectTypeSymbol: paramType
+                );
+            }
+
+            // Component-typed singleton.
+            if (!isIn && !isRef)
+            {
+                reportDiagnostic(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.SingleEntityWrongModifier,
+                        param.GetLocation(),
+                        param.Identifier.Text
+                    )
+                );
+                return null;
+            }
+            return new HoistedSingletonInfo(
+                paramName: param.Identifier.ToString(),
+                isAspect: false,
+                tagTypes: tagTypes,
+                componentTypeDisplay: PerformanceCache.GetDisplayString(paramType),
+                componentTypeSymbol: paramType,
+                isRef: isRef
+            );
         }
     }
 }

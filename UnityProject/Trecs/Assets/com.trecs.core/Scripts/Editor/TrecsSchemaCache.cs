@@ -34,9 +34,16 @@ namespace Trecs
 
         // Access data captured from the live TrecsAccessTracker at save time.
         // One entry per component type that's been read or written by at
-        // least one system since the world started — empty if the tracker
-        // didn't run (e.g. world disposed without any system ticks).
+        // least one accessor since the world started — empty if the tracker
+        // didn't run (e.g. world disposed without any system ticks). Entries
+        // here accumulate across play sessions via TrecsSchemaCache merge.
         public List<TrecsSchemaAccessInfo> Access = new();
+
+        // Tags touched per accessor, derived at save time by mapping each
+        // accessor's GetGroupsTouchedBy through WorldInfo.GetGroupTags. Lets
+        // cache mode show "Tags touched" without a live tracker / world. Same
+        // accumulation semantics as Access.
+        public List<TrecsSchemaTagsTouchedInfo> TagsTouched = new();
     }
 
     [Serializable]
@@ -111,6 +118,14 @@ namespace Trecs
     public class TrecsSchemaAccessor
     {
         public string DebugName;
+
+        // Source-file path + line where world.CreateAccessor(...) was
+        // called. Captured via CallerFilePath/CallerLineNumber on the
+        // public CreateAccessor entry points; empty/0 in release builds
+        // and for accessors made via paths that don't propagate caller
+        // info (system-owned ones use system metadata instead).
+        public string CreatedAtFile;
+        public int CreatedAtLine;
     }
 
     [Serializable]
@@ -138,8 +153,19 @@ namespace Trecs
         // Display name as rendered in the hierarchy's Components section
         // (matches TrecsHierarchyWindow.ComponentTypeDisplayName).
         public string ComponentDisplayName;
+
+        // Field names say "Systems" for back-compat — they hold accessor
+        // debug names, which include any manually-created accessor whose
+        // reads/writes the tracker has observed, not just ISystem instances.
         public List<string> ReadBySystems = new();
         public List<string> WrittenBySystems = new();
+    }
+
+    [Serializable]
+    public class TrecsSchemaTagsTouchedInfo
+    {
+        public string AccessorDebugName;
+        public List<string> TagNames = new();
     }
 
     /// <summary>
@@ -165,7 +191,12 @@ namespace Trecs
         {
             TrecsEditorAccessorNames.Register("TrecsSchemaCache");
             WorldRegistry.WorldRegistered += OnWorldRegistered;
-            WorldRegistry.WorldUnregistered += OnWorldUnregistered;
+            // Save + cached-accessor teardown both run from the registry's
+            // pre-clear hook, not WorldUnregistered directly: the access
+            // tracker is wiped inside its own OnWorldUnregistered handler
+            // and [InitializeOnLoad] subscription order isn't deterministic,
+            // so without this we'd race the tracker's data away.
+            TrecsAccessRegistry.WorldAccessTrackerWillClear += OnWorldAccessTrackerWillClear;
             PruneStaleSnapshots();
         }
 
@@ -205,12 +236,15 @@ namespace Trecs
             TrySave(world);
         }
 
-        static void OnWorldUnregistered(World world)
+        // Fires from TrecsAccessRegistry just before it tears down the live
+        // tracker for `world`. The world is still alive (Unregister runs at
+        // the top of World.Dispose, before _isDisposed is set), so Build can
+        // walk WorldInfo and read the tracker normally. We then drop the
+        // cached accessor here (rather than from a separate WorldUnregistered
+        // handler) so the save-then-teardown ordering is unambiguous.
+        static void OnWorldAccessTrackerWillClear(World world)
         {
-            // Drop our cached accessor first so a re-registration doesn't
-            // hit a stale entry. Don't bother re-snapshotting — each world
-            // has its own on-disk file, so unregistering one doesn't make
-            // the others' snapshots stale.
+            TrySave(world);
             _cachedAccessors.Remove(world);
         }
 
@@ -307,10 +341,14 @@ namespace Trecs
             }
             try
             {
-                var schema = Build(world);
-                var path = GetSchemaPath(schema.WorldName);
+                var fresh = Build(world);
+                if (TryLoad(fresh.WorldName, out var existing) && existing != null)
+                {
+                    MergeRuntimeData(existing, fresh);
+                }
+                var path = GetSchemaPath(fresh.WorldName);
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
-                File.WriteAllText(path, JsonUtility.ToJson(schema, prettyPrint: true));
+                File.WriteAllText(path, JsonUtility.ToJson(fresh, prettyPrint: true));
                 SchemaSaved?.Invoke();
             }
             catch (Exception)
@@ -319,6 +357,211 @@ namespace Trecs
                 // skip the snapshot than spam the console. Next world tick
                 // will retry.
             }
+        }
+
+        /// <summary>
+        /// Delete the on-disk snapshot for a single world. No-op if the file
+        /// doesn't exist. Used by the hierarchy window's Clear-cache action
+        /// when the user wants to drop accumulated runtime data.
+        /// </summary>
+        public static void Clear(string worldName)
+        {
+            try
+            {
+                var path = GetSchemaPath(worldName);
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                    SchemaSaved?.Invoke();
+                }
+            }
+            catch (Exception)
+            {
+                // Best-effort.
+            }
+        }
+
+        /// <summary>
+        /// Delete every snapshot under the schema directory. Used when the
+        /// user wants to wipe all accumulated runtime data across worlds.
+        /// </summary>
+        public static void ClearAll()
+        {
+            try
+            {
+                var dir = GetSchemaDirectory();
+                if (!Directory.Exists(dir))
+                {
+                    return;
+                }
+                foreach (var path in Directory.GetFiles(dir, "*.json"))
+                {
+                    try
+                    {
+                        File.Delete(path);
+                    }
+                    catch (Exception)
+                    {
+                        // Best-effort per file.
+                    }
+                }
+                SchemaSaved?.Invoke();
+            }
+            catch (Exception)
+            {
+                // Best-effort.
+            }
+        }
+
+        /// <summary>
+        /// Carries forward runtime-derived data (component access, tags
+        /// touched) from a prior snapshot into the freshly-built one, so
+        /// each play session adds to what we know rather than overwriting
+        /// it. Static schema (templates, components, systems, accessors,
+        /// sets, tags) is left untouched — fresh always wins for those,
+        /// since they describe the current code's structure. Stale entries
+        /// for renamed/removed accessors will linger here until
+        /// ClearAll/Clear. Lists are re-sorted at end so the merged JSON is
+        /// deterministic and git-diff-friendly.
+        /// <para>
+        /// Public so unit tests can drive the merge in isolation —
+        /// <see cref="TrySave"/> is the only production caller.
+        /// </para>
+        /// </summary>
+        public static void MergeRuntimeData(TrecsSchema existing, TrecsSchema fresh)
+        {
+            bool accessChanged = false;
+            if (existing.Access != null && existing.Access.Count > 0)
+            {
+                var byComponent = new Dictionary<string, TrecsSchemaAccessInfo>(fresh.Access.Count);
+                foreach (var entry in fresh.Access)
+                {
+                    if (entry.ComponentDisplayName != null)
+                    {
+                        byComponent[entry.ComponentDisplayName] = entry;
+                    }
+                }
+                foreach (var prior in existing.Access)
+                {
+                    if (prior?.ComponentDisplayName == null)
+                    {
+                        continue;
+                    }
+                    if (byComponent.TryGetValue(prior.ComponentDisplayName, out var current))
+                    {
+                        accessChanged |= UnionInto(current.ReadBySystems, prior.ReadBySystems);
+                        accessChanged |= UnionInto(
+                            current.WrittenBySystems,
+                            prior.WrittenBySystems
+                        );
+                    }
+                    else
+                    {
+                        var copy = new TrecsSchemaAccessInfo
+                        {
+                            ComponentDisplayName = prior.ComponentDisplayName,
+                        };
+                        UnionInto(copy.ReadBySystems, prior.ReadBySystems);
+                        UnionInto(copy.WrittenBySystems, prior.WrittenBySystems);
+                        fresh.Access.Add(copy);
+                        byComponent[prior.ComponentDisplayName] = copy;
+                        accessChanged = true;
+                    }
+                }
+            }
+            if (accessChanged)
+            {
+                foreach (var entry in fresh.Access)
+                {
+                    entry.ReadBySystems.Sort(StringComparer.OrdinalIgnoreCase);
+                    entry.WrittenBySystems.Sort(StringComparer.OrdinalIgnoreCase);
+                }
+                fresh.Access.Sort(
+                    (a, b) =>
+                        string.Compare(
+                            a.ComponentDisplayName ?? string.Empty,
+                            b.ComponentDisplayName ?? string.Empty,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                );
+            }
+
+            bool tagsChanged = false;
+            if (existing.TagsTouched != null && existing.TagsTouched.Count > 0)
+            {
+                var byAccessor = new Dictionary<string, TrecsSchemaTagsTouchedInfo>(
+                    fresh.TagsTouched.Count
+                );
+                foreach (var entry in fresh.TagsTouched)
+                {
+                    if (entry.AccessorDebugName != null)
+                    {
+                        byAccessor[entry.AccessorDebugName] = entry;
+                    }
+                }
+                foreach (var prior in existing.TagsTouched)
+                {
+                    if (prior?.AccessorDebugName == null)
+                    {
+                        continue;
+                    }
+                    if (byAccessor.TryGetValue(prior.AccessorDebugName, out var current))
+                    {
+                        tagsChanged |= UnionInto(current.TagNames, prior.TagNames);
+                    }
+                    else
+                    {
+                        var copy = new TrecsSchemaTagsTouchedInfo
+                        {
+                            AccessorDebugName = prior.AccessorDebugName,
+                        };
+                        UnionInto(copy.TagNames, prior.TagNames);
+                        fresh.TagsTouched.Add(copy);
+                        byAccessor[prior.AccessorDebugName] = copy;
+                        tagsChanged = true;
+                    }
+                }
+            }
+            if (tagsChanged)
+            {
+                foreach (var entry in fresh.TagsTouched)
+                {
+                    entry.TagNames.Sort(StringComparer.OrdinalIgnoreCase);
+                }
+                fresh.TagsTouched.Sort(
+                    (a, b) =>
+                        string.Compare(
+                            a.AccessorDebugName ?? string.Empty,
+                            b.AccessorDebugName ?? string.Empty,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                );
+            }
+        }
+
+        // Returns true if anything was actually added to `sink`. Callers use
+        // the flag to skip a list re-sort when the merge was a no-op.
+        static bool UnionInto(List<string> sink, List<string> additional)
+        {
+            if (additional == null || additional.Count == 0)
+            {
+                return false;
+            }
+            bool added = false;
+            // Small lists (handfuls of names) — linear Contains beats a HashSet.
+            foreach (var name in additional)
+            {
+                if (string.IsNullOrEmpty(name))
+                {
+                    continue;
+                }
+                if (!sink.Contains(name))
+                {
+                    sink.Add(name);
+                    added = true;
+                }
+            }
+            return added;
         }
 
         static TrecsSchema Build(World world)
@@ -443,8 +686,44 @@ namespace Trecs
                         debugNameByIndex[i] =
                             systems[i].Metadata.DebugName ?? systems[i].System.GetType().Name;
                     }
-                    foreach (var s in systems)
+                    // Walk in the runner's actual execution order so cache
+                    // mode's per-phase grouping ends up in the same order as
+                    // the live tree. Without this, schema.Systems followed
+                    // accessor.GetSystems() registration order, so cache mode
+                    // showed each phase's accessors in declaration order
+                    // rather than topologically sorted run order.
+                    var orderedIndices = new List<int>(systems.Count);
+                    var written = new bool[systems.Count];
+                    void AppendPhase(IReadOnlyList<int> sorted)
                     {
+                        if (sorted == null)
+                        {
+                            return;
+                        }
+                        foreach (var idx in sorted)
+                        {
+                            if (idx >= 0 && idx < systems.Count && !written[idx])
+                            {
+                                written[idx] = true;
+                                orderedIndices.Add(idx);
+                            }
+                        }
+                    }
+                    AppendPhase(accessor.GetSortedEarlyPresentationSystems());
+                    AppendPhase(accessor.GetSortedInputSystems());
+                    AppendPhase(accessor.GetSortedFixedSystems());
+                    AppendPhase(accessor.GetSortedPresentationSystems());
+                    AppendPhase(accessor.GetSortedLatePresentationSystems());
+                    for (int i = 0; i < systems.Count; i++)
+                    {
+                        if (!written[i])
+                        {
+                            orderedIndices.Add(i);
+                        }
+                    }
+                    foreach (var sysIdx in orderedIndices)
+                    {
+                        var s = systems[sysIdx];
                         var sysType = s.System.GetType();
                         var sysSchema = new TrecsSchemaSystem
                         {
@@ -500,7 +779,12 @@ namespace Trecs
                             continue;
                         }
                         schema.ManualAccessors.Add(
-                            new TrecsSchemaAccessor { DebugName = a.DebugName ?? $"#{entry.Key}" }
+                            new TrecsSchemaAccessor
+                            {
+                                DebugName = a.DebugName ?? $"#{entry.Key}",
+                                CreatedAtFile = a.CreatedAtFile ?? string.Empty,
+                                CreatedAtLine = a.CreatedAtLine,
+                            }
                         );
                     }
                 }
@@ -610,6 +894,7 @@ namespace Trecs
                         {
                             info_.ReadBySystems.Add(n);
                         }
+                        info_.ReadBySystems.Sort(StringComparer.OrdinalIgnoreCase);
                     }
                     if (writers != null)
                     {
@@ -617,9 +902,66 @@ namespace Trecs
                         {
                             info_.WrittenBySystems.Add(n);
                         }
+                        info_.WrittenBySystems.Sort(StringComparer.OrdinalIgnoreCase);
                     }
                     schema.Access.Add(info_);
                 }
+                schema.Access.Sort(
+                    (a, b) =>
+                        string.Compare(
+                            a.ComponentDisplayName ?? string.Empty,
+                            b.ComponentDisplayName ?? string.Empty,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                );
+
+                // Tags-touched per accessor — same source data the live
+                // accessor inspector derives at render time, captured here
+                // so cache mode doesn't have to fall back to "(runtime
+                // tracker data not available)". Iterate accessors known to
+                // the tracker, resolve each touched group's tags via the
+                // live WorldInfo, and persist the dedup'd union per accessor.
+                foreach (var accessorName in tracker.GetAllTrackedAccessorNames())
+                {
+                    var groups = tracker.GetGroupsTouchedBy(accessorName);
+                    if (groups == null || groups.Count == 0)
+                    {
+                        continue;
+                    }
+                    var seenTagNames = new HashSet<string>();
+                    var tagNames = new List<string>();
+                    foreach (var g in groups)
+                    {
+                        foreach (var tag in info.GetGroupTags(g))
+                        {
+                            var name = tag.ToString();
+                            if (!string.IsNullOrEmpty(name) && seenTagNames.Add(name))
+                            {
+                                tagNames.Add(name);
+                            }
+                        }
+                    }
+                    if (tagNames.Count == 0)
+                    {
+                        continue;
+                    }
+                    tagNames.Sort(StringComparer.OrdinalIgnoreCase);
+                    schema.TagsTouched.Add(
+                        new TrecsSchemaTagsTouchedInfo
+                        {
+                            AccessorDebugName = accessorName,
+                            TagNames = tagNames,
+                        }
+                    );
+                }
+                schema.TagsTouched.Sort(
+                    (a, b) =>
+                        string.Compare(
+                            a.AccessorDebugName ?? string.Empty,
+                            b.AccessorDebugName ?? string.Empty,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                );
             }
 
             return schema;

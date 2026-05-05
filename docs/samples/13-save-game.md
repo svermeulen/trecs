@@ -1,12 +1,12 @@
 # 13 — Save Game
 
-A small Sokoban puzzle demonstrating the `BookmarkSerializer` file API in the classic save-game use case: save before a risky move, reload if you get stuck.
+A small Sokoban puzzle demonstrating the `SnapshotSerializer` file API in the classic save-game use case: save before a risky move, reload if you get stuck.
 
 **Source:** `Samples/13_SaveGame/`
 
 ## What It Does
 
-Push every box onto a target square. Boxes can only be pushed (never pulled), so a box shoved into a corner is stuck forever — load a bookmark to undo.
+Push every box onto a target square. Boxes can only be pushed (never pulled), so a box shoved into a corner is stuck forever — load a snapshot to undo.
 
 | Key | Action |
 |---|---|
@@ -27,48 +27,48 @@ TrecsSerialization.RegisterTrecsSerializers(registry);
 // (skip RegisterRecordingSerializers — no record/playback needed)
 
 var worldStateSer = new WorldStateSerializer(world);
-var bookmarks = new BookmarkSerializer(worldStateSer, registry, world);
+var snapshots = new SnapshotSerializer(worldStateSer, registry, world);
 ```
 
 ## Save / Load
 
-The controller uses `BookmarkSerializer`'s file overloads directly:
+The controller uses `SnapshotSerializer`'s file overloads directly:
 
 ```csharp
 // Save
-var metadata = bookmarks.SaveBookmark(version: 1, filePath: slot.FilePath);
+var metadata = snapshots.SaveSnapshot(version: 1, filePath: slot.FilePath);
 
 // Load — restores the entire ECS state (walls, boxes, targets, player)
-var metadata = bookmarks.LoadBookmark(slot.FilePath);
+var metadata = snapshots.LoadSnapshot(slot.FilePath);
 ```
 
-Because level geometry is represented as wall/target entities rather than a static prefab, **loading a bookmark reverts the whole level**, not just the moveable pieces. That is a feature of the ECS-first design: anything you made part of the world is part of a save.
+Because level geometry is represented as wall/target entities rather than a static prefab, **loading a snapshot reverts the whole level**, not just the moveable pieces. That is a feature of the ECS-first design: anything you made part of the world is part of a save.
 
 Both methods also accept a `Stream` if you want to encrypt, compress, or upload the bytes.
 
 ### Peeking metadata and version checks
 
-`BookmarkSerializer.PeekMetadata(path)` reads only the header (schema version, current frame, blob ids, connection count) without rehydrating the whole world. Two common uses:
+`SnapshotSerializer.PeekMetadata(path)` reads only the header (schema version, current frame, blob ids, connection count) without rehydrating the whole world. Two common uses:
 
 - **Save-slot UIs** that display "last saved at frame 1234" without paying the deserialization cost.
-- **Version guards** before a full load. The `version` int you pass to `SaveBookmark` is preserved on `BookmarkMetadata.Version`, so you can detect saves from an incompatible build:
+- **Version guards** before a full load. The `version` int you pass to `SaveSnapshot` is preserved on `SnapshotMetadata.Version`, so you can detect saves from an incompatible build:
 
 ```csharp
-var header = bookmarks.PeekMetadata(path);
+var header = snapshots.PeekMetadata(path);
 if (header.Version != currentSchemaVersion)
 {
     ShowIncompatibleSaveDialog();
     return;
 }
-bookmarks.LoadBookmark(path);
+snapshots.LoadSnapshot(path);
 ```
 
 Trecs does not interpret `version` itself — bumping it on breaking schema changes is a convention you own.
 
 ## Concepts Introduced
 
-- **`BookmarkSerializer.SaveBookmark(path)` / `LoadBookmark(path)`** — the file-based save/load API.
-- **Multiple save slots** — each file is an independent bookmark.
+- **`SnapshotSerializer.SaveSnapshot(path)` / `LoadSnapshot(path)`** — the file-based save/load API.
+- **Multiple save slots** — each file is an independent snapshot.
 - **Full-state round-trip** — static-seeming geometry that is stored as ECS state saves and restores just like dynamic state.
 - **`PeekMetadata(path)`** — lightweight metadata-only read for save-slot UIs.
 

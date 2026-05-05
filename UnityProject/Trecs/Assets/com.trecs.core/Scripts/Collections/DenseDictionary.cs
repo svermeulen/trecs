@@ -3,9 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using Trecs.Internal;
 
-namespace Trecs.Collections
+namespace Trecs.Internal // not part of public api atm
 {
     /// <summary>
     /// This dictionary has been created for the following reasons:
@@ -22,9 +21,9 @@ namespace Trecs.Collections
     /// </summary>
     public class DenseDictionary<TKey, TValue> : IEnumerable<DenseDictionary<TKey, TValue>.KvPair>
     {
-        readonly SimpleResizableBuffer<Node> _valuesInfo;
-        readonly SimpleResizableBuffer<TValue> _values;
-        readonly SimpleResizableBuffer<int> _buckets;
+        Node[] _valuesInfo;
+        TValue[] _values;
+        int[] _buckets;
 
         int _freeValueCellIndex;
         int _collisions;
@@ -34,15 +33,13 @@ namespace Trecs.Collections
         {
             Assert.That(size >= 0, "DenseDictionary size must be non-negative");
 
-            _valuesInfo = new(size);
-            _values = new(size);
-            _buckets = new(HashHelpers.GetPrime(size));
+            _valuesInfo = new Node[size];
+            _values = new TValue[size];
+            _buckets = new int[HashHelpers.GetPrime(size)];
 
             if (size > 0)
             {
-                _fastModBucketsMultiplier = HashHelpers.GetFastModMultiplier(
-                    (uint)_buckets.Capacity
-                );
+                _fastModBucketsMultiplier = HashHelpers.GetFastModMultiplier((uint)_buckets.Length);
             }
         }
 
@@ -88,19 +85,19 @@ namespace Trecs.Collections
         public Node[] UnsafeKeys
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _valuesInfo._realBuffer;
+            get => _valuesInfo;
         }
 
         public TValue[] UnsafeValues
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _values._realBuffer;
+            get => _values;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool IsEmpty()
+        public bool IsEmpty
         {
-            return Count == 0;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => Count == 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -108,7 +105,7 @@ namespace Trecs.Collections
         {
             count = _freeValueCellIndex;
 
-            return _values._realBuffer;
+            return _values;
         }
 
         public int Count => _freeValueCellIndex;
@@ -173,7 +170,7 @@ namespace Trecs.Collections
             // Clear only the buckets that were actually written to, using the
             // stored hash codes. This is O(entries) instead of O(bucket capacity),
             // which is much faster when the dictionary is large but sparsely used.
-            var bucketsCapacity = (uint)_buckets.Capacity;
+            var bucketsCapacity = (uint)_buckets.Length;
             for (int i = 0; i < _freeValueCellIndex; i++)
             {
                 var bucketIndex = Reduce(
@@ -197,9 +194,9 @@ namespace Trecs.Collections
 
             _freeValueCellIndex = 0;
 
-            _buckets.Clear();
-            _values.Clear();
-            _valuesInfo.Clear();
+            Array.Clear(_buckets, 0, _buckets.Length);
+            Array.Clear(_values, 0, _values.Length);
+            Array.Clear(_valuesInfo, 0, _valuesInfo.Length);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -385,22 +382,22 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnsureCapacity(int size)
         {
-            if (_values.Capacity < size)
+            if (_values.Length < size)
             {
                 var expandPrime = HashHelpers.Expand(size);
 
-                _values.Resize(expandPrime, true);
-                _valuesInfo.Resize(expandPrime, true);
+                Array.Resize(ref _values, expandPrime);
+                Array.Resize(ref _valuesInfo, expandPrime);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void IncreaseCapacityBy(int size)
         {
-            var expandPrime = HashHelpers.Expand(_values.Capacity + size);
+            var expandPrime = HashHelpers.Expand(_values.Length + size);
 
-            _values.Resize(expandPrime, true);
-            _valuesInfo.Resize(expandPrime, true);
+            Array.Resize(ref _values, expandPrime);
+            Array.Resize(ref _valuesInfo, expandPrime);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -436,11 +433,7 @@ namespace Trecs.Collections
         public bool TryRemove(TKey key, out int index, out TValue value)
         {
             int hash = key.GetHashCode();
-            int bucketIndex = Reduce(
-                (uint)hash,
-                (uint)_buckets.Capacity,
-                _fastModBucketsMultiplier
-            );
+            int bucketIndex = Reduce((uint)hash, (uint)_buckets.Length, _fastModBucketsMultiplier);
 
             //find the bucket
             int indexToValueToRemove = _buckets[bucketIndex] - 1;
@@ -512,7 +505,7 @@ namespace Trecs.Collections
 
                 var movingBucketIndex = Reduce(
                     (uint)dictionaryNodeToMove.hashcode,
-                    (uint)_buckets.Capacity,
+                    (uint)_buckets.Length,
                     _fastModBucketsMultiplier
                 );
 
@@ -555,8 +548,8 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Trim()
         {
-            _values.Resize(_freeValueCellIndex);
-            _valuesInfo.Resize(_freeValueCellIndex);
+            Array.Resize(ref _values, _freeValueCellIndex);
+            Array.Resize(ref _valuesInfo, _freeValueCellIndex);
         }
 
         //I store all the index with an offset + 1, so that in the bucket list 0 means actually not existing.
@@ -569,17 +562,13 @@ namespace Trecs.Collections
         public bool TryGetIndex(TKey key, out int findIndex)
         {
             Assert.That(
-                _buckets.Capacity > 0,
+                _buckets.Length > 0,
                 "Dictionary arrays are not correctly initialized (0 size)"
             );
 
             int hash = key.GetHashCode();
 
-            int bucketIndex = Reduce(
-                (uint)hash,
-                (uint)_buckets.Capacity,
-                _fastModBucketsMultiplier
-            );
+            int bucketIndex = Reduce((uint)hash, (uint)_buckets.Length, _fastModBucketsMultiplier);
 
             int valueIndex = _buckets[bucketIndex] - 1;
 
@@ -654,11 +643,7 @@ namespace Trecs.Collections
         bool AddValue(TKey key, out int indexSet)
         {
             int hash = key.GetHashCode(); //IEquatable doesn't enforce the override of GetHashCode
-            int bucketIndex = Reduce(
-                (uint)hash,
-                (uint)_buckets.Capacity,
-                _fastModBucketsMultiplier
-            );
+            int bucketIndex = Reduce((uint)hash, (uint)_buckets.Length, _fastModBucketsMultiplier);
 
             //buckets value -1 means it's empty
             var valueIndex = _buckets[bucketIndex] - 1;
@@ -705,9 +690,9 @@ namespace Trecs.Collections
             _freeValueCellIndex++;
 
             //too many collisions
-            if (_collisions > _buckets.Capacity)
+            if (_collisions > _buckets.Length)
             {
-                if (_buckets.Capacity < 100)
+                if (_buckets.Length < 100)
                 {
                     RecomputeBuckets(_collisions << 1);
                 }
@@ -724,10 +709,10 @@ namespace Trecs.Collections
         internal void RecomputeBuckets(int newSize)
         {
             //we need more space and less collisions
-            _buckets.Resize(newSize, false);
+            _buckets = new int[newSize];
             _collisions = 0;
-            _fastModBucketsMultiplier = HashHelpers.GetFastModMultiplier((uint)_buckets.Capacity);
-            var bucketsCapacity = (uint)_buckets.Capacity;
+            _fastModBucketsMultiplier = HashHelpers.GetFastModMultiplier((uint)_buckets.Length);
+            var bucketsCapacity = (uint)_buckets.Length;
 
             //we need to get all the hash code of all the values stored so far and spread them over the new bucket
             //length
@@ -771,12 +756,12 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void ResizeIfNeeded()
         {
-            if (_freeValueCellIndex == _values.Capacity)
+            if (_freeValueCellIndex == _values.Length)
             {
                 var expandPrime = HashHelpers.Expand(_freeValueCellIndex);
 
-                _values.Resize(expandPrime, true);
-                _valuesInfo.Resize(expandPrime, true);
+                Array.Resize(ref _values, expandPrime);
+                Array.Resize(ref _valuesInfo, expandPrime);
             }
         }
 
@@ -850,7 +835,7 @@ namespace Trecs.Collections
         /// </summary>
         public readonly struct KvPair
         {
-            public KvPair(in TKey key, in SimpleResizableBuffer<TValue> dicValues, int index)
+            public KvPair(in TKey key, TValue[] dicValues, int index)
             {
                 _dicValues = dicValues;
                 _index = index;
@@ -866,7 +851,7 @@ namespace Trecs.Collections
             public TKey Key => _key;
             public ref TValue Value => ref _dicValues[_index];
 
-            readonly SimpleResizableBuffer<TValue> _dicValues;
+            readonly TValue[] _dicValues;
             readonly TKey _key;
             readonly int _index;
         }
@@ -970,12 +955,12 @@ namespace Trecs.Collections
         /// <summary>
         /// Gets the internal buckets array for serialization.
         /// </summary>
-        public int[] UnsafeBuckets => _buckets._realBuffer;
+        public int[] UnsafeBuckets => _buckets;
 
         /// <summary>
         /// Gets the buckets capacity for serialization.
         /// </summary>
-        public int UnsafeBucketsCapacity => _buckets.Capacity;
+        public int UnsafeBucketsCapacity => _buckets.Length;
 
         /// <summary>
         /// Gets the internal collision counter for serialization.
@@ -992,18 +977,18 @@ namespace Trecs.Collections
         /// </summary>
         public void UnsafeEnsureCapacityForDeserialization(int valuesCount, int bucketsCapacity)
         {
-            if (valuesCount > _valuesInfo.Capacity)
+            if (valuesCount > _valuesInfo.Length)
             {
                 var newCapacity = HashHelpers.Expand(valuesCount);
-                _valuesInfo.Resize(newCapacity, false);
-                _values.Resize(newCapacity, false);
+                _valuesInfo = new Node[newCapacity];
+                _values = new TValue[newCapacity];
             }
 
             // ALWAYS resize buckets to exact capacity (not just when larger)
-            // This ensures _buckets.Capacity matches _fastModBucketsMultiplier
-            if (bucketsCapacity != _buckets.Capacity)
+            // This ensures _buckets.Length matches _fastModBucketsMultiplier
+            if (bucketsCapacity != _buckets.Length)
             {
-                _buckets.Resize(bucketsCapacity, false);
+                _buckets = new int[bucketsCapacity];
             }
         }
     }

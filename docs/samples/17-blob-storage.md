@@ -99,7 +99,7 @@ If you adapt the pattern to entities that come and go, register an `OnRemoved` o
 ## When to Reach for This
 
 - Large, immutable assets that many entities share (colour palettes, lookup tables, mesh metadata, spline definitions, AI behaviour trees).
-- Content pipelines where the blob's identity must survive across runs, recordings, or bookmarks — and auto-minted IDs would drift.
+- Content pipelines where the blob's identity must survive across runs, recordings, or snapshots — and auto-minted IDs would drift.
 - Anywhere the data is too big or too managed (lists, dictionaries) to copy into each entity's component.
 
 For per-entity managed data that isn't shared, use `UniquePtr<T>` instead ([Sample 10](10-pointers.md)).

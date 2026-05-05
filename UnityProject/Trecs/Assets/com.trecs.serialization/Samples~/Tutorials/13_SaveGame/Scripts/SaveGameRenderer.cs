@@ -8,7 +8,7 @@ namespace Trecs.Serialization.Samples.SaveGame
 {
     /// <summary>
     /// Renders the Sokoban board as 3D primitives synced each variable
-    /// frame from current ECS state. Loading a bookmark just works —
+    /// frame from current ECS state. Loading a snapshot just works —
     /// the next frame re-reads the restored world state.
     ///
     /// Rendering order by height:

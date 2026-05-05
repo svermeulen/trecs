@@ -32,13 +32,13 @@ namespace Trecs.Samples.JobSystem
                 IExtends<CommonTemplates.Renderable>,
                 IHasTags<SampleTags.Particle>
         {
-            public Velocity Velocity;
+            Velocity Velocity;
         }
 
         public partial class Globals : ITemplate, IExtends<TrecsTemplates.Globals>
         {
-            public DesiredNumParticles DesiredNumParticles = new() { Value = 5000 };
-            public IsJobsEnabled IsJobsEnabled = new() { Value = true };
+            DesiredNumParticles DesiredNumParticles = new() { Value = 5000 };
+            IsJobsEnabled IsJobsEnabled = new() { Value = true };
         }
     }
 }

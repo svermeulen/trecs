@@ -1,6 +1,6 @@
 # Binary Format Reference
 
-This page documents the on-disk layout of Trecs binary payloads (bookmarks and recordings). Most users never need this — the API surface in [Serialization](serialization.md) and [Recording & Playback](recording-and-playback.md) is self-contained. Read this page if you are:
+This page documents the on-disk layout of Trecs binary payloads (snapshots and recordings). Most users never need this — the API surface in [Serialization](serialization.md) and [Recording & Playback](recording-and-playback.md) is self-contained. Read this page if you are:
 
 - Building tooling that inspects save files without loading them into Unity.
 - Diagnosing a payload-corruption bug.
@@ -36,7 +36,7 @@ Written by [`SerializationHeaderUtil.WriteHeader`](https://github.com/svermeulen
 These two are unrelated and must not be confused.
 
 - `FormatVersion` is owned by Trecs. It describes the header layout itself. It is bumped only when Trecs adds/removes/reorders header fields; current value is `1`. Mismatch throws — there is no forward-compat path, by design.
-- `version` is owned by your game. It describes the *schema* of the serialized data inside the payload. You bump it whenever you change one of your component or custom-serializer formats. Trecs surfaces it on `BookmarkMetadata.Version` / `RecordingMetadata.Version` but does not interpret it.
+- `version` is owned by your game. It describes the *schema* of the serialized data inside the payload. You bump it whenever you change one of your component or custom-serializer formats. Trecs surfaces it on `SnapshotMetadata.Version` / `RecordingMetadata.Version` but does not interpret it.
 
 ### `flags`
 
@@ -44,7 +44,7 @@ Application-level bitmask propagated to every serializer via `ISerializationWrit
 
 ### `includeTypeChecks`
 
-When `true`, the writer interleaves type IDs before each top-level value so the reader can assert it's reading what the writer wrote. Bookmarks and recordings use `true`; most user-driven round trips leave it `true` too. Disable only when you need the smallest possible payload and the reader trusts the stream end-to-end.
+When `true`, the writer interleaves type IDs before each top-level value so the reader can assert it's reading what the writer wrote. Snapshots and recordings use `true`; most user-driven round trips leave it `true` too. Disable only when you need the smallest possible payload and the reader trusts the stream end-to-end.
 
 ## Framing section
 
@@ -64,14 +64,14 @@ Sequential values, one per `Write(…)` call in the order the writer made them. 
 
 Exactly one byte `0x5E` (`SerializationConstants.EndOfPayloadMarker`). Distinguishes a valid end-of-payload from a truncated read. A bit-flip inside the data section is not detected by this marker — it catches only the tail.
 
-## Bookmark payload (world-state snapshot)
+## Snapshot payload (world-state snapshot)
 
-A bookmark is a payload whose top-level value is a `BookmarkMetadata` followed by a `WorldStateSerializer` dump. `BookmarkSerializer.SaveBookmark` writes them in that order.
+A snapshot is a payload whose top-level value is a `SnapshotMetadata` followed by a `WorldStateSerializer` dump. `SnapshotSerializer.SaveSnapshot` writes them in that order.
 
 ```
 [Header]                          16 bytes
 [BitField prelude]                variable
-[BookmarkMetadata]                {Version, FixedFrame, BlobIds}
+[SnapshotMetadata]                {Version, FixedFrame, BlobIds}
 [ECS state, via WorldStateSerializer]
    [ComponentStore]
    [SetStore]
@@ -111,19 +111,19 @@ The format is a mix of two encodings:
 - **Primitives routed through `BinaryWriter` / `BinaryReader`** — header fields, explicit `Write<int>` / `Write<long>` / `Write<bool>` calls, the sentinels. Always little-endian (the .NET `BinaryWriter` / `BinaryReader` spec).
 - **Blittable structs routed through `MemoryBlitter`** — `BlitWrite<T>`, `BlitWriteArray<T>`, `BlitWriteRawBytes`. Raw memory copy, so host-native endian.
 
-On every platform Unity currently ships (x64, ARM64, WebGL) both encodings are little-endian in practice, so payloads round-trip cleanly. A hypothetical big-endian host would produce files where `BinaryWriter` output is LE while blit output is BE, making those files unreadable on little-endian hosts and vice versa. Treat bookmarks and recordings as non-portable across architectures; do not share them between players running different CPUs without an explicit portability test.
+On every platform Unity currently ships (x64, ARM64, WebGL) both encodings are little-endian in practice, so payloads round-trip cleanly. A hypothetical big-endian host would produce files where `BinaryWriter` output is LE while blit output is BE, making those files unreadable on little-endian hosts and vice versa. Treat snapshots and recordings as non-portable across architectures; do not share them between players running different CPUs without an explicit portability test.
 
 ## Integrity
 
-A single `0x5E` byte is the only payload-integrity check. A bit flip inside the data section is not detected; checksums (recordings only) catch most such cases but are FNV-1a, which has known collision risk. When stronger integrity is needed, wrap the stream in your own CRC / HMAC envelope before passing it to `SaveBookmark(stream)` / `StartPlayback(stream)`.
+A single `0x5E` byte is the only payload-integrity check. A bit flip inside the data section is not detected; checksums (recordings only) catch most such cases but are FNV-1a, which has known collision risk. When stronger integrity is needed, wrap the stream in your own CRC / HMAC envelope before passing it to `SaveSnapshot(stream)` / `StartPlayback(stream)`.
 
 ## Forward compatibility
 
 Trecs does **not** migrate old payloads automatically. When you change a serializer's shape:
 
-1. Bump `version` in the `SaveBookmark` / `StartRecording` call.
+1. Bump `version` in the `SaveSnapshot` / `StartRecording` call.
 2. In your custom serializer's `Deserialize`, branch on `reader.Version` to handle historical layouts. See the example at the bottom of [Serialization](serialization.md#versioned-custom-serializers).
-3. If the change is large enough that in-serializer branching is unmanageable, wrap the payload in your own versioned format and run a migration pass before calling `LoadBookmark`.
+3. If the change is large enough that in-serializer branching is unmanageable, wrap the payload in your own versioned format and run a migration pass before calling `LoadSnapshot`.
 
 ## See also
 

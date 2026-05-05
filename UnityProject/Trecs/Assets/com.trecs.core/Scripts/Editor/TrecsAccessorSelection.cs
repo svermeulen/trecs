@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Trecs.Internal;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -10,56 +12,14 @@ namespace Trecs
     /// <summary>
     /// ScriptableObject proxy used as <see cref="Selection.activeObject"/> when
     /// the user picks an accessor row in <see cref="TrecsHierarchyWindow"/>.
-    /// Identifies the accessor by <see cref="WorldAccessor.Id"/>, which is
-    /// stable for the world's lifetime and works for both system-owned and
-    /// manually-created (<see cref="World.CreateAccessor"/>) accessors. The
-    /// inspector resolves the id back to a live <see cref="WorldAccessor"/>
-    /// each refresh, then optionally maps it to its owning system to surface
-    /// system-only metadata (phase, dependencies, enable toggle).
+    /// Carries only a serialized <see cref="TrecsSelectionProxy.Identity"/>
+    /// string (e.g. <c>"accessor:MoveSystem"</c>); the inspector resolves
+    /// the live <see cref="AccessorRef"/> dynamically against
+    /// <see cref="TrecsHierarchyWindow.ActiveSource"/> on every refresh.
+    /// Same identity covers both system-owned and manually-created
+    /// accessors; the source's projection decides which.
     /// </summary>
-    public class TrecsAccessorSelection : ScriptableObject
-    {
-        [NonSerialized]
-        WeakReference<World> _worldRef;
-
-        [NonSerialized]
-        public int AccessorId = -1;
-
-        [NonSerialized]
-        public TrecsSchema CacheSchema;
-
-        // Cache mode identifies an accessor by its debug name (the same
-        // string the schema saved). Could be a system or a manual accessor.
-        [NonSerialized]
-        public string CacheAccessorName;
-
-        public World GetWorld()
-        {
-            if (_worldRef == null)
-            {
-                return null;
-            }
-            return _worldRef.TryGetTarget(out var w) ? w : null;
-        }
-
-        public void Set(World world, int accessorId, string displayName)
-        {
-            _worldRef = world == null ? null : new WeakReference<World>(world);
-            AccessorId = accessorId;
-            CacheSchema = null;
-            CacheAccessorName = null;
-            name = displayName;
-        }
-
-        public void SetCache(TrecsSchema schema, string accessorName)
-        {
-            _worldRef = null;
-            AccessorId = -1;
-            CacheSchema = schema;
-            CacheAccessorName = accessorName;
-            name = accessorName ?? "Accessor";
-        }
-    }
+    public class TrecsAccessorSelection : TrecsSelectionProxy { }
 
     [CustomEditor(typeof(TrecsAccessorSelection))]
     public class TrecsAccessorSelectionInspector : Editor
@@ -80,17 +40,18 @@ namespace Trecs
         Foldout _dependsOnFoldout;
         Foldout _dependentsFoldout;
         Toggle _enabledToggle;
+        Label _enabledOverrideLabel;
         VisualElement _systemOnlySection;
+        VisualElement _manualOnlySection;
+        Label _originValue;
         Foldout _readsFoldout;
         Foldout _writesFoldout;
         Foldout _tagsTouchedFoldout;
         Label _tagsCaveat;
         bool _suppressToggleEvents;
 
-        // Identity of the currently-rendered accessor: boxed int for live
-        // (AccessorId), string for cache (CacheAccessorName). RenderStatic
-        // only fires when this changes.
-        object _renderedEntryKey;
+        // Composite render key — identity + source mode + source name.
+        string _renderedKey;
         int _lastReadsHash;
         int _lastWritesHash;
         int _lastTagsTouchedHash;
@@ -130,13 +91,9 @@ namespace Trecs
 
             // Shift+hover the heading → hierarchy scrolls back to this
             // accessor's tree row.
-            TrecsInspectorLinks.WireHoverPreviewAccessor(
+            TrecsInspectorLinks.WireHoverPreview(
                 _nameValue,
-                () =>
-                {
-                    var sel = target as TrecsAccessorSelection;
-                    return (sel?.GetWorld(), sel?.AccessorId ?? -1);
-                }
+                () => (target as TrecsAccessorSelection)?.Identity
             );
 
             _kindValue = AddRow(container, "Kind", "");
@@ -162,7 +119,24 @@ namespace Trecs
             _enabledToggle.RegisterValueChangedCallback(OnEnabledToggleChanged);
             _systemOnlySection.Add(_enabledToggle);
 
+            // Surfaces non-Editor blockers (Playback channel, User channel, or
+            // deterministic Paused) when the toggle and the actual run state
+            // disagree, so the inspector doesn't lie about why a system isn't
+            // running. Hidden when the toggle accurately reflects state.
+            _enabledOverrideLabel = new Label();
+            _enabledOverrideLabel.style.marginLeft = 16;
+            _enabledOverrideLabel.style.opacity = 0.75f;
+            _enabledOverrideLabel.style.display = DisplayStyle.None;
+            _systemOnlySection.Add(_enabledOverrideLabel);
+
             container.Add(_systemOnlySection);
+
+            // Manual-only metadata: source-line origin. Click jumps to the
+            // CreateAccessor callsite via the user's external script editor.
+            _manualOnlySection = new VisualElement();
+            _originValue = AddRow(_manualOnlySection, "Origin", "");
+            _originValue.RegisterCallback<ClickEvent>(OnOriginClicked);
+            container.Add(_manualOnlySection);
 
             // Component access tracking (populated per-tick via tracker, so
             // manual accessors get covered too — not just systems).
@@ -191,6 +165,53 @@ namespace Trecs
             _tagsTouchedFoldout.Add(_tagsCaveat);
         }
 
+        void RenderManualOriginSection(AccessorEntry entry)
+        {
+            var path = entry.CreatedAtFile;
+            if (string.IsNullOrEmpty(path))
+            {
+                _manualOnlySection.style.display = DisplayStyle.None;
+                _originValue.userData = null;
+                return;
+            }
+            _manualOnlySection.style.display = DisplayStyle.Flex;
+            // Show the file name + line in the visible label so the inspector
+            // doesn't get pushed wide by long absolute paths; full path goes
+            // in the tooltip and on click. Click handler reads CreatedAtFile
+            // from the proxy via _originValue.userData so we don't need to
+            // capture entry across closures.
+            var fileName = Path.GetFileName(path);
+            _originValue.text =
+                entry.CreatedAtLine > 0 ? $"{fileName}:{entry.CreatedAtLine}" : fileName;
+            // Tooltip flags the cross-machine case: paths captured by
+            // CallerFilePath are absolute on the recorder's machine, so a
+            // snapshot from another developer's checkout (or one whose
+            // working tree has moved) won't open here.
+            var pathWithLine = entry.CreatedAtLine > 0 ? $"{path}:{entry.CreatedAtLine}" : path;
+            _originValue.tooltip =
+                $"{pathWithLine}\n\nClick to open in your script editor "
+                + "(no-ops if the file isn't on this machine).";
+            _originValue.style.unityFontStyleAndWeight = FontStyle.Italic;
+            _originValue.userData = (path, entry.CreatedAtLine);
+        }
+
+        void OnOriginClicked(ClickEvent _)
+        {
+            if (_originValue.userData is not ValueTuple<string, int> origin)
+            {
+                return;
+            }
+            var (path, line) = origin;
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+            // Same path Unity uses for stack-frame links in the console.
+            // Silently no-ops when the file doesn't exist on this machine
+            // (e.g. a snapshot taken on another developer's checkout).
+            InternalEditorUtility.OpenFileAtLineExternal(path, line);
+        }
+
         static Label AddRow(VisualElement container, string label, string initial)
         {
             var row = new VisualElement();
@@ -217,44 +238,79 @@ namespace Trecs
                 return;
             }
             var selection = (TrecsAccessorSelection)target;
-            var world = selection.GetWorld();
-            if (world == null || world.IsDisposed || _windowAccessor == null)
+            if (
+                TrecsHierarchyWindow.ActiveSource is not LiveSchemaSource live
+                || live.World == null
+                || live.World.IsDisposed
+            )
             {
                 return;
             }
-            int systemIndex = -1;
-            try
-            {
-                var systems = _windowAccessor.GetSystems();
-                for (int i = 0; i < systems.Count; i++)
-                {
-                    var s = systems[i];
-                    if (
-                        s.Metadata.Accessor != null
-                        && s.Metadata.Accessor.Id == selection.AccessorId
-                    )
-                    {
-                        systemIndex = i;
-                        break;
-                    }
-                }
-            }
-            catch (Exception)
+            var aref = live.ResolveAccessor(selection.Identity);
+            if (aref == null || aref.SystemIndex < 0)
             {
                 return;
             }
-            if (systemIndex < 0)
+            live.SetSystemEnabled(aref.SystemIndex, evt.newValue);
+        }
+
+        void UpdateEnabledOverrideLabel(ITrecsSchemaSource src, int systemIndex)
+        {
+            // Only the live source carries channel / paused state to surface.
+            var live = src as LiveSchemaSource;
+            if (live == null || live.World == null || live.World.IsDisposed)
             {
+                _enabledOverrideLabel.style.display = DisplayStyle.None;
                 return;
             }
-            try
+            var world = live.World;
+
+            // Cheap early-out: if the only thing affecting the system is the
+            // Editor channel (which the toggle already reflects), skip the
+            // per-blocker enumeration entirely.
+            bool editorEnabled = world.IsSystemEnabled(systemIndex, EnableChannel.Editor);
+            if (world.IsSystemEffectivelyEnabled(systemIndex) == editorEnabled)
             {
-                _windowAccessor.GetSystemRunner().SetSystemEnabled(systemIndex, evt.newValue);
+                _enabledOverrideLabel.style.display = DisplayStyle.None;
+                return;
             }
-            catch (Exception)
+
+            // Something other than Editor is in play. Enumerate which channels
+            // are blocking, then note the deterministic paused flag separately.
+            string blockers = null;
+            if (!world.IsSystemEnabled(systemIndex, EnableChannel.Playback))
             {
-                // World may have transitioned; next refresh will resync.
+                blockers = "Playback";
             }
+            if (!world.IsSystemEnabled(systemIndex, EnableChannel.User))
+            {
+                blockers = blockers == null ? "User" : blockers + ", User";
+            }
+
+            bool paused = live.Accessor != null && live.Accessor.IsSystemPaused(systemIndex);
+
+            if (blockers == null && !paused)
+            {
+                _enabledOverrideLabel.style.display = DisplayStyle.None;
+                return;
+            }
+
+            string text;
+            if (blockers != null && paused)
+            {
+                text = $"Disabled by: {blockers}. Paused (deterministic).";
+            }
+            else if (blockers != null)
+            {
+                text = $"Disabled by: {blockers}";
+            }
+            else
+            {
+                text = "Paused (deterministic)";
+            }
+
+            _enabledOverrideLabel.text = text;
+            _enabledOverrideLabel.style.display = DisplayStyle.Flex;
         }
 
         void Refresh()
@@ -265,147 +321,102 @@ namespace Trecs
                 return;
             }
 
-            ResolveContext(
-                selection,
-                out var liveWorld,
-                out var liveAccessor,
-                out var liveSystem,
-                out var liveSystems,
-                out var liveRunner,
-                out var liveSystemIndex,
-                out var identity,
-                out var error
-            );
-
-            if (error != null)
+            var src = TrecsHierarchyWindow.ActiveSource;
+            if (src == null || string.IsNullOrEmpty(selection.Identity))
             {
-                ShowStatus(error);
+                ShowStatus("No accessor selected.");
                 return;
             }
-            if (identity == null)
+
+            var aref = src.ResolveAccessor(selection.Identity);
+            if (aref == null)
             {
-                var w = selection.GetWorld();
                 ShowStatus(
-                    w == null || w.IsDisposed
-                        ? "No accessor selected — world unavailable."
-                        : "No accessor selected."
+                    $"Accessor '{selection.name}' not found in {(src.IsLive ? "live world" : "cached schema")} '{src.DisplayName}'."
                 );
                 return;
+            }
+
+            // Live mode also needs the runtime ExecutableSystemInfo to
+            // render system metadata (type, dependencies). Resolve it via
+            // the live world's system list.
+            ExecutableSystemInfo liveSystem = null;
+            IReadOnlyList<ExecutableSystemInfo> liveSystems = null;
+            SystemRunner liveRunner = null;
+            World liveWorld = null;
+            if (src is LiveSchemaSource live)
+            {
+                liveWorld = live.World;
+                if (liveWorld != null && !liveWorld.IsDisposed)
+                {
+                    try
+                    {
+                        _windowAccessor ??= liveWorld.CreateAccessor(
+                            "TrecsAccessorSelectionInspector"
+                        );
+                        liveSystems = _windowAccessor.GetSystems();
+                        liveRunner = _windowAccessor.GetSystemRunner();
+                        if (aref.SystemIndex >= 0 && aref.SystemIndex < liveSystems.Count)
+                        {
+                            liveSystem = liveSystems[aref.SystemIndex];
+                        }
+                    }
+                    catch (Exception) { }
+                }
             }
 
             _statusLabel.style.display = DisplayStyle.None;
             _bodyContainer.style.display = DisplayStyle.Flex;
 
-            if (!Equals(identity, _renderedEntryKey))
+            var renderKey = src.RenderKey(selection.Identity);
+            if (renderKey != _renderedKey)
             {
-                _renderedEntryKey = identity;
+                _renderedKey = renderKey;
                 _lastReadsHash = 0;
                 _lastWritesHash = 0;
                 _lastTagsTouchedHash = 0;
-                var entry =
-                    liveWorld != null
-                        ? BuildEntryFromLive(liveAccessor, liveSystem, liveSystems, liveSystemIndex)
-                        : BuildEntryFromCache(selection.CacheSchema, selection.CacheAccessorName);
-                var linker =
-                    liveWorld != null
-                        ? (InspectorLinker)new LiveInspectorLinker(liveWorld)
-                        : new CacheInspectorLinker(selection.CacheSchema);
-                bool isCache = liveWorld == null;
-                RenderStatic(entry, linker, isCache);
+                var entry = BuildEntryFromRef(aref, liveSystem, liveSystems);
+                var linker = new InspectorLinker(src);
+                RenderStatic(entry, linker, !src.IsLive);
             }
 
-            UpdateRuntimeFields(
-                selection,
-                liveWorld,
-                liveAccessor,
-                liveRunner,
-                liveSystem,
-                liveSystemIndex
-            );
+            UpdateRuntimeFields(src, aref, liveSystem, liveRunner);
         }
 
-        // Resolve the live/cache context. Identity is boxed-int (live
-        // AccessorId) or string (cache name). Error is populated when we
-        // know the user picked something but it's no longer valid (e.g.
-        // accessor unregistered) so we can show a specific status.
-        void ResolveContext(
-            TrecsAccessorSelection selection,
-            out World liveWorld,
-            out WorldAccessor liveAccessor,
-            out ExecutableSystemInfo liveSystem,
-            out IReadOnlyList<ExecutableSystemInfo> liveSystems,
-            out SystemRunner liveRunner,
-            out int liveSystemIndex,
-            out object identity,
-            out string error
+        static AccessorEntry BuildEntryFromRef(
+            AccessorRef aref,
+            ExecutableSystemInfo liveSystem,
+            IReadOnlyList<ExecutableSystemInfo> liveSystems
         )
         {
-            liveWorld = null;
-            liveAccessor = null;
-            liveSystem = null;
-            liveSystems = null;
-            liveRunner = null;
-            liveSystemIndex = -1;
-            identity = null;
-            error = null;
-
-            var world = selection.GetWorld();
-            if (world != null && !world.IsDisposed && selection.AccessorId >= 0)
+            if (aref.CacheNativeSystem != null)
             {
-                try
-                {
-                    _windowAccessor ??= world.CreateAccessor("TrecsAccessorSelectionInspector");
-                }
-                catch (Exception e)
-                {
-                    error = $"Failed to create world accessor: {e.Message}";
-                    return;
-                }
-                try
-                {
-                    if (
-                        !world.GetAllAccessors().TryGetValue(selection.AccessorId, out liveAccessor)
-                    )
-                    {
-                        error = "Accessor is no longer registered.";
-                        return;
-                    }
-                }
-                catch (Exception e)
-                {
-                    error = $"Failed to read accessors: {e.Message}";
-                    return;
-                }
-                try
-                {
-                    liveSystems = _windowAccessor.GetSystems();
-                    liveRunner = _windowAccessor.GetSystemRunner();
-                    for (int i = 0; i < liveSystems.Count; i++)
-                    {
-                        var s = liveSystems[i];
-                        if (
-                            s.Metadata.Accessor != null
-                            && s.Metadata.Accessor.Id == selection.AccessorId
-                        )
-                        {
-                            liveSystem = s;
-                            liveSystemIndex = i;
-                            break;
-                        }
-                    }
-                }
-                catch (Exception)
-                {
-                    // System list unavailable — treat as manual accessor.
-                }
-                liveWorld = world;
-                identity = selection.AccessorId;
-                return;
+                return BuildEntryFromCacheSystem(aref.CacheNativeSystem);
             }
-            if (!string.IsNullOrEmpty(selection.CacheAccessorName))
+            if (aref.CacheNativeManual != null)
             {
-                identity = selection.CacheAccessorName;
+                return new AccessorEntry
+                {
+                    DebugName = aref.DebugName ?? "(unnamed)",
+                    CreatedAtFile = aref.CreatedAtFile,
+                    CreatedAtLine = aref.CreatedAtLine,
+                };
             }
+            var entry = BuildEntryFromLive(
+                aref.DebugName,
+                liveSystem,
+                liveSystems,
+                aref.SystemIndex
+            );
+            // Live manual accessors carry their origin on the AccessorRef
+            // itself (LiveSchemaSource pulls it from WorldAccessor.CreatedAt*).
+            // Systems leave it empty — they have richer metadata anyway.
+            if (!entry.IsSystem)
+            {
+                entry.CreatedAtFile = aref.CreatedAtFile;
+                entry.CreatedAtLine = aref.CreatedAtLine;
+            }
+            return entry;
         }
 
         // Internal view type: same shape regardless of live or cache source.
@@ -422,16 +433,20 @@ namespace Trecs
             public int Priority;
             public List<string> DependsOnSystemDebugNames = new();
             public List<string> DependentSystemDebugNames = new();
+
+            // Manual accessors only — system entries leave these unset.
+            public string CreatedAtFile;
+            public int CreatedAtLine;
         }
 
         static AccessorEntry BuildEntryFromLive(
-            WorldAccessor accessor,
+            string debugName,
             ExecutableSystemInfo systemInfo,
             IReadOnlyList<ExecutableSystemInfo> allSystems,
             int systemIndex
         )
         {
-            var entry = new AccessorEntry { DebugName = accessor.DebugName ?? $"#{accessor.Id}" };
+            var entry = new AccessorEntry { DebugName = debugName ?? "(unnamed)" };
             if (systemInfo == null)
             {
                 return entry;
@@ -487,38 +502,32 @@ namespace Trecs
             return entry;
         }
 
-        static AccessorEntry BuildEntryFromCache(TrecsSchema schema, string accessorName)
+        static AccessorEntry BuildEntryFromCacheSystem(TrecsSchemaSystem sys)
         {
-            var entry = new AccessorEntry { DebugName = accessorName ?? "(unnamed)" };
-            if (schema == null)
-                return entry;
-            foreach (var sys in schema.Systems)
+            var entry = new AccessorEntry
             {
-                if (sys.DebugName != accessorName)
-                    continue;
-                entry.IsSystem = true;
-                entry.TypeName = sys.TypeName;
-                entry.TypeNamespace = sys.TypeNamespace;
-                entry.Phase = sys.Phase;
-                entry.HasPriority = sys.HasPriority;
-                entry.Priority = sys.Priority;
-                if (sys.DependsOnSystemDebugNames != null)
+                DebugName = sys.DebugName ?? "(unnamed)",
+                IsSystem = true,
+                TypeName = sys.TypeName,
+                TypeNamespace = sys.TypeNamespace,
+                Phase = sys.Phase,
+                HasPriority = sys.HasPriority,
+                Priority = sys.Priority,
+            };
+            if (sys.DependsOnSystemDebugNames != null)
+            {
+                foreach (var d in sys.DependsOnSystemDebugNames)
                 {
-                    foreach (var d in sys.DependsOnSystemDebugNames)
-                    {
-                        entry.DependsOnSystemDebugNames.Add(d);
-                    }
+                    entry.DependsOnSystemDebugNames.Add(d);
                 }
-                if (sys.DependentSystemDebugNames != null)
-                {
-                    foreach (var d in sys.DependentSystemDebugNames)
-                    {
-                        entry.DependentSystemDebugNames.Add(d);
-                    }
-                }
-                return entry;
             }
-            // Not in Systems — treat as manual; debug name is enough.
+            if (sys.DependentSystemDebugNames != null)
+            {
+                foreach (var d in sys.DependentSystemDebugNames)
+                {
+                    entry.DependentSystemDebugNames.Add(d);
+                }
+            }
             return entry;
         }
 
@@ -529,10 +538,12 @@ namespace Trecs
             {
                 _kindValue.text = isCache ? "Manual accessor (cached)" : "Manual accessor";
                 _systemOnlySection.style.display = DisplayStyle.None;
+                RenderManualOriginSection(entry);
                 return;
             }
             _kindValue.text = isCache ? "System (cached)" : "System";
             _systemOnlySection.style.display = DisplayStyle.Flex;
+            _manualOnlySection.style.display = DisplayStyle.None;
             _typeValue.text = entry.TypeName ?? string.Empty;
             _namespaceValue.text = string.IsNullOrEmpty(entry.TypeNamespace)
                 ? "(none)"
@@ -548,188 +559,91 @@ namespace Trecs
             {
                 _enabledToggle.SetValueWithoutNotify(true);
                 _enabledToggle.SetEnabled(false);
+                _enabledToggle.tooltip =
+                    "Cached schema — system enable state isn't editable from a snapshot.";
             }
             else
             {
                 _enabledToggle.SetEnabled(true);
+                _enabledToggle.tooltip = string.Empty;
             }
         }
 
         void UpdateRuntimeFields(
-            TrecsAccessorSelection selection,
-            World world,
-            WorldAccessor accessor,
-            SystemRunner runner,
-            ExecutableSystemInfo systemInfo,
-            int systemIndex
+            ITrecsSchemaSource src,
+            AccessorRef aref,
+            ExecutableSystemInfo liveSystem,
+            SystemRunner liveRunner
         )
         {
-            // Enabled toggle reflects current runner state when live.
-            if (world != null && !world.IsDisposed && systemInfo != null && runner != null)
+            // Enabled toggle controls (and reflects) the Editor disable channel
+            // via the schema source. Other blockers (Playback / User channels,
+            // deterministic Paused) are surfaced via _enabledOverrideLabel below.
+            if (src.IsLive && liveSystem != null && liveRunner != null && aref.SystemIndex >= 0)
             {
                 _suppressToggleEvents = true;
                 try
                 {
-                    _enabledToggle.SetValueWithoutNotify(runner.IsSystemEnabled(systemIndex));
+                    if (src.TryGetSystemEnabled(aref.SystemIndex, out var enabled))
+                    {
+                        _enabledToggle.SetValueWithoutNotify(enabled);
+                    }
                 }
                 finally
                 {
                     _suppressToggleEvents = false;
                 }
-            }
 
-            // Reads/Writes — live tracker (per-tick) or schema.Access (frozen).
-            IReadOnlyCollection<string> reads = null;
-            IReadOnlyCollection<string> writes = null;
-            InspectorLinker linker;
-            if (world != null && !world.IsDisposed)
-            {
-                var tracker = TrecsAccessRegistry.GetTracker(world);
-                if (tracker != null && accessor != null)
-                {
-                    var rIds = tracker.GetReadsBy(accessor.DebugName);
-                    var wIds = tracker.GetWritesBy(accessor.DebugName);
-                    reads = TranslateComponentIds(rIds);
-                    writes = TranslateComponentIds(wIds);
-                }
-                linker = new LiveInspectorLinker(world);
+                UpdateEnabledOverrideLabel(src, aref.SystemIndex);
             }
             else
             {
-                var (r, w) = ExtractCacheReadsWrites(
-                    selection.CacheSchema,
-                    selection.CacheAccessorName
-                );
-                reads = r;
-                writes = w;
-                linker = new CacheInspectorLinker(selection.CacheSchema);
+                _enabledOverrideLabel.style.display = DisplayStyle.None;
+            }
+
+            // Reads/Writes — both modes go through src.AccessTracker.
+            IReadOnlyCollection<string> reads = null;
+            IReadOnlyCollection<string> writes = null;
+            var linker = new InspectorLinker(src);
+            if (!string.IsNullOrEmpty(aref.DebugName))
+            {
+                reads = src.AccessTracker.GetComponentsReadBy(aref.DebugName);
+                writes = src.AccessTracker.GetComponentsWrittenBy(aref.DebugName);
             }
             ApplyNameList(_readsFoldout, reads, ref _lastReadsHash, linker.ComponentTypeLink);
             ApplyNameList(_writesFoldout, writes, ref _lastWritesHash, linker.ComponentTypeLink);
 
             // Tags touched — live derives from tracker groups; cache mode
             // doesn't capture this so it shows a marker.
-            UpdateTagsTouched(world, accessor, linker);
+            UpdateTagsTouched(src, aref, linker);
         }
 
-        // Tracker stores ComponentId; the foldout renders display names. We
-        // translate once per refresh and feed the same name → linker path
-        // both modes use.
-        static IReadOnlyCollection<string> TranslateComponentIds(
-            IReadOnlyCollection<ComponentId> ids
-        )
+        void UpdateTagsTouched(ITrecsSchemaSource src, AccessorRef aref, InspectorLinker linker)
         {
-            if (ids == null || ids.Count == 0)
-            {
-                return Array.Empty<string>();
-            }
-            var names = new List<string>(ids.Count);
-            foreach (var id in ids)
-            {
-                Type type = null;
-                try
-                {
-                    type = TypeIdProvider.GetTypeFromId(id.Value);
-                }
-                catch (Exception) { }
-                names.Add(
-                    type != null
-                        ? TrecsHierarchyWindow.ComponentTypeDisplayName(type)
-                        : $"#{id.Value}"
-                );
-            }
-            return names;
-        }
+            // Both modes go through src.AccessTracker.GetTagNamesTouchedBy.
+            // Live derives from the runtime tracker + WorldInfo on demand;
+            // cache reads from schema.TagsTouched (persisted at save time so
+            // offline browsing shows real data).
+            IReadOnlyCollection<string> tagNames = string.IsNullOrEmpty(aref.DebugName)
+                ? Array.Empty<string>()
+                : src.AccessTracker.GetTagNamesTouchedBy(aref.DebugName);
 
-        static (List<string> reads, List<string> writes) ExtractCacheReadsWrites(
-            TrecsSchema schema,
-            string accessorName
-        )
-        {
-            var reads = new List<string>();
-            var writes = new List<string>();
-            if (schema?.Access == null)
-                return (reads, writes);
-            foreach (var a in schema.Access)
-            {
-                if (a.ReadBySystems != null && a.ReadBySystems.Contains(accessorName))
-                {
-                    reads.Add(a.ComponentDisplayName ?? "?");
-                }
-                if (a.WrittenBySystems != null && a.WrittenBySystems.Contains(accessorName))
-                {
-                    writes.Add(a.ComponentDisplayName ?? "?");
-                }
-            }
-            return (reads, writes);
-        }
-
-        void UpdateTagsTouched(World world, WorldAccessor accessor, InspectorLinker linker)
-        {
-            if (world == null || world.IsDisposed)
-            {
-                if (_lastTagsTouchedHash != -1)
-                {
-                    _lastTagsTouchedHash = -1;
-                    StripTagsTouchedRows();
-                    _tagsTouchedFoldout.Add(
-                        MakeMutedLine("(cached — runtime tracker data not available)")
-                    );
-                }
-                return;
-            }
-
-            var tags = new Dictionary<int, Tag>();
-            try
-            {
-                var tracker = TrecsAccessRegistry.GetTracker(world);
-                if (tracker != null && accessor != null)
-                {
-                    var info = world.WorldInfo;
-                    foreach (var g in tracker.GetGroupsTouchedBy(accessor.DebugName))
-                    {
-                        foreach (var t in info.GetGroupTags(g))
-                        {
-                            if (t.Guid != 0 && !tags.ContainsKey(t.Guid))
-                            {
-                                tags[t.Guid] = t;
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                return;
-            }
-
-            int hash = tags.Count;
-            foreach (var kv in tags)
-            {
-                hash ^= kv.Key;
-            }
+            int hash = HashOfNames(tagNames);
             if (hash == _lastTagsTouchedHash)
                 return;
             _lastTagsTouchedHash = hash;
 
             StripTagsTouchedRows();
-            if (tags.Count == 0)
+            if (tagNames == null || tagNames.Count == 0)
             {
                 _tagsTouchedFoldout.Add(MakeMutedLine("(none recorded)"));
                 return;
             }
-            var sorted = new List<Tag>(tags.Values);
-            sorted.Sort(
-                (a, b) =>
-                    string.Compare(
-                        a.ToString() ?? "",
-                        b.ToString() ?? "",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-            );
-            foreach (var tag in sorted)
+            var sorted = new List<string>(tagNames);
+            sorted.Sort(StringComparer.OrdinalIgnoreCase);
+            foreach (var name in sorted)
             {
-                _tagsTouchedFoldout.Add(linker.TagLink(tag.ToString() ?? $"#{tag.Guid}"));
+                _tagsTouchedFoldout.Add(linker.TagLink(name));
             }
         }
 
@@ -786,7 +700,7 @@ namespace Trecs
             _statusLabel.text = text;
             _statusLabel.style.display = DisplayStyle.Flex;
             _bodyContainer.style.display = DisplayStyle.None;
-            _renderedEntryKey = null;
+            _renderedKey = null;
         }
 
         static Label MakeMutedLine(string text)

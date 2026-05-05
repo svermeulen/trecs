@@ -23,10 +23,10 @@ namespace Trecs.Samples.Aspects
     {
         public partial class BoidEntity : ITemplate, IHasTags<SampleTags.Boid>
         {
-            public Position Position = default;
-            public Velocity Velocity;
-            public Speed Speed;
-            public GameObjectId GameObjectId;
+            Position Position = default;
+            Velocity Velocity;
+            Speed Speed;
+            GameObjectId GameObjectId;
         }
     }
 }

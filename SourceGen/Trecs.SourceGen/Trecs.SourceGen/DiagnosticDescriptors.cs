@@ -20,7 +20,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor EmptyParameters = new(
             id: "TRECS002",
             title: "No parameters defined",
-            messageFormat: "[ForEachEntity] / [SingleEntity] iteration method must have at least one per-entity parameter (a component, aspect, or EntityIndex)",
+            messageFormat: "[ForEachEntity] iteration method must have at least one per-entity parameter (a component, aspect, or EntityIndex)",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -29,7 +29,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor InvalidReturnType = new(
             id: "TRECS003",
             title: "Invalid return type",
-            messageFormat: "[ForEachEntity] / [SingleEntity] iteration method must return void",
+            messageFormat: "[ForEachEntity] iteration method must return void",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -38,7 +38,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor NotPartialClass = new(
             id: "TRECS004",
             title: "Class must be partial",
-            messageFormat: "Class '{0}' must be marked as partial since it contains a source-generated [ForEachEntity] / [SingleEntity] iteration method",
+            messageFormat: "Class '{0}' must be marked as partial since it contains a source-generated [ForEachEntity] iteration method, [SingleEntity] parameters, or a [WrapAsJob] method",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -47,7 +47,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor InvalidParameterList = new(
             id: "TRECS005",
             title: "Invalid parameter list",
-            messageFormat: "Invalid [ForEachEntity] / [SingleEntity] parameter list: {0}. Parameters may appear in any order. Component parameters must use 'in' or 'ref'. Use [PassThroughArgument] on a parameter whose type is IEntityComponent / EntityIndex / WorldAccessor when you want it forwarded as a user-supplied value rather than auto-detected.",
+            messageFormat: "Invalid [ForEachEntity] parameter list: {0}. Parameters may appear in any order. Component parameters must use 'in' or 'ref'. Use [PassThroughArgument] on a parameter whose type is IEntityComponent / EntityIndex / WorldAccessor when you want it forwarded as a user-supplied value rather than auto-detected.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -255,10 +255,10 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        public static readonly DiagnosticDescriptor TemplateFieldMustBePublic = new(
+        public static readonly DiagnosticDescriptor TemplateFieldMustHaveNoAccessModifier = new(
             id: "TRECS034",
-            title: "Template field must be public",
-            messageFormat: "Field '{0}' in template '{1}' must be declared as public",
+            title: "Template field must not have an access modifier",
+            messageFormat: "Field '{0}' in template '{1}' must not declare an access modifier (omit 'public', 'private', etc.) — template fields are config, not API",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -361,7 +361,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor IterationMethodCannotBeStatic = new(
             id: "TRECS050",
             title: "Iteration method cannot be static",
-            messageFormat: "Method '{0}' cannot be static when marked with [ForEachEntity] or [SingleEntity]",
+            messageFormat: "Method '{0}' cannot be static when marked with [ForEachEntity] or when it carries [SingleEntity] parameters",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -370,16 +370,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor IterationMethodCannotBeAbstract = new(
             id: "TRECS051",
             title: "Iteration method cannot be abstract",
-            messageFormat: "Method '{0}' cannot be abstract when marked with [ForEachEntity] or [SingleEntity]",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
-        public static readonly DiagnosticDescriptor IterationMethodMultipleAttributes = new(
-            id: "TRECS052",
-            title: "Method has multiple iteration attributes",
-            messageFormat: "Method '{0}' has multiple iteration attributes (e.g. both [ForEachEntity] and [SingleEntity]). Only one is allowed.",
+            messageFormat: "Method '{0}' cannot be abstract when marked with [ForEachEntity] or when it carries [SingleEntity] parameters",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -702,6 +693,50 @@ namespace Trecs.SourceGen
             title: "NativeUniquePtr must not be passed by value",
             messageFormat: "Parameter '{0}' of type NativeUniquePtr<{1}> must be declared as ref, in, or out — "
                 + "not by value — to preserve write-access tracking",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        // ── per-parameter / per-field [SingleEntity] (TRECS112-115) ────────
+
+        public static readonly DiagnosticDescriptor SingleEntityWrongType = new(
+            id: "TRECS112",
+            title: "[SingleEntity] parameter or field must be an aspect or component",
+            messageFormat: "[SingleEntity] target '{0}' has type '{1}' which is neither an IAspect nor an IEntityComponent. "
+                + "[SingleEntity] resolves to a single matched entity, so the type must be a Trecs aspect "
+                + "(implementing IAspect) or a component (implementing IEntityComponent).",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor SingleEntityWrongModifier = new(
+            id: "TRECS113",
+            title: "[SingleEntity] parameter has wrong modifier",
+            messageFormat: "[SingleEntity] parameter '{0}' must be declared 'in' for an aspect or read-only component, "
+                + "or 'ref' for a writable component. Bare-by-value and 'out' are not supported.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor SingleEntityRequiresInlineTags = new(
+            id: "TRECS114",
+            title: "[SingleEntity] requires inline Tag or Tags",
+            messageFormat: "[SingleEntity] target '{0}' must specify an inline Tag or Tags "
+                + "(e.g. [SingleEntity(Tag = typeof(MyTag))]). [SingleEntity] has no runtime override "
+                + "— the singleton is resolved at the same site every call.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor SingleEntityConflictingAttributes = new(
+            id: "TRECS115",
+            title: "[SingleEntity] conflicts with [FromWorld] or [PassThroughArgument]",
+            messageFormat: "[SingleEntity] on '{0}' cannot be combined with [{1}]. [SingleEntity] alone is the carrier "
+                + "for world-sourced single-entity values (it implies [FromWorld] semantics).",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true

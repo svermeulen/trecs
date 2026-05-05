@@ -74,10 +74,10 @@ namespace Trecs.Samples.NativePointers
             : ITemplate,
                 IHasTags<NativePatrolTags.Follower>
         {
-            public Position Position;
-            public Route Route;
-            public Trail Trail;
-            public GameObjectId GameObjectId;
+            Position Position;
+            Route Route;
+            Trail Trail;
+            GameObjectId GameObjectId;
         }
     }
 }

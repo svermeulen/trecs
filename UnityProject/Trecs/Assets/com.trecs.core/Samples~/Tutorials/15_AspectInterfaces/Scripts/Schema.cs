@@ -73,27 +73,27 @@ namespace Trecs.Samples.AspectInterfaces
     {
         public partial class EnemyEntity : ITemplate, IHasTags<SampleTags.Enemy>
         {
-            public Position Position = default;
-            public Armor Armor = default;
-            public MaxHealth MaxHealth = default;
-            public Health Health = default;
-            public HitFlashTime HitFlashTime = default;
-            public ChaseSpeed ChaseSpeed = default;
-            public FleeEndTime FleeEndTime = default;
-            public Mood Mood = default;
-            public ColorComponent ColorComponent = default;
-            public GameObjectId GameObjectId;
+            Position Position = default;
+            Armor Armor = default;
+            MaxHealth MaxHealth = default;
+            Health Health = default;
+            HitFlashTime HitFlashTime = default;
+            ChaseSpeed ChaseSpeed = default;
+            FleeEndTime FleeEndTime = default;
+            Mood Mood = default;
+            ColorComponent ColorComponent = default;
+            GameObjectId GameObjectId;
         }
 
         public partial class BossEntity : ITemplate, IHasTags<SampleTags.Boss>
         {
-            public Position Position = default;
-            public Armor Armor = default;
-            public MaxHealth MaxHealth = default;
-            public Health Health = default;
-            public HitFlashTime HitFlashTime = default;
-            public ColorComponent ColorComponent = default;
-            public GameObjectId GameObjectId;
+            Position Position = default;
+            Armor Armor = default;
+            MaxHealth MaxHealth = default;
+            Health Health = default;
+            HitFlashTime HitFlashTime = default;
+            ColorComponent ColorComponent = default;
+            GameObjectId GameObjectId;
         }
     }
 }

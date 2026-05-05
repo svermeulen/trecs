@@ -530,6 +530,10 @@ namespace Trecs.SourceGen
                             : "";
                         args.Add($"{prefix}{p.Name}");
                         break;
+                    case ParamSlotKind.HoistedSingleton:
+                        var hs = info.HoistedSingletons[slot.Index];
+                        args.Add(hs.IsRef ? $"ref __{hs.ParamName}" : $"in __{hs.ParamName}");
+                        break;
                 }
             }
             return string.Join(", ", args);
@@ -557,6 +561,7 @@ namespace Trecs.SourceGen
                 sb.AppendLine(indentLevel, $"var {worldName} = {builderVar}.World;");
 
             NamespaceCollector.EmitSetAccessorDeclarations(sb, info, indentLevel, worldName);
+            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, info.HoistedSingletons);
 
             sb.AppendLine(indentLevel, $"foreach (var __slice in {builderVar}.GroupSlices())");
             sb.AppendLine(indentLevel, "{");
@@ -610,6 +615,7 @@ namespace Trecs.SourceGen
                 sb.AppendLine(indentLevel, $"var {worldName} = {builderVar}.World;");
 
             NamespaceCollector.EmitSetAccessorDeclarations(sb, info, indentLevel, worldName);
+            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, info.HoistedSingletons);
 
             sb.AppendLine(indentLevel, $"foreach (var __slice in {builderVar}.GroupSlices())");
             sb.AppendLine(indentLevel, "{");
@@ -704,6 +710,12 @@ namespace Trecs.SourceGen
                 info,
                 indentLevel: 3,
                 worldVar: "__world"
+            );
+            HoistedSingleEmitter.Emit(
+                sb,
+                indentLevel: 3,
+                worldVar: "__world",
+                info.HoistedSingletons
             );
 
             EmitPerGroupBufferFetch(
@@ -804,6 +816,20 @@ namespace Trecs.SourceGen
                         TrecsNamespaces.Trecs
                     );
                 if (pIsPassThrough)
+                    continue;
+
+                // [SingleEntity] aspects are hoisted out of the iteration loop, not
+                // the iteration target — skip them here so they don't get mis-detected
+                // as the loop aspect. ParameterClassifier records them as
+                // ParamSlotKind.HoistedSingleton.
+                bool pHasSingleEntity =
+                    pSymbol != null
+                    && PerformanceCache.HasAttributeByName(
+                        pSymbol,
+                        TrecsAttributeNames.SingleEntity,
+                        TrecsNamespaces.Trecs
+                    );
+                if (pHasSingleEntity)
                     continue;
 
                 if (!SymbolAnalyzer.ImplementsInterface(pType, "IAspect", TrecsNamespaces.Trecs))
@@ -949,6 +975,7 @@ namespace Trecs.SourceGen
                     SetAccessorParameters = setAccessorParameters,
                     SetReadParameters = setReadParameters,
                     SetWriteParameters = setWriteParameters,
+                    HoistedSingletons = classified.HoistedSingletons,
                 };
             }
 

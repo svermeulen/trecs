@@ -110,13 +110,13 @@ namespace Trecs.Samples.FeedingFrenzy101
                 IHasPartition<FrenzyTags.NotEating>,
                 IHasPartition<FrenzyTags.Eating>
         {
-            public Rotation Rotation = new(quaternion.identity);
-            public SimPosition SimPosition = default;
-            public SimRotation SimRotation = new() { Value = quaternion.identity };
-            public Velocity Velocity = default;
-            public Speed Speed;
-            public TargetMeal TargetMeal = default;
-            public DestinationPosition DestinationPosition = default;
+            Rotation Rotation = new(quaternion.identity);
+            SimPosition SimPosition = default;
+            SimRotation SimRotation = new() { Value = quaternion.identity };
+            Velocity Velocity = default;
+            Speed Speed;
+            TargetMeal TargetMeal = default;
+            DestinationPosition DestinationPosition = default;
         }
 
         /// <summary>
@@ -130,9 +130,9 @@ namespace Trecs.Samples.FeedingFrenzy101
                 IHasPartition<FrenzyTags.NotEating>,
                 IHasPartition<FrenzyTags.Eating>
         {
-            public Rotation Rotation = new(quaternion.identity);
-            public MealNutrition Nutrition;
-            public ApproachingFish ApproachingFish = default;
+            Rotation Rotation = new(quaternion.identity);
+            MealNutrition Nutrition;
+            ApproachingFish ApproachingFish = default;
         }
 
         /// <summary>
@@ -141,8 +141,8 @@ namespace Trecs.Samples.FeedingFrenzy101
         /// </summary>
         public partial class Globals : ITemplate, IExtends<TrecsTemplates.Globals>
         {
-            public DesiredFishCount DesiredFishCount = new() { Value = 1000 };
-            public DesiredMealCount DesiredMealCount = default;
+            DesiredFishCount DesiredFishCount = new() { Value = 1000 };
+            DesiredMealCount DesiredMealCount = default;
         }
     }
 }

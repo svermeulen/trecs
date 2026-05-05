@@ -4,7 +4,7 @@ namespace Trecs.Serialization.Samples.Snake
     /// Trims the oldest segments until the segment count matches the
     /// snake's target body length (SnakeLength.Value - 1, since length
     /// counts the head). Sorts segments by SegmentAge.FrameSpawned each
-    /// frame so age order survives bookmark loads cleanly.
+    /// frame so age order survives snapshot loads cleanly.
     /// </summary>
     [ExecuteAfter(typeof(FoodConsumeSystem))]
     public partial class SegmentTrimSystem : ISystem

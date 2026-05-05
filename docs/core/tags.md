@@ -22,7 +22,7 @@ Tags are declared on templates via `IHasTags`:
 ```csharp
 public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
 {
-    public Rotation Rotation;
+    Rotation Rotation;
 }
 ```
 

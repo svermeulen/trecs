@@ -24,25 +24,16 @@ namespace Trecs
 
         // Fired while the user hovers an inspector link row — the hierarchy
         // window scrolls to the matching tree row and applies a transient
-        // highlight. PreviewClearRequested removes the highlight when the
-        // mouse leaves the link. None of these change Selection.activeObject;
-        // selection only happens on click, via the SelectXxx helpers below.
-        public static event Action<World, Template> PreviewTemplateRequested;
-        public static event Action<World, Type> PreviewComponentTypeRequested;
-        public static event Action<World, int> PreviewAccessorRequested;
+        // highlight. The identity string (e.g. "template:Foo") is computed
+        // at the link factory and matches the row's stable key, so the
+        // window resolves it via its single _idByKey map regardless of
+        // live vs cache mode. PreviewClearRequested removes the highlight
+        // when the mouse leaves the link. None of these change
+        // Selection.activeObject; selection only happens on click, via the
+        // SelectXxx helpers below.
+        public static event Action<string> PreviewRequested;
         public static event Action<World, EntityHandle> PreviewEntityRequested;
-        public static event Action<World, SetId> PreviewSetRequested;
-        public static event Action<World, Tag> PreviewTagRequested;
         public static event Action PreviewClearRequested;
-
-        // Cache-mode counterparts of the live preview events. Cache rows have
-        // no World/Template/etc., so the payload is the schema entry that the
-        // hierarchy uses to look up the matching tree row id.
-        public static event Action<TrecsSchemaTemplate> PreviewTemplateCacheRequested;
-        public static event Action<TrecsSchemaComponentType> PreviewComponentTypeCacheRequested;
-        public static event Action<string> PreviewAccessorCacheRequested;
-        public static event Action<TrecsSchemaSet> PreviewSetCacheRequested;
-        public static event Action<TrecsSchemaTag> PreviewTagCacheRequested;
 
         static Texture _iconTemplate;
         static Texture _iconScript;
@@ -76,47 +67,100 @@ namespace Trecs
             return l;
         }
 
-        public static VisualElement MakeTemplateLink(World world, Template template, string text)
+        // Identity-based link factories. The publishers — link click, hover
+        // preview, click select — all key off the row's stable identity
+        // string ("template:Foo", "tag:Player", etc.), so live and cache
+        // mode share a single set of factories. The typed-payload public
+        // overloads below are thin wrappers for callers that have a
+        // Template / Type / EntitySet etc. in scope (e.g. the entity
+        // inspector); InspectorLinker calls the by-name versions directly.
+
+        public static VisualElement MakeTemplateLink(string name, string text)
         {
-            return BuildLinkRow(
+            return MakeIdentityLinkRow(
                 IconForTemplate(),
                 text,
-                onMouseEnter: () => PreviewTemplateRequested?.Invoke(world, template),
-                onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectTemplate(world, template)
+                TrecsRowIdentity.TemplatePrefix + (name ?? string.Empty),
+                name ?? string.Empty,
+                TrecsSelectionProxies.NextTemplate
             );
         }
+
+        public static VisualElement MakeComponentTypeLink(string displayName, string text)
+        {
+            return MakeIdentityLinkRow(
+                IconForComponentType(),
+                text,
+                TrecsRowIdentity.ComponentPrefix + (displayName ?? string.Empty),
+                displayName ?? string.Empty,
+                TrecsSelectionProxies.NextComponentType
+            );
+        }
+
+        public static VisualElement MakeAccessorLink(string displayName, string text)
+        {
+            var name = displayName ?? string.Empty;
+            return MakeIdentityLinkRow(
+                IconForAccessor(),
+                text,
+                TrecsRowIdentity.AccessorPrefix + name,
+                name,
+                TrecsSelectionProxies.NextAccessor
+            );
+        }
+
+        public static VisualElement MakeSetLink(string name, string text)
+        {
+            return MakeIdentityLinkRow(
+                IconForFolder(),
+                text,
+                TrecsRowIdentity.SetPrefix + (name ?? string.Empty),
+                name ?? string.Empty,
+                TrecsSelectionProxies.NextSet
+            );
+        }
+
+        public static VisualElement MakeTagLink(string name, string text)
+        {
+            return MakeIdentityLinkRow(
+                IconForTag(),
+                text,
+                TrecsRowIdentity.TagPrefix + (name ?? string.Empty),
+                name ?? string.Empty,
+                TrecsSelectionProxies.NextTag
+            );
+        }
+
+        // Live typed overloads — preserved for callers that have a
+        // Template/Type/EntitySet/Tag in scope (entity inspector). Each
+        // extracts the name and delegates to the identity-based factory.
+        public static VisualElement MakeTemplateLink(World world, Template template, string text) =>
+            MakeTemplateLink(template?.DebugName, text);
 
         public static VisualElement MakeComponentTypeLink(
             World world,
             Type componentType,
             string text
-        )
-        {
-            return BuildLinkRow(
-                IconForComponentType(),
-                text,
-                onMouseEnter: () => PreviewComponentTypeRequested?.Invoke(world, componentType),
-                onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectComponentType(world, componentType)
+        ) =>
+            MakeComponentTypeLink(
+                componentType == null
+                    ? null
+                    : TrecsHierarchyWindow.ComponentTypeDisplayName(componentType),
+                text
             );
-        }
 
         public static VisualElement MakeAccessorLink(
             World world,
             int accessorId,
             string text,
             string displayName = null
-        )
-        {
-            return BuildLinkRow(
-                IconForAccessor(),
-                text,
-                onMouseEnter: () => PreviewAccessorRequested?.Invoke(world, accessorId),
-                onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectAccessor(world, accessorId, displayName ?? text)
-            );
-        }
+        ) => MakeAccessorLink(displayName ?? text, text);
+
+        public static VisualElement MakeTagLink(World world, Tag tag, string text) =>
+            MakeTagLink(tag.Guid == 0 ? null : (tag.ToString() ?? $"#{tag.Guid}"), text);
+
+        public static VisualElement MakeSetLink(World world, EntitySet entitySet, string text) =>
+            MakeSetLink(entitySet.DebugName ?? $"#{entitySet.Id.Id}", text);
 
         // Small "go to component type inspector" button — renders as an
         // arrow glyph rather than a full row so it can sit inline next to
@@ -124,12 +168,50 @@ namespace Trecs
         // ownership of the line.
         public static VisualElement MakeComponentTypeJumpButton(World world, Type componentType)
         {
+            var name =
+                componentType == null
+                    ? string.Empty
+                    : TrecsHierarchyWindow.ComponentTypeDisplayName(componentType);
+            var identity = TrecsRowIdentity.ComponentPrefix + name;
             return BuildJumpGlyph(
                 tooltip: "Inspect component type",
-                onMouseEnter: () => PreviewComponentTypeRequested?.Invoke(world, componentType),
+                onMouseEnter: () => PreviewRequested?.Invoke(identity),
                 onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectComponentType(world, componentType)
+                onClick: () =>
+                    SelectByIdentity(TrecsSelectionProxies.NextComponentType, identity, name)
             );
+        }
+
+        // Shared identity-link factory. Identity is the stable-key string
+        // the hierarchy uses to resolve a row; the proxy factory mints a
+        // fresh ring-pool slot of the right kind on click so external
+        // selection-history tools see distinct references.
+        static VisualElement MakeIdentityLinkRow(
+            Texture icon,
+            string text,
+            string identity,
+            string displayName,
+            Func<TrecsSelectionProxy> proxyFactory
+        )
+        {
+            return BuildLinkRow(
+                icon,
+                text,
+                onMouseEnter: () => PreviewRequested?.Invoke(identity),
+                onMouseLeave: () => PreviewClearRequested?.Invoke(),
+                onClick: () => SelectByIdentity(proxyFactory, identity, displayName)
+            );
+        }
+
+        static void SelectByIdentity(
+            Func<TrecsSelectionProxy> proxyFactory,
+            string identity,
+            string displayName
+        )
+        {
+            var p = proxyFactory();
+            p.SetIdentity(identity, displayName);
+            Selection.activeObject = p;
         }
 
         // Wires hover-only preview behavior onto an existing element (e.g.
@@ -143,60 +225,31 @@ namespace Trecs
         // these once at build-time — the resolver is invoked on each
         // hover so the inspector can change the underlying selection
         // without re-registering callbacks.
-        public static void WireHoverPreviewTemplate(
-            VisualElement element,
-            Func<(World, Template)> resolve
-        )
+        // Single identity-based hover-preview wire for all non-entity kinds.
+        // Inspectors pass a resolver that returns the active proxy's
+        // identity string (e.g. "template:Foo"); shift+hover fires the
+        // unified PreviewRequested event so the hierarchy window scrolls
+        // to the matching row. resolve() returning null/empty leaves the
+        // preview untouched.
+        public static void WireHoverPreview(VisualElement element, Func<string> resolveIdentity)
         {
             element.RegisterCallback<MouseEnterEvent>(evt =>
             {
                 if (!evt.shiftKey)
                     return;
-                var (w, t) = resolve();
-                if (w != null && t != null)
+                var identity = resolveIdentity();
+                if (!string.IsNullOrEmpty(identity))
                 {
-                    PreviewTemplateRequested?.Invoke(w, t);
+                    PreviewRequested?.Invoke(identity);
                 }
             });
             element.RegisterCallback<MouseLeaveEvent>(_ => PreviewClearRequested?.Invoke());
         }
 
-        public static void WireHoverPreviewComponentType(
-            VisualElement element,
-            Func<(World, Type)> resolve
-        )
-        {
-            element.RegisterCallback<MouseEnterEvent>(evt =>
-            {
-                if (!evt.shiftKey)
-                    return;
-                var (w, t) = resolve();
-                if (w != null && t != null)
-                {
-                    PreviewComponentTypeRequested?.Invoke(w, t);
-                }
-            });
-            element.RegisterCallback<MouseLeaveEvent>(_ => PreviewClearRequested?.Invoke());
-        }
-
-        public static void WireHoverPreviewAccessor(
-            VisualElement element,
-            Func<(World, int)> resolve
-        )
-        {
-            element.RegisterCallback<MouseEnterEvent>(evt =>
-            {
-                if (!evt.shiftKey)
-                    return;
-                var (w, id) = resolve();
-                if (w != null && id >= 0)
-                {
-                    PreviewAccessorRequested?.Invoke(w, id);
-                }
-            });
-            element.RegisterCallback<MouseLeaveEvent>(_ => PreviewClearRequested?.Invoke());
-        }
-
+        // Entity preview stays on its own typed event — entity row ids
+        // are tracked separately (_entityIds is keyed by EntityHandle, not
+        // by identity string) and have no meaningful identity that
+        // survives world transitions.
         public static void WireHoverPreviewEntity(
             VisualElement element,
             Func<(World, EntityHandle)> resolve
@@ -213,58 +266,6 @@ namespace Trecs
                 }
             });
             element.RegisterCallback<MouseLeaveEvent>(_ => PreviewClearRequested?.Invoke());
-        }
-
-        public static void WireHoverPreviewSet(VisualElement element, Func<(World, SetId)> resolve)
-        {
-            element.RegisterCallback<MouseEnterEvent>(evt =>
-            {
-                if (!evt.shiftKey)
-                    return;
-                var (w, id) = resolve();
-                if (w != null && id.Id != 0)
-                {
-                    PreviewSetRequested?.Invoke(w, id);
-                }
-            });
-            element.RegisterCallback<MouseLeaveEvent>(_ => PreviewClearRequested?.Invoke());
-        }
-
-        public static void WireHoverPreviewTag(VisualElement element, Func<(World, Tag)> resolve)
-        {
-            element.RegisterCallback<MouseEnterEvent>(evt =>
-            {
-                if (!evt.shiftKey)
-                    return;
-                var (w, tag) = resolve();
-                if (w != null && tag.Guid != 0)
-                {
-                    PreviewTagRequested?.Invoke(w, tag);
-                }
-            });
-            element.RegisterCallback<MouseLeaveEvent>(_ => PreviewClearRequested?.Invoke());
-        }
-
-        public static VisualElement MakeTagLink(World world, Tag tag, string text)
-        {
-            return BuildLinkRow(
-                IconForTag(),
-                text,
-                onMouseEnter: () => PreviewTagRequested?.Invoke(world, tag),
-                onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectTag(world, tag)
-            );
-        }
-
-        public static VisualElement MakeSetLink(World world, EntitySet entitySet, string text)
-        {
-            return BuildLinkRow(
-                IconForFolder(),
-                text,
-                onMouseEnter: () => PreviewSetRequested?.Invoke(world, entitySet.Id),
-                onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectSet(world, entitySet)
-            );
         }
 
         static VisualElement BuildJumpGlyph(
@@ -364,187 +365,20 @@ namespace Trecs
             return row;
         }
 
+        // Live typed Select* — kept for the entity inspector's
+        // "select this entity's template" click handler. Internally
+        // delegates to the identity-based path.
         public static void SelectTemplate(World world, Template template)
         {
-            if (world == null || template == null)
+            if (template == null)
             {
                 return;
             }
-            var p = TrecsSelectionProxies.NextTemplate();
-            p.Set(world, template);
-            Selection.activeObject = p;
-        }
-
-        public static void SelectComponentType(World world, Type componentType)
-        {
-            if (world == null || componentType == null)
-            {
-                return;
-            }
-            var p = TrecsSelectionProxies.NextComponentType();
-            p.Set(world, componentType);
-            Selection.activeObject = p;
-        }
-
-        public static void SelectAccessor(World world, int accessorId, string displayName)
-        {
-            if (world == null || accessorId < 0)
-            {
-                return;
-            }
-            var p = TrecsSelectionProxies.NextAccessor();
-            p.Set(world, accessorId, displayName);
-            Selection.activeObject = p;
-        }
-
-        public static void SelectSet(World world, EntitySet entitySet)
-        {
-            if (world == null || entitySet.Id.Id == 0)
-            {
-                return;
-            }
-            var p = TrecsSelectionProxies.NextSet();
-            p.Set(world, entitySet);
-            Selection.activeObject = p;
-        }
-
-        public static void SelectTag(World world, Tag tag)
-        {
-            if (world == null || tag.Guid == 0)
-            {
-                return;
-            }
-            var p = TrecsSelectionProxies.NextTag();
-            p.Set(world, tag);
-            Selection.activeObject = p;
-        }
-
-        // ----- Cache-mode select / link helpers ------------------------------
-        // Mirror the live versions but route through SetCache(...) on each
-        // proxy. Used by InspectorLinker.Cache so unified inspector code can
-        // make clickable cross-links without knowing whether it's running
-        // against a live world or a schema snapshot.
-
-        public static void SelectTemplateCache(TrecsSchema schema, TrecsSchemaTemplate entry)
-        {
-            if (entry == null)
-                return;
-            var p = TrecsSelectionProxies.NextTemplate();
-            p.SetCache(schema, entry);
-            Selection.activeObject = p;
-        }
-
-        public static void SelectComponentTypeCache(
-            TrecsSchema schema,
-            TrecsSchemaComponentType entry
-        )
-        {
-            if (entry == null)
-                return;
-            var p = TrecsSelectionProxies.NextComponentType();
-            p.SetCache(schema, entry);
-            Selection.activeObject = p;
-        }
-
-        public static void SelectAccessorCache(TrecsSchema schema, string accessorName)
-        {
-            if (string.IsNullOrEmpty(accessorName))
-                return;
-            var p = TrecsSelectionProxies.NextAccessor();
-            p.SetCache(schema, accessorName);
-            Selection.activeObject = p;
-        }
-
-        public static void SelectSetCache(TrecsSchema schema, TrecsSchemaSet entry)
-        {
-            if (entry == null)
-                return;
-            var p = TrecsSelectionProxies.NextSet();
-            p.SetCache(schema, entry);
-            Selection.activeObject = p;
-        }
-
-        public static void SelectTagCache(TrecsSchema schema, TrecsSchemaTag entry)
-        {
-            if (entry == null)
-                return;
-            var p = TrecsSelectionProxies.NextTag();
-            p.SetCache(schema, entry);
-            Selection.activeObject = p;
-        }
-
-        public static VisualElement MakeTemplateLinkCache(
-            TrecsSchema schema,
-            TrecsSchemaTemplate entry,
-            string text
-        )
-        {
-            return BuildLinkRow(
-                IconForTemplate(),
-                text,
-                onMouseEnter: () => PreviewTemplateCacheRequested?.Invoke(entry),
-                onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectTemplateCache(schema, entry)
-            );
-        }
-
-        public static VisualElement MakeComponentTypeLinkCache(
-            TrecsSchema schema,
-            TrecsSchemaComponentType entry,
-            string text
-        )
-        {
-            return BuildLinkRow(
-                IconForComponentType(),
-                text,
-                onMouseEnter: () => PreviewComponentTypeCacheRequested?.Invoke(entry),
-                onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectComponentTypeCache(schema, entry)
-            );
-        }
-
-        public static VisualElement MakeAccessorLinkCache(
-            TrecsSchema schema,
-            string accessorName,
-            string text
-        )
-        {
-            return BuildLinkRow(
-                IconForAccessor(),
-                text,
-                onMouseEnter: () => PreviewAccessorCacheRequested?.Invoke(accessorName),
-                onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectAccessorCache(schema, accessorName)
-            );
-        }
-
-        public static VisualElement MakeSetLinkCache(
-            TrecsSchema schema,
-            TrecsSchemaSet entry,
-            string text
-        )
-        {
-            return BuildLinkRow(
-                IconForFolder(),
-                text,
-                onMouseEnter: () => PreviewSetCacheRequested?.Invoke(entry),
-                onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectSetCache(schema, entry)
-            );
-        }
-
-        public static VisualElement MakeTagLinkCache(
-            TrecsSchema schema,
-            TrecsSchemaTag entry,
-            string text
-        )
-        {
-            return BuildLinkRow(
-                IconForTag(),
-                text,
-                onMouseEnter: () => PreviewTagCacheRequested?.Invoke(entry),
-                onMouseLeave: () => PreviewClearRequested?.Invoke(),
-                onClick: () => SelectTagCache(schema, entry)
+            var name = template.DebugName ?? string.Empty;
+            SelectByIdentity(
+                TrecsSelectionProxies.NextTemplate,
+                TrecsRowIdentity.TemplatePrefix + name,
+                name
             );
         }
 

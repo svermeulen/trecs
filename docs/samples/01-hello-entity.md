@@ -33,8 +33,8 @@ public struct Spinner : ITag { }
 ```csharp
 public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
 {
-    public Rotation Rotation = new(quaternion.identity);
-    public GameObjectId GameObjectId;
+    Rotation Rotation = new(quaternion.identity);
+    GameObjectId GameObjectId;
 }
 ```
 

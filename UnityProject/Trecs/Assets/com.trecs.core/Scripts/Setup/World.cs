@@ -46,6 +46,7 @@ namespace Trecs
         readonly InterpolatedPreviousSaverManager _interpolatedPreviousSaverManager;
         readonly ComponentStore _componentStore;
         readonly SystemLoader _systemLoader;
+        readonly SystemEnableState _systemEnableState = new();
         readonly List<ISystem> _systems;
 
         bool _hasTriggeredAllRemoveEvents;
@@ -178,6 +179,87 @@ namespace Trecs
                 Assert.That(!_isDisposed);
                 return _systemRunner;
             }
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        internal SystemEnableState SystemEnableState
+        {
+            get
+            {
+                Assert.That(!_isDisposed);
+                return _systemEnableState;
+            }
+        }
+
+        /// <summary>
+        /// Total number of systems registered in this world. Stable for the lifetime
+        /// of the world; system indices are in the range <c>[0, SystemCount)</c> and
+        /// can be used with <see cref="GetSystemMetadata"/> and
+        /// <see cref="SetSystemEnabled"/>.
+        /// </summary>
+        public int SystemCount
+        {
+            get
+            {
+                Assert.That(!_isDisposed);
+                return _systemRunner.Systems.Count;
+            }
+        }
+
+        /// <summary>
+        /// Returns metadata for the system at <paramref name="systemIndex"/>. Use this to
+        /// iterate systems and build custom groupings (e.g. "all systems matching some tag")
+        /// that drive <see cref="SetSystemEnabled"/> or
+        /// <see cref="WorldAccessor.SetSystemPaused"/> calls.
+        /// </summary>
+        public SystemMetadata GetSystemMetadata(int systemIndex)
+        {
+            Assert.That(!_isDisposed);
+            var systems = _systemRunner.Systems;
+            Assert.That(
+                systemIndex >= 0 && systemIndex < systems.Count,
+                "System index {} out of range [0, {})",
+                systemIndex,
+                systems.Count
+            );
+            return systems[systemIndex].Metadata;
+        }
+
+        /// <summary>
+        /// Toggles a non-deterministic disable channel for a system. A system runs only when
+        /// no channel has it disabled.
+        /// <para>
+        /// Channel state is ephemeral: not part of snapshot/restore, and not part of recording
+        /// state. For deterministic pauses that participate in replay, use
+        /// <see cref="WorldAccessor.SetSystemPaused"/>.
+        /// </para>
+        /// </summary>
+        public void SetSystemEnabled(int systemIndex, EnableChannel channel, bool enabled)
+        {
+            Assert.That(!_isDisposed);
+            _systemEnableState.SetSystemEnabled(systemIndex, channel, enabled);
+        }
+
+        /// <summary>
+        /// Returns whether the given channel currently has the system enabled.
+        /// Note: a system runs only when ALL channels have it enabled AND it is not paused.
+        /// </summary>
+        public bool IsSystemEnabled(int systemIndex, EnableChannel channel)
+        {
+            Assert.That(!_isDisposed);
+            return _systemEnableState.IsSystemEnabled(systemIndex, channel);
+        }
+
+        /// <summary>
+        /// Returns true iff the system would run on the next tick — i.e. no
+        /// <see cref="EnableChannel"/> has it disabled and it is not paused via
+        /// <see cref="WorldAccessor.SetSystemPaused"/>. Convenience for debug UIs and
+        /// tests that want a single "is this system actually live" query.
+        /// </summary>
+        public bool IsSystemEffectivelyEnabled(int systemIndex)
+        {
+            Assert.That(!_isDisposed);
+            return _systemEnableState.IsSystemEffectivelyEnabled(systemIndex);
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
@@ -420,6 +502,7 @@ namespace Trecs
 
             _eventSubscriptions.Dispose();
             _systemRunner.Dispose();
+            _systemEnableState.Dispose();
             _heapAllocator.Dispose();
 
             _entitySubmitter.Dispose();
@@ -632,9 +715,11 @@ namespace Trecs
 
             CallSystemReadyHooks(loadInfo);
 
+            _systemEnableState.Initialize(loadInfo.Systems.Count);
+
             using (TrecsProfiling.Start("SystemRunner.Initialize"))
             {
-                _systemRunner.Initialize(this, loadInfo);
+                _systemRunner.Initialize(this, loadInfo, _systemEnableState);
             }
 
             _interpolatedPreviousSaverManager.Initialize(this);
@@ -706,6 +791,7 @@ namespace Trecs
             string debugName = null,
 #if DEBUG
             [CallerFilePath] string callerFile = "",
+            [CallerLineNumber] int callerLine = 0,
 #endif
             [CallerMemberName] string callerMember = ""
         )
@@ -714,8 +800,15 @@ namespace Trecs
             debugName ??= Path.GetFileNameWithoutExtension(callerFile) + "." + callerMember;
 #else
             debugName ??= callerMember;
+            string callerFile = string.Empty;
+            int callerLine = 0;
 #endif
-            return CreateAccessorImpl(phase: null, debugName: debugName);
+            return CreateAccessorImpl(
+                phase: null,
+                debugName: debugName,
+                createdAtFile: callerFile,
+                createdAtLine: callerLine
+            );
         }
 
         /// <summary>
@@ -732,7 +825,14 @@ namespace Trecs
 
             var phase = phaseAttribute?.Phase ?? SystemPhase.Fixed;
 
-            return CreateAccessorImpl(phase: phase, debugName: debugName);
+            // System-owned accessors take their identity from the system
+            // type — no source-line origin to capture.
+            return CreateAccessorImpl(
+                phase: phase,
+                debugName: debugName,
+                createdAtFile: string.Empty,
+                createdAtLine: 0
+            );
         }
 
         /// <summary>
@@ -744,7 +844,12 @@ namespace Trecs
             return CreateAccessor(typeof(T));
         }
 
-        internal WorldAccessor CreateAccessorImpl(SystemPhase? phase, string debugName)
+        internal WorldAccessor CreateAccessorImpl(
+            SystemPhase? phase,
+            string debugName,
+            string createdAtFile,
+            int createdAtLine
+        )
         {
             Assert.IsNotNull(debugName);
 
@@ -752,6 +857,7 @@ namespace Trecs
                 ClaimAccessorIdInternal(),
                 this,
                 systemRunnerInfo: _systemRunner,
+                systemEnableState: _systemEnableState,
                 heapAllocator: _heapAllocator,
                 structuralOps: _structuralOps,
                 entitiesDb: _querier,
@@ -761,7 +867,9 @@ namespace Trecs
                 variableRng: _variableUpdateRng,
                 entityInputQueue: _entityInputQueue,
                 phase: phase,
-                debugName: debugName
+                debugName: debugName,
+                createdAtFile: createdAtFile,
+                createdAtLine: createdAtLine
             );
 
             _accessorRegistry.RegisterById(accessor);
@@ -898,10 +1006,17 @@ namespace Trecs.Internal
         public static WorldAccessor CreateAccessorExplicit(
             this World world,
             SystemPhase? phase,
-            string debugName
+            string debugName,
+            [CallerFilePath] string callerFile = "",
+            [CallerLineNumber] int callerLine = 0
         )
         {
-            return world.CreateAccessorImpl(phase: phase, debugName: debugName);
+            return world.CreateAccessorImpl(
+                phase: phase,
+                debugName: debugName,
+                createdAtFile: callerFile,
+                createdAtLine: callerLine
+            );
         }
     }
 }

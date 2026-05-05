@@ -127,7 +127,7 @@ namespace Trecs.Serialization
             root.style.borderLeftColor = border;
             root.style.borderRightColor = border;
 
-            var heading = new Label("Trecs Replay — Help");
+            var heading = new Label("Trecs Player — Help");
             heading.style.unityFontStyleAndWeight = FontStyle.Bold;
             heading.style.fontSize = 14;
             heading.style.marginBottom = 6;

@@ -38,18 +38,48 @@ namespace Trecs
         bool _showAbstractTemplates = true;
 
         DropdownField _worldDropdown;
+        ToolbarButton _clearCacheButton;
         ToolbarSearchField _searchField;
         ToolbarButton _searchHelpButton;
         VisualElement _searchHelpPanel;
         Label _emptyState;
         Label _cacheBanner;
-        bool _cacheMode;
-        TrecsSchema _cachedSchema;
+
+        // Convenience accessors derived from _source. Branches across the
+        // window read these instead of pattern-matching the source type
+        // inline; one place to change if the source taxonomy grows.
+        bool _cacheMode => _source != null && !_source.IsLive;
+        TrecsSchema _cachedSchema => (_source as CacheSchemaSource)?.Schema;
         readonly List<TrecsSchema> _cachedSchemas = new();
         TreeView _tree;
 
         World _selectedWorld;
         WorldAccessor _selectedAccessor;
+
+        // Unified data source over the current selection. Replaces the
+        // _selectedWorld / _cacheMode / _cachedSchema reads as each section
+        // gets ported off the live/cache divergence. Recreated whenever the
+        // dropdown selection changes or a structural rebuild fires (so the
+        // pre-projected lists in LiveSchemaSource pick up new templates,
+        // entity counts, etc.). Null when nothing is selected.
+        ITrecsSchemaSource _source;
+
+        // Mirrors `_source` for inspector consumption. Identity-based
+        // selection proxies (TrecsTemplateSelection etc.) resolve their
+        // payload by walking ActiveSource.Templates / .ComponentTypes /
+        // … on every Refresh — that's how a proxy survives Unity's
+        // silent stop-play-mode restoration: identity is serialized,
+        // data is recomputed each tick from whichever source is current.
+        // Last writer wins across multiple hierarchy windows; in practice
+        // only one is open at a time.
+        public static ITrecsSchemaSource ActiveSource { get; private set; }
+
+        void SetSource(ITrecsSchemaSource src)
+        {
+            _source = src;
+            ActiveSource = src;
+        }
+
         readonly List<World> _dropdownWorlds = new();
         string _searchText = string.Empty;
         readonly ParsedSearch _searchFilter = new();
@@ -124,17 +154,49 @@ namespace Trecs
         // via UQuery once, since BaseListView.scrollView is internal).
         ScrollView _treeScrollViewCache;
 
-        // Snapshot of expanded ids taken when the user starts typing in the
+        // Snapshot of expanded keys taken when the user starts typing in the
         // search field. While search is active we override the natural
         // expand state (collapse all templates, expand all accessor phases)
         // and we want clearing the search to restore the user's previous
         // shape rather than leave them with our search-time mutations.
-        HashSet<int> _preSearchExpandedIds;
+        HashSet<string> _preSearchExpandedKeys;
 
         // First-rebuild gate for the root sections. After the initial rebuild
-        // we let the prevExpanded restore loop handle expand state, so a user
-        // collapsing a section stays collapsed.
+        // we let the persisted-expansion restore loop handle expand state,
+        // so a user collapsing a section stays collapsed. Persisted via
+        // SessionState so the gate survives domain reload — without that,
+        // every play-mode entry would wipe C# state and re-open sections
+        // the user had just collapsed.
         bool _initialSectionExpansionApplied;
+        const string InitialSectionExpansionAppliedSessionKey =
+            "Svkj.TrecsHierarchy.InitialSectionExpansionApplied";
+
+        // Persistent set of stable string keys for rows the user has
+        // expanded. Survives play-mode entry / domain reload via
+        // SessionState (a [SerializeField] mirror was unreliable: the
+        // EditorWindow round-trip during play-mode entry sometimes lost
+        // the field, and the periodic RefreshTick wasn't fast enough to
+        // capture user clicks made just before pressing Play). Saved on
+        // every mutation and on the playModeStateChanged ExitingEditMode
+        // edge so the user's edit-mode changes always reach storage.
+        readonly HashSet<string> _expandedStableKeys = new();
+
+        const string ExpandedKeysSessionKey = "Svkj.TrecsHierarchy.ExpandedKeys";
+        const string ExpandedKeysSeparator = "\n";
+
+        // Name-based identity of the currently-selected row, persisted to
+        // SessionState so the selection survives world transitions
+        // (entering/exiting play mode disposes the editor / play-mode
+        // world, leaving the proxy bound to a stale World reference).
+        // The corresponding row in the new world is found by matching
+        // against this identity and a fresh proxy is bound.
+        const string SelectedRowIdentitySessionKey = "Svkj.TrecsHierarchy.SelectedRowIdentity";
+
+        // Parallel id → stable-string-key map. Populated alongside _idByKey
+        // in GetOrAssignId. Used by CaptureExpandedKeys /
+        // RestoreExpandedFromStableKeys to bridge between TreeView's int
+        // ids and the persistent stable keys.
+        readonly Dictionary<int, string> _stableKeyById = new();
 
         // Five fixed root-section ids; user-data ids start at 100 so they
         // never collide.
@@ -153,23 +215,11 @@ namespace Trecs
         readonly Dictionary<int, RowData> _dataById = new();
         readonly Dictionary<int, int> _parentById = new();
 
-        // Per-kind reverse lookup tables for cross-link reveal: jump from a
-        // selection proxy back to the corresponding tree row id.
-        readonly Dictionary<Template, int> _templateIds = new();
+        // Entity rows aren't keyed by identity (no stable identity that
+        // survives across worlds), so they need their own EntityHandle-
+        // keyed map for the "select this entity" reverse lookup. All
+        // other kinds resolve identity → row id via _idByKey directly.
         readonly Dictionary<EntityHandle, int> _entityIds = new();
-        readonly Dictionary<int, int> _accessorTreeIds = new();
-        readonly Dictionary<Type, int> _componentTypeIds = new();
-        readonly Dictionary<SetId, int> _setIds = new();
-        readonly Dictionary<int, int> _tagIds = new();
-
-        // Cache-mode counterparts. Keyed by the schema entry that the
-        // selection proxy holds (or accessor display name for accessors,
-        // since cache-mode accessors have no stable id).
-        readonly Dictionary<TrecsSchemaTemplate, int> _templateCacheIds = new();
-        readonly Dictionary<TrecsSchemaComponentType, int> _componentTypeCacheIds = new();
-        readonly Dictionary<string, int> _accessorCacheIds = new();
-        readonly Dictionary<TrecsSchemaSet, int> _setCacheIds = new();
-        readonly Dictionary<TrecsSchemaTag, int> _tagCacheIds = new();
 
         // Structural fingerprint used by RefreshTick to decide whether
         // SetRootItems is needed (slow path) or just RefreshItems for binding
@@ -189,12 +239,6 @@ namespace Trecs
         // HashSets per call would generate steady GC pressure.
         readonly HashSet<Type> _scratchTypeSet = new();
         readonly HashSet<int> _scratchTagGuidSet = new();
-
-        static Texture _iconTemplate;
-        static Texture _iconEntity;
-        static Texture _iconFolder;
-        static Texture _iconScript;
-        static Texture _iconScriptable;
 
         [MenuItem("Window/Trecs/Hierarchy")]
         public static void ShowWindow()
@@ -261,23 +305,10 @@ namespace Trecs
         VisualElement BuildSearchHelpPanel()
         {
             var panel = new VisualElement();
-            panel.style.marginTop = 4;
-            panel.style.marginLeft = 8;
-            panel.style.marginRight = 8;
-            panel.style.marginBottom = 4;
-            panel.style.paddingLeft = 8;
-            panel.style.paddingRight = 8;
-            panel.style.paddingTop = 6;
-            panel.style.paddingBottom = 6;
-            panel.style.borderTopLeftRadius = 3;
-            panel.style.borderTopRightRadius = 3;
-            panel.style.borderBottomLeftRadius = 3;
-            panel.style.borderBottomRightRadius = 3;
-            panel.style.backgroundColor = new Color(0.18f, 0.22f, 0.30f, 0.55f);
+            panel.AddToClassList("trecs-help-panel");
 
             var heading = new Label("Trecs Hierarchy — Help");
-            heading.style.unityFontStyleAndWeight = FontStyle.Bold;
-            heading.style.marginBottom = 4;
+            heading.AddToClassList("trecs-help-panel__heading");
             panel.Add(heading);
 
             var body = new Label(
@@ -310,7 +341,8 @@ namespace Trecs
                     + "  derived:X   template is extended by X\n"
                     + "  template:X  entity belongs to template X\n"
                     + "  reads:X     accessor reads component X\n"
-                    + "  writes:X    accessor writes component X\n\n"
+                    + "  writes:X    accessor writes component X\n"
+                    + "  accesses:X  accessor reads OR writes component X\n\n"
                     + "<b>Modifiers</b>\n"
                     + "  -tok        negate (exclude rows that match)\n"
                     + "  \"a b c\"     quoted phrase — single substring with spaces\n\n"
@@ -326,14 +358,11 @@ namespace Trecs
                     + "  base:Enemy                 templates derived from Enemy"
             );
             body.enableRichText = true;
-            body.style.whiteSpace = WhiteSpace.Normal;
-            body.style.fontSize = 11;
-            body.style.opacity = 0.9f;
+            body.AddToClassList("trecs-help-panel__body");
             panel.Add(body);
 
             var dismiss = new Button(ToggleSearchHelp) { text = "Close" };
-            dismiss.style.alignSelf = Align.FlexEnd;
-            dismiss.style.marginTop = 4;
+            dismiss.AddToClassList("trecs-help-panel__dismiss");
             panel.Add(dismiss);
 
             return panel;
@@ -345,22 +374,23 @@ namespace Trecs
             _showAbstractTemplates = EditorPrefs.GetBool(PrefShowAbstractTemplates, true);
             LoadSearchHistory();
 
+            // Rehydrate persisted state from SessionState (survives the
+            // domain reload that fires on play-mode entry).
+            LoadExpandedStableKeys();
+            _initialSectionExpansionApplied = SessionState.GetBool(
+                InitialSectionExpansionAppliedSessionKey,
+                false
+            );
+
+            EditorApplication.playModeStateChanged += OnPlayModeStateChangedForExpansion;
+
             WorldRegistry.WorldRegistered += OnWorldRegistered;
             WorldRegistry.WorldUnregistered += OnWorldUnregistered;
             TrecsEditorSelection.ActiveWorldChanged += OnSharedActiveWorldChanged;
             Selection.selectionChanged += OnUnitySelectionChanged;
-            TrecsInspectorLinks.PreviewTemplateRequested += OnPreviewTemplate;
-            TrecsInspectorLinks.PreviewComponentTypeRequested += OnPreviewComponentType;
-            TrecsInspectorLinks.PreviewAccessorRequested += OnPreviewAccessor;
+            TrecsInspectorLinks.PreviewRequested += OnPreviewByIdentity;
             TrecsInspectorLinks.PreviewEntityRequested += OnPreviewEntity;
-            TrecsInspectorLinks.PreviewSetRequested += OnPreviewSet;
-            TrecsInspectorLinks.PreviewTagRequested += OnPreviewTag;
             TrecsInspectorLinks.PreviewClearRequested += OnPreviewClear;
-            TrecsInspectorLinks.PreviewTemplateCacheRequested += OnPreviewTemplateCache;
-            TrecsInspectorLinks.PreviewComponentTypeCacheRequested += OnPreviewComponentTypeCache;
-            TrecsInspectorLinks.PreviewAccessorCacheRequested += OnPreviewAccessorCache;
-            TrecsInspectorLinks.PreviewSetCacheRequested += OnPreviewSetCache;
-            TrecsInspectorLinks.PreviewTagCacheRequested += OnPreviewTagCache;
             TrecsSchemaCache.SchemaSaved += OnSchemaSaved;
         }
 
@@ -370,20 +400,22 @@ namespace Trecs
             WorldRegistry.WorldUnregistered -= OnWorldUnregistered;
             TrecsEditorSelection.ActiveWorldChanged -= OnSharedActiveWorldChanged;
             Selection.selectionChanged -= OnUnitySelectionChanged;
-            TrecsInspectorLinks.PreviewTemplateRequested -= OnPreviewTemplate;
-            TrecsInspectorLinks.PreviewComponentTypeRequested -= OnPreviewComponentType;
-            TrecsInspectorLinks.PreviewAccessorRequested -= OnPreviewAccessor;
+            TrecsInspectorLinks.PreviewRequested -= OnPreviewByIdentity;
             TrecsInspectorLinks.PreviewEntityRequested -= OnPreviewEntity;
-            TrecsInspectorLinks.PreviewSetRequested -= OnPreviewSet;
-            TrecsInspectorLinks.PreviewTagRequested -= OnPreviewTag;
             TrecsInspectorLinks.PreviewClearRequested -= OnPreviewClear;
-            TrecsInspectorLinks.PreviewTemplateCacheRequested -= OnPreviewTemplateCache;
-            TrecsInspectorLinks.PreviewComponentTypeCacheRequested -= OnPreviewComponentTypeCache;
-            TrecsInspectorLinks.PreviewAccessorCacheRequested -= OnPreviewAccessorCache;
-            TrecsInspectorLinks.PreviewSetCacheRequested -= OnPreviewSetCache;
-            TrecsInspectorLinks.PreviewTagCacheRequested -= OnPreviewTagCache;
             TrecsSchemaCache.SchemaSaved -= OnSchemaSaved;
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChangedForExpansion;
             _selectedAccessor = null;
+
+            // Flush any in-flight expansion state into SessionState so a
+            // window-close-then-reopen during the same editor session
+            // preserves it. The live capture is unioned in so a row the
+            // user expanded since the last RefreshTick isn't lost.
+            if (_tree != null && _dataById.Count > 0)
+            {
+                _expandedStableKeys.UnionWith(CaptureExpandedKeys());
+            }
+            SaveExpandedStableKeys();
 
             // Don't clear Selection.activeObject here. Other Trecs editor
             // windows (Time Travel, Systems) drive the same proxy types,
@@ -392,10 +424,19 @@ namespace Trecs
             // they're safe to leave selected after this window closes.
         }
 
+        const string StyleSheetPath =
+            "Packages/com.trecs.core/Scripts/Editor/TrecsHierarchyWindow.uss";
+
         void CreateGUI()
         {
             var root = rootVisualElement;
             root.style.flexGrow = 1;
+
+            var styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(StyleSheetPath);
+            if (styleSheet != null)
+            {
+                root.styleSheets.Add(styleSheet);
+            }
 
             var toolbar = new Toolbar();
             root.Add(toolbar);
@@ -405,6 +446,21 @@ namespace Trecs
             _worldDropdown.RegisterValueChangedCallback(OnWorldDropdownChanged);
             toolbar.Add(_worldDropdown);
 
+            // Cache-mode-only: drop the on-disk snapshot for the currently
+            // shown world (left-click) or all worlds (right-click). Hidden
+            // in live mode since there's nothing accumulated to clear.
+            _clearCacheButton = new ToolbarButton(OnClearCacheButtonClicked) { text = "Clear" };
+            _clearCacheButton.tooltip =
+                "Delete the on-disk schema snapshot for this world. Right-click for 'Clear all'.";
+            _clearCacheButton.style.minWidth = 44;
+            _clearCacheButton.style.display = DisplayStyle.None;
+            _clearCacheButton.RegisterCallback<ContextClickEvent>(evt =>
+            {
+                evt.StopPropagation();
+                OnClearCacheButtonContextClicked();
+            });
+            toolbar.Add(_clearCacheButton);
+
             _searchField = new ToolbarSearchField();
             _searchField.style.flexGrow = 1;
             _searchField.style.marginLeft = 4;
@@ -412,7 +468,7 @@ namespace Trecs
                 "Space-separated tokens AND together. 't:kind' restricts scope "
                 + "(t:e, t:t, t:c, t:s, t:tag, t:a). 'key:value' adds a typed "
                 + "predicate (tag:, c:, base:, derived:, template:, reads:, "
-                + "writes:). Prefix '-' to negate; wrap a phrase in \"...\" for "
+                + "writes:, accesses:). Prefix '-' to negate; wrap a phrase in \"...\" for "
                 + "spaces. Up/Down arrow recalls recent queries. Esc clears. "
                 + "Click the ? button for full help.";
             _searchField.RegisterValueChangedCallback(OnSearchChanged);
@@ -557,6 +613,26 @@ namespace Trecs
 
         void OnWorldUnregistered(World w) => RebuildDropdown();
 
+        // Capture-and-flush at the precise moment the user clicks Play
+        // (or clicks Stop). The periodic RefreshTick can lag behind
+        // user clicks by up to RefreshIntervalMs, so a row expanded
+        // immediately before pressing Play wouldn't otherwise reach
+        // SessionState before the domain reload kicked in.
+        void OnPlayModeStateChangedForExpansion(PlayModeStateChange change)
+        {
+            if (
+                change == PlayModeStateChange.ExitingEditMode
+                || change == PlayModeStateChange.ExitingPlayMode
+            )
+            {
+                if (_tree != null && _dataById.Count > 0)
+                {
+                    _expandedStableKeys.UnionWith(CaptureExpandedKeys());
+                }
+                SaveExpandedStableKeys();
+            }
+        }
+
         void OnSchemaSaved()
         {
             // Only re-render if we're already showing the cache; live mode
@@ -590,7 +666,7 @@ namespace Trecs
             // the search.
             if (string.IsNullOrEmpty(_searchText) && !string.IsNullOrEmpty(newSearch))
             {
-                _preSearchExpandedIds = CaptureExpandedIds();
+                _preSearchExpandedKeys = CaptureExpandedKeys();
             }
             // Manual edit (vs Up/Down recall) — exit history navigation
             // and record the new query in history. Programmatic recall
@@ -841,7 +917,8 @@ namespace Trecs
                 or "derived"
                 or "template"
                 or "reads"
-                or "writes" => true,
+                or "writes"
+                or "accesses" => true,
                 _ => false,
             };
 
@@ -944,88 +1021,13 @@ namespace Trecs
 
         void EnterCacheModeForSchema(TrecsSchema schema)
         {
-            _cacheMode = true;
-            _cachedSchema = schema;
+            SetSource(new CacheSchemaSource(schema));
             ShowCacheBanner(schema);
-            RebuildTreeFromCache(schema);
-            // The active selection proxy may still be holding refs to the
-            // previous schema's entries (e.g. SchemaSaved fired while the
-            // user was inspecting a cached row). Rebind it so the inspector
-            // sees the fresh data without the user having to re-click.
-            RebindActiveCacheProxy(schema);
-        }
-
-        // Walks the active Selection.activeObject and, if it's one of our
-        // cache proxies, looks up its identity in the new schema by name
-        // and re-issues SetCache. The inspector's identity check then sees
-        // the new ref and rebuilds its rendering on the next refresh tick.
-        static void RebindActiveCacheProxy(TrecsSchema schema)
-        {
-            var sel = Selection.activeObject;
-            if (sel == null || schema == null)
-                return;
-
-            switch (sel)
-            {
-                case TrecsTemplateSelection tplSel when tplSel.CacheTemplate != null:
-                {
-                    var name = tplSel.CacheTemplate.DebugName;
-                    foreach (var t in schema.Templates)
-                    {
-                        if (t.DebugName == name)
-                        {
-                            tplSel.SetCache(schema, t);
-                            return;
-                        }
-                    }
-                    break;
-                }
-                case TrecsComponentTypeSelection cmpSel when cmpSel.CacheComponent != null:
-                {
-                    var name = cmpSel.CacheComponent.DisplayName;
-                    foreach (var c in schema.ComponentTypes)
-                    {
-                        if (c.DisplayName == name)
-                        {
-                            cmpSel.SetCache(schema, c);
-                            return;
-                        }
-                    }
-                    break;
-                }
-                case TrecsAccessorSelection accSel
-                    when !string.IsNullOrEmpty(accSel.CacheAccessorName):
-                {
-                    accSel.SetCache(schema, accSel.CacheAccessorName);
-                    return;
-                }
-                case TrecsSetSelection setSel when setSel.CacheSet != null:
-                {
-                    var name = setSel.CacheSet.DebugName;
-                    foreach (var s in schema.Sets)
-                    {
-                        if (s.DebugName == name)
-                        {
-                            setSel.SetCache(schema, s);
-                            return;
-                        }
-                    }
-                    break;
-                }
-                case TrecsTagSelection tagSel when tagSel.CacheTag != null:
-                {
-                    var name = tagSel.CacheTag.Name;
-                    foreach (var t in schema.Tags)
-                    {
-                        if (t.Name == name)
-                        {
-                            tagSel.SetCache(schema, t);
-                            return;
-                        }
-                    }
-                    break;
-                }
-            }
+            RebuildTree();
+            // No proxy rebind needed: every selection-proxy kind is now
+            // identity-based, and SetSource above updates ActiveSource so
+            // each inspector's next Refresh resolves against the new
+            // schema automatically.
         }
 
         void RebuildDropdown()
@@ -1115,17 +1117,15 @@ namespace Trecs
                 _searchField.style.display = DisplayStyle.None;
                 _emptyState.style.display = DisplayStyle.Flex;
                 _tree.style.display = DisplayStyle.None;
-                _cacheBanner.style.display = DisplayStyle.None;
-                _cacheMode = false;
-                _cachedSchema = null;
+                HideCacheBanner();
+                SetSource(null);
                 SelectWorld(null);
                 return;
             }
 
             _worldDropdown.choices = labels;
-            _cacheMode = false;
-            _cachedSchema = null;
-            _cacheBanner.style.display = DisplayStyle.None;
+            SetSource(null);
+            HideCacheBanner();
             _worldDropdown.style.display = DisplayStyle.Flex;
             _searchField.style.display = DisplayStyle.Flex;
             _emptyState.style.display = DisplayStyle.None;
@@ -1157,22 +1157,34 @@ namespace Trecs
             }
             _selectedWorld = world;
             _selectedAccessor = null;
+            // Live source needs both world + accessor. Accessor is created
+            // lazily by TryGetAccessor on the next refresh tick — we'll
+            // (re)build the live source then, inside RefreshTick.
+            SetSource(null);
+
+            // Drop TreeView's selection before we wipe the id maps below.
+            // Without this, the next rebuild's SetRootItems would auto-
+            // fire selectionChanged on whichever new row happens to land
+            // at the previously-selected int id (the cross-world id
+            // namespaces don't agree on what id 105 means).
+            if (_tree != null)
+            {
+                _suppressTreeSelectionFeedback = true;
+                try
+                {
+                    _tree.ClearSelection();
+                }
+                finally
+                {
+                    _suppressTreeSelectionFeedback = false;
+                }
+            }
 
             // Different worlds use different ids. No need to share state.
             _idByKey.Clear();
             _dataById.Clear();
             _parentById.Clear();
-            _templateIds.Clear();
             _entityIds.Clear();
-            _accessorTreeIds.Clear();
-            _componentTypeIds.Clear();
-            _setIds.Clear();
-            _tagIds.Clear();
-            _templateCacheIds.Clear();
-            _componentTypeCacheIds.Clear();
-            _accessorCacheIds.Clear();
-            _setCacheIds.Clear();
-            _tagCacheIds.Clear();
             _lastEntityCountByGroup.Clear();
             _lastResolvedTemplateCount = -1;
             _lastAbstractTemplateCount = -1;
@@ -1246,6 +1258,72 @@ namespace Trecs
             }
             _cacheBanner.text = text;
             _cacheBanner.style.display = DisplayStyle.Flex;
+            if (_clearCacheButton != null)
+            {
+                _clearCacheButton.style.display = DisplayStyle.Flex;
+            }
+        }
+
+        void HideCacheBanner()
+        {
+            _cacheBanner.style.display = DisplayStyle.None;
+            if (_clearCacheButton != null)
+            {
+                _clearCacheButton.style.display = DisplayStyle.None;
+            }
+        }
+
+        void OnClearCacheButtonClicked()
+        {
+            var schema = _cachedSchema;
+            if (schema == null)
+            {
+                return;
+            }
+            var name = schema.WorldName ?? "(unnamed)";
+            if (
+                !EditorUtility.DisplayDialog(
+                    "Clear cached schema",
+                    $"Delete the on-disk schema snapshot for world '{name}'?\n\n"
+                        + "Accumulated runtime access data (reads/writes/tags-touched) "
+                        + "for this world will be lost.",
+                    "Clear",
+                    "Cancel"
+                )
+            )
+            {
+                return;
+            }
+            TrecsSchemaCache.Clear(name);
+            RebuildDropdown();
+        }
+
+        void OnClearCacheButtonContextClicked()
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent("Clear this world"), false, OnClearCacheButtonClicked);
+            menu.AddItem(
+                new GUIContent("Clear all cached schemas"),
+                false,
+                () =>
+                {
+                    if (
+                        EditorUtility.DisplayDialog(
+                            "Clear all cached schemas",
+                            "Delete every on-disk schema snapshot under svkj_temp/"
+                                + "trecs_inspector_schema/?\n\nAccumulated runtime access "
+                                + "data for every world will be lost.",
+                            "Clear all",
+                            "Cancel"
+                        )
+                    )
+                    {
+                        TrecsSchemaCache.ClearAll();
+                        RebuildDropdown();
+                    }
+                }
+            );
+            menu.ShowAsContext();
         }
 
         static string FormatRelativeTime(TimeSpan delta)
@@ -1259,381 +1337,6 @@ namespace Trecs
             return $"{(int)delta.TotalDays}d";
         }
 
-        void RebuildTreeFromCache(TrecsSchema schema)
-        {
-            // Reset structural state. Cache rows use synthetic ids — no
-            // overlap with the live-world id space (which starts at 100).
-            _dataById.Clear();
-            _parentById.Clear();
-            _templateIds.Clear();
-            _entityIds.Clear();
-            _accessorTreeIds.Clear();
-            _componentTypeIds.Clear();
-            _setIds.Clear();
-            _tagIds.Clear();
-            _templateCacheIds.Clear();
-            _componentTypeCacheIds.Clear();
-            _accessorCacheIds.Clear();
-            _setCacheIds.Clear();
-            _tagCacheIds.Clear();
-            _idByKey.Clear();
-            _nextId = 100;
-
-            var rootItems = new List<TreeViewItemData<RowData>>();
-
-            // While search is active the tree morphs into a flat list of
-            // matching content rows (mirrors RebuildTreeStructure). Per-
-            // section build code runs unchanged so reverse-lookup tables
-            // still get populated; only the root assembly differs.
-            bool searchActive = !string.IsNullOrEmpty(_searchText);
-
-            // Templates (resolved + abstract). No per-template entity counts
-            // in cache mode; sort alphabetically.
-            var tplData = new RowData
-            {
-                Kind = RowKind.Section,
-                DisplayName = "Templates",
-                Count = schema.Templates.Count,
-                ShowCount = true,
-            };
-            _dataById[SectionTemplatesId] = tplData;
-            var tplChildren = new List<TreeViewItemData<RowData>>();
-            var sortedTpl = new List<TrecsSchemaTemplate>(schema.Templates);
-            // Concrete (resolved) templates first, then abstract; ties broken
-            // by name. Mirrors how the live tree groups them visually.
-            sortedTpl.Sort(
-                (a, b) =>
-                {
-                    if (a.IsResolved != b.IsResolved)
-                    {
-                        return a.IsResolved ? -1 : 1;
-                    }
-                    return string.Compare(
-                        a.DebugName ?? "",
-                        b.DebugName ?? "",
-                        StringComparison.OrdinalIgnoreCase
-                    );
-                }
-            );
-            foreach (var st in sortedTpl)
-            {
-                var name = st.DebugName ?? "(unnamed)";
-                var ctx = new PredicateData { CacheTemplate = st };
-                if (!MatchesSearch(SearchScope.Templates, name, in ctx))
-                {
-                    continue;
-                }
-                int id = _nextId++;
-                var data = new RowData
-                {
-                    Kind = st.IsResolved ? RowKind.Template : RowKind.AbstractTemplate,
-                    DisplayName = name,
-                    Count = 0,
-                    ShowCount = false,
-                    CacheTemplate = st,
-                };
-                _dataById[id] = data;
-                _templateCacheIds[st] = id;
-                tplChildren.Add(new TreeViewItemData<RowData>(id, data));
-            }
-            if (searchActive)
-            {
-                HarvestFlatLeaves(tplChildren, rootItems);
-            }
-            else
-            {
-                rootItems.Add(
-                    new TreeViewItemData<RowData>(SectionTemplatesId, tplData, tplChildren)
-                );
-            }
-
-            // Accessors / Systems by phase. Each system row carries its
-            // priority for the phase-bracket badge in the live tree; in
-            // cache mode we just show the name + phase grouping.
-            var accData = new RowData
-            {
-                Kind = RowKind.Section,
-                DisplayName = "Accessors",
-                Count = schema.Systems.Count + schema.ManualAccessors.Count,
-                ShowCount = true,
-            };
-            _dataById[SectionAccessorsId] = accData;
-            var accChildren = new List<TreeViewItemData<RowData>>();
-            var byPhase = new Dictionary<string, List<TrecsSchemaSystem>>();
-            foreach (var s in schema.Systems)
-            {
-                if (!byPhase.TryGetValue(s.Phase ?? "", out var list))
-                {
-                    list = new List<TrecsSchemaSystem>();
-                    byPhase[s.Phase ?? ""] = list;
-                }
-                list.Add(s);
-            }
-            foreach (var kv in byPhase)
-            {
-                int phaseId = _nextId++;
-                var phaseRows = new List<TreeViewItemData<RowData>>();
-                foreach (var s in kv.Value)
-                {
-                    var name = s.DebugName ?? s.TypeName ?? "(unnamed)";
-                    var ctx = new PredicateData
-                    {
-                        AccessorDebugName = name,
-                        CacheSchemaForAccess = schema,
-                    };
-                    if (!MatchesSearch(SearchScope.Accessors, name, in ctx))
-                    {
-                        continue;
-                    }
-                    int sysId = _nextId++;
-                    var data = new RowData
-                    {
-                        Kind = RowKind.Accessor,
-                        DisplayName = name,
-                        SystemEnabled = true,
-                        ExecutionPriority = s.HasPriority ? s.Priority : (int?)null,
-                    };
-                    _dataById[sysId] = data;
-                    _accessorCacheIds[name] = sysId;
-                    phaseRows.Add(new TreeViewItemData<RowData>(sysId, data));
-                }
-                if (phaseRows.Count == 0)
-                {
-                    continue;
-                }
-                var phaseData = new RowData
-                {
-                    Kind = RowKind.AccessorPhase,
-                    DisplayName = string.IsNullOrEmpty(kv.Key) ? "(no phase)" : kv.Key,
-                    Count = phaseRows.Count,
-                    ShowCount = true,
-                };
-                _dataById[phaseId] = phaseData;
-                accChildren.Add(new TreeViewItemData<RowData>(phaseId, phaseData, phaseRows));
-            }
-            // Manual accessors get their own "Other" phase folder so the
-            // structure matches the live tree (where AddPhaseFromSpecs adds
-            // an "Other" folder for accessors with no system phase).
-            if (schema.ManualAccessors.Count > 0)
-            {
-                var manualRows = new List<TreeViewItemData<RowData>>();
-                var sortedManual = new List<TrecsSchemaAccessor>(schema.ManualAccessors);
-                sortedManual.Sort(
-                    (a, b) =>
-                        string.Compare(
-                            a.DebugName ?? "",
-                            b.DebugName ?? "",
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                );
-                foreach (var m in sortedManual)
-                {
-                    var name = m.DebugName ?? "(unnamed)";
-                    var ctx = new PredicateData
-                    {
-                        AccessorDebugName = name,
-                        CacheSchemaForAccess = schema,
-                    };
-                    if (!MatchesSearch(SearchScope.Accessors, name, in ctx))
-                    {
-                        continue;
-                    }
-                    int mid = _nextId++;
-                    var data = new RowData
-                    {
-                        Kind = RowKind.Accessor,
-                        DisplayName = name,
-                        SystemEnabled = true,
-                    };
-                    _dataById[mid] = data;
-                    _accessorCacheIds[name] = mid;
-                    manualRows.Add(new TreeViewItemData<RowData>(mid, data));
-                }
-                if (manualRows.Count > 0)
-                {
-                    int otherId = _nextId++;
-                    var otherData = new RowData
-                    {
-                        Kind = RowKind.AccessorPhase,
-                        DisplayName = "Other",
-                        Count = manualRows.Count,
-                        ShowCount = true,
-                    };
-                    _dataById[otherId] = otherData;
-                    accChildren.Add(new TreeViewItemData<RowData>(otherId, otherData, manualRows));
-                }
-            }
-            if (searchActive)
-            {
-                HarvestFlatLeaves(accChildren, rootItems);
-            }
-            else
-            {
-                rootItems.Add(
-                    new TreeViewItemData<RowData>(SectionAccessorsId, accData, accChildren)
-                );
-            }
-
-            // Components.
-            var cmpData = new RowData
-            {
-                Kind = RowKind.Section,
-                DisplayName = "Components",
-                Count = schema.ComponentTypes.Count,
-                ShowCount = true,
-            };
-            _dataById[SectionComponentsId] = cmpData;
-            var cmpChildren = new List<TreeViewItemData<RowData>>();
-            var sortedCmp = new List<TrecsSchemaComponentType>(schema.ComponentTypes);
-            sortedCmp.Sort(
-                (a, b) =>
-                    string.Compare(
-                        a.DisplayName ?? "",
-                        b.DisplayName ?? "",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-            );
-            foreach (var c in sortedCmp)
-            {
-                var name = c.DisplayName ?? "(unnamed)";
-                var ctx = new PredicateData { CacheComponent = c };
-                if (!MatchesSearch(SearchScope.Components, name, in ctx))
-                {
-                    continue;
-                }
-                int id = _nextId++;
-                var data = new RowData
-                {
-                    Kind = RowKind.ComponentType,
-                    DisplayName = name,
-                    CacheComponent = c,
-                };
-                _dataById[id] = data;
-                _componentTypeCacheIds[c] = id;
-                cmpChildren.Add(new TreeViewItemData<RowData>(id, data));
-            }
-            if (searchActive)
-            {
-                HarvestFlatLeaves(cmpChildren, rootItems);
-            }
-            else
-            {
-                rootItems.Add(
-                    new TreeViewItemData<RowData>(SectionComponentsId, cmpData, cmpChildren)
-                );
-            }
-
-            // Sets.
-            var setsData = new RowData
-            {
-                Kind = RowKind.Section,
-                DisplayName = "Sets",
-                Count = schema.Sets.Count,
-                ShowCount = true,
-            };
-            _dataById[SectionSetsId] = setsData;
-            var setsChildren = new List<TreeViewItemData<RowData>>();
-            var sortedSets = new List<TrecsSchemaSet>(schema.Sets);
-            sortedSets.Sort(
-                (a, b) =>
-                    string.Compare(
-                        a.DebugName ?? "",
-                        b.DebugName ?? "",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-            );
-            foreach (var s in sortedSets)
-            {
-                var name = s.DebugName ?? "(unnamed)";
-                var ctx = new PredicateData { CacheSet = s };
-                if (!MatchesSearch(SearchScope.Sets, name, in ctx))
-                {
-                    continue;
-                }
-                int id = _nextId++;
-                var data = new RowData
-                {
-                    Kind = RowKind.SetItem,
-                    DisplayName = name,
-                    ShowCount = false,
-                    CacheSet = s,
-                };
-                _dataById[id] = data;
-                _setCacheIds[s] = id;
-                setsChildren.Add(new TreeViewItemData<RowData>(id, data));
-            }
-            if (searchActive)
-            {
-                HarvestFlatLeaves(setsChildren, rootItems);
-            }
-            else
-            {
-                rootItems.Add(new TreeViewItemData<RowData>(SectionSetsId, setsData, setsChildren));
-            }
-
-            // Tags.
-            var tagsData = new RowData
-            {
-                Kind = RowKind.Section,
-                DisplayName = "Tags",
-                Count = schema.Tags.Count,
-                ShowCount = true,
-            };
-            _dataById[SectionTagsId] = tagsData;
-            var tagsChildren = new List<TreeViewItemData<RowData>>();
-            var sortedTags = new List<TrecsSchemaTag>(schema.Tags);
-            sortedTags.Sort(
-                (a, b) =>
-                    string.Compare(a.Name ?? "", b.Name ?? "", StringComparison.OrdinalIgnoreCase)
-            );
-            foreach (var t in sortedTags)
-            {
-                var name = t.Name ?? "(unnamed)";
-                var ctx = new PredicateData { CacheTag = t };
-                if (!MatchesSearch(SearchScope.Tags, name, in ctx))
-                {
-                    continue;
-                }
-                int id = _nextId++;
-                var data = new RowData
-                {
-                    Kind = RowKind.TagItem,
-                    DisplayName = name,
-                    CacheTag = t,
-                };
-                _dataById[id] = data;
-                _tagCacheIds[t] = id;
-                tagsChildren.Add(new TreeViewItemData<RowData>(id, data));
-            }
-            if (searchActive)
-            {
-                HarvestFlatLeaves(tagsChildren, rootItems);
-                rootItems.Sort(
-                    (a, b) =>
-                        string.Compare(
-                            a.data.DisplayName ?? string.Empty,
-                            b.data.DisplayName ?? string.Empty,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                );
-            }
-            else
-            {
-                rootItems.Add(new TreeViewItemData<RowData>(SectionTagsId, tagsData, tagsChildren));
-            }
-
-            _tree.SetRootItems(rootItems);
-            _tree.Rebuild();
-            if (!searchActive)
-            {
-                _tree.ExpandItem(SectionTemplatesId);
-                _tree.ExpandItem(SectionAccessorsId);
-                _tree.ExpandItem(SectionComponentsId);
-                _tree.ExpandItem(SectionSetsId);
-                _tree.ExpandItem(SectionTagsId);
-            }
-        }
-
         // ----- Refresh tick ---------------------------------------------------
 
         void ForceFullRebuild()
@@ -1643,9 +1346,9 @@ namespace Trecs
             _lastAccessorCount = -1;
             _lastComponentTypeCount = -1;
             _lastEntityCountByGroup.Clear();
-            if (_cacheMode && _cachedSchema != null)
+            if (_source != null && !_source.SupportsLiveRefresh)
             {
-                RebuildTreeFromCache(_cachedSchema);
+                RebuildTree();
                 return;
             }
             RefreshTick();
@@ -1657,11 +1360,49 @@ namespace Trecs
             {
                 // No live world. The cache mode tree (if any) is static and
                 // doesn't need per-tick refreshes — only wipe if we aren't
-                // in cache mode.
+                // in cache mode. Either way, sync the user's
+                // expand/collapse clicks into SessionState so they survive
+                // a play-mode entry from this state.
+                SyncExpandedStableKeysFromTree();
                 if (!_cacheMode && _tree != null)
                 {
+                    // Capture expansion before wiping so play-mode entry
+                    // (which fires WorldUnregistered → this branch) doesn't
+                    // collapse every folder. Without this, when the world
+                    // re-registers after play mode boots, the rebuild's
+                    // CaptureExpandedKeys call would snapshot the empty
+                    // tree and lose the user's prior layout.
+                    _expandedStableKeys.UnionWith(CaptureExpandedKeys());
+                    SaveExpandedStableKeys();
+                    // Clear TreeView's selectedIds before wiping rows.
+                    // Without this, TreeView preserves the int id across
+                    // SetRootItems calls, and a later cache rebuild that
+                    // happens to assign that id to a different row would
+                    // auto-fire selectionChanged on it (re-binding
+                    // Selection.activeObject to the wrong proxy).
+                    _suppressTreeSelectionFeedback = true;
+                    try
+                    {
+                        _tree.ClearSelection();
+                    }
+                    finally
+                    {
+                        _suppressTreeSelectionFeedback = false;
+                    }
                     _tree.SetRootItems(new List<TreeViewItemData<RowData>>());
                     _tree.Rebuild();
+
+                    // Drop the stale Trecs proxy so the inspector doesn't
+                    // sit on "world unavailable" once the world goes away
+                    // (Stop play mode is the canonical case). The
+                    // selection identity is already in SessionState, so
+                    // TryRestoreSelectionFromIdentity will rebind it
+                    // when a fresh world registers and the tree rebuilds.
+                    if (IsTrecsSelection(Selection.activeObject))
+                    {
+                        Selection.activeObject = null;
+                        _lastReflectedSelectionId = -1;
+                    }
                 }
                 return;
             }
@@ -1670,7 +1411,11 @@ namespace Trecs
 
             if (NeedsStructuralRebuild(accessor, info))
             {
-                RebuildTreeStructure(accessor, info);
+                // Recreate the live source so its pre-projected lists pick
+                // up any new templates / components / etc. Cheap (single
+                // WorldInfo walk) and fired only on structural change.
+                SetSource(new LiveSchemaSource(_selectedWorld, accessor));
+                RebuildTree();
             }
             else if (UpdateMutableData(accessor))
             {
@@ -1679,6 +1424,55 @@ namespace Trecs
                 // tick, so the hover highlight only paints while the mouse is
                 // moving.
                 _tree.RefreshItems();
+            }
+
+            SyncExpandedStableKeysFromTree();
+        }
+
+        // Per-row sync: for each row currently in the tree, mirror its
+        // expand state into _expandedStableKeys. Keys for off-screen rows
+        // (in the persistent set but not in _stableKeyById right now) are
+        // left untouched — when the matching row reappears, the rebuild
+        // path will restore its expansion. Without this method the user's
+        // expand/collapse clicks wouldn't persist until the next
+        // structural rebuild.
+        void SyncExpandedStableKeysFromTree()
+        {
+            if (_tree == null || _dataById.Count == 0)
+            {
+                return;
+            }
+            bool changed = false;
+            foreach (var kv in _stableKeyById)
+            {
+                if (!_dataById.ContainsKey(kv.Key))
+                {
+                    continue;
+                }
+                bool nowExpanded;
+                try
+                {
+                    nowExpanded = _tree.IsExpanded(kv.Key);
+                }
+                catch
+                {
+                    continue;
+                }
+                bool wasExpanded = _expandedStableKeys.Contains(kv.Value);
+                if (nowExpanded && !wasExpanded)
+                {
+                    _expandedStableKeys.Add(kv.Value);
+                    changed = true;
+                }
+                else if (!nowExpanded && wasExpanded)
+                {
+                    _expandedStableKeys.Remove(kv.Value);
+                    changed = true;
+                }
+            }
+            if (changed)
+            {
+                SaveExpandedStableKeys();
             }
         }
 
@@ -1772,54 +1566,42 @@ namespace Trecs
             // structural rebuild via NeedsStructuralRebuild. Returns true if
             // any visible row's data actually changed so the caller can
             // decide whether to RefreshItems.
+            // Single _dataById walk handles both per-tick mutables that
+            // don't trigger a structural rebuild: per-accessor system-
+            // enabled state and per-set entity-count badges. Total row
+            // count is small (low hundreds even on big worlds), so the
+            // walk is cheap.
             bool changed = false;
             try
             {
-                var systems = accessor.GetSystems();
-                var runner = accessor.GetSystemRunner();
-                foreach (var kvp in _accessorTreeIds)
+                var world = accessor.GetWorld();
+                foreach (var kvp in _dataById)
                 {
-                    if (
-                        !_dataById.TryGetValue(kvp.Value, out var data)
-                        || data.Kind != RowKind.Accessor
-                    )
+                    var data = kvp.Value;
+                    switch (data.Kind)
                     {
-                        continue;
-                    }
-                    if (data.SystemIndex >= 0 && data.SystemIndex < systems.Count)
-                    {
-                        var enabled = runner.IsSystemEnabled(data.SystemIndex);
-                        if (enabled != data.SystemEnabled)
-                        {
-                            data.SystemEnabled = enabled;
-                            changed = true;
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // World may have transitioned; next tick will resync.
-            }
-
-            // Set entity counts mutate without changing tree structure (set
-            // rows are leaves), so refresh the count badge on each tick.
-            try
-            {
-                foreach (var kvp in _setIds)
-                {
-                    if (
-                        !_dataById.TryGetValue(kvp.Value, out var data)
-                        || data.Kind != RowKind.SetItem
-                    )
-                    {
-                        continue;
-                    }
-                    var newCount = accessor.CountEntitiesInSet(data.EntitySet.Id);
-                    if (newCount != data.Count)
-                    {
-                        data.Count = newCount;
-                        changed = true;
+                        case RowKind.Accessor:
+                            if (data.SystemIndex >= 0 && data.SystemIndex < world.SystemCount)
+                            {
+                                var enabled = world.IsSystemEnabled(
+                                    data.SystemIndex,
+                                    EnableChannel.Editor
+                                );
+                                if (enabled != data.SystemEnabled)
+                                {
+                                    data.SystemEnabled = enabled;
+                                    changed = true;
+                                }
+                            }
+                            break;
+                        case RowKind.SetItem:
+                            var newCount = accessor.CountEntitiesInSet(data.EntitySet.Id);
+                            if (newCount != data.Count)
+                            {
+                                data.Count = newCount;
+                                changed = true;
+                            }
+                            break;
                     }
                 }
             }
@@ -1833,30 +1615,36 @@ namespace Trecs
 
         // ----- Tree structure build ------------------------------------------
 
-        void RebuildTreeStructure(WorldAccessor accessor, WorldInfo info)
+        // Single section-emission path used by both live (re-entered on
+        // structural change) and cache (re-entered on schema swap). Live-
+        // only state — fingerprint update, post-rebuild Selection sync,
+        // PruneIdByKey — runs only when the source supports live refresh,
+        // gated through src.SupportsLiveRefresh.
+        void RebuildTree()
         {
-            // Capture expand state by stable id so we can re-apply after
-            // SetRootItems. TreeView preserves expand state by id internally,
-            // but explicit re-expand makes the behavior independent of that
-            // implementation detail.
-            var prevExpanded = CaptureExpandedIds();
+            if (_source == null || _tree == null)
+            {
+                return;
+            }
 
-            // Reset structural state. _idByKey is intentionally preserved so
-            // ids stay stable for keys we already saw.
+            var src = _source;
+            var live = src as LiveSchemaSource;
+            var info = live?.Info;
+
+            // Merge the tree's currently-expanded rows into the persistent
+            // set so the rebuild can restore them. Stable string keys (vs.
+            // int ids) survive play-mode entry and domain reloads.
+            _expandedStableKeys.UnionWith(CaptureExpandedKeys());
+
+            // Reset structural state. _idByKey and _stableKeyById are
+            // intentionally preserved so ids stay stable for keys we
+            // already saw — PruneIdByKey at the end drops entries whose
+            // ids didn't make it into the new tree.
             _dataById.Clear();
             _parentById.Clear();
-            _templateIds.Clear();
             _entityIds.Clear();
-            _accessorTreeIds.Clear();
-            _componentTypeIds.Clear();
-            _setIds.Clear();
-            _tagIds.Clear();
-            _templateCacheIds.Clear();
-            _componentTypeCacheIds.Clear();
-            _accessorCacheIds.Clear();
-            _setCacheIds.Clear();
-            _tagCacheIds.Clear();
             _lastEntityCountByGroup.Clear();
+            SeedSectionStableKeys();
 
             var rootItems = new List<TreeViewItemData<RowData>>();
 
@@ -1864,43 +1652,59 @@ namespace Trecs
             // list — the children list reflects the current search filter,
             // but the heading should always show "this is what exists in
             // the world", same as how the per-template count ignores
-            // partition-level expansion.
-            //
-            // Compute every count once here and reuse below for both the
-            // section header rows and the _lastXxx fingerprint update at
-            // the end of this method.
-            int totalTemplateCount = info.AllTemplates.Count;
-            int resolvedTemplateCount = info.ResolvedTemplates.Count;
+            // partition-level expansion. Live mode walks WorldInfo (matches
+            // the structural-rebuild fingerprint inputs); cache mode reads
+            // the source's projected list lengths.
+            int totalTemplateCount;
+            int resolvedTemplateCount = 0;
             int abstractTemplateCount = 0;
-            foreach (var t in info.AllTemplates)
+            int totalComponentTypeCount;
+            int totalAccessorCount;
+            int totalSetCount;
+            int totalTagCount = src.Tags.Count;
+            if (info != null)
             {
-                if (!info.IsResolvedTemplate(t))
-                    abstractTemplateCount++;
-            }
-            _scratchTypeSet.Clear();
-            foreach (var rt in info.ResolvedTemplates)
-            {
-                foreach (var d in rt.ComponentDeclarations)
+                totalTemplateCount = info.AllTemplates.Count;
+                resolvedTemplateCount = info.ResolvedTemplates.Count;
+                foreach (var t in info.AllTemplates)
                 {
-                    if (d.ComponentType != null)
+                    if (!info.IsResolvedTemplate(t))
+                        abstractTemplateCount++;
+                }
+                _scratchTypeSet.Clear();
+                foreach (var rt in info.ResolvedTemplates)
+                {
+                    foreach (var d in rt.ComponentDeclarations)
                     {
-                        _scratchTypeSet.Add(d.ComponentType);
+                        if (d.ComponentType != null)
+                        {
+                            _scratchTypeSet.Add(d.ComponentType);
+                        }
                     }
                 }
+                totalComponentTypeCount = _scratchTypeSet.Count;
+                try
+                {
+                    totalAccessorCount = CountNonEditorAccessors();
+                }
+                catch
+                {
+                    totalAccessorCount = -1;
+                }
+                totalSetCount = info.AllSets.Count;
             }
-            int totalComponentTypeCount = _scratchTypeSet.Count;
-            int totalAccessorCount;
-            try
+            else
             {
-                totalAccessorCount = CountNonEditorAccessors();
+                totalTemplateCount = src.Templates.Count;
+                totalComponentTypeCount = src.ComponentTypes.Count;
+                totalSetCount = src.Sets.Count;
+                int accessorCount = 0;
+                foreach (var p in src.AccessorsByPhase)
+                {
+                    accessorCount += p.Accessors.Count;
+                }
+                totalAccessorCount = accessorCount;
             }
-            catch
-            {
-                totalAccessorCount = -1;
-            }
-            int totalSetCount = info.AllSets.Count;
-            var allTags = CollectAllTags(info);
-            int totalTagCount = allTags.Count;
 
             // While search is active the tree morphs into a flat list of
             // matching content rows (see HarvestFlatLeaves). Otherwise we
@@ -1909,113 +1713,46 @@ namespace Trecs
             // ids stay populated either way.
             bool searchActive = !string.IsNullOrEmpty(_searchText);
 
-            var templatesData = new RowData
-            {
-                Kind = RowKind.Section,
-                DisplayName = "Templates",
-                Count = totalTemplateCount,
-                ShowCount = true,
-            };
-            _dataById[SectionTemplatesId] = templatesData;
-            var templatesChildren = BuildTemplatesChildren(accessor, info, SectionTemplatesId);
-            if (searchActive)
-            {
-                HarvestFlatLeaves(templatesChildren, rootItems);
-            }
-            else
-            {
-                rootItems.Add(
-                    new TreeViewItemData<RowData>(
-                        SectionTemplatesId,
-                        templatesData,
-                        templatesChildren
-                    )
-                );
-            }
-
-            var accessorsData = new RowData
-            {
-                Kind = RowKind.Section,
-                DisplayName = "Accessors",
-                Count = totalAccessorCount,
-                ShowCount = true,
-            };
-            _dataById[SectionAccessorsId] = accessorsData;
-            var accessorsChildren = BuildAccessorsChildren(accessor, SectionAccessorsId);
-            if (searchActive)
-            {
-                HarvestFlatLeaves(accessorsChildren, rootItems);
-            }
-            else
-            {
-                rootItems.Add(
-                    new TreeViewItemData<RowData>(
-                        SectionAccessorsId,
-                        accessorsData,
-                        accessorsChildren
-                    )
-                );
-            }
-
-            var componentsData = new RowData
-            {
-                Kind = RowKind.Section,
-                DisplayName = "Components",
-                Count = totalComponentTypeCount,
-                ShowCount = true,
-            };
-            _dataById[SectionComponentsId] = componentsData;
-            var componentsChildren = BuildComponentsChildren(info, SectionComponentsId);
-            if (searchActive)
-            {
-                HarvestFlatLeaves(componentsChildren, rootItems);
-            }
-            else
-            {
-                rootItems.Add(
-                    new TreeViewItemData<RowData>(
-                        SectionComponentsId,
-                        componentsData,
-                        componentsChildren
-                    )
-                );
-            }
-
-            var setsData = new RowData
-            {
-                Kind = RowKind.Section,
-                DisplayName = "Sets",
-                Count = totalSetCount,
-                ShowCount = true,
-            };
-            _dataById[SectionSetsId] = setsData;
-            var setsChildren = BuildSetsChildren(accessor, info, SectionSetsId);
-            if (searchActive)
-            {
-                HarvestFlatLeaves(setsChildren, rootItems);
-            }
-            else
-            {
-                rootItems.Add(new TreeViewItemData<RowData>(SectionSetsId, setsData, setsChildren));
-            }
-
-            var tagsData = new RowData
-            {
-                Kind = RowKind.Section,
-                DisplayName = "Tags",
-                Count = allTags.Count,
-                ShowCount = true,
-            };
-            _dataById[SectionTagsId] = tagsData;
-            var tagsChildren = BuildTagsChildren(allTags, SectionTagsId);
-            if (searchActive)
-            {
-                HarvestFlatLeaves(tagsChildren, rootItems);
-            }
-            else
-            {
-                rootItems.Add(new TreeViewItemData<RowData>(SectionTagsId, tagsData, tagsChildren));
-            }
+            EmitSection(
+                SectionTemplatesId,
+                "Templates",
+                totalTemplateCount,
+                BuildTemplatesChildren(_source, SectionTemplatesId),
+                rootItems,
+                searchActive
+            );
+            EmitSection(
+                SectionAccessorsId,
+                "Accessors",
+                totalAccessorCount,
+                BuildAccessorsChildren(_source, SectionAccessorsId),
+                rootItems,
+                searchActive
+            );
+            EmitSection(
+                SectionComponentsId,
+                "Components",
+                totalComponentTypeCount,
+                BuildComponentsChildren(_source, SectionComponentsId),
+                rootItems,
+                searchActive
+            );
+            EmitSection(
+                SectionSetsId,
+                "Sets",
+                totalSetCount,
+                BuildSetsChildren(_source, SectionSetsId),
+                rootItems,
+                searchActive
+            );
+            EmitSection(
+                SectionTagsId,
+                "Tags",
+                totalTagCount,
+                BuildTagsChildren(_source, SectionTagsId),
+                rootItems,
+                searchActive
+            );
 
             if (searchActive)
             {
@@ -2034,56 +1771,38 @@ namespace Trecs
 
             // First non-search rebuild: open the five root sections so the
             // tree doesn't appear collapsed-from-empty. Subsequent rebuilds
-            // rely on the prevExpanded restore loop below — that way the
-            // user can collapse a section and have it stay collapsed
-            // across ticks. Skipped when the very first rebuild happens
-            // with search active so the initial expansion runs against
-            // the non-flat tree on first clear.
+            // rely on the persisted-key restore below — that way the user
+            // can collapse a section and have it stay collapsed across
+            // ticks (and across play-mode entry). The gate is
+            // [SerializeField], so it survives domain reload — without
+            // that, every play-mode entry would force-reopen sections
+            // the user had just collapsed.
             if (!searchActive && !_initialSectionExpansionApplied)
             {
-                _tree.ExpandItem(SectionTemplatesId);
-                _tree.ExpandItem(SectionAccessorsId);
-                _tree.ExpandItem(SectionComponentsId);
-                _tree.ExpandItem(SectionSetsId);
-                _tree.ExpandItem(SectionTagsId);
-                _initialSectionExpansionApplied = true;
+                _expandedStableKeys.Add("section:Templates");
+                _expandedStableKeys.Add("section:Accessors");
+                _expandedStableKeys.Add("section:Components");
+                _expandedStableKeys.Add("section:Sets");
+                _expandedStableKeys.Add("section:Tags");
+                SetInitialSectionExpansionApplied(true);
             }
 
-            bool leavingSearch = !searchActive && _preSearchExpandedIds != null;
+            bool leavingSearch = !searchActive && _preSearchExpandedKeys != null;
 
             if (leavingSearch)
             {
                 // Search just got cleared. Restore the expand state the
                 // user had before they started typing — the flat-mode
-                // tree had nothing to capture so prevExpanded is empty,
-                // and pre-search is the source of truth.
-                var preSearch = _preSearchExpandedIds;
-                _preSearchExpandedIds = null;
-                foreach (var id in prevExpanded)
-                {
-                    if (_dataById.ContainsKey(id))
-                    {
-                        _tree.ExpandItem(id);
-                    }
-                }
-                foreach (var id in preSearch)
-                {
-                    if (_dataById.ContainsKey(id))
-                    {
-                        _tree.ExpandItem(id);
-                    }
-                }
+                // tree had nothing to capture so _expandedStableKeys may
+                // already be partial, and pre-search is the source of
+                // truth.
+                _expandedStableKeys.UnionWith(_preSearchExpandedKeys);
+                _preSearchExpandedKeys = null;
             }
-            else
-            {
-                foreach (var id in prevExpanded)
-                {
-                    if (_dataById.ContainsKey(id))
-                    {
-                        _tree.ExpandItem(id);
-                    }
-                }
-            }
+
+            RestoreExpandedFromStableKeys();
+            SaveExpandedStableKeys();
+            TryRestoreSelectionFromIdentity();
 
             // Drop _idByKey entries whose ids didn't make it into the new
             // tree (entities destroyed, accessors disposed, templates pruned
@@ -2092,31 +1811,39 @@ namespace Trecs
             PruneIdByKey();
 
             // Update structural fingerprint with the counts captured at the
-            // top of this method — no need to re-walk the world.
-            _lastResolvedTemplateCount = resolvedTemplateCount;
-            _lastAbstractTemplateCount = abstractTemplateCount;
-            _lastAccessorCount = totalAccessorCount;
-            _lastComponentTypeCount = totalComponentTypeCount;
-            _lastSetCount = totalSetCount;
-            _lastTagCount = totalTagCount;
+            // top of this method — no need to re-walk the world. Cache mode
+            // doesn't run NeedsStructuralRebuild so the fingerprint update
+            // is wasted; skip.
+            if (src.SupportsLiveRefresh)
+            {
+                _lastResolvedTemplateCount = resolvedTemplateCount;
+                _lastAbstractTemplateCount = abstractTemplateCount;
+                _lastAccessorCount = totalAccessorCount;
+                _lastComponentTypeCount = totalComponentTypeCount;
+                _lastSetCount = totalSetCount;
+                _lastTagCount = totalTagCount;
+            }
 
             // Reapply tree highlight from the current Selection.activeObject —
             // the prior tree's selected row id is gone, but the proxy may
             // still point to a row that exists in the new tree. Don't
-            // scroll: the rebuild fired because of a count tick, and the
-            // user may be scrolled elsewhere on purpose.
-            UpdateRowSelectionFromUnity(scrollToItem: false);
+            // scroll for routine rebuilds (count tick): the user may be
+            // scrolled elsewhere on purpose. Exception: when the user just
+            // cleared the search field, the flat results view collapses
+            // back to the section tree and the selection often lands
+            // off-screen — scroll it into view so they regain context.
+            UpdateRowSelectionFromUnity(scrollToItem: leavingSearch);
         }
 
         // While search is active we render a flat list of matching leaves
         // instead of the section hierarchy — see header comment on
-        // _preSearchExpandedIds. Walks the per-section subtree and pulls
+        // _preSearchExpandedKeys. Walks the per-section subtree and pulls
         // out every content row, dropping headers (Section, AccessorPhase,
         // Group, MorePlaceholder). Each harvested leaf is reconstructed
         // without children so it sits at the root of the flat tree.
         //
         // The explicit-kind filter (e.g. `t:e`) gets re-applied here:
-        // TryBuildConcreteTemplateNode keeps a template node when any of
+        // TryBuildTemplateNode keeps a template node when any of
         // its entity children match, since hierarchy-mode rendering needs
         // the template as the structural parent of those children. In
         // flat mode there's no structural reason to keep it, so a `t:e`
@@ -2175,20 +1902,28 @@ namespace Trecs
                 _ => 0,
             };
 
-        HashSet<int> CaptureExpandedIds()
+        // Walks live tree rows, looks up each id's stable string key, and
+        // emits the keys for rows that are currently expanded. Rows
+        // without a registered stable key (anonymous "more not shown"
+        // placeholders) are skipped.
+        HashSet<string> CaptureExpandedKeys()
         {
-            var s = new HashSet<int>();
+            var s = new HashSet<string>();
             if (_tree == null)
             {
                 return s;
             }
             foreach (var id in _dataById.Keys)
             {
+                if (!_stableKeyById.TryGetValue(id, out var key))
+                {
+                    continue;
+                }
                 try
                 {
                     if (_tree.IsExpanded(id))
                     {
-                        s.Add(id);
+                        s.Add(key);
                     }
                 }
                 catch
@@ -2199,133 +1934,215 @@ namespace Trecs
             return s;
         }
 
+        // Re-expands every row whose stable key is in _expandedStableKeys.
+        // Called after each Rebuild() to translate persisted keys back
+        // into the new tree's int ids.
+        void RestoreExpandedFromStableKeys()
+        {
+            if (_tree == null)
+            {
+                return;
+            }
+            foreach (var kv in _stableKeyById)
+            {
+                if (!_dataById.ContainsKey(kv.Key))
+                {
+                    continue;
+                }
+                if (_expandedStableKeys.Contains(kv.Value))
+                {
+                    _tree.ExpandItem(kv.Key);
+                }
+            }
+        }
+
+        // Persist _expandedStableKeys to SessionState. Called on every
+        // mutation and at the play-mode-entry edge so the user's
+        // edit-mode expansions survive the domain reload.
+        void SaveExpandedStableKeys()
+        {
+            SessionState.SetString(
+                ExpandedKeysSessionKey,
+                string.Join(ExpandedKeysSeparator, _expandedStableKeys)
+            );
+        }
+
+        void LoadExpandedStableKeys()
+        {
+            _expandedStableKeys.Clear();
+            var raw = SessionState.GetString(ExpandedKeysSessionKey, string.Empty);
+            if (string.IsNullOrEmpty(raw))
+            {
+                return;
+            }
+            foreach (var k in raw.Split(ExpandedKeysSeparator))
+            {
+                if (!string.IsNullOrEmpty(k))
+                {
+                    _expandedStableKeys.Add(k);
+                }
+            }
+        }
+
+        void SetInitialSectionExpansionApplied(bool value)
+        {
+            _initialSectionExpansionApplied = value;
+            SessionState.SetBool(InitialSectionExpansionAppliedSessionKey, value);
+        }
+
         // ---- Templates subtree ----
 
-        List<TreeViewItemData<RowData>> BuildTemplatesChildren(
-            WorldAccessor accessor,
-            WorldInfo info,
-            int parentId
-        )
+        List<TreeViewItemData<RowData>> BuildTemplatesChildren(ITrecsSchemaSource src, int parentId)
         {
             var children = new List<TreeViewItemData<RowData>>();
-
-            // Concrete (resolved) templates first, sorted by entity count
-            // (desc) so populated templates float up.
-            var concrete = new List<(ResolvedTemplate rt, int count)>();
-            foreach (var rt in info.ResolvedTemplates)
+            if (src == null)
             {
-                int c = 0;
-                foreach (var g in rt.Groups)
-                {
-                    var n = accessor.CountEntitiesInGroup(g);
-                    c += n;
-                    _lastEntityCountByGroup[g] = n;
-                }
-                concrete.Add((rt, c));
+                return children;
             }
-            concrete.Sort(
+
+            // Alpha sort across both modes, with concrete templates ahead
+            // of abstract on ties so the "(abstract)" badge rows naturally
+            // bunch at the bottom. Live mode loses its old "populated
+            // templates float up" affordance — the win is that row order
+            // is now identical between live and the same world's cached
+            // snapshot, so transitioning between the two doesn't shuffle
+            // the visible list.
+            var sorted = new List<TemplateRef>(src.Templates);
+            sorted.Sort(
                 (a, b) =>
                 {
-                    if (a.count != b.count)
+                    if (a.IsResolved != b.IsResolved)
                     {
-                        return b.count.CompareTo(a.count);
+                        return a.IsResolved ? -1 : 1;
                     }
                     return string.Compare(
-                        a.rt.DebugName ?? string.Empty,
-                        b.rt.DebugName ?? string.Empty,
+                        a.DebugName ?? string.Empty,
+                        b.DebugName ?? string.Empty,
                         StringComparison.OrdinalIgnoreCase
                     );
                 }
             );
-            foreach (var (rt, count) in concrete)
+
+            // Disambiguate duplicate names. Different Template instances are
+            // allowed to share a DebugName, but each row needs a unique
+            // stable key (and hence a unique int id) — otherwise two rows
+            // collapse onto the same id and TreeView selects both at once.
+            // The disambiguator is the 0-based occurrence index among
+            // same-named entries; left at -1 (no suffix) for unique names.
+            var disambig = new int[sorted.Count];
+            var nameSeen = new Dictionary<string, int>();
+            var nameTotal = new Dictionary<string, int>();
+            for (int i = 0; i < sorted.Count; i++)
             {
-                // User toggle: hide templates with no entities.
-                if (!_showEmptyTemplates && count == 0)
+                var name = sorted[i].DebugName ?? string.Empty;
+                nameTotal.TryGetValue(name, out int total);
+                nameTotal[name] = total + 1;
+            }
+            for (int i = 0; i < sorted.Count; i++)
+            {
+                var name = sorted[i].DebugName ?? string.Empty;
+                if (nameTotal[name] <= 1)
+                {
+                    disambig[i] = -1;
+                    continue;
+                }
+                nameSeen.TryGetValue(name, out int idx);
+                disambig[i] = idx;
+                nameSeen[name] = idx + 1;
+            }
+
+            for (int i = 0; i < sorted.Count; i++)
+            {
+                var tref = sorted[i];
+                if (!_showAbstractTemplates && !tref.IsResolved)
                 {
                     continue;
                 }
-                if (TryBuildConcreteTemplateNode(accessor, rt, count, parentId, out var item))
+                if (TryBuildTemplateNode(src, tref, disambig[i], parentId, out var item))
                 {
                     children.Add(item);
-                }
-            }
-
-            // Abstract / base templates listed below in alpha order — flat
-            // (non-expandable) leaves with the "(abstract)" badge.
-            if (_showAbstractTemplates)
-            {
-                var abstracts = new List<Template>();
-                foreach (var t in info.AllTemplates)
-                {
-                    if (!info.IsResolvedTemplate(t))
-                    {
-                        abstracts.Add(t);
-                    }
-                }
-                abstracts.Sort(
-                    (a, b) =>
-                        string.Compare(
-                            a.DebugName ?? string.Empty,
-                            b.DebugName ?? string.Empty,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                );
-                foreach (var t in abstracts)
-                {
-                    if (TryBuildAbstractTemplateNode(t, parentId, out var item))
-                    {
-                        children.Add(item);
-                    }
                 }
             }
             return children;
         }
 
-        bool TryBuildConcreteTemplateNode(
-            WorldAccessor accessor,
-            ResolvedTemplate rt,
-            int totalCount,
+        bool TryBuildTemplateNode(
+            ITrecsSchemaSource src,
+            TemplateRef tref,
+            int disambiguator,
             int parentId,
             out TreeViewItemData<RowData> result
         )
         {
             result = default;
-            var displayName = ObjectNames.NicifyVariableName(rt.DebugName ?? "(unnamed)");
+            var displayName = ObjectNames.NicifyVariableName(tref.DebugName ?? "(unnamed)");
 
-            // Build entity / partition children first so we can decide
-            // whether the subtree as a whole satisfies the search filter.
+            // Children — only when the source supports entity iteration
+            // (live mode + resolved template). Cache rows are leaves; the
+            // TreeView's expand arrow won't render for them.
             List<TreeViewItemData<RowData>> tplChildren = null;
-            if (totalCount > 0)
+            int totalCount = 0;
+            bool canIterateEntities =
+                src.SupportsEntityIteration && tref.IsResolved && tref.LiveResolved != null;
+            if (canIterateEntities)
             {
-                tplChildren = new List<TreeViewItemData<RowData>>();
-                var hasPartitions = rt.Partitions.Count > 0;
-                for (int i = 0; i < rt.Groups.Count; i++)
+                var rt = tref.LiveResolved;
+                foreach (var g in rt.Groups)
                 {
-                    var group = rt.Groups[i];
-                    if (hasPartitions)
+                    int n = src.CountEntitiesInGroup(g);
+                    totalCount += n;
+                    _lastEntityCountByGroup[g] = n;
+                }
+                if (!_showEmptyTemplates && totalCount == 0)
+                {
+                    return false;
+                }
+                if (totalCount > 0 && _selectedAccessor != null)
+                {
+                    tplChildren = new List<TreeViewItemData<RowData>>();
+                    var hasPartitions = rt.Partitions.Count > 0;
+                    for (int i = 0; i < rt.Groups.Count; i++)
                     {
-                        var tags = i < rt.Partitions.Count ? rt.Partitions[i] : default;
-                        if (TryBuildPartitionNode(accessor, rt, group, tags, out var pitem))
+                        var group = rt.Groups[i];
+                        if (hasPartitions)
                         {
-                            tplChildren.Add(pitem);
+                            var tags = i < rt.Partitions.Count ? rt.Partitions[i] : default;
+                            if (
+                                TryBuildPartitionNode(
+                                    _selectedAccessor,
+                                    tref,
+                                    rt,
+                                    group,
+                                    tags,
+                                    out var pitem
+                                )
+                            )
+                            {
+                                tplChildren.Add(pitem);
+                            }
                         }
-                    }
-                    else
-                    {
-                        AppendEntityChildren(accessor, group, displayName, rt, tplChildren);
+                        else
+                        {
+                            AppendEntityChildren(
+                                _selectedAccessor,
+                                group,
+                                displayName,
+                                tref,
+                                tplChildren
+                            );
+                        }
                     }
                 }
             }
 
-            var ctx = new PredicateData
-            {
-                ResolvedTemplate = rt,
-                WorldInfo = _selectedWorld?.WorldInfo,
-            };
+            // Search predicate context. Refs carry pre-projected name lists
+            // (tags, components, base/derived templates) so the matchers
+            // read uniformly across live and cache modes.
+            var ctx = new PredicateData { Template = tref };
             bool selfMatches = MatchesSearch(
                 SearchScope.Templates,
                 displayName,
-                rt.DebugName ?? string.Empty,
+                tref.DebugName ?? string.Empty,
                 in ctx
             );
             bool anyChildMatches = tplChildren != null && tplChildren.Count > 0;
@@ -2334,18 +2151,29 @@ namespace Trecs
                 return false;
             }
 
-            int treeId = GetOrAssignId(rt.Template);
-            _templateIds[rt.Template] = treeId;
+            // Name-keyed id allocation — survives the live ↔ cache
+            // transition, so the same template row keeps its id and
+            // expansion state across mode switches. The disambiguator
+            // suffix (#N) is appended only when multiple templates in
+            // this rebuild share a debug name; ordinary unique-name rows
+            // stay on the bare "template:Name" key.
+            var bareName = tref.DebugName ?? string.Empty;
+            string stableKey =
+                disambiguator < 0
+                    ? TrecsRowIdentity.TemplatePrefix + bareName
+                    : TrecsRowIdentity.TemplatePrefix + bareName + "#" + disambiguator;
+            int treeId = GetOrAssignId(stableKey);
             _parentById[treeId] = parentId;
 
             var data = new RowData
             {
-                Kind = RowKind.Template,
+                Kind = tref.IsResolved ? RowKind.Template : RowKind.AbstractTemplate,
                 DisplayName = displayName,
-                Template = rt.Template,
-                ResolvedTemplate = rt,
+                StableKey = stableKey,
+                Template = tref.LiveTemplate,
+                ResolvedTemplate = tref.LiveResolved,
                 Count = totalCount,
-                ShowCount = true,
+                ShowCount = canIterateEntities,
             };
             _dataById[treeId] = data;
 
@@ -2361,46 +2189,9 @@ namespace Trecs
             return true;
         }
 
-        bool TryBuildAbstractTemplateNode(
-            Template t,
-            int parentId,
-            out TreeViewItemData<RowData> result
-        )
-        {
-            result = default;
-            var displayName = ObjectNames.NicifyVariableName(t.DebugName ?? "(unnamed)");
-            // Abstract templates skip predicate dispatch — they don't have
-            // a ResolvedTemplate, so tag/c/base/derived predicates have no
-            // resolution path and would always fail. Substring + kind only.
-            var ctx = new PredicateData { AbstractTemplate = t };
-            if (
-                SearchActive
-                && !MatchesSearch(
-                    SearchScope.Templates,
-                    displayName,
-                    t.DebugName ?? string.Empty,
-                    in ctx
-                )
-            )
-            {
-                return false;
-            }
-            int treeId = GetOrAssignId(t);
-            _templateIds[t] = treeId;
-            _parentById[treeId] = parentId;
-            var data = new RowData
-            {
-                Kind = RowKind.AbstractTemplate,
-                DisplayName = displayName,
-                Template = t,
-            };
-            _dataById[treeId] = data;
-            result = new TreeViewItemData<RowData>(treeId, data);
-            return true;
-        }
-
         bool TryBuildPartitionNode(
             WorldAccessor accessor,
+            TemplateRef parentTref,
             ResolvedTemplate rt,
             GroupIndex group,
             TagSet partitionTags,
@@ -2417,7 +2208,7 @@ namespace Trecs
                 accessor,
                 group,
                 ObjectNames.NicifyVariableName(rt.DebugName ?? string.Empty),
-                rt,
+                parentTref,
                 entityChildren
             );
 
@@ -2452,7 +2243,7 @@ namespace Trecs
             WorldAccessor accessor,
             GroupIndex group,
             string templateDisplay,
-            ResolvedTemplate parentRt,
+            TemplateRef parentTref,
             List<TreeViewItemData<RowData>> sink
         )
         {
@@ -2479,7 +2270,7 @@ namespace Trecs
                 if (SearchActive)
                 {
                     var hay = $"{displayName} id:{handle.UniqueId}";
-                    var ctx = new PredicateData { ResolvedTemplate = parentRt };
+                    var ctx = new PredicateData { Template = parentTref };
                     if (!MatchesSearch(SearchScope.Entities, hay, in ctx))
                     {
                         continue;
@@ -2520,198 +2311,77 @@ namespace Trecs
 
         // ---- Accessors subtree ----
 
-        List<TreeViewItemData<RowData>> BuildAccessorsChildren(
-            WorldAccessor windowAccessor,
-            int parentId
-        )
+        List<TreeViewItemData<RowData>> BuildAccessorsChildren(ITrecsSchemaSource src, int parentId)
         {
             var result = new List<TreeViewItemData<RowData>>();
-
-            IReadOnlyList<ExecutableSystemInfo> systems;
-            SystemRunner runner;
-            try
-            {
-                systems = windowAccessor.GetSystems();
-                runner = windowAccessor.GetSystemRunner();
-            }
-            catch
+            if (src == null)
             {
                 return result;
             }
-
-            // accessor.Id → system index (so each system row carries the index
-            // for enable-toggle bookkeeping in the accessor inspector).
-            var accessorIdToSystemIndex = new Dictionary<int, int>();
-            for (int i = 0; i < systems.Count; i++)
+            foreach (var phase in src.AccessorsByPhase)
             {
-                var acc = systems[i].Metadata.Accessor;
-                if (acc != null)
-                {
-                    accessorIdToSystemIndex[acc.Id] = i;
-                }
+                AddPhase(src, result, phase, parentId);
             }
-
-            var byPhase = new Dictionary<SystemPhase, List<AccessorRowSpec>>();
-            var manual = new List<AccessorRowSpec>();
-
-            try
-            {
-                foreach (var entry in _selectedWorld.GetAllAccessors())
-                {
-                    var id = entry.Key;
-                    var accessor = entry.Value;
-                    if (accessor == null)
-                    {
-                        continue;
-                    }
-                    if (TrecsEditorAccessorNames.Contains(accessor.DebugName))
-                    {
-                        continue;
-                    }
-
-                    if (accessorIdToSystemIndex.TryGetValue(id, out var sysIdx))
-                    {
-                        var info = systems[sysIdx];
-                        if (!byPhase.TryGetValue(info.Metadata.Phase, out var list))
-                        {
-                            list = new List<AccessorRowSpec>();
-                            byPhase[info.Metadata.Phase] = list;
-                        }
-                        list.Add(
-                            new AccessorRowSpec
-                            {
-                                AccessorId = id,
-                                DisplayName =
-                                    info.Metadata.DebugName ?? accessor.DebugName ?? $"#{id}",
-                                SystemIndex = sysIdx,
-                                ExecutionPriority = info.Metadata.ExecutionPriority,
-                                SystemEnabled = runner.IsSystemEnabled(sysIdx),
-                            }
-                        );
-                    }
-                    else
-                    {
-                        manual.Add(
-                            new AccessorRowSpec
-                            {
-                                AccessorId = id,
-                                DisplayName = accessor.DebugName ?? $"#{id}",
-                                SystemIndex = -1,
-                                ExecutionPriority = null,
-                                SystemEnabled = true,
-                            }
-                        );
-                    }
-                }
-            }
-            catch
-            {
-                return result;
-            }
-
-            AddPhase(
-                result,
-                "Early Presentation",
-                byPhase,
-                SystemPhase.EarlyPresentation,
-                parentId
-            );
-            AddPhase(result, "Input", byPhase, SystemPhase.Input, parentId);
-            AddPhase(result, "Fixed", byPhase, SystemPhase.Fixed, parentId);
-            AddPhase(result, "Presentation", byPhase, SystemPhase.Presentation, parentId);
-            AddPhase(result, "Late Presentation", byPhase, SystemPhase.LatePresentation, parentId);
-
-            if (manual.Count > 0)
-            {
-                manual.Sort(
-                    (a, b) =>
-                        string.Compare(
-                            a.DisplayName,
-                            b.DisplayName,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                );
-                AddPhaseFromSpecs(result, "Other", manual, parentId);
-            }
-
             return result;
         }
 
         void AddPhase(
+            ITrecsSchemaSource src,
             List<TreeViewItemData<RowData>> sink,
-            string title,
-            Dictionary<SystemPhase, List<AccessorRowSpec>> grouped,
-            SystemPhase phase,
-            int parentId
-        )
-        {
-            if (!grouped.TryGetValue(phase, out var list) || list.Count == 0)
-            {
-                return;
-            }
-            // Lower priority first preserves intended execution order; ties
-            // broken alphabetically.
-            list.Sort(
-                (a, b) =>
-                {
-                    var ap = a.ExecutionPriority ?? int.MaxValue;
-                    var bp = b.ExecutionPriority ?? int.MaxValue;
-                    if (ap != bp)
-                    {
-                        return ap.CompareTo(bp);
-                    }
-                    return string.Compare(
-                        a.DisplayName,
-                        b.DisplayName,
-                        StringComparison.OrdinalIgnoreCase
-                    );
-                }
-            );
-            AddPhaseFromSpecs(sink, title, list, parentId);
-        }
-
-        void AddPhaseFromSpecs(
-            List<TreeViewItemData<RowData>> sink,
-            string title,
-            List<AccessorRowSpec> specs,
+            AccessorPhaseRef phase,
             int parentId
         )
         {
             var phaseChildren = new List<TreeViewItemData<RowData>>();
-            foreach (var spec in specs)
+            foreach (var aref in phase.Accessors)
             {
-                var ctx = new PredicateData { AccessorDebugName = spec.DisplayName };
-                if (!MatchesSearch(SearchScope.Accessors, spec.DisplayName, in ctx))
+                var ctx = new PredicateData { AccessorDebugName = aref.DebugName };
+                if (!MatchesSearch(SearchScope.Accessors, aref.DebugName, in ctx))
                 {
                     continue;
                 }
-                int aid = GetOrAssignId(BoxedAccessorIdKey(spec.AccessorId));
-                _accessorTreeIds[spec.AccessorId] = aid;
+                // Live system enable state — falls through to true (the
+                // pre-rebuild snapshot) for cache rows, manual accessors,
+                // and any live row whose system index isn't currently
+                // resolvable. UpdateMutableData flips it on the next tick
+                // for resolvable live system rows.
+                bool enabled = true;
+                if (
+                    src.SupportsSystemEnableToggle
+                    && aref.SystemIndex >= 0
+                    && src.TryGetSystemEnabled(aref.SystemIndex, out var live)
+                )
+                {
+                    enabled = live;
+                }
+                var stableKey = TrecsRowIdentity.AccessorPrefix + aref.DebugName;
+                int aid = GetOrAssignId(stableKey);
                 var data = new RowData
                 {
                     Kind = RowKind.Accessor,
-                    DisplayName = spec.DisplayName,
-                    AccessorId = spec.AccessorId,
-                    SystemIndex = spec.SystemIndex,
-                    ExecutionPriority = spec.ExecutionPriority,
-                    SystemEnabled = spec.SystemEnabled,
+                    DisplayName = aref.DebugName,
+                    StableKey = stableKey,
+                    AccessorId = aref.AccessorId,
+                    SystemIndex = aref.SystemIndex,
+                    ExecutionPriority = aref.ExecutionPriority,
+                    SystemEnabled = enabled,
                 };
                 _dataById[aid] = data;
                 phaseChildren.Add(new TreeViewItemData<RowData>(aid, data));
             }
 
-            bool phaseTitleMatches = MatchesSearch(SearchScope.Accessors, title);
+            bool phaseTitleMatches = MatchesSearch(SearchScope.Accessors, phase.PhaseName);
             if (SearchActive && !phaseTitleMatches && phaseChildren.Count == 0)
             {
                 return;
             }
 
-            int phid = GetOrAssignId(BoxedPhaseKey(title));
+            int phid = GetOrAssignId("phase:" + phase.PhaseName);
             _parentById[phid] = parentId;
             var pdata = new RowData
             {
                 Kind = RowKind.AccessorPhase,
-                DisplayName = title,
+                DisplayName = phase.PhaseName,
                 Count = phaseChildren.Count,
                 ShowCount = true,
             };
@@ -2726,44 +2396,42 @@ namespace Trecs
 
         // ---- Components subtree ----
 
-        List<TreeViewItemData<RowData>> BuildComponentsChildren(WorldInfo info, int parentId)
+        List<TreeViewItemData<RowData>> BuildComponentsChildren(
+            ITrecsSchemaSource src,
+            int parentId
+        )
         {
-            // Union of all component types declared across resolved templates.
-            // Same type may appear on multiple templates — one row per type.
-            var seen = new HashSet<Type>();
-            var rows = new List<(Type t, string display)>();
-            foreach (var rt in info.ResolvedTemplates)
-            {
-                foreach (var dec in rt.ComponentDeclarations)
-                {
-                    var t = dec.ComponentType;
-                    if (t == null || !seen.Add(t))
-                    {
-                        continue;
-                    }
-                    rows.Add((t, ComponentTypeDisplayName(t)));
-                }
-            }
-            rows.Sort(
-                (a, b) => string.Compare(a.display, b.display, StringComparison.OrdinalIgnoreCase)
-            );
-
             var children = new List<TreeViewItemData<RowData>>();
-            foreach (var (t, display) in rows)
+            if (src == null)
             {
-                var ctx = new PredicateData { ComponentType = t };
-                if (!MatchesSearch(SearchScope.Components, display, t.Name, in ctx))
+                return children;
+            }
+            var sorted = new List<ComponentTypeRef>(src.ComponentTypes);
+            sorted.Sort(
+                (a, b) =>
+                    string.Compare(
+                        a.DisplayName ?? string.Empty,
+                        b.DisplayName ?? string.Empty,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+            );
+            foreach (var cref in sorted)
+            {
+                var display = cref.DisplayName ?? "(unnamed)";
+                var ctx = new PredicateData { ComponentType = cref };
+                if (!MatchesSearch(SearchScope.Components, display, cref.LiveType?.Name, in ctx))
                 {
                     continue;
                 }
-                int cid = GetOrAssignId(t);
-                _componentTypeIds[t] = cid;
+                var stableKey = TrecsRowIdentity.ComponentPrefix + display;
+                int cid = GetOrAssignId(stableKey);
                 _parentById[cid] = parentId;
                 var data = new RowData
                 {
                     Kind = RowKind.ComponentType,
                     DisplayName = display,
-                    ComponentType = t,
+                    StableKey = stableKey,
+                    ComponentType = cref.LiveType,
                 };
                 _dataById[cid] = data;
                 children.Add(new TreeViewItemData<RowData>(cid, data));
@@ -2771,106 +2439,64 @@ namespace Trecs
             return children;
         }
 
-        List<TreeViewItemData<RowData>> BuildSetsChildren(
-            WorldAccessor accessor,
-            WorldInfo info,
-            int parentId
-        )
+        List<TreeViewItemData<RowData>> BuildSetsChildren(ITrecsSchemaSource src, int parentId)
         {
-            var rows = new List<EntitySet>(info.AllSets);
-            rows.Sort(
+            var children = new List<TreeViewItemData<RowData>>();
+            if (src == null)
+            {
+                return children;
+            }
+            var sorted = new List<SetRef>(src.Sets);
+            sorted.Sort(
                 (a, b) =>
                     string.Compare(
-                        a.DebugName ?? "",
-                        b.DebugName ?? "",
+                        a.DebugName ?? string.Empty,
+                        b.DebugName ?? string.Empty,
                         StringComparison.OrdinalIgnoreCase
                     )
             );
-
-            var children = new List<TreeViewItemData<RowData>>();
-            foreach (var entitySet in rows)
+            foreach (var sref in sorted)
             {
-                var display = entitySet.DebugName ?? $"#{entitySet.Id.Id}";
-                var ctx = new PredicateData { Set = entitySet };
+                var display = sref.DebugName ?? "(unnamed)";
+                var ctx = new PredicateData { Set = sref };
                 if (!MatchesSearch(SearchScope.Sets, display, in ctx))
                 {
                     continue;
                 }
-                int count;
-                try
+
+                // Live mode shows the entity count (mutates each tick);
+                // cache rows have no count (entities aren't snapshotted).
+                int count = 0;
+                bool showCount = false;
+                if (src.SupportsEntityIteration && sref.HasLiveSet && _selectedAccessor != null)
                 {
-                    count = accessor.CountEntitiesInSet(entitySet.Id);
+                    try
+                    {
+                        count = _selectedAccessor.CountEntitiesInSet(sref.LiveSet.Id);
+                        showCount = true;
+                    }
+                    catch
+                    {
+                        count = 0;
+                    }
                 }
-                catch
-                {
-                    count = 0;
-                }
-                int sid = GetOrAssignId(entitySet.Id);
-                _setIds[entitySet.Id] = sid;
+
+                var stableKey = TrecsRowIdentity.SetPrefix + display;
+                int sid = GetOrAssignId(stableKey);
                 _parentById[sid] = parentId;
                 var data = new RowData
                 {
                     Kind = RowKind.SetItem,
                     DisplayName = display,
-                    EntitySet = entitySet,
+                    StableKey = stableKey,
+                    EntitySet = sref.HasLiveSet ? sref.LiveSet : default,
                     Count = count,
-                    ShowCount = true,
+                    ShowCount = showCount,
                 };
                 _dataById[sid] = data;
                 children.Add(new TreeViewItemData<RowData>(sid, data));
             }
             return children;
-        }
-
-        // Walks templates (AllTags + every partition) and sets to gather
-        // every tag referenced in this world. Returns deduped by Tag.Guid,
-        // keyed by Guid so we can share with downstream consumers without
-        // recomputing.
-        static Dictionary<int, Tag> CollectAllTags(WorldInfo info)
-        {
-            var tags = new Dictionary<int, Tag>();
-            foreach (var rt in info.ResolvedTemplates)
-            {
-                if (!rt.AllTags.IsNull)
-                {
-                    foreach (var t in rt.AllTags.Tags)
-                    {
-                        if (t.Guid != 0 && !tags.ContainsKey(t.Guid))
-                        {
-                            tags[t.Guid] = t;
-                        }
-                    }
-                }
-                foreach (var p in rt.Partitions)
-                {
-                    if (p.IsNull)
-                    {
-                        continue;
-                    }
-                    foreach (var t in p.Tags)
-                    {
-                        if (t.Guid != 0 && !tags.ContainsKey(t.Guid))
-                        {
-                            tags[t.Guid] = t;
-                        }
-                    }
-                }
-            }
-            foreach (var entitySet in info.AllSets)
-            {
-                if (entitySet.Tags.IsNull)
-                {
-                    continue;
-                }
-                foreach (var t in entitySet.Tags.Tags)
-                {
-                    if (t.Guid != 0 && !tags.ContainsKey(t.Guid))
-                    {
-                        tags[t.Guid] = t;
-                    }
-                }
-            }
-            return tags;
         }
 
         // Counts unique tag guids without building a Dictionary<int, Tag>.
@@ -2914,40 +2540,76 @@ namespace Trecs
             return scratch.Count;
         }
 
-        List<TreeViewItemData<RowData>> BuildTagsChildren(Dictionary<int, Tag> tags, int parentId)
+        List<TreeViewItemData<RowData>> BuildTagsChildren(ITrecsSchemaSource src, int parentId)
         {
-            var rows = new List<Tag>(tags.Values);
-            rows.Sort(
+            var children = new List<TreeViewItemData<RowData>>();
+            if (src == null)
+            {
+                return children;
+            }
+            var sorted = new List<TagRef>(src.Tags);
+            sorted.Sort(
                 (a, b) =>
                     string.Compare(
-                        a.ToString() ?? "",
-                        b.ToString() ?? "",
+                        a.Name ?? string.Empty,
+                        b.Name ?? string.Empty,
                         StringComparison.OrdinalIgnoreCase
                     )
             );
-
-            var children = new List<TreeViewItemData<RowData>>();
-            foreach (var tag in rows)
+            foreach (var tref in sorted)
             {
-                var display = tag.ToString() ?? $"#{tag.Guid}";
-                var ctx = new PredicateData { Tag = tag };
+                var display = tref.Name ?? "(unnamed)";
+                var ctx = new PredicateData { Tag = tref };
                 if (!MatchesSearch(SearchScope.Tags, display, in ctx))
                 {
                     continue;
                 }
-                int tid = GetOrAssignId(("tag", tag.Guid));
-                _tagIds[tag.Guid] = tid;
+                var stableKey = TrecsRowIdentity.TagPrefix + display;
+                int tid = GetOrAssignId(stableKey);
                 _parentById[tid] = parentId;
                 var data = new RowData
                 {
                     Kind = RowKind.TagItem,
                     DisplayName = display,
-                    Tag = tag,
+                    StableKey = stableKey,
+                    Tag = tref.HasLiveTag ? tref.LiveTag : default,
                 };
                 _dataById[tid] = data;
                 children.Add(new TreeViewItemData<RowData>(tid, data));
             }
             return children;
+        }
+
+        // Stamps the section header into _dataById and either harvests its
+        // already-built children as flat rootItems (search active) or emits
+        // them as a collapsible section node (default). Live and cache
+        // rebuilds drive five of these per pass; the search-active sort runs
+        // once after all five.
+        void EmitSection(
+            int sectionId,
+            string title,
+            int count,
+            List<TreeViewItemData<RowData>> children,
+            List<TreeViewItemData<RowData>> rootItems,
+            bool searchActive
+        )
+        {
+            var sectionData = new RowData
+            {
+                Kind = RowKind.Section,
+                DisplayName = title,
+                Count = count,
+                ShowCount = true,
+            };
+            _dataById[sectionId] = sectionData;
+            if (searchActive)
+            {
+                HarvestFlatLeaves(children, rootItems);
+            }
+            else
+            {
+                rootItems.Add(new TreeViewItemData<RowData>(sectionId, sectionData, children));
+            }
         }
 
         // ----- Tree make / bind ----------------------------------------------
@@ -2997,17 +2659,24 @@ namespace Trecs
                 return;
             }
 
-            var icon = element.Q<Image>("trecs-icon");
-            var label = element.Q<Label>("trecs-label");
-            var badge = element.Q<Label>("trecs-badge");
+            BindRowIcon(element.Q<Image>("trecs-icon"), data);
+            BindRowLabel(element.Q<Label>("trecs-label"), data);
+            BindRowBadge(element.Q<Label>("trecs-badge"), data);
+            BindRowPreviewOverlay(element, id);
+        }
 
-            icon.image = IconForKind(data.Kind);
+        static void BindRowIcon(Image icon, RowData data)
+        {
+            icon.image = TrecsRowIcons.For(data.Kind);
             icon.style.opacity =
                 (data.Kind == RowKind.AbstractTemplate || data.Kind == RowKind.MorePlaceholder)
                     ? 0.5f
                     : 1f;
             icon.style.display = icon.image == null ? DisplayStyle.None : DisplayStyle.Flex;
+        }
 
+        void BindRowLabel(Label label, RowData data)
+        {
             ApplyLabelTextWithSearchHighlight(label, data.DisplayName);
             switch (data.Kind)
             {
@@ -3036,9 +2705,11 @@ namespace Trecs
                     label.style.opacity = 1f;
                     break;
             }
+        }
 
+        static void BindRowBadge(Label badge, RowData data)
+        {
             string badgeText = null;
-            string badgeTooltip = null;
             switch (data.Kind)
             {
                 case RowKind.Section:
@@ -3064,7 +2735,7 @@ namespace Trecs
             if (badgeText != null)
             {
                 badge.text = badgeText;
-                badge.tooltip = badgeTooltip ?? string.Empty;
+                badge.tooltip = string.Empty;
                 badge.style.display = DisplayStyle.Flex;
             }
             else
@@ -3072,12 +2743,15 @@ namespace Trecs
                 badge.tooltip = string.Empty;
                 badge.style.display = DisplayStyle.None;
             }
+        }
 
-            // Preview-hover overlay driven by inspector links. Apply on the
-            // custom row element only — TreeView's own selection / :hover
-            // visuals live on the wrapper above us, so we don't interfere
-            // with them. Use StyleKeyword.Null to release the override
-            // when this row isn't the previewed one.
+        // Preview-hover overlay driven by inspector links. Apply on the
+        // custom row element only — TreeView's own selection / :hover
+        // visuals live on the wrapper above us, so we don't interfere
+        // with them. Use StyleKeyword.Null to release the override
+        // when this row isn't the previewed one.
+        void BindRowPreviewOverlay(VisualElement element, int id)
+        {
             element.style.backgroundColor =
                 id == _previewHoverRowId
                     ? new StyleColor(_previewHoverColor)
@@ -3164,6 +2838,10 @@ namespace Trecs
                     evt.menu.AppendAction(
                         "Find Entities With This Component",
                         _ => SetSearchFromMenu($"t:e c:{quoted}")
+                    );
+                    evt.menu.AppendAction(
+                        "Find Accessors That Read or Write This",
+                        _ => SetSearchFromMenu($"t:a accesses:{quoted}")
                     );
                     evt.menu.AppendAction(
                         "Find Accessors That Read This",
@@ -3264,6 +2942,7 @@ namespace Trecs
                     Selection.activeObject = null;
                 }
                 _lastReflectedSelectionId = -1;
+                SessionState.SetString(SelectedRowIdentitySessionKey, string.Empty);
                 return;
             }
 
@@ -3282,53 +2961,15 @@ namespace Trecs
             }
 
             var data = rowDatas[0];
-            switch (data.Kind)
+            var proxy = TrecsSelectionProxies.CreateProxy(_selectedWorld, data);
+            if (proxy != null)
             {
-                case RowKind.Template:
-                case RowKind.AbstractTemplate:
-                {
-                    var p = TrecsSelectionProxies.NextTemplate();
-                    p.Set(_selectedWorld, data.Template);
-                    Selection.activeObject = p;
-                    break;
-                }
-                case RowKind.Entity:
-                {
-                    var p = TrecsSelectionProxies.NextEntity();
-                    p.Set(_selectedWorld, data.EntityHandle);
-                    Selection.activeObject = p;
-                    break;
-                }
-                case RowKind.Accessor:
-                {
-                    var p = TrecsSelectionProxies.NextAccessor();
-                    p.Set(_selectedWorld, data.AccessorId, data.DisplayName);
-                    Selection.activeObject = p;
-                    break;
-                }
-                case RowKind.ComponentType:
-                {
-                    var p = TrecsSelectionProxies.NextComponentType();
-                    p.Set(_selectedWorld, data.ComponentType);
-                    Selection.activeObject = p;
-                    break;
-                }
-                case RowKind.SetItem:
-                {
-                    var p = TrecsSelectionProxies.NextSet();
-                    p.Set(_selectedWorld, data.EntitySet);
-                    Selection.activeObject = p;
-                    break;
-                }
-                case RowKind.TagItem:
-                {
-                    var p = TrecsSelectionProxies.NextTag();
-                    p.Set(_selectedWorld, data.Tag);
-                    Selection.activeObject = p;
-                    break;
-                }
-                // Section / Group / AccessorPhase / MorePlaceholder: no proxy.
+                Selection.activeObject = proxy;
             }
+            // Section / Group / AccessorPhase / MorePlaceholder return null
+            // (no proxy). Identity still gets saved so the next RebuildTree
+            // can restore the row's selection.
+            SaveSelectionIdentity(data);
         }
 
         void RouteCacheModeSelection(IEnumerable<object> selected)
@@ -3347,56 +2988,12 @@ namespace Trecs
                 return;
             }
             ArmScrollSuppression();
-            switch (first.Kind)
+            var proxy = TrecsSelectionProxies.CreateProxy(world: null, first);
+            if (proxy != null)
             {
-                case RowKind.Template:
-                case RowKind.AbstractTemplate:
-                {
-                    if (first.CacheTemplate == null)
-                        return;
-                    var p = TrecsSelectionProxies.NextTemplate();
-                    p.SetCache(_cachedSchema, first.CacheTemplate);
-                    Selection.activeObject = p;
-                    break;
-                }
-                case RowKind.ComponentType:
-                {
-                    if (first.CacheComponent == null)
-                        return;
-                    var p = TrecsSelectionProxies.NextComponentType();
-                    p.SetCache(_cachedSchema, first.CacheComponent);
-                    Selection.activeObject = p;
-                    break;
-                }
-                case RowKind.Accessor:
-                {
-                    if (string.IsNullOrEmpty(first.DisplayName))
-                        return;
-                    var p = TrecsSelectionProxies.NextAccessor();
-                    p.SetCache(_cachedSchema, first.DisplayName);
-                    Selection.activeObject = p;
-                    break;
-                }
-                case RowKind.SetItem:
-                {
-                    if (first.CacheSet == null)
-                        return;
-                    var p = TrecsSelectionProxies.NextSet();
-                    p.SetCache(_cachedSchema, first.CacheSet);
-                    Selection.activeObject = p;
-                    break;
-                }
-                case RowKind.TagItem:
-                {
-                    if (first.CacheTag == null)
-                        return;
-                    var p = TrecsSelectionProxies.NextTag();
-                    p.SetCache(_cachedSchema, first.CacheTag);
-                    Selection.activeObject = p;
-                    break;
-                }
-                // Sections, phases, groups: no proxy.
+                Selection.activeObject = proxy;
             }
+            SaveSelectionIdentity(first);
         }
 
         // True when the active selection is one of the Trecs hierarchy proxy
@@ -3404,50 +3001,22 @@ namespace Trecs
         // should fire only while the user is "inside" the hierarchy (e.g.
         // clearing selection on window close).
         static bool IsTrecsSelection(Object obj) =>
-            obj is TrecsEntitySelection
-            || obj is TrecsTemplateSelection
-            || obj is TrecsComponentTypeSelection
-            || obj is TrecsAccessorSelection
-            || obj is TrecsSetSelection
-            || obj is TrecsTagSelection
-            || obj is TrecsMultiSelection;
+            obj is TrecsSelectionProxy || obj is TrecsMultiSelection;
 
         // ----- Preview hover (driven by inspector link MouseEnter/Leave) ----
 
-        void OnPreviewTemplate(World world, Template template)
+        // Single identity-based preview handler. The link factories and
+        // the inspector-title hover wires now all fire PreviewRequested
+        // with the row's stable-key identity (e.g. "tag:Player"); a row
+        // built in this rebuild has the same key in _idByKey.
+        void OnPreviewByIdentity(string identity)
         {
-            if (world != _selectedWorld || template == null)
+            if (string.IsNullOrEmpty(identity))
             {
                 SetPreviewRowId(-1);
                 return;
             }
-            if (_templateIds.TryGetValue(template, out var id))
-            {
-                SetPreviewRowId(id);
-            }
-        }
-
-        void OnPreviewComponentType(World world, Type componentType)
-        {
-            if (world != _selectedWorld || componentType == null)
-            {
-                SetPreviewRowId(-1);
-                return;
-            }
-            if (_componentTypeIds.TryGetValue(componentType, out var id))
-            {
-                SetPreviewRowId(id);
-            }
-        }
-
-        void OnPreviewAccessor(World world, int accessorId)
-        {
-            if (world != _selectedWorld || accessorId < 0)
-            {
-                SetPreviewRowId(-1);
-                return;
-            }
-            if (_accessorTreeIds.TryGetValue(accessorId, out var id))
+            if (_idByKey.TryGetValue(identity, out var id))
             {
                 SetPreviewRowId(id);
             }
@@ -3461,97 +3030,6 @@ namespace Trecs
                 return;
             }
             if (_entityIds.TryGetValue(handle, out var id))
-            {
-                SetPreviewRowId(id);
-            }
-        }
-
-        void OnPreviewSet(World world, SetId setId)
-        {
-            if (world != _selectedWorld || setId.Id == 0)
-            {
-                SetPreviewRowId(-1);
-                return;
-            }
-            if (_setIds.TryGetValue(setId, out var id))
-            {
-                SetPreviewRowId(id);
-            }
-        }
-
-        void OnPreviewTag(World world, Tag tag)
-        {
-            if (world != _selectedWorld || tag.Guid == 0)
-            {
-                SetPreviewRowId(-1);
-                return;
-            }
-            if (_tagIds.TryGetValue(tag.Guid, out var id))
-            {
-                SetPreviewRowId(id);
-            }
-        }
-
-        void OnPreviewTemplateCache(TrecsSchemaTemplate entry)
-        {
-            if (!_cacheMode || entry == null)
-            {
-                SetPreviewRowId(-1);
-                return;
-            }
-            if (_templateCacheIds.TryGetValue(entry, out var id))
-            {
-                SetPreviewRowId(id);
-            }
-        }
-
-        void OnPreviewComponentTypeCache(TrecsSchemaComponentType entry)
-        {
-            if (!_cacheMode || entry == null)
-            {
-                SetPreviewRowId(-1);
-                return;
-            }
-            if (_componentTypeCacheIds.TryGetValue(entry, out var id))
-            {
-                SetPreviewRowId(id);
-            }
-        }
-
-        void OnPreviewAccessorCache(string accessorName)
-        {
-            if (!_cacheMode || string.IsNullOrEmpty(accessorName))
-            {
-                SetPreviewRowId(-1);
-                return;
-            }
-            if (_accessorCacheIds.TryGetValue(accessorName, out var id))
-            {
-                SetPreviewRowId(id);
-            }
-        }
-
-        void OnPreviewSetCache(TrecsSchemaSet entry)
-        {
-            if (!_cacheMode || entry == null)
-            {
-                SetPreviewRowId(-1);
-                return;
-            }
-            if (_setCacheIds.TryGetValue(entry, out var id))
-            {
-                SetPreviewRowId(id);
-            }
-        }
-
-        void OnPreviewTagCache(TrecsSchemaTag entry)
-        {
-            if (!_cacheMode || entry == null)
-            {
-                SetPreviewRowId(-1);
-                return;
-            }
-            if (_tagCacheIds.TryGetValue(entry, out var id))
             {
                 SetPreviewRowId(id);
             }
@@ -3745,36 +3223,39 @@ namespace Trecs
             {
                 _entityIds.TryGetValue(es.Handle, out id);
             }
-            else if (sel is TrecsTemplateSelection ts && ts.GetWorld() == _selectedWorld)
+            else if (sel is TrecsTemplateSelection ts && !string.IsNullOrEmpty(ts.Identity))
             {
-                if (ts.Template != null)
+                if (_idByKey.TryGetValue(ts.Identity, out var resolved))
                 {
-                    _templateIds.TryGetValue(ts.Template, out id);
+                    id = resolved;
                 }
             }
-            else if (sel is TrecsAccessorSelection acs && acs.GetWorld() == _selectedWorld)
+            else if (sel is TrecsAccessorSelection acs && !string.IsNullOrEmpty(acs.Identity))
             {
-                _accessorTreeIds.TryGetValue(acs.AccessorId, out id);
-            }
-            else if (sel is TrecsComponentTypeSelection cs && cs.GetWorld() == _selectedWorld)
-            {
-                if (cs.ComponentType != null)
+                if (_idByKey.TryGetValue(acs.Identity, out var resolved))
                 {
-                    _componentTypeIds.TryGetValue(cs.ComponentType, out id);
+                    id = resolved;
                 }
             }
-            else if (sel is TrecsSetSelection ss && ss.GetWorld() == _selectedWorld)
+            else if (sel is TrecsComponentTypeSelection cs && !string.IsNullOrEmpty(cs.Identity))
             {
-                if (ss.EntitySet.Id.Id != 0)
+                if (_idByKey.TryGetValue(cs.Identity, out var resolved))
                 {
-                    _setIds.TryGetValue(ss.EntitySet.Id, out id);
+                    id = resolved;
                 }
             }
-            else if (sel is TrecsTagSelection tgs && tgs.GetWorld() == _selectedWorld)
+            else if (sel is TrecsSetSelection ss && !string.IsNullOrEmpty(ss.Identity))
             {
-                if (tgs.Tag.Guid != 0)
+                if (_idByKey.TryGetValue(ss.Identity, out var resolved))
                 {
-                    _tagIds.TryGetValue(tgs.Tag.Guid, out id);
+                    id = resolved;
+                }
+            }
+            else if (sel is TrecsTagSelection tgs && !string.IsNullOrEmpty(tgs.Identity))
+            {
+                if (_idByKey.TryGetValue(tgs.Identity, out var resolved))
+                {
+                    id = resolved;
                 }
             }
             else
@@ -3838,33 +3319,46 @@ namespace Trecs
         // we're rendering from a TrecsSchema rather than a live world. The
         // proxies' live fields (Template, ComponentType, etc.) are null in
         // cache mode — only the CacheXxx fields are populated — so this
-        // mirrors UpdateRowSelectionFromUnity's switch but goes through the
-        // schema-entry-keyed dictionaries populated in RebuildTreeFromCache.
+        // mirrors UpdateRowSelectionFromUnity's switch but reads
+        // .DebugName / .DisplayName off the cache entry to look up the
+        // unified name-keyed dictionaries.
         int ResolveCacheModeRowId(Object sel)
         {
             int id = -1;
-            if (sel is TrecsTemplateSelection ts && ts.CacheTemplate != null)
+            if (sel is TrecsTemplateSelection ts && !string.IsNullOrEmpty(ts.Identity))
             {
-                _templateCacheIds.TryGetValue(ts.CacheTemplate, out id);
+                if (_idByKey.TryGetValue(ts.Identity, out var resolved))
+                {
+                    id = resolved;
+                }
             }
-            else if (sel is TrecsComponentTypeSelection cs && cs.CacheComponent != null)
+            else if (sel is TrecsComponentTypeSelection cs && !string.IsNullOrEmpty(cs.Identity))
             {
-                _componentTypeCacheIds.TryGetValue(cs.CacheComponent, out id);
+                if (_idByKey.TryGetValue(cs.Identity, out var resolved))
+                {
+                    id = resolved;
+                }
             }
-            else if (
-                sel is TrecsAccessorSelection acs
-                && !string.IsNullOrEmpty(acs.CacheAccessorName)
-            )
+            else if (sel is TrecsAccessorSelection acs && !string.IsNullOrEmpty(acs.Identity))
             {
-                _accessorCacheIds.TryGetValue(acs.CacheAccessorName, out id);
+                if (_idByKey.TryGetValue(acs.Identity, out var resolved))
+                {
+                    id = resolved;
+                }
             }
-            else if (sel is TrecsSetSelection ss && ss.CacheSet != null)
+            else if (sel is TrecsSetSelection ss && !string.IsNullOrEmpty(ss.Identity))
             {
-                _setCacheIds.TryGetValue(ss.CacheSet, out id);
+                if (_idByKey.TryGetValue(ss.Identity, out var resolved))
+                {
+                    id = resolved;
+                }
             }
-            else if (sel is TrecsTagSelection tgs && tgs.CacheTag != null)
+            else if (sel is TrecsTagSelection tgs && !string.IsNullOrEmpty(tgs.Identity))
             {
-                _tagCacheIds.TryGetValue(tgs.CacheTag, out id);
+                if (_idByKey.TryGetValue(tgs.Identity, out var resolved))
+                {
+                    id = resolved;
+                }
             }
             return id;
         }
@@ -4039,6 +3533,11 @@ namespace Trecs
             }
             id = _nextId++;
             _idByKey[key] = id;
+            var sk = TryGetStableKey(key);
+            if (sk != null)
+            {
+                _stableKeyById[id] = sk;
+            }
             return id;
         }
 
@@ -4047,10 +3546,237 @@ namespace Trecs
         // fresh unkeyed id each rebuild.
         int AllocateAnonId() => _nextId++;
 
+        // Cache-mode rows bypass GetOrAssignId (they use raw _nextId++ +
+        // _idByKey.Clear() each rebuild) but we still want their expand
+        // state to survive domain reloads. Pair the fresh id with a
+        // hand-built stable key from the schema-entry fields.
+        int AllocateIdWithStableKey(string stableKey)
+        {
+            int id = _nextId++;
+            if (stableKey != null)
+            {
+                _stableKeyById[id] = stableKey;
+            }
+            return id;
+        }
+
+        // Maps an _idByKey key into a deterministic short string that
+        // survives domain reload (TreeView ids do not). Returns null for
+        // shapes we don't recognize — those rows simply won't have their
+        // expansion persisted, which is the same behavior as before this
+        // tracking existed.
+        string TryGetStableKey(object key)
+        {
+            switch (key)
+            {
+                case string s:
+                    // Pre-built stable key (templates, after the live/cache
+                    // unification that name-keys both modes through the
+                    // same _idByKey entry).
+                    return s;
+                case Template t:
+                    return TrecsRowIdentity.TemplatePrefix + (t.DebugName ?? "");
+                case EntityHandle eh:
+                    return TrecsRowIdentity.EntityPrefix + eh.UniqueId + ":" + eh.Version;
+                case ValueTuple<Template, GroupIndex> tg:
+                    return "group:"
+                        + (tg.Item1?.DebugName ?? "")
+                        + ":"
+                        + (tg.Item2.IsNull ? -1 : tg.Item2.Index);
+                default:
+                    return null;
+            }
+        }
+
+        // The five hardcoded section ids never flow through GetOrAssignId,
+        // so they need to be seeded into _stableKeyById manually after each
+        // clear. Called from RebuildTree.
+        void SeedSectionStableKeys()
+        {
+            _stableKeyById[SectionTemplatesId] = "section:Templates";
+            _stableKeyById[SectionAccessorsId] = "section:Accessors";
+            _stableKeyById[SectionComponentsId] = "section:Components";
+            _stableKeyById[SectionSetsId] = "section:Sets";
+            _stableKeyById[SectionTagsId] = "section:Tags";
+        }
+
+        // Builds a name-based identity for a selectable row. Distinct from
+        // _stableKeyById (which uses live-world ids for accessors and
+        // entity handles), because selection needs to survive world
+        // transitions and the new world will have different ids. Returns
+        // null for header rows (Section / AccessorPhase / Group /
+        // MorePlaceholder) and unselectable kinds.
+        string TryGetSelectionIdentity(RowData data)
+        {
+            if (data == null)
+            {
+                return null;
+            }
+            switch (data.Kind)
+            {
+                case RowKind.Template:
+                case RowKind.AbstractTemplate:
+                    return data.StableKey;
+                case RowKind.Entity:
+                    // Entity selection across world transitions is
+                    // best-effort: UniqueId+Version are stable within a
+                    // world but not across instances. The match will
+                    // typically miss after play-mode entry, which is the
+                    // honest answer (the editor-mode entity isn't in the
+                    // play-mode world).
+                    if (data.EntityHandle.UniqueId != 0)
+                    {
+                        return TrecsRowIdentity.EntityPrefix
+                            + data.EntityHandle.UniqueId
+                            + ":"
+                            + data.EntityHandle.Version;
+                    }
+                    return null;
+                case RowKind.Accessor:
+                case RowKind.ComponentType:
+                case RowKind.SetItem:
+                case RowKind.TagItem:
+                    return data.StableKey;
+                default:
+                    return null;
+            }
+        }
+
+        // Persists the currently-selected row's identity (or clears it
+        // when there is no Trecs selection). Called after every
+        // user-initiated selection change so the most recent intent is
+        // always in SessionState.
+        void SaveSelectionIdentity(RowData data)
+        {
+            var ident = TryGetSelectionIdentity(data);
+            SessionState.SetString(SelectedRowIdentitySessionKey, ident ?? string.Empty);
+        }
+
+        // After a tree rebuild (live or cache), if Selection.activeObject
+        // doesn't match a row in the current tree, attempt to restore by
+        // looking up the persisted identity and binding a fresh proxy to
+        // the new world. No-op when the existing selection is already
+        // valid for the current world (i.e. the user navigated within
+        // the same world).
+        void TryRestoreSelectionFromIdentity()
+        {
+            if (_tree == null || _dataById.Count == 0)
+            {
+                return;
+            }
+            if (IsCurrentSelectionStillValid())
+            {
+                return;
+            }
+
+            var key = SessionState.GetString(SelectedRowIdentitySessionKey, string.Empty);
+            if (string.IsNullOrEmpty(key))
+            {
+                return;
+            }
+
+            foreach (var kv in _dataById)
+            {
+                var ident = TryGetSelectionIdentity(kv.Value);
+                if (ident == null || ident != key)
+                {
+                    continue;
+                }
+                ApplySelectionFromRow(kv.Key, kv.Value, scrollToItem: false);
+                return;
+            }
+        }
+
+        // True when Selection.activeObject is one of our proxies bound
+        // to the current world / cache schema. Used to short-circuit
+        // restoration so we don't repeatedly create fresh proxy
+        // instances on every routine refresh. Identity is the proxy's
+        // serialized payload — non-empty means the proxy survived
+        // domain reload and points at a row we can render against the
+        // current source. Empty means the proxy is gutted and the
+        // identity-restore path needs to mint a fresh one.
+        bool IsCurrentSelectionStillValid()
+        {
+            var sel = Selection.activeObject;
+            if (sel == null)
+            {
+                return false;
+            }
+            if (_cacheMode)
+            {
+                return sel switch
+                {
+                    // Identity-based: a non-empty Identity is enough; the
+                    // inspector resolves dynamically against ActiveSource
+                    // and shows a "not found" status when stale.
+                    TrecsTemplateSelection ts => !string.IsNullOrEmpty(ts.Identity),
+                    TrecsComponentTypeSelection cs => !string.IsNullOrEmpty(cs.Identity),
+                    TrecsAccessorSelection acs => !string.IsNullOrEmpty(acs.Identity),
+                    TrecsSetSelection ss => !string.IsNullOrEmpty(ss.Identity),
+                    TrecsTagSelection tgs => !string.IsNullOrEmpty(tgs.Identity),
+                    TrecsMultiSelection => true,
+                    _ => false,
+                };
+            }
+            if (_selectedWorld == null)
+            {
+                return false;
+            }
+            return sel switch
+            {
+                TrecsTemplateSelection ts => !string.IsNullOrEmpty(ts.Identity),
+                TrecsEntitySelection es => es.GetWorld() == _selectedWorld
+                    && es.Handle.UniqueId != 0,
+                TrecsAccessorSelection acs => !string.IsNullOrEmpty(acs.Identity),
+                TrecsComponentTypeSelection cs => !string.IsNullOrEmpty(cs.Identity),
+                TrecsSetSelection ss => !string.IsNullOrEmpty(ss.Identity),
+                TrecsTagSelection tgs => !string.IsNullOrEmpty(tgs.Identity),
+                TrecsMultiSelection => true,
+                _ => false,
+            };
+        }
+
+        // Mirrors OnTreeSelectionChanged's single-row switch but works
+        // for both live and cache modes, and is callable from the
+        // selection-restore path (where no UI click occurred). Sets
+        // both the tree's selection highlight and Selection.activeObject
+        // to a fresh proxy bound to the current world / schema.
+        void ApplySelectionFromRow(int rowId, RowData data, bool scrollToItem)
+        {
+            if (data == null)
+            {
+                return;
+            }
+            _suppressTreeSelectionFeedback = true;
+            try
+            {
+                _tree.SetSelectionById(new[] { rowId });
+            }
+            finally
+            {
+                _suppressTreeSelectionFeedback = false;
+            }
+            _lastReflectedSelectionId = rowId;
+
+            var proxy = TrecsSelectionProxies.CreateProxy(_cacheMode ? null : _selectedWorld, data);
+            if (proxy != null)
+            {
+                Selection.activeObject = proxy;
+            }
+
+            if (scrollToItem)
+            {
+                ExpandAncestors(rowId);
+                var captured = rowId;
+                _tree.schedule.Execute(() => ScrollToItemCentered(captured));
+            }
+        }
+
         // Drop key→id entries whose id no longer appears in _dataById. Called
         // at the end of each structural rebuild. Without it, every entity /
         // template / accessor we've ever seen sticks around in _idByKey for
-        // the editor session.
+        // the editor session. _stableKeyById is pruned in lockstep so the
+        // two maps stay consistent.
         void PruneIdByKey()
         {
             List<object> toRemove = null;
@@ -4065,14 +3791,35 @@ namespace Trecs
             {
                 foreach (var k in toRemove)
                 {
+                    var staleId = _idByKey[k];
                     _idByKey.Remove(k);
+                    _stableKeyById.Remove(staleId);
                 }
             }
+
+            List<int> staleStableIds = null;
+            foreach (var kv in _stableKeyById)
+            {
+                if (!_dataById.ContainsKey(kv.Key))
+                {
+                    (staleStableIds ??= new List<int>()).Add(kv.Key);
+                }
+            }
+            if (staleStableIds != null)
+            {
+                foreach (var id in staleStableIds)
+                {
+                    _stableKeyById.Remove(id);
+                }
+            }
+            // Re-seed sections in case a prune dropped them (they're not
+            // in _idByKey, so the loop above wouldn't have removed them,
+            // but the second loop will if _dataById is currently empty).
+            if (_dataById.ContainsKey(SectionTemplatesId))
+            {
+                SeedSectionStableKeys();
+            }
         }
-
-        static object BoxedAccessorIdKey(int accessorId) => ("accessor", accessorId);
-
-        static object BoxedPhaseKey(string title) => ("phase", title);
 
         static object MakeGroupKey(ResolvedTemplate rt, GroupIndex group) => (rt.Template, group);
 
@@ -4096,33 +3843,6 @@ namespace Trecs
             }
             sb.Append("]");
             return sb.ToString();
-        }
-
-        static Texture IconForKind(RowKind kind)
-        {
-            switch (kind)
-            {
-                case RowKind.Template:
-                case RowKind.AbstractTemplate:
-                    return _iconTemplate ??= EditorGUIUtility.IconContent("Prefab Icon").image;
-                case RowKind.Entity:
-                    return _iconEntity ??= EditorGUIUtility.IconContent("GameObject Icon").image;
-                case RowKind.Group:
-                case RowKind.AccessorPhase:
-                    return _iconFolder ??= EditorGUIUtility.IconContent("Folder Icon").image;
-                case RowKind.Accessor:
-                    return _iconScript ??= EditorGUIUtility.IconContent("cs Script Icon").image;
-                case RowKind.ComponentType:
-                    return _iconScriptable ??= EditorGUIUtility
-                        .IconContent("ScriptableObject Icon")
-                        .image;
-                case RowKind.SetItem:
-                    return _iconFolder ??= EditorGUIUtility.IconContent("Folder Icon").image;
-                case RowKind.TagItem:
-                    return EditorGUIUtility.IconContent("FilterByLabel").image;
-                default:
-                    return null;
-            }
         }
 
         // For the Components section we render the raw C# type name so it's
@@ -4182,78 +3902,6 @@ namespace Trecs
             return sb.ToString();
         }
 
-        // ----- Inner types ----------------------------------------------------
-
-        // Scope flags for the search field's prefix syntax. Bit per kind so
-        // a row can ask "am I in scope?" with one mask AND. All has every
-        // bit set; rows of any kind pass an All-scoped filter, but a
-        // scoped filter (e.g. Templates) only lets matching rows through.
-        // Partitions has its own bit so partition rows don't slip through
-        // a scoped filter via a substring match on their tag-set display
-        // string.
-        [Flags]
-        enum SearchScope
-        {
-            Templates = 1 << 0,
-            Entities = 1 << 1,
-            Components = 1 << 2,
-            Accessors = 1 << 3,
-            Sets = 1 << 4,
-            Tags = 1 << 5,
-            Partitions = 1 << 6,
-            All = Templates | Entities | Components | Accessors | Sets | Tags | Partitions,
-        }
-
-        // Parsed form of the search field. Reused across keystrokes (Reset
-        // clears the lists) so we don't allocate a new instance per change.
-        sealed class ParsedSearch
-        {
-            public SearchScope ExplicitKind = SearchScope.All;
-            public bool HasExplicitKind;
-
-            // Negate is true when the user prefixed the token with '-'.
-            // The matcher inverts the per-token result: a negated token
-            // passes when the row would NOT have matched it.
-            public readonly List<(string Key, string Value, bool Negate)> Predicates = new();
-            public readonly List<(string Substring, bool Negate)> BareSubstrings = new();
-
-            public bool IsEmpty =>
-                !HasExplicitKind && Predicates.Count == 0 && BareSubstrings.Count == 0;
-
-            public void Reset()
-            {
-                ExplicitKind = SearchScope.All;
-                HasExplicitKind = false;
-                Predicates.Clear();
-                BareSubstrings.Clear();
-            }
-        }
-
-        // Per-row data the predicate dispatch reads. Each row-build site
-        // stamps the fields its kind cares about and leaves the rest at
-        // default. Passed by ref so the struct doesn't get copied per
-        // predicate evaluation.
-        struct PredicateData
-        {
-            public static readonly PredicateData Empty = default;
-
-            // Live mode — at most one of these is set, matching the row kind.
-            public ResolvedTemplate ResolvedTemplate; // for templates + entity rows
-            public Template AbstractTemplate; // for abstract template rows
-            public Type ComponentType; // for component rows
-            public EntitySet Set; // for set rows (Tags carried inside)
-            public Tag Tag; // for tag rows
-            public string AccessorDebugName; // for accessor rows
-            public WorldInfo WorldInfo; // for derived-template lookup
-
-            // Cache mode — same idea, schema entries instead of live refs.
-            public TrecsSchemaTemplate CacheTemplate;
-            public TrecsSchemaComponentType CacheComponent;
-            public TrecsSchemaSet CacheSet;
-            public TrecsSchemaTag CacheTag;
-            public TrecsSchema CacheSchemaForAccess; // for cache-mode accessor reads/writes
-        }
-
         // Dispatch table: returns true if at least one of the row's
         // resolved values for `key` contains `value` as a substring. False
         // if the predicate isn't defined for this kind (so the row gets
@@ -4281,81 +3929,17 @@ namespace Trecs
 
         bool MatchesTemplatePredicate(string key, string value, in PredicateData ctx)
         {
-            if (ctx.CacheTemplate != null)
+            var t = ctx.Template;
+            if (t == null)
+                return false;
+            return key switch
             {
-                return key switch
-                {
-                    "tag" => ListContains(ctx.CacheTemplate.AllTagNames, value),
-                    "c" or "component" => ListContains(ctx.CacheTemplate.ComponentTypeNames, value)
-                        || ListContains(ctx.CacheTemplate.DirectComponentTypeNames, value)
-                        || ListContains(ctx.CacheTemplate.InheritedComponentTypeNames, value),
-                    "base" => ListContains(ctx.CacheTemplate.BaseTemplateNames, value),
-                    "derived" => ListContains(ctx.CacheTemplate.DerivedTemplateNames, value),
-                    _ => false,
-                };
-            }
-            var rt = ctx.ResolvedTemplate;
-            switch (key)
-            {
-                case "tag":
-                    return rt != null
-                        && !rt.AllTags.IsNull
-                        && TagSetContainsName(rt.AllTags, value);
-                case "c":
-                case "component":
-                    if (rt == null)
-                        return false;
-                    foreach (var d in rt.ComponentDeclarations)
-                    {
-                        if (d.ComponentType == null)
-                            continue;
-                        var n = ComponentTypeDisplayName(d.ComponentType);
-                        if (n != null && n.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            return true;
-                        }
-                    }
-                    return false;
-                case "base":
-                    if (rt == null)
-                        return false;
-                    foreach (var b in rt.AllBaseTemplates)
-                    {
-                        var n = b.DebugName;
-                        if (n != null && n.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            return true;
-                        }
-                    }
-                    return false;
-                case "derived":
-                    if (rt == null || ctx.WorldInfo == null)
-                        return false;
-                    foreach (var other in ctx.WorldInfo.ResolvedTemplates)
-                    {
-                        if (other.Template == rt.Template)
-                            continue;
-                        bool hasUs = false;
-                        foreach (var b in other.AllBaseTemplates)
-                        {
-                            if (b == rt.Template)
-                            {
-                                hasUs = true;
-                                break;
-                            }
-                        }
-                        if (!hasUs)
-                            continue;
-                        var n = other.DebugName;
-                        if (n != null && n.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            return true;
-                        }
-                    }
-                    return false;
-                default:
-                    return false;
-            }
+                "tag" => AnyContains(t.AllTagNames, value),
+                "c" or "component" => AnyContains(t.ComponentTypeNames, value),
+                "base" => AnyContains(t.BaseTemplateNames, value),
+                "derived" => AnyContains(t.DerivedTemplateNames, value),
+                _ => false,
+            };
         }
 
         bool MatchesEntityPredicate(string key, string value, in PredicateData ctx)
@@ -4370,10 +3954,7 @@ namespace Trecs
                 case "component":
                     return MatchesTemplatePredicate(key, value, in ctx);
                 case "template":
-                    var rt = ctx.ResolvedTemplate;
-                    if (rt == null)
-                        return false;
-                    var n = rt.DebugName;
+                    var n = ctx.Template?.DebugName;
                     return n != null && n.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
                 default:
                     return false;
@@ -4387,26 +3968,15 @@ namespace Trecs
             // (a component isn't itself tagged, doesn't have a base, etc.).
             if (key != "c" && key != "component")
                 return false;
-            string name =
-                ctx.CacheComponent != null
-                    ? ctx.CacheComponent.DisplayName
-                    : (
-                        ctx.ComponentType != null
-                            ? ComponentTypeDisplayName(ctx.ComponentType)
-                            : null
-                    );
+            var name = ctx.ComponentType?.DisplayName;
             return name != null && name.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         bool MatchesSetPredicate(string key, string value, in PredicateData ctx)
         {
-            if (key != "tag")
+            if (key != "tag" || ctx.Set == null)
                 return false;
-            if (ctx.CacheSet != null)
-            {
-                return ListContains(ctx.CacheSet.TagNames, value);
-            }
-            return !ctx.Set.Tags.IsNull && TagSetContainsName(ctx.Set.Tags, value);
+            return AnyContains(ctx.Set.TagNames, value);
         }
 
         bool MatchesTagPredicate(string key, string value, in PredicateData ctx)
@@ -4416,182 +3986,53 @@ namespace Trecs
             // components/templates/etc.).
             if (key != "tag")
                 return false;
-            string name = ctx.CacheTag != null ? ctx.CacheTag.Name : ctx.Tag.ToString();
+            var name = ctx.Tag?.Name;
             return name != null && name.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         bool MatchesAccessorPredicate(string key, string value, in PredicateData ctx)
         {
-            if (ctx.CacheSchemaForAccess != null && !string.IsNullOrEmpty(ctx.AccessorDebugName))
-            {
-                return key switch
-                {
-                    "reads" => CacheAccessorTouchesComponent(
-                        ctx.CacheSchemaForAccess,
-                        ctx.AccessorDebugName,
-                        value,
-                        reads: true
-                    ),
-                    "writes" => CacheAccessorTouchesComponent(
-                        ctx.CacheSchemaForAccess,
-                        ctx.AccessorDebugName,
-                        value,
-                        reads: false
-                    ),
-                    _ => false,
-                };
-            }
-            if (string.IsNullOrEmpty(ctx.AccessorDebugName) || _selectedWorld == null)
+            if (string.IsNullOrEmpty(ctx.AccessorDebugName) || _source == null)
             {
                 return false;
             }
-            var tracker = TrecsAccessRegistry.GetTracker(_selectedWorld);
+            var tracker = _source.AccessTracker;
             if (tracker == null)
+            {
                 return false;
+            }
             switch (key)
             {
                 case "reads":
-                    foreach (var id in tracker.GetReadsBy(ctx.AccessorDebugName))
-                    {
-                        if (ComponentIdMatches(id, value))
-                            return true;
-                    }
-                    return false;
+                    return AnyContains(tracker.GetComponentsReadBy(ctx.AccessorDebugName), value);
                 case "writes":
-                    foreach (var id in tracker.GetWritesBy(ctx.AccessorDebugName))
-                    {
-                        if (ComponentIdMatches(id, value))
-                            return true;
-                    }
-                    return false;
+                    return AnyContains(
+                        tracker.GetComponentsWrittenBy(ctx.AccessorDebugName),
+                        value
+                    );
+                case "accesses":
+                    return AnyContains(tracker.GetComponentsReadBy(ctx.AccessorDebugName), value)
+                        || AnyContains(
+                            tracker.GetComponentsWrittenBy(ctx.AccessorDebugName),
+                            value
+                        );
                 default:
                     return false;
             }
         }
 
-        static bool CacheAccessorTouchesComponent(
-            TrecsSchema schema,
-            string accessorName,
-            string value,
-            bool reads
-        )
+        static bool AnyContains(IReadOnlyCollection<string> names, string value)
         {
-            if (schema?.Access == null)
+            if (names == null || names.Count == 0)
                 return false;
-            foreach (var a in schema.Access)
+            foreach (var n in names)
             {
-                var users = reads ? a.ReadBySystems : a.WrittenBySystems;
-                if (users == null || !users.Contains(accessorName))
-                    continue;
-                var n = a.ComponentDisplayName;
                 if (n != null && n.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return true;
                 }
             }
             return false;
-        }
-
-        static bool ComponentIdMatches(ComponentId id, string value)
-        {
-            try
-            {
-                var t = TypeIdProvider.GetTypeFromId(id.Value);
-                if (t == null)
-                    return false;
-                var n = ComponentTypeDisplayName(t);
-                return n != null && n.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        static bool ListContains(List<string> list, string value)
-        {
-            if (list == null)
-                return false;
-            for (int i = 0; i < list.Count; i++)
-            {
-                var v = list[i];
-                if (v != null && v.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        static bool TagSetContainsName(TagSet ts, string value)
-        {
-            if (ts.IsNull)
-                return false;
-            foreach (var t in ts.Tags)
-            {
-                var n = t.ToString();
-                if (n != null && n.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        enum RowKind
-        {
-            Section,
-            Template,
-            AbstractTemplate,
-            Group,
-            Entity,
-            MorePlaceholder,
-            AccessorPhase,
-            Accessor,
-            ComponentType,
-            SetItem,
-            TagItem,
-        }
-
-        // Single mutable row payload shared across all kinds. Each TreeView
-        // item carries a reference to one of these, so periodic refresh can
-        // mutate fields (Count, SystemEnabled) and a follow-up RefreshItems
-        // re-binds visible rows without touching tree structure.
-        sealed class RowData
-        {
-            public RowKind Kind;
-            public string DisplayName;
-            public ResolvedTemplate ResolvedTemplate;
-            public Template Template;
-            public GroupIndex Group;
-            public TagSet PartitionTags;
-            public EntityHandle EntityHandle;
-            public int AccessorId;
-            public int SystemIndex;
-            public int? ExecutionPriority;
-            public bool SystemEnabled;
-            public Type ComponentType;
-            public EntitySet EntitySet;
-            public Tag Tag;
-            public int Count;
-            public bool ShowCount;
-
-            // Cache-mode payloads — populated by RebuildTreeFromCache so
-            // OnTreeSelectionChanged can route clicks through the proxies'
-            // SetCache(...) entry points without re-walking the schema.
-            public TrecsSchemaTemplate CacheTemplate;
-            public TrecsSchemaComponentType CacheComponent;
-            public TrecsSchemaSet CacheSet;
-            public TrecsSchemaTag CacheTag;
-        }
-
-        struct AccessorRowSpec
-        {
-            public int AccessorId;
-            public string DisplayName;
-            public int SystemIndex; // -1 for manual accessors
-            public int? ExecutionPriority;
-            public bool SystemEnabled;
         }
     }
 }

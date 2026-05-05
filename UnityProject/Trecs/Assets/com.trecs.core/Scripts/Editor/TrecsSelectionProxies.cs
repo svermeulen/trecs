@@ -1,8 +1,56 @@
+using System;
 using UnityEditor;
 using UnityEngine;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Common base for the per-kind selection-proxy ScriptableObjects assigned
+    /// to <see cref="Selection.activeObject"/> when the user picks a row in
+    /// <see cref="TrecsHierarchyWindow"/>. Carries an opaque
+    /// <see cref="Identity"/> string (e.g. <c>"template:Foo"</c>) that derived
+    /// inspectors resolve dynamically against
+    /// <see cref="TrecsHierarchyWindow.ActiveSource"/> on every refresh.
+    /// Identity is <c>[SerializeField]</c> so it survives Unity's selection
+    /// serialization across play-mode entry/exit and domain reload — the
+    /// inspector self-rebinds without the window having to chase the
+    /// proxy down on every restoration race.
+    /// </summary>
+    public abstract class TrecsSelectionProxy : ScriptableObject
+    {
+        [SerializeField]
+        string _identity;
+
+        // Entity is the one kind that doesn't fit the identity pattern —
+        // an EntityHandle is meaningful only relative to a specific World
+        // instance, so the proxy holds the world directly. WeakReference
+        // so a stale proxy doesn't pin a disposed world.
+        [NonSerialized]
+        WeakReference<World> _worldRef;
+
+        public string Identity => _identity;
+
+        public void SetIdentity(string identity, string displayName)
+        {
+            _identity = identity;
+            name = displayName;
+        }
+
+        public World GetWorld()
+        {
+            if (_worldRef == null)
+            {
+                return null;
+            }
+            return _worldRef.TryGetTarget(out var w) ? w : null;
+        }
+
+        protected void SetWorld(World world)
+        {
+            _worldRef = world == null ? null : new WeakReference<World>(world);
+        }
+    }
+
     /// <summary>
     /// Pool of editor-session-scoped selection-proxy ScriptableObjects, one
     /// ring per kind (Template / Entity / Component / Accessor / Set / Tag).
@@ -64,6 +112,63 @@ namespace Trecs
                     _multi.name = "Trecs Multi-Select";
                 }
                 return _multi;
+            }
+        }
+
+        // Builds the right kind of selection proxy for the given row,
+        // stamps it with the row's payload, and returns it. Pass the live
+        // World only for Entity rows (which can't be resolved by identity);
+        // null is fine for everything else, and required for cache mode
+        // where there's no world to thread. Returns null for row kinds
+        // with no inspector (Section, Group, AccessorPhase, MorePlaceholder)
+        // and for Entity rows when no world is supplied.
+        internal static TrecsSelectionProxy CreateProxy(World world, RowData data)
+        {
+            switch (data.Kind)
+            {
+                case RowKind.Template:
+                case RowKind.AbstractTemplate:
+                {
+                    var p = NextTemplate();
+                    p.SetIdentity(data.StableKey, data.DisplayName);
+                    return p;
+                }
+                case RowKind.Entity:
+                {
+                    if (world == null)
+                    {
+                        return null;
+                    }
+                    var p = NextEntity();
+                    p.Set(world, data.EntityHandle);
+                    return p;
+                }
+                case RowKind.Accessor:
+                {
+                    var p = NextAccessor();
+                    p.SetIdentity(data.StableKey, data.DisplayName);
+                    return p;
+                }
+                case RowKind.ComponentType:
+                {
+                    var p = NextComponentType();
+                    p.SetIdentity(data.StableKey, data.DisplayName);
+                    return p;
+                }
+                case RowKind.SetItem:
+                {
+                    var p = NextSet();
+                    p.SetIdentity(data.StableKey, data.DisplayName);
+                    return p;
+                }
+                case RowKind.TagItem:
+                {
+                    var p = NextTag();
+                    p.SetIdentity(data.StableKey, data.DisplayName);
+                    return p;
+                }
+                default:
+                    return null;
             }
         }
 

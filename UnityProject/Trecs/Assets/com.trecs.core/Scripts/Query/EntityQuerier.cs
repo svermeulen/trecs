@@ -341,11 +341,10 @@ namespace Trecs.Internal
                     // bypass the ComponentArray's NativeList atomic safety handle entirely.
                     var componentArray = (IComponentArray<T>)typeSafeDictionary;
                     var buffer = componentArray.GetValues(out var entryCount);
-                    var rawPtr = buffer.GetRawReadWritePointer(out _);
                     entries[writeIdx] = new NativeComponentLookupEntry
                     {
                         GroupIndex = group,
-                        DataPtr = (void*)rawPtr,
+                        DataPtr = buffer.GetRawPointer(out _),
                         Count = entryCount,
                     };
                     writeIdx++;

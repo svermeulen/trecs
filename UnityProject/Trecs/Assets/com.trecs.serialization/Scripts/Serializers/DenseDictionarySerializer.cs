@@ -1,5 +1,4 @@
 using System;
-using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization
@@ -30,7 +29,7 @@ namespace Trecs.Serialization
                 }
                 else
                 {
-                    Assert.That(dict.IsEmpty());
+                    Assert.That(dict.IsEmpty);
                 }
 
                 DenseDictionaryBlitHelperCache<TKey, TValue>.Helper.DeserializeBlit(
@@ -49,7 +48,7 @@ namespace Trecs.Serialization
                 }
                 else
                 {
-                    Assert.That(dict.IsEmpty());
+                    Assert.That(dict.IsEmpty);
                     dict.EnsureCapacity(numItems);
                 }
 

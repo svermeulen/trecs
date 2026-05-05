@@ -2,9 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using Trecs.Internal;
 
-namespace Trecs.Collections
+namespace Trecs.Internal // not part of public api atm
 {
     /// <summary>
     ///   Reasons to use this over standard C# HashSet:
@@ -30,10 +29,7 @@ namespace Trecs.Collections
             _dictionary = new DenseDictionary<T, HashSetEmptyValue>(size);
         }
 
-        public bool IsEmpty()
-        {
-            return _dictionary.Count == 0;
-        }
+        public bool IsEmpty => _dictionary.Count == 0;
 
         /// <summary>
         /// Gets the number of elements in the set.

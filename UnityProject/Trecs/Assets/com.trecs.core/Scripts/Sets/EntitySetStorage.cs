@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using Trecs.Collections;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -151,20 +150,20 @@ namespace Trecs.Internal
         /// </summary>
         internal void FlushJobWrites()
         {
-            for (int i = 0; i < _jobRemoveQueue.Count; i++)
+            for (int i = 0; i < _jobRemoveQueue.Length; i++)
             {
                 ref var bag = ref _jobRemoveQueue.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                 {
                     var entityIndex = bag.Dequeue<EntityIndex>();
                     _entriesPerGroup[entityIndex.GroupIndex.Index].Remove(entityIndex.Index);
                 }
             }
 
-            for (int i = 0; i < _jobAddQueue.Count; i++)
+            for (int i = 0; i < _jobAddQueue.Length; i++)
             {
                 ref var bag = ref _jobAddQueue.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                 {
                     var entityIndex = bag.Dequeue<EntityIndex>();
                     _entriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
@@ -192,10 +191,10 @@ namespace Trecs.Internal
 
         static void DrainBags(AtomicNativeBags bags)
         {
-            for (int i = 0; i < bags.Count; i++)
+            for (int i = 0; i < bags.Length; i++)
             {
                 ref var bag = ref bags.GetBag(i);
-                while (!bag.IsEmpty())
+                while (!bag.IsEmpty)
                     bag.Dequeue<EntityIndex>();
             }
         }

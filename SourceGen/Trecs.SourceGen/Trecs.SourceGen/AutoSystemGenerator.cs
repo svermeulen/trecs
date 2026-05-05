@@ -258,43 +258,10 @@ namespace Trecs.SourceGen
                     isValid = false;
                 }
 
-                // Check for multiple iteration attributes on the same method
-                var attrCount = 0;
-                if (
-                    PerformanceCache.HasAttributeByName(
-                        methodSymbol,
-                        TrecsAttributeNames.EntityFilter,
-                        TrecsNamespaces.Trecs
-                    )
-                )
-                    attrCount++;
-                if (
-                    PerformanceCache.HasAttributeByName(
-                        methodSymbol,
-                        TrecsAttributeNames.SingleEntity,
-                        TrecsNamespaces.Trecs
-                    )
-                )
-                    attrCount++;
-                if (attrCount > 1)
-                {
-                    reportDiagnostic(
-                        Diagnostic.Create(
-                            DiagnosticDescriptors.IterationMethodMultipleAttributes,
-                            methodLocation,
-                            methodName
-                        )
-                    );
-                    isValid = false;
-                }
-
                 var customParams = new List<CustomParamInfo>();
                 bool hasAnyAttributeCriteria = HasAnyAttributeCriteria(methodSymbol);
 
-                if (
-                    iterationType == IterationType.EntityFilterComponents
-                    || iterationType == IterationType.SingleEntityComponents
-                )
+                if (iterationType == IterationType.EntityFilterComponents)
                 {
                     bool readingComponents = true;
                     var methodReadTypes = new List<ITypeSymbol>();
@@ -369,10 +336,7 @@ namespace Trecs.SourceGen
                         foreach (var attr in PerformanceCache.GetAttributes(methodSymbol))
                         {
                             var attrName = attr.AttributeClass?.Name;
-                            if (
-                                attrName == TrecsAttributeNames.EntityFilter
-                                || attrName == TrecsAttributeNames.SingleEntity
-                            )
+                            if (attrName == TrecsAttributeNames.EntityFilter)
                             {
                                 foreach (var constructorArg in attr.ConstructorArguments)
                                 {
@@ -404,10 +368,7 @@ namespace Trecs.SourceGen
                         }
                     }
                 }
-                else if (
-                    iterationType == IterationType.EntityFilterAspect
-                    || iterationType == IterationType.SingleEntityAspect
-                )
+                else if (iterationType == IterationType.EntityFilterAspect)
                 {
                     var parameters = methodDecl.ParameterList.Parameters;
                     if (parameters.Count > 0)
@@ -522,6 +483,42 @@ namespace Trecs.SourceGen
                                 );
                             }
                         }
+                    }
+                }
+                else if (iterationType == IterationType.RunOnce)
+                {
+                    // RunOnce methods consume [SingleEntity] params via RunOnceGenerator's
+                    // generated (WorldAccessor) overload. The auto-system wrapper just
+                    // forwards [PassThroughArgument] params (typically none for Execute,
+                    // since Execute can't have customs by design).
+                    foreach (var param in methodDecl.ParameterList.Parameters)
+                    {
+                        var paramSymbol = semanticModel.GetDeclaredSymbol(param);
+                        if (paramSymbol == null)
+                            continue;
+                        if (
+                            !PerformanceCache.HasAttributeByName(
+                                paramSymbol,
+                                TrecsAttributeNames.PassThroughArgument,
+                                TrecsNamespaces.Trecs
+                            )
+                        )
+                            continue;
+                        var paramType =
+                            param.Type != null ? semanticModel.GetTypeInfo(param.Type).Type : null;
+                        if (paramType == null)
+                            continue;
+                        var paramIsRef = param.Modifiers.Any(m => m.IsKind(SyntaxKind.RefKeyword));
+                        var paramIsIn = param.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword));
+                        customParams.Add(
+                            new CustomParamInfo(
+                                PerformanceCache.GetDisplayString(paramType),
+                                paramType,
+                                param.Identifier.ToString(),
+                                paramIsRef,
+                                paramIsIn
+                            )
+                        );
                     }
                 }
 
@@ -668,11 +665,11 @@ namespace Trecs.SourceGen
             return isValid;
         }
 
-        // IterationType distinguishes EntityFilter/SingleEntity x Aspect/Components
-        // four-way internally — those are the four code paths AutoSystemGenerator's
-        // emission switches on. The PUBLIC user-facing API is just [ForEachEntity] and
-        // [SingleEntity]; this method maps each marker to the right internal kind by
-        // inspecting the method's parameter shape.
+        // IterationType distinguishes the three code paths AutoSystemGenerator's
+        // emission switches on: [ForEachEntity] aspect/components iteration, and
+        // RunOnce (methods with [SingleEntity] parameters and no [ForEachEntity] /
+        // [WrapAsJob]). The aspect-vs-components split for [ForEachEntity] is
+        // determined by the method's parameter shape.
         private static IterationType? GetIterationType(IMethodSymbol methodSymbol)
         {
             if (IterationAttributeRouting.HasEntityFilter(methodSymbol))
@@ -681,11 +678,9 @@ namespace Trecs.SourceGen
                     ? IterationType.EntityFilterAspect
                     : IterationType.EntityFilterComponents;
             }
-            if (IterationAttributeRouting.HasSingleEntity(methodSymbol))
+            if (IterationAttributeRouting.IsRunOnceMethod(methodSymbol))
             {
-                return IterationAttributeRouting.RoutesToAspectGenerator(methodSymbol)
-                    ? IterationType.SingleEntityAspect
-                    : IterationType.SingleEntityComponents;
+                return IterationType.RunOnce;
             }
             return null;
         }
@@ -695,16 +690,20 @@ namespace Trecs.SourceGen
         /// (Tags/Tag/Set/MatchByComponents). Used to decide whether to generate the
         /// auto-wrapper that calls Method(_world): without any criteria there is no
         /// (WorldAccessor) overload to call.
+        /// <para>
+        /// RunOnce methods always have criteria (the per-parameter <c>[SingleEntity]</c>
+        /// inline tags), so we shortcut to <c>true</c> for them.
+        /// </para>
         /// </summary>
         private static bool HasAnyAttributeCriteria(IMethodSymbol methodSymbol)
         {
+            if (IterationAttributeRouting.IsRunOnceMethod(methodSymbol))
+                return true;
+
             foreach (var attr in PerformanceCache.GetAttributes(methodSymbol))
             {
                 var name = attr.AttributeClass?.Name;
-                if (
-                    name != TrecsAttributeNames.EntityFilter
-                    && name != TrecsAttributeNames.SingleEntity
-                )
+                if (name != TrecsAttributeNames.EntityFilter)
                     continue;
 
                 foreach (var namedArg in attr.NamedArguments)
@@ -897,8 +896,14 @@ namespace Trecs.SourceGen
     {
         EntityFilterComponents,
         EntityFilterAspect,
-        SingleEntityComponents,
-        SingleEntityAspect,
+
+        /// <summary>
+        /// Method has one or more <c>[SingleEntity]</c> parameters and no other
+        /// iteration attribute. <see cref="RunOnceGenerator"/> emits the
+        /// <c>(WorldAccessor)</c> overload that resolves each singleton then calls
+        /// the user method exactly once.
+        /// </summary>
+        RunOnce,
     }
 
     internal class IterationMethodInfo

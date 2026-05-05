@@ -356,6 +356,15 @@ namespace Trecs.Serialization
                 "Heap memory serialized in {} kb",
                 (writer.NumBytesWritten - bytesBefore) / 1024f
             );
+
+            // Per-system deterministic paused state. Channel state (Editor /
+            // Playback / User) is intentionally not serialized — those are
+            // ephemeral, app-side concerns.
+            using (TrecsProfiling.Start("Writing system enable state"))
+            {
+                var trecsWriter = new TrecsSerializationWriterAdapter(writer);
+                _world.SystemEnableState.Serialize(trecsWriter);
+            }
         }
 
         void WriteSetRoutingIndex(
@@ -579,6 +588,12 @@ namespace Trecs.Serialization
                 _world.GetSharedHeap().Deserialize(trecsReader);
                 _world.GetNativeSharedHeap().Deserialize(trecsReader);
                 _world.GetNativeUniqueHeap().Deserialize(trecsReader);
+            }
+
+            using (TrecsProfiling.Start("Reading system enable state"))
+            {
+                var trecsReader = new TrecsSerializationReaderAdapter(reader);
+                _world.SystemEnableState.Deserialize(trecsReader);
             }
         }
 
