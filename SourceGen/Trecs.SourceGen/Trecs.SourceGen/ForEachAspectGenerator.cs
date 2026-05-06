@@ -724,7 +724,12 @@ namespace Trecs.SourceGen
                 indentLevel: 3,
                 worldVar: "__world"
             );
-            HoistedSingleEmitter.Emit(sb, indentLevel: 3, worldVar: "__world", info.HoistedSingletons);
+            HoistedSingleEmitter.Emit(
+                sb,
+                indentLevel: 3,
+                worldVar: "__world",
+                info.HoistedSingletons
+            );
 
             EmitPerGroupBufferFetch(
                 sb,

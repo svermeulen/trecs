@@ -36,12 +36,16 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS001", new IIncrementalGenerator[]
-        {
-            new ForEachAspectGenerator(),
-            new IncrementalAspectGenerator(),
-            new IncrementalEntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS001",
+            new IIncrementalGenerator[]
+            {
+                new ForEachAspectGenerator(),
+                new IncrementalAspectGenerator(),
+                new IncrementalEntityComponentGenerator(),
+            }
+        );
     }
 
     [Test]
@@ -61,11 +65,15 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS002", new IIncrementalGenerator[]
-        {
-            new IncrementalForEachGenerator(),
-            new IncrementalEntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS002",
+            new IIncrementalGenerator[]
+            {
+                new IncrementalForEachGenerator(),
+                new IncrementalEntityComponentGenerator(),
+            }
+        );
     }
 
     [Test]
@@ -86,11 +94,15 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS003", new IIncrementalGenerator[]
-        {
-            new IncrementalForEachGenerator(),
-            new IncrementalEntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS003",
+            new IIncrementalGenerator[]
+            {
+                new IncrementalForEachGenerator(),
+                new IncrementalEntityComponentGenerator(),
+            }
+        );
     }
 
     [Test]
@@ -112,11 +124,15 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS004", new IIncrementalGenerator[]
-        {
-            new IncrementalForEachGenerator(),
-            new IncrementalEntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS004",
+            new IIncrementalGenerator[]
+            {
+                new IncrementalForEachGenerator(),
+                new IncrementalEntityComponentGenerator(),
+            }
+        );
     }
 
     [Test]
@@ -140,11 +156,15 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS005", new IIncrementalGenerator[]
-        {
-            new JobGenerator(),
-            new IncrementalEntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS005",
+            new IIncrementalGenerator[]
+            {
+                new JobGenerator(),
+                new IncrementalEntityComponentGenerator(),
+            }
+        );
     }
 
     [Test]
@@ -169,12 +189,16 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS007", new IIncrementalGenerator[]
-        {
-            new JobGenerator(),
-            new IncrementalAspectGenerator(),
-            new IncrementalEntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS007",
+            new IIncrementalGenerator[]
+            {
+                new JobGenerator(),
+                new IncrementalAspectGenerator(),
+                new IncrementalEntityComponentGenerator(),
+            }
+        );
     }
 
     [Test]
@@ -196,21 +220,25 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS008", new IIncrementalGenerator[]
-        {
-            new JobGenerator(),
-            new IncrementalEntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS008",
+            new IIncrementalGenerator[]
+            {
+                new JobGenerator(),
+                new IncrementalEntityComponentGenerator(),
+            }
+        );
     }
 
-    static void AssertDiagnostic(string source, string expectedId, IIncrementalGenerator[] generators)
+    static void AssertDiagnostic(
+        string source,
+        string expectedId,
+        IIncrementalGenerator[] generators
+    )
     {
         var run = GeneratorTestHarness.Run(generators, source);
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
-        Assert.That(
-            diag,
-            Is.Not.Null,
-            $"Expected {expectedId}, got:\n{run.Format()}"
-        );
+        Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
     }
 }

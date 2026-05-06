@@ -635,8 +635,7 @@ namespace Trecs.SourceGen
                         return null;
                     }
 
-                    var seParamLoc =
-                        param.Locations.FirstOrDefault() ?? methodDecl.GetLocation();
+                    var seParamLoc = param.Locations.FirstOrDefault() ?? methodDecl.GetLocation();
                     var seTagTypes = InlineTagsParser.ParseFromSymbol(
                         param,
                         "SingleEntity",
@@ -1230,9 +1229,7 @@ namespace Trecs.SourceGen
                             sb.AppendLine(
                                 $"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]"
                             );
-                        sb.AppendLine(
-                            $"{fieldInd}public {p.TypeDisplay} {GenPrefix}se_{p.Name};"
-                        );
+                        sb.AppendLine($"{fieldInd}public {p.TypeDisplay} {GenPrefix}se_{p.Name};");
                         break;
                     case AutoJobParamRole.SingleEntityComponentRead:
                         sb.AppendLine(
@@ -1834,11 +1831,8 @@ namespace Trecs.SourceGen
                 || p.Role == AutoJobParamRole.SingleEntityComponentWrite
             );
 
-        static void EmitSingleEntityHoistedSetup(
-            StringBuilder sb,
-            string body,
-            AutoJobInfo info
-        ) => SingleEntityEmitter.EmitHoistedSetup(sb, body, SingleEntityParams(info));
+        static void EmitSingleEntityHoistedSetup(StringBuilder sb, string body, AutoJobInfo info) =>
+            SingleEntityEmitter.EmitHoistedSetup(sb, body, SingleEntityParams(info));
 
         static void EmitSingleEntityDepRegistration(
             StringBuilder sb,
@@ -2184,13 +2178,14 @@ namespace Trecs.SourceGen
             // _trecs_se_<name>[/_read|_write] convention.
             string SingleEntityEmitter.IEmitTarget.LocalNameRoot => Name;
 
-            string SingleEntityEmitter.IEmitTarget.JobFieldAssignmentLhs => Role switch
-            {
-                AutoJobParamRole.SingleEntityAspect => $"{GenPrefix}se_{Name}",
-                AutoJobParamRole.SingleEntityComponentRead => $"{GenPrefix}se_{Name}_read",
-                AutoJobParamRole.SingleEntityComponentWrite => $"{GenPrefix}se_{Name}_write",
-                _ => Name,
-            };
+            string SingleEntityEmitter.IEmitTarget.JobFieldAssignmentLhs =>
+                Role switch
+                {
+                    AutoJobParamRole.SingleEntityAspect => $"{GenPrefix}se_{Name}",
+                    AutoJobParamRole.SingleEntityComponentRead => $"{GenPrefix}se_{Name}_read",
+                    AutoJobParamRole.SingleEntityComponentWrite => $"{GenPrefix}se_{Name}_write",
+                    _ => Name,
+                };
 
             bool SingleEntityEmitter.IEmitTarget.IsAspect =>
                 Role == AutoJobParamRole.SingleEntityAspect;
@@ -2208,8 +2203,9 @@ namespace Trecs.SourceGen
                 Role == AutoJobParamRole.SingleEntityAspect ? TypeDisplay : null;
 
             string? SingleEntityEmitter.IEmitTarget.ComponentTypeDisplay =>
-                Role is AutoJobParamRole.SingleEntityComponentRead
-                    or AutoJobParamRole.SingleEntityComponentWrite
+                Role
+                    is AutoJobParamRole.SingleEntityComponentRead
+                        or AutoJobParamRole.SingleEntityComponentWrite
                     ? TypeDisplay
                     : null;
         }

@@ -85,8 +85,7 @@ namespace Trecs.SourceGen
             if (classDecl == null)
                 return null;
 
-            var methodSymbol =
-                context.SemanticModel.GetDeclaredSymbol(methodDecl) as IMethodSymbol;
+            var methodSymbol = context.SemanticModel.GetDeclaredSymbol(methodDecl) as IMethodSymbol;
             if (methodSymbol == null)
                 return null;
 
@@ -161,7 +160,14 @@ namespace Trecs.SourceGen
                 SourceGenLogger.Log($"[RunOnceGenerator] Processing {className}.{methodName}");
 
                 var source = ErrorRecovery.TryExecute(
-                    () => Emit(data.ClassDecl, data.MethodDecl, data.MethodSymbol.ContainingType, data.Validated, globalNamespaceName),
+                    () =>
+                        Emit(
+                            data.ClassDecl,
+                            data.MethodDecl,
+                            data.MethodSymbol.ContainingType,
+                            data.Validated,
+                            globalNamespaceName
+                        ),
                     context,
                     location,
                     "RunOnce code generation"
@@ -420,7 +426,11 @@ namespace Trecs.SourceGen
 
             var sb = OptimizedStringBuilder.ForAspect(8);
 
-            var namespaces = new HashSet<string>(CommonUsings.Namespaces) { "Unity.Jobs", "System" };
+            var namespaces = new HashSet<string>(CommonUsings.Namespaces)
+            {
+                "Unity.Jobs",
+                "System",
+            };
             HoistedSingleEmitter.CollectNamespaces(
                 namespaces,
                 info.HoistedSingletons,
@@ -462,19 +472,20 @@ namespace Trecs.SourceGen
         {
             var customDecl = string.Join(
                 "",
-                info.ParamSlots
-                    .Where(s => s.Kind == RunOnceParamKind.Custom)
+                info.ParamSlots.Where(s => s.Kind == RunOnceParamKind.Custom)
                     .Select(s =>
                         $", {(s.IsRef ? "ref " : s.IsIn ? "in " : "")}{s.ParamTypeDisplay} {s.ParamName}"
                     )
             );
-            sb.AppendLine(
-                2,
-                $"{visibility} void {methodName}(WorldAccessor __world{customDecl})"
-            );
+            sb.AppendLine(2, $"{visibility} void {methodName}(WorldAccessor __world{customDecl})");
             sb.AppendLine(2, "{");
 
-            HoistedSingleEmitter.Emit(sb, indentLevel: 3, worldVar: "__world", info.HoistedSingletons);
+            HoistedSingleEmitter.Emit(
+                sb,
+                indentLevel: 3,
+                worldVar: "__world",
+                info.HoistedSingletons
+            );
 
             var callArgs = new List<string>();
             foreach (var slot in info.ParamSlots)

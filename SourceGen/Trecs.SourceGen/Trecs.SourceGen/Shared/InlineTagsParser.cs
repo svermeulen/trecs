@@ -68,10 +68,7 @@ namespace Trecs.SourceGen.Shared
                         )
                             ctorTags.Add(cet);
                 }
-                else if (
-                    ctorArg.Kind == TypedConstantKind.Type
-                    && ctorArg.Value is ITypeSymbol ct
-                )
+                else if (ctorArg.Kind == TypedConstantKind.Type && ctorArg.Value is ITypeSymbol ct)
                 {
                     ctorTags.Add(ct);
                 }
@@ -101,7 +98,8 @@ namespace Trecs.SourceGen.Shared
             bool hasNamedTags = singleTag != null || tagTypes.Count > 0;
             bool hasCtorTags = ctorTags.Count > 0;
             bool hasGenericTags = genericTags.Count > 0;
-            int sourcesPresent = (hasNamedTags ? 1 : 0) + (hasCtorTags ? 1 : 0) + (hasGenericTags ? 1 : 0);
+            int sourcesPresent =
+                (hasNamedTags ? 1 : 0) + (hasCtorTags ? 1 : 0) + (hasGenericTags ? 1 : 0);
             if (sourcesPresent > 1)
             {
                 reportDiagnostic(
@@ -165,10 +163,9 @@ namespace Trecs.SourceGen.Shared
         {
             // attributeShortName is the simple attribute name w/ "Attribute" suffix.
             // Symbols always carry the full FQN — match against the Name.
-            string fullName =
-                attributeShortName.EndsWith("Attribute")
-                    ? attributeShortName
-                    : attributeShortName + "Attribute";
+            string fullName = attributeShortName.EndsWith("Attribute")
+                ? attributeShortName
+                : attributeShortName + "Attribute";
             foreach (var attr in PerformanceCache.GetAttributes(symbol))
             {
                 if (attr.AttributeClass?.Name != fullName)

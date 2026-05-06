@@ -82,11 +82,8 @@ namespace Trecs.SourceGen
 
                 var semanticModel = context.GetSemanticModel(syntaxTree);
                 if (
-                    semanticModel.GetDeclaredSymbol(
-                        classDecl,
-                        context.CancellationToken
-                    )
-                        is not INamedTypeSymbol classSymbol
+                    semanticModel.GetDeclaredSymbol(classDecl, context.CancellationToken)
+                    is not INamedTypeSymbol classSymbol
                 )
                     continue;
 

@@ -58,11 +58,12 @@ internal static class GeneratorTestHarness
             parseOptions: driverParseOptions,
             optionsProvider: null
         );
-        driver = (CSharpGeneratorDriver)driver.RunGeneratorsAndUpdateCompilation(
-            compilation,
-            out var outputCompilation,
-            out var generationDiagnostics
-        );
+        driver = (CSharpGeneratorDriver)
+            driver.RunGeneratorsAndUpdateCompilation(
+                compilation,
+                out var outputCompilation,
+                out var generationDiagnostics
+            );
 
         var runResult = driver.GetRunResult();
         var generatedTrees = runResult
@@ -176,7 +177,9 @@ internal sealed record GeneratorRun(
         else
         {
             foreach (var d in compileErrorsAndWarnings)
-                sb.AppendLine($"  {d.Severity} {d.Id} at {d.Location.GetLineSpan()}: {d.GetMessage()}");
+                sb.AppendLine(
+                    $"  {d.Severity} {d.Id} at {d.Location.GetLineSpan()}: {d.GetMessage()}"
+                );
         }
 
         sb.AppendLine($"--- Generated files ({GeneratedTrees.Length}) ---");

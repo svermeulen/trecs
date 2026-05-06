@@ -341,7 +341,6 @@ namespace Trecs.SourceGen
             }
         }
     }
-
 }
 
 namespace System.Runtime.CompilerServices
