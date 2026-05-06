@@ -12,7 +12,7 @@ namespace Trecs.Samples.FeedingFrenzy101
     /// </summary>
     public partial class MovementSystem : ISystem
     {
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.Eating) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.Eating))]
         [WrapAsJob]
         static void Execute(in Fish fish, in NativeWorldAccessor world)
         {

@@ -25,17 +25,17 @@ namespace Trecs.Serialization
     /// Keyboard shortcuts (Space, Home/End, ←/→, Shift+arrows) drive the
     /// same actions when the window has focus.
     /// </summary>
-    public class TrecsTimeTravelWindow : EditorWindow
+    public class TrecsPlayerWindow : EditorWindow
     {
         [InitializeOnLoadMethod]
         static void RegisterEditorAccessorName() =>
-            TrecsEditorAccessorNames.Register("TrecsTimeTravelWindow");
+            TrecsEditorAccessorNames.Register("TrecsPlayerWindow");
 
         // Speed presets the inline button cycles through. A discrete set
         // matches user expectations (YouTube / VLC / Replay Mod) and is more
         // useful for debug than fine-grained slider control — nobody needs
         // 0.83×.
-        static readonly float[] SpeedPresets = { 0.1f, 0.25f, 0.5f, 1f, 2f };
+        static readonly float[] SpeedPresets = { 0.1f, 0.25f, 0.5f, 1f, 2f, 4f, 8f };
 
         // Shared "this transport control is active" tint — Loop ON, Play
         // when paused. One color so the visual vocabulary stays consistent;
@@ -229,7 +229,7 @@ namespace Trecs.Serialization
         [MenuItem("Window/Trecs/Player")]
         public static void ShowWindow()
         {
-            var window = GetWindow<TrecsTimeTravelWindow>();
+            var window = GetWindow<TrecsPlayerWindow>();
             window.titleContent = new GUIContent("Trecs Player");
             window.minSize = new Vector2(320, 260);
         }
@@ -371,7 +371,21 @@ namespace Trecs.Serialization
             _recordingStatusLabel.style.bottom = 4;
             _recordingStatusLabel.style.left = 8;
             _recordingStatusLabel.style.fontSize = 10;
-            _recordingStatusLabel.style.opacity = 0.7f;
+            // Background + padding keep the text readable when it grows
+            // long enough to overlap the bottom-right buffer-info overlay.
+            // Use explicit alpha on text/background instead of style.opacity
+            // so the dimming doesn't fade the background too.
+            _recordingStatusLabel.style.color = new Color(1f, 1f, 1f, 0.85f);
+            _recordingStatusLabel.style.backgroundColor = new Color(0f, 0f, 0f, 0.65f);
+            _recordingStatusLabel.style.paddingLeft = 4;
+            _recordingStatusLabel.style.paddingRight = 4;
+            _recordingStatusLabel.style.paddingTop = 1;
+            _recordingStatusLabel.style.paddingBottom = 1;
+            _recordingStatusLabel.style.borderTopLeftRadius = 2;
+            _recordingStatusLabel.style.borderTopRightRadius = 2;
+            _recordingStatusLabel.style.borderBottomLeftRadius = 2;
+            _recordingStatusLabel.style.borderBottomRightRadius = 2;
+            _recordingStatusLabel.style.display = DisplayStyle.None;
             _recordingStatusLabel.pickingMode = PickingMode.Ignore;
             rootVisualElement.Add(_recordingStatusLabel);
 
@@ -1103,7 +1117,7 @@ namespace Trecs.Serialization
             }
             try
             {
-                _selectedAccessor ??= _selectedWorld.CreateAccessor("TrecsTimeTravelWindow");
+                _selectedAccessor ??= _selectedWorld.CreateAccessor("TrecsPlayerWindow");
                 runner = _selectedAccessor.GetSystemRunner();
                 return runner != null;
             }
@@ -1142,7 +1156,7 @@ namespace Trecs.Serialization
                 return;
             }
 
-            _selectedAccessor ??= _selectedWorld.CreateAccessor("TrecsTimeTravelWindow");
+            _selectedAccessor ??= _selectedWorld.CreateAccessor("TrecsPlayerWindow");
 
             var controller = GetController();
             if (controller == null)
@@ -1690,6 +1704,25 @@ namespace Trecs.Serialization
             {
                 return;
             }
+            // Refuse to un-pause at the tail of a Playback recording —
+            // un-pausing would let the runner take one more fixed tick
+            // before the at-tail logic re-pauses, advancing past the end.
+            // Mirrors OnStepForwardClicked's guard. Pause→play only;
+            // play→pause always works.
+            var recorder = controller.AutoRecorder;
+            if (
+                controller.IsPaused
+                && recorder != null
+                && controller.CurrentMode == GameStateMode.Playback
+                && _selectedAccessor != null
+                && _selectedAccessor.FixedFrame >= recorder.LastSnapshotFrame
+            )
+            {
+                SetRecordingStatus(
+                    "At the end of the recording — press Record to fork and continue live."
+                );
+                return;
+            }
             controller.SetPaused(!controller.IsPaused);
         }
 
@@ -1701,7 +1734,7 @@ namespace Trecs.Serialization
                 return;
             }
             // Refuse to step past the recording's tail in Playback.
-            // runner.StepFrame() bypasses the pause-at-tail logic in
+            // runner.StepFixedFrame() bypasses the pause-at-tail logic in
             // OnFixedFrameChange, so without this gate the next handler
             // tick lands in the "frame > _lastSnapshotFrame" branch — the
             // loaded-recording side silently flips to live capture, and
@@ -1720,7 +1753,7 @@ namespace Trecs.Serialization
                 );
                 return;
             }
-            controller.StepFrame();
+            controller.StepFixedFrame();
         }
 
         void OnStepBackClicked()
@@ -1926,13 +1959,22 @@ namespace Trecs.Serialization
         {
             _recordingStatusClearTask?.Pause();
             _recordingStatusLabel.text = text;
+            // Hide the label entirely when empty so the background pill
+            // doesn't render as a thin sliver in the corner.
+            _recordingStatusLabel.style.display = string.IsNullOrEmpty(text)
+                ? DisplayStyle.None
+                : DisplayStyle.Flex;
             if (string.IsNullOrEmpty(text))
             {
                 _recordingStatusClearTask = null;
                 return;
             }
             _recordingStatusClearTask = _recordingStatusLabel
-                .schedule.Execute(() => _recordingStatusLabel.text = "")
+                .schedule.Execute(() =>
+                {
+                    _recordingStatusLabel.text = "";
+                    _recordingStatusLabel.style.display = DisplayStyle.None;
+                })
                 .StartingIn(RecordingStatusClearDelayMs);
         }
 
@@ -2022,7 +2064,23 @@ namespace Trecs.Serialization
             {
                 return;
             }
-            DoSaveRecording(controller, name.Trim());
+            var trimmed = name.Trim();
+            var path = TrecsGameStateController.GetRecordingPath(trimmed);
+            if (File.Exists(path))
+            {
+                if (
+                    !EditorUtility.DisplayDialog(
+                        "Overwrite recording?",
+                        $"A recording named '{trimmed}' already exists. Overwrite it?",
+                        "Overwrite",
+                        "Cancel"
+                    )
+                )
+                {
+                    return;
+                }
+            }
+            DoSaveRecording(controller, trimmed);
         }
 
         void DoSaveRecording(TrecsGameStateController controller, string name)

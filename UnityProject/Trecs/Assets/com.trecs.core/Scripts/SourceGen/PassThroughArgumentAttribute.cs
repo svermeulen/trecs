@@ -27,15 +27,15 @@ namespace Trecs
     /// <example>
     /// <code>
     /// // Most custom args need no attribute (primitive type, not auto-detected):
-    /// [ForEachEntity(Tag = typeof(MyTag))]
+    /// [ForEachEntity(typeof(MyTag))]
     /// void Step(ref CPosition pos, float dt) { pos.Value += dt; }
     ///
     /// // IEntityComponent passed by value as a pass-through arg requires the attribute:
-    /// [ForEachEntity(Tag = typeof(MyTag))]
+    /// [ForEachEntity(typeof(MyTag))]
     /// void Step(ref CPosition pos, [PassThroughArgument] CDefaults defaults) { /* ... */ }
     ///
     /// // User-supplied EntityIndex (overrides loop's iteration index, or supplements it):
-    /// [ForEachEntity(Tag = typeof(MyTag))]
+    /// [ForEachEntity(typeof(MyTag))]
     /// void Step(ref CPosition pos, [PassThroughArgument] EntityIndex target) { /* ... */ }
     /// </code>
     /// </example>

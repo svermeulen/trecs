@@ -32,7 +32,7 @@ namespace Trecs.Samples.Interpolation
 
         // Interpolated<Position> is only present on entities whose
         // template marked Position with [Interpolated].
-        [ForEachEntity(Tag = typeof(OrbitTags.Smooth))]
+        [ForEachEntity(typeof(OrbitTags.Smooth))]
         void RenderSmooth(in SmoothOrbitView view)
         {
             var go = _registry.Resolve(view.GameObjectId);
@@ -43,7 +43,7 @@ namespace Trecs.Samples.Interpolation
         // Raw entities only have Position and Rotation (no Interpolated wrappers).
         // Reading these in variable update shows the fixed-frame values,
         // which "jump" at each fixed timestep boundary.
-        [ForEachEntity(Tag = typeof(OrbitTags.Raw))]
+        [ForEachEntity(typeof(OrbitTags.Raw))]
         void RenderRaw(in RawOrbitView view)
         {
             var go = _registry.Resolve(view.GameObjectId);

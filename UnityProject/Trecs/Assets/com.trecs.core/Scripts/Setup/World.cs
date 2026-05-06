@@ -32,7 +32,7 @@ namespace Trecs
         readonly SystemRunner _systemRunner;
         readonly EntitySubmitter _entitySubmitter;
         readonly WorldAccessorRegistry _accessorRegistry;
-        IComponentAccessRecorder _accessRecorder;
+        IAccessRecorder _accessRecorder;
         readonly WorldSettings _settings;
         readonly Rng _fixedRng;
         readonly Rng _variableUpdateRng;
@@ -129,7 +129,7 @@ namespace Trecs
 
         /// <summary>
         /// Optional human-readable name for this world. Surfaced by editor tooling
-        /// (e.g. the World dropdown in <c>TrecsTimeTravelWindow</c>) when present.
+        /// (e.g. the World dropdown in <c>TrecsPlayerWindow</c>) when present.
         /// Null by default.
         /// </summary>
         public string DebugName { get; set; }
@@ -884,17 +884,19 @@ namespace Trecs
 
         /// <summary>
         /// Installs (or removes, if <c>null</c>) an
-        /// <see cref="IComponentAccessRecorder"/> that the world hands to every
+        /// <see cref="IAccessRecorder"/> that the world hands to every
         /// accessor — current and future. Intended for editor / debug tooling
-        /// that wants a per-system read/write map. Pass <c>null</c> to detach.
+        /// that wants per-system read/write and add/remove/move maps. Pass
+        /// <c>null</c> to detach.
         /// </summary>
-        public void SetComponentAccessRecorder(IComponentAccessRecorder recorder)
+        public void SetAccessRecorder(IAccessRecorder recorder)
         {
             _accessRecorder = recorder;
             foreach (var kvp in _accessorRegistry.AllAccessors)
             {
                 kvp.Value.AccessRecorder = recorder;
             }
+            _entitySubmitter.SetAccessRecorder(recorder);
         }
     }
 }

@@ -101,7 +101,7 @@ This is the point of the sample: the pointer resolution happens inside a Burst-c
 ```csharp
 public partial class PatrolMovementSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(NativePatrolTags.Follower))]
+    [ForEachEntity(typeof(NativePatrolTags.Follower))]
     [WrapAsJob]
     static void Execute(
         ref Position position,

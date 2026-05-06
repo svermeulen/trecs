@@ -34,11 +34,11 @@ Systems target specific tag combinations to iterate only matching entities:
 
 ```csharp
 // Iterate only entities with the Spinner tag
-[ForEachEntity(Tag = typeof(SampleTags.Spinner))]
+[ForEachEntity(typeof(SampleTags.Spinner))]
 void Execute(ref Rotation rotation) { ... }
 
 // Iterate entities with both Ball and Active tags
-[ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+[ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
 void Execute(in ActiveBall ball) { ... }
 ```
 

@@ -86,7 +86,7 @@ Define aspects inside each system or share them. Since aspects are just partial 
 // Defined inside a system
 public partial class PhysicsSystem : ISystem
 {
-    [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
     void Execute(in ActiveBall ball)
     {
         ball.Velocity += Gravity * World.DeltaTime;
@@ -98,10 +98,10 @@ public partial class PhysicsSystem : ISystem
 // Same system can have multiple aspects for different queries
 public partial class RenderSystem : ISystem
 {
-    [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
     void RenderActive(in ActiveView ball) { ... }
 
-    [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Resting) })]
+    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
     void RenderResting(in RestingView ball) { ... }
 
     public void Execute()

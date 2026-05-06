@@ -16,7 +16,7 @@ namespace Trecs.Samples.Aspects
         // One way to iterate over aspects is via a method marked with ForEachEntity attribute
         // If this method is also called Execute then this becomes entry point for System
         // We can then specify tags or MatchByComponents
-        [ForEachEntity(Tag = typeof(SampleTags.Boid))]
+        [ForEachEntity(typeof(SampleTags.Boid))]
         void Execute(in Boid boid)
         {
             var go = _gameObjectRegistry.Resolve(boid.GameObjectId);

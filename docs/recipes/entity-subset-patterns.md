@@ -42,7 +42,7 @@ public partial class EnemyEntity : ITemplate,
 World.MoveTo<GameTags.Enemy, GameTags.Dead>(entity.EntityIndex);
 
 // Iterate only dead enemies
-[ForEachEntity(Tags = new[] { typeof(GameTags.Enemy), typeof(GameTags.Dead) })]
+[ForEachEntity(typeof(GameTags.Enemy), typeof(GameTags.Dead))]
 void Execute(in DeadEnemy enemy) { ... }
 ```
 

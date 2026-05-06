@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;

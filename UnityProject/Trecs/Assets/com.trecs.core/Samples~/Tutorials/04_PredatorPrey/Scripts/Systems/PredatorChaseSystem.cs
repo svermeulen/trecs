@@ -10,7 +10,7 @@ namespace Trecs.Samples.PredatorPrey
     {
         const float CatchRadius = 0.8f;
 
-        [ForEachEntity(Tag = typeof(SampleTags.Predator))]
+        [ForEachEntity(typeof(SampleTags.Predator))]
         void Execute(in Predator predator)
         {
             if (predator.ChosenPrey.IsNull)

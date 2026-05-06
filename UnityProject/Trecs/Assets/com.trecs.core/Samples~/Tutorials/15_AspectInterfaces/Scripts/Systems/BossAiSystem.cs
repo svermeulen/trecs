@@ -13,7 +13,7 @@ namespace Trecs.Samples.AspectInterfaces
 
         // [ForEachEntity] (not [SingleEntity]) so the system is a no-op
         // after the boss dies — [SingleEntity] would assert on zero matches.
-        [ForEachEntity(Tag = typeof(SampleTags.Boss))]
+        [ForEachEntity(typeof(SampleTags.Boss))]
         void Execute(in BossView boss)
         {
             float collisionSqr = _settings.CollisionDistance * _settings.CollisionDistance;

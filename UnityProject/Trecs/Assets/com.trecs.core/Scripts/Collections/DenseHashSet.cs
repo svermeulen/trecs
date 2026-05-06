@@ -2,8 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Trecs.Internal;
 
-namespace Trecs.Internal // not part of public api atm
+namespace Trecs.Collections
 {
     /// <summary>
     ///   Reasons to use this over standard C# HashSet:

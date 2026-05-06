@@ -6,20 +6,21 @@ using UnityEditor;
 namespace Trecs
 {
     /// <summary>
-    /// Per-world implementation of <see cref="IComponentAccessRecorder"/> that
-    /// dedupes incoming access events into four maps used by the inspectors:
+    /// Per-world implementation of <see cref="IAccessRecorder"/> that
+    /// dedupes incoming access events into maps used by the inspectors:
     /// <list type="bullet">
     /// <item>component → set of writer system names,</item>
     /// <item>component → set of reader system names,</item>
     /// <item>system name → set of components written,</item>
-    /// <item>system name → set of components read.</item>
+    /// <item>system name → set of components read,</item>
+    /// <item>system ↔ groups added / removed / moved.</item>
     /// </list>
     /// Registered on the <see cref="World"/> by
     /// <see cref="TrecsAccessRegistry"/> when any debug window is open. The
-    /// recorder fires on every component read/write, so dedupe is essential —
+    /// component recorder fires on every read/write, so dedupe is essential —
     /// otherwise allocations explode.
     /// </summary>
-    public sealed class TrecsAccessTracker : IComponentAccessRecorder
+    public sealed class TrecsAccessTracker : IAccessRecorder
     {
         readonly Dictionary<ComponentId, HashSet<string>> _componentWriters = new();
         readonly Dictionary<ComponentId, HashSet<string>> _componentReaders = new();
@@ -31,6 +32,13 @@ namespace Trecs
         // system→groups map here. Same dedupe pattern.
         readonly Dictionary<string, HashSet<GroupIndex>> _systemGroups = new();
         readonly Dictionary<GroupIndex, HashSet<string>> _groupSystems = new();
+
+        readonly Dictionary<string, HashSet<GroupIndex>> _systemAdds = new();
+        readonly Dictionary<string, HashSet<GroupIndex>> _systemRemoves = new();
+        readonly Dictionary<string, HashSet<GroupIndex>> _systemMoves = new();
+        readonly Dictionary<GroupIndex, HashSet<string>> _groupAdders = new();
+        readonly Dictionary<GroupIndex, HashSet<string>> _groupRemovers = new();
+        readonly Dictionary<GroupIndex, HashSet<string>> _groupMovers = new();
 
         public void OnComponentAccess(
             string systemName,
@@ -55,6 +63,49 @@ namespace Trecs
             }
             Add(_systemGroups, systemName, group);
             Add(_groupSystems, group, systemName);
+        }
+
+        public void OnEntityAdded(string systemName, GroupIndex group)
+        {
+            if (string.IsNullOrEmpty(systemName))
+            {
+                return;
+            }
+            Add(_systemAdds, systemName, group);
+            Add(_groupAdders, group, systemName);
+            Add(_systemGroups, systemName, group);
+            Add(_groupSystems, group, systemName);
+        }
+
+        public void OnEntityRemoved(string systemName, GroupIndex group)
+        {
+            if (string.IsNullOrEmpty(systemName))
+            {
+                return;
+            }
+            Add(_systemRemoves, systemName, group);
+            Add(_groupRemovers, group, systemName);
+            Add(_systemGroups, systemName, group);
+            Add(_groupSystems, group, systemName);
+        }
+
+        // Per design: a move flags BOTH the source and destination groups
+        // under "moves" (so the source shows "moves to" and the destination
+        // shows "moved to by" the same system).
+        public void OnEntityMoved(string systemName, GroupIndex fromGroup, GroupIndex toGroup)
+        {
+            if (string.IsNullOrEmpty(systemName))
+            {
+                return;
+            }
+            Add(_systemMoves, systemName, fromGroup);
+            Add(_systemMoves, systemName, toGroup);
+            Add(_groupMovers, fromGroup, systemName);
+            Add(_groupMovers, toGroup, systemName);
+            Add(_systemGroups, systemName, fromGroup);
+            Add(_systemGroups, systemName, toGroup);
+            Add(_groupSystems, fromGroup, systemName);
+            Add(_groupSystems, toGroup, systemName);
         }
 
         public IReadOnlyCollection<string> GetReadersOf(ComponentId id) =>
@@ -92,6 +143,36 @@ namespace Trecs
                 ? (IReadOnlyCollection<string>)s
                 : Array.Empty<string>();
 
+        public IReadOnlyCollection<GroupIndex> GetGroupsAddedBy(string systemName) =>
+            _systemAdds.TryGetValue(systemName ?? string.Empty, out var s)
+                ? (IReadOnlyCollection<GroupIndex>)s
+                : Array.Empty<GroupIndex>();
+
+        public IReadOnlyCollection<GroupIndex> GetGroupsRemovedBy(string systemName) =>
+            _systemRemoves.TryGetValue(systemName ?? string.Empty, out var s)
+                ? (IReadOnlyCollection<GroupIndex>)s
+                : Array.Empty<GroupIndex>();
+
+        public IReadOnlyCollection<GroupIndex> GetGroupsMovedBy(string systemName) =>
+            _systemMoves.TryGetValue(systemName ?? string.Empty, out var s)
+                ? (IReadOnlyCollection<GroupIndex>)s
+                : Array.Empty<GroupIndex>();
+
+        public IReadOnlyCollection<string> GetSystemsAddingTo(GroupIndex group) =>
+            _groupAdders.TryGetValue(group, out var s)
+                ? (IReadOnlyCollection<string>)s
+                : Array.Empty<string>();
+
+        public IReadOnlyCollection<string> GetSystemsRemovingFrom(GroupIndex group) =>
+            _groupRemovers.TryGetValue(group, out var s)
+                ? (IReadOnlyCollection<string>)s
+                : Array.Empty<string>();
+
+        public IReadOnlyCollection<string> GetSystemsMovingOn(GroupIndex group) =>
+            _groupMovers.TryGetValue(group, out var s)
+                ? (IReadOnlyCollection<string>)s
+                : Array.Empty<string>();
+
         public void Clear()
         {
             _componentReaders.Clear();
@@ -100,6 +181,12 @@ namespace Trecs
             _systemWrites.Clear();
             _systemGroups.Clear();
             _groupSystems.Clear();
+            _systemAdds.Clear();
+            _systemRemoves.Clear();
+            _systemMoves.Clear();
+            _groupAdders.Clear();
+            _groupRemovers.Clear();
+            _groupMovers.Clear();
         }
 
         static void Add<TKey, TVal>(Dictionary<TKey, HashSet<TVal>> map, TKey key, TVal value)
@@ -173,7 +260,7 @@ namespace Trecs
                 }
                 if (!world.IsDisposed)
                 {
-                    world.SetComponentAccessRecorder(null);
+                    world.SetAccessRecorder(null);
                 }
                 existing.Clear();
                 _trackers.Remove(world);
@@ -188,7 +275,7 @@ namespace Trecs
             }
             var tracker = new TrecsAccessTracker();
             _trackers[world] = tracker;
-            world.SetComponentAccessRecorder(tracker);
+            world.SetAccessRecorder(tracker);
         }
     }
 }

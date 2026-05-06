@@ -11,7 +11,7 @@ namespace Trecs.Samples.MultipleWorlds
             _gameObjectRegistry = gameObjectRegistry;
         }
 
-        [ForEachEntity(Tags = new[] { typeof(SampleTags.Critter) })]
+        [ForEachEntity(typeof(SampleTags.Critter))]
         void Execute(in GameObjectId gameObjectId, ref Lifetime lifetime, EntityIndex entityIndex)
         {
             lifetime.Value -= World.DeltaTime;

@@ -11,7 +11,7 @@ namespace Trecs.Samples.JobSystem
             _halfSize = areaSize / 2f;
         }
 
-        [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+        [ForEachEntity(typeof(SampleTags.Particle))]
         void ExecuteMainThread(ref Velocity velocity, ref Position position)
         {
             Bounce(ref velocity, ref position, _halfSize);
@@ -19,7 +19,7 @@ namespace Trecs.Samples.JobSystem
 
         // Note that it is static in this case since it is called from inside a job
         // and that all parameters must be native compatible
-        [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+        [ForEachEntity(typeof(SampleTags.Particle))]
         [WrapAsJob]
         static void ExecuteAsJob(
             ref Velocity velocity,

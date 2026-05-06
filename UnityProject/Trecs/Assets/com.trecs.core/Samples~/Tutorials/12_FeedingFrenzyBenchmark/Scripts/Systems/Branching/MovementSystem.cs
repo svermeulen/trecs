@@ -48,7 +48,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             }
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         void RunForEachMethodAspect(in Fish fish)
         {
             if (!fish.TargetMeal.IsNull)
@@ -57,7 +57,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             }
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         void RunForEachMethodComponents(
             in Velocity velocity,
             in TargetMeal meal,
@@ -125,7 +125,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             );
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         [WrapAsJob]
         static void RunWrapAsJobAspect(in Fish fish, in NativeWorldAccessor world)
         {
@@ -135,7 +135,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             }
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         [WrapAsJob]
         static void RunWrapAsJobComponents(
             in Velocity velocity,
@@ -155,7 +155,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
         {
             public float DeltaTime;
 
-            [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+            [ForEachEntity(typeof(FrenzyTags.Fish))]
             public readonly void Execute(in Fish fish)
             {
                 if (!fish.TargetMeal.IsNull)
@@ -170,7 +170,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
         {
             public float DeltaTime;
 
-            [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+            [ForEachEntity(typeof(FrenzyTags.Fish))]
             public readonly void Execute(
                 in Velocity velocity,
                 in TargetMeal meal,
@@ -189,14 +189,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
         {
             public float DeltaTime;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<Velocity> Velocities;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<TargetMeal> TargetMeals;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<Position> Positions;
 
             public void Execute(int i)

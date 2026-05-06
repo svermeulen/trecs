@@ -110,7 +110,7 @@ Querying happens through tags and component schemas, not through template names:
 
 ```csharp
 // Filter by tag — systems don't know or care which template produced the entity.
-[ForEachEntity(Tags = new[] { typeof(GameTags.Enemy), typeof(GameTags.Alive) })]
+[ForEachEntity(typeof(GameTags.Enemy), typeof(GameTags.Alive))]
 void Execute(ref Health health, in Position pos) { ... }
 
 // Or filter purely by component schema — Unity-ECS style.
@@ -122,7 +122,7 @@ Both styles are first-class. `MatchByComponents = true` (and `Query(...).MatchBy
 
 In practice the extra identity axis buys you several things that matter more than they look on paper:
 
-- **Queries can read like the design when you want.** `[ForEachEntity(Tags = new[] { typeof(GameTags.Enemy) })]` says what you mean. Component-set queries drift: "things that have `Health`, `Position`, and `AIState`" is a brittle stand-in for "enemies" and silently picks up anything else that happens to share those components.
+- **Queries can read like the design when you want.** `[ForEachEntity(typeof(GameTags.Enemy))]` says what you mean. Component-set queries drift: "things that have `Health`, `Position`, and `AIState`" is a brittle stand-in for "enemies" and silently picks up anything else that happens to share those components.
 - **Tag queries fail loudly when the shape is wrong.** If you ask for a tag-scoped query and the matching template doesn't declare the components you're reading, Trecs surfaces an error instead of quietly matching nothing. Component-matching ECS has the opposite default: if a system expects `Position` + `Velocity` and an entity is missing one of them, the system just skips it — which is a notoriously common source of "why isn't my system running on this entity?" bugs. Tag-scoped queries turn that silent mismatch into a noisy failure the first time you run the code.
 - **Templates are a single source of truth for an entity's shape, at spawn time.** The full component layout, defaults, tags, and partitions for "an Enemy" live in one place. Adding a component to the template is one edit; nobody has to remember to attach it at every spawn site. In archetype-based ECS it's normal for the "right" component set to drift across call sites, and for systems to silently skip those entities.
 - **Inheritance via `IExtends<>` composes naturally at the template level.** A `Renderable` base captures "things that get drawn", a `Moveable` base captures "things that integrate velocity", and concrete templates extend both. This is shared *structure*, not runtime polymorphism — the generator still flattens it into an unmanaged layout. Systems never need to know about the inheritance graph; they just ask for the tags or components they care about.

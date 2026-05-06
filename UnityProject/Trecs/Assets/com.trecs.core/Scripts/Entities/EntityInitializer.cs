@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Collections.LowLevel.Unsafe;
 

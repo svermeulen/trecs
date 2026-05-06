@@ -36,6 +36,12 @@ namespace Trecs
         Foldout _componentsFoldout;
         Foldout _inheritedComponentsFoldout;
         Foldout _partitionsFoldout;
+        Foldout _addedByFoldout;
+        Foldout _removedByFoldout;
+        Foldout _movedByFoldout;
+        int _lastAddedByHash;
+        int _lastRemovedByHash;
+        int _lastMovedByHash;
 
         // Composite key of (identity, source-mode-and-name) — the static
         // section gets re-rendered when EITHER the user picks a different
@@ -118,6 +124,21 @@ namespace Trecs
             _partitionsFoldout.style.marginTop = 6;
             _bodyContainer.Add(_partitionsFoldout);
 
+            // Structural-change tracking (cross-system) — which systems
+            // perform Add / Remove / Move operations on this template. A
+            // move flags both its source and destination templates.
+            _addedByFoldout = new Foldout { text = "Added by", value = true };
+            _addedByFoldout.style.marginTop = 6;
+            _bodyContainer.Add(_addedByFoldout);
+
+            _removedByFoldout = new Foldout { text = "Removed by", value = true };
+            _removedByFoldout.style.marginTop = 6;
+            _bodyContainer.Add(_removedByFoldout);
+
+            _movedByFoldout = new Foldout { text = "Moved by", value = true };
+            _movedByFoldout.style.marginTop = 6;
+            _bodyContainer.Add(_movedByFoldout);
+
             _root.Add(_bodyContainer);
 
             Refresh();
@@ -161,12 +182,16 @@ namespace Trecs
             if (renderKey != _renderedKey)
             {
                 _renderedKey = renderKey;
+                _lastAddedByHash = 0;
+                _lastRemovedByHash = 0;
+                _lastMovedByHash = 0;
                 var entry = BuildEntryFromRef(src, tref);
                 var linker = new InspectorLinker(src);
                 RenderStatic(entry, linker, src.DisplayName, !src.IsLive);
             }
 
             UpdateRuntimeFields(src, tref);
+            UpdateStructuralFields(src, tref);
         }
 
         // Folds the source's TemplateRef into the cache schema shape so
@@ -437,6 +462,68 @@ namespace Trecs
             catch
             {
                 _entityCountLabel.text = "Entities: (unavailable)";
+            }
+        }
+
+        void UpdateStructuralFields(ITrecsSchemaSource src, TemplateRef tref)
+        {
+            var templateName =
+                tref.LiveTemplate?.DebugName
+                ?? tref.LiveResolved?.DebugName
+                ?? tref.CacheNative?.DebugName;
+            IReadOnlyCollection<string> adders = null;
+            IReadOnlyCollection<string> removers = null;
+            IReadOnlyCollection<string> movers = null;
+            if (!string.IsNullOrEmpty(templateName) && src.AccessTracker != null)
+            {
+                adders = src.AccessTracker.GetSystemsAddingTo(templateName);
+                removers = src.AccessTracker.GetSystemsRemovingFrom(templateName);
+                movers = src.AccessTracker.GetSystemsMovingOn(templateName);
+            }
+            var linker = new InspectorLinker(src);
+            ApplySystemList(_addedByFoldout, adders, ref _lastAddedByHash, linker);
+            ApplySystemList(_removedByFoldout, removers, ref _lastRemovedByHash, linker);
+            ApplySystemList(_movedByFoldout, movers, ref _lastMovedByHash, linker);
+        }
+
+        static void ApplySystemList(
+            Foldout foldout,
+            IReadOnlyCollection<string> names,
+            ref int lastHash,
+            InspectorLinker linker
+        )
+        {
+            int hash = HashOfNames(names);
+            if (hash == lastHash)
+                return;
+            lastHash = hash;
+            foldout.Clear();
+            if (names == null || names.Count == 0)
+            {
+                foldout.style.display = DisplayStyle.None;
+                return;
+            }
+            foldout.style.display = DisplayStyle.Flex;
+            var sorted = new List<string>(names);
+            sorted.Sort(StringComparer.OrdinalIgnoreCase);
+            foreach (var n in sorted)
+            {
+                foldout.Add(linker.AccessorLink(n));
+            }
+        }
+
+        static int HashOfNames(IReadOnlyCollection<string> names)
+        {
+            if (names == null || names.Count == 0)
+                return 0;
+            unchecked
+            {
+                int h = 17;
+                foreach (var n in names)
+                {
+                    h = h * 31 + (n?.GetHashCode() ?? 0);
+                }
+                return h * 31 + names.Count;
             }
         }
 

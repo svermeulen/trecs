@@ -15,7 +15,7 @@ namespace Trecs.Samples.Partitions
         const float Bounciness = 0.7f;
         const float RestThreshold = 0.3f;
 
-        [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+        [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
         void Execute(in ActiveBall ball)
         {
             var vel = ball.Velocity;

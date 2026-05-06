@@ -27,16 +27,8 @@ namespace Trecs.Tests
         /// Advances <paramref name="frames"/> fixed-update frames in lockstep.
         /// Decouples from Unity's non-deterministic <c>Time.deltaTime</c> in EditMode
         /// by pausing fixed update and explicitly stepping one frame per iteration.
-        ///
-        /// The first Tick+LateTick "primes" the pause flag: the public
-        /// <c>FixedIsPaused</c> setter only updates <c>_desiredFixedIsPaused</c>;
-        /// the actual <c>_fixedIsPaused</c> field doesn't sync until the start of
-        /// the next <c>Tick()</c>. Without the prime, the first <c>StepFrame()</c>
-        /// silently warns-and-returns because the runner isn't paused yet, and the
-        /// first fixed step is lost. The prime itself runs no fixed update — the
-        /// pause takes effect at its start.
-        ///
-        /// Safe to call repeatedly: subsequent primes are no-op ticks.
+        /// The leading Tick+LateTick gives variable-update systems one cycle to
+        /// settle before the first stepped fixed frame.
         /// </summary>
         public void StepFixedFrames(int frames)
         {
@@ -48,7 +40,7 @@ namespace Trecs.Tests
 
             for (int i = 0; i < frames; i++)
             {
-                runner.StepFrame();
+                runner.StepFixedFrame();
                 World.Tick();
                 World.LateTick();
             }

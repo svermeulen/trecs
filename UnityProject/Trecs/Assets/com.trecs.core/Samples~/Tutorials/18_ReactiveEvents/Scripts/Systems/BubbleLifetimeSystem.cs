@@ -7,7 +7,7 @@ namespace Trecs.Samples.ReactiveEvents
     /// </summary>
     public partial class BubbleLifetimeSystem : ISystem
     {
-        [ForEachEntity(Tag = typeof(SampleTags.Bubble))]
+        [ForEachEntity(typeof(SampleTags.Bubble))]
         void Execute(EntityIndex entity, ref Lifetime lifetime)
         {
             lifetime.Value -= World.DeltaTime;

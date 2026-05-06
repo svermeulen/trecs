@@ -16,7 +16,7 @@ namespace Trecs.Samples.FeedingFrenzy101
     {
         const float ChaseSpeed = 15f;
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         [WrapAsJob]
         static void Execute(in Fish fish, in NativeWorldAccessor world)
         {

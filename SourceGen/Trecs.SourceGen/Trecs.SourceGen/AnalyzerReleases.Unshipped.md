@@ -10,15 +10,11 @@ TRECS002 | Trecs | Error | No parameters defined
 TRECS003 | Trecs | Error | Invalid return type
 TRECS004 | Trecs | Error | Class must be partial
 TRECS005 | Trecs | Error | Invalid parameter list
-TRECS006 | Trecs | Error | Missing execute method on EntityJobGroup
 TRECS007 | Trecs | Error | Multiple execute methods on EntityJobGroup
 TRECS008 | Trecs | Error | Invalid job parameter list
 TRECS009 | Trecs | Error | Aspect must be partial
-TRECS010 | Trecs | Error | Aspect must be a struct
-TRECS011 | Trecs | Error | Single value component must be a struct
 TRECS012 | Trecs | Error | Single value component must implement IEntityComponent
 TRECS013 | Trecs | Error | Single value component must have exactly one field
-TRECS014 | Trecs | Error | Aspect must specify Tags or MatchByComponents
 TRECS015 | Trecs | Error | Could not resolve symbol
 TRECS016 | Trecs | Error | Duplicate component type
 TRECS020 | Trecs | Error | Aspect interface must be partial
@@ -39,13 +35,10 @@ TRECS037 | Trecs | Error | Globals template field must have an explicit default
 TRECS040 | Trecs | Error | AutoSystem class must be partial
 TRECS043 | Trecs | Error | Iteration method named Execute must not have custom parameters
 TRECS044 | Trecs | Error | AutoSystem Execute conflict
-TRECS045 | Trecs | Error | System already defines World property
-TRECS046 | Trecs | Error | System already defines _world field
 TRECS047 | Trecs | Error | System has no Execute method
 TRECS050 | Trecs | Error | Iteration method cannot be static
 TRECS051 | Trecs | Error | Iteration method cannot be abstract
 TRECS053 | Trecs | Error | Both Tag and Tags specified
-TRECS060 | Trecs | Error | Old-style DeclareDependencies hook detected
 TRECS061 | Trecs | Error | Old-style Ready hook detected
 TRECS062 | Trecs | Error | Partial method uses old hook name
 TRECS070 | Trecs | Warning | Use the generated ScheduleParallel/Schedule member instead of Unity's raw schedule extension
@@ -63,10 +56,8 @@ TRECS083 | Trecs | Error | [FromWorld] too many inline tags
 TRECS084 | Trecs | Error | [FromWorld] inline tags not supported for NativeWorldAccessor
 TRECS090 | Trecs | Error | [WrapAsJob] method must be static
 TRECS091 | Trecs | Error | [WrapAsJob] method cannot take WorldAccessor
-TRECS092 | Trecs | Error | [WrapAsJob] cannot be used on struct methods
 TRECS093 | Trecs | Error | [WrapAsJob] pass-through parameter must be unmanaged
 TRECS094 | Trecs | Error | [WrapAsJob] pass-through parameter cannot be ref/out
-TRECS095 | Trecs | Error | [WrapAsJob] does not support set-based filtering
 TRECS096 | Trecs | Error | [WrapAsJob] requires query criteria
 TRECS097 | Trecs | Error | [WrapAsJob] Execute cannot have [PassThroughArgument] parameters
 TRECS098 | Trecs | Error | SetAccessor/SetRead/SetWrite cannot be used in [WrapAsJob] methods
@@ -80,5 +71,6 @@ TRECS112 | Trecs | Error | [SingleEntity] parameter or field must be an aspect o
 TRECS113 | Trecs | Error | [SingleEntity] parameter has wrong modifier
 TRECS114 | Trecs | Error | [SingleEntity] requires inline Tag or Tags
 TRECS115 | Trecs | Error | [SingleEntity] conflicts with [FromWorld] or [PassThroughArgument]
+TRECS116 | Trecs | Warning | [SingleEntity] write-aspect field on a parallel job needs [NativeDisableParallelForRestriction]
 TRECS996 | Trecs | Error | Source generation error
 TRECS999 | Trecs | Error | Source generation error

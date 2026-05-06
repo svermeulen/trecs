@@ -165,6 +165,7 @@ namespace Trecs.SourceGen
                         GenerateSource(
                             data.ClassDecl,
                             data.MethodDecl,
+                            data.MethodSymbol.ContainingType,
                             data.ValidatedInfo,
                             globalNamespaceName
                         ),
@@ -205,6 +206,7 @@ namespace Trecs.SourceGen
         private static string GenerateSource(
             ClassDeclarationSyntax classDec,
             MethodDeclarationSyntax methodDec,
+            INamedTypeSymbol classSymbol,
             ValidatedMethodInfo validatedMethodInfo,
             string globalNamespaceName
         )
@@ -251,28 +253,39 @@ namespace Trecs.SourceGen
 
             sb.AppendUsings(requiredNamespaces.ToArray());
 
+            // Walk the system class's containing-type chain so the emitted partial merges
+            // with a nested system class. Without these wrappers, `partial class InnerSystem`
+            // would land at namespace scope rather than under `partial class Outer`, and the
+            // emitted overloads would shadow (rather than augment) the user's method.
+            var containingTypes = SymbolAnalyzer.GetContainingTypeChainInfo(classSymbol);
+
             return sb.WrapInNamespace(
                     namespaceName,
                     (builder) =>
                     {
-                        builder.WrapInType(
-                            "public",
-                            "class",
-                            className,
-                            (classBuilder) =>
-                            {
-                                // Generate single overload based on Aspect attribute properties
-                                GenerateSingleOverload(
-                                    classBuilder,
-                                    methodName,
-                                    aspectTypeName,
-                                    validatedMethodInfo,
-                                    customArgsDecStr,
-                                    customArgsCallStr,
-                                    visibility
-                                );
-                            },
-                            1
+                        builder.WrapInContainingTypes(
+                            containingTypes,
+                            0,
+                            (b, indent) =>
+                                b.WrapInType(
+                                    "public",
+                                    "class",
+                                    className,
+                                    (classBuilder) =>
+                                    {
+                                        // Generate single overload based on Aspect attribute properties
+                                        GenerateSingleOverload(
+                                            classBuilder,
+                                            methodName,
+                                            aspectTypeName,
+                                            validatedMethodInfo,
+                                            customArgsDecStr,
+                                            customArgsCallStr,
+                                            visibility
+                                        );
+                                    },
+                                    indent
+                                )
                         );
                     }
                 )
@@ -711,12 +724,7 @@ namespace Trecs.SourceGen
                 indentLevel: 3,
                 worldVar: "__world"
             );
-            HoistedSingleEmitter.Emit(
-                sb,
-                indentLevel: 3,
-                worldVar: "__world",
-                info.HoistedSingletons
-            );
+            HoistedSingleEmitter.Emit(sb, indentLevel: 3, worldVar: "__world", info.HoistedSingletons);
 
             EmitPerGroupBufferFetch(
                 sb,

@@ -7,18 +7,17 @@ namespace Trecs.Samples.FeedingFrenzy101
     ///
     /// Demonstrates: [WrapAsJob] with [FromWorld] for cross-entity access
     /// inside a Burst job. The NativeFactory parameter is annotated with
-    /// [FromWorld(Tag = ...)] so the source generator handles group resolution,
+    /// [FromWorld(typeof(...))] so the source generator handles group resolution,
     /// dependency tracking, lookup creation, and disposal automatically.
     /// </summary>
     public partial class ConsumingMealSystem : ISystem
     {
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.Eating) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.Eating))]
         [WrapAsJob]
         static void Execute(
             in ConsumingFish fish,
             in NativeWorldAccessor world,
-            [FromWorld(Tag = typeof(FrenzyTags.Meal))]
-                in MealNutritionView.NativeFactory mealFactory
+            [FromWorld(typeof(FrenzyTags.Meal))] in MealNutritionView.NativeFactory mealFactory
         )
         {
             var distSqr = math.lengthsq(fish.DestinationPosition - fish.SimPosition);

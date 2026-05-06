@@ -878,17 +878,6 @@ namespace Trecs
                 {
                     return false;
                 }
-                // Note: previously bailed out unconditionally for generic
-                // structs, on the theory that Unity's serializer couldn't
-                // navigate them and any such field anywhere in a component
-                // would corrupt PropertyHandlerCache. We're testing whether
-                // that's still (or ever was) true: closed generics whose
-                // type-param is itself [Serializable] (e.g. Interpolated<CFoo>
-                // when CFoo's source-gen partial emits [Serializable]) should
-                // in principle work via SerializeReference. Recurse normally
-                // and let the [Serializable] check below catch the actual
-                // problematic types. Revert this if "out of bounds offset"
-                // log spam reappears.
                 if (type.IsPrimitive || type.IsEnum || type == typeof(string))
                 {
                     return false;
@@ -899,6 +888,24 @@ namespace Trecs
                     // these as serialized references; not the trigger we're
                     // chasing.
                     return false;
+                }
+                // Closed-generic value types — Nullable<T>, Interpolated<T>,
+                // NativeSharedPtr<T>, FixedArray<T>, BlobAssetReference<T>,
+                // etc. Unity's [SerializeField] serializer and PropertyField
+                // can't navigate generic struct fields: it leaves an
+                // incomplete managed-reference entry that corrupts
+                // PropertyHandlerCache hashing for the trailing
+                // [SerializeReference] array index, producing "Cannot get
+                // managed reference index with out of bounds offset" log
+                // spam every IMGUI redraw. The [Serializable] check below
+                // doesn't catch this — Nullable<T> in particular carries
+                // [Serializable] but exposes zero public instance fields, so
+                // the field-walk silently bottoms out and reports the
+                // containing component as supported. Route the whole
+                // component through the readonly fallback renderer instead.
+                if (type.IsGenericType)
+                {
+                    return true;
                 }
                 // Custom struct: Unity's serializer requires [Serializable]
                 // to navigate into its fields. Without it, Unity can't

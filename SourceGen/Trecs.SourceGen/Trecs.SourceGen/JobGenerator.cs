@@ -342,7 +342,12 @@ namespace Trecs.SourceGen
             if (fromWorldFields == null)
                 return null;
 
-            var singleEntityFields = ScanSingleEntityFields(context, structDecl, semanticModel);
+            var singleEntityFields = ScanSingleEntityFields(
+                context,
+                structDecl,
+                semanticModel,
+                isParallelJob: true
+            );
             if (singleEntityFields == null)
                 return null;
 
@@ -826,7 +831,12 @@ namespace Trecs.SourceGen
             if (fromWorldFields == null)
                 return null;
 
-            var singleEntityFields = ScanSingleEntityFields(context, structDecl, semanticModel);
+            var singleEntityFields = ScanSingleEntityFields(
+                context,
+                structDecl,
+                semanticModel,
+                isParallelJob: false
+            );
             if (singleEntityFields == null)
                 return null;
 
@@ -912,7 +922,12 @@ namespace Trecs.SourceGen
             if (fromWorldFields == null)
                 return null;
 
-            var singleEntityFields = ScanSingleEntityFields(context, structDecl, semanticModel);
+            var singleEntityFields = ScanSingleEntityFields(
+                context,
+                structDecl,
+                semanticModel,
+                isParallelJob: true
+            );
             if (singleEntityFields == null)
                 return null;
 
@@ -1029,44 +1044,15 @@ namespace Trecs.SourceGen
                         if (attr.AttributeClass?.Name != TrecsAttributeNames.FromWorld)
                             continue;
 
-                        var tagTypes = new List<ITypeSymbol>();
-                        ITypeSymbol? singleTag = null;
-
-                        foreach (var named in attr.NamedArguments)
-                        {
-                            switch (named.Key)
-                            {
-                                case "Tags" when named.Value.Kind == TypedConstantKind.Array:
-                                    foreach (var element in named.Value.Values)
-                                        if (
-                                            element.Kind == TypedConstantKind.Type
-                                            && element.Value is ITypeSymbol et
-                                        )
-                                            tagTypes.Add(et);
-                                    break;
-                                case "Tag"
-                                    when named.Value.Kind == TypedConstantKind.Type
-                                        && named.Value.Value is ITypeSymbol t1:
-                                    singleTag = t1;
-                                    break;
-                            }
-                        }
-
-                        if (singleTag != null && tagTypes.Count > 0)
-                        {
-                            context.ReportDiagnostic(
-                                Diagnostic.Create(
-                                    DiagnosticDescriptors.TagAndTagsBothSpecified,
-                                    field.GetLocation(),
-                                    v.Identifier.Text,
-                                    "FromWorld"
-                                )
-                            );
+                        var tagTypes = InlineTagsParser.Parse(
+                            attr,
+                            field.GetLocation(),
+                            v.Identifier.Text,
+                            "FromWorld",
+                            context.ReportDiagnostic
+                        );
+                        if (tagTypes == null)
                             return null;
-                        }
-
-                        if (singleTag != null)
-                            tagTypes.Add(singleTag);
 
                         // Validate: inline tags not supported on NativeComponentRead/Write
                         // (these require an EntityIndex, not a TagSet).
@@ -1097,20 +1083,6 @@ namespace Trecs.SourceGen
                                     DiagnosticDescriptors.FromWorldInlineTagsNotSupportedForNativeWorldAccessor,
                                     field.GetLocation(),
                                     v.Identifier.Text
-                                )
-                            );
-                            return null;
-                        }
-
-                        // TagSet<T1, ..., TN> only has generic overloads up to 4.
-                        if (tagTypes.Count > 4)
-                        {
-                            context.ReportDiagnostic(
-                                Diagnostic.Create(
-                                    DiagnosticDescriptors.FromWorldTooManyInlineTags,
-                                    field.GetLocation(),
-                                    v.Identifier.Text,
-                                    tagTypes.Count
                                 )
                             );
                             return null;
@@ -1151,7 +1123,8 @@ namespace Trecs.SourceGen
         static List<SingleEntityFieldEntry>? ScanSingleEntityFields(
             SourceProductionContext context,
             StructDeclarationSyntax structDecl,
-            SemanticModel semanticModel
+            SemanticModel semanticModel,
+            bool isParallelJob
         )
         {
             var result = new List<SingleEntityFieldEntry>();
@@ -1279,6 +1252,14 @@ namespace Trecs.SourceGen
                 if (isAspect)
                 {
                     var aspectData = AspectAttributeParser.ParseAspectData(typeSymbol);
+                    CheckSingleEntityAspectWriteAttributes(
+                        context,
+                        field,
+                        typeSymbol,
+                        aspectData,
+                        structDecl.Identifier.Text,
+                        isParallelJob
+                    );
                     result.Add(
                         new SingleEntityFieldEntry(
                             fieldName: v.Identifier.Text,
@@ -1315,62 +1296,17 @@ namespace Trecs.SourceGen
         // registration / field assignment / tracking run per-job-instance (which is
         // per-iteration-group for iteration jobs, once for custom jobs).
 
-        static string SingleEntityWithTags(SingleEntityFieldEntry e) =>
-            $"WithTags<{string.Join(", ", e.TagTypes.Select(PerformanceCache.GetDisplayString))}>()";
-
-        static string SingleEntityEiLocal(SingleEntityFieldEntry e) =>
-            FromWorldEmitter.GenPrefix + "se_" + e.FieldName + "_ei";
-
         static void EmitSingleEntityFieldsHoistedSetup(
             StringBuilder sb,
             string body,
             List<SingleEntityFieldEntry> entries
-        )
-        {
-            foreach (var e in entries)
-            {
-                var ei = SingleEntityEiLocal(e);
-                sb.AppendLine(
-                    $"{body}var {ei} = {FromWorldEmitter.GenPrefix}world.Query().{SingleEntityWithTags(e)}.SingleEntityIndex();"
-                );
-            }
-        }
+        ) => SingleEntityEmitter.EmitHoistedSetup(sb, body, entries);
 
         static void EmitSingleEntityFieldsDepRegistration(
             StringBuilder sb,
             string body,
             List<SingleEntityFieldEntry> entries
-        )
-        {
-            foreach (var e in entries)
-            {
-                var ei = SingleEntityEiLocal(e);
-                if (e.IsAspect)
-                {
-                    foreach (var comp in e.AspectData!.ReadTypes)
-                    {
-                        var n = PerformanceCache.GetDisplayString(comp);
-                        sb.AppendLine(
-                            $"{body}{FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}scheduler.IncludeReadDep({FromWorldEmitter.GenPrefix}deps, ResourceId.Component(ComponentTypeId<{n}>.Value), {ei}.GroupIndex);"
-                        );
-                    }
-                    foreach (var comp in e.AspectData!.WriteTypes)
-                    {
-                        var n = PerformanceCache.GetDisplayString(comp);
-                        sb.AppendLine(
-                            $"{body}{FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}scheduler.IncludeWriteDep({FromWorldEmitter.GenPrefix}deps, ResourceId.Component(ComponentTypeId<{n}>.Value), {ei}.GroupIndex);"
-                        );
-                    }
-                }
-                else
-                {
-                    var method = e.IsRef ? "IncludeWriteDep" : "IncludeReadDep";
-                    sb.AppendLine(
-                        $"{body}{FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}scheduler.{method}({FromWorldEmitter.GenPrefix}deps, ResourceId.Component(ComponentTypeId<{e.ComponentTypeDisplay}>.Value), {ei}.GroupIndex);"
-                    );
-                }
-            }
-        }
+        ) => SingleEntityEmitter.EmitDepRegistration(sb, body, entries);
 
         /// <summary>
         /// Emits the field assignments for [SingleEntity] fields on the per-job-instance
@@ -1382,83 +1318,13 @@ namespace Trecs.SourceGen
             StringBuilder sb,
             string body,
             List<SingleEntityFieldEntry> entries
-        )
-        {
-            foreach (var e in entries)
-            {
-                var ei = SingleEntityEiLocal(e);
-                if (e.IsAspect)
-                {
-                    // Use AspectAttributeData.AllComponentTypes — same canonical order
-                    // the aspect's generated EntityIndex constructor uses, so the
-                    // positional buffer args line up by construction.
-                    var aspectData = e.AspectData!;
-                    var allComponents = aspectData.AllComponentTypes;
-                    var bufferLocals = new List<string>(allComponents.Length);
-                    for (int i = 0; i < allComponents.Length; i++)
-                    {
-                        var compType = allComponents[i];
-                        bool inWrite = aspectData.WriteTypes.Any(w =>
-                            SymbolEqualityComparer.Default.Equals(w, compType)
-                        );
-                        var ext = inWrite ? "GetBufferWriteForJob" : "GetBufferReadForJob";
-                        var local = $"{FromWorldEmitter.GenPrefix}se_{e.FieldName}_b{i}";
-                        bufferLocals.Add(local);
-                        sb.AppendLine(
-                            $"{body}var ({local}, _) = {FromWorldEmitter.GenPrefix}world.{ext}<{PerformanceCache.GetDisplayString(compType)}>({ei}.GroupIndex);"
-                        );
-                    }
-                    sb.AppendLine(
-                        $"{body}{FromWorldEmitter.GenPrefix}job.{e.FieldName} = new {e.AspectTypeDisplay}({ei}, {string.Join(", ", bufferLocals)});"
-                    );
-                }
-                else
-                {
-                    var method = e.IsRef
-                        ? "GetNativeComponentWriteForJob"
-                        : "GetNativeComponentReadForJob";
-                    sb.AppendLine(
-                        $"{body}{FromWorldEmitter.GenPrefix}job.{e.FieldName} = {FromWorldEmitter.GenPrefix}world.{method}<{e.ComponentTypeDisplay}>({ei});"
-                    );
-                }
-            }
-        }
+        ) => SingleEntityEmitter.EmitFieldAssignment(sb, body, entries);
 
         static void EmitSingleEntityFieldsTracking(
             StringBuilder sb,
             string body,
             List<SingleEntityFieldEntry> entries
-        )
-        {
-            foreach (var e in entries)
-            {
-                var ei = SingleEntityEiLocal(e);
-                if (e.IsAspect)
-                {
-                    foreach (var comp in e.AspectData!.ReadTypes)
-                    {
-                        var n = PerformanceCache.GetDisplayString(comp);
-                        sb.AppendLine(
-                            $"{body}{FromWorldEmitter.GenPrefix}scheduler.TrackJobRead({FromWorldEmitter.GenPrefix}handle, ResourceId.Component(ComponentTypeId<{n}>.Value), {ei}.GroupIndex);"
-                        );
-                    }
-                    foreach (var comp in e.AspectData!.WriteTypes)
-                    {
-                        var n = PerformanceCache.GetDisplayString(comp);
-                        sb.AppendLine(
-                            $"{body}{FromWorldEmitter.GenPrefix}scheduler.TrackJobWrite({FromWorldEmitter.GenPrefix}handle, ResourceId.Component(ComponentTypeId<{n}>.Value), {ei}.GroupIndex);"
-                        );
-                    }
-                }
-                else
-                {
-                    var method = e.IsRef ? "TrackJobWrite" : "TrackJobRead";
-                    sb.AppendLine(
-                        $"{body}{FromWorldEmitter.GenPrefix}scheduler.{method}({FromWorldEmitter.GenPrefix}handle, ResourceId.Component(ComponentTypeId<{e.ComponentTypeDisplay}>.Value), {ei}.GroupIndex);"
-                    );
-                }
-            }
-        }
+        ) => SingleEntityEmitter.EmitTracking(sb, body, entries);
 
         /// <summary>
         /// Emits TRECS081 for any field on a Trecs job struct whose type is a recognized
@@ -1569,6 +1435,56 @@ namespace Trecs.SourceGen
                         structName,
                         variable.Identifier.Text,
                         PerformanceCache.GetDisplayString(typeSymbol)
+                    )
+                );
+            }
+        }
+
+        // Mirror of CheckFromWorldFieldWriteAttributes for hand-written
+        // [SingleEntity] aspect fields. If the aspect carries IWrite
+        // components the materialized aspect stores a NativeComponentBufferWrite,
+        // which Unity's parallel-job safety walker rejects on a field without
+        // [NativeDisableParallelForRestriction]. Auto-generated [WrapAsJob]
+        // wrappers add the attribute themselves; hand-written job structs need
+        // this warning so users learn at compile time rather than via a Burst
+        // safety error at runtime.
+        static void CheckSingleEntityAspectWriteAttributes(
+            SourceProductionContext context,
+            FieldDeclarationSyntax field,
+            INamedTypeSymbol aspectTypeSymbol,
+            AspectAttributeData aspectData,
+            string structName,
+            bool isParallelJob
+        )
+        {
+            if (!isParallelJob)
+                return;
+            if (aspectData == null || aspectData.WriteTypes.IsDefaultOrEmpty)
+                return;
+
+            bool hasNativeDisableParallel = false;
+            foreach (var attrList in field.AttributeLists)
+            {
+                foreach (var attr in attrList.Attributes)
+                {
+                    if (
+                        IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
+                        == "NativeDisableParallelForRestrictionAttribute"
+                    )
+                        hasNativeDisableParallel = true;
+                }
+            }
+
+            if (!hasNativeDisableParallel)
+            {
+                var variable = field.Declaration.Variables[0];
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.SingleEntityWriteAspectMissingNativeDisableParallelForRestriction,
+                        field.GetLocation(),
+                        variable.Identifier.Text,
+                        structName,
+                        PerformanceCache.GetDisplayString(aspectTypeSymbol)
                     )
                 );
             }
@@ -2467,7 +2383,7 @@ namespace Trecs.SourceGen
         /// <summary>
         /// Field on a hand-written Trecs job struct that carries <c>[SingleEntity(Tag/Tags)]</c>.
         /// </summary>
-        internal class SingleEntityFieldEntry
+        internal class SingleEntityFieldEntry : SingleEntityEmitter.IEmitTarget
         {
             public string FieldName { get; }
             public bool IsAspect { get; }
@@ -2488,6 +2404,14 @@ namespace Trecs.SourceGen
             public string? ComponentTypeDisplay { get; }
             public ITypeSymbol? ComponentTypeSymbol { get; }
             public bool IsRef { get; }
+
+            // SingleEntityEmitter.IEmitTarget — Phase 4 emits to the user-declared
+            // field directly, so the local-name root and the LHS of the per-job
+            // assignment are both the user's field name.
+            string SingleEntityEmitter.IEmitTarget.LocalNameRoot => FieldName;
+            string SingleEntityEmitter.IEmitTarget.JobFieldAssignmentLhs => FieldName;
+            bool SingleEntityEmitter.IEmitTarget.IsComponentWrite => IsRef;
+            IReadOnlyList<ITypeSymbol> SingleEntityEmitter.IEmitTarget.TagTypes => TagTypes;
 
             public SingleEntityFieldEntry(
                 string fieldName,

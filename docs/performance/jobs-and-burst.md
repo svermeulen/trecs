@@ -9,7 +9,7 @@ Mark a static `[ForEachEntity]` method with `[WrapAsJob]` to generate a Burst-co
 ```csharp
 public partial class ParticleMoveSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+    [ForEachEntity(typeof(SampleTags.Particle))]
     [WrapAsJob]
     static void Execute(in Velocity velocity, ref Position position, in NativeWorldAccessor world)
     {
@@ -32,7 +32,7 @@ public partial class ParticleJobSystem : ISystem
     {
         public float DeltaTime;
 
-        [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+        [ForEachEntity(typeof(SampleTags.Particle))]
         public readonly void Execute(in Velocity velocity, ref Position position)
         {
             position.Value += DeltaTime * velocity.Value;

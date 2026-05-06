@@ -11,7 +11,7 @@ namespace Trecs.Samples.SpawnAndDestroy
             _gameObjectRegistry = gameObjectRegistry;
         }
 
-        [ForEachEntity(Tags = new[] { typeof(SampleTags.Sphere) })]
+        [ForEachEntity(typeof(SampleTags.Sphere))]
         void Execute(in GameObjectId gameObjectId, ref Lifetime lifetime, EntityIndex entityIndex)
         {
             lifetime.Value -= World.DeltaTime;

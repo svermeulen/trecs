@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using Trecs.Collections;
 using Unity.Collections;
 using Unity.Mathematics;
 

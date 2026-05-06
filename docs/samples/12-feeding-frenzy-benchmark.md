@@ -33,7 +33,7 @@ else
 Uses `IEntitySet` for membership tracking. Systems filter by set:
 
 ```csharp
-[ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
+[ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
 void IdleBob(in Fish fish) { ... }
 ```
 
@@ -44,7 +44,7 @@ void IdleBob(in Fish fish) { ... }
 Uses `IHasPartition` for group separation:
 
 ```csharp
-[ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+[ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
 void IdleBob(in Fish fish) { ... }
 ```
 

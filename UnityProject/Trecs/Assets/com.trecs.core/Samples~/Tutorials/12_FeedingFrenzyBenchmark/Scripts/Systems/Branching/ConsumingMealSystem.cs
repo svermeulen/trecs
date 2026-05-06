@@ -49,7 +49,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             }
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         void RunForEachMethodAspect(in Fish fish)
         {
             if (fish.TargetMeal.IsNull)
@@ -67,7 +67,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             }
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         void RunForEachMethodComponents(
             in Position position,
             in DestinationPosition destinationPosition,
@@ -161,7 +161,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             new ConsumeMealRawBuffersJob().ScheduleParallel(World, count: fishCount);
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         [WrapAsJob]
         static void RunWrapAsJobAspect(in Fish fish, in NativeWorldAccessor world)
         {
@@ -180,7 +180,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             }
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         [WrapAsJob]
         static void RunWrapAsJobComponents(
             in Position position,
@@ -210,7 +210,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             [FromWorld]
             public NativeWorldAccessor World;
 
-            [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+            [ForEachEntity(typeof(FrenzyTags.Fish))]
             public void Execute(in Fish fish)
             {
                 if (fish.TargetMeal.IsNull)
@@ -235,7 +235,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             [FromWorld]
             public NativeWorldAccessor World;
 
-            [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+            [ForEachEntity(typeof(FrenzyTags.Fish))]
             public void Execute(
                 in Position position,
                 in DestinationPosition destinationPosition,
@@ -265,14 +265,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             [FromWorld]
             public NativeWorldAccessor World;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<Position> Positions;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<DestinationPosition> DestinationPositions;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<TargetMeal> Meals;
 
             public void Execute(int i)

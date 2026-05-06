@@ -33,7 +33,7 @@ namespace Trecs
 
         /// <summary>
         /// Sets a human-readable debug name on the resulting <see cref="World.DebugName"/>.
-        /// Surfaced by editor tooling (e.g. the World dropdown in <c>TrecsTimeTravelWindow</c>).
+        /// Surfaced by editor tooling (e.g. the World dropdown in <c>TrecsPlayerWindow</c>).
         /// </summary>
         public WorldBuilder SetDebugName(string debugName)
         {

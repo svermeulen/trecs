@@ -16,7 +16,7 @@ namespace Trecs.Samples.NativePointers
     /// </summary>
     public partial class PatrolMovementSystem : ISystem
     {
-        [ForEachEntity(Tag = typeof(NativePatrolTags.Follower))]
+        [ForEachEntity(typeof(NativePatrolTags.Follower))]
         [WrapAsJob]
         static void Execute(
             ref Position position,

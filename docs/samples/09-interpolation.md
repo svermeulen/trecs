@@ -114,7 +114,7 @@ The renderer reads `Interpolated<Position>` and `Interpolated<Rotation>` for smo
 
 ```csharp
 // Smooth: reads blended values — silky smooth
-[ForEachEntity(Tag = typeof(OrbitTags.Smooth))]
+[ForEachEntity(typeof(OrbitTags.Smooth))]
 void RenderSmooth(in Interpolated<Position> pos, in Interpolated<Rotation> rot, in GameObjectId id)
 {
     var go = _registry.Resolve(id);
@@ -122,7 +122,7 @@ void RenderSmooth(in Interpolated<Position> pos, in Interpolated<Rotation> rot, 
 }
 
 // Raw: reads fixed-update values directly — visibly jittery
-[ForEachEntity(Tag = typeof(OrbitTags.Raw))]
+[ForEachEntity(typeof(OrbitTags.Raw))]
 void RenderRaw(in Position pos, in Rotation rot, in GameObjectId id)
 {
     var go = _registry.Resolve(id);

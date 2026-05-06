@@ -30,7 +30,7 @@ namespace Trecs.Samples.AspectInterfaces
             ExecuteImpl(in boss);
         }
 
-        [ForEachEntity(Tag = typeof(SampleTags.Enemy))]
+        [ForEachEntity(typeof(SampleTags.Enemy))]
         void DanceImpl(in EnemyView enemy)
         {
             // Per-entity phase from EntityIndex so each enemy bobs out
@@ -45,7 +45,7 @@ namespace Trecs.Samples.AspectInterfaces
             enemy.Position = pos;
         }
 
-        [ForEachEntity(Tag = typeof(SampleTags.Enemy))]
+        [ForEachEntity(typeof(SampleTags.Enemy))]
         void ExecuteImpl(in EnemyView enemy, [PassThroughArgument] in BossView boss)
         {
             // Passive heal. Tuned so an enemy that just took a hit needs

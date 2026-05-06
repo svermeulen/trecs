@@ -11,7 +11,7 @@ namespace Trecs.Samples.Partitions
     {
         const float LaunchSpeed = 8f;
 
-        [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Resting) })]
+        [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
         void Execute(in RestingBall ball)
         {
             ball.RestTimer -= World.DeltaTime;

@@ -135,6 +135,27 @@ namespace Trecs
             }
         }
 
+        public bool TryGetSystemEffectivelyEnabled(int systemIndex, out bool enabled)
+        {
+            enabled = false;
+            if (_world == null || systemIndex < 0)
+                return false;
+            try
+            {
+                // Combines all enable channels with the deterministic paused
+                // flag — the hierarchy grayout uses this so a system disabled
+                // via code (User / Playback channel, or paused) shows as
+                // grayed even when the inspector's Editor-channel toggle is
+                // still checked.
+                enabled = _world.IsSystemEffectivelyEnabled(systemIndex);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         IReadOnlyList<TemplateRef> ProjectTemplates()
         {
             var list = new List<TemplateRef>();
@@ -521,6 +542,100 @@ namespace Trecs
             if (seen == null || seen.Count == 0)
                 return Array.Empty<string>();
             return seen;
+        }
+
+        public IReadOnlyCollection<string> GetTemplateNamesAddedBy(string accessorDebugName) =>
+            CollectTemplateNames(accessorDebugName, t => t.GetGroupsAddedBy(accessorDebugName));
+
+        public IReadOnlyCollection<string> GetTemplateNamesRemovedBy(string accessorDebugName) =>
+            CollectTemplateNames(accessorDebugName, t => t.GetGroupsRemovedBy(accessorDebugName));
+
+        public IReadOnlyCollection<string> GetTemplateNamesMovedBy(string accessorDebugName) =>
+            CollectTemplateNames(accessorDebugName, t => t.GetGroupsMovedBy(accessorDebugName));
+
+        public IReadOnlyCollection<string> GetSystemsAddingTo(string templateDebugName) =>
+            CollectSystemsForTemplate(templateDebugName, (t, g) => t.GetSystemsAddingTo(g));
+
+        public IReadOnlyCollection<string> GetSystemsRemovingFrom(string templateDebugName) =>
+            CollectSystemsForTemplate(templateDebugName, (t, g) => t.GetSystemsRemovingFrom(g));
+
+        public IReadOnlyCollection<string> GetSystemsMovingOn(string templateDebugName) =>
+            CollectSystemsForTemplate(templateDebugName, (t, g) => t.GetSystemsMovingOn(g));
+
+        IReadOnlyCollection<string> CollectTemplateNames(
+            string accessorDebugName,
+            Func<TrecsAccessTracker, IReadOnlyCollection<GroupIndex>> getGroups
+        )
+        {
+            if (_world == null || _world.IsDisposed || string.IsNullOrEmpty(accessorDebugName))
+                return Array.Empty<string>();
+            var tracker = TrecsAccessRegistry.GetTracker(_world);
+            if (tracker == null)
+                return Array.Empty<string>();
+            var groups = getGroups(tracker);
+            if (groups == null || groups.Count == 0)
+                return Array.Empty<string>();
+            HashSet<string> seen = null;
+            try
+            {
+                var info = _world.WorldInfo;
+                foreach (var g in groups)
+                {
+                    var template = info.GetResolvedTemplateForGroup(g);
+                    var name = template?.DebugName;
+                    if (string.IsNullOrEmpty(name))
+                        continue;
+                    seen ??= new HashSet<string>();
+                    seen.Add(name);
+                }
+            }
+            catch (Exception)
+            {
+                return Array.Empty<string>();
+            }
+            return seen ?? (IReadOnlyCollection<string>)Array.Empty<string>();
+        }
+
+        IReadOnlyCollection<string> CollectSystemsForTemplate(
+            string templateDebugName,
+            Func<TrecsAccessTracker, GroupIndex, IReadOnlyCollection<string>> getSystems
+        )
+        {
+            if (_world == null || _world.IsDisposed || string.IsNullOrEmpty(templateDebugName))
+                return Array.Empty<string>();
+            var tracker = TrecsAccessRegistry.GetTracker(_world);
+            if (tracker == null)
+                return Array.Empty<string>();
+            HashSet<string> seen = null;
+            try
+            {
+                foreach (var rt in _world.WorldInfo.ResolvedTemplates)
+                {
+                    if (rt?.DebugName != templateDebugName)
+                        continue;
+                    var groups = rt.Groups;
+                    if (groups == null)
+                        continue;
+                    foreach (var g in groups)
+                    {
+                        var systems = getSystems(tracker, g);
+                        if (systems == null)
+                            continue;
+                        foreach (var s in systems)
+                        {
+                            if (string.IsNullOrEmpty(s))
+                                continue;
+                            seen ??= new HashSet<string>();
+                            seen.Add(s);
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                return Array.Empty<string>();
+            }
+            return seen ?? (IReadOnlyCollection<string>)Array.Empty<string>();
         }
 
         bool TryResolveComponentId(string displayName, out ComponentId id)

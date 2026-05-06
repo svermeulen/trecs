@@ -1,7 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+using Trecs.Internal;
 
-namespace Trecs.Internal // not part of public api atm
+namespace Trecs.Collections
 {
     ///   NOTE: accessing via IEnumerable is less performant and may contain boxing
     public readonly struct ReadOnlyDenseDictionary<TKey, TValue>

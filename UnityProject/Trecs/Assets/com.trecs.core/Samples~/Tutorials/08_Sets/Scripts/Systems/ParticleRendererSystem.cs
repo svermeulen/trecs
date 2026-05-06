@@ -25,7 +25,7 @@ namespace Trecs.Samples.Sets
             _registry = registry;
         }
 
-        [ForEachEntity(Tags = new[] { typeof(SampleTags.Particle) })]
+        [ForEachEntity(typeof(SampleTags.Particle))]
         void Execute(in RenderView view)
         {
             var go = _registry.Resolve(view.GameObjectId);

@@ -44,6 +44,12 @@ namespace Trecs
         // cache mode show "Tags touched" without a live tracker / world. Same
         // accumulation semantics as Access.
         public List<TrecsSchemaTagsTouchedInfo> TagsTouched = new();
+
+        // Per-accessor record of which templates the accessor performed
+        // structural changes on (Add / Remove / Move). Move flags both the
+        // source and destination templates of each operation. Same
+        // accumulation semantics as Access / TagsTouched.
+        public List<TrecsSchemaStructuralInfo> Structural = new();
     }
 
     [Serializable]
@@ -166,6 +172,19 @@ namespace Trecs
     {
         public string AccessorDebugName;
         public List<string> TagNames = new();
+    }
+
+    [Serializable]
+    public class TrecsSchemaStructuralInfo
+    {
+        public string AccessorDebugName;
+
+        // Template DebugNames for the groups the accessor mutated. A move
+        // contributes its source template to MovedTemplateNames *and* its
+        // destination — there is no separate "moved-from" / "moved-to" split.
+        public List<string> AddedTemplateNames = new();
+        public List<string> RemovedTemplateNames = new();
+        public List<string> MovedTemplateNames = new();
     }
 
     /// <summary>
@@ -529,6 +548,74 @@ namespace Trecs
                     entry.TagNames.Sort(StringComparer.OrdinalIgnoreCase);
                 }
                 fresh.TagsTouched.Sort(
+                    (a, b) =>
+                        string.Compare(
+                            a.AccessorDebugName ?? string.Empty,
+                            b.AccessorDebugName ?? string.Empty,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                );
+            }
+
+            bool structuralChanged = false;
+            if (existing.Structural != null && existing.Structural.Count > 0)
+            {
+                fresh.Structural ??= new List<TrecsSchemaStructuralInfo>();
+                var byAccessor = new Dictionary<string, TrecsSchemaStructuralInfo>(
+                    fresh.Structural.Count
+                );
+                foreach (var entry in fresh.Structural)
+                {
+                    if (entry?.AccessorDebugName != null)
+                    {
+                        byAccessor[entry.AccessorDebugName] = entry;
+                    }
+                }
+                foreach (var prior in existing.Structural)
+                {
+                    if (prior?.AccessorDebugName == null)
+                    {
+                        continue;
+                    }
+                    if (byAccessor.TryGetValue(prior.AccessorDebugName, out var current))
+                    {
+                        structuralChanged |= UnionInto(
+                            current.AddedTemplateNames,
+                            prior.AddedTemplateNames
+                        );
+                        structuralChanged |= UnionInto(
+                            current.RemovedTemplateNames,
+                            prior.RemovedTemplateNames
+                        );
+                        structuralChanged |= UnionInto(
+                            current.MovedTemplateNames,
+                            prior.MovedTemplateNames
+                        );
+                    }
+                    else
+                    {
+                        var copy = new TrecsSchemaStructuralInfo
+                        {
+                            AccessorDebugName = prior.AccessorDebugName,
+                        };
+                        UnionInto(copy.AddedTemplateNames, prior.AddedTemplateNames);
+                        UnionInto(copy.RemovedTemplateNames, prior.RemovedTemplateNames);
+                        UnionInto(copy.MovedTemplateNames, prior.MovedTemplateNames);
+                        fresh.Structural.Add(copy);
+                        byAccessor[prior.AccessorDebugName] = copy;
+                        structuralChanged = true;
+                    }
+                }
+            }
+            if (structuralChanged)
+            {
+                foreach (var entry in fresh.Structural)
+                {
+                    entry.AddedTemplateNames.Sort(StringComparer.OrdinalIgnoreCase);
+                    entry.RemovedTemplateNames.Sort(StringComparer.OrdinalIgnoreCase);
+                    entry.MovedTemplateNames.Sort(StringComparer.OrdinalIgnoreCase);
+                }
+                fresh.Structural.Sort(
                     (a, b) =>
                         string.Compare(
                             a.AccessorDebugName ?? string.Empty,
@@ -962,9 +1049,74 @@ namespace Trecs
                             StringComparison.OrdinalIgnoreCase
                         )
                 );
+
+                // Per-accessor structural changes (Add / Remove / Move),
+                // recorded against template DebugNames so cache mode answers
+                // the same template-level questions as live mode.
+                foreach (var accessorName in tracker.GetAllTrackedAccessorNames())
+                {
+                    var added = ProjectGroupsToTemplateNames(
+                        info,
+                        tracker.GetGroupsAddedBy(accessorName)
+                    );
+                    var removed = ProjectGroupsToTemplateNames(
+                        info,
+                        tracker.GetGroupsRemovedBy(accessorName)
+                    );
+                    var moved = ProjectGroupsToTemplateNames(
+                        info,
+                        tracker.GetGroupsMovedBy(accessorName)
+                    );
+                    if (added.Count == 0 && removed.Count == 0 && moved.Count == 0)
+                    {
+                        continue;
+                    }
+                    schema.Structural.Add(
+                        new TrecsSchemaStructuralInfo
+                        {
+                            AccessorDebugName = accessorName,
+                            AddedTemplateNames = added,
+                            RemovedTemplateNames = removed,
+                            MovedTemplateNames = moved,
+                        }
+                    );
+                }
+                schema.Structural.Sort(
+                    (a, b) =>
+                        string.Compare(
+                            a.AccessorDebugName ?? string.Empty,
+                            b.AccessorDebugName ?? string.Empty,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                );
             }
 
             return schema;
+        }
+
+        static List<string> ProjectGroupsToTemplateNames(
+            WorldInfo info,
+            IReadOnlyCollection<GroupIndex> groups
+        )
+        {
+            if (groups == null || groups.Count == 0)
+            {
+                return new List<string>();
+            }
+            var seen = new HashSet<string>();
+            var names = new List<string>();
+            foreach (var g in groups)
+            {
+                var template = info.GetResolvedTemplateForGroup(g);
+                var name = template?.DebugName;
+                if (string.IsNullOrEmpty(name) || !seen.Add(name))
+                {
+                    continue;
+                }
+                names.Add(name);
+            }
+            names.Sort(StringComparer.OrdinalIgnoreCase);
+            return names;
         }
 
         // Walk the component struct's instance fields (public + non-public)

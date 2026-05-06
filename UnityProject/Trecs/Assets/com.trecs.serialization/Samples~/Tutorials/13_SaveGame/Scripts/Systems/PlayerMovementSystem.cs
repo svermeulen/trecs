@@ -18,7 +18,7 @@ namespace Trecs.Serialization.Samples.SaveGame
     [ExecuteAfter(typeof(PlayerInputSystem))]
     public partial class PlayerMovementSystem : ISystem
     {
-        public void Execute()
+        void Execute([SingleEntity(typeof(SaveGameTags.Player))] in PlayerView player)
         {
             var step = World.GlobalComponent<MoveInput>().Read.Step;
             if (step.x == 0 && step.y == 0)
@@ -26,7 +26,6 @@ namespace Trecs.Serialization.Samples.SaveGame
                 return;
             }
 
-            var player = PlayerView.Query(World).WithTags<SaveGameTags.Player>().Single();
             var currentPos = player.GridPos;
             var targetPos = currentPos + step;
 

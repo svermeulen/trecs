@@ -1583,13 +1583,15 @@ namespace Trecs
                         case RowKind.Accessor:
                             if (data.SystemIndex >= 0 && data.SystemIndex < world.SystemCount)
                             {
-                                var enabled = world.IsSystemEnabled(
-                                    data.SystemIndex,
-                                    EnableChannel.Editor
-                                );
-                                if (enabled != data.SystemEnabled)
+                                // Effective state — combines all enable
+                                // channels with the deterministic paused
+                                // flag — so the row grays out whenever the
+                                // system isn't actually running, even if
+                                // the inspector's Editor toggle is checked.
+                                var enabled = world.IsSystemEffectivelyEnabled(data.SystemIndex);
+                                if (enabled != data.SystemEffectivelyEnabled)
                                 {
-                                    data.SystemEnabled = enabled;
+                                    data.SystemEffectivelyEnabled = enabled;
                                     changed = true;
                                 }
                             }
@@ -2075,7 +2077,7 @@ namespace Trecs
         )
         {
             result = default;
-            var displayName = ObjectNames.NicifyVariableName(tref.DebugName ?? "(unnamed)");
+            var displayName = tref.DebugName ?? "(unnamed)";
 
             // Children — only when the source supports entity iteration
             // (live mode + resolved template). Cache rows are leaves; the
@@ -2207,7 +2209,7 @@ namespace Trecs
             AppendEntityChildren(
                 accessor,
                 group,
-                ObjectNames.NicifyVariableName(rt.DebugName ?? string.Empty),
+                rt.DebugName ?? string.Empty,
                 parentTref,
                 entityChildren
             );
@@ -2340,7 +2342,7 @@ namespace Trecs
                 {
                     continue;
                 }
-                // Live system enable state — falls through to true (the
+                // Live effective enable state — falls through to true (the
                 // pre-rebuild snapshot) for cache rows, manual accessors,
                 // and any live row whose system index isn't currently
                 // resolvable. UpdateMutableData flips it on the next tick
@@ -2349,7 +2351,7 @@ namespace Trecs
                 if (
                     src.SupportsSystemEnableToggle
                     && aref.SystemIndex >= 0
-                    && src.TryGetSystemEnabled(aref.SystemIndex, out var live)
+                    && src.TryGetSystemEffectivelyEnabled(aref.SystemIndex, out var live)
                 )
                 {
                     enabled = live;
@@ -2364,7 +2366,7 @@ namespace Trecs
                     AccessorId = aref.AccessorId,
                     SystemIndex = aref.SystemIndex,
                     ExecutionPriority = aref.ExecutionPriority,
-                    SystemEnabled = enabled,
+                    SystemEffectivelyEnabled = enabled,
                 };
                 _dataById[aid] = data;
                 phaseChildren.Add(new TreeViewItemData<RowData>(aid, data));
@@ -2694,7 +2696,7 @@ namespace Trecs
                     break;
                 case RowKind.Accessor:
                     label.style.unityFontStyleAndWeight = FontStyle.Normal;
-                    label.style.opacity = data.SystemEnabled ? 1f : 0.45f;
+                    label.style.opacity = data.SystemEffectivelyEnabled ? 1f : 0.45f;
                     break;
                 case RowKind.Template:
                     label.style.unityFontStyleAndWeight = FontStyle.Normal;

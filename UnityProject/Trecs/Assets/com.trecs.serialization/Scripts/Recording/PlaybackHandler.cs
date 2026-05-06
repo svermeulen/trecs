@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs.Serialization

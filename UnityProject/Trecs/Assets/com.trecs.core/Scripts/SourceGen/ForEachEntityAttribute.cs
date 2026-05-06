@@ -51,5 +51,16 @@ namespace Trecs
         {
             Tags = Array.Empty<Type>();
         }
+
+        /// <summary>
+        /// Shorthand: <c>[ForEachEntity(typeof(MyTag))]</c> /
+        /// <c>[ForEachEntity(typeof(A), typeof(B))]</c>. Equivalent to setting
+        /// <see cref="Tags"/>. Cannot be combined with the named <see cref="Tag"/>
+        /// / <see cref="Tags"/> properties.
+        /// </summary>
+        public ForEachEntityAttribute(params Type[] tags)
+        {
+            Tags = tags ?? Array.Empty<Type>();
+        }
     }
 }

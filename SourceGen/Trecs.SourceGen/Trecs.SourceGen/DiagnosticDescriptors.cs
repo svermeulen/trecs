@@ -71,15 +71,6 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        public static readonly DiagnosticDescriptor EntityJobGroupMissingExecuteMethod = new(
-            id: "TRECS006",
-            title: "Missing execute method on EntityJobGroup",
-            messageFormat: "Entity group job '{0}' must define an Execute method with parameters",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
         public static readonly DiagnosticDescriptor EntityJobGroupMultipleExecuteMethods = new(
             id: "TRECS007",
             title: "Multiple execute methods on EntityJobGroup",
@@ -109,24 +100,6 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        public static readonly DiagnosticDescriptor AspectMustBeStruct = new(
-            id: "TRECS010",
-            title: "Aspect must be a struct",
-            messageFormat: "Aspect '{0}' must be a struct, not a class",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
-        public static readonly DiagnosticDescriptor UnwrapComponentMustBeStruct = new(
-            id: "TRECS011",
-            title: "Single value component must be a struct",
-            messageFormat: "Single value component '{0}' must be a struct, not a class",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
         public static readonly DiagnosticDescriptor UnwrapComponentMustImplementIEntityComponent =
             new(
                 id: "TRECS012",
@@ -141,15 +114,6 @@ namespace Trecs.SourceGen
             id: "TRECS013",
             title: "Single value component must have exactly one field",
             messageFormat: "Single value component '{0}' must have exactly one field, but has {1}",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
-        public static readonly DiagnosticDescriptor AspectMustSpecifyTagsOrMatchByComponents = new(
-            id: "TRECS014",
-            title: "Aspect must specify Tags or MatchByComponents",
-            messageFormat: "Aspect '{0}' must specify either Tags property or set MatchByComponents to true",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -329,24 +293,6 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        public static readonly DiagnosticDescriptor AutoSystemWorldPropertyConflict = new(
-            id: "TRECS045",
-            title: "System already defines World property",
-            messageFormat: "Class '{0}' already defines a 'World' property which conflicts with the generated implementation. Remove the user-defined property.",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
-        public static readonly DiagnosticDescriptor AutoSystemWorldFieldConflict = new(
-            id: "TRECS046",
-            title: "System already defines _world field",
-            messageFormat: "Class '{0}' already defines a '_world' field which conflicts with the generated backing field. Remove the user-defined field.",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
         public static readonly DiagnosticDescriptor AutoSystemMissingExecute = new(
             id: "TRECS047",
             title: "System has no Execute method",
@@ -386,15 +332,6 @@ namespace Trecs.SourceGen
         );
 
         // Hook method migration diagnostics (TRECS060-069)
-
-        public static readonly DiagnosticDescriptor OldStyleDeclareDependenciesHook = new(
-            id: "TRECS060",
-            title: "Old-style DeclareDependencies hook detected",
-            messageFormat: "Replace 'void DeclareDependencies(IAccessDeclarations deps)' with 'partial void OnDeclareDependencies(IAccessDeclarations deps)'. The old hook pattern is no longer supported.",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
 
         public static readonly DiagnosticDescriptor OldStyleInitializeHook = new(
             id: "TRECS061",
@@ -558,15 +495,6 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        public static readonly DiagnosticDescriptor WrapAsJobOnStruct = new(
-            id: "TRECS092",
-            title: "[WrapAsJob] cannot be used on struct methods",
-            messageFormat: "[WrapAsJob] method '{0}' is on a struct. [WrapAsJob] is for system class methods; struct jobs already use [ForEachEntity] directly.",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
         public static readonly DiagnosticDescriptor WrapAsJobManagedPassThrough = new(
             id: "TRECS093",
             title: "[WrapAsJob] pass-through parameter must be unmanaged",
@@ -580,15 +508,6 @@ namespace Trecs.SourceGen
             id: "TRECS094",
             title: "[WrapAsJob] pass-through parameter cannot be ref/out",
             messageFormat: "[WrapAsJob] method '{0}' has [PassThroughArgument] parameter '{1}' with ref/out modifier. Job fields are value copies and cannot be passed by reference.",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
-        public static readonly DiagnosticDescriptor WrapAsJobSetsNotSupported = new(
-            id: "TRECS095",
-            title: "[WrapAsJob] does not support set-based filtering",
-            messageFormat: "[WrapAsJob] method '{0}' uses Set on [ForEachEntity]. Set-based (sparse) filtering is not yet supported for [WrapAsJob] — use Tags or MatchByComponents instead, or write a manual job struct with [ForEachEntity] + [FromWorld] fields.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -669,7 +588,7 @@ namespace Trecs.SourceGen
             id: "TRECS102",
             title: "[FromWorld] on [WrapAsJob] requires inline Tag/Tags",
             messageFormat: "[FromWorld] parameter '{0}' on [WrapAsJob] method requires inline Tag or Tags "
-                + "(e.g. [FromWorld(Tag = typeof(MyTag))]). The generated wrapper method has no way "
+                + "(e.g. [FromWorld(typeof(MyTag))]). The generated wrapper method has no way "
                 + "to accept runtime TagSets. Use a manual job struct if runtime-variable tags are needed.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
@@ -725,8 +644,10 @@ namespace Trecs.SourceGen
             id: "TRECS114",
             title: "[SingleEntity] requires inline Tag or Tags",
             messageFormat: "[SingleEntity] target '{0}' must specify an inline Tag or Tags "
-                + "(e.g. [SingleEntity(Tag = typeof(MyTag))]). [SingleEntity] has no runtime override "
-                + "— the singleton is resolved at the same site every call.",
+                + "(e.g. [SingleEntity(typeof(MyTag))]). [SingleEntity] has no runtime override "
+                + "— the singleton is resolved at the same site every call. "
+                + "If you need a runtime-supplied query, use "
+                + "World.Query().WithTags(...).Single() directly inside the method body.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -739,6 +660,16 @@ namespace Trecs.SourceGen
                 + "for world-sourced single-entity values (it implies [FromWorld] semantics).",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor SingleEntityWriteAspectMissingNativeDisableParallelForRestriction = new(
+            id: "TRECS116",
+            title: "[SingleEntity] write-aspect field on a parallel job needs [NativeDisableParallelForRestriction]",
+            messageFormat: "Field '{0}' on parallel job '{1}' has [SingleEntity] with aspect '{2}' that contains IWrite components. "
+                + "Add [NativeDisableParallelForRestriction] to the field — Unity's parallel-job safety walker rejects the materialized aspect's NativeComponentBufferWrite without it.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Warning,
             isEnabledByDefault: true
         );
 

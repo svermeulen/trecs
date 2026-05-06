@@ -327,7 +327,7 @@ namespace Trecs.Serialization
         }
 
         /// <summary>Step one fixed frame; pauses first if not already paused.</summary>
-        public void StepFrame()
+        public void StepFixedFrame()
         {
             if (!TryGetRunner(out var runner))
             {
@@ -337,7 +337,7 @@ namespace Trecs.Serialization
             {
                 runner.FixedIsPaused = true;
             }
-            runner.StepFrame();
+            runner.StepFixedFrame();
         }
 
         bool TryGetRunner(out SystemRunner runner)

@@ -178,6 +178,48 @@ namespace Trecs.SourceGen.Shared
         }
 
         /// <summary>
+        /// Gets the containing type chain for nested types with the full
+        /// info (kind, accessibility, type-parameter list) needed to emit a
+        /// matching <c>partial</c> wrapper. Outer-most type is first.
+        /// </summary>
+        public static List<ContainingTypeInfo> GetContainingTypeChainInfo(INamedTypeSymbol symbol)
+        {
+            var parts = new List<ContainingTypeInfo>();
+            var current = symbol.ContainingType;
+
+            while (current != null)
+            {
+                parts.Add(
+                    new ContainingTypeInfo(
+                        Name: current.Name,
+                        Kind: current.TypeKind == TypeKind.Struct ? "struct" : "class",
+                        Accessibility: GetAccessibilityModifier(current),
+                        TypeParameterList: FormatTypeParameterList(current)
+                    )
+                );
+                current = current.ContainingType;
+            }
+
+            parts.Reverse();
+            return parts;
+        }
+
+        /// <summary>
+        /// Formats a symbol's type parameters as <c>"&lt;T, U&gt;"</c>
+        /// (or empty for non-generic). Partial declarations are matched on
+        /// the full name including arity + parameter names, so this must
+        /// match the user's source verbatim.
+        /// </summary>
+        public static string FormatTypeParameterList(INamedTypeSymbol symbol)
+        {
+            if (symbol.TypeParameters.Length == 0)
+            {
+                return string.Empty;
+            }
+            return "<" + string.Join(", ", symbol.TypeParameters.Select(p => p.Name)) + ">";
+        }
+
+        /// <summary>
         /// Determines the accessibility modifier for a symbol
         /// </summary>
         public static string GetAccessibilityModifier(ISymbol symbol)
@@ -188,6 +230,8 @@ namespace Trecs.SourceGen.Shared
                 Accessibility.Internal => "internal",
                 Accessibility.Protected => "protected",
                 Accessibility.Private => "private",
+                Accessibility.ProtectedOrInternal => "protected internal",
+                Accessibility.ProtectedAndInternal => "private protected",
                 _ => "internal",
             };
         }
@@ -275,8 +319,17 @@ namespace Trecs.SourceGen.Shared
         /// </summary>
         public static string GetNamespace(ClassDeclarationSyntax classNode)
         {
-            var namespaceDecl = classNode.Parent as BaseNamespaceDeclarationSyntax;
-            return namespaceDecl?.Name.ToString() ?? string.Empty;
+            // Walk up the syntax tree so nested classes resolve to the enclosing namespace.
+            // The immediate parent of a nested class is a TypeDeclarationSyntax, not a
+            // BaseNamespaceDeclarationSyntax — without this walk the iteration generators
+            // would emit their wrapping `partial class Outer { ... }` at top level rather
+            // than inside the user's namespace.
+            for (SyntaxNode? node = classNode.Parent; node != null; node = node.Parent)
+            {
+                if (node is BaseNamespaceDeclarationSyntax ns)
+                    return ns.Name.ToString();
+            }
+            return string.Empty;
         }
 
         /// <summary>

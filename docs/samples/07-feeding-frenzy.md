@@ -56,12 +56,12 @@ Checks if eating fish have reached their meal. On contact: removes the meal, gro
 Demonstrates accessing entities from a *different* group inside a `[WrapAsJob]` method — the `[FromWorld]` attribute on the `mealFactory` parameter lets the job look up meal data by `EntityHandle`:
 
 ```csharp
-[ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.Eating) })]
+[ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.Eating))]
 [WrapAsJob]
 static void Execute(
     in ConsumingFish fish,
     in NativeWorldAccessor world,
-    [FromWorld(Tag = typeof(FrenzyTags.Meal))]
+    [FromWorld(typeof(FrenzyTags.Meal))]
         in MealNutritionView.NativeFactory mealFactory
 )
 {
@@ -86,7 +86,7 @@ Moves eating fish toward their destination position.
 Applies sinusoidal bobbing to idle (NotEating) fish. Uses `EntityIndex` as a phase offset so fish bob at different times:
 
 ```csharp
-[ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+[ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
 [WrapAsJob]
 static void Execute(in Fish fish, EntityIndex entityIndex, in NativeWorldAccessor world)
 {
@@ -105,7 +105,7 @@ Shrinks all fish over time. Removes fish that are too small. Colors fish based o
 Demonstrates `[PassThroughArgument]` to pass configuration into a job, and entity removal inside a parallel job via `NativeWorldAccessor`:
 
 ```csharp
-[ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+[ForEachEntity(typeof(FrenzyTags.Fish))]
 [WrapAsJob]
 static void ExecuteImpl(
     ref UniformScale scale,
@@ -138,7 +138,7 @@ Lerps `Position`/`Rotation` toward `SimPosition`/`SimRotation` each visual frame
 [Phase(SystemPhase.Presentation)]
 public partial class VisualSmoothingSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+    [ForEachEntity(typeof(FrenzyTags.Fish))]
     [WrapAsJob]
     static void Execute(in Fish fish, in NativeWorldAccessor world)
     {

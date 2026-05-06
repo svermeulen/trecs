@@ -74,6 +74,8 @@ namespace Trecs.Internal
         readonly WorldAccessorRegistry _accessorRegistry;
         readonly WorldSettings _trecsSettings;
 
+        IAccessRecorder _accessRecorder;
+
 #if DEBUG && TRECS_IS_PROFILING
         internal readonly HashSet<GroupIndex> _groupsWithEntitiesEverAdded = new();
 #endif
@@ -152,6 +154,11 @@ namespace Trecs.Internal
         public bool IsValid()
         {
             return !_isDisposed;
+        }
+
+        internal void SetAccessRecorder(IAccessRecorder recorder)
+        {
+            _accessRecorder = recorder;
         }
 
         public void SubmitEntities()
@@ -1403,15 +1410,20 @@ namespace Trecs.Internal
 
                         while (!buffer.IsEmpty)
                         {
-#if TRECS_INTERNAL_CHECKS && DEBUG
                             var accessorId = buffer.Dequeue<int>();
-#else
-                            var accessorId = 0;
-#endif
                             var entityHandlex = buffer.Dequeue<EntityIndex>();
 
                             _log.Trace("Removing entity {} (from native operation)", entityHandlex);
                             removals.Add((entityHandlex, accessorId));
+
+                            if (_accessRecorder != null)
+                            {
+                                var accessor = _accessorRegistry.GetAccessorById(accessorId);
+                                _accessRecorder.OnEntityRemoved(
+                                    accessor.DebugName,
+                                    entityHandlex.GroupIndex
+                                );
+                            }
                         }
                     }
                 }
@@ -1464,11 +1476,7 @@ namespace Trecs.Internal
 
                         while (!buffer.IsEmpty)
                         {
-#if TRECS_INTERNAL_CHECKS && DEBUG
                             var accessorId = buffer.Dequeue<int>();
-#else
-                            var accessorId = 0;
-#endif
                             var from = buffer.Dequeue<EntityIndex>();
                             var toTagSet = DequeueTagSet(ref buffer);
                             var toGroup = _worldInfo.GetSingleGroupWithTags(toTagSet);
@@ -1480,6 +1488,16 @@ namespace Trecs.Internal
                                 toGroup
                             );
                             swaps.Add((from, toGroup, accessorId));
+
+                            if (_accessRecorder != null)
+                            {
+                                var accessor = _accessorRegistry.GetAccessorById(accessorId);
+                                _accessRecorder.OnEntityMoved(
+                                    accessor.DebugName,
+                                    from.GroupIndex,
+                                    toGroup
+                                );
+                            }
                         }
                     }
                 }
@@ -1550,6 +1568,12 @@ namespace Trecs.Internal
                                 "Adding new entity to group {} (from native operation)",
                                 group
                             );
+
+                            if (_accessRecorder != null)
+                            {
+                                var accessor = _accessorRegistry.GetAccessorById(accessorId);
+                                _accessRecorder.OnEntityAdded(accessor.DebugName, group);
+                            }
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
                             CheckNativeOpsCanAdd(accessorId, group);

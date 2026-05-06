@@ -45,13 +45,13 @@ The system defines both a main-thread and a `[WrapAsJob]` version of the same lo
 ```csharp
 public partial class ParticleMoveSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+    [ForEachEntity(typeof(SampleTags.Particle))]
     void ExecuteMainThread(in Velocity velocity, ref Position position)
     {
         position.Value += World.DeltaTime * velocity.Value;
     }
 
-    [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+    [ForEachEntity(typeof(SampleTags.Particle))]
     [WrapAsJob]
     static void ExecuteAsJob(
         in Velocity velocity,

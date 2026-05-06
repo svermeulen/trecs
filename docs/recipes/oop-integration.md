@@ -51,7 +51,7 @@ Simulation systems contain only ECS logic — no `GameObject`, no `MonoBehaviour
 ```csharp
 public partial class MovementSystem : ISystem
 {
-    [ForEachEntity(Tags = new[] { typeof(GameTags.Player) })]
+    [ForEachEntity(typeof(GameTags.Player))]
     void Execute(in PlayerView player)
     {
         player.Position += player.Velocity * World.DeltaTime;

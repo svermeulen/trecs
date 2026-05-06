@@ -2,7 +2,7 @@ namespace Trecs.Samples.PredatorPrey
 {
     public partial class MovementSystem : ISystem
     {
-        [ForEachEntity(Tag = typeof(SampleTags.Movable))]
+        [ForEachEntity(typeof(SampleTags.Movable))]
         void Execute(in Mover mover)
         {
             mover.Position += World.DeltaTime * mover.Speed * mover.MoveDirection;

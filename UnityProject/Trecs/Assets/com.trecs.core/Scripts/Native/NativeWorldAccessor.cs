@@ -293,9 +293,7 @@ namespace Trecs
             Assert.That(entityIndex != EntityIndex.Null);
 
             var simpleNativeBag = _removeQueue.GetBag(_threadIndex);
-#if TRECS_INTERNAL_CHECKS && DEBUG
             simpleNativeBag.Enqueue(_accessorId);
-#endif
             simpleNativeBag.Enqueue(entityIndex);
         }
 
@@ -314,9 +312,7 @@ namespace Trecs
         {
             AssertStructuralChangesAllowed();
             var bag = _moveQueue.GetBag(_threadIndex);
-#if TRECS_INTERNAL_CHECKS && DEBUG
             bag.Enqueue(_accessorId);
-#endif
             bag.Enqueue(entityIndex);
             bag.Enqueue((int)-1); // sentinel: TagSet ID follows
             bag.Enqueue(tags.Id);
@@ -328,9 +324,7 @@ namespace Trecs
         {
             AssertStructuralChangesAllowed();
             var bag = _moveQueue.GetBag(_threadIndex);
-#if TRECS_INTERNAL_CHECKS && DEBUG
             bag.Enqueue(_accessorId);
-#endif
             bag.Enqueue(entityIndex);
             bag.Enqueue((int)1); // tag count
             bag.Enqueue(Tag<T1>.NativeGuid);
@@ -343,9 +337,7 @@ namespace Trecs
         {
             AssertStructuralChangesAllowed();
             var bag = _moveQueue.GetBag(_threadIndex);
-#if TRECS_INTERNAL_CHECKS && DEBUG
             bag.Enqueue(_accessorId);
-#endif
             bag.Enqueue(entityIndex);
             bag.Enqueue((int)2); // tag count
             bag.Enqueue(Tag<T1>.NativeGuid);
@@ -360,9 +352,7 @@ namespace Trecs
         {
             AssertStructuralChangesAllowed();
             var bag = _moveQueue.GetBag(_threadIndex);
-#if TRECS_INTERNAL_CHECKS && DEBUG
             bag.Enqueue(_accessorId);
-#endif
             bag.Enqueue(entityIndex);
             bag.Enqueue((int)3); // tag count
             bag.Enqueue(Tag<T1>.NativeGuid);
@@ -379,9 +369,7 @@ namespace Trecs
         {
             AssertStructuralChangesAllowed();
             var bag = _moveQueue.GetBag(_threadIndex);
-#if TRECS_INTERNAL_CHECKS && DEBUG
             bag.Enqueue(_accessorId);
-#endif
             bag.Enqueue(entityIndex);
             bag.Enqueue((int)4); // tag count
             bag.Enqueue(Tag<T1>.NativeGuid);

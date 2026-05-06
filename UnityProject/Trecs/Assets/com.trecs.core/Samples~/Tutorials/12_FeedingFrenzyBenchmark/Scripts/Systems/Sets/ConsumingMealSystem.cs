@@ -49,7 +49,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             }
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
+        [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
         void RunForEachMethodAspect(in Fish fish, EntityIndex entityIndex)
         {
             var distanceSqr = math.lengthsq(fish.DestinationPosition - fish.Position);
@@ -64,7 +64,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             }
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish) }, Set = typeof(FrenzySets.Eating))]
+        [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
         void RunForEachMethodComponents(
             in Position position,
             in DestinationPosition destinationPosition,
@@ -84,7 +84,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             }
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
+        [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
         [WrapAsJob]
         static void RunWrapAsJobAspect(in Fish fish, in NativeWorldAccessor world)
         {
@@ -101,7 +101,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             }
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
+        [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
         [WrapAsJob]
         static void RunWrapAsJobComponents(
             in Position position,
@@ -212,7 +212,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             [FromWorld]
             public NativeWorldAccessor World;
 
-            [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
+            [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
             public void Execute(in Fish fish)
             {
                 var distanceSqr = math.lengthsq(fish.DestinationPosition - fish.Position);
@@ -235,7 +235,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             [FromWorld]
             public NativeWorldAccessor World;
 
-            [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
+            [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
             public void Execute(
                 in Position position,
                 in DestinationPosition destinationPosition,
@@ -260,23 +260,23 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
         [BurstCompile]
         partial struct ConsumeMealRawBuffersJob
         {
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public GroupIndex FishGroup;
 
             [FromWorld]
             public NativeWorldAccessor World;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeEntitySetIndices<FrenzySets.Eating> FilterIndices;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<Position> Positions;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<DestinationPosition> DestinationPositions;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<TargetMeal> Meals;
 
             public void Execute(int i)

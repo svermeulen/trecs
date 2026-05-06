@@ -66,6 +66,12 @@ namespace Trecs
             // No-op in cache mode.
         }
 
+        public bool TryGetSystemEffectivelyEnabled(int systemIndex, out bool enabled)
+        {
+            enabled = false;
+            return false;
+        }
+
         IReadOnlyList<TemplateRef> ProjectTemplates()
         {
             var list = new List<TemplateRef>();
@@ -210,6 +216,12 @@ namespace Trecs
         readonly Dictionary<string, HashSet<string>> _readsBySystem;
         readonly Dictionary<string, HashSet<string>> _writesBySystem;
         readonly Dictionary<string, IReadOnlyCollection<string>> _tagsTouchedByAccessor;
+        readonly Dictionary<string, IReadOnlyCollection<string>> _addsByAccessor;
+        readonly Dictionary<string, IReadOnlyCollection<string>> _removesByAccessor;
+        readonly Dictionary<string, IReadOnlyCollection<string>> _movesByAccessor;
+        readonly Dictionary<string, HashSet<string>> _addersByTemplate;
+        readonly Dictionary<string, HashSet<string>> _removersByTemplate;
+        readonly Dictionary<string, HashSet<string>> _moversByTemplate;
 
         public CacheAccessTrackerView(TrecsSchema schema)
         {
@@ -218,6 +230,12 @@ namespace Trecs
             _readsBySystem = new();
             _writesBySystem = new();
             _tagsTouchedByAccessor = new();
+            _addsByAccessor = new();
+            _removesByAccessor = new();
+            _movesByAccessor = new();
+            _addersByTemplate = new();
+            _removersByTemplate = new();
+            _moversByTemplate = new();
 
             if (schema == null)
                 return;
@@ -261,6 +279,58 @@ namespace Trecs
                     _tagsTouchedByAccessor[entry.AccessorDebugName] = entry.TagNames.ToArray();
                 }
             }
+
+            if (schema.Structural != null)
+            {
+                foreach (var entry in schema.Structural)
+                {
+                    if (entry?.AccessorDebugName == null)
+                    {
+                        continue;
+                    }
+                    var sys = entry.AccessorDebugName;
+                    IndexStructural(
+                        sys,
+                        entry.AddedTemplateNames,
+                        _addsByAccessor,
+                        _addersByTemplate
+                    );
+                    IndexStructural(
+                        sys,
+                        entry.RemovedTemplateNames,
+                        _removesByAccessor,
+                        _removersByTemplate
+                    );
+                    IndexStructural(
+                        sys,
+                        entry.MovedTemplateNames,
+                        _movesByAccessor,
+                        _moversByTemplate
+                    );
+                }
+            }
+        }
+
+        static void IndexStructural(
+            string accessorDebugName,
+            List<string> templateNames,
+            Dictionary<string, IReadOnlyCollection<string>> bySystem,
+            Dictionary<string, HashSet<string>> byTemplate
+        )
+        {
+            if (templateNames == null || templateNames.Count == 0)
+            {
+                return;
+            }
+            bySystem[accessorDebugName] = templateNames.ToArray();
+            foreach (var template in templateNames)
+            {
+                if (string.IsNullOrEmpty(template))
+                {
+                    continue;
+                }
+                AddTo(byTemplate, template, accessorDebugName);
+            }
         }
 
         public IReadOnlyCollection<string> GetReadersOfComponent(string componentDisplayName) =>
@@ -287,6 +357,36 @@ namespace Trecs
             _tagsTouchedByAccessor.TryGetValue(accessorDebugName ?? string.Empty, out var v)
                 ? v
                 : Array.Empty<string>();
+
+        public IReadOnlyCollection<string> GetTemplateNamesAddedBy(string accessorDebugName) =>
+            _addsByAccessor.TryGetValue(accessorDebugName ?? string.Empty, out var v)
+                ? v
+                : Array.Empty<string>();
+
+        public IReadOnlyCollection<string> GetTemplateNamesRemovedBy(string accessorDebugName) =>
+            _removesByAccessor.TryGetValue(accessorDebugName ?? string.Empty, out var v)
+                ? v
+                : Array.Empty<string>();
+
+        public IReadOnlyCollection<string> GetTemplateNamesMovedBy(string accessorDebugName) =>
+            _movesByAccessor.TryGetValue(accessorDebugName ?? string.Empty, out var v)
+                ? v
+                : Array.Empty<string>();
+
+        public IReadOnlyCollection<string> GetSystemsAddingTo(string templateDebugName) =>
+            _addersByTemplate.TryGetValue(templateDebugName ?? string.Empty, out var v)
+                ? v
+                : (IReadOnlyCollection<string>)Array.Empty<string>();
+
+        public IReadOnlyCollection<string> GetSystemsRemovingFrom(string templateDebugName) =>
+            _removersByTemplate.TryGetValue(templateDebugName ?? string.Empty, out var v)
+                ? v
+                : (IReadOnlyCollection<string>)Array.Empty<string>();
+
+        public IReadOnlyCollection<string> GetSystemsMovingOn(string templateDebugName) =>
+            _moversByTemplate.TryGetValue(templateDebugName ?? string.Empty, out var v)
+                ? v
+                : (IReadOnlyCollection<string>)Array.Empty<string>();
 
         static void AddTo(Dictionary<string, HashSet<string>> map, string key, string value)
         {

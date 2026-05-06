@@ -174,9 +174,14 @@ namespace Trecs.Serialization
             _bitWriter.WriteBit(value);
         }
 
-        // The only advantage to using Write<T> instead of WriteObject
-        // is that we avoid boxing, and instead pass directly by
-        // reference down to the serializer
+        // Advantages of Write<T> over WriteObject (apply only when T is non-abstract;
+        // abstract T is auto-forwarded to the WriteObject path):
+        // - Avoids boxing; the value is passed by reference down to the serializer.
+        // - The type id is not part of the payload. T is statically known on
+        //   read, so the type id is only emitted (when _includeTypeChecks is on)
+        //   as a verification stamp, not as data the reader needs. WriteObject
+        //   must always emit it so the reader knows which concrete type to
+        //   instantiate.
         public void WriteDelta<T>(string name, in T value, in T baseValue)
         {
             Assert.That(_hasStarted);
@@ -187,13 +192,23 @@ namespace Trecs.Serialization
 
             var type = typeof(T);
 
-            // We need the using code to be explicit when reading/writing an abstract type, because
-            // in this case we need to serialize out the type id
-            // check IsValueType first to avoid an alloc from .GetType()
+            // Abstract base types must use the WriteObjectDelta path to emit the
+            // runtime type id; divert automatically so callers don't have to.
+            if (type.IsAbstract && type != typeof(Type))
+            {
+                WriteObjectDelta(name, value, baseValue);
+                return;
+            }
+
             Assert.That(
-                type == typeof(Type)
-                    || (!type.IsAbstract && (type.IsValueType || value.GetType() == type)),
-                "When serializing from base class/interface, use WriteObject instead"
+                type == typeof(Type) || type.IsValueType || value.GetType() == type,
+                "WriteDelta<T> requires the runtime type to match T={} exactly; use WriteObjectDelta for polymorphic types",
+                type
+            );
+            Assert.That(
+                type == typeof(Type) || type.IsValueType || baseValue.GetType() == type,
+                "WriteDelta<T> requires baseValue runtime type to match T={} exactly",
+                type
             );
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
@@ -416,14 +431,27 @@ namespace Trecs.Serialization
             MemoryBlitter.WriteArray(value, count, _dataWriter);
         }
 
-        // The only advantage to using Write<T> instead of WriteObject
-        // is that we avoid boxing, and instead pass directly by
-        // reference down to the serializer
+        // Advantages of Write<T> over WriteObject (apply only when T is non-abstract;
+        // abstract T is auto-forwarded to the WriteObject path):
+        // - Avoids boxing; the value is passed by reference down to the serializer.
+        // - The type id is not part of the payload. T is statically known on
+        //   read, so the type id is only emitted (when _includeTypeChecks is on)
+        //   as a verification stamp, not as data the reader needs. WriteObject
+        //   must always emit it so the reader knows which concrete type to
+        //   instantiate.
         public void Write<T>(string name, in T value)
         {
             Assert.That(_hasStarted);
 
             var type = typeof(T);
+
+            // Abstract base types must use the WriteObject path to emit the runtime
+            // type id; divert automatically so callers don't have to.
+            if (type.IsAbstract && type != typeof(Type))
+            {
+                WriteObject(name, value);
+                return;
+            }
 
             // For value types, null checking doesn't apply
             if (!type.IsValueType)
@@ -438,13 +466,10 @@ namespace Trecs.Serialization
                 }
             }
 
-            // We need the using code to be explicit when reading/writing an abstract type, because
-            // in this case we need to serialize out the type id
-            // check IsValueType first to avoid an alloc from .GetType()
             Assert.That(
-                type == typeof(Type)
-                    || (!type.IsAbstract && (type.IsValueType || value.GetType() == type)),
-                "When serializing from base class/interface, use WriteObject instead"
+                type == typeof(Type) || type.IsValueType || value.GetType() == type,
+                "Write<T> requires the runtime type to match T={} exactly; use WriteObject for polymorphic types",
+                type
             );
 
 #if TRECS_INTERNAL_CHECKS && DEBUG

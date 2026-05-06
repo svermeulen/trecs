@@ -30,8 +30,21 @@ namespace Trecs
         // Live-only — return 0 / empty / false in cache mode.
         int CountEntitiesInGroup(GroupIndex group);
         IEnumerable<EntityHandle> EntitiesInGroup(GroupIndex group, int max);
+
+        // Editor-channel state — this is what the inspector toggle reflects
+        // and round-trips with SetSystemEnabled. Other channels (User /
+        // Playback) and the deterministic paused flag are not folded in
+        // here; consume TryGetSystemEffectivelyEnabled when you need the
+        // combined "is this system actually running" answer.
         bool TryGetSystemEnabled(int systemIndex, out bool enabled);
         void SetSystemEnabled(int systemIndex, bool enabled);
+
+        // Combined enable state across all channels (Editor / User /
+        // Playback) plus the deterministic paused flag. Drives hierarchy
+        // grayout so the tree row matches whether the system actually runs,
+        // matching Unity's GameObject convention (inspector toggle =
+        // activeSelf, hierarchy grayout = activeInHierarchy).
+        bool TryGetSystemEffectivelyEnabled(int systemIndex, out bool enabled);
 
         IAccessTracker AccessTracker { get; }
     }

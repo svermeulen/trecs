@@ -31,11 +31,7 @@ public class IncrementalEntityComponentGeneratorTests
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
         Assert.That(run.GenErrors, Is.Empty, run.Format());
-        Assert.That(
-            run.GeneratedTrees,
-            Is.Not.Empty,
-            "Expected the generator to emit at least one file."
-        );
+        Assert.That(run.GeneratedTrees, Is.Not.Empty, "Expected the generator to emit at least one file.");
     }
 
     [Test]

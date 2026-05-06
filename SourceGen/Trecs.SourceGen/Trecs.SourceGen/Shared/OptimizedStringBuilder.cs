@@ -215,6 +215,41 @@ namespace Trecs.SourceGen.Shared
         }
 
         /// <summary>
+        /// Opens a stack of <c>partial &lt;kind&gt; &lt;Name&gt;&lt;TypeParams&gt;</c>
+        /// wrappers for every entry in <paramref name="containingTypes"/>
+        /// (outer-first), invokes <paramref name="contentGenerator"/> with the
+        /// indent level inside the innermost wrapper, then closes the
+        /// wrappers in reverse. When the chain is empty, just calls the
+        /// content generator at <paramref name="startIndentLevel"/>.
+        /// </summary>
+        public OptimizedStringBuilder WrapInContainingTypes(
+            IReadOnlyList<ContainingTypeInfo> containingTypes,
+            int startIndentLevel,
+            Action<OptimizedStringBuilder, int> contentGenerator
+        )
+        {
+            int indentLevel = startIndentLevel;
+            foreach (var ct in containingTypes)
+            {
+                AppendLine(
+                    indentLevel,
+                    $"{ct.Accessibility} partial {ct.Kind} {ct.Name}{ct.TypeParameterList}"
+                );
+                AppendLine(indentLevel, "{");
+                indentLevel++;
+            }
+
+            contentGenerator(this, indentLevel);
+
+            for (int i = containingTypes.Count - 1; i >= 0; i--)
+            {
+                indentLevel--;
+                AppendLine(indentLevel, "}");
+            }
+            return this;
+        }
+
+        /// <summary>
         /// Wraps content in a class or struct block
         /// </summary>
         public OptimizedStringBuilder WrapInType(

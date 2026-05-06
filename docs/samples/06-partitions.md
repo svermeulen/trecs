@@ -42,7 +42,7 @@ Each `IHasPartition` declares a valid partition. The entity always has the `Ball
 Only processes balls in the Active partition:
 
 ```csharp
-[ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+[ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
 void Execute(in ActiveBall ball)
 {
     var vel = ball.Velocity;
@@ -71,7 +71,7 @@ partial struct ActiveBall : IAspect, IWrite<Position, Velocity, RestTimer> { }
 [ExecuteAfter(typeof(PhysicsSystem))]
 public partial class WakeUpSystem : ISystem
 {
-    [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Resting) })]
+    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
     void Execute(in RestingBall ball)
     {
         ball.RestTimer -= World.DeltaTime;
@@ -96,13 +96,13 @@ Two `[ForEachEntity]` methods with different tag filters:
 [Phase(SystemPhase.Presentation)]
 public partial class BallRendererSystem : ISystem
 {
-    [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
     void RenderActive(in ActiveBallView ball)
     {
         // Yellow/red color
     }
 
-    [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Resting) })]
+    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
     void RenderResting(in RestingBallView ball)
     {
         // Gray color

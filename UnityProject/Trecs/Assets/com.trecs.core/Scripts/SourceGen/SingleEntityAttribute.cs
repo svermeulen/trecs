@@ -46,5 +46,16 @@ namespace Trecs
         {
             Tags = Array.Empty<Type>();
         }
+
+        /// <summary>
+        /// Shorthand: <c>[SingleEntity(typeof(MyTag))]</c> /
+        /// <c>[SingleEntity(typeof(A), typeof(B))]</c>. Equivalent to setting
+        /// <see cref="Tags"/>. Cannot be combined with the named <see cref="Tag"/>
+        /// / <see cref="Tags"/> properties.
+        /// </summary>
+        public SingleEntityAttribute(params Type[] tags)
+        {
+            Tags = tags ?? Array.Empty<Type>();
+        }
     }
 }

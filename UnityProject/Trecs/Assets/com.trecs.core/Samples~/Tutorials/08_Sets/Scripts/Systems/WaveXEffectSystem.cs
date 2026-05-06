@@ -18,10 +18,7 @@ namespace Trecs.Samples.Sets
             _gridExtent = settings.GridSize * settings.Spacing * 0.5f;
         }
 
-        [ForEachEntity(
-            Tags = new[] { typeof(SampleTags.Particle) },
-            Set = typeof(SampleSets.WaveX)
-        )]
+        [ForEachEntity(typeof(SampleTags.Particle), Set = typeof(SampleSets.WaveX))]
         void Execute(in WaveXView view)
         {
             float waveCenterX = math.sin(World.ElapsedTime * _settings.WaveXSpeed) * _gridExtent;

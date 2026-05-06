@@ -24,7 +24,7 @@ namespace Trecs
     /// </summary>
     /// <example>
     /// <code>
-    /// [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish) })]
+    /// [ForEachEntity(typeof(FrenzyTags.Fish))]
     /// [WrapAsJob]
     /// static void Move(in Fish fish, in NativeWorldAccessor world)
     /// {

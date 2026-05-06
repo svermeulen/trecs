@@ -44,7 +44,7 @@ Trecs exposes two first-class handles for groups, with a clear layering:
 | **Role** | Stable identity for a tag combination | Runtime handle — a small array-indexable integer |
 | **Representation** | 32-bit stable hash of the tag GUIDs | Sequential `ushort` assigned at world build time |
 | **Serializable** | Yes — same value across runs | No — assignment depends on registration order |
-| **Typical use** | `[FromWorld(Tag = typeof(GameTags.Player))]`, `world.CountEntitiesWithTags<...>()`, save-game fields | `[ForEachEntity]` internals, group-slice iteration, `ComponentBuffer`, event callbacks |
+| **Typical use** | `[FromWorld(typeof(GameTags.Player))]`, `world.CountEntitiesWithTags<...>()`, save-game fields | `[ForEachEntity]` internals, group-slice iteration, `ComponentBuffer`, event callbacks |
 | **How you get one** | `TagSet<GameTags.Player>.Value`, `TagSet.FromTags(...)` | `worldInfo.GetSingleGroupWithTags(tagSet)`, capture from slice, event callback |
 
 Rule of thumb: if you're going to **store** the handle (in a component, on disk, across sessions), use `TagSet`. If you're **using** it within a frame to reach into native storage, use `GroupIndex`.

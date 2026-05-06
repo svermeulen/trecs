@@ -3,8 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Trecs.Internal;
 
-namespace Trecs.Internal // not part of public api atm
+namespace Trecs.Collections
 {
     /// <summary>
     /// This dictionary has been created for the following reasons:

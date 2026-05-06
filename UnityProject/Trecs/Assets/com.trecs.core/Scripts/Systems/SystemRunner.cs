@@ -116,6 +116,14 @@ namespace Trecs.Internal
                 if (_desiredFixedIsPaused != value)
                 {
                     _desiredFixedIsPaused = value;
+                    if (!value)
+                    {
+                        // Drop any pending step request when leaving the paused
+                        // state — otherwise the flag would survive into a normal
+                        // unpaused tick and narrow its end-of-frame bound to a
+                        // single fixed step.
+                        _stepFixedFrame = false;
+                    }
                     _fixedIsPausedChangedEvent.Invoke(_desiredFixedIsPaused);
                 }
             }
@@ -745,13 +753,15 @@ namespace Trecs.Internal
             }
         }
 
-        public void StepFrame()
+        /// <summary>
+        /// Schedule one fixed-update frame to run on the next <see cref="Tick"/>,
+        /// then resume the paused state. Requires <see cref="FixedIsPaused"/> to
+        /// be true. Only fixed frames are steppable — variable frames are driven
+        /// by the Unity update loop.
+        /// </summary>
+        public void StepFixedFrame()
         {
-            if (!_fixedIsPaused)
-            {
-                _log.Warning("Attempted to step frame but not paused");
-                return;
-            }
+            Assert.That(_desiredFixedIsPaused, "StepFixedFrame requires FixedIsPaused to be true");
 
             _stepFixedFrame = true;
         }

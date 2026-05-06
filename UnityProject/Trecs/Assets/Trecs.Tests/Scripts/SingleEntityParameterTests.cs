@@ -176,6 +176,103 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(999, _runOnceComponentSeen);
         }
+
+        // ─── Gap 1: multi-tag inline form ────────────────────────────────────────
+
+        int _multiTagSeen;
+
+        // Tags = new[] { typeof(QId2), typeof(QCatA) } resolves to QTestEntityAB
+        // (which has both); QTestEntityA has QCatA but not QId2, so it must not
+        // be picked up.
+        void RunOnceMultiTag(
+            [SingleEntity(Tags = new[] { typeof(QId2), typeof(QCatA) })] in TestInt value
+        )
+        {
+            _multiTagSeen = value.Value;
+        }
+
+        [Test]
+        public void RunOnce_MultiTagSingleton_ResolvesUniqueIntersection()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(
+                QTestEntityA.Template,
+                QTestEntityAB.Template
+            );
+            var a = env.Accessor;
+
+            // QTestEntityA shares QCatA but not QId2 — must not match.
+            a.AddEntity(Tag<QId1>.Value)
+                .Set(new TestInt { Value = 1 })
+                .Set(new TestFloat())
+                .AssertComplete();
+            // QTestEntityAB matches both QId2 and QCatA — the unique singleton.
+            a.AddEntity(Tag<QId2>.Value)
+                .Set(new TestInt { Value = 77 })
+                .Set(new TestFloat())
+                .AssertComplete();
+            a.SubmitEntities();
+
+            _multiTagSeen = 0;
+            RunOnceMultiTag(a);
+
+            NAssert.AreEqual(77, _multiTagSeen);
+        }
+
+        // ─── Gap 2: write-component singleton ────────────────────────────────────
+
+        // ref TestInt value with [SingleEntity] resolves through the same
+        // hoist-then-bind path as a read singleton, but binds a writable alias
+        // so mutations land back in the component buffer.
+        void RunOnceComponentWrite([SingleEntity(Tag = typeof(QId3))] ref TestInt value)
+        {
+            value.Value += 1000;
+        }
+
+        [Test]
+        public void RunOnce_ComponentSingletonWrite_MutationLandsInBuffer()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 42 }).AssertComplete();
+            a.SubmitEntities();
+
+            RunOnceComponentWrite(a);
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId3>.Value);
+            var buf = a.ComponentBuffer<TestInt>(group).Read;
+            NAssert.AreEqual(1042, buf[0].Value);
+        }
+
+        // ─── Gap 3: RunOnce method that mixes [SingleEntity] with [PassThroughArgument] ─
+
+        int _passThroughSeen;
+
+        // The generator emits a wrapper that takes the accessor plus any
+        // [PassThroughArgument] params and forwards them after hoisting the
+        // singleton. Caller invocation: RunOncePassThrough(a, 17).
+        void RunOncePassThrough(
+            [SingleEntity(Tag = typeof(QId3))] in TestInt singleton,
+            [PassThroughArgument] int multiplier
+        )
+        {
+            _passThroughSeen = singleton.Value * multiplier;
+        }
+
+        [Test]
+        public void RunOnce_SingletonWithPassThroughArgument_ForwardsCustomParam()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 6 }).AssertComplete();
+            a.SubmitEntities();
+
+            _passThroughSeen = 0;
+            RunOncePassThrough(a, 7);
+
+            NAssert.AreEqual(42, _passThroughSeen);
+        }
     }
 
     // ─── 6. [WrapAsJob] with [SingleEntity] aspect parameter ─────────────────

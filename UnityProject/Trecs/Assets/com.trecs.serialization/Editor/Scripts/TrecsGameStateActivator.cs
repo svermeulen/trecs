@@ -6,7 +6,7 @@ namespace Trecs.Serialization
     /// Wires Trecs game-state recording to the time travel window's open
     /// state. When a <see cref="TrecsGameStateController"/> registers itself
     /// (typically at scene startup, after the World is built), if a
-    /// <see cref="TrecsTimeTravelWindow"/> instance is currently open and
+    /// <see cref="TrecsPlayerWindow"/> instance is currently open and
     /// <see cref="AutoRecordEnabled"/> is true, we ask the controller to enter
     /// <see cref="GameStateMode.Recording"/>.
     /// </summary>
@@ -81,7 +81,7 @@ namespace Trecs.Serialization
 
         static bool HasOpenWindow()
         {
-            return EditorWindow.HasOpenInstances<TrecsTimeTravelWindow>();
+            return EditorWindow.HasOpenInstances<TrecsPlayerWindow>();
         }
     }
 }

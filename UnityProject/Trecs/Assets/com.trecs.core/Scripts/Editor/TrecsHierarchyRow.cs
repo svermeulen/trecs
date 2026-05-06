@@ -21,8 +21,8 @@ namespace Trecs
 
     // Single mutable row payload shared across all kinds. Each TreeView
     // item carries a reference to one of these, so periodic refresh can
-    // mutate fields (Count, SystemEnabled) and a follow-up RefreshItems
-    // re-binds visible rows without touching tree structure.
+    // mutate fields (Count, SystemEffectivelyEnabled) and a follow-up
+    // RefreshItems re-binds visible rows without touching tree structure.
     sealed class RowData
     {
         public RowKind Kind;
@@ -41,7 +41,12 @@ namespace Trecs
         public int AccessorId;
         public int SystemIndex;
         public int? ExecutionPriority;
-        public bool SystemEnabled;
+
+        // Combined enable state across all channels + the deterministic
+        // paused flag. Drives the row's grayout opacity so the tree
+        // matches whether the system actually runs (mirrors Unity's
+        // GameObject.activeInHierarchy convention).
+        public bool SystemEffectivelyEnabled;
         public Type ComponentType;
         public EntitySet EntitySet;
         public Tag Tag;
@@ -55,7 +60,7 @@ namespace Trecs
         public string DisplayName;
         public int SystemIndex; // -1 for manual accessors
         public int? ExecutionPriority;
-        public bool SystemEnabled;
+        public bool SystemEffectivelyEnabled;
     }
 
     // Icons for hierarchy tree rows. Lazy-cached on first access; not

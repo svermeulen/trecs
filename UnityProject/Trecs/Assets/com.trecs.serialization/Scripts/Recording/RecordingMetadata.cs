@@ -1,4 +1,4 @@
-using Trecs.Internal;
+using Trecs.Collections;
 
 namespace Trecs.Serialization
 {

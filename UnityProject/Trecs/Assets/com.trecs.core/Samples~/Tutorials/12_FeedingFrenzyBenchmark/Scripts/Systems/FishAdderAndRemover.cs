@@ -34,10 +34,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             _presets = presets;
         }
 
-        public void Execute()
+        void Execute([SingleEntity(typeof(TrecsTags.Globals))] in GlobalsView globals)
         {
-            var globals = GlobalsView.Query(World).WithTags<TrecsTags.Globals>().Single();
-
             int presetIndex = globals.DesiredPreset;
 
             Assert.That(presetIndex >= 0);

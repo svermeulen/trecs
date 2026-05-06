@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Trecs.Collections;
 
 namespace Trecs.Internal
 {

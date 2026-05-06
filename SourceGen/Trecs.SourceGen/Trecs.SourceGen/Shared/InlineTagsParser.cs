@@ -39,6 +39,43 @@ namespace Trecs.SourceGen.Shared
         {
             var tagTypes = new List<ITypeSymbol>();
             ITypeSymbol? singleTag = null;
+            // Positional ctor: [SingleEntity(typeof(A))] / [SingleEntity(typeof(A), typeof(B))]
+            // expanded as either a single Type arg or an array via params Type[].
+            var ctorTags = new List<ITypeSymbol>();
+            // C# 11 generic-attribute form: [SingleEntity<A>] / [SingleEntity<A, B>].
+            // Tags are pulled from the attribute class's TypeArguments. Roslyn returns
+            // the same Name ("SingleEntityAttribute") for the generic and non-generic
+            // variants, so callers' attribute-name matching already routes both here.
+            var genericTags = new List<ITypeSymbol>();
+            if (attribute.AttributeClass is INamedTypeSymbol namedAttrClass)
+            {
+                foreach (var typeArg in namedAttrClass.TypeArguments)
+                {
+                    // TypeParameterSymbol means an unbound generic — skip; only add
+                    // concrete ITypeSymbol args.
+                    if (typeArg.TypeKind != TypeKind.TypeParameter)
+                        genericTags.Add(typeArg);
+                }
+            }
+            foreach (var ctorArg in attribute.ConstructorArguments)
+            {
+                if (ctorArg.Kind == TypedConstantKind.Array)
+                {
+                    foreach (var element in ctorArg.Values)
+                        if (
+                            element.Kind == TypedConstantKind.Type
+                            && element.Value is ITypeSymbol cet
+                        )
+                            ctorTags.Add(cet);
+                }
+                else if (
+                    ctorArg.Kind == TypedConstantKind.Type
+                    && ctorArg.Value is ITypeSymbol ct
+                )
+                {
+                    ctorTags.Add(ct);
+                }
+            }
             foreach (var named in attribute.NamedArguments)
             {
                 switch (named.Key)
@@ -58,6 +95,25 @@ namespace Trecs.SourceGen.Shared
                         break;
                 }
             }
+            // Mixing tag-source forms is ambiguous (named setters would silently
+            // overwrite ctor-set Tags; generic args + Tag/Tags double-specifies).
+            // Reuse the existing "both Tag and Tags" diagnostic — same root cause.
+            bool hasNamedTags = singleTag != null || tagTypes.Count > 0;
+            bool hasCtorTags = ctorTags.Count > 0;
+            bool hasGenericTags = genericTags.Count > 0;
+            int sourcesPresent = (hasNamedTags ? 1 : 0) + (hasCtorTags ? 1 : 0) + (hasGenericTags ? 1 : 0);
+            if (sourcesPresent > 1)
+            {
+                reportDiagnostic(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.TagAndTagsBothSpecified,
+                        diagnosticLocation,
+                        targetName,
+                        attributeShortName
+                    )
+                );
+                return null;
+            }
             if (singleTag != null && tagTypes.Count > 0)
             {
                 reportDiagnostic(
@@ -72,6 +128,10 @@ namespace Trecs.SourceGen.Shared
             }
             if (singleTag != null)
                 tagTypes.Add(singleTag);
+            if (hasCtorTags)
+                tagTypes.AddRange(ctorTags);
+            if (hasGenericTags)
+                tagTypes.AddRange(genericTags);
             if (tagTypes.Count > 4)
             {
                 // TagSet<T1, T2, T3, T4>.Value is the highest runtime overload.
@@ -105,9 +165,10 @@ namespace Trecs.SourceGen.Shared
         {
             // attributeShortName is the simple attribute name w/ "Attribute" suffix.
             // Symbols always carry the full FQN — match against the Name.
-            string fullName = attributeShortName.EndsWith("Attribute")
-                ? attributeShortName
-                : attributeShortName + "Attribute";
+            string fullName =
+                attributeShortName.EndsWith("Attribute")
+                    ? attributeShortName
+                    : attributeShortName + "Attribute";
             foreach (var attr in PerformanceCache.GetAttributes(symbol))
             {
                 if (attr.AttributeClass?.Name != fullName)

@@ -1,3 +1,4 @@
+using Trecs.Collections;
 using Unity.Collections;
 
 namespace Trecs.Internal

@@ -35,27 +35,6 @@ namespace Trecs.SourceGen.Shared
         }
 
         /// <summary>
-        /// Validates that a symbol is a struct
-        /// </summary>
-        public static bool ValidateStructType(
-            INamedTypeSymbol symbol,
-            SourceProductionContext context
-        )
-        {
-            if (symbol.TypeKind != TypeKind.Struct)
-            {
-                var diagnostic = Diagnostic.Create(
-                    DiagnosticDescriptors.AspectMustBeStruct,
-                    symbol.Locations.FirstOrDefault(),
-                    symbol.Name
-                );
-                context.ReportDiagnostic(diagnostic);
-                return false;
-            }
-            return true;
-        }
-
-        /// <summary>
         /// Gets all attributes of a specific type from a symbol, optionally verifying namespace
         /// </summary>
         public static IEnumerable<AttributeData> GetAttributesOfType(

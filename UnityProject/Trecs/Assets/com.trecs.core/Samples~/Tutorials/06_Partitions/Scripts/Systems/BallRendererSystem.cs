@@ -18,7 +18,7 @@ namespace Trecs.Samples.Partitions
             _registry = registry;
         }
 
-        [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+        [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
         void RenderActive(in ActiveBallView ball)
         {
             var go = _registry.Resolve(ball.GameObjectId);
@@ -26,7 +26,7 @@ namespace Trecs.Samples.Partitions
             go.GetComponent<Renderer>().material.color = Color.Lerp(Color.yellow, Color.red, 0.5f);
         }
 
-        [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Resting) })]
+        [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
         void RenderResting(in RestingBallView ball)
         {
             var go = _registry.Resolve(ball.GameObjectId);

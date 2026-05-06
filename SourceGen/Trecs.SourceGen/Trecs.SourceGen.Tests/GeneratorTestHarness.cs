@@ -48,13 +48,21 @@ internal static class GeneratorTestHarness
     {
         var compilation = BuildInputCompilation(userSource);
 
-        var driver = CSharpGeneratorDriver.Create(generators);
-        driver = (CSharpGeneratorDriver)
-            driver.RunGeneratorsAndUpdateCompilation(
-                compilation,
-                out var outputCompilation,
-                out var generationDiagnostics
-            );
+        // Match the parse options used for the input compilation so generated trees
+        // (which the driver re-parses) don't trip "Inconsistent language versions"
+        // when the input trees opt into Preview for generic attributes.
+        var driverParseOptions = new CSharpParseOptions(LanguageVersion.Preview);
+        var driver = CSharpGeneratorDriver.Create(
+            generators: generators.Select(GeneratorExtensions.AsSourceGenerator).ToImmutableArray(),
+            additionalTexts: ImmutableArray<AdditionalText>.Empty,
+            parseOptions: driverParseOptions,
+            optionsProvider: null
+        );
+        driver = (CSharpGeneratorDriver)driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var generationDiagnostics
+        );
 
         var runResult = driver.GetRunResult();
         var generatedTrees = runResult
@@ -79,10 +87,14 @@ internal static class GeneratorTestHarness
     /// </summary>
     private static CSharpCompilation BuildInputCompilation(string userSource)
     {
+        // The stubs and user sources use C# 11 generic attributes. The pinned
+        // Microsoft.CodeAnalysis.CSharp 4.3.0 still treats them as a preview feature,
+        // so use LanguageVersion.Preview rather than Latest.
+        var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
         var syntaxTrees = new[]
         {
-            CSharpSyntaxTree.ParseText(TrecsStubs.Source),
-            CSharpSyntaxTree.ParseText(userSource),
+            CSharpSyntaxTree.ParseText(TrecsStubs.Source, parseOptions),
+            CSharpSyntaxTree.ParseText(userSource, parseOptions),
         };
 
         // Reference assemblies provided by the test SDK. Without these, even `object` won't
@@ -164,9 +176,7 @@ internal sealed record GeneratorRun(
         else
         {
             foreach (var d in compileErrorsAndWarnings)
-                sb.AppendLine(
-                    $"  {d.Severity} {d.Id} at {d.Location.GetLineSpan()}: {d.GetMessage()}"
-                );
+                sb.AppendLine($"  {d.Severity} {d.Id} at {d.Location.GetLineSpan()}: {d.GetMessage()}");
         }
 
         sb.AppendLine($"--- Generated files ({GeneratedTrees.Length}) ---");

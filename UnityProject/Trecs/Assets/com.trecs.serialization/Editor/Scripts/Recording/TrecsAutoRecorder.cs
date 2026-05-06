@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Trecs.Collections;
 using Trecs.Internal;
 using UnityEditor;
 using UnityEngine;
@@ -15,7 +16,7 @@ namespace Trecs.Serialization
     /// <summary>
     /// Periodically captures full-state snapshots of a Trecs <see cref="World"/>
     /// while running. Snapshots are kept in memory only — no disk I/O. Designed
-    /// to be enabled on demand by editor tooling (see <c>TrecsTimeTravelWindow</c>).
+    /// to be enabled on demand by editor tooling (see <c>TrecsPlayerWindow</c>).
     /// </summary>
     public class TrecsAutoRecorder : IDisposable, IInputHistoryLocker
     {
@@ -828,9 +829,10 @@ namespace Trecs.Serialization
             _isLoadedRecording = false;
             _isLoopingPlayback = false;
             _desyncedFrame = null;
-            // Forking diverges from the loaded recording — the post-fork
-            // buffer is no longer faithful to the on-disk file, so detach.
-            LoadedRecordingPath = null;
+            // Keep LoadedRecordingPath attached so a subsequent plain Save
+            // overwrites the original file — fork is the "edit this recording
+            // from frame N onward" gesture. Save As remains the path for
+            // saving under a different name.
             _log.Debug("Forked recording at frame {}; trailing snapshots dropped", current);
             return true;
         }

@@ -43,7 +43,7 @@ namespace Trecs.Serialization
         // Once the user opts out via the confirm dialog's "Don't ask again"
         // button, suppress the load-during-recording prompt forever. Stored
         // in EditorPrefs so the choice persists across editor sessions.
-        // Same key used by TrecsTimeTravelWindow's snapshot loader so the
+        // Same key used by TrecsPlayerWindow's snapshot loader so the
         // setting carries between both surfaces. The key still spells
         // "Bookmarks" — predates the bookmark→snapshot rename. Keeping the
         // original spelling so existing user dismissals carry over.

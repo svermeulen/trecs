@@ -14,7 +14,7 @@ This page is a **cross-reference index**, not a tutorial. Each row links to the 
 | `[WrapAsJob]` | methods on `IJobSystem` | [Jobs & Burst](../performance/jobs-and-burst.md) |
 | `[FromWorld]` / `[FromWorld(Tag=…)]` / `[FromWorld(Tags=…)]` | fields on a job struct | [Advanced Job Features](advanced-jobs.md) |
 | `[PassThroughArgument]` | method parameters | [Systems](../core/systems.md), [Jobs & Burst](../performance/jobs-and-burst.md) |
-| `[SingleEntity]` | aspect / system-method parameters | [Aspects](../data-access/aspects.md), [Systems](../core/systems.md) |
+| `[SingleEntity]` | individual method parameters or job-struct fields | [Systems — SingleEntity](../core/systems.md#singleentity) |
 
 ### System lifecycle
 

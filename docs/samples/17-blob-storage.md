@@ -79,7 +79,7 @@ Systems dereference the handle through the heap accessor — same as any `Shared
 ```csharp
 public partial class PaletteCycleSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(SampleTags.Swatch))]
+    [ForEachEntity(typeof(SampleTags.Swatch))]
     void Execute(in PaletteRef palette, ref ColorComponent color)
     {
         var table = palette.Value.Get(World.Heap);

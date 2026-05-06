@@ -22,7 +22,7 @@ namespace Trecs.Samples.FeedingFrenzy101
             _settings = settings;
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         [WrapAsJob]
         static void ExecuteImpl(
             ref UniformScale scale,

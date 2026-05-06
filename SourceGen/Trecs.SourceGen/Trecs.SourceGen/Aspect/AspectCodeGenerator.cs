@@ -26,7 +26,7 @@ namespace Trecs.SourceGen.Aspect
             var sb = OptimizedStringBuilder.ForAspect(componentCount);
             var namespaceName = SymbolAnalyzer.GetNamespaceChain(symbol);
             var accessibility = SymbolAnalyzer.GetAccessibilityModifier(symbol);
-            var containingTypes = SymbolAnalyzer.GetContainingTypeChain(symbol);
+            var containingTypes = SymbolAnalyzer.GetContainingTypeChainInfo(symbol);
 
             // Generate using statements
             sb.AppendUsings(CommonUsings.WithExtras("System", "System.Runtime.CompilerServices"));
@@ -56,53 +56,41 @@ namespace Trecs.SourceGen.Aspect
             INamedTypeSymbol symbol,
             AspectAttributeData attributeData,
             string accessibility,
-            List<string> containingTypes
+            IReadOnlyList<ContainingTypeInfo> containingTypes
         )
         {
-            int indentLevel = 0;
-
-            // Open containing types
-            foreach (var containingType in containingTypes)
-            {
-                sb.AppendLine(indentLevel, $"partial class {containingType}");
-                sb.AppendLine(indentLevel, "{");
-                indentLevel++;
-            }
-
             // Start struct - user's partial already declares interfaces; C# merges partials
             var effectiveAccessibility = accessibility == "private" ? "internal" : accessibility;
-            sb.WrapInType(
-                effectiveAccessibility,
-                "struct",
-                symbol.Name,
-                (builder) =>
-                {
-                    // Generate fields
-                    GenerateFields(builder, indentLevel + 1, attributeData);
+            sb.WrapInContainingTypes(
+                containingTypes,
+                0,
+                (b, indentLevel) =>
+                    b.WrapInType(
+                        effectiveAccessibility,
+                        "struct",
+                        symbol.Name,
+                        (builder) =>
+                        {
+                            // Generate fields
+                            GenerateFields(builder, indentLevel + 1, attributeData);
 
-                    // Generate constructors
-                    GenerateConstructors(builder, indentLevel + 1, symbol.Name, attributeData);
+                            // Generate constructors
+                            GenerateConstructors(builder, indentLevel + 1, symbol.Name, attributeData);
 
-                    // DeclareDependencies removed — RuntimeJobScheduler handles deps implicitly
+                            // DeclareDependencies removed — RuntimeJobScheduler handles deps implicitly
 
-                    // Generate properties
-                    GenerateProperties(builder, indentLevel + 1, attributeData);
+                            // Generate properties
+                            GenerateProperties(builder, indentLevel + 1, attributeData);
 
-                    // Generate helper methods
-                    GenerateHelperMethods(builder, indentLevel + 1, symbol, attributeData);
+                            // Generate helper methods
+                            GenerateHelperMethods(builder, indentLevel + 1, symbol, attributeData);
 
-                    // Generate nested NativeFactory struct for cross-entity access in jobs
-                    GenerateNativeFactory(builder, indentLevel + 1, symbol, attributeData);
-                },
-                indentLevel
+                            // Generate nested NativeFactory struct for cross-entity access in jobs
+                            GenerateNativeFactory(builder, indentLevel + 1, symbol, attributeData);
+                        },
+                        indentLevel
+                    )
             );
-
-            // Close containing types
-            for (int i = containingTypes.Count - 1; i >= 0; i--)
-            {
-                indentLevel--;
-                sb.AppendLine(indentLevel, "}");
-            }
         }
 
         /// <summary>
@@ -1036,7 +1024,7 @@ namespace Trecs.SourceGen.Aspect
             var sb = OptimizedStringBuilder.ForAspect(componentCount);
             var namespaceName = SymbolAnalyzer.GetNamespaceChain(symbol);
             var accessibility = SymbolAnalyzer.GetAccessibilityModifier(symbol);
-            var containingTypes = SymbolAnalyzer.GetContainingTypeChain(symbol);
+            var containingTypes = SymbolAnalyzer.GetContainingTypeChainInfo(symbol);
 
             // Generate using statements
             sb.AppendUsings(CommonUsings.WithExtras("System", "System.Runtime.CompilerServices"));
@@ -1066,55 +1054,45 @@ namespace Trecs.SourceGen.Aspect
             INamedTypeSymbol symbol,
             AspectInterfaceData attributeData,
             string accessibility,
-            List<string> containingTypes
+            IReadOnlyList<ContainingTypeInfo> containingTypes
         )
         {
-            int indentLevel = 0;
-
-            // Open containing types
-            foreach (var containingType in containingTypes)
-            {
-                sb.AppendLine(indentLevel, $"partial class {containingType}");
-                sb.AppendLine(indentLevel, "{");
-                indentLevel++;
-            }
-
             // Start interface - user's partial already declares base interfaces; C# merges partials
             var effectiveAccessibility = accessibility == "private" ? "internal" : accessibility;
 
-            sb.AppendLine(indentLevel, $"{effectiveAccessibility} partial interface {symbol.Name}");
-            sb.AppendLine(indentLevel, "{");
+            sb.WrapInContainingTypes(
+                containingTypes,
+                0,
+                (b, indentLevel) =>
+                {
+                    b.AppendLine(indentLevel, $"{effectiveAccessibility} partial interface {symbol.Name}");
+                    b.AppendLine(indentLevel, "{");
 
-            // Note: EntityIndex is inherited from Trecs.IAspect — re-declaring it here would
-            // shadow the base and produce CS0108. The user's partial already lists IAspect in
-            // the base list (that's how we detected this type as an aspect interface).
+                    // Note: EntityIndex is inherited from Trecs.IAspect — re-declaring it here would
+                    // shadow the base and produce CS0108. The user's partial already lists IAspect in
+                    // the base list (that's how we detected this type as an aspect interface).
 
-            // Generate read properties with ref readonly
-            foreach (var readType in attributeData.ReadTypes)
-            {
-                var propertyName = ComponentTypeHelper.GetPropertyName(readType);
-                var returnType = ComponentTypeHelper.GetPropertyReturnType(readType, true);
+                    // Generate read properties with ref readonly
+                    foreach (var readType in attributeData.ReadTypes)
+                    {
+                        var propertyName = ComponentTypeHelper.GetPropertyName(readType);
+                        var returnType = ComponentTypeHelper.GetPropertyReturnType(readType, true);
 
-                sb.AppendLine(indentLevel + 1, $"{returnType} {propertyName} {{ get; }}");
-            }
+                        b.AppendLine(indentLevel + 1, $"{returnType} {propertyName} {{ get; }}");
+                    }
 
-            // Generate write properties with ref (only getter needed, since ref provides both read and write)
-            foreach (var writeType in attributeData.WriteTypes)
-            {
-                var propertyName = ComponentTypeHelper.GetPropertyName(writeType);
-                var returnType = ComponentTypeHelper.GetPropertyReturnType(writeType, false);
+                    // Generate write properties with ref (only getter needed, since ref provides both read and write)
+                    foreach (var writeType in attributeData.WriteTypes)
+                    {
+                        var propertyName = ComponentTypeHelper.GetPropertyName(writeType);
+                        var returnType = ComponentTypeHelper.GetPropertyReturnType(writeType, false);
 
-                sb.AppendLine(indentLevel + 1, $"{returnType} {propertyName} {{ get; }}");
-            }
+                        b.AppendLine(indentLevel + 1, $"{returnType} {propertyName} {{ get; }}");
+                    }
 
-            sb.AppendLine(indentLevel, "}");
-
-            // Close containing types
-            for (int i = containingTypes.Count - 1; i >= 0; i--)
-            {
-                indentLevel--;
-                sb.AppendLine(indentLevel, "}");
-            }
+                    b.AppendLine(indentLevel, "}");
+                }
+            );
         }
 
         /// <summary>

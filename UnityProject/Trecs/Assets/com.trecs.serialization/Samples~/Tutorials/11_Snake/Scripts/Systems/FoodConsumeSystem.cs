@@ -8,7 +8,7 @@ namespace Trecs.Serialization.Samples.Snake
     [ExecuteAfter(typeof(SnakeMovementSystem))]
     public partial class FoodConsumeSystem : ISystem
     {
-        public void Execute()
+        void Execute([SingleEntity(typeof(TrecsTags.Globals))] in Globals globals)
         {
             var headPos = World
                 .Query()
@@ -16,8 +16,6 @@ namespace Trecs.Serialization.Samples.Snake
                 .Single()
                 .Get<GridPos>()
                 .Read.Value;
-
-            var globals = Globals.Query(World).WithTags<TrecsTags.Globals>().Single();
 
             foreach (var food in Food.Query(World).WithTags<SnakeTags.SnakeFood>())
             {

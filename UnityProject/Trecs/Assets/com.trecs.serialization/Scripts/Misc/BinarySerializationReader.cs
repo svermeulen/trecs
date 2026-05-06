@@ -187,12 +187,21 @@ namespace Trecs.Serialization
 
             var type = typeof(T);
 
-            // We need the using code to be explicit when reading/writing an abstract type, because
-            // in this case we need to serialize out the type id
-            Assert.That(
-                !type.IsAbstract || type == typeof(Type),
-                "When deserializing from base class/interface, use ReadObject instead"
-            );
+            // Abstract base types must use the ReadObjectDelta path to read the
+            // runtime type id; divert automatically so callers don't have to.
+            if (type.IsAbstract && type != typeof(Type))
+            {
+                object obj = value;
+                ReadObjectDelta(name, ref obj, baseValue);
+                Assert.That(
+                    obj is T,
+                    "Wire concrete type {} does not derive from T={}",
+                    obj?.GetType(),
+                    type
+                );
+                value = (T)obj;
+                return;
+            }
 
             if (_includesTypeChecks)
             {
@@ -288,6 +297,22 @@ namespace Trecs.Serialization
 
             var type = typeof(T);
 
+            // Abstract base types must use the ReadObject path to read the runtime
+            // type id; divert automatically so callers don't have to.
+            if (type.IsAbstract && type != typeof(Type))
+            {
+                object obj = value;
+                ReadObject(name, ref obj);
+                Assert.That(
+                    obj == null || obj is T,
+                    "Wire concrete type {} does not derive from T={}",
+                    obj?.GetType(),
+                    type
+                );
+                value = (T)obj;
+                return;
+            }
+
             // For value types, null checking doesn't apply
             if (!type.IsValueType)
             {
@@ -299,13 +324,6 @@ namespace Trecs.Serialization
                     return;
                 }
             }
-
-            // We need the using code to be explicit when reading/writing an abstract type, because
-            // in this case we need to serialize out the type id
-            Assert.That(
-                !type.IsAbstract || type == typeof(Type),
-                "When deserializing from base class/interface, use ReadObject instead"
-            );
 
             if (_includesTypeChecks)
             {

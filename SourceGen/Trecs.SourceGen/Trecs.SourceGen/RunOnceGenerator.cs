@@ -85,7 +85,8 @@ namespace Trecs.SourceGen
             if (classDecl == null)
                 return null;
 
-            var methodSymbol = context.SemanticModel.GetDeclaredSymbol(methodDecl) as IMethodSymbol;
+            var methodSymbol =
+                context.SemanticModel.GetDeclaredSymbol(methodDecl) as IMethodSymbol;
             if (methodSymbol == null)
                 return null;
 
@@ -160,8 +161,7 @@ namespace Trecs.SourceGen
                 SourceGenLogger.Log($"[RunOnceGenerator] Processing {className}.{methodName}");
 
                 var source = ErrorRecovery.TryExecute(
-                    () =>
-                        Emit(data.ClassDecl, data.MethodDecl, data.Validated, globalNamespaceName),
+                    () => Emit(data.ClassDecl, data.MethodDecl, data.MethodSymbol.ContainingType, data.Validated, globalNamespaceName),
                     context,
                     location,
                     "RunOnce code generation"
@@ -408,6 +408,7 @@ namespace Trecs.SourceGen
         private static string Emit(
             ClassDeclarationSyntax classDecl,
             MethodDeclarationSyntax methodDecl,
+            INamedTypeSymbol classSymbol,
             ValidatedRunOnce info,
             string globalNamespaceName
         )
@@ -419,11 +420,7 @@ namespace Trecs.SourceGen
 
             var sb = OptimizedStringBuilder.ForAspect(8);
 
-            var namespaces = new HashSet<string>(CommonUsings.Namespaces)
-            {
-                "Unity.Jobs",
-                "System",
-            };
+            var namespaces = new HashSet<string>(CommonUsings.Namespaces) { "Unity.Jobs", "System" };
             HoistedSingleEmitter.CollectNamespaces(
                 namespaces,
                 info.HoistedSingletons,
@@ -431,16 +428,25 @@ namespace Trecs.SourceGen
             );
             sb.AppendUsings(namespaces.ToArray());
 
+            // Walk the system class's containing-type chain so the emitted partial merges
+            // with a nested system class instead of landing at namespace scope.
+            var containingTypes = SymbolAnalyzer.GetContainingTypeChainInfo(classSymbol);
+
             return sb.WrapInNamespace(
                     namespaceName,
                     (b) =>
                     {
-                        b.WrapInType(
-                            "public",
-                            "class",
-                            className,
-                            (cb) => EmitOverload(cb, methodName, visibility, info),
-                            1
+                        b.WrapInContainingTypes(
+                            containingTypes,
+                            0,
+                            (inner, indent) =>
+                                inner.WrapInType(
+                                    "public",
+                                    "class",
+                                    className,
+                                    (cb) => EmitOverload(cb, methodName, visibility, info),
+                                    indent
+                                )
                         );
                     }
                 )
@@ -456,20 +462,19 @@ namespace Trecs.SourceGen
         {
             var customDecl = string.Join(
                 "",
-                info.ParamSlots.Where(s => s.Kind == RunOnceParamKind.Custom)
+                info.ParamSlots
+                    .Where(s => s.Kind == RunOnceParamKind.Custom)
                     .Select(s =>
                         $", {(s.IsRef ? "ref " : s.IsIn ? "in " : "")}{s.ParamTypeDisplay} {s.ParamName}"
                     )
             );
-            sb.AppendLine(2, $"{visibility} void {methodName}(WorldAccessor __world{customDecl})");
+            sb.AppendLine(
+                2,
+                $"{visibility} void {methodName}(WorldAccessor __world{customDecl})"
+            );
             sb.AppendLine(2, "{");
 
-            HoistedSingleEmitter.Emit(
-                sb,
-                indentLevel: 3,
-                worldVar: "__world",
-                info.HoistedSingletons
-            );
+            HoistedSingleEmitter.Emit(sb, indentLevel: 3, worldVar: "__world", info.HoistedSingletons);
 
             var callArgs = new List<string>();
             foreach (var slot in info.ParamSlots)

@@ -58,7 +58,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             }
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
+        [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
         void RunForEachMethodAspect(in Fish fish)
         {
             float baseY = _settings.BobBaseY * fish.UniformScale;
@@ -70,7 +70,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                     * math.sin(_settings.BobFrequency * World.ElapsedTime + phaseOffset);
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
+        [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
         void RunForEachMethodComponents(
             in UniformScale uniformScale,
             ref Position position,
@@ -130,7 +130,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             }
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
+        [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
         [WrapAsJob]
         static void RunWrapAsJobAspect(
             in Fish fish,
@@ -147,7 +147,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                     * math.sin(settings.BobFrequency * world.ElapsedTime + phaseOffset);
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
+        [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
         [WrapAsJob]
         static void RunWrapAsJobComponents(
             in UniformScale uniformScale,
@@ -215,7 +215,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             public float BobFrequency;
             public float BobBaseY;
 
-            [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
+            [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
             public readonly void Execute(in Fish fish, EntityIndex entityIndex)
             {
                 float baseY = BobBaseY * fish.UniformScale;
@@ -236,7 +236,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             public float BobFrequency;
             public float BobBaseY;
 
-            [ForEachEntity(Tag = typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
+            [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.NotEating))]
             public readonly void Execute(
                 in UniformScale uniformScale,
                 ref Position position,
@@ -261,14 +261,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             public float BobFrequency;
             public float BobBaseY;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeEntitySetIndices<FrenzySets.NotEating> FilterIndices;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<UniformScale> Scales;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<Position> Positions;
 
             public void Execute(int i)

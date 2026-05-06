@@ -230,32 +230,32 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             [ReadOnly]
             public NativeArray<int2> Pairs;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<Position> FishPositions;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<Speed> FishSpeeds;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<TargetMeal> FishMeals;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<Velocity> FishVelocities;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<DestinationPosition> FishDestPositions;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<Rotation> FishRotations;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Meal))]
+            [FromWorld(typeof(FrenzyTags.Meal))]
             public NativeComponentBufferRead<Position> MealPositions;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Meal))]
+            [FromWorld(typeof(FrenzyTags.Meal))]
             public GroupIndex MealGroup;
 
             [FromWorld]

@@ -45,7 +45,7 @@ public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 // Step 4: Define systems to operate on entities
 public partial class MovementSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(PlayerTag))]
+    [ForEachEntity(typeof(PlayerTag))]
     void Execute(in Player player)
     {
         player.Position += player.Velocity * World.DeltaTime;

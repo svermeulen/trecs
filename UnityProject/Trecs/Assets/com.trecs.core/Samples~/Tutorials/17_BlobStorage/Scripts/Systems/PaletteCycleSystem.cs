@@ -11,7 +11,7 @@ namespace Trecs.Samples.BlobStorage
     /// </summary>
     public partial class PaletteCycleSystem : ISystem
     {
-        [ForEachEntity(Tag = typeof(SampleTags.Swatch))]
+        [ForEachEntity(typeof(SampleTags.Swatch))]
         void Execute(in PaletteRef palette, ref ColorComponent color)
         {
             var table = palette.Value.Get(World.Heap);

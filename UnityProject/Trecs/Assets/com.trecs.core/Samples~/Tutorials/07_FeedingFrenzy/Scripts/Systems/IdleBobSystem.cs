@@ -15,7 +15,7 @@ namespace Trecs.Samples.FeedingFrenzy101
     {
         const float GoldenRatio = 1.61803f;
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
         [WrapAsJob]
         static void Execute(in Fish fish, EntityIndex entityIndex, in NativeWorldAccessor world)
         {

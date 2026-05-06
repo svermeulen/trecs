@@ -85,7 +85,7 @@ public void Execute()
 
 ```csharp
 [ForEachEntity(
-    Tags = new[] { typeof(SampleTags.Particle) },
+    typeof(SampleTags.Particle),
     Set = typeof(SampleSets.WaveX)
 )]
 void Execute(in WaveXView view)

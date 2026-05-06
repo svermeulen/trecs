@@ -181,6 +181,7 @@ namespace Trecs.SourceGen
                         GenerateSource(
                             data.ClassDecl,
                             data.MethodDecl,
+                            data.MethodSymbol.ContainingType,
                             data.ValidatedInfo,
                             globalNamespaceName
                         ),
@@ -218,6 +219,7 @@ namespace Trecs.SourceGen
         private static string GenerateSource(
             ClassDeclarationSyntax classDec,
             MethodDeclarationSyntax methodDec,
+            INamedTypeSymbol classSymbol,
             ValidatedMethodInfo validatedParamsInfo,
             string globalNamespaceName
         )
@@ -237,20 +239,30 @@ namespace Trecs.SourceGen
 
             sb.AppendUsings(requiredNamespaces.ToArray());
 
+            // Walk the system class's containing-type chain so the emitted partial merges
+            // with a nested system class instead of landing at namespace scope.
+            var containingTypes = SymbolAnalyzer.GetContainingTypeChainInfo(classSymbol);
+
             return sb.WrapInNamespace(
                     namespaceName,
                     (builder) =>
                     {
-                        // Generate class declaration manually like legacy generator
-                        builder.AppendLine(1, $"partial class {className}");
-                        builder.AppendLine(1, "{");
-                        GenerateForEachOverloads(
-                            builder,
-                            methodName,
-                            validatedParamsInfo,
-                            methodDec
+                        builder.WrapInContainingTypes(
+                            containingTypes,
+                            0,
+                            (b, indent) =>
+                            {
+                                b.AppendLine(indent, $"partial class {className}");
+                                b.AppendLine(indent, "{");
+                                GenerateForEachOverloads(
+                                    b,
+                                    methodName,
+                                    validatedParamsInfo,
+                                    methodDec
+                                );
+                                b.AppendLine(indent, "}");
+                            }
                         );
-                        builder.AppendLine(1, "}");
                     }
                 )
                 .ToString();

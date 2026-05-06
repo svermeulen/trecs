@@ -48,6 +48,9 @@ namespace Trecs
         Foldout _writesFoldout;
         Foldout _tagsTouchedFoldout;
         Label _tagsCaveat;
+        Foldout _addsFoldout;
+        Foldout _removesFoldout;
+        Foldout _movesFoldout;
         bool _suppressToggleEvents;
 
         // Composite render key — identity + source mode + source name.
@@ -55,6 +58,9 @@ namespace Trecs
         int _lastReadsHash;
         int _lastWritesHash;
         int _lastTagsTouchedHash;
+        int _lastAddsHash;
+        int _lastRemovesHash;
+        int _lastMovesHash;
 
         public override VisualElement CreateInspectorGUI()
         {
@@ -163,6 +169,21 @@ namespace Trecs
             _tagsCaveat.style.marginLeft = 4;
             _tagsCaveat.style.marginRight = 4;
             _tagsTouchedFoldout.Add(_tagsCaveat);
+
+            // Structural-change tracking — which templates this accessor
+            // adds/removes/moves entities on. Move flags both source and
+            // destination of each operation.
+            _addsFoldout = new Foldout { text = "Adds to templates", value = true };
+            _addsFoldout.style.marginTop = 6;
+            container.Add(_addsFoldout);
+
+            _removesFoldout = new Foldout { text = "Removes from templates", value = true };
+            _removesFoldout.style.marginTop = 6;
+            container.Add(_removesFoldout);
+
+            _movesFoldout = new Foldout { text = "Moves on templates", value = true };
+            _movesFoldout.style.marginTop = 6;
+            container.Add(_movesFoldout);
         }
 
         void RenderManualOriginSection(AccessorEntry entry)
@@ -375,6 +396,9 @@ namespace Trecs
                 _lastReadsHash = 0;
                 _lastWritesHash = 0;
                 _lastTagsTouchedHash = 0;
+                _lastAddsHash = 0;
+                _lastRemovesHash = 0;
+                _lastMovesHash = 0;
                 var entry = BuildEntryFromRef(aref, liveSystem, liveSystems);
                 var linker = new InspectorLinker(src);
                 RenderStatic(entry, linker, !src.IsLive);
@@ -616,6 +640,22 @@ namespace Trecs
             // Tags touched — live derives from tracker groups; cache mode
             // doesn't capture this so it shows a marker.
             UpdateTagsTouched(src, aref, linker);
+
+            // Structural ops — both modes go through the IAccessTracker
+            // surface; cache reads from schema.Structural (persisted at save
+            // time so offline browsing shows real data).
+            IReadOnlyCollection<string> adds = null;
+            IReadOnlyCollection<string> removes = null;
+            IReadOnlyCollection<string> moves = null;
+            if (!string.IsNullOrEmpty(aref.DebugName))
+            {
+                adds = src.AccessTracker.GetTemplateNamesAddedBy(aref.DebugName);
+                removes = src.AccessTracker.GetTemplateNamesRemovedBy(aref.DebugName);
+                moves = src.AccessTracker.GetTemplateNamesMovedBy(aref.DebugName);
+            }
+            ApplyNameList(_addsFoldout, adds, ref _lastAddsHash, linker.TemplateLink);
+            ApplyNameList(_removesFoldout, removes, ref _lastRemovesHash, linker.TemplateLink);
+            ApplyNameList(_movesFoldout, moves, ref _lastMovesHash, linker.TemplateLink);
         }
 
         void UpdateTagsTouched(ITrecsSchemaSource src, AccessorRef aref, InspectorLinker linker)

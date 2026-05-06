@@ -328,45 +328,6 @@ namespace Trecs.SourceGen
                             }
                         }
                     }
-
-                    // Extract tag types from [ForEachEntity(typeof(Tag))] / [SingleEntity(typeof(Tag))]
-                    var entityTagTypeNames = new List<string>();
-                    if (methodSymbol != null)
-                    {
-                        foreach (var attr in PerformanceCache.GetAttributes(methodSymbol))
-                        {
-                            var attrName = attr.AttributeClass?.Name;
-                            if (attrName == TrecsAttributeNames.EntityFilter)
-                            {
-                                foreach (var constructorArg in attr.ConstructorArguments)
-                                {
-                                    if (constructorArg.Kind == TypedConstantKind.Array)
-                                    {
-                                        foreach (var element in constructorArg.Values)
-                                        {
-                                            if (
-                                                element.Kind == TypedConstantKind.Type
-                                                && element.Value is ITypeSymbol tagType
-                                            )
-                                                entityTagTypeNames.Add(
-                                                    PerformanceCache.GetDisplayString(tagType)
-                                                );
-                                        }
-                                    }
-                                    else if (
-                                        constructorArg.Kind == TypedConstantKind.Type
-                                        && constructorArg.Value is ITypeSymbol singleTagType
-                                    )
-                                    {
-                                        entityTagTypeNames.Add(
-                                            PerformanceCache.GetDisplayString(singleTagType)
-                                        );
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
                 }
                 else if (iterationType == IterationType.EntityFilterAspect)
                 {
@@ -378,66 +339,6 @@ namespace Trecs.SourceGen
                             firstParam.Type != null
                                 ? semanticModel.GetTypeInfo(firstParam.Type).Type
                                 : null;
-
-                        if (firstParamType is INamedTypeSymbol aspectType)
-                        {
-                            var attributeData = AspectAttributeParser.ParseAspectData(aspectType);
-
-                            {
-                                var aspectTypeName = firstParam.Type?.ToString() ?? "UnknownType";
-
-                                // Extract tag types from [ForEachEntity(typeof(Tag))] / [SingleEntity(typeof(Tag))]
-                                var tagTypeNames = new List<string>();
-                                if (methodSymbol != null)
-                                {
-                                    foreach (
-                                        var attr in PerformanceCache.GetAttributes(methodSymbol)
-                                    )
-                                    {
-                                        var aspectAttrName = attr.AttributeClass?.Name;
-                                        if (
-                                            aspectAttrName == TrecsAttributeNames.EntityFilter
-                                            || aspectAttrName == TrecsAttributeNames.SingleEntity
-                                        )
-                                        {
-                                            foreach (
-                                                var constructorArg in attr.ConstructorArguments
-                                            )
-                                            {
-                                                if (constructorArg.Kind == TypedConstantKind.Array)
-                                                {
-                                                    foreach (var element in constructorArg.Values)
-                                                    {
-                                                        if (
-                                                            element.Kind == TypedConstantKind.Type
-                                                            && element.Value is ITypeSymbol tagType
-                                                        )
-                                                            tagTypeNames.Add(
-                                                                PerformanceCache.GetDisplayString(
-                                                                    tagType
-                                                                )
-                                                            );
-                                                    }
-                                                }
-                                                else if (
-                                                    constructorArg.Kind == TypedConstantKind.Type
-                                                    && constructorArg.Value
-                                                        is ITypeSymbol singleTagType
-                                                )
-                                                {
-                                                    tagTypeNames.Add(
-                                                        PerformanceCache.GetDisplayString(
-                                                            singleTagType
-                                                        )
-                                                    );
-                                                }
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
 
                         // Collect only explicit [PassThroughArgument] params as custom,
                         // skipping the aspect (index 0) and loop-managed types.
@@ -485,6 +386,7 @@ namespace Trecs.SourceGen
                         }
                     }
                 }
+
                 else if (iterationType == IterationType.RunOnce)
                 {
                     // RunOnce methods consume [SingleEntity] params via RunOnceGenerator's
@@ -505,10 +407,14 @@ namespace Trecs.SourceGen
                         )
                             continue;
                         var paramType =
-                            param.Type != null ? semanticModel.GetTypeInfo(param.Type).Type : null;
+                            param.Type != null
+                                ? semanticModel.GetTypeInfo(param.Type).Type
+                                : null;
                         if (paramType == null)
                             continue;
-                        var paramIsRef = param.Modifiers.Any(m => m.IsKind(SyntaxKind.RefKeyword));
+                        var paramIsRef = param.Modifiers.Any(m =>
+                            m.IsKind(SyntaxKind.RefKeyword)
+                        );
                         var paramIsIn = param.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword));
                         customParams.Add(
                             new CustomParamInfo(
@@ -705,6 +611,24 @@ namespace Trecs.SourceGen
                 var name = attr.AttributeClass?.Name;
                 if (name != TrecsAttributeNames.EntityFilter)
                     continue;
+
+                // C# 11 generic-attribute form: [ForEachEntity<A>] etc. Roslyn's Name
+                // strips arity, so the same name-check matches generic and non-generic.
+                if (
+                    attr.AttributeClass is INamedTypeSymbol namedClass
+                    && namedClass.TypeArguments.Length > 0
+                )
+                    return true;
+
+                // Positional ctor: [ForEachEntity(typeof(A))] / [ForEachEntity(typeof(A), typeof(B))].
+                foreach (var ctorArg in attr.ConstructorArguments)
+                {
+                    if (
+                        ctorArg.Kind == TypedConstantKind.Type
+                        || ctorArg.Kind == TypedConstantKind.Array
+                    )
+                        return true;
+                }
 
                 foreach (var namedArg in attr.NamedArguments)
                 {

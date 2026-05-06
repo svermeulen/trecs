@@ -152,6 +152,23 @@ namespace Trecs
         }
 
         /// <summary>
+        /// Attempts to create a live <see cref="EntityAccessor"/> bound to the given <see cref="WorldAccessor"/>,
+        /// returning false if the entity no longer exists.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryToEntity(WorldAccessor accessor, out EntityAccessor entity)
+        {
+            if (!TryToIndex(accessor.World.EntityQuerier, out var entityIndex))
+            {
+                entity = default;
+                return false;
+            }
+
+            entity = new EntityAccessor(accessor, entityIndex);
+            return true;
+        }
+
+        /// <summary>
         /// Attempts to resolve this reference to an <see cref="EntityIndex"/>, returning false if the entity no longer exists.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

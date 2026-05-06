@@ -8,11 +8,11 @@ The most common way to iterate entities is with `[ForEachEntity]` on a system me
 
 ```csharp
 // By tag
-[ForEachEntity(Tag = typeof(GameTags.Player))]
+[ForEachEntity(typeof(GameTags.Player))]
 void Execute(ref Position position, in Velocity velocity) { ... }
 
 // By multiple tags
-[ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+[ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
 void Execute(in ActiveBall ball) { ... }
 
 // By components (matches any entity that has these components, regardless of tags)

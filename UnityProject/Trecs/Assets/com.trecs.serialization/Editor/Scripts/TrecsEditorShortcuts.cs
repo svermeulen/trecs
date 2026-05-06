@@ -48,7 +48,7 @@ namespace Trecs.Serialization
             {
                 runner.FixedIsPaused = true;
             }
-            runner.StepFrame();
+            runner.StepFixedFrame();
         }
 
         [Shortcut(ShortcutCategory + "/Jump To Previous Snapshot")]

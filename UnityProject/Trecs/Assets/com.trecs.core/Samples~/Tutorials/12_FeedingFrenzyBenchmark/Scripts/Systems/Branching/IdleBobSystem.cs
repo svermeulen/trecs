@@ -58,7 +58,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             }
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         void RunForEachMethodAspect(in Fish fish)
         {
             if (fish.TargetMeal.IsNull)
@@ -73,7 +73,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             }
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         void RunForEachMethodComponents(
             in TargetMeal targetMeal,
             in UniformScale uniformScale,
@@ -145,7 +145,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             }.ScheduleParallel(World);
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         [WrapAsJob]
         static void RunWrapAsJobAspect(
             in Fish fish,
@@ -165,7 +165,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             }
         }
 
-        [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+        [ForEachEntity(typeof(FrenzyTags.Fish))]
         [WrapAsJob]
         static void RunWrapAsJobComponents(
             in TargetMeal targetMeal,
@@ -220,7 +220,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             public float ElapsedTime;
             public IdleBobSystemSettings Settings;
 
-            [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+            [ForEachEntity(typeof(FrenzyTags.Fish))]
             public readonly void Execute(in Fish fish, EntityIndex entityIndex)
             {
                 if (fish.TargetMeal.IsNull)
@@ -242,7 +242,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             public float ElapsedTime;
             public IdleBobSystemSettings Settings;
 
-            [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+            [ForEachEntity(typeof(FrenzyTags.Fish))]
             public readonly void Execute(
                 in TargetMeal targetMeal,
                 in UniformScale uniformScale,
@@ -269,14 +269,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             public float ElapsedTime;
             public IdleBobSystemSettings Settings;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<TargetMeal> TargetMeals;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<UniformScale> Scales;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<Position> Positions;
 
             public void Execute(int i)

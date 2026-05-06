@@ -16,7 +16,7 @@ namespace Trecs.Samples.BlobStorage
             _registry = registry;
         }
 
-        [ForEachEntity(Tag = typeof(SampleTags.Swatch))]
+        [ForEachEntity(typeof(SampleTags.Swatch))]
         void Execute(
             in GameObjectId id,
             in Position position,

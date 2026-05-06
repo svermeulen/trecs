@@ -90,7 +90,7 @@ In your variable-update rendering system, read from `Interpolated<T>` instead of
 [Phase(SystemPhase.Presentation)]
 public partial class RenderSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(MyTags.Smooth))]
+    [ForEachEntity(typeof(MyTags.Smooth))]
     void Execute(in Interpolated<Position> pos, in Interpolated<Rotation> rot, in GameObjectId id)
     {
         var go = _registry.Resolve(id);

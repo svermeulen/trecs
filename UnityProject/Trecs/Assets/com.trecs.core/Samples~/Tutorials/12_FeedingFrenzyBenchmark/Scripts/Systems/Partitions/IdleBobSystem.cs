@@ -58,7 +58,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             }
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
         void RunForEachMethodAspect(in Fish fish)
         {
             float baseY = _settings.BobBaseY * fish.UniformScale;
@@ -70,7 +70,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     * math.sin(_settings.BobFrequency * World.ElapsedTime + phaseOffset);
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
         void RunForEachMethodComponents(
             in UniformScale uniformScale,
             ref Position position,
@@ -86,7 +86,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     * math.sin(_settings.BobFrequency * World.ElapsedTime + phaseOffset);
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
         [WrapAsJob]
         static void RunWrapAsJobAspect(
             in Fish fish,
@@ -103,7 +103,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     * math.sin(settings.BobFrequency * world.ElapsedTime + phaseOffset);
         }
 
-        [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+        [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
         [WrapAsJob]
         static void RunWrapAsJobComponents(
             in UniformScale uniformScale,
@@ -214,7 +214,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             public float BobFrequency;
             public float BobBaseY;
 
-            [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public readonly void Execute(in Fish fish, EntityIndex entityIndex)
             {
                 float baseY = BobBaseY * fish.UniformScale;
@@ -235,7 +235,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             public float BobFrequency;
             public float BobBaseY;
 
-            [ForEachEntity(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public readonly void Execute(
                 in UniformScale uniformScale,
                 ref Position position,
@@ -260,11 +260,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             public float BobFrequency;
             public float BobBaseY;
 
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public NativeComponentBufferRead<UniformScale> Scales;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public NativeComponentBufferWrite<Position> Positions;
 
             public void Execute(int i)

@@ -50,7 +50,7 @@ See [Tags](tags.md) for details on how tags are used.
 Templates and tags are closely related but play distinct roles, and understanding the split is key to using Trecs idiomatically:
 
 - **A template is the concrete shape.** It declares the exact component layout an entity is spawned with, along with defaults, partitions, and which tags the entity carries. The template class is referenced when you *define* the entity kind (the partial class itself), when you *register* it with the builder (`AddEntityType(EnemyEntity.Template)`), and when other templates extend it via `IExtends<EnemyEntity>`.
-- **A tag is the identity handle that the rest of the code uses.** Systems, queries, aspects, events, and cross-entity references all refer to entities through their tags, not through their template class. `[ForEachEntity(Tags = new[] { typeof(GameTags.Enemy) })]` and `World.CountEntitiesWithTags<GameTags.Enemy>()` are the normal ways to talk about "enemies" — runtime/system code should not name the template class directly. The split keeps gameplay code from depending on the concrete blueprint.
+- **A tag is the identity handle that the rest of the code uses.** Systems, queries, aspects, events, and cross-entity references all refer to entities through their tags, not through their template class. `[ForEachEntity(typeof(GameTags.Enemy))]` and `World.CountEntitiesWithTags<GameTags.Enemy>()` are the normal ways to talk about "enemies" — runtime/system code should not name the template class directly. The split keeps gameplay code from depending on the concrete blueprint.
 
 In other words, **templates describe the shape; tags are the vocabulary**. This separation is deliberate: systems stay decoupled from concrete entity definitions, so you can evolve a template (add a component, split it into two templates, change inheritance) without touching any system code, as long as the tag contract stays the same.
 
@@ -179,14 +179,14 @@ Systems can target specific partitions:
 
 ```csharp
 // Only processes Active balls
-[ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+[ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
 void UpdateActive(in ActiveBall ball)
 {
     ball.Velocity += Gravity * World.DeltaTime;
 }
 
 // Only processes Resting balls
-[ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Resting) })]
+[ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
 void UpdateResting(in RestingBall ball)
 {
     ball.RestTimer -= World.DeltaTime;

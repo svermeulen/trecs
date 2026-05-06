@@ -69,7 +69,7 @@ namespace Trecs
     /// partial struct ScatterJob
     /// {
     ///     [ReadOnly]
-    ///     [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+    ///     [FromWorld(typeof(FrenzyTags.Fish))]
     ///     public NativeComponentBufferRead&lt;CPosition&gt; FishPositions;
     ///
     ///     public void Execute(int i) { /* ... */ }
@@ -90,7 +90,7 @@ namespace Trecs
     ///     [FromWorld]
     ///     public NativeComponentLookupRead&lt;CPosition&gt; AllPositions;
     ///
-    ///     [ForEachEntity(Tag = typeof(FrenzyTags.Fish))]
+    ///     [ForEachEntity(typeof(FrenzyTags.Fish))]
     ///     void Execute(in Fish fish) { /* ... */ }
     /// }
     ///
@@ -120,6 +120,17 @@ namespace Trecs
         public FromWorldAttribute()
         {
             Tags = Array.Empty<Type>();
+        }
+
+        /// <summary>
+        /// Shorthand: <c>[FromWorld(typeof(MyTag))]</c> /
+        /// <c>[FromWorld(typeof(A), typeof(B))]</c>. Equivalent to setting
+        /// <see cref="Tags"/>. Cannot be combined with the named <see cref="Tag"/>
+        /// / <see cref="Tags"/> properties.
+        /// </summary>
+        public FromWorldAttribute(params Type[] tags)
+        {
+            Tags = tags ?? Array.Empty<Type>();
         }
     }
 }

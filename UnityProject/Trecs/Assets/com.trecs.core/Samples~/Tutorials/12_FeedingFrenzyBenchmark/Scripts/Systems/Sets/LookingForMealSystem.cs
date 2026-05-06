@@ -178,51 +178,51 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
         [BurstCompile]
         partial struct RawBuffersScatterJob : IJobFor
         {
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeEntitySetIndices<FrenzySets.NotEating> FishFilterIndices;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Meal))]
+            [FromWorld(typeof(FrenzyTags.Meal))]
             public NativeEntitySetIndices<FrenzySets.NotEating> MealFilterIndices;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public GroupIndex FishGroup;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Meal))]
+            [FromWorld(typeof(FrenzyTags.Meal))]
             public GroupIndex MealGroup;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<Position> FishPositions;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferRead<Speed> FishSpeeds;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<TargetMeal> FishMeals;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<Velocity> FishVelocities;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<DestinationPosition> FishDestPositions;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeComponentBufferWrite<Rotation> FishRotations;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Meal))]
+            [FromWorld(typeof(FrenzyTags.Meal))]
             public NativeComponentBufferRead<Position> MealPositions;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tag = typeof(FrenzyTags.Meal))]
+            [FromWorld(typeof(FrenzyTags.Meal))]
             public NativeComponentBufferWrite<ApproachingFish> MealApproachingFish;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Fish))]
+            [FromWorld(typeof(FrenzyTags.Fish))]
             public NativeEntityHandleBuffer FishEntityHandles;
 
-            [FromWorld(Tag = typeof(FrenzyTags.Meal))]
+            [FromWorld(typeof(FrenzyTags.Meal))]
             public NativeEntityHandleBuffer MealEntityHandles;
 
             [FromWorld]

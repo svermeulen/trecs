@@ -41,7 +41,7 @@ Every system must define exactly one method named `Execute`. This is the system'
 // Option 1: ForEachEntity (most common)
 public partial class MovementSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(GameTags.Player))]
+    [ForEachEntity(typeof(GameTags.Player))]
     void Execute(in PlayerView player)
     {
         player.Position += player.Velocity * World.DeltaTime;
@@ -66,7 +66,7 @@ public partial class DamageSystem : ISystem
 // Option 3: WrapAsJob (parallel, Burst-compiled)
 public partial class ParticleMoveSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+    [ForEachEntity(typeof(SampleTags.Particle))]
     [WrapAsJob]
     static void Execute(in Velocity velocity, ref Position position, in NativeWorldAccessor world)
     {
@@ -83,11 +83,11 @@ The `[ForEachEntity]` attribute marks a method for source-generated entity itera
 
 ```csharp
 // Single tag
-[ForEachEntity(Tag = typeof(SampleTags.Spinner))]
+[ForEachEntity(typeof(SampleTags.Spinner))]
 void Execute(ref Rotation rotation) { ... }
 
 // Multiple tags
-[ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+[ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
 void Execute(in ActiveBall ball) { ... }
 ```
 
@@ -120,13 +120,13 @@ A system can have multiple iteration methods for different entity groups:
 [Phase(SystemPhase.Presentation)]
 public partial class BallRendererSystem : ISystem
 {
-    [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Active) })]
+    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
     void RenderActive(in ActiveBallView ball)
     {
         // Render active balls as red
     }
 
-    [ForEachEntity(Tags = new[] { typeof(BallTags.Ball), typeof(BallTags.Resting) })]
+    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
     void RenderResting(in RestingBallView ball)
     {
         // Render resting balls as gray
@@ -170,7 +170,7 @@ public partial class ParticleBoundSystem : ISystem
 {
     readonly float _halfSize;
 
-    [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+    [ForEachEntity(typeof(SampleTags.Particle))]
     [WrapAsJob]
     static void ExecuteAsJob(
         ref Velocity velocity,
@@ -195,13 +195,61 @@ This is useful for passing configuration, precomputed values, or other data that
 
 ## SingleEntity
 
-Use `[SingleEntity]` for operations on a singleton entity (asserts exactly one entity matches):
+`[SingleEntity]` marks an individual parameter (or a job-struct field) that should be resolved to the unique entity matching the given tag(s). The framework runs the equivalent of `World.Query().WithTags<...>().Single()` before the user method body, asserts exactly one match, and binds the result to the parameter or field.
+
+Inline tags are mandatory — `[SingleEntity]` has no runtime override and no `Optional` mode. If you need a runtime-supplied query, call `World.Query().WithTags(...).Single()` directly inside the method body.
 
 ```csharp
-[SingleEntity(Tag = typeof(GlobalTag))]
-void Execute(ref Score score)
+void Execute([SingleEntity(typeof(GlobalTag))] ref Score score)
 {
     score.Value += 1;
+}
+```
+
+`[SingleEntity]` works in four contexts:
+
+**Plain `Execute` methods.** A method whose only iteration markers are per-parameter `[SingleEntity]` runs *once* per call; the framework hoists every singleton lookup before the body.
+
+```csharp
+void Execute(
+    [SingleEntity(typeof(PlayerTag))] in PlayerView player,
+    [SingleEntity(typeof(GlobalsTag))] in GlobalsView globals)
+{
+    // ...
+}
+```
+
+**Mixed with `[ForEachEntity]`.** A method that already iterates can also receive singleton parameters; the lookup is hoisted out of the loop and bound once per call.
+
+```csharp
+[ForEachEntity(Tag = typeof(EnemyTag))]
+void Process(in EnemyView enemy, [SingleEntity(typeof(PlayerTag))] in PlayerView player)
+{
+    // 'player' is resolved once before the loop and reused for every enemy.
+}
+```
+
+**`[WrapAsJob]` static methods.** Singleton parameters become job-struct fields that the generator wires up at schedule time, so the body remains Burst-clean.
+
+```csharp
+[ForEachEntity(Tag = typeof(EnemyTag))]
+[WrapAsJob]
+static void Process(
+    in EnemyView enemy,
+    [SingleEntity(typeof(PlayerTag))] in PlayerView player)
+{
+    // ...
+}
+```
+
+**Hand-written job-struct fields.** Adding `[SingleEntity]` directly on a field of an `IJobFor` (or other custom job struct) makes the generator populate it at schedule time, the same way `[FromWorld]` populates other field kinds.
+
+```csharp
+public partial struct ScoringJob : IJobFor
+{
+    [SingleEntity(typeof(GlobalTag))]
+    public NativeWrite<Score> Score;
+    // ...
 }
 ```
 

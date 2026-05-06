@@ -35,18 +35,6 @@ namespace Trecs.SourceGen.Aspect
                 isValid = false;
             }
 
-            // Must be struct
-            if (symbol.TypeKind != TypeKind.Struct)
-            {
-                var diagnostic = Diagnostic.Create(
-                    DiagnosticDescriptors.AspectMustBeStruct,
-                    declaration.GetLocation(),
-                    symbol.Name
-                );
-                reportDiagnostic(diagnostic);
-                isValid = false;
-            }
-
             // Validate component types
             var allComponentTypes = attributeData.ReadTypes.Concat(attributeData.WriteTypes);
             if (

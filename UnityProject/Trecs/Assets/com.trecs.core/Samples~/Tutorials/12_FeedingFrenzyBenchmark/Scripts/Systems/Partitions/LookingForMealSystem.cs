@@ -171,50 +171,50 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
         [BurstCompile]
         partial struct RawComponentBuffersJob : IJobFor
         {
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Meal), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Meal), typeof(FrenzyTags.NotEating))]
             public NativeComponentBufferRead<Position> MealPositions;
 
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public NativeComponentBufferRead<Position> FishPositions;
 
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public NativeComponentBufferRead<Speed> FishSpeeds;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public NativeComponentBufferWrite<TargetMeal> Meals;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public NativeComponentBufferWrite<Velocity> Velocities;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public NativeComponentBufferWrite<DestinationPosition> DestinationPositions;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public NativeComponentBufferWrite<Rotation> Rotations;
 
             [NativeDisableParallelForRestriction]
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Meal), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Meal), typeof(FrenzyTags.NotEating))]
             public NativeComponentBufferWrite<ApproachingFish> MealApproachingFish;
 
             // We could also call World.GetEntityHandle instead but by injecting the NativeEntityHandleBuffer
             // we save a dictionary lookup per entity
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Meal), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Meal), typeof(FrenzyTags.NotEating))]
             public NativeEntityHandleBuffer MealEntityHandles;
 
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public NativeEntityHandleBuffer FishEntityHandles;
 
             [FromWorld]
             public NativeWorldAccessor World;
 
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Meal), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Meal), typeof(FrenzyTags.NotEating))]
             public GroupIndex MealGroup;
 
-            [FromWorld(Tags = new[] { typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating) })]
+            [FromWorld(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
             public GroupIndex FishGroup;
 
             public readonly void Execute(int i)

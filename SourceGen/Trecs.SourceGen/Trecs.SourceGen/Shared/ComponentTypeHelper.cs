@@ -97,18 +97,6 @@ namespace Trecs.SourceGen.Shared
             if (!IsUnwrapComponent(type))
                 return true;
 
-            // Must be a struct
-            if (type.TypeKind != TypeKind.Struct)
-            {
-                var diagnostic = Diagnostic.Create(
-                    DiagnosticDescriptors.UnwrapComponentMustBeStruct,
-                    location,
-                    type.Name
-                );
-                reportDiagnostic(diagnostic);
-                return false;
-            }
-
             // Must implement IEntityComponent
             if (!IsEntityComponent(type))
             {

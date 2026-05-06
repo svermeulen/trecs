@@ -39,8 +39,7 @@ Input systems run first, before the fixed update phase. Mark them with `[Phase(S
 [Phase(SystemPhase.Input)]
 public partial class ProcessInputSystem : ISystem
 {
-    [SingleEntity(Tag = typeof(GlobalTag))]
-    void Execute(in MoveInput input)
+    void Execute([SingleEntity(typeof(GlobalTag))] in MoveInput input)
     {
         // input.Direction contains the queued input for this frame
     }

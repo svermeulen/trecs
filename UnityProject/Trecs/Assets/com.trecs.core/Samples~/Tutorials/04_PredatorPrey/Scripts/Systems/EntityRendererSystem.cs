@@ -13,7 +13,7 @@ namespace Trecs.Samples.PredatorPrey
             _gameObjectRegistry = gameObjectRegistry;
         }
 
-        [ForEachEntity(Tags = new[] { typeof(SampleTags.Movable) })]
+        [ForEachEntity(typeof(SampleTags.Movable))]
         void Execute(in Mover mover)
         {
             var go = _gameObjectRegistry.Resolve(mover.GameObjectId);

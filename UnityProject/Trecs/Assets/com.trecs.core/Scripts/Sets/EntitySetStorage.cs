@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Trecs.Collections;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 

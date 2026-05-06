@@ -39,7 +39,7 @@ namespace Trecs
         readonly string _createdAtFile;
         readonly int _createdAtLine;
 
-        internal IComponentAccessRecorder AccessRecorder;
+        internal IAccessRecorder AccessRecorder;
 
         public HeapAccessor Heap { get; }
 
@@ -143,6 +143,17 @@ namespace Trecs
 
         public ISimpleObservable<bool> FixedIsPausedChangedEvent =>
             _systemRunner.FixedIsPausedChangedEvent;
+
+        /// <summary>
+        /// Schedule one fixed-update frame to run on the next host tick, then
+        /// resume the paused state. Requires <see cref="FixedIsPaused"/> to be
+        /// true. Only fixed frames are steppable — variable frames are driven
+        /// by the host update loop.
+        /// </summary>
+        public void StepFixedFrame()
+        {
+            _systemRunner.StepFixedFrame();
+        }
 
         /// <summary>
         /// Phase-aware time step. Returns <see cref="FixedDeltaTime"/> in fixed-update systems
@@ -482,6 +493,8 @@ namespace Trecs
             var toGroup = _worldInfo.GetSingleGroupWithTags(tags);
 
             _structuralOps.MoveTo(entityIndex, toGroup);
+
+            AccessRecorder?.OnEntityMoved(_debugName, entityIndex.GroupIndex, toGroup);
         }
 
         public void MoveTo<T1>(EntityIndex entityIndex)
@@ -531,6 +544,8 @@ namespace Trecs
             AssertCanMakeStructuralChanges();
 
             _structuralOps.RemoveEntity(entityIndex);
+
+            AccessRecorder?.OnEntityRemoved(_debugName, entityIndex.GroupIndex);
         }
 
         public void RemoveEntitiesWithTags(TagSet tags)
@@ -542,6 +557,7 @@ namespace Trecs
             {
                 var count = CountEntitiesInGroup(group);
                 _structuralOps.RemoveAllEntitiesInGroup(group, count);
+                AccessRecorder?.OnEntityRemoved(_debugName, group);
             }
         }
 
@@ -621,7 +637,11 @@ namespace Trecs
 
             var group = _worldInfo.GetSingleGroupWithTags(tags);
 
-            return _structuralOps.AddEntity(group, callerFile, callerLine);
+            var initializer = _structuralOps.AddEntity(group, callerFile, callerLine);
+
+            AccessRecorder?.OnEntityAdded(_debugName, group);
+
+            return initializer;
         }
 
         public EntityInitializer AddEntity<T1>(

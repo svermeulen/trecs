@@ -10,10 +10,10 @@ The `[FromWorld]` attribute marks fields on a job struct to be automatically pop
 [BurstCompile]
 partial struct MyJob : IJobFor
 {
-    [FromWorld(Tag = typeof(GameTags.Player))]
+    [FromWorld(typeof(GameTags.Player))]
     public NativeComponentBufferRead<Position> Positions;
 
-    [FromWorld(Tag = typeof(GameTags.Player))]
+    [FromWorld(typeof(GameTags.Player))]
     public NativeComponentBufferWrite<Velocity> Velocities;
 
     [FromWorld]
@@ -43,7 +43,7 @@ partial struct MyJob : IJobFor
 
 Fields that require a tag scope (buffers, lookups, `GroupIndex`) can get their tags in two ways:
 
-- **Inline** — specify `Tag` or `Tags` directly on the attribute: `[FromWorld(Tag = typeof(GameTags.Player))]`. The tag is baked into the generated code.
+- **Inline** — specify `Tag` or `Tags` directly on the attribute: `[FromWorld(typeof(GameTags.Player))]`. The tag is baked into the generated code.
 - **At schedule time** — omit `Tag`/`Tags`, and the generated `ScheduleParallel` method will include a `TagSet` parameter that the caller must provide:
 
 ```csharp

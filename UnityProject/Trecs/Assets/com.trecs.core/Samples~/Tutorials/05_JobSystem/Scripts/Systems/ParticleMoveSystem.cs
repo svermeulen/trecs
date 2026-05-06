@@ -7,13 +7,13 @@ namespace Trecs.Samples.JobSystem
     /// </summary>
     public partial class ParticleMoveSystem : ISystem
     {
-        [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+        [ForEachEntity(typeof(SampleTags.Particle))]
         void ExecuteMainThread(in Velocity velocity, ref Position position)
         {
             position.Value += World.DeltaTime * velocity.Value;
         }
 
-        [ForEachEntity(Tag = typeof(SampleTags.Particle))]
+        [ForEachEntity(typeof(SampleTags.Particle))]
         [WrapAsJob]
         static void ExecuteAsJob(
             in Velocity velocity,

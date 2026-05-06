@@ -97,20 +97,14 @@ namespace Trecs.SourceGen
                 }
             }
 
-            var containingTypes = ImmutableArray.CreateBuilder<ContainingTypeInfo>();
-            var current = symbol.ContainingType;
-            while (current != null)
+            var containingTypeChain = SymbolAnalyzer.GetContainingTypeChainInfo(symbol);
+            var containingTypes = ImmutableArray.CreateBuilder<ContainingTypeInfo>(
+                containingTypeChain.Count
+            );
+            foreach (var info in containingTypeChain)
             {
-                containingTypes.Add(
-                    new ContainingTypeInfo(
-                        current.Name,
-                        current.TypeKind == TypeKind.Class ? "class" : "struct",
-                        GetAccessibility(current)
-                    )
-                );
-                current = current.ContainingType;
+                containingTypes.Add(info);
             }
-            containingTypes.Reverse();
 
             // Capture the type parameter list (e.g. "<T>" or "<TKey, TValue>")
             // so the emitted partial matches the original declaration —
@@ -118,12 +112,7 @@ namespace Trecs.SourceGen
             // arity + parameter names, so dropping "<T>" silently emits a
             // phantom non-generic type that nothing merges into. Empty for
             // non-generic structs.
-            string typeParameterList = "";
-            if (symbol.TypeParameters.Length > 0)
-            {
-                typeParameterList =
-                    "<" + string.Join(", ", symbol.TypeParameters.Select(p => p.Name)) + ">";
-            }
+            string typeParameterList = SymbolAnalyzer.FormatTypeParameterList(symbol);
 
             return new EntityComponentModel(
                 TypeName: symbol.Name,
@@ -195,7 +184,7 @@ namespace Trecs.SourceGen
             {
                 var indent = new string(' ', indentLevel * 4);
                 sb.AppendLine(
-                    $"{indent}{containingType.Accessibility} partial {containingType.Kind} {containingType.Name}"
+                    $"{indent}{containingType.Accessibility} partial {containingType.Kind} {containingType.Name}{containingType.TypeParameterList}"
                 );
                 sb.AppendLine($"{indent}{{");
                 indentLevel++;
@@ -353,11 +342,6 @@ namespace Trecs.SourceGen
         }
     }
 
-    internal readonly record struct ContainingTypeInfo(
-        string Name,
-        string Kind,
-        string Accessibility
-    );
 }
 
 namespace System.Runtime.CompilerServices

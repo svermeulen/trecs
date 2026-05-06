@@ -16,7 +16,7 @@ namespace Trecs.Serialization.Samples.Snake
             _settings = settings;
         }
 
-        public void Execute()
+        void Execute([SingleEntity(typeof(SnakeTags.SnakeHead))] in SnakeHead head)
         {
             ref var counter = ref World.GlobalComponent<MoveTickCounter>().Write;
 
@@ -27,8 +27,6 @@ namespace Trecs.Serialization.Samples.Snake
             }
 
             counter.FramesUntilNextMove = _settings.FramesPerMove - 1;
-
-            var head = SnakeHead.Query(World).WithTags<SnakeTags.SnakeHead>().Single();
 
             // Apply turn input if it's non-zero and not a 180° reversal.
             var requested = World.GlobalComponent<MoveInput>().Read.RequestedDirection;

@@ -1,7 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+using Trecs.Internal;
 
-namespace Trecs.Internal // not part of public api atm
+namespace Trecs.Collections
 {
     /// <summary>
     /// Read-only wrapper for DenseHashSet.
