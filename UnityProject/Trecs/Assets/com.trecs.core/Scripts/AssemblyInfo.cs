@@ -5,4 +5,3 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Trecs.GameObjects")]
 [assembly: InternalsVisibleTo("Trecs.Profiling")]
 [assembly: InternalsVisibleTo("Trecs.Serialization")]
-[assembly: InternalsVisibleTo("Trecs.Svkj")]
