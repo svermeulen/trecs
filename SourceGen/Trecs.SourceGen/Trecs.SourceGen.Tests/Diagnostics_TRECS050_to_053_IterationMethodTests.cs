@@ -34,12 +34,16 @@ public class Diagnostics_TRECS050_to_053_IterationMethodTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS050", new IIncrementalGenerator[]
-        {
-            new JobGenerator(),
-            new AspectGenerator(),
-            new EntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS050",
+            new IIncrementalGenerator[]
+            {
+                new JobGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
+            }
+        );
     }
 
     [Test]
@@ -63,12 +67,16 @@ public class Diagnostics_TRECS050_to_053_IterationMethodTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS051", new IIncrementalGenerator[]
-        {
-            new AutoSystemGenerator(),
-            new ForEachGenerator(),
-            new EntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS051",
+            new IIncrementalGenerator[]
+            {
+                new AutoSystemGenerator(),
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
+            }
+        );
     }
 
     [Test]
@@ -90,21 +98,21 @@ public class Diagnostics_TRECS050_to_053_IterationMethodTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS053", new IIncrementalGenerator[]
-        {
-            new ForEachGenerator(),
-            new EntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS053",
+            new IIncrementalGenerator[] { new ForEachGenerator(), new EntityComponentGenerator() }
+        );
     }
 
-    static void AssertDiagnostic(string source, string expectedId, IIncrementalGenerator[] generators)
+    static void AssertDiagnostic(
+        string source,
+        string expectedId,
+        IIncrementalGenerator[] generators
+    )
     {
         var run = GeneratorTestHarness.Run(generators, source);
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
-        Assert.That(
-            diag,
-            Is.Not.Null,
-            $"Expected {expectedId}, got:\n{run.Format()}"
-        );
+        Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
     }
 }

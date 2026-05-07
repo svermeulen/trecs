@@ -59,7 +59,10 @@ namespace Trecs.SourceGen.Shared
             HoistedSingletonInfo info
         )
         {
-            sb.AppendLine(indentLevel, $"// [SingleEntity] {info.ParamName} : {info.AspectTypeDisplay}");
+            sb.AppendLine(
+                indentLevel,
+                $"// [SingleEntity] {info.ParamName} : {info.AspectTypeDisplay}"
+            );
             var withTagsArgs = string.Join(
                 ", ",
                 info.TagTypes.Select(t => PerformanceCache.GetDisplayString(t))
@@ -103,7 +106,10 @@ namespace Trecs.SourceGen.Shared
             HoistedSingletonInfo info
         )
         {
-            sb.AppendLine(indentLevel, $"// [SingleEntity] {info.ParamName} : {info.ComponentTypeDisplay}");
+            sb.AppendLine(
+                indentLevel,
+                $"// [SingleEntity] {info.ParamName} : {info.ComponentTypeDisplay}"
+            );
             var withTagsArgs = string.Join(
                 ", ",
                 info.TagTypes.Select(t => PerformanceCache.GetDisplayString(t))

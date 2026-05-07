@@ -135,9 +135,7 @@ namespace Trecs.SourceGen
             try
             {
                 using var _timer_ = SourceGenTimer.Time("EntityComponentGenerator.Total");
-                SourceGenLogger.Log(
-                    $"[EntityComponentGenerator] Processing {model.TypeName}"
-                );
+                SourceGenLogger.Log($"[EntityComponentGenerator] Processing {model.TypeName}");
 
                 if (!model.IsPartial)
                 {
@@ -341,7 +339,6 @@ namespace Trecs.SourceGen
             }
         }
     }
-
 }
 
 namespace System.Runtime.CompilerServices

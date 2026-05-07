@@ -116,12 +116,16 @@ public class Diagnostics_TRECS009_to_023_AspectTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS022", new IIncrementalGenerator[]
-        {
-            new ForEachAspectGenerator(),
-            new AspectGenerator(),
-            new EntityComponentGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS022",
+            new IIncrementalGenerator[]
+            {
+                new ForEachAspectGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
+            }
+        );
     }
 
     [Test]
@@ -143,11 +147,11 @@ public class Diagnostics_TRECS009_to_023_AspectTests
             }
             """;
 
-        AssertDiagnostic(source, "TRECS023", new IIncrementalGenerator[]
-        {
-            new ForEachAspectGenerator(),
-            new AspectGenerator(),
-        });
+        AssertDiagnostic(
+            source,
+            "TRECS023",
+            new IIncrementalGenerator[] { new ForEachAspectGenerator(), new AspectGenerator() }
+        );
     }
 
     static void AssertAspectDiagnostic(string source, string expectedId)
@@ -161,15 +165,15 @@ public class Diagnostics_TRECS009_to_023_AspectTests
         );
     }
 
-    static void AssertDiagnostic(string source, string expectedId, IIncrementalGenerator[] generators)
+    static void AssertDiagnostic(
+        string source,
+        string expectedId,
+        IIncrementalGenerator[] generators
+    )
     {
         var run = GeneratorTestHarness.Run(generators, source);
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
-        Assert.That(
-            diag,
-            Is.Not.Null,
-            $"Expected {expectedId}, got:\n{run.Format()}"
-        );
+        Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
     }
 
     static string FormatDiagnostics(System.Collections.Generic.IEnumerable<Diagnostic> diagnostics)

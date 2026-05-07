@@ -674,15 +674,16 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        public static readonly DiagnosticDescriptor SingleEntityWriteAspectMissingNativeDisableParallelForRestriction = new(
-            id: "TRECS116",
-            title: "[SingleEntity] write-aspect field on a parallel job needs [NativeDisableParallelForRestriction]",
-            messageFormat: "Field '{0}' on parallel job '{1}' has [SingleEntity] with aspect '{2}' that contains IWrite components. "
-                + "Add [NativeDisableParallelForRestriction] to the field — Unity's parallel-job safety walker rejects the materialized aspect's NativeComponentBufferWrite without it.",
-            category: TrecsCategory,
-            DiagnosticSeverity.Warning,
-            isEnabledByDefault: true
-        );
+        public static readonly DiagnosticDescriptor SingleEntityWriteAspectMissingNativeDisableParallelForRestriction =
+            new(
+                id: "TRECS116",
+                title: "[SingleEntity] write-aspect field on a parallel job needs [NativeDisableParallelForRestriction]",
+                messageFormat: "Field '{0}' on parallel job '{1}' has [SingleEntity] with aspect '{2}' that contains IWrite components. "
+                    + "Add [NativeDisableParallelForRestriction] to the field — Unity's parallel-job safety walker rejects the materialized aspect's NativeComponentBufferWrite without it.",
+                category: TrecsCategory,
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true
+            );
 
         public static readonly DiagnosticDescriptor UnhandledSourceGenError = new(
             id: "TRECS999",

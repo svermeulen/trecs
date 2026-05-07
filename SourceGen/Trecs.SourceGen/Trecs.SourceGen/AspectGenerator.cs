@@ -307,9 +307,7 @@ namespace Trecs.SourceGen
 
             try
             {
-                SourceGenLogger.Log(
-                    $"[AspectGenerator] Processing AspectInterface {typeName}"
-                );
+                SourceGenLogger.Log($"[AspectGenerator] Processing AspectInterface {typeName}");
 
                 var source = ErrorRecovery.TryExecute(
                     () =>

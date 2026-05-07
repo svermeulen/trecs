@@ -35,10 +35,7 @@ public class InterpolatorInstallerGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(
-            new InterpolatorInstallerGenerator(),
-            source
-        );
+        var run = GeneratorTestHarness.Run(new InterpolatorInstallerGenerator(), source);
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
         Assert.That(run.GenErrors, Is.Empty, run.Format());
@@ -72,10 +69,7 @@ public class InterpolatorInstallerGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(
-            new InterpolatorInstallerGenerator(),
-            source
-        );
+        var run = GeneratorTestHarness.Run(new InterpolatorInstallerGenerator(), source);
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
     }
@@ -104,10 +98,7 @@ public class InterpolatorInstallerGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(
-            new InterpolatorInstallerGenerator(),
-            source
-        );
+        var run = GeneratorTestHarness.Run(new InterpolatorInstallerGenerator(), source);
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
     }
@@ -135,10 +126,7 @@ public class InterpolatorInstallerGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(
-            new InterpolatorInstallerGenerator(),
-            source
-        );
+        var run = GeneratorTestHarness.Run(new InterpolatorInstallerGenerator(), source);
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
     }

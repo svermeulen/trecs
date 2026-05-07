@@ -169,11 +169,7 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
             source
         );
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
-        Assert.That(
-            diag,
-            Is.Not.Null,
-            $"Expected {expectedId}, got:\n{run.Format()}"
-        );
+        Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
     }
 
     static void AssertNoDiagnostic(string source, string forbiddenId)
@@ -188,10 +184,6 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
             source
         );
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == forbiddenId);
-        Assert.That(
-            diag,
-            Is.Null,
-            $"Did not expect {forbiddenId}, got:\n{run.Format()}"
-        );
+        Assert.That(diag, Is.Null, $"Did not expect {forbiddenId}, got:\n{run.Format()}");
     }
 }

@@ -75,7 +75,12 @@ namespace Trecs.SourceGen.Aspect
                             GenerateFields(builder, indentLevel + 1, attributeData);
 
                             // Generate constructors
-                            GenerateConstructors(builder, indentLevel + 1, symbol.Name, attributeData);
+                            GenerateConstructors(
+                                builder,
+                                indentLevel + 1,
+                                symbol.Name,
+                                attributeData
+                            );
 
                             // DeclareDependencies removed — RuntimeJobScheduler handles deps implicitly
 
@@ -1065,7 +1070,10 @@ namespace Trecs.SourceGen.Aspect
                 0,
                 (b, indentLevel) =>
                 {
-                    b.AppendLine(indentLevel, $"{effectiveAccessibility} partial interface {symbol.Name}");
+                    b.AppendLine(
+                        indentLevel,
+                        $"{effectiveAccessibility} partial interface {symbol.Name}"
+                    );
                     b.AppendLine(indentLevel, "{");
 
                     // Note: EntityIndex is inherited from Trecs.IAspect — re-declaring it here would
@@ -1085,7 +1093,10 @@ namespace Trecs.SourceGen.Aspect
                     foreach (var writeType in attributeData.WriteTypes)
                     {
                         var propertyName = ComponentTypeHelper.GetPropertyName(writeType);
-                        var returnType = ComponentTypeHelper.GetPropertyReturnType(writeType, false);
+                        var returnType = ComponentTypeHelper.GetPropertyReturnType(
+                            writeType,
+                            false
+                        );
 
                         b.AppendLine(indentLevel + 1, $"{returnType} {propertyName} {{ get; }}");
                     }

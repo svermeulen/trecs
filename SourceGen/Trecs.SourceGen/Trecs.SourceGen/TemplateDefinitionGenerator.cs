@@ -102,9 +102,7 @@ namespace Trecs.SourceGen
             try
             {
                 using var _timer_ = SourceGenTimer.Time("TemplateDefinitionGenerator.Total");
-                SourceGenLogger.Log(
-                    $"[TemplateDefinitionGenerator] Processing {typeName}"
-                );
+                SourceGenLogger.Log($"[TemplateDefinitionGenerator] Processing {typeName}");
 
                 // Parse the template declaration
                 var definitionData = ErrorRecovery.TryExecute(

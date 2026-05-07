@@ -173,9 +173,7 @@ namespace Trecs.SourceGen
             try
             {
                 using var _timer_ = SourceGenTimer.Time("ForEachGenerator.Total");
-                SourceGenLogger.Log(
-                    $"[ForEachGenerator] Processing {className}.{methodName}"
-                );
+                SourceGenLogger.Log($"[ForEachGenerator] Processing {className}.{methodName}");
 
                 var source = ErrorRecovery.TryExecute(
                     () =>

@@ -26,8 +26,7 @@ namespace Trecs.SourceGen
             var candidatesRaw = context
                 .SyntaxProvider.CreateSyntaxProvider(
                     predicate: static (node, _) =>
-                        node is ClassDeclarationSyntax tds
-                        && tds.AttributeLists.Count > 0,
+                        node is ClassDeclarationSyntax tds && tds.AttributeLists.Count > 0,
                     transform: static (ctx, _) => GetCandidate(ctx)
                 )
                 .Where(static x => x != null);

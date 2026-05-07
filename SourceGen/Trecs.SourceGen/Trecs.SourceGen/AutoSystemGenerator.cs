@@ -386,7 +386,6 @@ namespace Trecs.SourceGen
                         }
                     }
                 }
-
                 else if (iterationType == IterationType.RunOnce)
                 {
                     // RunOnce methods consume [SingleEntity] params via RunOnceGenerator's
@@ -407,14 +406,10 @@ namespace Trecs.SourceGen
                         )
                             continue;
                         var paramType =
-                            param.Type != null
-                                ? semanticModel.GetTypeInfo(param.Type).Type
-                                : null;
+                            param.Type != null ? semanticModel.GetTypeInfo(param.Type).Type : null;
                         if (paramType == null)
                             continue;
-                        var paramIsRef = param.Modifiers.Any(m =>
-                            m.IsKind(SyntaxKind.RefKeyword)
-                        );
+                        var paramIsRef = param.Modifiers.Any(m => m.IsKind(SyntaxKind.RefKeyword));
                         var paramIsIn = param.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword));
                         customParams.Add(
                             new CustomParamInfo(

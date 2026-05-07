@@ -103,18 +103,10 @@ public class Diagnostics_TRECS080_to_084_FromWorldFieldTests
     static void AssertDiagnostic(string source, string expectedId)
     {
         var run = GeneratorTestHarness.Run(
-            new IIncrementalGenerator[]
-            {
-                new JobGenerator(),
-                new EntityComponentGenerator(),
-            },
+            new IIncrementalGenerator[] { new JobGenerator(), new EntityComponentGenerator() },
             source
         );
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
-        Assert.That(
-            diag,
-            Is.Not.Null,
-            $"Expected {expectedId}, got:\n{run.Format()}"
-        );
+        Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
     }
 }
