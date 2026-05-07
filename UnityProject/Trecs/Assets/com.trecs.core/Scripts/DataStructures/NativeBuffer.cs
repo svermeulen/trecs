@@ -31,17 +31,6 @@ namespace Trecs.Internal
     public readonly unsafe struct NativeBuffer<T>
         where T : unmanaged
     {
-        /// <summary>
-        /// Note: static constructors are NOT compiled by burst as long as there are no static fields in the struct
-        /// </summary>
-        static NativeBuffer()
-        {
-#if ENABLE_DEBUG_CHECKS
-            if (!TypeMeta<T>.IsUnmanaged)
-                throw new TrecsException("NativeBuffer supports only unmanaged types");
-#endif
-        }
-
         [NativeDisableUnsafePtrRestriction]
         readonly T* _data;
         readonly int _length;

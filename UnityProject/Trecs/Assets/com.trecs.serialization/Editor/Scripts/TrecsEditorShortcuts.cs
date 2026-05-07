@@ -114,7 +114,7 @@ namespace Trecs.Serialization
             }
             if (!_accessorCache.TryGetValue(world, out var accessor))
             {
-                accessor = world.CreateAccessor("TrecsEditorShortcuts");
+                accessor = world.CreateAccessor(AccessorRole.Unrestricted, "TrecsEditorShortcuts");
                 _accessorCache[world] = accessor;
             }
             try

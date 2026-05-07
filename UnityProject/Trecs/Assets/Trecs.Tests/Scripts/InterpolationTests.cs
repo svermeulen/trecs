@@ -29,7 +29,6 @@ namespace Trecs.Tests
                         null,
                         null,
                         null,
-                        null,
                         default(TestInt)
                     ),
                     new ComponentDeclaration<Interpolated<TestInt>>(
@@ -39,11 +38,9 @@ namespace Trecs.Tests
                         null,
                         null,
                         null,
-                        null,
                         default(Interpolated<TestInt>)
                     ),
                     new ComponentDeclaration<InterpolatedPrevious<TestInt>>(
-                        null,
                         null,
                         null,
                         null,

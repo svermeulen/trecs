@@ -7,27 +7,34 @@ namespace Trecs.Serialization
     /// <summary>
     /// Serializer for <see cref="NativeList{T}"/> of unmanaged elements.
     /// Writes length followed by the underlying memory as a single blit.
+    /// A list is allocated on the destination if it was not yet created;
+    /// the allocator used in that case is the one passed to the constructor
+    /// (default <see cref="Allocator.Persistent"/>).
     /// </summary>
-    public class NativeListSerializer<T> : ISerializer<NativeList<T>>
+    public sealed class NativeListSerializer<T> : ISerializer<NativeList<T>>
         where T : unmanaged
     {
-        public NativeListSerializer() { }
+        readonly Allocator _allocator;
+
+        public NativeListSerializer()
+            : this(Allocator.Persistent) { }
+
+        public NativeListSerializer(Allocator allocator)
+        {
+            _allocator = allocator;
+        }
 
         public void Deserialize(ref NativeList<T> value, ISerializationReader reader)
         {
             var length = reader.Read<int>("length");
             Assert.That(length >= 0);
 
-            // Note that there are many gotchas with the IsCreated property
-            // It is unreliable since another copy of NativeList could have
-            // disposed it
-            // Here we assume it is accurate though
-            // Note also that it isn't sufficient to just 'new NativeList'
-            // here since the capacity will be correct but length will
-            // be zero
+            // IsCreated is best-effort but sufficient to drive the alloc-or-reuse
+            // branch — `new NativeList(length, ...)` only reserves capacity, so
+            // we still need the explicit Resize below in either branch.
             if (!value.IsCreated)
             {
-                value = new NativeList<T>(length, Allocator.Persistent);
+                value = new NativeList<T>(length, _allocator);
             }
 
 #if DEBUG
@@ -48,10 +55,6 @@ namespace Trecs.Serialization
 
         public void Serialize(in NativeList<T> value, ISerializationWriter writer)
         {
-            // There are many gotchas with the IsCreated property
-            // So for now let's just require that it is always initialized and never disposed
-            // Even this check is unreliable since another copy of NativeList could have
-            // disposed it
             Assert.That(value.IsCreated);
 
             writer.Write("length", value.Length);

@@ -17,24 +17,27 @@ namespace Trecs.Internal
         [NativeDisableUnsafePtrRestriction]
         NativeBag* _data;
 
-        public int Length => _threadsCount;
+        AllocatorManager.AllocatorHandle _allocator;
 
-        public static AtomicNativeBags Create()
+        public int ThreadSlotCount => _threadsCount;
+
+        public static AtomicNativeBags Create(AllocatorManager.AllocatorHandle allocator)
         {
             var result = new AtomicNativeBags();
+            result._allocator = allocator;
             result._threadsCount = JobsUtility.MaxJobThreadCount + 1;
 
             var bufferSize = Unsafe.SizeOf<NativeBag>();
             var bufferCount = result._threadsCount;
             var allocationSize = bufferSize * bufferCount;
 
-            var ptr = (byte*)UnsafeUtility.Malloc(allocationSize, 16, Allocator.Persistent);
+            var ptr = (byte*)UnsafeUtility.Malloc(allocationSize, 16, allocator.ToAllocator);
             UnsafeUtility.MemClear(ptr, allocationSize);
 
             for (int i = 0; i < bufferCount; i++)
             {
                 var bufferPtr = (NativeBag*)(ptr + bufferSize * i);
-                var buffer = NativeBag.Create();
+                var buffer = NativeBag.Create(allocator);
                 Unsafe.Write(bufferPtr, buffer);
             }
 
@@ -64,7 +67,7 @@ namespace Trecs.Internal
             {
                 GetBag(i).Dispose();
             }
-            UnsafeUtility.Free(_data, Allocator.Persistent);
+            UnsafeUtility.Free(_data, _allocator.ToAllocator);
             _data = null;
         }
 

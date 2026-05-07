@@ -536,7 +536,7 @@ namespace Trecs
 
         internal void InitEntityHandleMap(int groupCount)
         {
-            _nextFreeIndex = SharedNativeInt.Create(0);
+            _nextFreeIndex = SharedNativeInt.Create(0, Allocator.Persistent);
             _entityHandleMap = new NativeList<EntityHandleMapElement>(0, Allocator.Persistent);
             _entityIndexToReferenceMap = new NativeList<UnsafeList<int>>(
                 groupCount,

@@ -33,6 +33,10 @@ namespace Trecs.SourceGen.Template
             var tagTypeNames = ExtractTagTypeNames(symbol);
             var baseTemplateTypeNames = ExtractBaseTemplateTypeNames(symbol);
             var isGlobals = IsGlobalsTemplate(symbol);
+            var isVariableUpdateOnly = HasAttribute(
+                symbol.GetAttributes(),
+                "VariableUpdateOnlyAttribute"
+            );
             var partitions = ExtractPartitions(symbol);
             var defaultInitializedFields = GetDefaultInitializedFields(syntax);
             var components = ExtractComponents(symbol, defaultInitializedFields);
@@ -43,6 +47,7 @@ namespace Trecs.SourceGen.Template
                 accessibility,
                 isClass,
                 isGlobals,
+                isVariableUpdateOnly,
                 containingTypes,
                 tagTypeNames,
                 baseTemplateTypeNames,
@@ -133,7 +138,6 @@ namespace Trecs.SourceGen.Template
                     var attrs = field.GetAttributes();
 
                     bool isInterpolated = HasAttribute(attrs, "InterpolatedAttribute");
-                    bool isFixedUpdateOnly = HasAttribute(attrs, "FixedUpdateOnlyAttribute");
                     bool isVariableUpdateOnly = HasAttribute(attrs, "VariableUpdateOnlyAttribute");
                     bool isConstant = HasAttribute(attrs, "ConstantAttribute");
                     bool hasExplicitDefault =
@@ -186,7 +190,6 @@ namespace Trecs.SourceGen.Template
                             fieldName: field.Name,
                             componentTypeFullName: PerformanceCache.GetDisplayString(field.Type),
                             isInterpolated: isInterpolated,
-                            isFixedUpdateOnly: isFixedUpdateOnly,
                             isVariableUpdateOnly: isVariableUpdateOnly,
                             isConstant: isConstant,
                             isInput: isInput,

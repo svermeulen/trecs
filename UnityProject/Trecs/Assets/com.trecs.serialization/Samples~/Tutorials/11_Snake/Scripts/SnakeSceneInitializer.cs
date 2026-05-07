@@ -18,7 +18,7 @@ namespace Trecs.Serialization.Samples.Snake
         public SnakeSceneInitializer(SnakeSettings settings, World world)
         {
             _settings = settings;
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Fixed);
         }
 
         public void Initialize()

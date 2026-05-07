@@ -4,14 +4,14 @@ using Trecs.SourceGen;
 namespace Trecs.SourceGen.Tests;
 
 /// <summary>
-/// Compile-cleanliness tests for IncrementalForEachGenerator. Routed to from any
+/// Compile-cleanliness tests for ForEachGenerator. Routed to from any
 /// <c>[ForEachEntity]</c> method whose parameters are all components (no aspect). The
 /// generator emits convenience overloads that take WorldAccessor / QueryBuilder /
 /// SparseQueryBuilder and iterate via <c>GroupSlices()</c>, calling the user method
 /// once per matching entity with `in`/`ref` component buffers.
 /// </summary>
 [TestFixture]
-public class IncrementalForEachGeneratorTests
+public class ForEachGeneratorTests
 {
     [Test]
     public void ForEachWithReadComponent_CompilesCleanly()
@@ -33,8 +33,8 @@ public class IncrementalForEachGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalForEachGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -64,8 +64,8 @@ public class IncrementalForEachGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalForEachGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -99,8 +99,8 @@ public class IncrementalForEachGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalForEachGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -134,8 +134,8 @@ public class IncrementalForEachGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalForEachGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -166,8 +166,8 @@ public class IncrementalForEachGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalForEachGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -197,8 +197,8 @@ public class IncrementalForEachGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalForEachGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -228,8 +228,8 @@ public class IncrementalForEachGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalForEachGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );

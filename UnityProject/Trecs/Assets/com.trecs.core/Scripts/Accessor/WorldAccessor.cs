@@ -34,7 +34,8 @@ namespace Trecs
         readonly Rng _fixedRng;
         readonly Rng _variableRng;
         readonly EntityInputQueue _entityInputQueue;
-        readonly SystemPhase? _phase;
+        readonly AccessorRole _role;
+        readonly bool _isInput;
         readonly string _debugName;
         readonly string _createdAtFile;
         readonly int _createdAtLine;
@@ -56,7 +57,8 @@ namespace Trecs
             Rng fixedRng,
             Rng variableRng,
             EntityInputQueue entityInputQueue,
-            SystemPhase? phase,
+            AccessorRole role,
+            bool isInput,
             string debugName,
             string createdAtFile,
             int createdAtLine
@@ -72,13 +74,21 @@ namespace Trecs
             _fixedRng = fixedRng;
             _variableRng = variableRng;
             _entityInputQueue = entityInputQueue;
-            _phase = phase;
+            _role = role;
+            _isInput = isInput;
             _debugName = debugName;
             _createdAtFile = createdAtFile ?? string.Empty;
             _createdAtLine = createdAtLine;
 
             Id = id;
-            Heap = new HeapAccessor(heapAllocator, systemRunnerInfo, phase, fixedRng, debugName);
+            Heap = new HeapAccessor(
+                heapAllocator,
+                systemRunnerInfo,
+                role,
+                isInput,
+                fixedRng,
+                debugName
+            );
         }
 
         /// <summary>
@@ -105,16 +115,18 @@ namespace Trecs
         }
 
         /// <summary>
-        /// The <see cref="SystemPhase"/> this accessor's owning system runs in,
-        /// or <c>null</c> for standalone accessors not bound to a system.
+        /// The <see cref="AccessorRole"/> this accessor was created with — controls
+        /// component read/write rules, structural-change rules, and heap-allocation
+        /// rules. See <see cref="AccessorRole"/> for the full matrix.
         /// </summary>
-        public SystemPhase? Phase
+        public AccessorRole Role
         {
-            get { return _phase; }
+            get { return _role; }
         }
 
-        bool IsFixedPhase => _phase == SystemPhase.Fixed;
-        bool IsInputPhase => _phase == SystemPhase.Input;
+        bool IsFixed => _role == AccessorRole.Fixed;
+        bool IsUnrestricted => _role == AccessorRole.Unrestricted;
+        bool IsInput => _isInput;
 
         public bool IsExecutingSystems
         {
@@ -438,7 +450,7 @@ namespace Trecs
         internal bool RequireDeterministicSubmission =>
             _systemRunner.RequireDeterministicSubmission;
 
-        bool CanMakeStructuralChanges => !_systemRunner.IsExecutingSystems || IsFixedPhase;
+        bool CanMakeStructuralChanges => IsUnrestricted || IsFixed;
 
         /// <summary>
         /// Track an externally-scheduled job (not scheduled through Trecs).
@@ -488,9 +500,14 @@ namespace Trecs
         /// </summary>
         public void MoveTo(EntityIndex entityIndex, TagSet tags)
         {
-            AssertCanMakeStructuralChanges();
+            // MoveTo touches both source and destination groups; both must
+            // be allowed for the role. The dest's role-allowance dictates
+            // whether VUO templates can receive moves from this accessor.
+            AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
 
             var toGroup = _worldInfo.GetSingleGroupWithTags(tags);
+
+            AssertCanMakeStructuralChangesToGroup(toGroup);
 
             _structuralOps.MoveTo(entityIndex, toGroup);
 
@@ -541,7 +558,7 @@ namespace Trecs
         /// </summary>
         public void RemoveEntity(EntityIndex entityIndex)
         {
-            AssertCanMakeStructuralChanges();
+            AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
 
             _structuralOps.RemoveEntity(entityIndex);
 
@@ -550,11 +567,10 @@ namespace Trecs
 
         public void RemoveEntitiesWithTags(TagSet tags)
         {
-            AssertCanMakeStructuralChanges();
-
             var groups = WorldInfo.GetGroupsWithTags(tags);
             foreach (var group in groups)
             {
+                AssertCanMakeStructuralChangesToGroup(group);
                 var count = CountEntitiesInGroup(group);
                 _structuralOps.RemoveAllEntitiesInGroup(group, count);
                 AccessRecorder?.OnEntityRemoved(_debugName, group);
@@ -633,9 +649,9 @@ namespace Trecs
             [CallerLineNumber] int callerLine = 0
         )
         {
-            AssertCanMakeStructuralChanges();
-
             var group = _worldInfo.GetSingleGroupWithTags(tags);
+
+            AssertCanMakeStructuralChangesToGroup(group);
 
             var initializer = _structuralOps.AddEntity(group, callerFile, callerLine);
 
@@ -769,8 +785,12 @@ namespace Trecs
         /// Bundles entity lifecycle operations (add/remove/move), set mutations, entity
         /// reference resolution, and shared pointer resolution. The thread index is managed internally.
         /// <para>
-        /// Structural operations (add/remove/move) on the returned accessor are only allowed
-        /// from fixed systems. Read-only operations (entity reference resolution, shared pointer
+        /// Structural operations (Add/Remove/MoveTo) and set mutations on the returned
+        /// accessor are only allowed from <see cref="AccessorRole.Fixed"/> /
+        /// <see cref="AccessorRole.Unrestricted"/> roles, including against
+        /// <see cref="VariableUpdateOnlyAttribute"/> templates — VUO templates can
+        /// only have entities added / removed via the main-thread path, not via jobs.
+        /// Read-only operations (entity reference resolution, shared pointer
         /// resolution) are available from any context.
         /// </para>
         /// </summary>
@@ -820,6 +840,7 @@ namespace Trecs
         public void SetAdd<T>(EntityIndex entityIndex)
             where T : struct, IEntitySet
         {
+            AssertCanMakeStructuralChanges();
             ref var queues = ref _structuralOps.GetDeferredQueues(EntitySet<T>.Value.Id);
             queues.AddQueue.GetBag(0).Enqueue(entityIndex);
         }
@@ -835,6 +856,7 @@ namespace Trecs
         public void SetRemove<T>(EntityIndex entityIndex)
             where T : struct, IEntitySet
         {
+            AssertCanMakeStructuralChanges();
             ref var queues = ref _structuralOps.GetDeferredQueues(EntitySet<T>.Value.Id);
             queues.RemoveQueue.GetBag(0).Enqueue(entityIndex);
         }
@@ -910,6 +932,8 @@ namespace Trecs
         internal NativeComponentBufferRead<T> GetBufferRead<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
+            AssertIsCurrentlyExecutingAccessor();
+            AssertCanReadComponent<T>(group);
             SyncAndRecordRead<T>(group);
             AssertGroupHasComponent<T>(group);
             var nb = _entitiesDb.QuerySingleBuffer<T>(group);
@@ -927,6 +951,8 @@ namespace Trecs
         internal NativeComponentBufferWrite<T> GetBufferWrite<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
+            AssertIsCurrentlyExecutingAccessor();
+            AssertCanWriteComponent<T>(group);
             SyncAndRecord<T>(group);
             AssertGroupHasComponent<T>(group);
             var nb = _entitiesDb.QuerySingleBuffer<T>(group);
@@ -956,6 +982,122 @@ namespace Trecs
             );
         }
 
+        // Component access rules — see docs/advanced/heap-allocation-rules.md
+        // for the full matrix. In short:
+        //   - [VariableUpdateOnly] components are render-only territory: only
+        //     Variable-role / input-system / None-role accessors may read
+        //     or write them.
+        //   - A template declared [VariableUpdateOnly] propagates VUO to every
+        //     component on it: same rules apply.
+        //   - Non-[VariableUpdateOnly] components are simulation state: any
+        //     accessor may read, only Fixed-role (or None-role) may write.
+        //   - [Constant] components are immutable after entity creation.
+        //     Init-time writes go through EntityInitializer.SetRawImpl, which
+        //     bypasses this path; any write that reaches GetBufferWrite /
+        //     GetComponentWrite is therefore post-creation and illegal.
+        [Conditional("DEBUG")]
+        void AssertCanWriteComponent<T>(GroupIndex group)
+            where T : unmanaged, IEntityComponent
+        {
+            var template = _worldInfo.GetResolvedTemplateForGroup(group);
+            var dec = template.TryGetComponentDeclaration(typeof(T));
+
+            // AssertGroupHasComponent reports the missing-component case with a
+            // better message; skip rather than asserting twice.
+            if (dec == null)
+            {
+                return;
+            }
+
+            Assert.That(
+                !dec.IsConstant,
+                "Cannot write [Constant] component {} (context {}). Constant components are immutable after entity creation — set them via the EntityInitializer at AddEntity time instead.",
+                typeof(T),
+                DebugName
+            );
+
+            if (IsUnrestricted)
+            {
+                return;
+            }
+
+            if (IsFixed)
+            {
+                Assert.That(
+                    !template.IsVariableUpdateOnly(dec),
+                    "Cannot write [VariableUpdateOnly] component {} from Fixed-role accessor {} (template {}{}). [VariableUpdateOnly] components are render-rate state and can only be touched by Variable-role / Input-system / None-role accessors.",
+                    typeof(T),
+                    DebugName,
+                    template.DebugName,
+                    template.VariableUpdateOnly ? " — template-level VUO" : ""
+                );
+            }
+            else
+            {
+                Assert.That(
+                    template.IsVariableUpdateOnly(dec),
+                    "Cannot write component {} from {}-role accessor {}. Components written outside the Fixed role must be declared [VariableUpdateOnly] on the field or template — they are otherwise treated as simulation state and writing them at render cadence breaks determinism for snapshots and replay.",
+                    typeof(T),
+                    _role,
+                    DebugName
+                );
+            }
+        }
+
+        // While a Fixed-role system is executing, only its own accessor may
+        // touch ECS state. None-role accessors and other-system accessors
+        // are both rejected — they scramble debug attribution by recording
+        // access under the wrong DebugName, and None-role accessors smuggle
+        // non-deterministic state in besides. The SystemRunner tracks the
+        // currently-executing Fixed accessor's id; it leaves the tracker
+        // at 0 outside Fixed execute, in which case this assertion is a
+        // no-op.
+        [Conditional("DEBUG")]
+        void AssertIsCurrentlyExecutingAccessor()
+        {
+            var currentId = _systemRunner.CurrentlyExecutingAccessorId;
+            if (currentId == 0)
+            {
+                return;
+            }
+
+            Assert.That(
+                Id == currentId,
+                "Accessor {} cannot be used during Fixed-role system execute. Only the currently-executing system's own accessor may touch ECS state — pass the system's WorldAccessor down rather than holding a separate accessor on a service or capturing one from another system.",
+                DebugName
+            );
+        }
+
+        [Conditional("DEBUG")]
+        void AssertCanReadComponent<T>(GroupIndex group)
+            where T : unmanaged, IEntityComponent
+        {
+            // Only Fixed-role gets gated on reads — all other roles
+            // (Variable / None) and input-system accessors read everything.
+            // None implies !IsFixed, so the one check covers both.
+            if (!IsFixed)
+            {
+                return;
+            }
+
+            var template = _worldInfo.GetResolvedTemplateForGroup(group);
+            var dec = template.TryGetComponentDeclaration(typeof(T));
+
+            if (dec == null)
+            {
+                return;
+            }
+
+            Assert.That(
+                !template.IsVariableUpdateOnly(dec),
+                "Cannot read [VariableUpdateOnly] component {} from Fixed-role accessor {} (template {}{}). [VariableUpdateOnly] components carry non-deterministic render-rate state, so reading them from Fixed would let that non-determinism leak into the simulation.",
+                typeof(T),
+                DebugName,
+                template.DebugName,
+                template.VariableUpdateOnly ? " — template-level VUO" : ""
+            );
+        }
+
         // ForJobScheduling variants — exposed to source-generated code via the
         // public extension methods in Trecs.Internal.JobGenSchedulingExtensions.
         // Skip SyncMainThread because the caller uses RuntimeJobScheduler
@@ -966,6 +1108,8 @@ namespace Trecs
         )
             where T : unmanaged, IEntityComponent
         {
+            AssertIsCurrentlyExecutingAccessor();
+            AssertCanReadComponent<T>(group);
             AssertGroupHasComponent<T>(group);
             var (nb, count) = _entitiesDb.QuerySingleBufferWithCount<T>(group);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -985,6 +1129,8 @@ namespace Trecs
         ) GetBufferWriteForJobScheduling<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
+            AssertIsCurrentlyExecutingAccessor();
+            AssertCanWriteComponent<T>(group);
             AssertGroupHasComponent<T>(group);
             var (nb, count) = _entitiesDb.QuerySingleBufferWithCount<T>(group);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -1063,6 +1209,8 @@ namespace Trecs
         internal NativeComponentRead<T> GetComponentRead<T>(EntityIndex entityIndex)
             where T : unmanaged, IEntityComponent
         {
+            AssertIsCurrentlyExecutingAccessor();
+            AssertCanReadComponent<T>(entityIndex.GroupIndex);
             SyncAndRecordRead<T>(entityIndex.GroupIndex);
             var buf = _entitiesDb.QueryEntitiesAndIndex<T>(entityIndex, out var index);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -1079,6 +1227,8 @@ namespace Trecs
         internal NativeComponentWrite<T> GetComponentWrite<T>(EntityIndex entityIndex)
             where T : unmanaged, IEntityComponent
         {
+            AssertIsCurrentlyExecutingAccessor();
+            AssertCanWriteComponent<T>(entityIndex.GroupIndex);
             SyncAndRecord<T>(entityIndex.GroupIndex);
             var buf = _entitiesDb.QueryEntitiesAndIndex<T>(entityIndex, out var index);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -1139,6 +1289,7 @@ namespace Trecs
         /// </summary>
         internal void SyncSetForWrite(SetId setId)
         {
+            AssertCanMakeStructuralChanges();
             ref var setCollection = ref _structuralOps.GetSet(setId);
 
             if (_systemRunner.JobScheduler.HasOutstandingJobs)
@@ -1261,12 +1412,13 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Pauses or resumes a system as part of deterministic game state. Paused state is
-        /// included in world snapshots and recordings, so this survives save/restore and
-        /// recording playback.
+        /// <b>Deterministic</b> pause / resume. Paused state IS in snapshots and recordings —
+        /// it survives save / restore and replays the same way every time. Use this for
+        /// gameplay pause: pause menus, networked freeze frames, anything that's part of
+        /// "the game state".
         /// <para>
         /// For non-deterministic toggles (editor inspector, recording-replay input silencing,
-        /// debug menus), use <see cref="World.SetSystemEnabled"/> with an
+        /// debug menus), use <see cref="SetSystemEnabled"/> with an
         /// <see cref="EnableChannel"/> instead.
         /// </para>
         /// <para>
@@ -1282,13 +1434,39 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Returns whether the system at <paramref name="systemIndex"/> is currently paused.
-        /// Note: a system runs only when no <see cref="EnableChannel"/> has it disabled AND
-        /// it is not paused.
+        /// Returns whether the system at <paramref name="systemIndex"/> is currently paused
+        /// (deterministic, see <see cref="SetSystemPaused"/>).
         /// </summary>
         public bool IsSystemPaused(int systemIndex)
         {
             return _systemEnableState.IsSystemPaused(systemIndex);
+        }
+
+        /// <summary>
+        /// <b>Non-deterministic</b> on / off toggle for a system, scoped to a
+        /// <see cref="EnableChannel"/>. Channel state is ephemeral — NOT in snapshots, NOT
+        /// in recordings, NOT replayed. Use this for editor toggles, recording-replay input
+        /// silencing, debug menus, and anything else that's host-side configuration rather
+        /// than game state.
+        /// <para>
+        /// A system runs only when ALL channels have it enabled AND it is not paused via
+        /// <see cref="SetSystemPaused"/>. Multiple channels are AND-combined so independent
+        /// callers (editor inspector + replay system) can disable the same system without
+        /// stepping on each other's state.
+        /// </para>
+        /// </summary>
+        public void SetSystemEnabled(int systemIndex, EnableChannel channel, bool enabled)
+        {
+            _systemEnableState.SetSystemEnabled(systemIndex, channel, enabled);
+        }
+
+        /// <summary>
+        /// Returns whether the given <paramref name="channel"/> currently has the system
+        /// enabled (non-deterministic, see <see cref="SetSystemEnabled"/>).
+        /// </summary>
+        public bool IsSystemEnabled(int systemIndex, EnableChannel channel)
+        {
+            return _systemEnableState.IsSystemEnabled(systemIndex, channel);
         }
 
         /// <summary>
@@ -1306,34 +1484,100 @@ namespace Trecs
         void AssertCanAddInputsSystem()
         {
             Assert.That(
-                !_systemRunner.IsExecutingSystems || IsInputPhase,
-                "Attempted to use input system only functionality from a non-input system {}",
+                IsUnrestricted || IsInput,
+                "Attempted to use input-only functionality from a non-Input accessor {}",
                 DebugName
             );
         }
 
         [Conditional("DEBUG")]
-        void AssertCanMakeStructuralChanges()
+        internal void AssertCanMakeStructuralChanges()
         {
-            // Note here that we allow structural changes when not executing systems since
-            // this is often needed and does not break determinism
-            //
-            // Valid examples are:
-            //
-            // - Reactive event handlers (via Events.OnAdded/OnRemoved/OnMoved)
-            //      * Since these are called deterministically
-            // - Initialize methods
-            //      * It's common to add entities before InitialEntitiesSubmitter
-            //        and this also doesn't break determinism, because we only
-            //        need determinism to be preserved from the starting snapshot
-            //        of recordings, and recordings don't start until after initialization
-            //
-            // So really the only place this is not allowed is in variable systems or input systems
+            AssertIsCurrentlyExecutingAccessor();
 
+            // None-role accessors bypass; otherwise structural changes
+            // require a Fixed-role accessor regardless of whether systems
+            // are currently executing. Fixed services that init/teardown
+            // world state run their structural ops at construction or in
+            // Initialize and stay deterministic; reactive observers fire
+            // during submission with the registering system's accessor;
+            // both are Fixed-role so this rule lets them through. Variable
+            // and input-system service accessors don't get a "we're
+            // between frames" loophole — that's a footgun. Init-time
+            // setup that touches mixed state should use AccessorRole.Unrestricted.
             Assert.That(
                 CanMakeStructuralChanges,
-                "Attempted to modify fixed state from a non-fixed context {}.  This is only possible before the first submission, or from inside a fixed system execute.",
-                DebugName
+                "Attempted to modify fixed state from {} (role {}). Structural changes require a Fixed-role or None-role accessor.",
+                DebugName,
+                _role
+            );
+        }
+
+        // A Fixed-role accessor that resolves a query to one or more
+        // VUO-template groups is leaking render-cadence state into the
+        // simulation. Reject at query construction time rather than
+        // silently filtering — silent filters hide the underlying bug
+        // (the predicate was wrong, not the iteration count). Shared
+        // between QueryBuilder and SparseQueryBuilder.
+        [Conditional("DEBUG")]
+        internal void AssertNoVariableUpdateOnlyGroupsForFixedRole(
+            ReadOnlyFastList<GroupIndex> groups
+        )
+        {
+            if (!IsFixed)
+            {
+                return;
+            }
+
+            for (int i = 0; i < groups.Count; i++)
+            {
+                var group = groups[i];
+                var template = _worldInfo.GetResolvedTemplateForGroup(group);
+                Assert.That(
+                    !template.VariableUpdateOnly,
+                    "Query from Fixed-role accessor {} resolved to [VariableUpdateOnly] template {} (group {}). VUO templates are render-cadence state and must not be queried from Fixed — narrow the predicate (e.g. add a WithoutTags constraint) or move the query to a Variable / Input system.",
+                    DebugName,
+                    template.DebugName,
+                    group
+                );
+            }
+        }
+
+        // Per-group structural-change rule. The "default" group is sim
+        // state and Fixed/None-only (per AssertCanMakeStructuralChanges
+        // above). A [VariableUpdateOnly] template flips that: its groups
+        // are render-cadence so Variable-role, input-system, and None-role
+        // accessors may add / remove / move entities there, while Fixed
+        // is rejected outright (Fixed must not touch VUO state at all).
+        [Conditional("DEBUG")]
+        internal void AssertCanMakeStructuralChangesToGroup(GroupIndex group)
+        {
+            AssertIsCurrentlyExecutingAccessor();
+
+            if (IsUnrestricted)
+            {
+                return;
+            }
+
+            var template = _worldInfo.GetResolvedTemplateForGroup(group);
+
+            if (template.VariableUpdateOnly)
+            {
+                Assert.That(
+                    !IsFixed,
+                    "Cannot modify VUO template {} from Fixed-role accessor {}. The template is declared [VariableUpdateOnly], so structural changes (add/remove/move) must come from Variable-role / input-system / None-role accessors.",
+                    template.DebugName,
+                    DebugName
+                );
+                return;
+            }
+
+            Assert.That(
+                IsFixed,
+                "Attempted to modify fixed-template state from {} (role {}, template {}). Structural changes on non-VUO templates require a Fixed-role or None-role accessor.",
+                DebugName,
+                _role,
+                template.DebugName
             );
         }
 
@@ -1354,8 +1598,8 @@ namespace Trecs
         void AssertCanAccessVariableData()
         {
             Assert.That(
-                !_systemRunner.IsExecutingSystems || !IsFixedPhase,
-                "Attempted to use variable update only functionality from fixed context {}",
+                IsUnrestricted || !IsFixed,
+                "Attempted to use variable-update functionality from Fixed-role accessor {}",
                 DebugName
             );
         }
@@ -1386,7 +1630,7 @@ namespace Trecs
                 return PhaseDefault.None;
             }
 
-            if (IsFixedPhase)
+            if (IsFixed)
             {
                 return PhaseDefault.Fixed;
             }

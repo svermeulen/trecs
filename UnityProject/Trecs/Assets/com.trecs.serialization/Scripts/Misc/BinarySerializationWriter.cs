@@ -328,6 +328,8 @@ namespace Trecs.Serialization
         {
             _hasStarted = false;
             _flags = 0;
+            _version = 0;
+            _includeTypeChecks = false;
             _dataBuffer.Position = 0;
             _dataBuffer.SetLength(0);
             _bitWriter.ResetForErrorRecovery();
@@ -344,7 +346,7 @@ namespace Trecs.Serialization
             get
             {
                 Assert.That(_hasStarted);
-                return _dataBuffer.Position + _bitWriter.BitCount / 8;
+                return _dataBuffer.Position + ((_bitWriter.BitCount + 7) / 8);
             }
         }
 

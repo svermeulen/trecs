@@ -15,7 +15,7 @@ namespace Trecs.Samples.PredatorPrey
             SampleSettings settings
         )
         {
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Fixed);
             _gameObjectRegistry = gameObjectRegistry;
             _settings = settings;
         }

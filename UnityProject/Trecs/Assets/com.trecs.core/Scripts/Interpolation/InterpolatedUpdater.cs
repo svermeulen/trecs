@@ -5,7 +5,7 @@ namespace Trecs
     /// value of <typeparamref name="T"/> into <see cref="Interpolated{T}"/> each render frame,
     /// using a caller-supplied <see cref="Interpolator"/> delegate.
     /// </summary>
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     [ExecutePriority(-1000)]
     [AllowMultiple]
     public partial class InterpolatedUpdater<T> : ISystem

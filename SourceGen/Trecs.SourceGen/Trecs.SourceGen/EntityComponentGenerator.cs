@@ -18,7 +18,7 @@ namespace Trecs.SourceGen
     /// implementing IEntityComponent. Provides better compilation performance than the legacy EntityComponentGenerator.
     /// </summary>
     [Generator]
-    public class IncrementalEntityComponentGenerator : IIncrementalGenerator
+    public class EntityComponentGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
@@ -136,13 +136,13 @@ namespace Trecs.SourceGen
             {
                 using var _timer_ = SourceGenTimer.Time("EntityComponentGenerator.Total");
                 SourceGenLogger.Log(
-                    $"[IncrementalEntityComponentGenerator] Processing {model.TypeName}"
+                    $"[EntityComponentGenerator] Processing {model.TypeName}"
                 );
 
                 if (!model.IsPartial)
                 {
                     SourceGenLogger.Log(
-                        $"[IncrementalEntityComponentGenerator] Type {model.TypeName} is not declared as partial, generated code may cause errors"
+                        $"[EntityComponentGenerator] Type {model.TypeName} is not declared as partial, generated code may cause errors"
                     );
                 }
 
@@ -153,7 +153,7 @@ namespace Trecs.SourceGen
             catch (Exception ex)
             {
                 SourceGenLogger.Log(
-                    $"[IncrementalEntityComponentGenerator] Error generating code for {model.TypeName}: {ex.Message}"
+                    $"[EntityComponentGenerator] Error generating code for {model.TypeName}: {ex.Message}"
                 );
 
                 var diagnostic = Diagnostic.Create(
@@ -341,6 +341,7 @@ namespace Trecs.SourceGen
             }
         }
     }
+
 }
 
 namespace System.Runtime.CompilerServices

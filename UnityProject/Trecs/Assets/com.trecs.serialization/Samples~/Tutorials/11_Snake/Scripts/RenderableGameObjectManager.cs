@@ -19,7 +19,7 @@ namespace Trecs.Serialization.Samples.Snake
 
         public RenderableGameObjectManager(World world)
         {
-            World = world.CreateAccessor();
+            World = world.CreateAccessor(AccessorRole.Fixed);
 
             _activeParent = new GameObject("Renderables").transform;
 

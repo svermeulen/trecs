@@ -1228,7 +1228,10 @@ namespace Trecs
             }
             try
             {
-                _selectedAccessor ??= _selectedWorld.CreateAccessor("TrecsHierarchyWindow");
+                _selectedAccessor ??= _selectedWorld.CreateAccessor(
+                    AccessorRole.Unrestricted,
+                    "TrecsHierarchyWindow"
+                );
                 accessor = _selectedAccessor;
                 return accessor != null;
             }
@@ -2366,6 +2369,7 @@ namespace Trecs
                     AccessorId = aref.AccessorId,
                     SystemIndex = aref.SystemIndex,
                     ExecutionPriority = aref.ExecutionPriority,
+                    AccessorRole = aref.Role,
                     SystemEffectivelyEnabled = enabled,
                 };
                 _dataById[aid] = data;
@@ -2725,9 +2729,23 @@ namespace Trecs
                     }
                     break;
                 case RowKind.Accessor:
-                    if (data.ExecutionPriority.HasValue)
+                    // Show role + (optional) priority. Role is always
+                    // present on live rows and on cache snapshots written
+                    // after the role field landed; legacy snapshots
+                    // gracefully fall back to "prio N" / nothing.
+                    string roleText = data.AccessorRole.HasValue
+                        ? data.AccessorRole.Value.ToString()
+                        : null;
+                    string prioText = data.ExecutionPriority.HasValue
+                        ? $"prio {data.ExecutionPriority.Value}"
+                        : null;
+                    if (roleText != null && prioText != null)
                     {
-                        badgeText = $"prio {data.ExecutionPriority.Value}";
+                        badgeText = $"{roleText} · {prioText}";
+                    }
+                    else
+                    {
+                        badgeText = roleText ?? prioText;
                     }
                     break;
                 case RowKind.AbstractTemplate:

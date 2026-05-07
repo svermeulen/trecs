@@ -141,7 +141,7 @@ Key points:
 ### PatrolRendererSystem — Main Thread
 
 ```csharp
-[Phase(SystemPhase.Presentation)]
+[ExecuteIn(SystemPhase.Presentation)]
 [ExecuteAfter(typeof(PatrolMovementSystem))]
 public partial class PatrolRendererSystem : ISystem
 {
@@ -173,7 +173,7 @@ public partial class PointerCleanupHandler : IDisposable
 
     public PointerCleanupHandler(World world)
     {
-        World = world.CreateAccessor();
+        World = world.CreateAccessor(AccessorRole.Fixed);
 
         World.Events.EntitiesWithTags<NativePatrolTags.Follower>()
             .OnRemoved(OnFollowerRemoved)

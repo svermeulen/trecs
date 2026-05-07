@@ -14,7 +14,7 @@ namespace Trecs.Samples.NativePointers
 
         public PointerCleanupHandler(World world)
         {
-            World = world.CreateAccessor();
+            World = world.CreateAccessor(AccessorRole.Fixed);
 
             World
                 .Events.EntitiesWithTags<NativePatrolTags.Follower>()

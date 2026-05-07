@@ -110,6 +110,14 @@ namespace Trecs
         public string TypeName;
         public string TypeNamespace;
         public string Phase;
+
+        // The accessor role this system runs under (Input / Fixed /
+        // Variable / Bypass). Persisted as the enum's string name so
+        // older snapshots without this field deserialize as empty
+        // and the inspector falls back gracefully. Always set on new
+        // snapshots — TrecsSchemaCache derives it from the live
+        // WorldAccessor at save time.
+        public string Role;
         public bool HasPriority;
         public int Priority;
         public List<string> DependsOnSystemDebugNames = new();
@@ -124,6 +132,12 @@ namespace Trecs
     public class TrecsSchemaAccessor
     {
         public string DebugName;
+
+        // The accessor role this manual accessor was created with
+        // (Input / Fixed / Variable / Bypass). Persisted as the enum's
+        // string name so older snapshots without this field deserialize
+        // as empty and the inspector falls back gracefully.
+        public string Role;
 
         // Source-file path + line where world.CreateAccessor(...) was
         // called. Captured via CallerFilePath/CallerLineNumber on the
@@ -818,6 +832,8 @@ namespace Trecs
                             TypeName = sysType.Name,
                             TypeNamespace = sysType.Namespace ?? string.Empty,
                             Phase = s.Metadata.Phase.ToString(),
+                            // System-owned accessor's role mirrors phase.
+                            Role = s.Metadata.Phase.ToAccessorRole().ToString(),
                             HasPriority = s.Metadata.ExecutionPriority.HasValue,
                             Priority = s.Metadata.ExecutionPriority ?? 0,
                         };
@@ -869,6 +885,7 @@ namespace Trecs
                             new TrecsSchemaAccessor
                             {
                                 DebugName = a.DebugName ?? $"#{entry.Key}",
+                                Role = a.Role.ToString(),
                                 CreatedAtFile = a.CreatedAtFile ?? string.Empty,
                                 CreatedAtLine = a.CreatedAtLine,
                             }
@@ -1291,7 +1308,7 @@ namespace Trecs
             }
             try
             {
-                a = world.CreateAccessor("TrecsSchemaCache");
+                a = world.CreateAccessor(AccessorRole.Unrestricted, "TrecsSchemaCache");
                 _cachedAccessors[world] = a;
                 return a;
             }

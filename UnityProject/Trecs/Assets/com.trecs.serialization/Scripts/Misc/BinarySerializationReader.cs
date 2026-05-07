@@ -84,6 +84,13 @@ namespace Trecs.Serialization
             );
         }
 
+        /// <summary>
+        /// Finish reading. When <paramref name="verifySentinel"/> is true, the
+        /// sentinel is read and validated, leaving the underlying stream
+        /// positioned just past it. When false, the underlying stream
+        /// position is left undefined — callers in this mode (e.g. peek paths)
+        /// must reset the stream themselves before any subsequent read.
+        /// </summary>
         public void Stop(bool verifySentinel)
         {
             Assert.That(_hasStarted);
@@ -103,6 +110,8 @@ namespace Trecs.Serialization
             _hasStarted = false;
             _binaryReader = null;
             _flags = 0;
+            _version = 0;
+            _includesTypeChecks = false;
             _bitReader.ResetForErrorRecovery();
         }
 

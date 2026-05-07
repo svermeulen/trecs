@@ -15,7 +15,7 @@ namespace Trecs.SourceGen
     /// dispatch into the two codegen paths is by symbol kind.
     /// </summary>
     [Generator]
-    public class IncrementalAspectGenerator : IIncrementalGenerator
+    public class AspectGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
@@ -259,7 +259,7 @@ namespace Trecs.SourceGen
             try
             {
                 using var _ = SourceGenTimer.Time("AspectGenerator.Total");
-                SourceGenLogger.Log($"[IncrementalAspectGenerator] Processing {typeName}");
+                SourceGenLogger.Log($"[AspectGenerator] Processing {typeName}");
 
                 string? source;
                 using (SourceGenTimer.Time("AspectGenerator.CodeGen"))
@@ -308,7 +308,7 @@ namespace Trecs.SourceGen
             try
             {
                 SourceGenLogger.Log(
-                    $"[IncrementalAspectGenerator] Processing AspectInterface {typeName}"
+                    $"[AspectGenerator] Processing AspectInterface {typeName}"
                 );
 
                 var source = ErrorRecovery.TryExecute(

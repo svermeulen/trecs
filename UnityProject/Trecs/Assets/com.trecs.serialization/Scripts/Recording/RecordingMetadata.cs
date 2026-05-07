@@ -10,23 +10,6 @@ namespace Trecs.Serialization
     [TypeId(81038975)]
     public class RecordingMetadata
     {
-        public RecordingMetadata(
-            int version,
-            int startFixedFrame,
-            int endFixedFrame,
-            long checksumFlags,
-            DenseDictionary<int, uint> checksums,
-            DenseHashSet<BlobId> blobIds
-        )
-        {
-            Version = version;
-            StartFixedFrame = startFixedFrame;
-            EndFixedFrame = endFixedFrame;
-            ChecksumFlags = checksumFlags;
-            Checksums = checksums;
-            BlobIds = blobIds;
-        }
-
         public static void RegisterSerializers(SerializerRegistry registry)
         {
             registry.RegisterSerializer<DenseDictionarySerializer<int, uint>>();
@@ -37,10 +20,11 @@ namespace Trecs.Serialization
         /// <summary>
         /// User-defined schema version passed to <see cref="RecordingHandler.StartRecording"/>.
         /// </summary>
-        public int Version { get; }
+        /// <seealso cref="RecordingHandler.StartRecording"/>
+        public int Version { get; init; }
 
-        public int StartFixedFrame { get; }
-        public int EndFixedFrame { get; }
+        public int StartFixedFrame { get; init; }
+        public int EndFixedFrame { get; init; }
 
         /// <summary>
         /// Serialization flags used when computing per-frame checksums during
@@ -48,12 +32,12 @@ namespace Trecs.Serialization
         /// which <see cref="PlaybackHandler"/> does automatically by reading
         /// this value out of the metadata.
         /// </summary>
-        public long ChecksumFlags { get; }
+        public long ChecksumFlags { get; init; }
 
-        public DenseDictionary<int, uint> Checksums { get; }
-        public DenseHashSet<BlobId> BlobIds { get; }
+        public DenseDictionary<int, uint> Checksums { get; init; }
+        public DenseHashSet<BlobId> BlobIds { get; init; }
 
-        public class Serializer : ISerializer<RecordingMetadata>
+        public sealed class Serializer : ISerializer<RecordingMetadata>
         {
             public Serializer() { }
 
@@ -66,14 +50,15 @@ namespace Trecs.Serialization
                 var checksums = reader.Read<DenseDictionary<int, uint>>("Checksums");
                 var blobIds = reader.Read<DenseHashSet<BlobId>>("BlobIds");
 
-                value = new RecordingMetadata(
-                    version,
-                    startFixedFrame,
-                    endFixedFrame,
-                    checksumFlags,
-                    checksums,
-                    blobIds
-                );
+                value = new RecordingMetadata
+                {
+                    Version = version,
+                    StartFixedFrame = startFixedFrame,
+                    EndFixedFrame = endFixedFrame,
+                    ChecksumFlags = checksumFlags,
+                    Checksums = checksums,
+                    BlobIds = blobIds,
+                };
             }
 
             public void Serialize(in RecordingMetadata value, ISerializationWriter writer)

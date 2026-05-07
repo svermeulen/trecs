@@ -77,6 +77,14 @@ namespace Trecs.Serialization
             registry.RegisterBlit<EntityHandleMapElement>();
             registry.RegisterBlit<EntityHandle>();
             registry.RegisterBlit<TagSet>();
+            // SetId is written by WorldStateSerializer.WriteSets /
+            // WriteSetRoutingIndex unconditionally — register it here so
+            // any world serialization works without callers having to
+            // remember to register it themselves. Same for the per-set
+            // entity-id-to-dense-index dictionary, written for each
+            // group's entries.
+            registry.RegisterBlit<SetId>();
+            registry.RegisterSerializer<NativeDenseDictionarySerializer<int, int>>();
 
             // For EntityInputQueue
             registry.RegisterSerializer<DenseHashSetSerializer<EntityHandle>>();

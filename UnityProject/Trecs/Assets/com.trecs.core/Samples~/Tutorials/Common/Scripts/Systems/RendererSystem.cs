@@ -11,7 +11,7 @@ using UnityEngine.Rendering;
 
 namespace Trecs.Samples
 {
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     public partial class RendererSystem : ISystem, IDisposable
     {
         // Batch size for the fallback path. Must match the shader's

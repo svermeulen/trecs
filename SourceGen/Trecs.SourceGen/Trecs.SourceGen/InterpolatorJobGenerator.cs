@@ -16,7 +16,7 @@ namespace Trecs.SourceGen
     /// Provides better compilation performance than the legacy InterpolationGenerator.
     /// </summary>
     [Generator]
-    public class IncrementalInterpolatorJobGenerator : IIncrementalGenerator
+    public class InterpolatorJobGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
@@ -85,13 +85,13 @@ namespace Trecs.SourceGen
                 )
                 {
                     SourceGenLogger.Log(
-                        $"[IncrementalInterpolatorJobGenerator] Missing or invalid className in attribute for {methodSymbol.Name}"
+                        $"[InterpolatorJobGenerator] Missing or invalid className in attribute for {methodSymbol.Name}"
                     );
                     return;
                 }
 
                 SourceGenLogger.Log(
-                    $"[IncrementalInterpolatorJobGenerator] Processing {methodSymbol.Name} -> {className}"
+                    $"[InterpolatorJobGenerator] Processing {methodSymbol.Name} -> {className}"
                 );
 
                 // Generate the interpolated updater source code
@@ -107,7 +107,7 @@ namespace Trecs.SourceGen
             catch (Exception ex)
             {
                 SourceGenLogger.Log(
-                    $"[IncrementalInterpolatorJobGenerator] Error generating code for {methodSymbol.Name}: {ex.Message}"
+                    $"[InterpolatorJobGenerator] Error generating code for {methodSymbol.Name}: {ex.Message}"
                 );
 
                 // Report error for any unhandled exceptions
@@ -140,7 +140,7 @@ using Unity.Collections;
 
 namespace {nameSpace}
 {{
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     [ExecutePriority(-1000)]
     [AllowMultiple]
     public class {className} : ISystem, Trecs.Internal.ISystemInternal

@@ -25,7 +25,7 @@ namespace Trecs.Samples.ReactiveEvents
 
         public GameStatsUpdater(World world, GameObjectRegistry registry)
         {
-            World = world.CreateAccessor();
+            World = world.CreateAccessor(AccessorRole.Fixed);
             _registry = registry;
 
             World

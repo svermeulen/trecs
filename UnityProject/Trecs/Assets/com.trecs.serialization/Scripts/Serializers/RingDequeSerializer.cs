@@ -2,13 +2,13 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
-    public class RingDequeSerializer<T> : ISerializer<RingDeque<T>>
+    public sealed class RingDequeSerializer<T> : ISerializer<RingDeque<T>>
     {
         public RingDequeSerializer() { }
 
         public void Deserialize(ref RingDeque<T> value, ISerializationReader reader)
         {
-            var numItems = reader.Read<int>("numItems");
+            var numItems = reader.Read<int>("count");
             Assert.That(numItems >= 0);
             Assert.That(
                 numItems <= 1000000,
@@ -37,7 +37,7 @@ namespace Trecs.Serialization
 
         public void Serialize(in RingDeque<T> value, ISerializationWriter writer)
         {
-            writer.Write("numItems", value.Count);
+            writer.Write("count", value.Count);
 
             foreach (var item in value)
             {

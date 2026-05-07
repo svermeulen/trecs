@@ -8,10 +8,9 @@ namespace Trecs
     {
         Type ComponentType { get; }
 
-        bool FixedUpdateOnly { get; }
         bool VariableUpdateOnly { get; }
         bool IsInput { get; }
-        MissingInputFrameBehaviour? MissingInputFrameBehaviour { get; }
+        MissingInputBehavior? MissingInputBehavior { get; }
         bool WarnOnMissingInput { get; }
         bool IsConstant { get; }
         bool IsInterpolated { get; }
@@ -32,20 +31,18 @@ namespace Trecs.Internal
         static readonly Type _componentType = typeof(T);
 
         public ResolvedComponentDeclaration(
-            bool fixedUpdateOnly,
             bool variableUpdateOnly,
             bool isInput,
-            MissingInputFrameBehaviour? inputFrameBehaviour,
+            MissingInputBehavior? inputFrameBehaviour,
             bool warnOnMissingInput,
             bool isConstant,
             T? defaultValue,
             bool isInterpolated
         )
         {
-            FixedUpdateOnly = fixedUpdateOnly;
             VariableUpdateOnly = variableUpdateOnly;
             IsInput = isInput;
-            MissingInputFrameBehaviour = inputFrameBehaviour;
+            MissingInputBehavior = inputFrameBehaviour;
             WarnOnMissingInput = warnOnMissingInput;
             IsConstant = isConstant;
             IsInterpolated = isInterpolated;
@@ -53,11 +50,10 @@ namespace Trecs.Internal
             Builder = new ComponentBuilder<T>(defaultValue);
         }
 
-        public bool FixedUpdateOnly { get; }
         public bool VariableUpdateOnly { get; }
         public bool IsInput { get; }
         public T? Default { get; }
-        public MissingInputFrameBehaviour? MissingInputFrameBehaviour { get; }
+        public MissingInputBehavior? MissingInputBehavior { get; }
         public bool WarnOnMissingInput { get; }
         public bool IsConstant { get; }
         public bool IsInterpolated { get; }

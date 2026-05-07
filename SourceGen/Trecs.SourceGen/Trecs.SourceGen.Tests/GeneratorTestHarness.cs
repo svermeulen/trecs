@@ -11,7 +11,7 @@ namespace Trecs.SourceGen.Tests;
 /// <summary>
 /// Drives Trecs source generators against an in-memory compilation. Two modes:
 ///
-/// <para><see cref="RunGenerator"/> — runs IncrementalAspectGenerator only and returns its
+/// <para><see cref="RunGenerator"/> — runs AspectGenerator only and returns its
 /// emitted diagnostics. Used by the existing diagnostic-focused tests.</para>
 ///
 /// <para><see cref="Run"/> / <see cref="Run(IIncrementalGenerator[], string)"/> — runs any
@@ -22,12 +22,12 @@ namespace Trecs.SourceGen.Tests;
 internal static class GeneratorTestHarness
 {
     /// <summary>
-    /// Runs IncrementalAspectGenerator and returns only its emitted diagnostics. Kept for
+    /// Runs AspectGenerator and returns only its emitted diagnostics. Kept for
     /// the diagnostic-focused tests that don't care about post-generation compilation.
     /// </summary>
     public static ImmutableArray<Diagnostic> RunGenerator(string userSource)
     {
-        return Run(new IncrementalAspectGenerator(), userSource).GenDiagnostics;
+        return Run(new AspectGenerator(), userSource).GenDiagnostics;
     }
 
     /// <summary>
@@ -58,12 +58,11 @@ internal static class GeneratorTestHarness
             parseOptions: driverParseOptions,
             optionsProvider: null
         );
-        driver = (CSharpGeneratorDriver)
-            driver.RunGeneratorsAndUpdateCompilation(
-                compilation,
-                out var outputCompilation,
-                out var generationDiagnostics
-            );
+        driver = (CSharpGeneratorDriver)driver.RunGeneratorsAndUpdateCompilation(
+            compilation,
+            out var outputCompilation,
+            out var generationDiagnostics
+        );
 
         var runResult = driver.GetRunResult();
         var generatedTrees = runResult
@@ -177,9 +176,7 @@ internal sealed record GeneratorRun(
         else
         {
             foreach (var d in compileErrorsAndWarnings)
-                sb.AppendLine(
-                    $"  {d.Severity} {d.Id} at {d.Location.GetLineSpan()}: {d.GetMessage()}"
-                );
+                sb.AppendLine($"  {d.Severity} {d.Id} at {d.Location.GetLineSpan()}: {d.GetMessage()}");
         }
 
         sb.AppendLine($"--- Generated files ({GeneratedTrees.Length}) ---");

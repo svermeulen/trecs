@@ -25,7 +25,7 @@ namespace Trecs.SourceGen
         {
             // Validation runs in the transform, so the terminal stage doesn't need a full
             // Compilation — only the global-namespace display string. See
-            // IncrementalForEachGenerator for the caching rationale.
+            // ForEachGenerator for the caching rationale.
             var forEachMethodProvider = context
                 .SyntaxProvider.CreateSyntaxProvider(
                     predicate: static (s, _) => IsMethodWithForEachAspectAttribute(s),
@@ -54,7 +54,7 @@ namespace Trecs.SourceGen
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
                         IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
-                        == TrecsAttributeNames.EntityFilter
+                        == TrecsAttributeNames.ForEachEntity
                     );
         }
 
@@ -78,7 +78,7 @@ namespace Trecs.SourceGen
 
             // [ForEachEntity] only routes to this generator when the method has at
             // least one IAspect parameter — otherwise the components-side generator
-            // (IncrementalForEachGenerator) takes it.
+            // (ForEachGenerator) takes it.
             if (!IterationAttributeRouting.HasEntityFilter(methodSymbol))
                 return null;
             if (IterationAttributeRouting.HasWrapAsJobAttribute(methodSymbol))
@@ -724,12 +724,7 @@ namespace Trecs.SourceGen
                 indentLevel: 3,
                 worldVar: "__world"
             );
-            HoistedSingleEmitter.Emit(
-                sb,
-                indentLevel: 3,
-                worldVar: "__world",
-                info.HoistedSingletons
-            );
+            HoistedSingleEmitter.Emit(sb, indentLevel: 3, worldVar: "__world", info.HoistedSingletons);
 
             EmitPerGroupBufferFetch(
                 sb,
@@ -927,7 +922,7 @@ namespace Trecs.SourceGen
                 methodDec,
                 methodSymbol,
                 classDec.Identifier.Text,
-                TrecsAttributeNames.EntityFilter
+                TrecsAttributeNames.ForEachEntity
             );
             if (criteria == null)
             {

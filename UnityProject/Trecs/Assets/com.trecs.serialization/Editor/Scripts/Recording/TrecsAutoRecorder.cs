@@ -291,7 +291,7 @@ namespace Trecs.Serialization
 
         public void Initialize()
         {
-            _accessor = _world.CreateAccessor("TrecsAutoRecorder");
+            _accessor = _world.CreateAccessor(AccessorRole.Unrestricted, "TrecsAutoRecorder");
             _checksumCalculator = new RecordingChecksumCalculator(_stateSerializer);
             _checksumBuffer = new SerializationBuffer(_serializerRegistry);
         }

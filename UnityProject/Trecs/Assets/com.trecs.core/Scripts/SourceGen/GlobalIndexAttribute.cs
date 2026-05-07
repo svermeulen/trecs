@@ -3,8 +3,8 @@ using System;
 namespace Trecs
 {
     /// <summary>
-    /// Marks an <c>int</c> parameter in an <see cref="IForEachComponentsJob"/> Execute method
-    /// to receive the entity's global index across all groups.
+    /// Marks an <c>int</c> parameter on a <c>[ForEachEntity]</c> Execute method to receive
+    /// the entity's global index across all groups iterated by the call.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -16,10 +16,11 @@ namespace Trecs
     /// <example>
     /// <code>
     /// [BurstCompile]
-    /// public partial struct GatherPositionsJob : IForEachComponentsJob
+    /// public partial struct GatherPositionsJob
     /// {
     ///     [WriteOnly] public NativeArray&lt;float3&gt; Output;
     ///
+    ///     [ForEachEntity]
     ///     public readonly void Execute(in CPosition pos, [GlobalIndex] int globalIndex)
     ///     {
     ///         Output[globalIndex] = pos.Value;

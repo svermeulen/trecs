@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Trecs.Samples.Aspects
 {
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     public partial class BoidRendererSystem : ISystem
     {
         readonly GameObjectRegistry _gameObjectRegistry;

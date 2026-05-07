@@ -32,7 +32,7 @@ namespace Trecs.Serialization.Samples.SaveGame
 
         public SaveGameSceneInitializer(World world)
         {
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Fixed);
         }
 
         public void Initialize()

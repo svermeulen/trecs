@@ -91,8 +91,8 @@ internal static class TrecsStubs
 
         namespace Trecs
         {
-            // Marker interfaces consumed by IncrementalEntityComponentGenerator and
-            // IncrementalAspectGenerator base-list scanning.
+            // Marker interfaces consumed by EntityComponentGenerator and
+            // AspectGenerator base-list scanning.
             public interface IEntityComponent { }
             public interface ITag { }
             public interface IEntitySet { }
@@ -166,7 +166,7 @@ internal static class TrecsStubs
             public interface IWrite<T1, T2, T3, T4, T5, T6, T7> { }
             public interface IWrite<T1, T2, T3, T4, T5, T6, T7, T8> { }
 
-            // Template composition interfaces — IncrementalTemplateDefinitionGenerator validates
+            // Template composition interfaces — TemplateDefinitionGenerator validates
             // their use; arity 1..4 mirrors TemplateAttributes.cs in the runtime.
             public interface IExtends<T1> where T1 : class, ITemplate { }
             public interface IExtends<T1, T2> where T1 : class, ITemplate where T2 : class, ITemplate { }
@@ -177,6 +177,16 @@ internal static class TrecsStubs
             // an emitted convenience constructor.
             [System.AttributeUsage(System.AttributeTargets.Struct, AllowMultiple = false)]
             public class UnwrapAttribute : System.Attribute { }
+
+            // [VariableUpdateOnly] — see Packages/com.trecs.core/Scripts/SourceGen/TemplateAttributes.cs.
+            // Field on a template component, or class on a template. Mirror the runtime
+            // AttributeUsage exactly so the analyzer tests catch struct-target misuses
+            // via CS0592 (the C# compiler) rather than via TRECS035.
+            [System.AttributeUsage(
+                System.AttributeTargets.Field | System.AttributeTargets.Class,
+                AllowMultiple = false
+            )]
+            public class VariableUpdateOnlyAttribute : System.Attribute { }
 
             // Iteration / job attributes consumed by ForEach / Job / RunOnce generators.
             // Properties match the real declarations in Packages/com.trecs.core/Scripts/SourceGen/.
@@ -513,7 +523,7 @@ internal static class TrecsStubs
             }
 
             // ----- Template generator surface -----
-            // IncrementalTemplateDefinitionGenerator emits:
+            // TemplateDefinitionGenerator emits:
             //     public static readonly Template Template = new Template(
             //         debugName: "...", localBaseTemplates: ...,
             //         partitions: ..., localComponentDeclarations: ...,
@@ -545,7 +555,8 @@ internal static class TrecsStubs
                     Template[] localBaseTemplates,
                     TagSet[] partitions,
                     IComponentDeclaration[] localComponentDeclarations,
-                    Tag[] localTags
+                    Tag[] localTags,
+                    bool localVariableUpdateOnly = false
                 ) { }
             }
 
@@ -574,10 +585,10 @@ internal static class TrecsStubs
                 public static TagSet Value { get; }
             }
 
-            public enum MissingInputFrameBehaviour { ResetToDefault, KeepLast }
+            public enum MissingInputBehavior { ResetToDefault, KeepLast }
 
             // ----- InterpolatorInstaller surface -----
-            // IncrementalInterpolatorInstallerGenerator emits a WorldBuilder extension method
+            // InterpolatorInstallerGenerator emits a WorldBuilder extension method
             // that calls AddInterpolatedPreviousSaver<T>() and AddSystem(systemName).
 
             [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = false)]
@@ -603,9 +614,9 @@ internal static class TrecsStubs
             // System-level attributes emitted on the generated InterpolatorSystem class.
             public enum SystemPhase { FixedUpdate, Presentation, Input }
             [System.AttributeUsage(System.AttributeTargets.Class)]
-            public class PhaseAttribute : System.Attribute
+            public class ExecuteInAttribute : System.Attribute
             {
-                public PhaseAttribute(SystemPhase phase) { }
+                public ExecuteInAttribute(SystemPhase phase) { }
             }
             [System.AttributeUsage(System.AttributeTargets.Class)]
             public class ExecutePriorityAttribute : System.Attribute
@@ -626,7 +637,7 @@ internal static class TrecsStubs
         namespace Trecs.Internal
         {
             // Real signature lives at Packages/com.trecs.core/Scripts/Util/UnmanagedUtil.cs.
-            // Generated equality / operator overloads in IncrementalEntityComponentGenerator
+            // Generated equality / operator overloads in EntityComponentGenerator
             // call BlittableEquals; the body doesn't matter for compile-cleanliness tests.
             public static class UnmanagedUtil
             {

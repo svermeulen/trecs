@@ -4,14 +4,14 @@ using Trecs.SourceGen;
 namespace Trecs.SourceGen.Tests;
 
 /// <summary>
-/// Compile-cleanliness tests for IncrementalInterpolatorJobGenerator. Each
+/// Compile-cleanliness tests for InterpolatorJobGenerator. Each
 /// <c>[GenerateInterpolatorSystem]</c> static method emits a full ISystem class with a
 /// nested <c>[BurstCompile]</c> InterpolateJob that walks all groups containing the three
 /// component triplet and writes the interpolated value, threading dependency tracking
 /// through the JobScheduler.
 /// </summary>
 [TestFixture]
-public class IncrementalInterpolatorJobGeneratorTests
+public class InterpolatorJobGeneratorTests
 {
     [Test]
     public void Interpolator_GeneratesValidSystem()
@@ -32,8 +32,8 @@ public class IncrementalInterpolatorJobGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalInterpolatorJobGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new InterpolatorJobGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -75,8 +75,8 @@ public class IncrementalInterpolatorJobGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalInterpolatorJobGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new InterpolatorJobGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -109,8 +109,8 @@ public class IncrementalInterpolatorJobGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalInterpolatorJobGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new InterpolatorJobGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -141,9 +141,9 @@ public class IncrementalInterpolatorJobGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalInterpolatorJobGenerator(),
-                new IncrementalInterpolatorInstallerGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new InterpolatorJobGenerator(),
+                new InterpolatorInstallerGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );

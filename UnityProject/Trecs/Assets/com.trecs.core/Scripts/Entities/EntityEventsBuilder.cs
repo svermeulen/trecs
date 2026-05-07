@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using Trecs.Collections;
 using Trecs.Internal;
 
@@ -222,6 +223,41 @@ namespace Trecs
             _world = world;
             _groups = groups;
             _debugName = world?.DebugName;
+
+            AssertNoVariableUpdateOnlyGroupsForFixedRole();
+        }
+
+        // A Fixed-role accessor that subscribes to entity lifecycle events
+        // on a [VariableUpdateOnly] template's group is registering for
+        // structural-change callbacks that, by the VUO rules, can only be
+        // *driven* by Variable-role / input-system / None-role accessors.
+        // The callback would either never fire (defeating the subscription)
+        // or fire with the Fixed accessor mid-flight on render-cadence state
+        // (leaking non-determinism into the simulation). Reject at
+        // registration rather than at first callback fire — same shape as
+        // QueryBuilder.AssertNoVariableUpdateOnlyGroupsForFixedRole.
+        [Conditional("DEBUG")]
+        void AssertNoVariableUpdateOnlyGroupsForFixedRole()
+        {
+            if (_world == null || _world.Role != AccessorRole.Fixed)
+            {
+                return;
+            }
+
+            var worldInfo = _world.WorldInfo;
+
+            for (int i = 0; i < _groups.Count; i++)
+            {
+                var group = _groups[i];
+                var template = worldInfo.GetResolvedTemplateForGroup(group);
+                Assert.That(
+                    !template.VariableUpdateOnly,
+                    "Entity-event subscription from Fixed-role accessor {} resolved to [VariableUpdateOnly] template {} (group {}). VUO templates are render-cadence — only Variable-role / input-system / None-role accessors drive structural changes there, so a Fixed-role observer would either never fire or leak render-rate state into the simulation. Narrow the predicate (e.g. add a WithoutTags constraint) or move the subscription to a Variable-role or input-system service.",
+                    _debugName,
+                    template.DebugName,
+                    group
+                );
+            }
         }
 
         public EntityEventsSubscription WithPriority(int priority)

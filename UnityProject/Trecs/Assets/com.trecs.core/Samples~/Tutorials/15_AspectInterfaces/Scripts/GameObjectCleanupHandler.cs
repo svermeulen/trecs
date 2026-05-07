@@ -16,7 +16,7 @@ namespace Trecs.Samples.AspectInterfaces
         public GameObjectCleanupHandler(World world, GameObjectRegistry gameObjectRegistry)
         {
             _gameObjectRegistry = gameObjectRegistry;
-            var accessor = world.CreateAccessor();
+            var accessor = world.CreateAccessor(AccessorRole.Fixed);
 
             accessor
                 .Events.EntitiesWithComponents<GameObjectId>()

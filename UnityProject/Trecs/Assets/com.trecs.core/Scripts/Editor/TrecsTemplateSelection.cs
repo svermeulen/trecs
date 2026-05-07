@@ -449,7 +449,10 @@ namespace Trecs
             {
                 if (_accessor == null || _accessorWorld != world)
                 {
-                    _accessor = world.CreateAccessor("TrecsTemplateSelectionInspector");
+                    _accessor = world.CreateAccessor(
+                        AccessorRole.Unrestricted,
+                        "TrecsTemplateSelectionInspector"
+                    );
                     _accessorWorld = world;
                 }
                 int total = 0;

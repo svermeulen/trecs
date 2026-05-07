@@ -8,7 +8,7 @@ namespace Trecs
     /// Use a random int to ensure uniqueness across the codebase.
     /// </summary>
     [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class | AttributeTargets.Enum)]
-    public class TypeIdAttribute : Attribute
+    public sealed class TypeIdAttribute : Attribute
     {
         public int Id { get; }
 

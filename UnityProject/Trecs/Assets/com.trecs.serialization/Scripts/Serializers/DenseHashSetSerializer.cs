@@ -9,7 +9,7 @@ namespace Trecs.Serialization
     /// dense-indexed hash-set used by Trecs. Writes the contents in their
     /// internal dense order so the wire format is stable across runs.
     /// </summary>
-    public class DenseHashSetSerializer<T> : ISerializer<DenseHashSet<T>>
+    public sealed class DenseHashSetSerializer<T> : ISerializer<DenseHashSet<T>>
         where T : struct, IEquatable<T>
     {
         public DenseHashSetSerializer() { }

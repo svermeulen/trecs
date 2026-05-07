@@ -4,14 +4,14 @@ using Trecs.SourceGen;
 namespace Trecs.SourceGen.Tests;
 
 /// <summary>
-/// Compile-cleanliness tests for IncrementalTemplateDefinitionGenerator. The generator emits
+/// Compile-cleanliness tests for TemplateDefinitionGenerator. The generator emits
 /// a static <c>Template Template</c> field on every ITemplate type, calling the runtime
 /// Template constructor with explicit named arguments. Regressions usually surface as a
 /// missing namespace, a wrong constructor argument shape (param renaming), or a malformed
 /// list initializer.
 /// </summary>
 [TestFixture]
-public class IncrementalTemplateDefinitionGeneratorTests
+public class TemplateDefinitionGeneratorTests
 {
     [Test]
     public void EmptyTemplate_CompilesCleanly()
@@ -25,7 +25,7 @@ public class IncrementalTemplateDefinitionGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(new IncrementalTemplateDefinitionGenerator(), source);
+        var run = GeneratorTestHarness.Run(new TemplateDefinitionGenerator(), source);
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
         Assert.That(run.GenErrors, Is.Empty, run.Format());
@@ -55,13 +55,68 @@ public class IncrementalTemplateDefinitionGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalTemplateDefinitionGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new TemplateDefinitionGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
+    public void TemplateWithVariableUpdateOnlyAttribute_PassesFlagToCtor()
+    {
+        // Template-level [VariableUpdateOnly] is detected on the symbol's
+        // attribute list and forwarded to the emitted Template constructor
+        // as localVariableUpdateOnly: true. Regressions show up as either
+        // a CS error (constructor arity mismatch with the runtime stub) or
+        // a missing/false flag in the emitted source.
+        const string source = """
+            namespace Sample
+            {
+                [Trecs.VariableUpdateOnly]
+                public partial class RenderOnlyTemplate : Trecs.ITemplate { }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(new TemplateDefinitionGenerator(), source);
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+
+        var tree = string.Join("\n", run.GeneratedTrees);
+        Assert.That(
+            tree,
+            Does.Contain("localVariableUpdateOnly: true"),
+            "Expected emitted Template ctor to carry localVariableUpdateOnly: true.\n"
+                + run.Format()
+        );
+    }
+
+    [Test]
+    public void TemplateWithoutVariableUpdateOnlyAttribute_DefaultsToFalse()
+    {
+        // Sanity check: a template without the attribute must emit
+        // localVariableUpdateOnly: false so the runtime defaults to the
+        // regular (sim-state) rule set.
+        const string source = """
+            namespace Sample
+            {
+                public partial class SimTemplate : Trecs.ITemplate { }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(new TemplateDefinitionGenerator(), source);
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+
+        var tree = string.Join("\n", run.GeneratedTrees);
+        Assert.That(
+            tree,
+            Does.Contain("localVariableUpdateOnly: false"),
+            "Expected emitted Template ctor to carry localVariableUpdateOnly: false.\n"
+                + run.Format()
+        );
     }
 
     [Test]
@@ -79,7 +134,7 @@ public class IncrementalTemplateDefinitionGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(new IncrementalTemplateDefinitionGenerator(), source);
+        var run = GeneratorTestHarness.Run(new TemplateDefinitionGenerator(), source);
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
     }

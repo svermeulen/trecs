@@ -4,7 +4,7 @@ using Trecs.SourceGen;
 namespace Trecs.SourceGen.Tests;
 
 /// <summary>
-/// Compile-cleanliness tests for IncrementalInterpolatorInstallerGenerator. The generator
+/// Compile-cleanliness tests for InterpolatorInstallerGenerator. The generator
 /// scans for static methods marked with <c>[GenerateInterpolatorSystem(systemName, groupName)]</c>
 /// and groups them per groupName into a generated <c>Add{Group}(this WorldBuilder)</c>
 /// extension method that calls <c>AddInterpolatedPreviousSaver&lt;T&gt;()</c> +
@@ -12,10 +12,10 @@ namespace Trecs.SourceGen.Tests;
 ///
 /// Tests use a separate `MyInterpolationSystem`-style class so the generator's emitted
 /// <c>new MyInterpolationSystem()</c> reference resolves; in real usage that class is
-/// emitted by IncrementalInterpolatorJobGenerator (covered separately).
+/// emitted by InterpolatorJobGenerator (covered separately).
 /// </summary>
 [TestFixture]
-public class IncrementalInterpolatorInstallerGeneratorTests
+public class InterpolatorInstallerGeneratorTests
 {
     [Test]
     public void SingleInterpolator_CompilesCleanly()
@@ -35,7 +35,10 @@ public class IncrementalInterpolatorInstallerGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(new IncrementalInterpolatorInstallerGenerator(), source);
+        var run = GeneratorTestHarness.Run(
+            new InterpolatorInstallerGenerator(),
+            source
+        );
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
         Assert.That(run.GenErrors, Is.Empty, run.Format());
@@ -69,7 +72,10 @@ public class IncrementalInterpolatorInstallerGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(new IncrementalInterpolatorInstallerGenerator(), source);
+        var run = GeneratorTestHarness.Run(
+            new InterpolatorInstallerGenerator(),
+            source
+        );
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
     }
@@ -98,7 +104,10 @@ public class IncrementalInterpolatorInstallerGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(new IncrementalInterpolatorInstallerGenerator(), source);
+        var run = GeneratorTestHarness.Run(
+            new InterpolatorInstallerGenerator(),
+            source
+        );
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
     }
@@ -126,7 +135,10 @@ public class IncrementalInterpolatorInstallerGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(new IncrementalInterpolatorInstallerGenerator(), source);
+        var run = GeneratorTestHarness.Run(
+            new InterpolatorInstallerGenerator(),
+            source
+        );
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
     }

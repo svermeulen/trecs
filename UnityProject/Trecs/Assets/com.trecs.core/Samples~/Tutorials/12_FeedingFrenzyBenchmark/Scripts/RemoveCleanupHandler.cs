@@ -8,7 +8,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
         public RemoveCleanupHandler(World world)
         {
-            World = world.CreateAccessor();
+            World = world.CreateAccessor(AccessorRole.Fixed);
 
             World
                 .Events.EntitiesWithTags<FrenzyTags.Fish>()

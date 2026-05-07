@@ -45,19 +45,18 @@ namespace Trecs.Serialization
             }
         }
 
-        // You shouldn't need to use this directly
+        // Only allow during idle — once a Start* is in progress, callers
+        // must read/write through the buffer's own methods, not the
+        // underlying BinaryReader.
         public BinaryReader BinaryReader
         {
             get
             {
-                // Only allow using during idle, since otherwise you
-                // should read via the reader
                 Assert.That(_state == State.Idle);
                 return _binaryReader;
             }
         }
 
-        // You shouldn't need to use this directly
         public BinarySerializationWriter Writer
         {
             get
@@ -67,7 +66,6 @@ namespace Trecs.Serialization
             }
         }
 
-        // You shouldn't need to use this directly
         public BinarySerializationReader Reader
         {
             get
@@ -77,8 +75,6 @@ namespace Trecs.Serialization
             }
         }
 
-        // You shouldn't need to use this directly
-        // NOTE: This is _writer.BinaryWriter, not _binaryWriter
         public BinaryWriter BinaryWriter
         {
             get
@@ -380,19 +376,10 @@ namespace Trecs.Serialization
 
         // NOTE: this hash is not suitable as a guid
         // For that, use GetMemoryStreamCollisionResistantGuid instead
+        [Obsolete("Use ComputeChecksum() instead — same hash, returned as uint.")]
         public int GetMemoryStreamHash()
         {
-            Assert.That(!_hasDisposed);
-            Assert.That(MemoryPosition == 0);
-            Assert.That(_state == State.Idle);
-
-            int length = (int)_memoryStream.Length;
-            Assert.That(length > 0);
-
-            byte[] buffer = _memoryStream.GetBuffer();
-
-            uint unsignedHash = ByteHashCalculator.Run(buffer, length);
-            return unchecked((int)unsignedHash);
+            return unchecked((int)ComputeChecksum());
         }
 
         /// <summary>

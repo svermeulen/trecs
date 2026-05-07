@@ -108,14 +108,12 @@ namespace Trecs.Tests
         {
             var ptr = default(UniquePtr<string>);
             NAssert.IsTrue(ptr.IsNull);
-            NAssert.IsFalse(ptr.IsCreated);
         }
 
         [Test]
-        public void UniquePtr_WithHandle_IsCreated()
+        public void UniquePtr_WithHandle_IsNotNull()
         {
             var ptr = new UniquePtr<string>(new PtrHandle(1));
-            NAssert.IsTrue(ptr.IsCreated);
             NAssert.IsFalse(ptr.IsNull);
         }
 
@@ -262,7 +260,6 @@ namespace Trecs.Tests
         {
             var ptr = new NativeSharedPtr<int>(new PtrHandle(1), new BlobId(10));
             NAssert.IsFalse(ptr.IsNull);
-            NAssert.IsTrue(ptr.IsCreated);
         }
 
         [Test]
@@ -687,7 +684,6 @@ namespace Trecs.Tests
             var value = new List<string> { "hello" };
             var ptr = heap.AllocUnique(value);
 
-            NAssert.IsTrue(ptr.IsCreated);
             NAssert.IsFalse(ptr.IsNull);
 
             heap.Dispose();
@@ -700,7 +696,7 @@ namespace Trecs.Tests
 
             var ptr = heap.AllocUnique<List<string>>(null);
 
-            NAssert.IsTrue(ptr.IsCreated);
+            NAssert.IsFalse(ptr.IsNull);
             NAssert.IsNull(heap.TryGetPtrValue(ptr.Handle.Value));
 
             heap.Dispose();
@@ -873,15 +869,13 @@ namespace Trecs.Tests
         {
             var ptr = default(NativeUniquePtr<int>);
             NAssert.IsTrue(ptr.IsNull);
-            NAssert.IsFalse(ptr.IsCreated);
         }
 
         [Test]
-        public void NativeUniquePtr_WithHandle_IsCreated()
+        public void NativeUniquePtr_WithHandle_IsNotNull()
         {
             var ptr = new NativeUniquePtr<int>(new PtrHandle(1));
             NAssert.IsFalse(ptr.IsNull);
-            NAssert.IsTrue(ptr.IsCreated);
         }
 
         [Test]
@@ -1073,7 +1067,6 @@ namespace Trecs.Tests
             var ptr = heap.Alloc<int>(42);
 
             NAssert.IsFalse(ptr.IsNull);
-            NAssert.IsTrue(ptr.IsCreated);
 
             heap.Dispose();
             frameScopedHeap.Dispose();
@@ -1217,7 +1210,6 @@ namespace Trecs.Tests
             var ptr = frameScopedHeap.Alloc<int>(1, 42);
 
             NAssert.IsFalse(ptr.IsNull);
-            NAssert.IsTrue(ptr.IsCreated);
             NAssert.AreEqual(1, frameScopedHeap.NumEntries);
 
             heap.Dispose();

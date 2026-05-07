@@ -37,7 +37,7 @@ namespace Trecs.SourceGen
                 hasTrecsReference
             );
 
-            // See IncrementalForEachGenerator for the caching rationale: validation runs
+            // See ForEachGenerator for the caching rationale: validation runs
             // in the transform, and the terminal stage only needs the global-namespace
             // display string.
             var globalNsProvider = context.CompilationProvider.Select(
@@ -386,6 +386,7 @@ namespace Trecs.SourceGen
                         }
                     }
                 }
+
                 else if (iterationType == IterationType.RunOnce)
                 {
                     // RunOnce methods consume [SingleEntity] params via RunOnceGenerator's
@@ -406,10 +407,14 @@ namespace Trecs.SourceGen
                         )
                             continue;
                         var paramType =
-                            param.Type != null ? semanticModel.GetTypeInfo(param.Type).Type : null;
+                            param.Type != null
+                                ? semanticModel.GetTypeInfo(param.Type).Type
+                                : null;
                         if (paramType == null)
                             continue;
-                        var paramIsRef = param.Modifiers.Any(m => m.IsKind(SyntaxKind.RefKeyword));
+                        var paramIsRef = param.Modifiers.Any(m =>
+                            m.IsKind(SyntaxKind.RefKeyword)
+                        );
                         var paramIsIn = param.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword));
                         customParams.Add(
                             new CustomParamInfo(
@@ -604,7 +609,7 @@ namespace Trecs.SourceGen
             foreach (var attr in PerformanceCache.GetAttributes(methodSymbol))
             {
                 var name = attr.AttributeClass?.Name;
-                if (name != TrecsAttributeNames.EntityFilter)
+                if (name != TrecsAttributeNames.ForEachEntity)
                     continue;
 
                 // C# 11 generic-attribute form: [ForEachEntity<A>] etc. Roslyn's Name

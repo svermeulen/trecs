@@ -185,22 +185,6 @@ namespace Trecs.SourceGen.Template
                 isValid = false;
             }
 
-            // [Interpolated] + [FixedUpdateOnly]
-            if (component.IsInterpolated && component.IsFixedUpdateOnly)
-            {
-                reportDiagnostic(
-                    Diagnostic.Create(
-                        DiagnosticDescriptors.TemplateInvalidAttributeCombination,
-                        location,
-                        component.FieldName,
-                        templateName,
-                        "Interpolated",
-                        "FixedUpdateOnly"
-                    )
-                );
-                isValid = false;
-            }
-
             // [Interpolated] + [VariableUpdateOnly]
             if (component.IsInterpolated && component.IsVariableUpdateOnly)
             {
@@ -243,22 +227,6 @@ namespace Trecs.SourceGen.Template
                         component.FieldName,
                         templateName,
                         "Input",
-                        "VariableUpdateOnly"
-                    )
-                );
-                isValid = false;
-            }
-
-            // [FixedUpdateOnly] + [VariableUpdateOnly]
-            if (component.IsFixedUpdateOnly && component.IsVariableUpdateOnly)
-            {
-                reportDiagnostic(
-                    Diagnostic.Create(
-                        DiagnosticDescriptors.TemplateInvalidAttributeCombination,
-                        location,
-                        component.FieldName,
-                        templateName,
-                        "FixedUpdateOnly",
                         "VariableUpdateOnly"
                     )
                 );

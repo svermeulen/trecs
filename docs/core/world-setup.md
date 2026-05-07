@@ -104,7 +104,7 @@ world.AddSystems(new ISystem[] { ... });
 world.Initialize();
 
 // 4. Create a WorldAccessor for interacting with the world
-var worldAccessor = world.CreateAccessor();
+var worldAccessor = world.CreateAccessor(AccessorRole.Fixed);
 
 // 5. Game loop
 while (running)
@@ -125,7 +125,7 @@ world.Dispose();
 `WorldAccessor` is the primary API for interacting with the world at runtime. Systems receive it automatically via source generation, but you can also create one manually:
 
 ```csharp
-var worldAccessor = world.CreateAccessor();
+var worldAccessor = world.CreateAccessor(AccessorRole.Fixed);
 ```
 
 `WorldAccessor` provides access to:

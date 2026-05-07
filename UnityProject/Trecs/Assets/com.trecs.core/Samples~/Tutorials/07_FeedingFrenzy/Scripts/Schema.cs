@@ -110,7 +110,16 @@ namespace Trecs.Samples.FeedingFrenzy101
                 IHasPartition<FrenzyTags.NotEating>,
                 IHasPartition<FrenzyTags.Eating>
         {
+            // Position/Rotation are render-only — VisualSmoothingSystem chases
+            // SimPosition/SimRotation each variable frame. Marking them
+            // [VariableUpdateOnly] keeps fixed-phase code from accidentally
+            // touching them.
+            [VariableUpdateOnly]
+            Position Position;
+
+            [VariableUpdateOnly]
             Rotation Rotation = new(quaternion.identity);
+
             SimPosition SimPosition = default;
             SimRotation SimRotation = new() { Value = quaternion.identity };
             Velocity Velocity = default;

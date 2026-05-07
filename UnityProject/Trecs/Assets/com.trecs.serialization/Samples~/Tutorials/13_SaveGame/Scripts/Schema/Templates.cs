@@ -8,7 +8,7 @@ namespace Trecs.Serialization.Samples.SaveGame
             // fixed tick. If the queued input has already been consumed and
             // no new key is pressed, MoveInput reverts to zero instead of
             // causing auto-repeat.
-            [Input(MissingInputFrameBehaviour.ResetToDefault)]
+            [Input(MissingInputBehavior.ResetToDefault)]
             MoveInput MoveInput = default;
         }
 

@@ -14,6 +14,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
     {
         public FrenzyConfigSettings Config;
         public SampleSettings Settings;
+        public GameObject ProfilerRunner;
         public TMP_Text DisplayText;
 
         public static FrenzyConfigSettings ConfigOverride;
@@ -29,10 +30,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             out List<Action> disposables
         )
         {
-            // Benchmark sample: uncap frame rate so the overhead of our systems,
-            // not vsync, determines throughput.
-            Application.targetFrameRate = 2000;
-
             // Allow static override for F1/F2/F3 maps
             FrenzyConfigSettings config;
 
@@ -68,7 +65,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             }
 
             var world = worldBuilder.Build();
-            CurrentWorld = world.CreateAccessor();
+            CurrentWorld = world.CreateAccessor(AccessorRole.Fixed);
 
             var subsetApproachDynamicSwitcher = new SubsetApproachDynamicSwitcher(world);
 

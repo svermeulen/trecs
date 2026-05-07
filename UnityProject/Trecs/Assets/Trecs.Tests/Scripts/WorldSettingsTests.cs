@@ -113,7 +113,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a1 = env.Accessor;
-            var a2 = env.World.CreateAccessor();
+            var a2 = env.World.CreateAccessor(AccessorRole.Unrestricted);
 
             // Both accessors can create entities
             a1.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 10 }).AssertComplete();

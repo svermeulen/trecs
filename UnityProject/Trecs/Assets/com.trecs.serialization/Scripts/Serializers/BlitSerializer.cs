@@ -7,7 +7,7 @@ namespace Trecs.Serialization
     /// name/type framing per field. Register via
     /// <see cref="SerializerRegistry.RegisterBlit{T}(bool)"/>.
     /// </summary>
-    public class BlitSerializer<T> : ISerializer<T>, ISerializerDelta<T>
+    public sealed class BlitSerializer<T> : ISerializer<T>, ISerializerDelta<T>
         where T : unmanaged
     {
         public BlitSerializer() { }

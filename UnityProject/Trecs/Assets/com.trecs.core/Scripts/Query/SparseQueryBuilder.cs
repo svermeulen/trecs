@@ -287,7 +287,11 @@ namespace Trecs
                 _negativeComps
             );
 
-            return _world.WorldInfo.QueryEngine.ResolveGroups(key);
+            var groups = _world.WorldInfo.QueryEngine.ResolveGroups(key);
+
+            _world.AssertNoVariableUpdateOnlyGroupsForFixedRole(groups);
+
+            return groups;
         }
 
         static TagSet MergeTags(TagSet existing, TagSet addition)

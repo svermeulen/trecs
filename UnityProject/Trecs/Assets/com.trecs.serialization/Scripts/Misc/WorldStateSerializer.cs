@@ -122,6 +122,16 @@ namespace Trecs.Serialization
 
         void DeserializeStateImpl(ISerializationReader reader)
         {
+            // Checksum streams skip VUO template component arrays via
+            // ShouldSkip on the write side. They are not a valid input
+            // for restore — the missing VUO entries would silently zero
+            // out render-side state on load. Treat that as caller error
+            // rather than corrupted data.
+            Assert.That(
+                !reader.HasFlag(SerializationFlags.IsForChecksum),
+                "Cannot restore world state from a checksum-mode stream — VUO template component arrays are intentionally omitted in that mode."
+            );
+
             var eventsManager = _world.GetEventsManager();
 
             using (TrecsProfiling.Start("Triggering OnEcsDeserializeStarted listeners"))
@@ -233,18 +243,18 @@ namespace Trecs.Serialization
             writer.Write("nextFreeIndex", nextFreeIndex);
         }
 
+        /// <remarks>
+        /// Variable-update components are skipped only when serializing for a
+        /// checksum (they would always desync between runs). Snapshots and
+        /// recordings include them, since otherwise the component arrays are
+        /// left in an invalid state on the read side.
+        ///
+        /// Checksum data is only ever byte-compared, never deserialized, so
+        /// the read path has no symmetric guard. If that ever changes, this
+        /// guard's twin must be added there to keep the bit stream aligned.
+        /// </remarks>
         bool ShouldSkip(GroupIndex group, ComponentId componentId, ISerializationWriter writer)
         {
-            // We do not want to serialize variable update components during checksum checks
-            // because they will always desync
-            // BUT we do need to serialize and deserialize them when reading/writing snapshots
-            // because otherwise the component arrays are left in an invalid state
-            //
-            // Note: checksum data is only ever byte-compared, never deserialized, so
-            // ReadGroupEntityComponentsDB does not need a corresponding ShouldSkip guard.
-            // If that changes, the read path would need to skip the same components to
-            // keep the bit stream aligned.
-
             if (!writer.HasFlag(SerializationFlags.IsForChecksum))
             {
                 return false;
@@ -255,7 +265,7 @@ namespace Trecs.Serialization
             var template = _worldDef.GetResolvedTemplateForGroup(group);
             var componentDec = template.GetComponentDeclaration(componentType);
 
-            return componentDec.VariableUpdateOnly;
+            return template.IsVariableUpdateOnly(componentDec);
         }
 
         void WriteGroupEntityComponentsDB(ISerializationWriter writer)
@@ -604,11 +614,5 @@ namespace Trecs.Serialization
         // magic will mismatch and we fail loudly instead of silently reading
         // garbage into component arrays.
         const int WorldStateStreamGuard = 510120270;
-    }
-
-    public interface IComponentArrayCustomSerializer
-    {
-        void Serialize(IComponentArray array, ISerializationWriter writer);
-        void Deserialize(IComponentArray array, ISerializationReader reader);
     }
 }

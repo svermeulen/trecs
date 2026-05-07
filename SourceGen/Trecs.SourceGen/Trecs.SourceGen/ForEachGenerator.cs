@@ -14,11 +14,12 @@ using Trecs.SourceGen.Shared;
 namespace Trecs.SourceGen
 {
     /// <summary>
-    /// Incremental source generator for ForEach methods that iterate over ECS components.
-    /// Provides much better compilation performance than the legacy ForEachGenerator.
+    /// Source generator for [ForEachEntity] methods that iterate over ECS components
+    /// (component-parameter shape). The aspect-parameter shape is handled by
+    /// ForEachAspectGenerator; routing is decided by IterationAttributeRouting.
     /// </summary>
     [Generator]
-    public class IncrementalForEachGenerator : IIncrementalGenerator
+    public class ForEachGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
@@ -68,7 +69,7 @@ namespace Trecs.SourceGen
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
                         IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
-                        == TrecsAttributeNames.EntityFilter
+                        == TrecsAttributeNames.ForEachEntity
                     );
         }
 
@@ -173,7 +174,7 @@ namespace Trecs.SourceGen
             {
                 using var _timer_ = SourceGenTimer.Time("ForEachGenerator.Total");
                 SourceGenLogger.Log(
-                    $"[IncrementalForEachGenerator] Processing {className}.{methodName}"
+                    $"[ForEachGenerator] Processing {className}.{methodName}"
                 );
 
                 var source = ErrorRecovery.TryExecute(
@@ -786,7 +787,7 @@ namespace Trecs.SourceGen
                 methodDec,
                 methodSymbol,
                 className,
-                TrecsAttributeNames.EntityFilter
+                TrecsAttributeNames.ForEachEntity
             );
             if (criteria == null)
             {

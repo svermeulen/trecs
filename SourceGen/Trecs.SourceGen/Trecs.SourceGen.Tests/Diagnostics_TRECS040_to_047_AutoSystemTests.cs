@@ -116,12 +116,16 @@ public class Diagnostics_TRECS040_to_047_AutoSystemTests
             new IIncrementalGenerator[]
             {
                 new AutoSystemGenerator(),
-                new IncrementalForEachGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
-        Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
+        Assert.That(
+            diag,
+            Is.Not.Null,
+            $"Expected {expectedId}, got:\n{run.Format()}"
+        );
     }
 }

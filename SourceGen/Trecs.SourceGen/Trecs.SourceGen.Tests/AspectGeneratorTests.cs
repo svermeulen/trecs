@@ -4,7 +4,7 @@ using Trecs.SourceGen;
 namespace Trecs.SourceGen.Tests;
 
 /// <summary>
-/// Compile-cleanliness tests for IncrementalAspectGenerator. The diagnostic-validation side
+/// Compile-cleanliness tests for AspectGenerator. The diagnostic-validation side
 /// (aspect-interface partial requirement, cycle handling, etc.) lives in
 /// <see cref="AspectInterfaceDiagnosticTests"/>. This fixture asserts that aspect structs
 /// produce code that *compiles*: aspects emit a substantial machinery layer (component
@@ -13,7 +13,7 @@ namespace Trecs.SourceGen.Tests;
 /// so most regressions surface as the emitted partial failing to compile.
 /// </summary>
 [TestFixture]
-public class IncrementalAspectGeneratorTests
+public class AspectGeneratorTests
 {
     [Test]
     public void AspectStruct_WithSingleRead_CompilesCleanly()
@@ -29,8 +29,8 @@ public class IncrementalAspectGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -55,8 +55,8 @@ public class IncrementalAspectGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -81,8 +81,8 @@ public class IncrementalAspectGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );

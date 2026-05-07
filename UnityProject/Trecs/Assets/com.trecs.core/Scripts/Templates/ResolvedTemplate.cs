@@ -20,7 +20,8 @@ namespace Trecs
             IReadOnlyList<IResolvedComponentDeclaration> componentDeclarations,
             ReadOnlyDenseDictionary<Type, IResolvedComponentDeclaration> componentDeclarationMap,
             IComponentBuilder[] componentBuilders,
-            TagSet tagset
+            TagSet tagset,
+            bool variableUpdateOnly
         )
         {
             Template = template;
@@ -31,6 +32,28 @@ namespace Trecs
             Partitions = partitions;
             AllTags = tagset;
             AllBaseTemplates = allBaseTemplates;
+            VariableUpdateOnly = variableUpdateOnly;
+        }
+
+        /// <summary>
+        /// True iff this template (or any of its ancestors) is declared
+        /// <c>[VariableUpdateOnly]</c>. When true, every component on the template is
+        /// VUO, Fixed-role queries that resolve to the template's groups are rejected,
+        /// and the template's component arrays are skipped during the determinism
+        /// checksum walk.
+        /// </summary>
+        public bool VariableUpdateOnly { get; }
+
+        /// <summary>
+        /// True iff <paramref name="dec"/> on this template is treated as VUO —
+        /// either the field itself is declared <c>[VariableUpdateOnly]</c>, or
+        /// the template (or any of its ancestors) is. Use this anywhere the rule
+        /// is "is this access subject to the VUO restriction" rather than
+        /// reading the two flags separately.
+        /// </summary>
+        public bool IsVariableUpdateOnly(IResolvedComponentDeclaration dec)
+        {
+            return dec.VariableUpdateOnly || VariableUpdateOnly;
         }
 
         /// <summary>
@@ -45,7 +68,29 @@ namespace Trecs
         /// Populated after world build — do not access before
         /// <see cref="WorldBuilder.Build"/> finishes.
         /// </summary>
-        public IReadOnlyList<GroupIndex> Groups { get; internal set; }
+        public IReadOnlyList<GroupIndex> Groups
+        {
+            get
+            {
+                Assert.IsNotNull(
+                    _groups,
+                    "ResolvedTemplate.Groups accessed before WorldBuilder.Build finished populating it"
+                );
+                return _groups;
+            }
+        }
+
+        IReadOnlyList<GroupIndex> _groups;
+
+        internal void SetGroups(IReadOnlyList<GroupIndex> groups)
+        {
+            Assert.IsNull(
+                _groups,
+                "ResolvedTemplate.Groups already initialized; SetGroups must be called exactly once per resolved template"
+            );
+            Assert.IsNotNull(groups);
+            _groups = groups;
+        }
 
         /// <summary>
         /// The original unresolved template definition.
@@ -103,12 +148,10 @@ namespace Trecs
             return ComponentDeclarationMap.ContainsKey(type);
         }
 
-        public ComponentDeclaration<T> TryGetComponentDeclaration<T>()
+        public IResolvedComponentDeclaration TryGetComponentDeclaration<T>()
             where T : unmanaged, IEntityComponent
         {
-            return ComponentDeclarationMap.TryGetValue(typeof(T), out var declaration)
-                ? (ComponentDeclaration<T>)declaration
-                : null;
+            return TryGetComponentDeclaration(typeof(T));
         }
 
         public IResolvedComponentDeclaration TryGetComponentDeclaration(Type componentType)
@@ -132,10 +175,10 @@ namespace Trecs
             );
         }
 
-        public ComponentDeclaration<T> GetComponentDeclaration<T>()
+        public IResolvedComponentDeclaration GetComponentDeclaration<T>()
             where T : unmanaged, IEntityComponent
         {
-            return (ComponentDeclaration<T>)GetComponentDeclaration(typeof(T));
+            return GetComponentDeclaration(typeof(T));
         }
     }
 }

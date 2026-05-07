@@ -111,7 +111,7 @@ When a template extends multiple bases, all components, tags, and partitions are
 
 When the same component appears in more than one base template:
 
-- **Attributes must agree** — If multiple bases declare the same component with different attributes (e.g. one marks it `[Interpolated]` and another marks it `[FixedUpdateOnly]`), this is an error.
+- **Attributes must agree** — If multiple bases declare the same component with different attributes (e.g. one marks it `[Interpolated]` and another marks it `[VariableUpdateOnly]`), this is an error.
 - **Default values must match** — If multiple bases provide default values for the same component, the values must be identical. Providing different defaults is an error.
 - **One default is enough** — If only one base provides a default and others don't, the default is used. The component becomes optional at the `AddEntity` call site.
 
@@ -215,7 +215,7 @@ public partial class MyGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
     Score Score = default;
     DesiredFishCount DesiredFishCount = new() { Value = 100 };
 
-    [Input(MissingInputFrameBehaviour.RetainCurrent)]
+    [Input(MissingInputBehavior.RetainCurrent)]
     MoveInput MoveInput = default;
 }
 ```

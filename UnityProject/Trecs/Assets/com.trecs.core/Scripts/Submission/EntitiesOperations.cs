@@ -229,6 +229,12 @@ namespace Trecs.Internal
             EntitySubmitter ecsRoot
         )
         {
+            // Swap before executing, so observer callbacks that fire during
+            // the upcoming remove/move callbacks queue *new* ops into the
+            // freshly-empty _thisSubmissionInfo. The outer SubmitEntitiesImpl
+            // loop then picks those up in a subsequent iteration. This is
+            // what keeps the cascade iterative rather than recursive — see
+            // the cascade contract on EntitySubmitter.SubmitEntitiesImpl.
             (_thisSubmissionInfo, _lastSubmittedInfo) = (_lastSubmittedInfo, _thisSubmissionInfo);
 
             foreach (var (group, caller) in _lastSubmittedInfo._groupsToRemove)

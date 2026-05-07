@@ -130,12 +130,12 @@ static void ExecuteImpl(
 }
 ```
 
-### VisualSmoothingSystem (`[Phase(SystemPhase.Presentation)]`)
+### VisualSmoothingSystem (`[ExecuteIn(SystemPhase.Presentation)]`)
 
 Lerps `Position`/`Rotation` toward `SimPosition`/`SimRotation` each visual frame. This creates smooth movement at the display frame rate even though the simulation runs at a lower fixed timestep:
 
 ```csharp
-[Phase(SystemPhase.Presentation)]
+[ExecuteIn(SystemPhase.Presentation)]
 public partial class VisualSmoothingSystem : ISystem
 {
     [ForEachEntity(typeof(FrenzyTags.Fish))]
@@ -162,7 +162,7 @@ public partial class RemoveCleanupHandler : IDisposable
 
     public RemoveCleanupHandler(World world)
     {
-        World = world.CreateAccessor();
+        World = world.CreateAccessor(AccessorRole.Fixed);
 
         World.Events.EntitiesWithTags<FrenzyTags.Fish>()
             .OnRemoved(OnFishRemoved)

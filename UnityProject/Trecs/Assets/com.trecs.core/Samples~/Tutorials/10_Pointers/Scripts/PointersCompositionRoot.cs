@@ -80,7 +80,7 @@ namespace Trecs.Samples.Pointers
         /// </summary>
         void RegisterPointerCleanup(World world)
         {
-            var cleanupAccessor = world.CreateAccessor();
+            var cleanupAccessor = world.CreateAccessor(AccessorRole.Fixed);
 
             cleanupAccessor
                 .Events.EntitiesWithTags<PatrolTags.Follower>()

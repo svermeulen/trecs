@@ -40,7 +40,10 @@ namespace Trecs.Serialization.Samples
             _recordingHandler = serialization.Recorder;
             _playbackHandler = serialization.Playback;
             _snapshotSerializer = serialization.Snapshots;
-            _world = world.CreateAccessor(nameof(RecordAndPlaybackController));
+            _world = world.CreateAccessor(
+                AccessorRole.Unrestricted,
+                nameof(RecordAndPlaybackController)
+            );
             _serializationVersion = serializationVersion;
 
             var recordingDir = Path.Combine(

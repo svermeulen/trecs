@@ -7,7 +7,7 @@ A runtime with deferred structural changes, source-generated systems, and Burst-
 A `WorldAccessor` is your read/write view of the world. To inspect an entity by hand (e.g. from an editor tool or a debugger-triggered logger):
 
 ```csharp
-// You already have a WorldAccessor from a system, or from world.CreateAccessor().
+// You already have a WorldAccessor from a system, or from world.CreateAccessor(AccessorRole.X).
 var entity = world.Query().WithTags<PlayerTag>().Single();
 var health = entity.Get<Health>().Read.Value;
 UnityEngine.Debug.Log($"Player health: {health}");

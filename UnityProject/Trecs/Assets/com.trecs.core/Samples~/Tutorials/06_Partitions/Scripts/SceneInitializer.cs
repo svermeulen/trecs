@@ -17,7 +17,7 @@ namespace Trecs.Samples.Partitions
             float spawnRadius
         )
         {
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Fixed);
             _gameObjectRegistry = gameObjectRegistry;
             _ballCount = ballCount;
             _spawnRadius = spawnRadius;

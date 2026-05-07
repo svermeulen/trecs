@@ -62,8 +62,8 @@ namespace Trecs.Internal
                     if (componentDec.IsInput)
                     {
                         if (
-                            componentDec.MissingInputFrameBehaviour.Value
-                            == MissingInputFrameBehaviour.ResetToDefault
+                            componentDec.MissingInputBehavior.Value
+                            == MissingInputBehavior.ResetToDefault
                         )
                         {
                             _resetToDefaultGroups.Add(

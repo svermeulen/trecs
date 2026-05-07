@@ -37,6 +37,9 @@ namespace Trecs.Serialization
         /// <summary>
         /// Reads a concrete type value. Use this when the exact type is known at compile time.
         /// The type information is verified during deserialization if type checking is enabled.
+        /// If <typeparamref name="T"/> is abstract (interface or abstract class), the call is
+        /// dispatched to <see cref="ReadObject(string, ref object)"/>, which always reads the
+        /// concrete type ID regardless of the type-checking setting.
         /// </summary>
         void Read<T>(string name, ref T value);
 
@@ -89,8 +92,6 @@ namespace Trecs.Serialization
         /// Reads a length-prefixed byte range into <paramref name="buffer"/>,
         /// resizing it if it's too small to hold the payload. Returns the
         /// actual number of bytes read (which may be less than buffer.Length).
-        /// For JSON serialization, bytes are decoded from base64.
-        /// For binary serialization, reads an int length followed by that many bytes.
         /// </summary>
         int ReadBytes(string name, ref byte[] buffer);
 

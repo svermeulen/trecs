@@ -29,6 +29,9 @@ namespace Trecs.Internal
 
         internal unsafe byte* ptr { get; set; }
 
+        // Set by NativeBag.Create after MemClear, before any Grow / Dispose call.
+        internal AllocatorManager.AllocatorHandle _allocator;
+
         //expressed in bytes
         internal uint capacity { get; private set; }
 
@@ -218,7 +221,7 @@ namespace Trecs.Internal
                 newCapacity += Pad4(newCapacity);
 
                 byte* newPointer = (byte*)
-                    UnsafeUtility.Malloc(newCapacity, PointerAlignment, Allocator.Persistent);
+                    UnsafeUtility.Malloc(newCapacity, PointerAlignment, _allocator.ToAllocator);
                 UnsafeUtility.MemClear(newPointer, newCapacity);
 
                 //copy wrapped content if there is any
@@ -272,7 +275,7 @@ namespace Trecs.Internal
                 }
 
                 if (ptr != null)
-                    UnsafeUtility.Free(ptr, Allocator.Persistent);
+                    UnsafeUtility.Free(ptr, _allocator.ToAllocator);
 
                 ptr = newPointer;
                 capacity = newCapacity;
@@ -288,7 +291,7 @@ namespace Trecs.Internal
             unsafe
             {
                 if (ptr != null)
-                    UnsafeUtility.Free(ptr, Allocator.Persistent);
+                    UnsafeUtility.Free(ptr, _allocator.ToAllocator);
 
                 ptr = null;
                 _writeIndex = 0;

@@ -9,7 +9,7 @@ namespace Trecs.Serialization
     /// deterministic, dense-indexed dictionary used by Trecs. Writes entries
     /// in their internal dense order so the wire format is stable across runs.
     /// </summary>
-    public class DenseDictionarySerializer<TKey, TValue>
+    public sealed class DenseDictionarySerializer<TKey, TValue>
         : ISerializer<DenseDictionary<TKey, TValue>>
         where TKey : struct, IEquatable<TKey>
     {
@@ -17,12 +17,7 @@ namespace Trecs.Serialization
 
         public void Deserialize(ref DenseDictionary<TKey, TValue> dict, ISerializationReader reader)
         {
-            // Use blit path only for binary serialization with unmanaged types
-            // JSON serialization doesn't support BlitReadArrayPtr
-            if (
-                DenseDictionaryBlitHelperCache<TKey, TValue>.CanUseBlit
-                && reader is BinarySerializationReader
-            )
+            if (DenseDictionaryBlitHelperCache<TKey, TValue>.CanUseBlit)
             {
                 if (dict == null)
                 {
@@ -40,7 +35,6 @@ namespace Trecs.Serialization
             }
             else
             {
-                // Fallback to element-by-element serialization
                 var numItems = reader.Read<int>("count");
 
                 if (dict == null)
@@ -65,18 +59,12 @@ namespace Trecs.Serialization
 
         public void Serialize(in DenseDictionary<TKey, TValue> value, ISerializationWriter writer)
         {
-            // Use blit path only for binary serialization with unmanaged types
-            // JSON serialization doesn't support BlitWriteArrayPtr
-            if (
-                DenseDictionaryBlitHelperCache<TKey, TValue>.CanUseBlit
-                && writer is BinarySerializationWriter
-            )
+            if (DenseDictionaryBlitHelperCache<TKey, TValue>.CanUseBlit)
             {
                 DenseDictionaryBlitHelperCache<TKey, TValue>.Helper.SerializeBlit(value, writer);
             }
             else
             {
-                // Fallback to element-by-element serialization
                 writer.Write<int>("count", value.Count);
 
                 foreach (var item in value)

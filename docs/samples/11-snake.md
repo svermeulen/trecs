@@ -44,7 +44,7 @@ public struct SnakeFood : ITag { }
 ```csharp
 public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
-    [Input(MissingInputFrameBehaviour.RetainCurrent)]
+    [Input(MissingInputBehavior.RetainCurrent)]
     MoveInput MoveInput;
     SnakeLength SnakeLength = new(4);
     Score Score;
@@ -56,12 +56,12 @@ The `[Input(RetainCurrent)]` attribute ensures the last input persists until a n
 
 ## Systems (Execution Order)
 
-### 1. SnakeInputSystem (`[Phase(SystemPhase.Input)]`)
+### 1. SnakeInputSystem (`[ExecuteIn(SystemPhase.Input)]`)
 
 Captures WASD input each visual frame and queues it:
 
 ```csharp
-[Phase(SystemPhase.Input)]
+[ExecuteIn(SystemPhase.Input)]
 public partial class SnakeInputSystem : ISystem
 {
     int2 _pendingDirection;
@@ -143,7 +143,7 @@ If the segment count exceeds `SnakeLength - 1`, removes the oldest segment (by `
 
 Spawns food up to a maximum count at random unoccupied grid cells using `World.Rng`.
 
-### 6. SnakeRendererSystem (`[Phase(SystemPhase.Presentation)]`)
+### 6. SnakeRendererSystem (`[ExecuteIn(SystemPhase.Presentation)]`)
 
 Maps `GridPos` to world coordinates for rendering.
 
@@ -168,7 +168,7 @@ See [Serialization](../advanced/serialization.md) for custom-serializer authorin
 ## Concepts Introduced
 
 - **`[Input(RetainCurrent)]`** — input persists across frames until replaced
-- **`[Phase(SystemPhase.Input)]`** — system runs in the input phase, before fixed update
+- **`[ExecuteIn(SystemPhase.Input)]`** — system runs in the input phase, before fixed update
 - **`AddInput()`** — queues input from outside the ECS tick
 - **Grid-based gameplay** — integer positions, discrete movement
 - **FIFO entity management** — `SegmentAge` tracks creation order for oldest-first removal

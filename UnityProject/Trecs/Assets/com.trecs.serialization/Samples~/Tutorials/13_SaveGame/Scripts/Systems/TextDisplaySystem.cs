@@ -5,7 +5,7 @@ using Unity.Mathematics;
 
 namespace Trecs.Serialization.Samples.SaveGame
 {
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     public partial class TextDisplaySystem : ISystem
     {
         readonly TMP_Text _displayText;

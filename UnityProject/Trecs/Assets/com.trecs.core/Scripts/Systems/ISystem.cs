@@ -6,7 +6,7 @@ namespace Trecs
     /// Core interface implemented by all user systems. Source generation adds a
     /// <see cref="WorldAccessor"/> property and lifecycle wiring; user code only needs
     /// to implement <see cref="Execute"/>. By default systems run in the
-    /// <see cref="SystemPhase.Fixed"/> phase — apply <see cref="PhaseAttribute"/>
+    /// <see cref="SystemPhase.Fixed"/> phase — apply <see cref="ExecuteInAttribute"/>
     /// to change the phase.
     /// </summary>
     public interface ISystem

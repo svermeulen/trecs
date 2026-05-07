@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Trecs.Collections;
 using Trecs.Internal;
+using UnityEngine;
 
 namespace Trecs
 {
@@ -226,31 +227,6 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Toggles a non-deterministic disable channel for a system. A system runs only when
-        /// no channel has it disabled.
-        /// <para>
-        /// Channel state is ephemeral: not part of snapshot/restore, and not part of recording
-        /// state. For deterministic pauses that participate in replay, use
-        /// <see cref="WorldAccessor.SetSystemPaused"/>.
-        /// </para>
-        /// </summary>
-        public void SetSystemEnabled(int systemIndex, EnableChannel channel, bool enabled)
-        {
-            Assert.That(!_isDisposed);
-            _systemEnableState.SetSystemEnabled(systemIndex, channel, enabled);
-        }
-
-        /// <summary>
-        /// Returns whether the given channel currently has the system enabled.
-        /// Note: a system runs only when ALL channels have it enabled AND it is not paused.
-        /// </summary>
-        public bool IsSystemEnabled(int systemIndex, EnableChannel channel)
-        {
-            Assert.That(!_isDisposed);
-            return _systemEnableState.IsSystemEnabled(systemIndex, channel);
-        }
-
-        /// <summary>
         /// Returns true iff the system would run on the next tick — i.e. no
         /// <see cref="EnableChannel"/> has it disabled and it is not paused via
         /// <see cref="WorldAccessor.SetSystemPaused"/>. Convenience for debug UIs and
@@ -435,8 +411,16 @@ namespace Trecs
 
         ~World()
         {
-            _log.Warning("World class has been garbage collected, don't forget to call Dispose()!");
-            Dispose(false);
+            // Warning only — do NOT call Dispose from the finalizer thread:
+            // Dispose touches managed event subscriptions and frees native heaps,
+            // both of which are unsafe from the GC thread (allocator state can be
+            // mid-mutation on the main thread, AtomicSafetyHandles can fire on the
+            // wrong thread, and event subscriptions can race). Native memory leaks
+            // if the user forgets Dispose() — this warning surfaces the bug; clean
+            // shutdown is the user's responsibility.
+            Debug.LogWarning(
+                "World class has been garbage collected, don't forget to call Dispose()!"
+            );
         }
 
         /// <summary>
@@ -480,7 +464,7 @@ namespace Trecs
             );
         }
 
-        void Dispose(bool _)
+        public void Dispose()
         {
             Assert.That(!_isDisposed, "Attempted to dispose WorldAccessor multiple times");
 
@@ -512,6 +496,7 @@ namespace Trecs
             _blobCache.Dispose();
 
             _isDisposed = true;
+            GC.SuppressFinalize(this);
         }
 
 #if DEBUG && TRECS_IS_PROFILING
@@ -549,12 +534,6 @@ namespace Trecs
             }
         }
 #endif
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
 
         void WarmupGroups()
         {
@@ -634,7 +613,7 @@ namespace Trecs
                 var systemInternal = (ISystemInternal)system;
                 if (systemInternal.World == null)
                 {
-                    systemInternal.World = CreateAccessor(system.GetType());
+                    systemInternal.World = CreateAccessorForSystem(system.GetType());
                 }
             }
         }
@@ -697,7 +676,10 @@ namespace Trecs
             Assert.That(!_hasInitialized);
             _hasInitialized = true;
 
-            _entityInputQueue.Accessor = CreateAccessor("EntityInputQueue");
+            _entityInputQueue.Accessor = CreateAccessor(
+                AccessorRole.Unrestricted,
+                "EntityInputQueue"
+            );
 
             _systemRunner.SetEventSubjects(_eventsManager);
 
@@ -784,10 +766,17 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Creates a standalone <see cref="WorldAccessor"/> not bound to any system. Useful for
-        /// application-level code that needs to interact with the ECS world outside of systems.
+        /// Creates a standalone <see cref="WorldAccessor"/> with the given <see cref="AccessorRole"/>.
+        /// The role controls component read/write rules, structural-change rules, and heap-allocation
+        /// rules — see <see cref="AccessorRole"/> for the full matrix. Pick <see cref="AccessorRole.Unrestricted"/>
+        /// only for non-system code (lifecycle hooks, debug tooling, event callbacks, networking,
+        /// scripting bridges); runtime gameplay code that runs as part of system execution should
+        /// declare a real role so rule violations surface loudly. Manually-created accessors never
+        /// gain input-system permissions; reach for <c>None</c> if you need to enqueue inputs from
+        /// non-system code.
         /// </summary>
         public WorldAccessor CreateAccessor(
+            AccessorRole role,
             string debugName = null,
 #if DEBUG
             [CallerFilePath] string callerFile = "",
@@ -804,7 +793,8 @@ namespace Trecs
             int callerLine = 0;
 #endif
             return CreateAccessorImpl(
-                phase: null,
+                role: role,
+                isInput: false,
                 debugName: debugName,
                 createdAtFile: callerFile,
                 createdAtLine: callerLine
@@ -812,40 +802,37 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Creates a <see cref="WorldAccessor"/> configured for the given system type, inspecting
-        /// its <see cref="PhaseAttribute"/> to determine the update phase. Defaults to
-        /// <see cref="SystemPhase.Fixed"/> when no <see cref="PhaseAttribute"/> is present.
+        /// Framework-internal: creates a <see cref="WorldAccessor"/> for an
+        /// <see cref="ISystem"/> by reflecting on the system type's
+        /// <see cref="ExecuteInAttribute"/>. End-user code should not call this —
+        /// systems get their accessor automatically from
+        /// <see cref="Initialize"/>; non-system code should use
+        /// <see cref="CreateAccessor(AccessorRole, string, string, int, string)"/>
+        /// with an explicit role.
         /// </summary>
-        public WorldAccessor CreateAccessor(Type ownerType)
+        internal WorldAccessor CreateAccessorForSystem(Type systemType)
         {
-            var debugName = ownerType.GetPrettyName();
+            var debugName = systemType.GetPrettyName();
 
-            var phaseAttribute = (PhaseAttribute)
-                ownerType.GetCustomAttributes(typeof(PhaseAttribute), true).SingleOrDefault();
+            var executeInAttribute = (ExecuteInAttribute)
+                systemType.GetCustomAttributes(typeof(ExecuteInAttribute), true).SingleOrDefault();
 
-            var phase = phaseAttribute?.Phase ?? SystemPhase.Fixed;
+            var phase = executeInAttribute?.Phase ?? SystemPhase.Fixed;
 
             // System-owned accessors take their identity from the system
             // type — no source-line origin to capture.
             return CreateAccessorImpl(
-                phase: phase,
+                role: phase.ToAccessorRole(),
+                isInput: phase == SystemPhase.Input,
                 debugName: debugName,
                 createdAtFile: string.Empty,
                 createdAtLine: 0
             );
         }
 
-        /// <summary>
-        /// Creates an accessor configured for the given system type, inspecting its
-        /// <see cref="PhaseAttribute"/> to determine the update phase.
-        /// </summary>
-        public WorldAccessor CreateAccessor<T>()
-        {
-            return CreateAccessor(typeof(T));
-        }
-
         internal WorldAccessor CreateAccessorImpl(
-            SystemPhase? phase,
+            AccessorRole role,
+            bool isInput,
             string debugName,
             string createdAtFile,
             int createdAtLine
@@ -866,7 +853,8 @@ namespace Trecs
                 fixedRng: _fixedRng,
                 variableRng: _variableUpdateRng,
                 entityInputQueue: _entityInputQueue,
-                phase: phase,
+                role: role,
+                isInput: isInput,
                 debugName: debugName,
                 createdAtFile: createdAtFile,
                 createdAtLine: createdAtLine
@@ -1007,14 +995,20 @@ namespace Trecs.Internal
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static WorldAccessor CreateAccessorExplicit(
             this World world,
-            SystemPhase? phase,
+            AccessorRole role,
+            bool isInput,
             string debugName,
             [CallerFilePath] string callerFile = "",
             [CallerLineNumber] int callerLine = 0
         )
         {
+            // Required role + isInput arguments (no defaults) so framework-internal
+            // callers — Lua system bridges, custom system loaders — have to declare
+            // exactly what they're constructing. isInput should be true iff the
+            // owning system is in SystemPhase.Input.
             return world.CreateAccessorImpl(
-                phase: phase,
+                role: role,
+                isInput: isInput,
                 debugName: debugName,
                 createdAtFile: callerFile,
                 createdAtLine: callerLine

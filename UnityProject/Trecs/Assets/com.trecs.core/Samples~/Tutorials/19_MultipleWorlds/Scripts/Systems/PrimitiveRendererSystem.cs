@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Trecs.Samples.MultipleWorlds
 {
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     public partial class PrimitiveRendererSystem : ISystem
     {
         readonly GameObjectRegistry _gameObjectRegistry;

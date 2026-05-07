@@ -47,7 +47,7 @@ namespace Trecs.Serialization
             _blobCache = world.GetBlobCache();
             _buffer = new SerializationBuffer(registry);
 
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Unrestricted);
             _eventSubscription = _world.Events.OnFixedUpdateCompleted(OnFixedUpdateCompleted);
         }
 
@@ -151,14 +151,15 @@ namespace Trecs.Serialization
             var finalFrame = _world.FixedFrame;
             _blobCache.GetAllActiveBlobIds(_recordingInfo.BlobIds);
 
-            var metadata = new RecordingMetadata(
-                version: _recordingVersion,
-                startFixedFrame: _recordingInfo.StartFrame,
-                endFixedFrame: finalFrame,
-                checksumFlags: _recordingInfo.ChecksumFlags,
-                checksums: _recordingInfo.Checksums,
-                blobIds: _recordingInfo.BlobIds
-            );
+            var metadata = new RecordingMetadata
+            {
+                Version = _recordingVersion,
+                StartFixedFrame = _recordingInfo.StartFrame,
+                EndFixedFrame = finalFrame,
+                ChecksumFlags = _recordingInfo.ChecksumFlags,
+                Checksums = _recordingInfo.Checksums,
+                BlobIds = _recordingInfo.BlobIds,
+            };
 
             long recordingNumBytes;
             try
@@ -266,6 +267,10 @@ namespace Trecs.Serialization
                 _buffer.MemoryStream.Position = 0;
                 _buffer.StartRead();
                 var metadata = _buffer.Read<RecordingMetadata>("metadata");
+                // verifySentinel: false — the sentinel sits at the end of the
+                // full payload (after every per-frame snapshot), so reading to
+                // it during a "peek" would defeat the point. Truncation
+                // detection is therefore deferred to StartPlayback.
                 _buffer.StopRead(verifySentinel: false);
                 return metadata;
             }

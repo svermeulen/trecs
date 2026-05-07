@@ -8,7 +8,8 @@ namespace Trecs.Tests
         public World World;
 
         WorldAccessor _accessor;
-        public WorldAccessor Accessor => _accessor ??= World.CreateAccessor();
+        public WorldAccessor Accessor =>
+            _accessor ??= World.CreateAccessor(AccessorRole.Unrestricted);
 
         public TestEnvironment(World world)
         {

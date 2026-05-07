@@ -7,7 +7,7 @@ namespace Trecs
     /// The system scheduler topologically sorts systems using these constraints; cycles cause an assertion failure.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-    public class ExecuteAfterAttribute : Attribute
+    public sealed class ExecuteAfterAttribute : Attribute
     {
         public ExecuteAfterAttribute(params Type[] systems)
         {
@@ -22,7 +22,7 @@ namespace Trecs
     /// The system scheduler topologically sorts systems using these constraints; cycles cause an assertion failure.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-    public class ExecuteBeforeAttribute : Attribute
+    public sealed class ExecuteBeforeAttribute : Attribute
     {
         public ExecuteBeforeAttribute(params Type[] systems)
         {
@@ -37,9 +37,9 @@ namespace Trecs
     /// default to <see cref="SystemPhase.Fixed"/>.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class PhaseAttribute : Attribute
+    public sealed class ExecuteInAttribute : Attribute
     {
-        public PhaseAttribute(SystemPhase phase)
+        public ExecuteInAttribute(SystemPhase phase)
         {
             Phase = phase;
         }
@@ -52,7 +52,7 @@ namespace Trecs
     /// Higher values execute later within the same update phase. Default priority is 0.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class ExecutePriorityAttribute : Attribute
+    public sealed class ExecutePriorityAttribute : Attribute
     {
         public ExecutePriorityAttribute(int priority)
         {
@@ -67,13 +67,13 @@ namespace Trecs
     /// Without this attribute, adding a duplicate system type causes an error.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
-    public class AllowMultipleAttribute : Attribute { }
+    public sealed class AllowMultipleAttribute : Attribute { }
 
     /// <summary>
     /// Controls what happens to an <see cref="InputAttribute"/> component when no input
     /// is provided for a fixed-update frame.
     /// </summary>
-    public enum MissingInputFrameBehaviour
+    public enum MissingInputBehavior
     {
         /// <summary>
         /// Resets the component to its <c>default</c> value when no input arrives.
@@ -91,7 +91,7 @@ namespace Trecs
     /// that interpolates a component between fixed-update snapshots each rendered frame.
     /// </summary>
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
-    public class GenerateInterpolatorSystemAttribute : Attribute
+    public sealed class GenerateInterpolatorSystemAttribute : Attribute
     {
         public GenerateInterpolatorSystemAttribute(string systemName, string groupName)
         {

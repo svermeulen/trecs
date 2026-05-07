@@ -7,7 +7,7 @@ namespace Trecs.Serialization
     /// Serializer for <see cref="List{T}"/>. Writes the item count followed by
     /// each element via the registered serializer for <typeparamref name="T"/>.
     /// </summary>
-    public class ListSerializer<T> : ISerializer<List<T>>
+    public sealed class ListSerializer<T> : ISerializer<List<T>>
     {
         public ListSerializer() { }
 

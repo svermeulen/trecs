@@ -59,7 +59,7 @@ namespace Trecs.SourceGen.Shared
         public static bool HasEntityFilter(IMethodSymbol method) =>
             PerformanceCache.HasAttributeByName(
                 method,
-                TrecsAttributeNames.EntityFilter,
+                TrecsAttributeNames.ForEachEntity,
                 TrecsNamespaces.Trecs
             );
 

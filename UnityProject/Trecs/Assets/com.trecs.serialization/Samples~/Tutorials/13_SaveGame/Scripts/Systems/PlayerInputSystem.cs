@@ -8,7 +8,7 @@ namespace Trecs.Serialization.Samples.SaveGame
     /// GetKeyDown fires only on the frame the key transitioned from up to
     /// down, so holding a key won't auto-repeat moves.
     /// </summary>
-    [Phase(SystemPhase.Input)]
+    [ExecuteIn(SystemPhase.Input)]
     public partial class PlayerInputSystem : ISystem
     {
         int2 _pendingStep;

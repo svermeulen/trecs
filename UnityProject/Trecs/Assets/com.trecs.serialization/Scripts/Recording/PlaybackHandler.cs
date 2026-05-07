@@ -59,7 +59,7 @@ namespace Trecs.Serialization
             _checksumBuffer = new SerializationBuffer(registry);
 
             _worldOwner = world;
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Unrestricted);
         }
 
         public PlaybackState State
@@ -203,7 +203,7 @@ namespace Trecs.Serialization
                 queueForRead.ClearAllInputs();
                 queueForRead.Deserialize(new TrecsSerializationReaderAdapter(_buffer));
 
-                var sentinelValue = _buffer.Read<int>("sentinel");
+                var sentinelValue = _buffer.Read<int>("recordingSentinel");
                 Assert.IsEqual(sentinelValue, TrecsConstants.RecordingSentinelValue);
 
                 _buffer.StopRead(verifySentinel: true);
@@ -242,14 +242,15 @@ namespace Trecs.Serialization
                     adjustedChecksums.Add(frame + frameOffset, checksum);
                 }
 
-                recordingMetadata = new RecordingMetadata(
-                    recordingMetadata.Version,
-                    adjustedStartFrame,
-                    adjustedEndFrame,
-                    recordingMetadata.ChecksumFlags,
-                    adjustedChecksums,
-                    recordingMetadata.BlobIds
-                );
+                recordingMetadata = new RecordingMetadata
+                {
+                    Version = recordingMetadata.Version,
+                    StartFixedFrame = adjustedStartFrame,
+                    EndFixedFrame = adjustedEndFrame,
+                    ChecksumFlags = recordingMetadata.ChecksumFlags,
+                    Checksums = adjustedChecksums,
+                    BlobIds = recordingMetadata.BlobIds,
+                };
             }
 
             _playbackMetadata = recordingMetadata;
@@ -373,8 +374,8 @@ namespace Trecs.Serialization
                 {
                     continue;
                 }
-                Assert.That(_worldOwner.IsSystemEnabled(i, EnableChannel.Playback) == !enable);
-                _worldOwner.SetSystemEnabled(i, EnableChannel.Playback, enable);
+                Assert.That(_world.IsSystemEnabled(i, EnableChannel.Playback) == !enable);
+                _world.SetSystemEnabled(i, EnableChannel.Playback, enable);
             }
         }
 

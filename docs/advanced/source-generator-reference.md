@@ -22,16 +22,15 @@ This page is a **cross-reference index**, not a tutorial. Each row links to the 
 |---|---|---|
 | `[ExecuteAfter(typeof(…))]`, `[ExecuteBefore(typeof(…))]` | `ISystem` / `IJobSystem` class | [Systems — Ordering](../core/systems.md) |
 | `[ExecutePriority(int)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
-| `[Phase(SystemPhase.Presentation)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
-| `[Phase(SystemPhase.LatePresentation)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
-| `[Phase(SystemPhase.Input)]` | `ISystem` class | [Input System](input-system.md) |
+| `[ExecuteIn(SystemPhase.Presentation)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
+| `[ExecuteIn(SystemPhase.LatePresentation)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
+| `[ExecuteIn(SystemPhase.Input)]` | `ISystem` class | [Input System](input-system.md) |
 
 ### Components and templates
 
 | Attribute | Target | See |
 |---|---|---|
 | `[Unwrap]` | single-field component structs | [Components — Unwrap](../core/components.md) |
-| `[FixedUpdateOnly]` | component struct | [Components](../core/components.md) |
 | `[VariableUpdateOnly]` | component struct | [Components](../core/components.md) |
 | `[Constant]` | component field | [Components](../core/components.md) |
 | `[Interpolated]` | template field | [Interpolation](interpolation.md) |

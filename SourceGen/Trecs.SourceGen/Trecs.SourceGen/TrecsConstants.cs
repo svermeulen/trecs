@@ -9,10 +9,10 @@ namespace Trecs.SourceGen
     {
         // Iteration markers. Aspect-vs-components routing is decided by inspecting the
         // method's parameter types (does it take an IAspect or a ref/in IEntityComponent),
-        // not by the attribute name itself. EntityFilter marks a normal iteration method;
-        // SingleEntity is the same shape but adds a post-loop assertion that the iteration
-        // count is exactly 1.
-        public const string EntityFilter = "ForEachEntityAttribute";
+        // not by the attribute name itself. ForEachEntity marks an iteration method;
+        // SingleEntity is per-parameter / per-field and resolves a singleton entity
+        // for that one parameter (with an assertion that exactly one entity matches).
+        public const string ForEachEntity = "ForEachEntityAttribute";
         public const string SingleEntity = "SingleEntityAttribute";
 
         public const string Unwrap = "UnwrapAttribute";

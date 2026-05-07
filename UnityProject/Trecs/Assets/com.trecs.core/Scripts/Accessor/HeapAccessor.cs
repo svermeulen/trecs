@@ -13,27 +13,31 @@ namespace Trecs
     {
         readonly EcsHeapAllocator _heapAllocator;
         readonly SystemRunner _systemRunner;
-        readonly SystemPhase? _phase;
+        readonly AccessorRole _role;
+        readonly bool _isInput;
         readonly Rng _fixedRng;
         readonly string _debugName;
 
         internal HeapAccessor(
             EcsHeapAllocator heapAllocator,
             SystemRunner systemRunner,
-            SystemPhase? phase,
+            AccessorRole role,
+            bool isInput,
             Rng fixedRng,
             string debugName
         )
         {
             _heapAllocator = heapAllocator;
             _systemRunner = systemRunner;
-            _phase = phase;
+            _role = role;
+            _isInput = isInput;
             _fixedRng = fixedRng;
             _debugName = debugName;
         }
 
-        bool IsFixedPhase => _phase == SystemPhase.Fixed;
-        bool IsInputPhase => _phase == SystemPhase.Input;
+        bool IsFixed => _role == AccessorRole.Fixed;
+        bool IsUnrestricted => _role == AccessorRole.Unrestricted;
+        bool IsInput => _isInput;
 
         internal int FixedFrame => _systemRunner.FixedFrame;
 
@@ -429,28 +433,29 @@ namespace Trecs
         void AssertCanAddInputsSystem()
         {
             Assert.That(
-                !_systemRunner.IsExecutingSystems || IsInputPhase,
-                "Attempted to use input system only functionality from a non-input system {}",
+                IsUnrestricted || IsInput,
+                "Attempted to use input-only functionality from a non-Input accessor {}",
                 _debugName
             );
         }
 
-        // Persistent heap allocations are only allowed from initialization
-        // (outside system execution) and fixed-update systems. Variable-update
-        // and input systems are rejected — see docs/advanced/heap-allocation-rules.md.
+        // Persistent heap allocations are only allowed from Fixed-role and
+        // None-role accessors. Input-system and Variable-role accessors are
+        // rejected regardless of whether systems are currently executing —
+        // see docs/advanced/heap-allocation-rules.md.
         [Conditional("DEBUG")]
         void AssertCanAllocatePersistent()
         {
-            if (!_systemRunner.IsExecutingSystems || IsFixedPhase)
+            if (IsUnrestricted || IsFixed)
             {
                 return;
             }
 
-            if (IsInputPhase)
+            if (IsInput)
             {
                 Assert.That(
                     false,
-                    "Cannot allocate persistent heap pointers from input system {}. Use the FrameScoped variant (e.g. AllocSharedFrameScoped) instead so that the pointer is frame scoped.",
+                    "Cannot allocate persistent heap pointers from input-system accessor {}. Use the FrameScoped variant (e.g. AllocSharedFrameScoped) instead so that the pointer is frame scoped.",
                     _debugName
                 );
             }
@@ -458,7 +463,7 @@ namespace Trecs
             {
                 Assert.That(
                     false,
-                    "Cannot allocate heap pointers from variable-update system {}. Heap allocation is only allowed from initialization and fixed-update systems. See Heap Allocation Rules in the docs.",
+                    "Cannot allocate heap pointers from Variable-role accessor {}. Heap allocation is only allowed from Fixed-role and None-role accessors. See Heap Allocation Rules in the docs.",
                     _debugName
                 );
             }

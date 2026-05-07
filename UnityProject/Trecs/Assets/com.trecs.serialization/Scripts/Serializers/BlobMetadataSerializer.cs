@@ -2,7 +2,7 @@ using System;
 
 namespace Trecs.Serialization
 {
-    internal class BlobMetadataSerializer : ISerializer<BlobMetadata>
+    public sealed class BlobMetadataSerializer : ISerializer<BlobMetadata>
     {
         public BlobMetadataSerializer() { }
 

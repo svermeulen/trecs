@@ -72,8 +72,7 @@ public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
     [Interpolated]
     Position Position = default;               // Smoothed between fixed frames
 
-    [FixedUpdateOnly]
-    Velocity Velocity;                          // Only writable in fixed update
+    Velocity Velocity;                          // Plain simulation state — Fixed-only writes
 
     [VariableUpdateOnly]
     RenderState RenderState;                    // Only writable in variable update
@@ -81,7 +80,7 @@ public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
     [Constant]
     PlayerId PlayerId;                          // Immutable after creation
 
-    [Input(MissingInputFrameBehaviour.RetainCurrent)]
+    [Input(MissingInputBehavior.RetainCurrent)]
     MoveInput MoveInput;                        // Player input, retains last value
 }
 ```
@@ -89,10 +88,11 @@ public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 | Attribute | Effect |
 |-----------|--------|
 | `[Interpolated]` | Generates interpolation components for smooth rendering. See [Interpolation](../advanced/interpolation.md). |
-| `[FixedUpdateOnly]` | Component is only writable during fixed update phase |
-| `[VariableUpdateOnly]` | Component is only writable during variable update phase |
-| `[Constant]` | Component is immutable after entity creation |
+| `[VariableUpdateOnly]` | Component is render-only state — only variable-cadence phases (`Input` / `EarlyPresentation` / `Presentation` / `LatePresentation`) may read or write it. `Fixed` systems may not touch it. Asserted at the access site — see [Accessor Roles](../advanced/accessor-roles.md#capability-matrix) for the full role × access matrix. |
+| `[Constant]` | Component is immutable after entity creation. Asserted at the write site. |
 | `[Input(...)]` | Marks component as input data. See [Input System](../advanced/input-system.md). |
+
+> Components without any attribute are treated as **simulation state**: any phase may read them, but only `Fixed` systems may write. There is no separate `[FixedUpdateOnly]` attribute — that's the default.
 
 ## Global Entity
 

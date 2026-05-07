@@ -16,7 +16,7 @@ namespace Trecs.Serialization.Samples.Snake
             // frames, so an input the player makes between move ticks must
             // persist until the next tick to be processed. RetainCurrent
             // keeps the last requested direction in place across frames.
-            [Input(MissingInputFrameBehaviour.RetainCurrent)]
+            [Input(MissingInputBehavior.RetainCurrent)]
             MoveInput MoveInput = default;
 
             SnakeLength SnakeLength = new(4);

@@ -71,7 +71,10 @@ namespace Trecs.Internal
             );
             DeferredQueues.Add(
                 entitySet.Id,
-                new NativeSetDeferredQueues(AtomicNativeBags.Create(), AtomicNativeBags.Create())
+                new NativeSetDeferredQueues(
+                    AtomicNativeBags.Create(Allocator.Persistent),
+                    AtomicNativeBags.Create(Allocator.Persistent)
+                )
             );
 
             foreach (var group in groups)
@@ -148,14 +151,14 @@ namespace Trecs.Internal
             ref NativeSetDeferredQueues queues
         )
         {
-            for (int i = 0; i < queues.RemoveQueue.Length; i++)
+            for (int i = 0; i < queues.RemoveQueue.ThreadSlotCount; i++)
             {
                 ref var bag = ref queues.RemoveQueue.GetBag(i);
                 while (!bag.IsEmpty)
                     set.RemoveImmediateUnchecked(bag.Dequeue<EntityIndex>());
             }
 
-            for (int i = 0; i < queues.AddQueue.Length; i++)
+            for (int i = 0; i < queues.AddQueue.ThreadSlotCount; i++)
             {
                 ref var bag = ref queues.AddQueue.GetBag(i);
                 while (!bag.IsEmpty)
@@ -169,7 +172,7 @@ namespace Trecs.Internal
         )
         {
             var allRemoves = new NativeList<EntityIndex>(64, Allocator.Temp);
-            for (int i = 0; i < queues.RemoveQueue.Length; i++)
+            for (int i = 0; i < queues.RemoveQueue.ThreadSlotCount; i++)
             {
                 ref var bag = ref queues.RemoveQueue.GetBag(i);
                 while (!bag.IsEmpty)
@@ -181,7 +184,7 @@ namespace Trecs.Internal
             allRemoves.Dispose();
 
             var allAdds = new NativeList<EntityIndex>(64, Allocator.Temp);
-            for (int i = 0; i < queues.AddQueue.Length; i++)
+            for (int i = 0; i < queues.AddQueue.ThreadSlotCount; i++)
             {
                 ref var bag = ref queues.AddQueue.GetBag(i);
                 while (!bag.IsEmpty)

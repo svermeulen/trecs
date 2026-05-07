@@ -225,41 +225,33 @@ public class Diagnostics_TRECS090_to_100_AutoJobTests
             }
             """;
 
-        AssertDiagnostic(
-            source,
-            "TRECS100",
-            new IIncrementalGenerator[]
-            {
-                new RunOnceGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
-            }
-        );
+        AssertDiagnostic(source, "TRECS100", new IIncrementalGenerator[]
+        {
+            new RunOnceGenerator(),
+            new AspectGenerator(),
+            new EntityComponentGenerator(),
+        });
     }
 
     static void AssertDiagnostic(string source, string expectedId)
     {
-        AssertDiagnostic(
-            source,
-            expectedId,
-            new IIncrementalGenerator[]
-            {
-                new AutoJobGenerator(),
-                new AutoSystemGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
-            }
-        );
+        AssertDiagnostic(source, expectedId, new IIncrementalGenerator[]
+        {
+            new AutoJobGenerator(),
+            new AutoSystemGenerator(),
+            new AspectGenerator(),
+            new EntityComponentGenerator(),
+        });
     }
 
-    static void AssertDiagnostic(
-        string source,
-        string expectedId,
-        IIncrementalGenerator[] generators
-    )
+    static void AssertDiagnostic(string source, string expectedId, IIncrementalGenerator[] generators)
     {
         var run = GeneratorTestHarness.Run(generators, source);
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
-        Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
+        Assert.That(
+            diag,
+            Is.Not.Null,
+            $"Expected {expectedId}, got:\n{run.Format()}"
+        );
     }
 }

@@ -11,7 +11,7 @@ namespace Trecs.Serialization
     /// - Each serializer declares the type it handles via ISerializer&lt;T&gt;.
     ///   During serialization, the type ID is written first, then the serializer is called.
     ///
-    /// - Type IDs are computed by ITypeIdProvider (from [SerializationId] attribute or stable hash).
+    /// - Type IDs are computed by TypeIdProvider (from [SerializationId] attribute or stable hash).
     ///
     /// - Serializers bound in the DI container are auto-discovered via constructor injection.
     ///   Additional serializers can be registered dynamically via RegisterBlit, RegisterEnum, etc.
@@ -62,13 +62,13 @@ namespace Trecs.Serialization
         {
             var objectType = ExtractObjectType(serializer.GetType(), typeof(ISerializer<>));
 
-            _log.Trace("Registering serializer {} for type {}", serializer.GetType(), objectType);
-
             Assert.That(
                 !_objectTypeToSerializer.ContainsKey(objectType),
                 "Serializer for type {} is already registered",
                 objectType
             );
+
+            _log.Trace("Registering serializer {} for type {}", serializer.GetType(), objectType);
 
             TypeIdProvider.Register(objectType);
             _objectTypeToSerializer.Add(objectType, serializer);
@@ -78,15 +78,15 @@ namespace Trecs.Serialization
         {
             var objectType = ExtractObjectType(serializer.GetType(), typeof(ISerializerDelta<>));
 
-            _log.Trace(
-                "Registering serializer delta {} for type {}",
-                serializer.GetType(),
-                objectType
-            );
-
             Assert.That(
                 !_objectTypeToSerializerDelta.ContainsKey(objectType),
                 "Serializer delta for type {} is already registered",
+                objectType
+            );
+
+            _log.Trace(
+                "Registering serializer delta {} for type {}",
+                serializer.GetType(),
                 objectType
             );
 

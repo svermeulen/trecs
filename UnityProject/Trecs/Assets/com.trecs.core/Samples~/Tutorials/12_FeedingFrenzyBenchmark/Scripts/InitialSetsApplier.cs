@@ -8,7 +8,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
         public InitialSetsApplier(FrenzyConfigSettings config, World world)
         {
-            World = world.CreateAccessor();
+            World = world.CreateAccessor(AccessorRole.Fixed);
 
             if (config.SubsetApproach != FrenzySubsetApproach.Sets)
             {

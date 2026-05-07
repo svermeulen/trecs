@@ -137,7 +137,10 @@ namespace Trecs.Serialization
 
         public void Initialize()
         {
-            _accessor = _world.CreateAccessor("TrecsGameStateController");
+            _accessor = _world.CreateAccessor(
+                AccessorRole.Unrestricted,
+                "TrecsGameStateController"
+            );
             _lastBroadcastMode = CurrentMode;
             // Poll on every fixed frame so auto-promotions (Playback →
             // Recording when the simulation walks past the buffer tail) flip
@@ -230,9 +233,9 @@ namespace Trecs.Serialization
                 {
                     continue;
                 }
-                if (_world.IsSystemEnabled(i, EnableChannel.Playback) != enable)
+                if (_accessor.IsSystemEnabled(i, EnableChannel.Playback) != enable)
                 {
-                    _world.SetSystemEnabled(i, EnableChannel.Playback, enable);
+                    _accessor.SetSystemEnabled(i, EnableChannel.Playback, enable);
                 }
             }
         }

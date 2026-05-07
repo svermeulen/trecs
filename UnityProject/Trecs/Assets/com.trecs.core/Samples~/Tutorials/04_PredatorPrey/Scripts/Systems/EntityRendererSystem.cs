@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Trecs.Samples.PredatorPrey
 {
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     public partial class EntityRendererSystem : ISystem
     {
         readonly GameObjectRegistry _gameObjectRegistry;

@@ -10,7 +10,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             _settings = settings;
             _config = config;
 
-            World = world.CreateAccessor();
+            World = world.CreateAccessor(AccessorRole.Fixed);
         }
 
         WorldAccessor World { get; }

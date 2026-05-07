@@ -11,7 +11,7 @@ namespace Trecs.Samples.FeedingFrenzy101
     /// Position/Rotation (read by RendererSystem) by lerping toward
     /// SimPosition/SimRotation (written by fixed-update systems).
     /// </summary>
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     public partial class VisualSmoothingSystem : ISystem
     {
         const float ChaseSpeed = 15f;

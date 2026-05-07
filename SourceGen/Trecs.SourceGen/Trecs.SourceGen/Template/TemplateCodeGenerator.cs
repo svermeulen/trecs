@@ -138,12 +138,20 @@ namespace Trecs.SourceGen.Template
             if (data.TagTypeNames.Length > 0)
             {
                 var tagArgs = string.Join(", ", data.TagTypeNames.Select(t => $"Tag<{t}>.Value"));
-                sb.AppendLine(argIndent, $"localTags: new Tag[] {{ {tagArgs} }}");
+                sb.AppendLine(argIndent, $"localTags: new Tag[] {{ {tagArgs} }},");
             }
             else
             {
-                sb.AppendLine(argIndent, "localTags: Array.Empty<Tag>()");
+                sb.AppendLine(argIndent, "localTags: Array.Empty<Tag>(),");
             }
+
+            // localVariableUpdateOnly — template-level flag that propagates
+            // VUO semantics to every component on this exact template class.
+            // Inheritance is resolved transitively in WorldInfo.ResolveTemplate.
+            sb.AppendLine(
+                argIndent,
+                $"localVariableUpdateOnly: {(data.IsVariableUpdateOnly ? "true" : "false")}"
+            );
 
             sb.AppendLine(indentLevel, ");");
         }
@@ -157,7 +165,6 @@ namespace Trecs.SourceGen.Template
         {
             bool hasConfig =
                 component.IsInterpolated
-                || component.IsFixedUpdateOnly
                 || component.IsVariableUpdateOnly
                 || component.IsConstant
                 || component.IsInput
@@ -167,7 +174,7 @@ namespace Trecs.SourceGen.Template
             {
                 sb.AppendLine(
                     indentLevel,
-                    $"new ComponentDeclaration<{component.ComponentTypeFullName}>(null, null, null, null, null, null, null, null),"
+                    $"new ComponentDeclaration<{component.ComponentTypeFullName}>(null, null, null, null, null, null, null),"
                 );
                 return;
             }
@@ -180,10 +187,6 @@ namespace Trecs.SourceGen.Template
 
             sb.AppendLine(
                 paramIndent,
-                $"fixedUpdateOnly: {NullableBool(component.IsFixedUpdateOnly)},"
-            );
-            sb.AppendLine(
-                paramIndent,
                 $"variableUpdateOnly: {NullableBool(component.IsVariableUpdateOnly)},"
             );
             sb.AppendLine(paramIndent, $"isInput: {NullableBool(component.IsInput)},");
@@ -191,7 +194,7 @@ namespace Trecs.SourceGen.Template
             if (component.IsInput)
             {
                 var frameBehaviour =
-                    component.InputFrameBehaviour ?? "MissingInputFrameBehaviour.ResetToDefault";
+                    component.OnMissing ?? "MissingInputBehavior.ResetToDefault";
                 sb.AppendLine(paramIndent, $"inputFrameBehaviour: {frameBehaviour},");
                 sb.AppendLine(
                     paramIndent,

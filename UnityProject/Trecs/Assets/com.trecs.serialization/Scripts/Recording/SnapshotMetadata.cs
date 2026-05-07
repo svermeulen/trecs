@@ -30,7 +30,7 @@ namespace Trecs.Serialization
             registry.RegisterSerializer<Serializer>();
         }
 
-        public class Serializer : ISerializer<SnapshotMetadata>
+        public sealed class Serializer : ISerializer<SnapshotMetadata>
         {
             public Serializer() { }
 

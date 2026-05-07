@@ -12,6 +12,18 @@ namespace Trecs.Internal
     {
         static byte[] _buffer;
 
+        static MemoryBlitter()
+        {
+            // Trecs serializes via direct memory blits (Buffer.MemoryCopy), so the
+            // wire format is little-endian-on-disk by virtue of every supported
+            // Unity target being LE. If Unity ever ships a BE target, payloads
+            // saved on one would not load on the other — fail fast at startup.
+            Assert.That(
+                BitConverter.IsLittleEndian,
+                "Trecs serialization assumes a little-endian platform"
+            );
+        }
+
         static void EnsureBufferCapacity(int requiredCapacity)
         {
             if (_buffer == null)

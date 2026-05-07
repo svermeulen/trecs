@@ -44,8 +44,8 @@ namespace Trecs.Internal
 
             _registeredGroups = new NativeList<GroupIndex>(validGroups.Count, Allocator.Persistent);
 
-            _jobAddQueue = AtomicNativeBags.Create();
-            _jobRemoveQueue = AtomicNativeBags.Create();
+            _jobAddQueue = AtomicNativeBags.Create(Allocator.Persistent);
+            _jobRemoveQueue = AtomicNativeBags.Create(Allocator.Persistent);
 
             // Populate only the slots whose groups match this set's template.
             // Unmatched slots remain default(SetGroupEntry) — IsValid == false.
@@ -151,7 +151,7 @@ namespace Trecs.Internal
         /// </summary>
         internal void FlushJobWrites()
         {
-            for (int i = 0; i < _jobRemoveQueue.Length; i++)
+            for (int i = 0; i < _jobRemoveQueue.ThreadSlotCount; i++)
             {
                 ref var bag = ref _jobRemoveQueue.GetBag(i);
                 while (!bag.IsEmpty)
@@ -161,7 +161,7 @@ namespace Trecs.Internal
                 }
             }
 
-            for (int i = 0; i < _jobAddQueue.Length; i++)
+            for (int i = 0; i < _jobAddQueue.ThreadSlotCount; i++)
             {
                 ref var bag = ref _jobAddQueue.GetBag(i);
                 while (!bag.IsEmpty)
@@ -192,7 +192,7 @@ namespace Trecs.Internal
 
         static void DrainBags(AtomicNativeBags bags)
         {
-            for (int i = 0; i < bags.Length; i++)
+            for (int i = 0; i < bags.ThreadSlotCount; i++)
             {
                 ref var bag = ref bags.GetBag(i);
                 while (!bag.IsEmpty)

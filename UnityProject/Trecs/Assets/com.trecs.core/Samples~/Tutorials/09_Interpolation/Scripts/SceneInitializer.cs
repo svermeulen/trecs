@@ -19,7 +19,7 @@ namespace Trecs.Samples.Interpolation
             float orbitSpeed
         )
         {
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Fixed);
             _gameObjectRegistry = gameObjectRegistry;
             _entitiesPerRing = entitiesPerRing;
             _orbitRadius = orbitRadius;

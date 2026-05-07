@@ -15,7 +15,8 @@ namespace Trecs
             IReadOnlyList<Template> localBaseTemplates,
             IReadOnlyList<TagSet> partitions,
             IReadOnlyList<IComponentDeclaration> localComponentDeclarations,
-            IReadOnlyList<Tag> localTags
+            IReadOnlyList<Tag> localTags,
+            bool localVariableUpdateOnly = false
         )
         {
             DebugName = debugName;
@@ -23,7 +24,17 @@ namespace Trecs
             LocalComponentDeclarations = localComponentDeclarations;
             LocalTags = localTags;
             Partitions = partitions;
+            LocalVariableUpdateOnly = localVariableUpdateOnly;
         }
+
+        /// <summary>
+        /// True iff this exact template class is declared <c>[VariableUpdateOnly]</c>.
+        /// Does NOT account for inheritance — a derived template that inherits VUO
+        /// from a base will still report <c>false</c> here. Production access-rule
+        /// code should read <see cref="ResolvedTemplate.VariableUpdateOnly"/> instead,
+        /// which transitively ORs the flag across the full base-template chain.
+        /// </summary>
+        public bool LocalVariableUpdateOnly { get; }
 
         public override string ToString()
         {

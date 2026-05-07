@@ -37,8 +37,8 @@ public class RunOnceGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new RunOnceGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -78,8 +78,8 @@ public class RunOnceGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new RunOnceGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -115,7 +115,7 @@ public class RunOnceGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new RunOnceGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -147,7 +147,7 @@ public class RunOnceGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new RunOnceGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -180,8 +180,8 @@ public class RunOnceGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new RunOnceGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -215,8 +215,8 @@ public class RunOnceGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new RunOnceGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -250,8 +250,8 @@ public class RunOnceGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new RunOnceGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -285,8 +285,8 @@ public class RunOnceGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new RunOnceGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -323,8 +323,7 @@ public class RunOnceGeneratorTests
             run.GenDiagnostics.Any(d => d.Id == "TRECS053"),
             Is.True,
             "Expected TRECS053 (TagAndTagsBothSpecified) when mixing positional ctor "
-                + "with named Tag/Tags. Got: "
-                + run.Format()
+                + "with named Tag/Tags. Got: " + run.Format()
         );
     }
 }

@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Trecs.Internal;
+using Unity.Collections;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -12,7 +13,7 @@ namespace Trecs.Tests
         [Test]
         public void Create_IsEmpty()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             NAssert.IsTrue(bag.IsEmpty);
             NAssert.AreEqual(0, bag.Length);
@@ -23,7 +24,7 @@ namespace Trecs.Tests
         [Test]
         public void Dispose_ThenDisposeAgain_NoThrow()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
             bag.Dispose();
             // Second dispose should be safe (null check)
             bag.Dispose();
@@ -36,7 +37,7 @@ namespace Trecs.Tests
         [Test]
         public void Enqueue_SingleItem_NotEmpty()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             bag.Enqueue(42);
 
@@ -50,7 +51,7 @@ namespace Trecs.Tests
         [Test]
         public void Enqueue_Dequeue_ReturnsCorrectValue()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             bag.Enqueue(42);
             var result = bag.Dequeue<int>();
@@ -63,7 +64,7 @@ namespace Trecs.Tests
         [Test]
         public void Enqueue_Multiple_DequeueInOrder()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             bag.Enqueue(10);
             bag.Enqueue(20);
@@ -79,7 +80,7 @@ namespace Trecs.Tests
         [Test]
         public void Enqueue_Dequeue_All_IsEmpty()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             bag.Enqueue(1);
             bag.Enqueue(2);
@@ -98,7 +99,7 @@ namespace Trecs.Tests
         [Test]
         public void MixedTypes_EnqueueDequeue_CorrectValues()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             bag.Enqueue(42);
             bag.Enqueue(3.14f);
@@ -116,7 +117,7 @@ namespace Trecs.Tests
         [Test]
         public void MixedTypes_Struct_RoundTrips()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             var data = new TestVec { X = 1.5f, Y = 2.5f };
             bag.Enqueue(data);
@@ -137,7 +138,7 @@ namespace Trecs.Tests
         [Test]
         public void Clear_MakesEmpty()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             bag.Enqueue(1);
             bag.Enqueue(2);
@@ -153,7 +154,7 @@ namespace Trecs.Tests
         [Test]
         public void Clear_CanReuse()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             bag.Enqueue(10);
             bag.Enqueue(20);
@@ -173,7 +174,7 @@ namespace Trecs.Tests
         [Test]
         public void ReserveEnqueue_ThenAccess_WritesCorrectly()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             ref var reserved = ref bag.ReserveEnqueue<int>(out var index);
             reserved = 99;
@@ -192,7 +193,7 @@ namespace Trecs.Tests
         [Test]
         public void ReserveEnqueue_UpdateLater_DequeuesUpdatedValue()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             ref var reserved = ref bag.ReserveEnqueue<int>(out var index);
             reserved = 10;
@@ -213,7 +214,7 @@ namespace Trecs.Tests
         [Test]
         public void Enqueue_BeyondInitialCapacity_Grows()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             // Enqueue many items to force growth
             for (int i = 0; i < 100; i++)
@@ -237,7 +238,7 @@ namespace Trecs.Tests
         [Test]
         public void Enqueue_LargeStructs_GrowsCorrectly()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             for (int i = 0; i < 50; i++)
             {
@@ -263,7 +264,7 @@ namespace Trecs.Tests
         [Test]
         public void WrapAround_EnqueueDequeueEnqueue_WorksCorrectly()
         {
-            var bag = NativeBag.Create();
+            var bag = NativeBag.Create(Allocator.Persistent);
 
             // Fill, drain, refill — exercises the ring buffer wrap-around
             for (int i = 0; i < 20; i++)

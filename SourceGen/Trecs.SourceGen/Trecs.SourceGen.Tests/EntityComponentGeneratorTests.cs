@@ -5,13 +5,13 @@ using Trecs.SourceGen;
 namespace Trecs.SourceGen.Tests;
 
 /// <summary>
-/// Compile-cleanliness tests for IncrementalEntityComponentGenerator. The generator emits
+/// Compile-cleanliness tests for EntityComponentGenerator. The generator emits
 /// Equals / GetHashCode / operator overloads for partial structs implementing IEntityComponent;
 /// regressions usually surface as the emitted partial failing to compile (wrong type-parameter
 /// list, missing namespace, double [Serializable], etc.).
 /// </summary>
 [TestFixture]
-public class IncrementalEntityComponentGeneratorTests
+public class EntityComponentGeneratorTests
 {
     [Test]
     public void SimpleComponent_CompilesCleanly()
@@ -27,15 +27,11 @@ public class IncrementalEntityComponentGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(new IncrementalEntityComponentGenerator(), source);
+        var run = GeneratorTestHarness.Run(new EntityComponentGenerator(), source);
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
         Assert.That(run.GenErrors, Is.Empty, run.Format());
-        Assert.That(
-            run.GeneratedTrees,
-            Is.Not.Empty,
-            "Expected the generator to emit at least one file."
-        );
+        Assert.That(run.GeneratedTrees, Is.Not.Empty, "Expected the generator to emit at least one file.");
     }
 
     [Test]
@@ -55,7 +51,7 @@ public class IncrementalEntityComponentGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(new IncrementalEntityComponentGenerator(), source);
+        var run = GeneratorTestHarness.Run(new EntityComponentGenerator(), source);
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
     }
@@ -77,7 +73,7 @@ public class IncrementalEntityComponentGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(new IncrementalEntityComponentGenerator(), source);
+        var run = GeneratorTestHarness.Run(new EntityComponentGenerator(), source);
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
         // CS0579 = "Duplicate attribute" — name it specifically so a regression points
@@ -108,7 +104,7 @@ public class IncrementalEntityComponentGeneratorTests
             }
             """;
 
-        var run = GeneratorTestHarness.Run(new IncrementalEntityComponentGenerator(), source);
+        var run = GeneratorTestHarness.Run(new EntityComponentGenerator(), source);
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
     }

@@ -87,11 +87,6 @@ namespace Trecs
             get { return Handle.IsNull; }
         }
 
-        public readonly bool IsCreated
-        {
-            get { return !IsNull; }
-        }
-
         public bool Equals(NativeUniquePtr<T> other)
         {
             return Handle.Equals(other.Handle);

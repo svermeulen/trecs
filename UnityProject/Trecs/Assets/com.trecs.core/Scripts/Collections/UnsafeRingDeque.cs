@@ -30,9 +30,9 @@ namespace Trecs.Internal // not part of public api atm
         public const int DefaultCapacity = 16;
 
         [NativeDisableUnsafePtrRestriction]
-        public T* Ptr;
+        internal T* Ptr;
 
-        public AllocatorManager.AllocatorHandle Allocator;
+        internal AllocatorManager.AllocatorHandle Allocator;
 
         internal int m_Capacity;
         internal int m_Length;

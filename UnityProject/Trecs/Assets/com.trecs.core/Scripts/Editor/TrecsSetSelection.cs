@@ -220,7 +220,10 @@ namespace Trecs
             {
                 if (_accessor == null || _accessorWorld != world)
                 {
-                    _accessor = world.CreateAccessor("TrecsSetSelectionInspector");
+                    _accessor = world.CreateAccessor(
+                        AccessorRole.Unrestricted,
+                        "TrecsSetSelectionInspector"
+                    );
                     _accessorWorld = world;
                 }
                 _entitiesValue.text = _accessor.CountEntitiesInSet(entitySet.Id).ToString();

@@ -1117,7 +1117,10 @@ namespace Trecs.Serialization
             }
             try
             {
-                _selectedAccessor ??= _selectedWorld.CreateAccessor("TrecsPlayerWindow");
+                _selectedAccessor ??= _selectedWorld.CreateAccessor(
+                    AccessorRole.Unrestricted,
+                    "TrecsPlayerWindow"
+                );
                 runner = _selectedAccessor.GetSystemRunner();
                 return runner != null;
             }
@@ -1156,7 +1159,10 @@ namespace Trecs.Serialization
                 return;
             }
 
-            _selectedAccessor ??= _selectedWorld.CreateAccessor("TrecsPlayerWindow");
+            _selectedAccessor ??= _selectedWorld.CreateAccessor(
+                AccessorRole.Unrestricted,
+                "TrecsPlayerWindow"
+            );
 
             var controller = GetController();
             if (controller == null)

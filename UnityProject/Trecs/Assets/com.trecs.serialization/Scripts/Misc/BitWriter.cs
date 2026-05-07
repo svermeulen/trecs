@@ -1,10 +1,11 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
-using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Internal
 {
-    internal class BitWriter
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public sealed class BitWriter
     {
         readonly List<byte> _bytes = new();
         byte _currentByte = 0;

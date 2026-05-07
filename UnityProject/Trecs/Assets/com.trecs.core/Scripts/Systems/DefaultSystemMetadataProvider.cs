@@ -200,10 +200,12 @@ namespace Trecs.Internal
                     directDepsIndices = new List<int>();
                 }
 
-                var phaseAttribute = (PhaseAttribute)
-                    systemType.GetCustomAttributes(typeof(PhaseAttribute), true).SingleOrDefault();
+                var executeInAttribute = (ExecuteInAttribute)
+                    systemType
+                        .GetCustomAttributes(typeof(ExecuteInAttribute), true)
+                        .SingleOrDefault();
 
-                var phase = phaseAttribute?.Phase ?? SystemPhase.Fixed;
+                var phase = executeInAttribute?.Phase ?? SystemPhase.Fixed;
 
                 var priorityAttribute = (ExecutePriorityAttribute)
                     systemType

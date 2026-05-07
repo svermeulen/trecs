@@ -50,16 +50,7 @@ namespace Trecs.Tests
                 partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestInt>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                    ),
+                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Alpha }
             );
@@ -76,36 +67,9 @@ namespace Trecs.Tests
                 partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestInt>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                    ),
-                    new ComponentDeclaration<TestFloat>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                    ),
-                    new ComponentDeclaration<TestVec>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                    ),
+                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null, null),
+                    new ComponentDeclaration<TestFloat>(null, null, null, null, null, null, null),
+                    new ComponentDeclaration<TestVec>(null, null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Alpha }
             );
@@ -126,16 +90,7 @@ namespace Trecs.Tests
                 },
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestInt>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                    ),
+                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Gamma }
             );
@@ -156,16 +111,7 @@ namespace Trecs.Tests
                 partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestInt>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                    ),
+                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Alpha }
             );
@@ -191,16 +137,7 @@ namespace Trecs.Tests
                 partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestInt>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                    ),
+                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Alpha }
             );
@@ -211,16 +148,7 @@ namespace Trecs.Tests
                 partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestFloat>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                    ),
+                    new ComponentDeclaration<TestFloat>(null, null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Beta }
             );
@@ -244,7 +172,6 @@ namespace Trecs.Tests
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
-                        fixedUpdateOnly: null,
                         variableUpdateOnly: null,
                         isInput: null,
                         inputFrameBehaviour: null,
@@ -275,7 +202,6 @@ namespace Trecs.Tests
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
-                        fixedUpdateOnly: null,
                         variableUpdateOnly: null,
                         isInput: null,
                         inputFrameBehaviour: null,
@@ -304,10 +230,9 @@ namespace Trecs.Tests
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestInt>(
-                        fixedUpdateOnly: null,
                         variableUpdateOnly: null,
                         isInput: true,
-                        inputFrameBehaviour: MissingInputFrameBehaviour.ResetToDefault,
+                        inputFrameBehaviour: MissingInputBehavior.ResetToDefault,
                         warnOnMissingInput: false,
                         isConstant: null,
                         isInterpolated: null,
@@ -320,10 +245,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, t.LocalComponentDeclarations.Count);
             var decl = t.LocalComponentDeclarations[0];
             NAssert.AreEqual(true, decl.IsInput, "IsInput flag should be true");
-            NAssert.AreEqual(
-                MissingInputFrameBehaviour.ResetToDefault,
-                decl.MissingInputFrameBehaviour
-            );
+            NAssert.AreEqual(MissingInputBehavior.ResetToDefault, decl.MissingInputBehavior);
             NAssert.AreEqual(false, decl.WarnOnMissingInput);
         }
 

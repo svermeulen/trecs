@@ -93,7 +93,7 @@ public partial class WakeUpSystem : ISystem
 Two `[ForEachEntity]` methods with different tag filters:
 
 ```csharp
-[Phase(SystemPhase.Presentation)]
+[ExecuteIn(SystemPhase.Presentation)]
 public partial class BallRendererSystem : ISystem
 {
     [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]

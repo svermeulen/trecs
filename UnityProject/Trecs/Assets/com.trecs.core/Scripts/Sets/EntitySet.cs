@@ -12,6 +12,14 @@ namespace Trecs
     public readonly struct EntitySet : IEquatable<EntitySet>, IStableHashProvider
     {
         public readonly SetId Id;
+
+        /// <summary>
+        /// The tag scope this set is restricted to — i.e. only entities whose group
+        /// tag set is a superset of this <see cref="TagSet"/> can be members. Set from
+        /// the type arguments to <c>IEntitySet&lt;...&gt;</c>; for a "global" set
+        /// declared as <c>IEntitySet</c> with no type arguments (any entity is eligible),
+        /// this is <see cref="TagSet.Null"/>.
+        /// </summary>
         public readonly TagSet Tags;
         public readonly string DebugName;
 

@@ -39,8 +39,8 @@ public class AutoJobGeneratorTests
             {
                 new AutoJobGenerator(),
                 new AutoSystemGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -80,8 +80,8 @@ public class AutoJobGeneratorTests
             {
                 new AutoJobGenerator(),
                 new AutoSystemGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -127,8 +127,8 @@ public class AutoJobGeneratorTests
             {
                 new AutoJobGenerator(),
                 new AutoSystemGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -164,8 +164,8 @@ public class AutoJobGeneratorTests
             {
                 new AutoJobGenerator(),
                 new AutoSystemGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -202,8 +202,8 @@ public class AutoJobGeneratorTests
             {
                 new AutoJobGenerator(),
                 new AutoSystemGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );

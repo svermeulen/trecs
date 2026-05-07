@@ -6,7 +6,7 @@ namespace Trecs.SourceGen.Tests;
 
 /// <summary>
 /// Negative tests for the Aspect diagnostics group (TRECS009-023). Most of these are
-/// raised by IncrementalAspectGenerator's validator (or its component-type helper)
+/// raised by AspectGenerator's validator (or its component-type helper)
 /// when the user declares an aspect struct or an [Unwrap] component that violates
 /// the contract.
 ///
@@ -116,16 +116,12 @@ public class Diagnostics_TRECS009_to_023_AspectTests
             }
             """;
 
-        AssertDiagnostic(
-            source,
-            "TRECS022",
-            new IIncrementalGenerator[]
-            {
-                new ForEachAspectGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
-            }
-        );
+        AssertDiagnostic(source, "TRECS022", new IIncrementalGenerator[]
+        {
+            new ForEachAspectGenerator(),
+            new AspectGenerator(),
+            new EntityComponentGenerator(),
+        });
     }
 
     [Test]
@@ -147,15 +143,11 @@ public class Diagnostics_TRECS009_to_023_AspectTests
             }
             """;
 
-        AssertDiagnostic(
-            source,
-            "TRECS023",
-            new IIncrementalGenerator[]
-            {
-                new ForEachAspectGenerator(),
-                new IncrementalAspectGenerator(),
-            }
-        );
+        AssertDiagnostic(source, "TRECS023", new IIncrementalGenerator[]
+        {
+            new ForEachAspectGenerator(),
+            new AspectGenerator(),
+        });
     }
 
     static void AssertAspectDiagnostic(string source, string expectedId)
@@ -169,15 +161,15 @@ public class Diagnostics_TRECS009_to_023_AspectTests
         );
     }
 
-    static void AssertDiagnostic(
-        string source,
-        string expectedId,
-        IIncrementalGenerator[] generators
-    )
+    static void AssertDiagnostic(string source, string expectedId, IIncrementalGenerator[] generators)
     {
         var run = GeneratorTestHarness.Run(generators, source);
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
-        Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
+        Assert.That(
+            diag,
+            Is.Not.Null,
+            $"Expected {expectedId}, got:\n{run.Format()}"
+        );
     }
 
     static string FormatDiagnostics(System.Collections.Generic.IEnumerable<Diagnostic> diagnostics)

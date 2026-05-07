@@ -13,8 +13,7 @@ namespace Trecs.Serialization
 
         /// <summary>
         /// Pause the SystemRunner's fixed phase so capture stops growing.
-        /// The user can then save/fork/reset before resuming. Default: chosen
-        /// for safety so a forgotten window doesn't burn through RAM.
+        /// The user can then save/fork/reset before resuming.
         /// </summary>
         Pause,
     }
@@ -49,8 +48,8 @@ namespace Trecs.Serialization
 
         /// <summary>
         /// What to do when a cap is reached. Defaults to
-        /// <see cref="CapacityOverflowAction.Pause"/> so an accidentally-left-on
-        /// recording cannot grow without bound.
+        /// <see cref="CapacityOverflowAction.DropOldest"/> so an
+        /// accidentally-left-on recording hard-caps memory via eviction.
         /// </summary>
         public CapacityOverflowAction OverflowAction = CapacityOverflowAction.DropOldest;
     }

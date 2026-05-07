@@ -88,7 +88,7 @@ namespace Trecs
                 {
                     groups.Add(tagSetToIndex[tagSet]);
                 }
-                resolvedTemplate.Groups = groups;
+                resolvedTemplate.SetGroups(groups);
             }
 
             // Sized to the registry above; every registered GroupIndex gets a slot.
@@ -399,6 +399,15 @@ namespace Trecs
 
             var tagset = TagSet.FromTags(allTags);
 
+            // VariableUpdateOnly is inherited transitively: if the concrete
+            // template OR any of its ancestors is locally declared VUO, the
+            // resolved template is VUO. There's no "un-declare via
+            // inheritance" — once any node in the chain opts in, every
+            // descendant is VUO.
+            bool variableUpdateOnly =
+                template.LocalVariableUpdateOnly
+                || allBaseTypesList.Any(b => b.LocalVariableUpdateOnly);
+
             return new(
                 template: template,
                 groupTagSets: CalculateTemplateGroupTagSets(tagset, allPartitions),
@@ -407,7 +416,8 @@ namespace Trecs
                 componentDeclarations: allComponentDecs,
                 componentDeclarationMap: new(allResolvedComponentDecMap),
                 componentBuilders: componentBuilders.ToArray(),
-                tagset: tagset
+                tagset: tagset,
+                variableUpdateOnly: variableUpdateOnly
             );
 
             static IReadOnlyList<TagSet> CalculateTemplateGroupTagSets(

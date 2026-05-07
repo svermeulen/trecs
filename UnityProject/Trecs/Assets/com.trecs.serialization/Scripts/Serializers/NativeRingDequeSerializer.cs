@@ -3,14 +3,14 @@ using Unity.Collections;
 
 namespace Trecs.Serialization
 {
-    public class NativeRingDequeSerializer<T> : ISerializer<NativeRingDeque<T>>
+    public sealed class NativeRingDequeSerializer<T> : ISerializer<NativeRingDeque<T>>
         where T : unmanaged
     {
         public NativeRingDequeSerializer() { }
 
         public void Deserialize(ref NativeRingDeque<T> value, ISerializationReader reader)
         {
-            var numItems = reader.Read<int>("numItems");
+            var numItems = reader.Read<int>("count");
             Assert.That(numItems >= 0);
 
             if (!value.IsCreated)
@@ -35,7 +35,7 @@ namespace Trecs.Serialization
 
         public void Serialize(in NativeRingDeque<T> value, ISerializationWriter writer)
         {
-            writer.Write("numItems", value.Length);
+            writer.Write("count", value.Length);
 
             foreach (var item in value)
             {

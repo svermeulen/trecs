@@ -50,53 +50,53 @@ namespace Trecs.Tests
         public void Execute() => TestSystemLog.ExecutionLog.Add("BetweenAC");
     }
 
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     partial class VariableSystemA : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("VarA");
     }
 
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     partial class VariableSystemB : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("VarB");
     }
 
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     [ExecuteAfter(typeof(VariableSystemA))]
     partial class VariableSystemAfterA : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("VarAfterA");
     }
 
-    [Phase(SystemPhase.LatePresentation)]
+    [ExecuteIn(SystemPhase.LatePresentation)]
     partial class LateVarSystem : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("LateVar");
     }
 
     [ExecutePriority(10)]
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     partial class PrioritySystem10 : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("P10");
     }
 
     [ExecutePriority(20)]
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     partial class PrioritySystem20 : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("P20");
     }
 
     [ExecutePriority(5)]
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     partial class PrioritySystem5 : ISystem
     {
         public void Execute() => TestSystemLog.ExecutionLog.Add("P5");
     }
 
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     partial class EnableDisableSystem : ISystem
     {
         public int ExecuteCount;
@@ -108,7 +108,7 @@ namespace Trecs.Tests
         }
     }
 
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     partial class WorldAccessSystem : ISystem
     {
         public bool HasAccessor;

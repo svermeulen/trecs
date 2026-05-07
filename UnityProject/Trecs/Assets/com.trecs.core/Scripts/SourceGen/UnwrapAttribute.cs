@@ -13,7 +13,6 @@ namespace Trecs
     /// instance field. Violating these constraints produces compile-time diagnostics:
     /// </para>
     /// <list type="bullet">
-    /// <item><description>TRECS011 — Component must be a struct.</description></item>
     /// <item><description>TRECS012 — Component must implement IEntityComponent.</description></item>
     /// <item><description>TRECS013 — Component must have exactly one field.</description></item>
     /// </list>

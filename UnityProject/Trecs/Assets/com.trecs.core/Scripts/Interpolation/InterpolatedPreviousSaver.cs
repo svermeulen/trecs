@@ -21,7 +21,7 @@ namespace Trecs
 
         public void Initialize(World world)
         {
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Unrestricted);
         }
 
         public JobHandle Save()

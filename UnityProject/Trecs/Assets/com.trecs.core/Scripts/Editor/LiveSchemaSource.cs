@@ -112,7 +112,7 @@ namespace Trecs
                 // the inspector toggle drives. Other channels (Playback / User)
                 // and the deterministic Paused flag are surfaced separately by
                 // the inspector status label.
-                enabled = _world.IsSystemEnabled(systemIndex, EnableChannel.Editor);
+                enabled = _accessor.IsSystemEnabled(systemIndex, EnableChannel.Editor);
                 return true;
             }
             catch (Exception)
@@ -127,7 +127,7 @@ namespace Trecs
                 return;
             try
             {
-                _world.SetSystemEnabled(systemIndex, EnableChannel.Editor, enabled);
+                _accessor.SetSystemEnabled(systemIndex, EnableChannel.Editor, enabled);
             }
             catch (Exception)
             {
@@ -401,6 +401,7 @@ namespace Trecs
                                 systemIndex: -1,
                                 executionPriority: null,
                                 isManual: true,
+                                role: acc.Role,
                                 createdAtFile: acc.CreatedAtFile ?? string.Empty,
                                 createdAtLine: acc.CreatedAtLine
                             )
@@ -430,7 +431,12 @@ namespace Trecs
                             accessorId: acc.Id,
                             systemIndex: sysIdx,
                             executionPriority: info.Metadata.ExecutionPriority,
-                            isManual: false
+                            isManual: false,
+                            // System-owned accessors carry the role
+                            // derived from their phase — surface it on the
+                            // ref so the inspector / hierarchy badge can
+                            // show it without re-walking metadata.
+                            role: acc.Role
                         )
                     );
                 }

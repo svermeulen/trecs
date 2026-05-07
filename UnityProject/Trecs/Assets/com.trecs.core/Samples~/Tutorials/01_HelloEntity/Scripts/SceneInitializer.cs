@@ -15,7 +15,7 @@ namespace Trecs.Samples.HelloEntity
 
         public void Initialize()
         {
-            var world = _world.CreateAccessor();
+            var world = _world.CreateAccessor(AccessorRole.Unrestricted);
 
             var cube = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
             cube.name = "SpinnerCube";

@@ -16,7 +16,7 @@ namespace Trecs.Samples.Pointers
             int entitiesPerRoute
         )
         {
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Fixed);
             _gameObjectRegistry = gameObjectRegistry;
             _entitiesPerRoute = entitiesPerRoute;
         }

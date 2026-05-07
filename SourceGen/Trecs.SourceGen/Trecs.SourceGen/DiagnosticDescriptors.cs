@@ -6,7 +6,9 @@ namespace Trecs.SourceGen
     {
         public const string TrecsCategory = "Trecs";
 
-        // ForEach diagnostics (TRECS001-008)
+        // ForEach diagnostics (TRECS001-008; TRECS006 deleted as duplicate).
+        // NOTE: descriptor declarations below are not strictly sorted by ID; the
+        // file order has not been re-shuffled to preserve git blame.
 
         public static readonly DiagnosticDescriptor InvalidParameterModifiers = new(
             id: "TRECS001",
@@ -83,13 +85,13 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor InvalidJobParameterList = new(
             id: "TRECS008",
             title: "Invalid job parameter list",
-            messageFormat: "Parameter list must first be the component parameters (all with either 'in' or 'ref' modifiers) then an optional EntityIndex parameter",
+            messageFormat: "{0}",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
         );
 
-        // Aspect diagnostics (TRECS009-023)
+        // Aspect diagnostics (TRECS009, 012, 013, 015, 016, 020, 022, 023; TRECS010/011/014/017/018/019/021 retired)
 
         public static readonly DiagnosticDescriptor AspectMustBePartial = new(
             id: "TRECS009",
@@ -199,7 +201,7 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // Template diagnostics (TRECS030-039)
+        // Template diagnostics (TRECS030-037; 038/039 unused)
 
         public static readonly DiagnosticDescriptor TemplateMustBePartial = new(
             id: "TRECS030",
@@ -264,7 +266,16 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // AutoSystem diagnostics (TRECS040-049)
+        public static readonly DiagnosticDescriptor VariableUpdateOnlyOnInvalidTarget = new(
+            id: "TRECS035",
+            title: "[VariableUpdateOnly] applied to a non-template class",
+            messageFormat: "[VariableUpdateOnly] on type '{0}' is silently ignored — the attribute is only meaningful on a class implementing ITemplate or on a template's component field. Remove it or apply it to one of those targets.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
+
+        // AutoSystem diagnostics (TRECS040, 043, 044, 047)
 
         public static readonly DiagnosticDescriptor AutoSystemMustBePartial = new(
             id: "TRECS040",
@@ -302,7 +313,7 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // Iteration method diagnostics (TRECS050-059)
+        // Iteration method diagnostics (TRECS050, 051, 053)
 
         public static readonly DiagnosticDescriptor IterationMethodCannotBeStatic = new(
             id: "TRECS050",
@@ -331,7 +342,7 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // Hook method migration diagnostics (TRECS060-069)
+        // Hook method migration diagnostics (TRECS061-062)
 
         public static readonly DiagnosticDescriptor OldStyleInitializeHook = new(
             id: "TRECS061",
@@ -351,7 +362,7 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // Job scheduling diagnostics (TRECS070-079)
+        // Job scheduling diagnostics (TRECS070, 071, 073-079; 072 unused)
 
         public static readonly DiagnosticDescriptor JobInsideGenericOuterTypeNotSupported = new(
             id: "TRECS073",
@@ -435,7 +446,7 @@ namespace Trecs.SourceGen
                 isEnabledByDefault: true
             );
 
-        // Field validation diagnostics (TRECS080-089)
+        // [FromWorld] field validation diagnostics (TRECS081-084; 080/085-089 unused)
 
         public static readonly DiagnosticDescriptor MissingFromWorldOnContainerField = new(
             id: "TRECS081",
@@ -475,7 +486,7 @@ namespace Trecs.SourceGen
                 isEnabledByDefault: true
             );
 
-        // AutoJob diagnostics (TRECS090-099)
+        // AutoJob / [WrapAsJob] diagnostics (TRECS090, 091, 093, 094, 096-100; 092/095 unused)
 
         public static readonly DiagnosticDescriptor WrapAsJobNonStatic = new(
             id: "TRECS090",
@@ -569,7 +580,7 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // [FromWorld] on [WrapAsJob] diagnostics (TRECS101-109)
+        // [FromWorld] on [WrapAsJob] diagnostics (TRECS101-102)
 
         public static readonly DiagnosticDescriptor FromWorldUnsupportedOnWrapAsJob = new(
             id: "TRECS101",
@@ -595,7 +606,7 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // ── NativeUniquePtr copy prevention ────────────────────────
+        // ── NativeUniquePtr copy prevention (TRECS110-111) ────────────────────────
 
         public static readonly DiagnosticDescriptor NativeUniquePtrByValueLocal = new(
             id: "TRECS110",
@@ -617,7 +628,7 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // ── per-parameter / per-field [SingleEntity] (TRECS112-115) ────────
+        // ── per-parameter / per-field [SingleEntity] (TRECS112-116) ────────
 
         public static readonly DiagnosticDescriptor SingleEntityWrongType = new(
             id: "TRECS112",
@@ -663,16 +674,15 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        public static readonly DiagnosticDescriptor SingleEntityWriteAspectMissingNativeDisableParallelForRestriction =
-            new(
-                id: "TRECS116",
-                title: "[SingleEntity] write-aspect field on a parallel job needs [NativeDisableParallelForRestriction]",
-                messageFormat: "Field '{0}' on parallel job '{1}' has [SingleEntity] with aspect '{2}' that contains IWrite components. "
-                    + "Add [NativeDisableParallelForRestriction] to the field — Unity's parallel-job safety walker rejects the materialized aspect's NativeComponentBufferWrite without it.",
-                category: TrecsCategory,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true
-            );
+        public static readonly DiagnosticDescriptor SingleEntityWriteAspectMissingNativeDisableParallelForRestriction = new(
+            id: "TRECS116",
+            title: "[SingleEntity] write-aspect field on a parallel job needs [NativeDisableParallelForRestriction]",
+            messageFormat: "Field '{0}' on parallel job '{1}' has [SingleEntity] with aspect '{2}' that contains IWrite components. "
+                + "Add [NativeDisableParallelForRestriction] to the field — Unity's parallel-job safety walker rejects the materialized aspect's NativeComponentBufferWrite without it.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
 
         public static readonly DiagnosticDescriptor UnhandledSourceGenError = new(
             id: "TRECS999",

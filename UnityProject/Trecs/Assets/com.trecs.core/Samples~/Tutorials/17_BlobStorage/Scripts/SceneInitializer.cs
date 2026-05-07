@@ -22,7 +22,7 @@ namespace Trecs.Samples.BlobStorage
 
         public void Initialize()
         {
-            var world = _world.CreateAccessor();
+            var world = _world.CreateAccessor(AccessorRole.Fixed);
             const int gridSize = 6;
             const float spacing = 1.5f;
             float halfExtent = spacing * (gridSize - 1) * 0.5f;

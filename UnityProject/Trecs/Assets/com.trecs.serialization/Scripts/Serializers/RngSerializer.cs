@@ -2,7 +2,7 @@ using Trecs.Collections;
 
 namespace Trecs.Serialization
 {
-    internal class RngSerializer : ISerializer<Rng>
+    public sealed class RngSerializer : ISerializer<Rng>
     {
         public void Serialize(in Rng value, ISerializationWriter writer)
         {

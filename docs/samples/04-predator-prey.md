@@ -128,7 +128,7 @@ public partial class CleanupHandlers
 
     public CleanupHandlers(World world, GameObjectRegistry gameObjectRegistry)
     {
-        World = world.CreateAccessor();
+        World = world.CreateAccessor(AccessorRole.Fixed);
         _gameObjectRegistry = gameObjectRegistry;
 
         World.Events

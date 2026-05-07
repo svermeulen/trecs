@@ -70,7 +70,7 @@ Uses `MatchByComponents = true` to iterate all entities with `Rotation`, regardl
 Syncs the ECS rotation to the Unity transform:
 
 ```csharp
-[Phase(SystemPhase.Presentation)]
+[ExecuteIn(SystemPhase.Presentation)]
 public partial class SpinnerGameObjectUpdater : ISystem
 {
     readonly GameObjectRegistry _gameObjectRegistry;
@@ -89,7 +89,7 @@ public partial class SpinnerGameObjectUpdater : ISystem
 }
 ```
 
-Marked `[Phase(SystemPhase.Presentation)]` because it touches Unity GameObjects — rendering should happen at the display frame rate, not the fixed timestep.  Though in this case it doesn't matter since rotation is updated in fixed and we aren't using [interpolation](../advanced/interpolation.md) in this sample.
+Marked `[ExecuteIn(SystemPhase.Presentation)]` because it touches Unity GameObjects — rendering should happen at the display frame rate, not the fixed timestep.  Though in this case it doesn't matter since rotation is updated in fixed and we aren't using [interpolation](../advanced/interpolation.md) in this sample.
 
 ## World Setup
 
@@ -106,7 +106,7 @@ world.AddSystems(new ISystem[]
 
 // Initialize is called separately (via the initializables list)
 // Entity creation happens in SceneInitializer.Initialize:
-var world = world.CreateAccessor();
+var world = world.CreateAccessor(AccessorRole.Fixed);
 
 world.AddEntity<SampleTags.Spinner>()
     .Set(gameObjectRegistry.Register(cube.gameObject));
@@ -118,5 +118,5 @@ world.AddEntity<SampleTags.Spinner>()
 - **Tags** are empty structs implementing `ITag` that classify entities
 - **Templates** declare which components and tags an entity has
 - **Systems** implement `ISystem` and use `[ForEachEntity]` for iteration
-- **`[Phase(SystemPhase.Presentation)]`** separates rendering from simulation
+- **`[ExecuteIn(SystemPhase.Presentation)]`** separates rendering from simulation
 - **`MatchByComponents`** iterates by component presence instead of tags

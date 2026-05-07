@@ -7,7 +7,7 @@ namespace Trecs
     /// Use this to preserve backward-compatible tag IDs when migrating from explicit Tag declarations.
     /// </summary>
     [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false)]
-    public class TagIdAttribute : Attribute
+    public sealed class TagIdAttribute : Attribute
     {
         public int Id { get; }
 
@@ -145,7 +145,7 @@ namespace Trecs
     /// Similar to TagIdAttribute for tags.
     /// </summary>
     [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false)]
-    public class SetIdAttribute : Attribute
+    public sealed class SetIdAttribute : Attribute
     {
         public int Id { get; }
 
@@ -161,47 +161,55 @@ namespace Trecs
     /// visual motion at variable frame rates while the simulation runs at a fixed time step.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-    public class InterpolatedAttribute : Attribute { }
+    public sealed class InterpolatedAttribute : Attribute { }
 
     /// <summary>
-    /// Restricts a template component field to the fixed-update phase only. Variable-update
-    /// systems cannot read or write this component.
+    /// Restricts a template component field or an entire template to the variable-update
+    /// phase only. Variable / Input / Bypass roles may read and write the affected state
+    /// freely; Fixed-role systems are rejected at access time.
+    /// <para>
+    /// On a <b>component field</b>: the single component is render-cadence; the rest of
+    /// the template is unaffected.
+    /// </para>
+    /// <para>
+    /// On a <b>template class</b>: every component on the template is treated as
+    /// <c>[VariableUpdateOnly]</c>, and Fixed-role queries that resolve to any of the
+    /// template's groups are rejected. The template's component arrays are still
+    /// snapshot/restore round-tripped, but skipped during the determinism checksum walk.
+    /// Use this for entities that are pure render-side state (cameras, view-only
+    /// helpers) so structural changes can happen on the variable side.
+    /// </para>
+    /// <para>
+    /// Not applicable to entity sets — set membership is always part of deterministic
+    /// simulation state. For render-cadence collections of entity references, use a
+    /// plain managed collection on a Variable / Input service rather than a trecs set.
+    /// </para>
     /// </summary>
-    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-    public class FixedUpdateOnlyAttribute : Attribute { }
-
-    /// <summary>
-    /// Restricts a template component field to the variable-update phase only. Fixed-update
-    /// systems cannot read or write this component.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-    public class VariableUpdateOnlyAttribute : Attribute { }
+    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Class, AllowMultiple = false)]
+    public sealed class VariableUpdateOnlyAttribute : Attribute { }
 
     /// <summary>
     /// Marks a template component field as constant. The value is set once during entity
     /// initialization and cannot be modified afterward. Attempts to write produce a runtime error.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-    public class ConstantAttribute : Attribute { }
+    public sealed class ConstantAttribute : Attribute { }
 
     /// <summary>
     /// Marks a template component field as externally-driven input. Input components are
     /// written by <see cref="SystemPhase.Input"/> systems via <see cref="WorldAccessor.AddInput{T}"/>
-    /// and consumed by fixed-update systems. See <see cref="MissingInputFrameBehaviour"/> for
+    /// and consumed by fixed-update systems. See <see cref="MissingInputBehavior"/> for
     /// what happens when no input is provided for a frame.
     /// </summary>
     [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
-    public class InputAttribute : Attribute
+    public sealed class InputAttribute : Attribute
     {
-        public MissingInputFrameBehaviour InputFrameBehaviour { get; }
+        public MissingInputBehavior OnMissing { get; }
         public bool WarnOnMissing { get; }
 
-        public InputAttribute(
-            MissingInputFrameBehaviour inputFrameBehaviour,
-            bool warnOnMissing = false
-        )
+        public InputAttribute(MissingInputBehavior onMissing, bool warnOnMissing = false)
         {
-            InputFrameBehaviour = inputFrameBehaviour;
+            OnMissing = onMissing;
             WarnOnMissing = warnOnMissing;
         }
     }

@@ -42,6 +42,11 @@ namespace Trecs
         public int SystemIndex;
         public int? ExecutionPriority;
 
+        // Accessor role badge — null on legacy cache snapshots saved
+        // before the field existed; the badge falls back to whatever
+        // metadata is available (e.g. prio) in that case.
+        public AccessorRole? AccessorRole;
+
         // Combined enable state across all channels + the deterministic
         // paused flag. Drives the row's grayout opacity so the tree
         // matches whether the system actually runs (mirrors Unity's

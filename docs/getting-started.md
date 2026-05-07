@@ -126,7 +126,7 @@ world.AddSystems(new ISystem[]
 world.Initialize();
 
 // Create accessor
-var worldAccessor = world.CreateAccessor();
+var worldAccessor = world.CreateAccessor(AccessorRole.Fixed);
 
 // Create an entity
 worldAccessor.AddEntity<Spinner>()

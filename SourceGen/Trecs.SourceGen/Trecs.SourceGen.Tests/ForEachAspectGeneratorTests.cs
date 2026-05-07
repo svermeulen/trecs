@@ -7,7 +7,7 @@ namespace Trecs.SourceGen.Tests;
 /// Compile-cleanliness tests for ForEachAspectGenerator. Routed to from any
 /// <c>[ForEachEntity]</c> method whose first parameter implements <c>IAspect</c>. The
 /// generator emits convenience overloads that drive the aspect's own per-aspect
-/// AspectQuery / Enumerator machinery (which IncrementalAspectGenerator emits on the
+/// AspectQuery / Enumerator machinery (which AspectGenerator emits on the
 /// aspect type itself).
 /// </summary>
 [TestFixture]
@@ -35,8 +35,8 @@ public class ForEachAspectGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new ForEachAspectGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -71,8 +71,8 @@ public class ForEachAspectGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new ForEachAspectGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -110,8 +110,8 @@ public class ForEachAspectGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new ForEachAspectGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -143,8 +143,8 @@ public class ForEachAspectGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new ForEachAspectGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -177,8 +177,8 @@ public class ForEachAspectGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new ForEachAspectGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -211,8 +211,8 @@ public class ForEachAspectGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new ForEachAspectGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );

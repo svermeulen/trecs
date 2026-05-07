@@ -17,7 +17,7 @@ namespace Trecs.SourceGen
     /// for registering interpolation systems and their previous-value savers.
     /// </summary>
     [Generator]
-    public class IncrementalInterpolatorInstallerGenerator : IIncrementalGenerator
+    public class InterpolatorInstallerGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
@@ -83,7 +83,7 @@ namespace Trecs.SourceGen
             {
                 using var _timer_ = SourceGenTimer.Time("InterpolatorInstallerGenerator.Total");
                 SourceGenLogger.Log(
-                    $"[IncrementalInterpolatorInstallerGenerator] Processing {methodData.Length} interpolator methods"
+                    $"[InterpolatorInstallerGenerator] Processing {methodData.Length} interpolator methods"
                 );
 
                 // GroupIndex methods by group name (filter out nulls first)
@@ -116,7 +116,7 @@ namespace Trecs.SourceGen
             catch (Exception ex)
             {
                 SourceGenLogger.Log(
-                    $"[IncrementalInterpolatorInstallerGenerator] Error generating extensions: {ex.Message}"
+                    $"[InterpolatorInstallerGenerator] Error generating extensions: {ex.Message}"
                 );
 
                 // Report error for any unhandled exceptions

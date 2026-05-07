@@ -35,8 +35,8 @@ public class JobGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new JobGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -73,8 +73,8 @@ public class JobGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new JobGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -113,8 +113,8 @@ public class JobGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new JobGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -155,8 +155,8 @@ public class JobGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new JobGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );
@@ -198,8 +198,8 @@ public class JobGeneratorTests
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
                 new JobGenerator(),
-                new IncrementalAspectGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
             },
             source
         );

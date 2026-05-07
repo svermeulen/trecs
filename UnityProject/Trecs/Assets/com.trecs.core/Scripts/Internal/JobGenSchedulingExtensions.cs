@@ -149,8 +149,11 @@ namespace Trecs.Internal
         public static NativeSetWrite<TSet> CreateNativeSetWriteForJob<TSet>(
             this WorldAccessor world
         )
-            where TSet : struct, IEntitySet =>
-            world.GetSetForJobScheduling<TSet>().CreateWriter<TSet>();
+            where TSet : struct, IEntitySet
+        {
+            world.AssertCanMakeStructuralChanges();
+            return world.GetSetForJobScheduling<TSet>().CreateWriter<TSet>();
+        }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static JobHandle IncludeNativeSetWriteDepsForJob<TSet>(

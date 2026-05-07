@@ -1,6 +1,6 @@
 namespace Trecs.Serialization
 {
-    internal class DefaultValueSerializer<T> : ISerializer<T>
+    internal sealed class DefaultValueSerializer<T> : ISerializer<T>
         where T : unmanaged
     {
         public void Serialize(in T value, ISerializationWriter writer) { }

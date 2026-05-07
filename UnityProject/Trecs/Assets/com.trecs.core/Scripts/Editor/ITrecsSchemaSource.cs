@@ -253,6 +253,13 @@ namespace Trecs
         public int? ExecutionPriority { get; }
         public bool IsManual { get; }
 
+        // The accessor's role (Input / Fixed / Variable / Bypass) — the
+        // permissions bucket the accessor was created with. Null when
+        // unknown (e.g. a cache snapshot saved before this field was
+        // recorded); inspector falls back to omitting the row in that
+        // case. See AccessorRole for the full matrix.
+        public AccessorRole? Role { get; }
+
         // For manual accessors: the file:line where world.CreateAccessor
         // was called (captured via CallerFilePath/CallerLineNumber). Empty
         // string + 0 when unavailable (release builds, system-owned
@@ -270,6 +277,7 @@ namespace Trecs
             int systemIndex,
             int? executionPriority,
             bool isManual,
+            AccessorRole? role = null,
             string createdAtFile = "",
             int createdAtLine = 0
         )
@@ -279,6 +287,7 @@ namespace Trecs
             SystemIndex = systemIndex;
             ExecutionPriority = executionPriority;
             IsManual = isManual;
+            Role = role;
             CreatedAtFile = createdAtFile ?? string.Empty;
             CreatedAtLine = createdAtLine;
         }
@@ -290,6 +299,7 @@ namespace Trecs
             SystemIndex = -1;
             ExecutionPriority = (cache?.HasPriority ?? false) ? cache.Priority : (int?)null;
             IsManual = false;
+            Role = ParseRole(cache?.Role);
             CreatedAtFile = string.Empty;
             CreatedAtLine = 0;
             CacheNativeSystem = cache;
@@ -302,9 +312,23 @@ namespace Trecs
             SystemIndex = -1;
             ExecutionPriority = null;
             IsManual = true;
+            Role = ParseRole(cache?.Role);
             CreatedAtFile = cache?.CreatedAtFile ?? string.Empty;
             CreatedAtLine = cache?.CreatedAtLine ?? 0;
             CacheNativeManual = cache;
+        }
+
+        // Cache snapshots persist Role as the enum's string name (so
+        // older snapshots without the field deserialize as null/empty
+        // and we just hide the row). Enum.TryParse is case-sensitive
+        // by design — every writer goes through Enum.ToString, so a
+        // case mismatch means the file has been hand-edited and we'd
+        // rather show nothing than guess.
+        static AccessorRole? ParseRole(string raw)
+        {
+            if (string.IsNullOrEmpty(raw))
+                return null;
+            return Enum.TryParse<AccessorRole>(raw, out var role) ? role : (AccessorRole?)null;
         }
     }
 

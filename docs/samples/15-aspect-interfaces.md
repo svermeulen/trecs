@@ -80,7 +80,7 @@ Without the aspect interface, this helper would need to either (a) take four ind
 The sample also shows the other half of the pattern: a `HitFlashRenderer` that iterates **by components, not by tags**, rendering any entity that has the required shape regardless of species:
 
 ```csharp
-[Phase(SystemPhase.Presentation)]
+[ExecuteIn(SystemPhase.Presentation)]
 public partial class HitFlashRenderer : ISystem
 {
     [ForEachEntity(MatchByComponents = true)]

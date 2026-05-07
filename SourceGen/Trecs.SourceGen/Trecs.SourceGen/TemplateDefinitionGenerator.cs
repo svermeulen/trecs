@@ -11,7 +11,7 @@ namespace Trecs.SourceGen
     /// and emits Template.Builder()...Build() code.
     /// </summary>
     [Generator]
-    public class IncrementalTemplateDefinitionGenerator : IIncrementalGenerator
+    public class TemplateDefinitionGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
@@ -103,7 +103,7 @@ namespace Trecs.SourceGen
             {
                 using var _timer_ = SourceGenTimer.Time("TemplateDefinitionGenerator.Total");
                 SourceGenLogger.Log(
-                    $"[IncrementalTemplateDefinitionGenerator] Processing {typeName}"
+                    $"[TemplateDefinitionGenerator] Processing {typeName}"
                 );
 
                 // Parse the template declaration

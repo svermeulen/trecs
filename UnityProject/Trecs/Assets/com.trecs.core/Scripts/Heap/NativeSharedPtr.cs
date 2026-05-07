@@ -117,11 +117,6 @@ namespace Trecs
             get { return BlobId.IsNull; }
         }
 
-        public readonly bool IsCreated
-        {
-            get { return !IsNull; }
-        }
-
         public bool Equals(NativeSharedPtr<T> other)
         {
             return Handle.Equals(other.Handle) && BlobId.Equals(other.BlobId);

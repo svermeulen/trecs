@@ -432,6 +432,7 @@ namespace Trecs
         public void SetAdd<TSet>(EntityIndex entityIndex)
             where TSet : struct, IEntitySet
         {
+            AssertStructuralChangesAllowed();
             _deferredQueues
                 .GetValueByRef(EntitySetId<TSet>.Value)
                 .AddQueue.GetBag(_threadIndex)
@@ -449,6 +450,7 @@ namespace Trecs
         public void SetRemove<TSet>(EntityIndex entityIndex)
             where TSet : struct, IEntitySet
         {
+            AssertStructuralChangesAllowed();
             _deferredQueues
                 .GetValueByRef(EntitySetId<TSet>.Value)
                 .RemoveQueue.GetBag(_threadIndex)

@@ -117,7 +117,7 @@ See [Sets](../entity-management/sets.md) for more on defining and using sets.
 A system can have multiple iteration methods for different entity groups:
 
 ```csharp
-[Phase(SystemPhase.Presentation)]
+[ExecuteIn(SystemPhase.Presentation)]
 public partial class BallRendererSystem : ISystem
 {
     [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
@@ -255,26 +255,26 @@ public partial struct ScoringJob : IJobFor
 
 ## Update Phases
 
-Systems run in one of five phases, controlled by `[Phase(...)]`. Phases execute in this order each rendered frame:
+Systems run in one of five phases, controlled by `[ExecuteIn(...)]`. Phases execute in this order each rendered frame:
 
 | Phase | Attribute | Typical Use |
 |-------|-----------|-------------|
-| `EarlyPresentation` | `[Phase(SystemPhase.EarlyPresentation)]` | Variable-cadence sampling that needs to feed into the fixed loop (e.g. raw mouse delta accumulation) |
-| `Input` | `[Phase(SystemPhase.Input)]` | Reading player input — runs just-in-time before each fixed step (0..N times per frame) |
+| `EarlyPresentation` | `[ExecuteIn(SystemPhase.EarlyPresentation)]` | Variable-cadence sampling that needs to feed into the fixed loop (e.g. raw mouse delta accumulation) |
+| `Input` | `[ExecuteIn(SystemPhase.Input)]` | Reading player input — runs just-in-time before each fixed step (0..N times per frame) |
 | `Fixed` | *(default)* | Deterministic simulation, physics, game logic |
-| `Presentation` | `[Phase(SystemPhase.Presentation)]` | Rendering, transform sync, interpolation reads |
-| `LatePresentation` | `[Phase(SystemPhase.LatePresentation)]` | Post-animation corrections — runs in Unity's `LateUpdate` |
+| `Presentation` | `[ExecuteIn(SystemPhase.Presentation)]` | Rendering, transform sync, interpolation reads |
+| `LatePresentation` | `[ExecuteIn(SystemPhase.LatePresentation)]` | Post-animation corrections — runs in Unity's `LateUpdate` |
 
 ```csharp
 // Fixed (default — no attribute needed)
 public partial class PhysicsSystem : ISystem { ... }
 
 // Presentation
-[Phase(SystemPhase.Presentation)]
+[ExecuteIn(SystemPhase.Presentation)]
 public partial class RenderSystem : ISystem { ... }
 
 // Input
-[Phase(SystemPhase.Input)]
+[ExecuteIn(SystemPhase.Input)]
 public partial class KeyboardInputSystem : ISystem { ... }
 ```
 

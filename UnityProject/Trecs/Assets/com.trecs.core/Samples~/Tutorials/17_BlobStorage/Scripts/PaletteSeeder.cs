@@ -24,7 +24,7 @@ namespace Trecs.Samples.BlobStorage
 
         public void Initialize()
         {
-            var world = _world.CreateAccessor();
+            var world = _world.CreateAccessor(AccessorRole.Unrestricted);
 
             // AllocShared(stableId, blob) seeds the blob under a caller-chosen
             // BlobId. Subsequent AllocShared(stableId) calls (without data)
@@ -35,7 +35,7 @@ namespace Trecs.Samples.BlobStorage
 
         public void Dispose()
         {
-            var world = _world.CreateAccessor();
+            var world = _world.CreateAccessor(AccessorRole.Unrestricted);
             _warm.Dispose(world.Heap);
             _cool.Dispose(world.Heap);
         }

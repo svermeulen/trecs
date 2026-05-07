@@ -34,7 +34,7 @@ namespace Trecs.Serialization.Samples.SaveGame
 
         public SaveGameRenderer(World world)
         {
-            _world = world.CreateAccessor(nameof(SaveGameRenderer));
+            _world = world.CreateAccessor(AccessorRole.Variable, nameof(SaveGameRenderer));
 
             int gridSize = SaveGameSceneInitializer.GridSize;
 

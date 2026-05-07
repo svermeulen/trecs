@@ -7,7 +7,7 @@ namespace Trecs.Samples.Partitions
     /// from resting ones. Uses two aspects with different tag constraints
     /// to iterate each partition separately.
     /// </summary>
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     [ExecuteAfter(typeof(WakeUpSystem))]
     public partial class BallRendererSystem : ISystem
     {

@@ -6,19 +6,20 @@ namespace Trecs.SourceGen.Tests;
 
 /// <summary>
 /// Negative tests for the Template diagnostics group (TRECS030-037). All emitted from
-/// IncrementalTemplateDefinitionGenerator's TemplateValidator pass when an
-/// ITemplate-implementing class violates a template-shape rule.
+/// TemplateDefinitionGenerator's TemplateValidator pass when an
+/// ITemplate-implementing class violates a template-shape rule, plus TRECS035
+/// emitted from VariableUpdateOnlyValidator for misapplied
+/// [VariableUpdateOnly].
 ///
-/// Codes covered: 030, 031, 033, 034, 036.
+/// Codes covered: 030, 031, 033, 034, 035, 036.
 ///
 /// Codes intentionally not covered here:
 /// - TRECS032 (TemplateInvalidAttributeCombination): triggers require the
-///   [Interpolated] / [Constant] / [FixedUpdateOnly] / [VariableUpdateOnly] /
-///   [Input] attribute stubs in TrecsStubs.cs, which are not currently included.
+///   [Interpolated] / [Constant] / [VariableUpdateOnly] / [Input] attribute
+///   stubs in TrecsStubs.cs, which are not currently included.
 ///   Adding them is its own scope-of-work; deferred.
 /// - TRECS037 (GlobalsTemplateFieldMustHaveDefault): triggers require the
 ///   IHasTags<TrecsTags.Globals> chain stub, also missing. Deferred.
-/// - TRECS035: gap in numbering (no descriptor).
 /// </summary>
 [TestFixture]
 public class Diagnostics_TRECS030_to_037_TemplateTests
@@ -103,6 +104,40 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
     }
 
     [Test]
+    public void TRECS035_VariableUpdateOnlyOnPlainClass()
+    {
+        // [VariableUpdateOnly] is silently ignored on a class that doesn't
+        // implement ITemplate — flag at compile time so the mistake doesn't
+        // slip through. (Struct misuse is caught by C# CS0592, since the
+        // attribute doesn't allow AttributeTargets.Struct.)
+        const string source = """
+            namespace Sample
+            {
+                [Trecs.VariableUpdateOnly]
+                public class JustSomeService { }
+            }
+            """;
+
+        AssertDiagnostic(source, "TRECS035");
+    }
+
+    [Test]
+    public void TRECS035_DoesNotFireOnTemplate()
+    {
+        // Positive control: a template class is the canonical valid target;
+        // no TRECS035 diagnostic must be emitted.
+        const string source = """
+            namespace Sample
+            {
+                [Trecs.VariableUpdateOnly]
+                public partial class RenderTemplate : Trecs.ITemplate { }
+            }
+            """;
+
+        AssertNoDiagnostic(source, "TRECS035");
+    }
+
+    [Test]
     public void TRECS036_ComponentWithManagedField()
     {
         // Components must be unmanaged for NativeArray/Burst compatibility — a
@@ -127,12 +162,36 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
         var run = GeneratorTestHarness.Run(
             new IIncrementalGenerator[]
             {
-                new IncrementalTemplateDefinitionGenerator(),
-                new IncrementalEntityComponentGenerator(),
+                new TemplateDefinitionGenerator(),
+                new EntityComponentGenerator(),
+                new VariableUpdateOnlyValidator(),
             },
             source
         );
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
-        Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
+        Assert.That(
+            diag,
+            Is.Not.Null,
+            $"Expected {expectedId}, got:\n{run.Format()}"
+        );
+    }
+
+    static void AssertNoDiagnostic(string source, string forbiddenId)
+    {
+        var run = GeneratorTestHarness.Run(
+            new IIncrementalGenerator[]
+            {
+                new TemplateDefinitionGenerator(),
+                new EntityComponentGenerator(),
+                new VariableUpdateOnlyValidator(),
+            },
+            source
+        );
+        var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == forbiddenId);
+        Assert.That(
+            diag,
+            Is.Null,
+            $"Did not expect {forbiddenId}, got:\n{run.Format()}"
+        );
     }
 }

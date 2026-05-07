@@ -50,6 +50,17 @@ namespace Trecs.Internal
         float? _variableDeltaTime;
         int _variableFrameCount;
         bool _isExecutingSystems;
+
+        // Tracks the WorldAccessor.Id of the Fixed-phase system currently inside
+        // its Execute method, or 0 when no Fixed system is executing. Used by
+        // WorldAccessor.AssertIsCurrentlyExecutingAccessor to enforce the
+        // "Fixed execute uses only the executing system's accessor" rule —
+        // service-class accessors and other-system accessors are rejected so
+        // they can't smuggle non-deterministic state into the simulation
+        // (or scramble debug-attribution by recording access under the wrong
+        // accessor name). Only set during Fixed; left at 0 for variable
+        // phases since the rule doesn't apply there.
+        int _currentlyExecutingAccessorId;
         bool _isPaused = false;
         bool _fixedIsPaused = false;
         bool _stepFixedFrame = false;
@@ -186,6 +197,7 @@ namespace Trecs.Internal
 
         public RuntimeJobScheduler JobScheduler => _jobScheduler;
         public WorldSafetyManager SafetyManager => _safetyManager;
+        internal int CurrentlyExecutingAccessorId => _currentlyExecutingAccessorId;
         internal bool WarnOnJobSyncPoints => _settings.WarnOnJobSyncPoints;
         internal bool RequireDeterministicSubmission => _settings.RequireDeterministicSubmission;
         internal bool AssertNoTimeInFixedPhase => _settings.AssertNoTimeInFixedPhase;
@@ -721,9 +733,29 @@ namespace Trecs.Internal
                 return;
             }
 
-            using (TrecsProfiling.Start("{l}.Execute", systemInfo.Metadata.DebugName))
+            // Track the executing system's accessor for Fixed phase only — see
+            // _currentlyExecutingAccessorId field comment. Variable-cadence
+            // phases don't have determinism guarantees that service-class
+            // accessors could break, so we leave the tracker at 0 for them.
+            bool trackAccessor = systemInfo.Metadata.Phase == SystemPhase.Fixed;
+            if (trackAccessor)
             {
-                ((ISystem)systemInfo.System).Execute();
+                _currentlyExecutingAccessorId = ((ISystemInternal)systemInfo.System).World.Id;
+            }
+
+            try
+            {
+                using (TrecsProfiling.Start("{l}.Execute", systemInfo.Metadata.DebugName))
+                {
+                    ((ISystem)systemInfo.System).Execute();
+                }
+            }
+            finally
+            {
+                if (trackAccessor)
+                {
+                    _currentlyExecutingAccessorId = 0;
+                }
             }
         }
 

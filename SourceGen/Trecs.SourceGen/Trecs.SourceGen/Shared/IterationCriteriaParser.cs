@@ -45,7 +45,7 @@ namespace Trecs.SourceGen.Shared
         /// for Tags / Tag / Set / MatchByComponents named arguments.
         /// </summary>
         /// <param name="attributeName">
-        /// The attribute class name to match (e.g. <c>TrecsAttributeNames.EntityFilter</c>
+        /// The attribute class name to match (e.g. <c>TrecsAttributeNames.ForEachEntity</c>
         /// or <c>TrecsAttributeNames.SingleEntity</c>).
         /// </param>
         internal static IterationCriteria? ParseIterationAttribute(

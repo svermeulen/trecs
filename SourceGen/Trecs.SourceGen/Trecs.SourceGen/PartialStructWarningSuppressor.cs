@@ -66,7 +66,7 @@ namespace Trecs.SourceGen
                 {
                     foreach (var attr in method.GetAttributes())
                     {
-                        if (attr.AttributeClass?.Name == TrecsAttributeNames.EntityFilter)
+                        if (attr.AttributeClass?.Name == TrecsAttributeNames.ForEachEntity)
                             return true;
                     }
                 }

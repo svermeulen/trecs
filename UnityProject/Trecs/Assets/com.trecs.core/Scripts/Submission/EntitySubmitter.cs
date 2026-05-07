@@ -133,9 +133,9 @@ namespace Trecs.Internal
             _trecsSettings = trecsSettings ?? new WorldSettings();
 
             InitStructuralChangeChecks();
-            _nativeAddOperationQueue = AtomicNativeBags.Create();
-            _nativeRemoveOperationQueue = AtomicNativeBags.Create();
-            _nativeMoveOperationQueue = AtomicNativeBags.Create();
+            _nativeAddOperationQueue = AtomicNativeBags.Create(Allocator.Persistent);
+            _nativeRemoveOperationQueue = AtomicNativeBags.Create(Allocator.Persistent);
+            _nativeMoveOperationQueue = AtomicNativeBags.Create(Allocator.Persistent);
             // Per-set deferred bags are allocated in EntitySetStorage.
             _eventsManager = eventsManager;
 
@@ -198,6 +198,33 @@ namespace Trecs.Internal
             FlushNativeOperations();
         }
 
+        // Observer-cascade contract (OnAdded / OnRemoved / OnMoved):
+        //   - Cascading is iterative, not recursive. Each SingleSubmission()
+        //     call swaps `_thisSubmissionInfo` with `_lastSubmittedInfo`
+        //     (and analogously for the add buffer via _groupedEntityToAdd.Swap)
+        //     before executing operations, so any structural changes queued
+        //     from observer callbacks land in the new "current" buffer and
+        //     get processed in the *next* iteration of this while loop —
+        //     SingleSubmission never reenters itself. _isRunningSubmit catches
+        //     the only remaining re-entrancy hazard (an observer that calls
+        //     SubmitEntities() directly).
+        //   - The cascade is bounded by MaxSubmissionIterations (default 10).
+        //     Hitting the cap throws "possible circular submission detected"
+        //     in DEBUG; in release the loop just exits with structural
+        //     operations still pending, which will surface as visible bugs.
+        //   - Cross-run determinism: each iteration walks groups in
+        //     GroupIndex.FromIndex(i) order and observers per group in the
+        //     priority order set up by InsertSorted, so within an iteration
+        //     observer fire order is fixed. Native-queued ops are sorted at
+        //     the boundary when RequireDeterministicSubmission is enabled;
+        //     managed ops inherit the determinism of the user code that
+        //     queued them (same as ordinary system Execute).
+        //   - The strict-accessor rule (WorldAccessor.AssertIsCurrentlyExecutingAccessor)
+        //     short-circuits inside observer callbacks because SystemRunner
+        //     resets _currentlyExecutingAccessorId to 0 before calling
+        //     SubmitEntities(). Observers may therefore use a separately-
+        //     created service accessor (e.g. the OnRemoved pointer-cleanup
+        //     pattern in samples/10_Pointers) without tripping the assert.
         void SubmitEntitiesImpl()
         {
             _eventsManager.NotifyOnSubmissionStarted();
@@ -1382,7 +1409,7 @@ namespace Trecs.Internal
 
             static bool HasAnyNonEmpty(AtomicNativeBags queue)
             {
-                for (int i = 0; i < queue.Length; i++)
+                for (int i = 0; i < queue.ThreadSlotCount; i++)
                 {
                     if (!queue.GetBag(i).IsEmpty)
                         return true;
@@ -1398,7 +1425,7 @@ namespace Trecs.Internal
 
             using (TrecsProfiling.Start("Native Remove Operations"))
             {
-                var removeBuffersCount = _nativeRemoveOperationQueue.Length;
+                var removeBuffersCount = _nativeRemoveOperationQueue.ThreadSlotCount;
 
                 var removals = new NativeList<(EntityIndex, int)>(Allocator.TempJob);
 
@@ -1464,7 +1491,7 @@ namespace Trecs.Internal
 
             using (TrecsProfiling.Start("Native Swap Operations"))
             {
-                var swapBuffersCount = _nativeMoveOperationQueue.Length;
+                var swapBuffersCount = _nativeMoveOperationQueue.ThreadSlotCount;
 
                 var swaps = new NativeList<(EntityIndex, GroupIndex, int)>(Allocator.TempJob);
 
@@ -1525,7 +1552,7 @@ namespace Trecs.Internal
                         }
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                        CheckNativeOpsCanMove(accessorId, fromEntityIndex.GroupIndex);
+                        CheckNativeOpsCanMove(accessorId, fromEntityIndex.GroupIndex, toGroup);
 #endif
                         CheckMoveEntityHandle(fromEntityIndex, toGroup, cachedTemplate.DebugName);
                     }
@@ -1550,7 +1577,7 @@ namespace Trecs.Internal
                     IComponentBuilder[] cachedComponents = null;
                     var cachedComponentArrays = _cachedNativeAddComponentArrays;
 
-                    var addBuffersCount = _nativeAddOperationQueue.Length;
+                    var addBuffersCount = _nativeAddOperationQueue.ThreadSlotCount;
                     for (int i = 0; i < addBuffersCount; i++)
                     {
                         ref var buffer = ref _nativeAddOperationQueue.GetBag(i);
@@ -1681,20 +1708,46 @@ namespace Trecs.Internal
             }
         }
 
+        // Native structural-change checks fire at submission time, after each op
+        // is popped from its native queue. The originating accessor's id is
+        // preserved through the queue (used for the deterministic composite
+        // sort key on adds), so we can route the per-group VUO check through
+        // the same AssertCanMakeStructuralChangesToGroup that gates the
+        // main-thread paths. The currently-executing-accessor guard inside
+        // that helper is a no-op during submission (the system has already
+        // finished executing by the time we drain the queues).
 #if !TRECS_INTERNAL_CHECKS || !DEBUG
         [Conditional("MEANINGLESS")]
 #endif
-        void CheckNativeOpsCanAdd(int accessorId, GroupIndex group) { }
+        void CheckNativeOpsCanAdd(int accessorId, GroupIndex group)
+        {
+            _accessorRegistry
+                .GetAccessorById(accessorId)
+                .AssertCanMakeStructuralChangesToGroup(group);
+        }
 
 #if !TRECS_INTERNAL_CHECKS || !DEBUG
         [Conditional("MEANINGLESS")]
 #endif
-        void CheckNativeOpsCanRemove(int accessorId, GroupIndex group) { }
+        void CheckNativeOpsCanRemove(int accessorId, GroupIndex group)
+        {
+            _accessorRegistry
+                .GetAccessorById(accessorId)
+                .AssertCanMakeStructuralChangesToGroup(group);
+        }
 
 #if !TRECS_INTERNAL_CHECKS || !DEBUG
         [Conditional("MEANINGLESS")]
 #endif
-        void CheckNativeOpsCanMove(int accessorId, GroupIndex group) { }
+        void CheckNativeOpsCanMove(int accessorId, GroupIndex fromGroup, GroupIndex toGroup)
+        {
+            // Mirror WorldAccessor.MoveTo: both source and destination must
+            // be allowed for the role, since a Fixed→VUO move would let
+            // sim state leak into render-cadence territory.
+            var accessor = _accessorRegistry.GetAccessorById(accessorId);
+            accessor.AssertCanMakeStructuralChangesToGroup(fromGroup);
+            accessor.AssertCanMakeStructuralChangesToGroup(toGroup);
+        }
 
 #if !DEBUG || TRECS_IS_PROFILING
         [Conditional("MEANINGLESS")]

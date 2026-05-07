@@ -18,13 +18,13 @@ namespace Trecs.Tests
 
     // Presentation phase so each Tick runs Execute exactly once — Fixed-phase
     // systems can run 0..N times per tick depending on accumulated time.
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     partial class CountingEnableSystemA : ISystem
     {
         public void Execute() => EnableTestLog.CountA++;
     }
 
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     partial class CountingEnableSystemB : ISystem
     {
         public void Execute() => EnableTestLog.CountB++;
@@ -76,15 +76,15 @@ namespace Trecs.Tests
             for (int i = 0; i < env.World.SystemCount; i++)
             {
                 NAssert.IsTrue(
-                    env.World.IsSystemEnabled(i, EnableChannel.Editor),
+                    env.Accessor.IsSystemEnabled(i, EnableChannel.Editor),
                     "Editor enabled by default"
                 );
                 NAssert.IsTrue(
-                    env.World.IsSystemEnabled(i, EnableChannel.Playback),
+                    env.Accessor.IsSystemEnabled(i, EnableChannel.Playback),
                     "Playback enabled by default"
                 );
                 NAssert.IsTrue(
-                    env.World.IsSystemEnabled(i, EnableChannel.User),
+                    env.Accessor.IsSystemEnabled(i, EnableChannel.User),
                     "User enabled by default"
                 );
                 NAssert.IsFalse(env.Accessor.IsSystemPaused(i), "Not paused by default");
@@ -114,7 +114,7 @@ namespace Trecs.Tests
             using var env = CreateEnv(sys);
             int idx = FindSystemIndex(env.World, typeof(CountingEnableSystemA));
 
-            env.World.SetSystemEnabled(idx, EnableChannel.User, false);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, false);
 
             env.World.Tick();
             env.World.LateTick();
@@ -129,12 +129,12 @@ namespace Trecs.Tests
             using var env = CreateEnv(sys);
             int idx = FindSystemIndex(env.World, typeof(CountingEnableSystemA));
 
-            env.World.SetSystemEnabled(idx, EnableChannel.User, false);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, false);
             env.World.Tick();
             env.World.LateTick();
             NAssert.AreEqual(0, EnableTestLog.CountA, "disabled");
 
-            env.World.SetSystemEnabled(idx, EnableChannel.User, true);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, true);
             EnableTestLog.Reset();
             env.World.Tick();
             env.World.LateTick();
@@ -149,21 +149,21 @@ namespace Trecs.Tests
             int idx = FindSystemIndex(env.World, typeof(CountingEnableSystemA));
 
             // Two channels disable concurrently
-            env.World.SetSystemEnabled(idx, EnableChannel.User, false);
-            env.World.SetSystemEnabled(idx, EnableChannel.Playback, false);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, false);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.Playback, false);
             env.World.Tick();
             env.World.LateTick();
             NAssert.AreEqual(0, EnableTestLog.CountA, "disabled by both");
 
             // Re-enable one — system stays skipped because the other still disables
-            env.World.SetSystemEnabled(idx, EnableChannel.Playback, true);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.Playback, true);
             EnableTestLog.Reset();
             env.World.Tick();
             env.World.LateTick();
             NAssert.AreEqual(0, EnableTestLog.CountA, "still disabled by User");
 
             // Re-enable the other — now it runs
-            env.World.SetSystemEnabled(idx, EnableChannel.User, true);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, true);
             EnableTestLog.Reset();
             env.World.Tick();
             env.World.LateTick();
@@ -177,15 +177,15 @@ namespace Trecs.Tests
             using var env = CreateEnv(sys);
             int idx = FindSystemIndex(env.World, typeof(CountingEnableSystemA));
 
-            env.World.SetSystemEnabled(idx, EnableChannel.User, false);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, false);
 
-            NAssert.IsFalse(env.World.IsSystemEnabled(idx, EnableChannel.User));
+            NAssert.IsFalse(env.Accessor.IsSystemEnabled(idx, EnableChannel.User));
             NAssert.IsTrue(
-                env.World.IsSystemEnabled(idx, EnableChannel.Editor),
+                env.Accessor.IsSystemEnabled(idx, EnableChannel.Editor),
                 "Editor untouched"
             );
             NAssert.IsTrue(
-                env.World.IsSystemEnabled(idx, EnableChannel.Playback),
+                env.Accessor.IsSystemEnabled(idx, EnableChannel.Playback),
                 "Playback untouched"
             );
         }
@@ -196,7 +196,7 @@ namespace Trecs.Tests
             using var env = CreateEnv(new CountingEnableSystemA(), new CountingEnableSystemB());
             int idxA = FindSystemIndex(env.World, typeof(CountingEnableSystemA));
 
-            env.World.SetSystemEnabled(idxA, EnableChannel.User, false);
+            env.Accessor.SetSystemEnabled(idxA, EnableChannel.User, false);
             env.World.Tick();
             env.World.LateTick();
 
@@ -262,7 +262,7 @@ namespace Trecs.Tests
             int idx = FindSystemIndex(env.World, typeof(CountingEnableSystemA));
 
             env.Accessor.SetSystemPaused(idx, true);
-            env.World.SetSystemEnabled(idx, EnableChannel.User, false);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, false);
 
             env.World.Tick();
             env.World.LateTick();
@@ -276,7 +276,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(0, EnableTestLog.CountA, "channel still disabled");
 
             // Clear channel too — now runs
-            env.World.SetSystemEnabled(idx, EnableChannel.User, true);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, true);
             EnableTestLog.Reset();
             env.World.Tick();
             env.World.LateTick();
@@ -346,7 +346,7 @@ namespace Trecs.Tests
             using var env = CreateEnv(new CountingEnableSystemA());
             int idx = FindSystemIndex(env.World, typeof(CountingEnableSystemA));
 
-            env.World.SetSystemEnabled(idx, EnableChannel.User, false);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, false);
             NAssert.IsFalse(env.World.IsSystemEffectivelyEnabled(idx));
             NAssert.IsFalse(env.Accessor.IsSystemEffectivelyEnabled(idx));
         }
@@ -368,7 +368,7 @@ namespace Trecs.Tests
             using var env = CreateEnv(new CountingEnableSystemA());
             int idx = FindSystemIndex(env.World, typeof(CountingEnableSystemA));
 
-            env.World.SetSystemEnabled(idx, EnableChannel.User, false);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, false);
             env.Accessor.SetSystemPaused(idx, true);
             NAssert.IsFalse(env.World.IsSystemEffectivelyEnabled(idx));
 
@@ -377,7 +377,7 @@ namespace Trecs.Tests
             NAssert.IsFalse(env.World.IsSystemEffectivelyEnabled(idx));
 
             // Clear channel — now effectively enabled
-            env.World.SetSystemEnabled(idx, EnableChannel.User, true);
+            env.Accessor.SetSystemEnabled(idx, EnableChannel.User, true);
             NAssert.IsTrue(env.World.IsSystemEffectivelyEnabled(idx));
         }
 

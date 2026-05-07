@@ -9,7 +9,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
         public SubsetApproachDynamicSwitcher(World world)
         {
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Variable);
         }
 
         public void Tick()

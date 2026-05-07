@@ -10,7 +10,7 @@ namespace Trecs.Serialization.Samples.Snake
     /// Update, Execute() runs once per fixed frame and forwards via
     /// World.AddInput.
     /// </summary>
-    [Phase(SystemPhase.Input)]
+    [ExecuteIn(SystemPhase.Input)]
     public partial class SnakeInputSystem : ISystem
     {
         int2 _pendingDirection;

@@ -9,7 +9,7 @@ namespace Trecs.Serialization
     /// <typeparamref name="TElem"/>. For arrays of unmanaged types prefer the
     /// blit path — this serializer is for arrays of managed/custom elements.
     /// </summary>
-    public class ArraySerializer<T, TElem> : ISerializer<T>
+    public sealed class ArraySerializer<T, TElem> : ISerializer<T>
     {
         static readonly TrecsLog _log = new("ArraySerializer");
 

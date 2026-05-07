@@ -17,7 +17,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
         public PerformanceStatsUpdater(World world)
         {
-            _world = world.CreateAccessor();
+            _world = world.CreateAccessor(AccessorRole.Unrestricted);
 
             _world.Events.OnFixedUpdateStarted(OnFixedUpdateStarted).AddTo(_disposables);
             _world.Events.OnFixedUpdateCompleted(OnFixedUpdateCompleted).AddTo(_disposables);

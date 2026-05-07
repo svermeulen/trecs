@@ -10,11 +10,10 @@ namespace Trecs.SourceGen.Template
         public string FieldName { get; }
         public string ComponentTypeFullName { get; }
         public bool IsInterpolated { get; }
-        public bool IsFixedUpdateOnly { get; }
         public bool IsVariableUpdateOnly { get; }
         public bool IsConstant { get; }
         public bool IsInput { get; }
-        public string InputFrameBehaviour { get; }
+        public string OnMissing { get; }
         public bool InputWarnOnMissing { get; }
         public bool HasExplicitDefault { get; }
 
@@ -22,7 +21,6 @@ namespace Trecs.SourceGen.Template
             string fieldName,
             string componentTypeFullName,
             bool isInterpolated,
-            bool isFixedUpdateOnly,
             bool isVariableUpdateOnly,
             bool isConstant,
             bool isInput,
@@ -34,11 +32,10 @@ namespace Trecs.SourceGen.Template
             FieldName = fieldName;
             ComponentTypeFullName = componentTypeFullName;
             IsInterpolated = isInterpolated;
-            IsFixedUpdateOnly = isFixedUpdateOnly;
             IsVariableUpdateOnly = isVariableUpdateOnly;
             IsConstant = isConstant;
             IsInput = isInput;
-            InputFrameBehaviour = inputFrameBehaviour;
+            OnMissing = inputFrameBehaviour;
             InputWarnOnMissing = inputWarnOnMissing;
             HasExplicitDefault = hasExplicitDefault;
         }
@@ -67,6 +64,7 @@ namespace Trecs.SourceGen.Template
         public string Accessibility { get; }
         public bool IsClass { get; }
         public bool IsGlobals { get; }
+        public bool IsVariableUpdateOnly { get; }
         public ImmutableArray<string> ContainingTypes { get; }
         public ImmutableArray<string> TagTypeNames { get; }
         public ImmutableArray<string> BaseTemplateTypeNames { get; }
@@ -79,6 +77,7 @@ namespace Trecs.SourceGen.Template
             string accessibility,
             bool isClass,
             bool isGlobals,
+            bool isVariableUpdateOnly,
             ImmutableArray<string> containingTypes,
             ImmutableArray<string> tagTypeNames,
             ImmutableArray<string> baseTemplateTypeNames,
@@ -91,6 +90,7 @@ namespace Trecs.SourceGen.Template
             Accessibility = accessibility;
             IsClass = isClass;
             IsGlobals = isGlobals;
+            IsVariableUpdateOnly = isVariableUpdateOnly;
             ContainingTypes = containingTypes;
             TagTypeNames = tagTypeNames;
             BaseTemplateTypeNames = baseTemplateTypeNames;

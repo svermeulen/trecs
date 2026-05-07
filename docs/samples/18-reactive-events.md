@@ -23,7 +23,7 @@ public partial class GameStatsUpdater : IDisposable
 
     public GameStatsUpdater(World world, GameObjectRegistry registry)
     {
-        World = world.CreateAccessor();
+        World = world.CreateAccessor(AccessorRole.Fixed);
         _registry = registry;
 
         World

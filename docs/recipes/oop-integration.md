@@ -20,7 +20,7 @@ Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours,
 ┌─────────────▼───────────────────────────┐
 │  Layer 3: ECS → Non-ECS (Output)        │
 │  Sync transforms, spawn GameObjects     │
-│  [Phase(SystemPhase.Presentation)] systems               │
+│  [ExecuteIn(SystemPhase.Presentation)] systems               │
 └─────────────────────────────────────────┘
 ```
 
@@ -42,7 +42,7 @@ public class InputBridge : MonoBehaviour
 }
 ```
 
-Use [`[Phase(SystemPhase.Input)]`](../advanced/input-system.md) systems to process queued input at the start of each fixed update.
+Use [`[ExecuteIn(SystemPhase.Input)]`](../advanced/input-system.md) systems to process queued input at the start of each fixed update.
 
 ## Layer 2: Pure ECS
 
@@ -66,7 +66,7 @@ This layer is fully deterministic and can be recorded/replayed.
 Variable-update systems sync ECS state to GameObjects:
 
 ```csharp
-[Phase(SystemPhase.Presentation)]
+[ExecuteIn(SystemPhase.Presentation)]
 public partial class GameObjectSyncSystem : ISystem
 {
     readonly GameObjectRegistry _registry;
@@ -93,7 +93,7 @@ public partial class EnemyGameObjectManager : IDisposable
 
     public EnemyGameObjectManager(World world, GameObjectRegistry registry)
     {
-        World = world.CreateAccessor();
+        World = world.CreateAccessor(AccessorRole.Fixed);
         _registry = registry;
 
         World.Events.EntitiesWithTags<GameTags.Enemy>()

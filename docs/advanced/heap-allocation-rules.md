@@ -2,20 +2,24 @@
 
 This article covers **when and where** you're allowed to allocate heap pointers and create entities, and how Trecs assigns stable IDs to allocations. These rules exist because Trecs is built around deterministic simulation — for replay, networked rollback, and snapshot/restore to work, the same code must produce the same world state on every run.
 
-For an introduction to the pointer types themselves (`SharedPtr<T>`, `UniquePtr<T>`, native variants), see [Heap](heap.md).
+For an introduction to the pointer types themselves (`SharedPtr<T>`, `UniquePtr<T>`, native variants), see [Heap](heap.md). For the broader set of per-role permissions (component reads / writes, structural changes, RNG streams) see [Accessor Roles](accessor-roles.md) — this page covers only the heap-allocation slice.
 
-## Phase rules at a glance
+## Heap allocation by role
 
-| Phase | Heap allocation | Entity creation |
-|------|-----------------|-----------------|
-| **Initialization** (no system context — e.g. `SceneInitializer`) | ✅ Allowed | ✅ Allowed |
-| `Fixed` systems | ✅ Allowed | ✅ Allowed |
-| `Input` systems | ❌ Not allowed | Use `AddInput<T>()` instead |
-| `EarlyPresentation` / `Presentation` / `LatePresentation` systems | ❌ Not allowed | ❌ Not allowed |
+Every `WorldAccessor` carries an [`AccessorRole`](accessor-roles.md) that controls what kinds of heap allocation it can perform. Input-system accessors (system-owned accessors created from `[ExecuteIn(SystemPhase.Input)]`) carry the role `Variable` plus an internal input flag — that combination is shown as "Input system" below.
 
-Presentation-phase systems are intentionally restricted to **reading** simulation state and writing to render-only data (typically `[VariableUpdateOnly]` components). They cannot allocate from the heap or create entities — both would introduce non-deterministic state into the simulation.
+| Accessor | Persistent (`AllocShared`, `AllocUnique`, native variants) | Frame-scoped (`AllocSharedFrameScoped`, etc.) |
+|------|--------|--------|
+| `Fixed` | ✅ Allowed | ❌ Not allowed |
+| Input system | ❌ Not allowed — use the FrameScoped variant | ✅ Allowed |
+| `Variable` | ❌ Not allowed | ❌ Not allowed |
+| `None` | ✅ Allowed | ✅ Allowed |
 
-The framework asserts these rules at the call site. Calling `world.Heap.AllocShared(...)` from a presentation-phase system throws an immediate, clear exception rather than producing silent desync later.
+The framework asserts at the allocation site. Calling `world.Heap.AllocShared(...)` from a `Variable` accessor or input-system accessor throws an immediate `AssertException` rather than producing silent desync later. The input-system error message points at the `FrameScoped` variant explicitly, since that's almost always what the caller wanted.
+
+The shape comes out of the role design: persistent allocations participate in deterministic ID minting (next section), so only the deterministic-state pickers (`Fixed`, `None`) may make them; frame-scoped allocations are an input-side mechanism for handing transient payloads into the simulation, so only input-system and `None` accessors may make them. `Variable` accessors can do neither because presentation-cadence code runs at a non-deterministic frame rate.
+
+Entity creation (`AddEntity` / `RemoveEntity` / `MoveTo`) follows the same shape — `Fixed` and `None` only — for the same reason: structural changes are part of the simulation state that gets serialized in snapshots and replay-checked.
 
 ## Why presentation-phase systems can't allocate or spawn entities
 
@@ -113,7 +117,7 @@ See [Sample 10 — Pointers](../samples/10-pointers.md) for a complete reference
 
 ## Cheat sheet
 
-- **Allocate from init or `Fixed` systems.** Don't allocate from `Input`, `EarlyPresentation`, `Presentation`, or `LatePresentation` systems.
+- **Persistent allocation from init or `Fixed` systems** (and `None`-role accessors if you must). Input systems use `AllocXxxFrameScoped` for transient input payloads instead; `Variable`-cadence systems can't allocate at all.
 - **Auto-IDs are deterministic** when init and fixed code is deterministic — same rule that already applies for replay.
 - **Use explicit `BlobId`s** when you want stable identity independent of startup ordering — particularly for content-pipeline assets.
 - **Seeder pattern**: a long-lived class holds `SharedPtr<T>` members for shared assets, allocated once at init with a stable `BlobId`, looked up by entities via `AllocShared(BlobId)`.

@@ -243,19 +243,15 @@ namespace Trecs.Internal // not part of public api atm
             }
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            var jobHandle = new NativeRingDequeDisposeJob
+            var jobHandle = new NativeRingDequeDisposeJob<T>
             {
-                Data = new NativeRingDequeDispose
-                {
-                    m_DequeData = (UnsafeRingDeque<int>*)m_Deque,
-                    m_Safety = m_Safety,
-                },
+                Data = new NativeRingDequeDispose<T> { m_DequeData = m_Deque, m_Safety = m_Safety },
             }.Schedule(inputDeps);
             AtomicSafetyHandle.Release(m_Safety);
 #else
-            var jobHandle = new NativeRingDequeDisposeJob
+            var jobHandle = new NativeRingDequeDisposeJob<T>
             {
-                Data = new NativeRingDequeDispose { m_DequeData = (UnsafeRingDeque<int>*)m_Deque },
+                Data = new NativeRingDequeDispose<T> { m_DequeData = m_Deque },
             }.Schedule(inputDeps);
 #endif
             m_Deque = null;
@@ -333,10 +329,11 @@ namespace Trecs.Internal // not part of public api atm
     }
 
     [NativeContainer]
-    internal unsafe struct NativeRingDequeDispose
+    internal unsafe struct NativeRingDequeDispose<T>
+        where T : unmanaged
     {
         [NativeDisableUnsafePtrRestriction]
-        public UnsafeRingDeque<int>* m_DequeData;
+        public UnsafeRingDeque<T>* m_DequeData;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
         public AtomicSafetyHandle m_Safety;
@@ -344,14 +341,15 @@ namespace Trecs.Internal // not part of public api atm
 
         public void Dispose()
         {
-            UnsafeRingDeque<int>.Free(m_DequeData);
+            UnsafeRingDeque<T>.Free(m_DequeData);
         }
     }
 
     [BurstCompile]
-    internal unsafe struct NativeRingDequeDisposeJob : IJob
+    internal unsafe struct NativeRingDequeDisposeJob<T> : IJob
+        where T : unmanaged
     {
-        public NativeRingDequeDispose Data;
+        public NativeRingDequeDispose<T> Data;
 
         public void Execute()
         {

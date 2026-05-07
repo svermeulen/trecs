@@ -26,11 +26,7 @@ namespace Trecs
 
         public bool IsNull
         {
-            get { return !IsCreated; }
-        }
-        public bool IsCreated
-        {
-            get { return !Handle.IsNull; }
+            get { return Handle.IsNull; }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

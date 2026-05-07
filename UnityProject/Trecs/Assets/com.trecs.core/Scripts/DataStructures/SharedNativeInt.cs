@@ -12,16 +12,19 @@ namespace Trecs.Internal
         [NativeDisableUnsafePtrRestriction]
         unsafe int* data;
 
-        public static SharedNativeInt Create(int t)
+        AllocatorManager.AllocatorHandle _allocator;
+
+        public static SharedNativeInt Create(int t, AllocatorManager.AllocatorHandle allocator)
         {
             unsafe
             {
                 var current = new SharedNativeInt();
+                current._allocator = allocator;
                 current.data = (int*)
                     UnsafeUtility.Malloc(
                         sizeof(int),
                         UnsafeUtility.AlignOf<int>(),
-                        Allocator.Persistent
+                        allocator.ToAllocator
                     );
                 *current.data = t;
 
@@ -44,7 +47,7 @@ namespace Trecs.Internal
             {
                 if (data != null)
                 {
-                    UnsafeUtility.Free(data, Allocator.Persistent);
+                    UnsafeUtility.Free(data, _allocator.ToAllocator);
                     data = null;
                 }
             }

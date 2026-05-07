@@ -11,7 +11,7 @@ namespace Trecs.Samples.AspectInterfaces
     //
     // Iterates by MatchByComponents rather than by tag, so the same system
     // renders any entity with the shape below regardless of species.
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     public partial class HitFlashRenderer : ISystem
     {
         readonly GameObjectRegistry _gameObjectRegistry;

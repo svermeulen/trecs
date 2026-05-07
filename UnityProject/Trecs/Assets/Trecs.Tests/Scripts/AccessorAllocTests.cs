@@ -17,7 +17,6 @@ namespace Trecs.Tests
 
             var ptr = a.Heap.AllocUnique<List<string>>();
 
-            NAssert.IsTrue(ptr.IsCreated);
             NAssert.IsFalse(ptr.IsNull);
 
             ptr.Dispose(a);
@@ -61,7 +60,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var ptr = a.Heap.AllocUnique(new List<string> { "test" });
-            NAssert.IsTrue(ptr.IsCreated);
+            NAssert.IsFalse(ptr.IsNull);
 
             ptr.Dispose(a);
 

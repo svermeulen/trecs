@@ -7,28 +7,33 @@ namespace Trecs.Serialization
     /// <summary>
     /// Serializer for <see cref="NativeArray{T}"/> of unmanaged elements.
     /// Writes length followed by the underlying memory as a single blit.
+    /// The deserialized array is allocated with the allocator passed to the
+    /// constructor (default <see cref="Allocator.Persistent"/>).
     /// </summary>
-    public class NativeArraySerializer<T> : ISerializer<NativeArray<T>>
+    public sealed class NativeArraySerializer<T> : ISerializer<NativeArray<T>>
         where T : unmanaged
     {
-        public NativeArraySerializer() { }
+        readonly Allocator _allocator;
+
+        public NativeArraySerializer()
+            : this(Allocator.Persistent) { }
+
+        public NativeArraySerializer(Allocator allocator)
+        {
+            _allocator = allocator;
+        }
 
         public void Deserialize(ref NativeArray<T> value, ISerializationReader reader)
         {
-            // There are many gotchas with the IsCreated property
-            // So for now let's just require that it is always uninitialized
-            // Even this check is unreliable since another copy of NativeArray could have
-            // disposed it
+            // IsCreated is best-effort (a separate alias may have disposed it),
+            // but the assert at least catches the "I forgot to clear before
+            // deserializing" mistake which would otherwise leak the prior allocation.
             Assert.That(!value.IsCreated);
 
             var length = reader.Read<int>("length");
             Assert.That(length >= 0);
 
-            value = new NativeArray<T>(
-                length,
-                Allocator.Persistent,
-                NativeArrayOptions.UninitializedMemory
-            );
+            value = new NativeArray<T>(length, _allocator, NativeArrayOptions.UninitializedMemory);
 
             unsafe
             {
@@ -42,10 +47,6 @@ namespace Trecs.Serialization
 
         public void Serialize(in NativeArray<T> value, ISerializationWriter writer)
         {
-            // There are many gotchas with the IsCreated property
-            // So for now let's just require that it is always initialized and never disposed
-            // Even this check is unreliable since another copy of NativeArray could have
-            // disposed it
             Assert.That(value.IsCreated);
 
             writer.Write("length", value.Length);

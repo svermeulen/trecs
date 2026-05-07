@@ -33,6 +33,7 @@ namespace Trecs
         Label _statusLabel;
         Label _nameValue;
         Label _kindValue;
+        Label _roleValue;
         Label _typeValue;
         Label _namespaceValue;
         Label _phaseValue;
@@ -103,6 +104,17 @@ namespace Trecs
             );
 
             _kindValue = AddRow(container, "Kind", "");
+
+            // Role applies to *every* accessor (system-owned or manual) so it
+            // sits above the system-only / manual-only blocks. Tooltip
+            // explains the rule matrix in one line so the user doesn't need
+            // to chase the AccessorRole docs to interpret the value.
+            _roleValue = AddRow(container, "Role", "");
+            _roleValue.tooltip =
+                "Input — input ingestion + frame-scoped heap.\n"
+                + "Fixed — deterministic simulation; structural changes; persistent heap.\n"
+                + "Variable — display/render; read-only sim state.\n"
+                + "Bypass — escape hatch; skips role rules. Use sparingly.";
 
             // System-only metadata: kept in its own VisualElement so the whole
             // block hides cleanly for non-system (manual) accessors.
@@ -252,6 +264,29 @@ namespace Trecs
             return value;
         }
 
+        // Hides the Role row entirely when the source can't supply one
+        // (legacy cache snapshot). Toggling DisplayStyle on the parent
+        // collapses the whole row including the label so the inspector
+        // doesn't show "Role: " with an empty value.
+        void UpdateRoleRow(AccessorRole? role)
+        {
+            var rowContainer = _roleValue.parent;
+            if (!role.HasValue)
+            {
+                if (rowContainer != null)
+                {
+                    rowContainer.style.display = DisplayStyle.None;
+                }
+                _roleValue.text = string.Empty;
+                return;
+            }
+            if (rowContainer != null)
+            {
+                rowContainer.style.display = DisplayStyle.Flex;
+            }
+            _roleValue.text = role.Value.ToString();
+        }
+
         void OnEnabledToggleChanged(ChangeEvent<bool> evt)
         {
             if (_suppressToggleEvents)
@@ -285,11 +320,17 @@ namespace Trecs
                 return;
             }
             var world = live.World;
+            var accessor = live.Accessor;
+            if (accessor == null)
+            {
+                _enabledOverrideLabel.style.display = DisplayStyle.None;
+                return;
+            }
 
             // Cheap early-out: if the only thing affecting the system is the
             // Editor channel (which the toggle already reflects), skip the
             // per-blocker enumeration entirely.
-            bool editorEnabled = world.IsSystemEnabled(systemIndex, EnableChannel.Editor);
+            bool editorEnabled = accessor.IsSystemEnabled(systemIndex, EnableChannel.Editor);
             if (world.IsSystemEffectivelyEnabled(systemIndex) == editorEnabled)
             {
                 _enabledOverrideLabel.style.display = DisplayStyle.None;
@@ -299,11 +340,11 @@ namespace Trecs
             // Something other than Editor is in play. Enumerate which channels
             // are blocking, then note the deterministic paused flag separately.
             string blockers = null;
-            if (!world.IsSystemEnabled(systemIndex, EnableChannel.Playback))
+            if (!accessor.IsSystemEnabled(systemIndex, EnableChannel.Playback))
             {
                 blockers = "Playback";
             }
-            if (!world.IsSystemEnabled(systemIndex, EnableChannel.User))
+            if (!accessor.IsSystemEnabled(systemIndex, EnableChannel.User))
             {
                 blockers = blockers == null ? "User" : blockers + ", User";
             }
@@ -373,6 +414,7 @@ namespace Trecs
                     try
                     {
                         _windowAccessor ??= liveWorld.CreateAccessor(
+                            AccessorRole.Unrestricted,
                             "TrecsAccessorSelectionInspector"
                         );
                         liveSystems = _windowAccessor.GetSystems();
@@ -413,33 +455,42 @@ namespace Trecs
             IReadOnlyList<ExecutableSystemInfo> liveSystems
         )
         {
+            AccessorEntry entry;
             if (aref.CacheNativeSystem != null)
             {
-                return BuildEntryFromCacheSystem(aref.CacheNativeSystem);
+                entry = BuildEntryFromCacheSystem(aref.CacheNativeSystem);
             }
-            if (aref.CacheNativeManual != null)
+            else if (aref.CacheNativeManual != null)
             {
-                return new AccessorEntry
+                entry = new AccessorEntry
                 {
                     DebugName = aref.DebugName ?? "(unnamed)",
                     CreatedAtFile = aref.CreatedAtFile,
                     CreatedAtLine = aref.CreatedAtLine,
                 };
             }
-            var entry = BuildEntryFromLive(
-                aref.DebugName,
-                liveSystem,
-                liveSystems,
-                aref.SystemIndex
-            );
-            // Live manual accessors carry their origin on the AccessorRef
-            // itself (LiveSchemaSource pulls it from WorldAccessor.CreatedAt*).
-            // Systems leave it empty — they have richer metadata anyway.
-            if (!entry.IsSystem)
+            else
             {
-                entry.CreatedAtFile = aref.CreatedAtFile;
-                entry.CreatedAtLine = aref.CreatedAtLine;
+                entry = BuildEntryFromLive(
+                    aref.DebugName,
+                    liveSystem,
+                    liveSystems,
+                    aref.SystemIndex
+                );
+                // Live manual accessors carry their origin on the
+                // AccessorRef itself (LiveSchemaSource pulls it from
+                // WorldAccessor.CreatedAt*). Systems leave it empty —
+                // they have richer metadata anyway.
+                if (!entry.IsSystem)
+                {
+                    entry.CreatedAtFile = aref.CreatedAtFile;
+                    entry.CreatedAtLine = aref.CreatedAtLine;
+                }
             }
+            // Role lives on the AccessorRef regardless of source mode.
+            // Always pull from there so we don't have to thread it
+            // through every per-source builder.
+            entry.Role = aref.Role;
             return entry;
         }
 
@@ -450,6 +501,11 @@ namespace Trecs
         {
             public string DebugName;
             public bool IsSystem;
+
+            // Set on every accessor (system or manual) when the source
+            // can supply it. Null on legacy cache snapshots saved before
+            // role was recorded — RenderStatic hides the row in that case.
+            public AccessorRole? Role;
             public string TypeName;
             public string TypeNamespace;
             public string Phase;
@@ -558,6 +614,10 @@ namespace Trecs
         void RenderStatic(AccessorEntry entry, InspectorLinker linker, bool isCache)
         {
             _nameValue.text = entry.DebugName ?? "(unnamed)";
+            // Role row is shared across system + manual entries. Hidden
+            // entirely when null (legacy cache snapshot) so the user sees
+            // "no info" rather than a misleading default value.
+            UpdateRoleRow(entry.Role);
             if (!entry.IsSystem)
             {
                 _kindValue.text = isCache ? "Manual accessor (cached)" : "Manual accessor";

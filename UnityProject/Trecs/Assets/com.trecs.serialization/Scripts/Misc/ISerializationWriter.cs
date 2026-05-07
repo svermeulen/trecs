@@ -17,6 +17,9 @@ namespace Trecs.Serialization
         /// <summary>
         /// Writes a concrete type value. Use this when the exact type is known at compile time.
         /// The type information is optionally written for verification during deserialization.
+        /// If <typeparamref name="T"/> is abstract (interface or abstract class), the call is
+        /// dispatched to <see cref="WriteObject(string, object)"/>, which always writes the
+        /// concrete type ID regardless of the type-checking setting.
         /// </summary>
         void Write<T>(string name, in T value);
 
@@ -88,8 +91,6 @@ namespace Trecs.Serialization
 
         /// <summary>
         /// Writes a length-prefixed byte range from <paramref name="buffer"/>.
-        /// For JSON serialization, bytes are encoded as base64.
-        /// For binary serialization, writes an int length followed by the bytes.
         /// </summary>
         void WriteBytes(string name, byte[] buffer, int offset, int count);
 

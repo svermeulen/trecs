@@ -20,7 +20,7 @@ namespace Trecs.Samples.FeedingFrenzy101
 
         public RemoveCleanupHandler(World world)
         {
-            World = world.CreateAccessor();
+            World = world.CreateAccessor(AccessorRole.Fixed);
 
             World
                 .Events.EntitiesWithTags<FrenzyTags.Fish>()

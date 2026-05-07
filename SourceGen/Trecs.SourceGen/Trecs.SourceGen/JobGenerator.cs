@@ -87,7 +87,7 @@ namespace Trecs.SourceGen
                     m.AttributeLists.SelectMany(al => al.Attributes)
                         .Any(attr =>
                             IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
-                            == TrecsAttributeNames.EntityFilter
+                            == TrecsAttributeNames.ForEachEntity
                         )
                 );
             if (hasIterationAttr)
@@ -244,7 +244,7 @@ namespace Trecs.SourceGen
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
                         IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString())
-                        == TrecsAttributeNames.EntityFilter
+                        == TrecsAttributeNames.ForEachEntity
                     );
 
                 if (!hasEntityFilter)

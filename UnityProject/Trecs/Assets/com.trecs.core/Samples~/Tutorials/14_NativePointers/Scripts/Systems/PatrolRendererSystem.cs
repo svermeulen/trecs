@@ -8,7 +8,7 @@ namespace Trecs.Samples.NativePointers
     /// WorldAccessor overload of Get — the same pointer resolves from a
     /// job or from the main thread without any conversion.
     /// </summary>
-    [Phase(SystemPhase.Presentation)]
+    [ExecuteIn(SystemPhase.Presentation)]
     [ExecuteAfter(typeof(PatrolMovementSystem))]
     public partial class PatrolRendererSystem : ISystem
     {
