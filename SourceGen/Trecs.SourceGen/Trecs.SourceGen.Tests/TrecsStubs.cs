@@ -731,6 +731,7 @@ internal static class TrecsStubs
             public static class UnmanagedUtil
             {
                 public static bool BlittableEquals<T>(in T lhs, in T rhs) where T : unmanaged => false;
+                public static int BlittableHashCode<T>(in T value) where T : unmanaged => 0;
             }
 
             // ISystemInternal — internal extension point that AutoSystemGenerator emits an
