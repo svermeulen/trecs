@@ -253,7 +253,7 @@ namespace Trecs
         public int? ExecutionPriority { get; }
         public bool IsManual { get; }
 
-        // The accessor's role (Input / Fixed / Variable / Bypass) — the
+        // The accessor's role (Input / Fixed / Variable / Unrestricted) — the
         // permissions bucket the accessor was created with. Null when
         // unknown (e.g. a cache snapshot saved before this field was
         // recorded); inspector falls back to omitting the row in that

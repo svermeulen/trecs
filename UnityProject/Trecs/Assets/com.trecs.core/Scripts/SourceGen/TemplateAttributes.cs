@@ -165,7 +165,7 @@ namespace Trecs
 
     /// <summary>
     /// Restricts a template component field or an entire template to the variable-update
-    /// phase only. Variable / Input / Bypass roles may read and write the affected state
+    /// phase only. Variable / Input / Unrestricted roles may read and write the affected state
     /// freely; Fixed-role systems are rejected at access time.
     /// <para>
     /// On a <b>component field</b>: the single component is render-cadence; the rest of

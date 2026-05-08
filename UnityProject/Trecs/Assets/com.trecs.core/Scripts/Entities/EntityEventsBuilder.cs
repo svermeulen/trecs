@@ -230,7 +230,7 @@ namespace Trecs
         // A Fixed-role accessor that subscribes to entity lifecycle events
         // on a [VariableUpdateOnly] template's group is registering for
         // structural-change callbacks that, by the VUO rules, can only be
-        // *driven* by Variable-role / input-system / None-role accessors.
+        // *driven* by Variable-role / input-system / Unrestricted-role accessors.
         // The callback would either never fire (defeating the subscription)
         // or fire with the Fixed accessor mid-flight on render-cadence state
         // (leaking non-determinism into the simulation). Reject at
@@ -252,7 +252,7 @@ namespace Trecs
                 var template = worldInfo.GetResolvedTemplateForGroup(group);
                 Assert.That(
                     !template.VariableUpdateOnly,
-                    "Entity-event subscription from Fixed-role accessor {} resolved to [VariableUpdateOnly] template {} (group {}). VUO templates are render-cadence — only Variable-role / input-system / None-role accessors drive structural changes there, so a Fixed-role observer would either never fire or leak render-rate state into the simulation. Narrow the predicate (e.g. add a WithoutTags constraint) or move the subscription to a Variable-role or input-system service.",
+                    "Entity-event subscription from Fixed-role accessor {} resolved to [VariableUpdateOnly] template {} (group {}). VUO templates are render-cadence — only Variable-role / input-system / Unrestricted-role accessors drive structural changes there, so a Fixed-role observer would either never fire or leak render-rate state into the simulation. Narrow the predicate (e.g. add a WithoutTags constraint) or move the subscription to a Variable-role or input-system service.",
                     _debugName,
                     template.DebugName,
                     group

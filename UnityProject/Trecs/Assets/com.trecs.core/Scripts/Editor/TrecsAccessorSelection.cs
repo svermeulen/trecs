@@ -114,7 +114,7 @@ namespace Trecs
                 "Input — input ingestion + frame-scoped heap.\n"
                 + "Fixed — deterministic simulation; structural changes; persistent heap.\n"
                 + "Variable — display/render; read-only sim state.\n"
-                + "Bypass — escape hatch; skips role rules. Use sparingly.";
+                + "Unrestricted — escape hatch; skips role rules. Use sparingly.";
 
             // System-only metadata: kept in its own VisualElement so the whole
             // block hides cleanly for non-system (manual) accessors.

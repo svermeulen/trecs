@@ -112,7 +112,7 @@ namespace Trecs
         public string Phase;
 
         // The accessor role this system runs under (Input / Fixed /
-        // Variable / Bypass). Persisted as the enum's string name so
+        // Variable / Unrestricted). Persisted as the enum's string name so
         // older snapshots without this field deserialize as empty
         // and the inspector falls back gracefully. Always set on new
         // snapshots — TrecsSchemaCache derives it from the live
@@ -134,7 +134,7 @@ namespace Trecs
         public string DebugName;
 
         // The accessor role this manual accessor was created with
-        // (Input / Fixed / Variable / Bypass). Persisted as the enum's
+        // (Input / Fixed / Variable / Unrestricted). Persisted as the enum's
         // string name so older snapshots without this field deserialize
         // as empty and the inspector falls back gracefully.
         public string Role;

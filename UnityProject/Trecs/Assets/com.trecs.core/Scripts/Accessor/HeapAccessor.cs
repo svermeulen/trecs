@@ -440,7 +440,7 @@ namespace Trecs
         }
 
         // Persistent heap allocations are only allowed from Fixed-role and
-        // None-role accessors. Input-system and Variable-role accessors are
+        // Unrestricted-role accessors. Input-system and Variable-role accessors are
         // rejected regardless of whether systems are currently executing —
         // see docs/advanced/heap-allocation-rules.md.
         [Conditional("DEBUG")]
@@ -463,7 +463,7 @@ namespace Trecs
             {
                 Assert.That(
                     false,
-                    "Cannot allocate heap pointers from Variable-role accessor {}. Heap allocation is only allowed from Fixed-role and None-role accessors. See Heap Allocation Rules in the docs.",
+                    "Cannot allocate heap pointers from Variable-role accessor {}. Heap allocation is only allowed from Fixed-role and Unrestricted-role accessors. See Heap Allocation Rules in the docs.",
                     _debugName
                 );
             }

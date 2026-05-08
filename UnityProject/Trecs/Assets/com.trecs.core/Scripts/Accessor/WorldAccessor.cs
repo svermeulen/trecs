@@ -985,12 +985,12 @@ namespace Trecs
         // Component access rules — see docs/advanced/heap-allocation-rules.md
         // for the full matrix. In short:
         //   - [VariableUpdateOnly] components are render-only territory: only
-        //     Variable-role / input-system / None-role accessors may read
-        //     or write them.
+        //     Variable-role / input-system / Unrestricted-role accessors may
+        //     read or write them.
         //   - A template declared [VariableUpdateOnly] propagates VUO to every
         //     component on it: same rules apply.
         //   - Non-[VariableUpdateOnly] components are simulation state: any
-        //     accessor may read, only Fixed-role (or None-role) may write.
+        //     accessor may read, only Fixed-role (or Unrestricted-role) may write.
         //   - [Constant] components are immutable after entity creation.
         //     Init-time writes go through EntityInitializer.SetRawImpl, which
         //     bypasses this path; any write that reaches GetBufferWrite /
@@ -1025,7 +1025,7 @@ namespace Trecs
             {
                 Assert.That(
                     !template.IsVariableUpdateOnly(dec),
-                    "Cannot write [VariableUpdateOnly] component {} from Fixed-role accessor {} (template {}{}). [VariableUpdateOnly] components are render-rate state and can only be touched by Variable-role / Input-system / None-role accessors.",
+                    "Cannot write [VariableUpdateOnly] component {} from Fixed-role accessor {} (template {}{}). [VariableUpdateOnly] components are render-rate state and can only be touched by Variable-role / Input-system / Unrestricted-role accessors.",
                     typeof(T),
                     DebugName,
                     template.DebugName,
@@ -1045,9 +1045,10 @@ namespace Trecs
         }
 
         // While a Fixed-role system is executing, only its own accessor may
-        // touch ECS state. None-role accessors and other-system accessors
-        // are both rejected — they scramble debug attribution by recording
-        // access under the wrong DebugName, and None-role accessors smuggle
+        // touch ECS state. Unrestricted-role accessors and other-system
+        // accessors are both rejected — they scramble debug attribution by
+        // recording access under the wrong DebugName, and Unrestricted-role
+        // accessors smuggle
         // non-deterministic state in besides. The SystemRunner tracks the
         // currently-executing Fixed accessor's id; it leaves the tracker
         // at 0 outside Fixed execute, in which case this assertion is a
@@ -1495,7 +1496,7 @@ namespace Trecs
         {
             AssertIsCurrentlyExecutingAccessor();
 
-            // None-role accessors bypass; otherwise structural changes
+            // Unrestricted-role accessors bypass; otherwise structural changes
             // require a Fixed-role accessor regardless of whether systems
             // are currently executing. Fixed services that init/teardown
             // world state run their structural ops at construction or in
@@ -1507,7 +1508,7 @@ namespace Trecs
             // setup that touches mixed state should use AccessorRole.Unrestricted.
             Assert.That(
                 CanMakeStructuralChanges,
-                "Attempted to modify fixed state from {} (role {}). Structural changes require a Fixed-role or None-role accessor.",
+                "Attempted to modify fixed state from {} (role {}). Structural changes require a Fixed-role or Unrestricted-role accessor.",
                 DebugName,
                 _role
             );
@@ -1544,10 +1545,11 @@ namespace Trecs
         }
 
         // Per-group structural-change rule. The "default" group is sim
-        // state and Fixed/None-only (per AssertCanMakeStructuralChanges
+        // state and Fixed/Unrestricted-only (per AssertCanMakeStructuralChanges
         // above). A [VariableUpdateOnly] template flips that: its groups
-        // are render-cadence so Variable-role, input-system, and None-role
-        // accessors may add / remove / move entities there, while Fixed
+        // are render-cadence so Variable-role, input-system, and
+        // Unrestricted-role accessors may add / remove / move entities there,
+        // while Fixed
         // is rejected outright (Fixed must not touch VUO state at all).
         [Conditional("DEBUG")]
         internal void AssertCanMakeStructuralChangesToGroup(GroupIndex group)
@@ -1565,7 +1567,7 @@ namespace Trecs
             {
                 Assert.That(
                     !IsFixed,
-                    "Cannot modify VUO template {} from Fixed-role accessor {}. The template is declared [VariableUpdateOnly], so structural changes (add/remove/move) must come from Variable-role / input-system / None-role accessors.",
+                    "Cannot modify VUO template {} from Fixed-role accessor {}. The template is declared [VariableUpdateOnly], so structural changes (add/remove/move) must come from Variable-role / input-system / Unrestricted-role accessors.",
                     template.DebugName,
                     DebugName
                 );
@@ -1574,7 +1576,7 @@ namespace Trecs
 
             Assert.That(
                 IsFixed,
-                "Attempted to modify fixed-template state from {} (role {}, template {}). Structural changes on non-VUO templates require a Fixed-role or None-role accessor.",
+                "Attempted to modify fixed-template state from {} (role {}, template {}). Structural changes on non-VUO templates require a Fixed-role or Unrestricted-role accessor.",
                 DebugName,
                 _role,
                 template.DebugName
