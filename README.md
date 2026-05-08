@@ -11,7 +11,7 @@ A high-performance Entity Component System framework for Unity, designed for det
 
 - **High-performance storage** — Components are stored in contiguous arrays (structure-of-arrays), grouped by explicit tags for cache-friendly iteration
 - **Serialization** — Full world state serialization out of the box, including all entities, components, and heap data
-- **Bookmarks, Recording & Playback** — Save and load snapshots of full game state, record and replay inputs deterministically with checksum-based desync detection, or use for network rollbacks
+- **Snapshots, Recording & Playback** — Save and load snapshots of full game state, record and replay inputs deterministically with checksum-based desync detection, or use for network rollbacks
 - **Burst & Jobs** — First-class support for Unity's job system and Burst compiler with automatic dependency tracking based on component access
 - **Source generation** — Roslyn-powered code generation eliminates boilerplate for systems, aspects, and templates
 - **Aspects** — Bundled component access that groups related read/write operations into a single reusable struct
@@ -43,14 +43,14 @@ public struct PlayerTag : ITag { }
 // Step 3: Define entity types
 public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 {
-    public Position Position;
-    public Velocity Velocity;
+    Position Position;
+    Velocity Velocity;
 }
 
 // Step 4: Define systems to operate on entities
 public partial class MovementSystem : ISystem
 {
-    [ForEachEntity(Tag = typeof(PlayerTag))]
+    [ForEachEntity<PlayerTag>]
     void Execute(in Player player)
     {
         player.Position += player.Velocity * World.DeltaTime;
@@ -87,7 +87,7 @@ With the [openupm-cli](https://openupm.com/):
 
 ```bash
 openupm add com.trecs.core
-# Optional: serialization features (bookmarks, recording/playback, save/load)
+# Optional: serialization features (snapshots, recording/playback, save/load)
 openupm add com.trecs.serialization
 ```
 
@@ -131,7 +131,7 @@ See full documentation at **[svermeulen.github.io/trecs](https://svermeulen.gith
 
 ## Samples
 
-The project includes 15 samples covering everything from basic entity creation to complex simulations with Burst jobs. To try them, clone the repo, open `UnityProject/Trecs` in Unity 6000.3+, and run `Assets/Samples/Main.unity`.
+The project includes 18 samples covering everything from basic entity creation to complex simulations with Burst jobs. To try them, clone the repo, open `UnityProject/Trecs` in Unity 6000.3+, and run `Assets/Samples/Main.unity`.
 
 | Sample | Concepts |
 |--------|----------|
@@ -147,9 +147,12 @@ The project includes 15 samples covering everything from basic entity creation t
 | 10 Pointers | Storing memory outside of components |
 | 11 Snake | Complete game with recording/playback |
 | 12 Feeding Frenzy Benchmark | Exhaustive examples of the many Trecs patterns available |
-| 13 Save Game | Bookmark-based save/load slots with the serialization package |
+| 13 Save Game | Snapshot-based save/load slots with the serialization package |
 | 14 Native Pointers | `NativeSharedPtr` and `NativeUniquePtr` read and mutated inside a Burst job |
 | 15 Aspect Interfaces | Reusing aspect logic across entity types via interface composition |
+| 17 Blob Storage | `BlobStore` for sharing immutable data across many entities |
+| 18 Reactive Events | Subscribing to entity add / remove / move events |
+| 19 Multiple Worlds | Running multiple `World` instances side by side in one scene |
 
 ## Acknowledgments
 
