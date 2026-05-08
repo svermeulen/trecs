@@ -33,14 +33,14 @@ world.Initialize();
 | Method | Description |
 |--------|-------------|
 | `SetDebugName(string)` | Set a human-readable name (surfaces in editor tooling) |
-| `SetSettings(WorldSettings)` | Configure timing, determinism, and debug options |
-| `AddTemplate(Template)` | Register an entity template |
-| `AddTemplates(IEnumerable<Template>)` | Register multiple templates |
+| `SetSettings(WorldSettings)` | Configure timing, determinism, and debug options — see [WorldSettings](#worldsettings) |
+| `AddTemplate(Template)` | Register an entity [template](templates.md) |
+| `AddTemplates(IEnumerable<Template>)` | Register multiple [templates](templates.md) |
 | `AddSet<T>()` | Register an [entity set](../entity-management/sets.md) |
 | `AddBlobStore(IBlobStore)` | Register a blob store for [heap](../advanced/heap.md) data |
 | `SetBlobCacheSettings(BlobCacheSettings)` | Configure blob caching |
-| `AddSystem(ISystem)` / `AddSystems(IEnumerable<ISystem>)` | Register systems |
-| `AddSystemOrderConstraint(params Type[])` | Declare system execution order |
+| `AddSystem(ISystem)` / `AddSystems(IEnumerable<ISystem>)` | Register [systems](systems.md) |
+| `AddSystemOrderConstraint(params Type[])` | Declare [system ordering](systems.md#system-ordering) |
 | `Build()` | Build the world (returns `World`) |
 | `BuildAndInitialize()` | Build and immediately initialize |
 
