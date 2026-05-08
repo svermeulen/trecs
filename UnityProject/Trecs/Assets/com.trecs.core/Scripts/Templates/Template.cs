@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Trecs
 {
     /// <summary>
-    /// Declares an entity type's component layout, tags, valid partitions, and inheritance chain.
+    /// Describes an entity's component layout, tags, valid partitions, and inheritance chain.
     /// Templates are defined as classes implementing <see cref="ITemplate"/> — the source generator
     /// produces concrete <see cref="Template"/> instances automatically. Register via
     /// <see cref="WorldBuilder.AddTemplate"/>.

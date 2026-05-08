@@ -5,7 +5,7 @@ namespace Trecs.Samples.Interpolation
     /// <summary>
     /// Fixed-update system: moves all entities (smooth AND raw) in circles.
     ///
-    /// Both entity types receive identical physics updates. The visual
+    /// Both templates receive identical physics updates. The visual
     /// difference comes entirely from how the renderer reads position data:
     /// interpolated (smooth) vs direct (raw).
     /// </summary>

@@ -377,7 +377,7 @@ public partial class LateSystem : ISystem { ... }
 
 ## OnReady Hook
 
-A system can declare `partial void OnReady()` to run one-time setup once the world is fully built but before the first tick. This is the right place to cache references, validate world state, or precompute data that depends on the registered entity types.
+A system can declare `partial void OnReady()` to run one-time setup once the world is fully built but before the first tick. This is the right place to cache references, validate world state, or precompute data that depends on the registered templates.
 
 ```csharp
 public partial class RendererSystem : ISystem

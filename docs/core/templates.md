@@ -54,9 +54,9 @@ Templates and tags are closely related but play distinct roles. Understanding th
 
 **Templates describe the shape; tags are the vocabulary.** The separation lets you evolve a template (add a component, split it in two, change inheritance) without touching any system code, as long as the tag contract stays the same.
 
-### Tags as a Proxy for Entity Type
+### Tags as Template Identity
 
-Because every template declares at least one identity tag, tags effectively act as the proxy for "entity type":
+Because every template declares at least one identity tag, tags effectively become the runtime way to identify which template an entity belongs to:
 
 - **1:1 with a concrete template** — `GameTags.Spinner` is carried only by `SpinnerEntity`, so querying by it picks out exactly that template's entities.
 - **An abstract role shared across templates** — a `CommonTags.Renderable` tag declared on a base template is inherited by every template that does `IExtends<Renderable>`. Querying by the role tag iterates every entity that fulfills it. This is Trecs's closest analogue to "interface" or "base class" polymorphism.

@@ -80,7 +80,7 @@ This is what makes `OnRemoved` the right place to dispose external resources key
 
 - Entities that own external resources — GameObjects, audio sources, particle systems, native handles, managed pointers — which need explicit cleanup when the entity is removed.
 - Global counters, analytics, or stat tracking that should update whenever a population changes, without a system polling each frame.
-- Logging or debugging: trace when specific entity types appear and disappear.
+- Logging or debugging: trace when specific templates appear and disappear.
 
 For intra-ECS reactions (e.g. "when an enemy is added, spawn a spawn-VFX entity"), you can often do it in a normal system or init hook instead — reserve observers for crossing the ECS/external boundary, which is the problem they solve best.
 

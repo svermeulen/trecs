@@ -155,6 +155,6 @@ public partial class CleanupHandlers
 
 - **`EntityHandle`** for stable cross-entity references that survive structural changes. See [Entities](../core/entities.md).
 - **Template inheritance** with `IExtends<T>` to share common components. See [Templates](../core/templates.md).
-- **Nested aspect queries** — iterating one entity type while querying another. See [Queries & Iteration](../data-access/queries-and-iteration.md).
+- **Nested aspect queries** — iterating one template while querying another. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 - **Entity events** (`OnRemoved`) for cleanup of cross-references. See [Entity Events](../entity-management/entity-events.md).
 - **Bidirectional linking** — predator points to prey and prey points back to predator.

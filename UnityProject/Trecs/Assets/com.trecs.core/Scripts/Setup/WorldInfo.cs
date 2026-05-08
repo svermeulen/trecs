@@ -127,13 +127,13 @@ namespace Trecs
                 {
                     Assert.That(
                         globalTemplate == null,
-                        "Found multiple global entity types.  There can only be one."
+                        "Found multiple global templates.  There can only be one."
                     );
                     globalTemplate = resolvedTemplate;
 
                     Assert.That(
                         resolvedTemplate.Groups.Count == 1,
-                        "Global entity type must only be in one group"
+                        "Global template must only be in one group"
                     );
                     Assert.That(!globalGroup.HasValue);
                     globalGroup = resolvedTemplate.Groups[0];
@@ -190,7 +190,7 @@ namespace Trecs
                     // So game code just needs to create a dedicated base template I guess for now
                     Assert.That(
                         !_resolvedTemplateSet.Contains(baseType),
-                        "Provided entity types must not be base types of other provided entity types.  Found {} as a base type of {}",
+                        "Registered templates must not be base templates of other registered templates.  Found {} as a base template of {}",
                         baseType,
                         resolvedTemplate
                     );
@@ -381,7 +381,7 @@ namespace Trecs
             {
                 Assert.That(
                     baseType.Partitions.IsEmpty(),
-                    "Entity type partitions must only be specified in the concrete entity type"
+                    "Partitions must only be specified on the concrete template, not on a base template"
                 );
             }
 
@@ -516,7 +516,7 @@ namespace Trecs
                 return _groupInfos[group.Index].ResolvedTemplate;
             }
 
-            throw Assert.CreateException("No entity type found for group {}", group);
+            throw Assert.CreateException("No template found for group {}", group);
         }
 
         public ResolvedTemplate GetResolvedTemplateForTags(TagSet tags) =>

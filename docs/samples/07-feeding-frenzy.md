@@ -212,6 +212,6 @@ This is an alternative to the formal [interpolation](09-interpolation.md) system
 - **Entity population management** — dynamically adjusting fish/meal counts via [WrapAsJob] and `MaxFishChangePerFrame` throttling.
 - **Bidirectional entity references** with cleanup handlers — see [Entity Events](../entity-management/entity-events.md).
 - **Partition transitions** between NotEating and Eating — see [Partitions](06-partitions.md).
-- **Generic tags** — `NotEating` and `Eating` represent dynamic states reused across entity types.
+- **Generic tags** — `NotEating` and `Eating` represent dynamic states reused across templates.
 - **Visual smoothing** — separating simulation position (`SimPosition`, fixed) from render position (`Position`, variable). For the formal alternative, see [Interpolation](../advanced/interpolation.md) and [sample 09](09-interpolation.md).
 - **`[VariableUpdateOnly]`** components — see [Accessor Roles](../advanced/accessor-roles.md).

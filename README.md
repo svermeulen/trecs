@@ -9,45 +9,38 @@ A high-performance Entity Component System framework for Unity, designed for det
 
 ## Features
 
-- **High-performance storage** — Components are stored in contiguous arrays (structure-of-arrays), grouped by explicit tags for cache-friendly iteration
-- **Serialization** — Full world state serialization out of the box, including all entities, components, and heap data
-- **Snapshots, Recording & Playback** — Save and load snapshots of full game state, record and replay inputs deterministically with checksum-based desync detection, or use for network rollbacks
-- **Burst & Jobs** — First-class support for Unity's job system and Burst compiler with automatic dependency tracking based on component access
-- **Source generation** — Roslyn-powered code generation eliminates boilerplate for systems, aspects, and templates
-- **Aspects** — Bundled component access that groups related read/write operations into a single reusable struct
-- **Sets** — Dynamic entity subsets without group changes, for efficient sparse iteration and overlapping membership
-- **Interpolation** — Built-in fixed-to-variable timestep interpolation for smooth rendering
-- **Heap & Pointers** — `SharedPtr`, `UniquePtr`, and native variants for storing managed or large data outside of components
-- **Deterministic simulation** — Fixed-timestep loop with deterministic RNG and isolated input handling, designed for networking and replay
-- **Template system** — Composable entity type blueprints with tag-based grouping and inheritance
+- **High-performance storage** — Components are stored in contiguous arrays (structure-of-arrays), grouped by tag set for cache-friendly iteration.
+- **Burst & Jobs** — First-class support for Unity's job system and Burst compiler, with automatic dependency tracking based on declared component access.
+- **Source generation** — Roslyn-powered code generation eliminates boilerplate for systems, aspects, templates, and jobs.
+- **Aspects** — Reusable bundles of read/write component access that systems iterate over a single entity at a time.
+- **Sets** — Dynamic entity subsets that can overlap freely for sparse iteration without restructuring storage.
+- **Heap & Pointers** — `SharedPtr` and `UniquePtr` for storing native or managed data outside of components.
+- **Interpolation** — Built-in fixed-to-variable timestep interpolation for smooth rendering off a deterministic simulation.
+- **Templates** — Composable blueprints describing an entity's components, tags, partitions, and inheritance.
+- **Deterministic simulation** — Fixed-timestep loop with deterministic RNG and an isolated input queue, designed for replay and rollback.
+- **Snapshots, Recording & Playback** — Full game state serialization, replayable input recordings with checksum desync detection, and snapshot/scrub editor tooling.
 
 ## Quick Start
 
 ```csharp
-// Step 1: Define components
+// 1. Define components
 [Unwrap]
-public partial struct Position : IEntityComponent
-{
-    public float3 Value;
-}
+public partial struct Position : IEntityComponent { public float3 Value; }
 
 [Unwrap]
-public partial struct Velocity : IEntityComponent
-{
-    public float3 Value;
-}
+public partial struct Velocity : IEntityComponent { public float3 Value; }
 
-// Step 2: Define entity tags
+// 2. Define a tag
 public struct PlayerTag : ITag { }
 
-// Step 3: Define entity types
+// 3. Define an entity template
 public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 {
     Position Position;
     Velocity Velocity;
 }
 
-// Step 4: Define systems to operate on entities
+// 4. Define a system
 public partial class MovementSystem : ISystem
 {
     [ForEachEntity(typeof(PlayerTag))]
@@ -59,23 +52,25 @@ public partial class MovementSystem : ISystem
     partial struct Player : IAspect, IRead<Velocity>, IWrite<Position> { }
 }
 
-// Step 5: Define, initialize, and run the world
+// 5. Build and run the world
 var world = new WorldBuilder()
     .AddTemplate(PlayerEntity.Template)
+    .AddSystem(new MovementSystem())
     .Build();
 
-world.AddSystem(new MovementSystem());
-    
 world.Initialize();
 
-// Call this from a MonoBehaviour Update
-world.Tick();
-
-// Call this on MonoBehaviour OnDestroy or when complete
-world.Dispose();
+// In a MonoBehaviour:
+void Update()    { world.Tick(); }
+void OnDestroy() { world.Dispose(); }
 ```
 
-`[Unwrap]` lets aspects expose the inner field directly (so `player.Position` is a `float3`, not a `Position` wrapper). See [Components — the Unwrap Shorthand](https://svermeulen.github.io/trecs/core/components/#the-unwrap-shorthand).
+A few things in that snippet that are worth knowing up front:
+
+- `[Unwrap]` lets aspects expose the component's inner field directly, so `player.Position` is a `float3` rather than a `Position` wrapper. See [Components — the `[Unwrap]` shorthand](https://svermeulen.github.io/trecs/core/components/#the-unwrap-shorthand).
+- `World` inside a system body is a source-generated **instance property** (a [`WorldAccessor`](https://svermeulen.github.io/trecs/data-access/aspects/)), not the `World` class. Outside systems, you create a `WorldAccessor` from `World.CreateAccessor(...)` explicitly.
+
+For a complete walkthrough that creates entities and runs them in a Unity scene, see [Getting Started](https://svermeulen.github.io/trecs/getting-started/).
 
 ## Installation
 
@@ -149,7 +144,7 @@ The project includes 18 samples covering everything from basic entity creation t
 | 12 Feeding Frenzy Benchmark | Exhaustive examples of the many Trecs patterns available |
 | 13 Save Game | Snapshot-based save/load slots with the serialization package |
 | 14 Native Pointers | `NativeSharedPtr` and `NativeUniquePtr` read and mutated inside a Burst job |
-| 15 Aspect Interfaces | Reusing aspect logic across entity types via interface composition |
+| 15 Aspect Interfaces | Reusing aspect logic across templates via interface composition |
 | 17 Blob Storage | `BlobStore` for sharing immutable data across many entities |
 | 18 Reactive Events | Subscribing to entity add / remove / move events |
 | 19 Multiple Worlds | Running multiple `World` instances side by side in one scene |

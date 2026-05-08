@@ -11,7 +11,7 @@ A high-performance Entity Component System framework for Unity, designed for det
 - **Sets** — Dynamic entity subsets that can overlap freely for sparse iteration without restructuring storage.
 - **Heap & Pointers** — `SharedPtr` and `UniquePtr` for storing native or managed data outside of components.
 - **Interpolation** — Built-in fixed-to-variable timestep interpolation for smooth rendering off a deterministic simulation.
-- **Templates** — Composable entity blueprints that describe component layouts for common entity types.
+- **Templates** — Composable blueprints describing an entity's components, tags, partitions, and inheritance.
 - **Deterministic simulation** — Fixed-timestep loop with deterministic RNG and an isolated input queue, designed for replay and rollback.
 - **Snapshots, Recording & Playback** — Full game state serialization, replayable input recordings with checksum desync detection, and snapshot/scrub editor tooling.
 

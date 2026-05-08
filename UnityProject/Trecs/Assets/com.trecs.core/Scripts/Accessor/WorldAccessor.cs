@@ -703,7 +703,7 @@ namespace Trecs
 
         /// <summary>
         /// Returns a <see cref="ComponentAccessor{T}"/> for the global (singleton) entity.
-        /// Use this for world-wide state that doesn't belong to any specific entity type.
+        /// Use this for world-wide state that isn't tied to any specific entity.
         /// </summary>
         public ComponentAccessor<T> GlobalComponent<T>()
             where T : unmanaged, IEntityComponent

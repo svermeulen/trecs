@@ -1,6 +1,6 @@
 # 15 — Aspect Interfaces
 
-Composable, reusable aspect contracts so different entity types can share the same helper logic without duplication.
+Composable, reusable aspect contracts so different templates can share the same helper logic without duplication.
 
 **Source:** `Samples/15_AspectInterfaces/`
 
@@ -102,7 +102,7 @@ Enemies and the boss both have this component set, so the same renderer drives b
 
 ## When to Reach for This
 
-- You have multiple entity types that participate in the same mechanic (damage, pickups, AI targeting, selection, saving) but differ in their extras.
+- You have multiple templates that participate in the same mechanic (damage, pickups, AI targeting, selection, saving) but differ in their extras.
 - You want a single helper method or system to handle all of them without copy-paste or tag-dispatch branches.
 - The shared component set is large enough that passing individual refs would bloat every signature.
 

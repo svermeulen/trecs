@@ -26,7 +26,7 @@ namespace Trecs
 
     /// <summary>
     /// Marker interface for entity template declarations. A template is a class whose
-    /// fields define the components an entity type carries. The source generator emits
+    /// fields define the components an entity carries. The source generator emits
     /// builder code and registration helpers. Register templates via
     /// <see cref="WorldBuilder.AddTemplate"/>.
     /// </summary>

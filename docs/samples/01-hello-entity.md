@@ -10,7 +10,7 @@ By the end you'll have a single entity with a `Rotation` component being rotated
 
 ## Schema
 
-A schema is just the components, tags, and templates that describe your entity types. This sample's schema is tiny:
+A schema is just the components, tags, and templates that describe your entities. This sample's schema is tiny:
 
 ```csharp
 public static class SampleTags
