@@ -377,7 +377,11 @@ namespace Trecs.Tests
                     // Header peek works against the same file.
                     NAssert.IsTrue(TrecsAutoRecorder.TryReadRecordingHeader(path, out var header));
                     NAssert.AreEqual(firstFrame, header.StartFrame);
-                    NAssert.AreEqual(lastFrame, header.EndFrame);
+                    // EndFrame is the recording's save-time frame, which
+                    // may exceed the last anchor when checksum / scrub-cache
+                    // cadences fire past the final anchor — the last anchor
+                    // just has to fall inside [StartFrame, EndFrame].
+                    NAssert.GreaterOrEqual(header.EndFrame, lastFrame);
                 }
             }
             finally

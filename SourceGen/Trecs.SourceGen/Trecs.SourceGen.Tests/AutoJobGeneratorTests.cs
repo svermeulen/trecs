@@ -211,4 +211,47 @@ public class AutoJobGeneratorTests
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
         Assert.That(run.GenErrors, Is.Empty, run.Format());
     }
+
+    [Test]
+    public void AutoJob_WithGlobalIndex_CompilesCleanly()
+    {
+        // [GlobalIndex] int on a [WrapAsJob] static method exercises the
+        // NeedsGlobalIndexOffset wiring on the AutoJobGenerator path: the emitted
+        // job struct gets an internal _trecs_GlobalIndexOffset field, the call-site
+        // forwards `_trecs_GlobalIndexOffset + i`, and the generated
+        // ScheduleParallel(QueryBuilder, ...) overload accumulates a
+        // _trecs_queryIndexOffset across the per-group loop. Mirrors
+        // JobGeneratorTests.IterationJob_WithGlobalIndex_CompilesCleanly so the
+        // user-facing API reads identically across both job-generation paths.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem : Trecs.ISystem
+                {
+                    public void Execute() { }
+
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    [Trecs.WrapAsJob]
+                    static void Process(in CPos pos, [Trecs.GlobalIndex] int globalIndex) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new AutoJobGenerator(),
+                new AutoSystemGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+        Assert.That(run.GenErrors, Is.Empty, run.Format());
+    }
 }

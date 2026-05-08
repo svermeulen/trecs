@@ -644,7 +644,11 @@ namespace Trecs.Serialization
                 {
                     Version = _settings.Version,
                     StartFixedFrame = initial.FixedFrame,
-                    EndFixedFrame = _anchors[_anchors.Count - 1].FixedFrame,
+                    // Current frame, not the last anchor's frame: per-frame
+                    // checksums, scrub-cache entries, and bookmarks can extend
+                    // past the last anchor when their cadences differ. Matches
+                    // BundleRecorder.Stop, which uses _accessor.FixedFrame.
+                    EndFixedFrame = _accessor.FixedFrame,
                     FixedDeltaTime = fixedDeltaTime,
                     ChecksumFlags = SerializationFlags.IsForChecksum,
                     BlobIds = blobs,

@@ -46,12 +46,12 @@ call and is a good copy-into-your-project starting point.
 
 ```csharp
 // Save the current world state to a file (creates parent directories).
-SnapshotMetadata metadata = snapshots.SaveSnapshot(version: 1, filePath: "save.bin");
+SnapshotMetadata metadata = snapshots.SaveSnapshot(version: 1, filePath: "save.snap");
 
 // ...later, possibly across editor restarts...
 
 // Restore that saved state into the live world.
-SnapshotMetadata loaded = snapshots.LoadSnapshot("save.bin");
+SnapshotMetadata loaded = snapshots.LoadSnapshot("save.snap");
 ```
 
 Stream overloads exist for both calls if you need to write/read from

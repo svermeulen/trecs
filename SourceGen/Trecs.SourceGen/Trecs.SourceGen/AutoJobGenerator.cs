@@ -233,6 +233,7 @@ namespace Trecs.SourceGen
             int bufferIndex = 0;
             bool hasAspect = false;
             bool hasEntityIndex = false;
+            bool hasGlobalIndex = false;
             bool hasNwa = false;
             AspectIterationData? aspectData = null;
 
@@ -240,6 +241,33 @@ namespace Trecs.SourceGen
             {
                 var paramType = param.Type;
                 var paramName = param.Name;
+
+                // [GlobalIndex] takes precedence over the type check (an int with the
+                // attribute is the global index, regardless of position). Mirrors
+                // JobGenerator's parameter classifier so the user-facing API reads
+                // identically across the manual-job-struct and [WrapAsJob] paths.
+                bool isGlobalIndex = PerformanceCache.HasAttributeByName(
+                    param,
+                    TrecsAttributeNames.GlobalIndex,
+                    TrecsNamespaces.Trecs
+                );
+                if (isGlobalIndex)
+                {
+                    if (hasGlobalIndex)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.InvalidJobParameterList,
+                                param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
+                                $"Method '{methodName}' has more than one [GlobalIndex] parameter — only one is allowed."
+                            )
+                        );
+                        return null;
+                    }
+                    hasGlobalIndex = true;
+                    paramSlots.Add(AutoJobParam.GlobalIndex(paramName));
+                    continue;
+                }
 
                 // Check for [PassThroughArgument] first — it overrides all auto-detection.
                 bool isPassThrough = PerformanceCache.HasAttributeByName(
@@ -1162,6 +1190,11 @@ namespace Trecs.SourceGen
             if (info.NeedsGroupField)
                 sb.AppendLine($"{fieldInd}internal GroupIndex {GenPrefix}GroupIndex;");
 
+            // GlobalIndexOffset field — the per-call offset assigned per group by the
+            // schedule overload; the Execute shim adds it to `i` before forwarding.
+            if (info.NeedsGlobalIndexOffset)
+                sb.AppendLine($"{fieldInd}internal int {GenPrefix}GlobalIndexOffset;");
+
             // NativeWorldAccessor field.
             if (info.HasNativeWorldAccessor)
                 sb.AppendLine($"{fieldInd}public NativeWorldAccessor {GenPrefix}nwa;");
@@ -1335,6 +1368,9 @@ namespace Trecs.SourceGen
                     case AutoJobParamRole.EntityIndex:
                         callArgs.Add($"{GenPrefix}ei");
                         break;
+                    case AutoJobParamRole.GlobalIndex:
+                        callArgs.Add($"{GenPrefix}GlobalIndexOffset + i");
+                        break;
                     case AutoJobParamRole.NativeWorldAccessor:
                         callArgs.Add($"in {GenPrefix}nwa");
                         break;
@@ -1465,6 +1501,9 @@ namespace Trecs.SourceGen
             );
             sb.AppendLine($"{body}var {GenPrefix}allJobs = {GenPrefix}extraDeps;");
 
+            if (info.NeedsGlobalIndexOffset)
+                sb.AppendLine($"{body}var {GenPrefix}queryIndexOffset = 0;");
+
             // [FromWorld] hoisted setup: resolve TagSets and groups before the loop.
             var fwEmits = GetFromWorldEmits(info);
             if (fwEmits.Count > 0)
@@ -1541,6 +1580,11 @@ namespace Trecs.SourceGen
                     $"{innerBody}{GenPrefix}job.{GenPrefix}GroupIndex = {GenPrefix}group;"
                 );
 
+            if (info.NeedsGlobalIndexOffset)
+                sb.AppendLine(
+                    $"{innerBody}{GenPrefix}job.{GenPrefix}GlobalIndexOffset = {GenPrefix}queryIndexOffset;"
+                );
+
             if (info.HasNativeWorldAccessor)
                 sb.AppendLine(
                     $"{innerBody}{GenPrefix}job.{GenPrefix}nwa = {GenPrefix}world.ToNative();"
@@ -1613,6 +1657,9 @@ namespace Trecs.SourceGen
                 $"{innerBody}{GenPrefix}allJobs = JobHandle.CombineDependencies({GenPrefix}allJobs, {GenPrefix}handle);"
             );
 
+            if (info.NeedsGlobalIndexOffset)
+                sb.AppendLine($"{innerBody}{GenPrefix}queryIndexOffset += {GenPrefix}count;");
+
             sb.AppendLine($"{body}}}");
             sb.AppendLine($"{body}return {GenPrefix}allJobs;");
             sb.AppendLine($"{ind}}}");
@@ -1645,6 +1692,9 @@ namespace Trecs.SourceGen
                 $"{body}var {GenPrefix}scheduler = {GenPrefix}world.GetJobSchedulerForJob();"
             );
             sb.AppendLine($"{body}var {GenPrefix}allJobs = {GenPrefix}extraDeps;");
+
+            if (info.NeedsGlobalIndexOffset)
+                sb.AppendLine($"{body}var {GenPrefix}queryIndexOffset = 0;");
 
             // [FromWorld] hoisted setup: resolve TagSets and groups before the loop.
             var fwEmits = GetFromWorldEmits(info);
@@ -1731,6 +1781,11 @@ namespace Trecs.SourceGen
                     $"{innerBody}{GenPrefix}job.{GenPrefix}GroupIndex = {GenPrefix}group;"
                 );
 
+            if (info.NeedsGlobalIndexOffset)
+                sb.AppendLine(
+                    $"{innerBody}{GenPrefix}job.{GenPrefix}GlobalIndexOffset = {GenPrefix}queryIndexOffset;"
+                );
+
             if (info.HasNativeWorldAccessor)
                 sb.AppendLine(
                     $"{innerBody}{GenPrefix}job.{GenPrefix}nwa = {GenPrefix}world.ToNative();"
@@ -1811,6 +1866,9 @@ namespace Trecs.SourceGen
             sb.AppendLine(
                 $"{innerBody}{GenPrefix}allJobs = JobHandle.CombineDependencies({GenPrefix}allJobs, {GenPrefix}disposeHandle);"
             );
+
+            if (info.NeedsGlobalIndexOffset)
+                sb.AppendLine($"{innerBody}{GenPrefix}queryIndexOffset += {GenPrefix}count;");
 
             sb.AppendLine($"{body}}}");
             sb.AppendLine($"{body}return {GenPrefix}allJobs;");
@@ -1976,6 +2034,14 @@ namespace Trecs.SourceGen
             Aspect,
             Component,
             EntityIndex,
+
+            /// <summary>
+            /// <c>int</c> parameter marked <c>[GlobalIndex]</c>. The Execute shim forwards
+            /// <c>_trecs_GlobalIndexOffset + i</c> at the call site; the schedule overload
+            /// accumulates the offset across the per-group loop. Mirrors JobGenerator's
+            /// <c>ComponentsParamRole.GlobalIndex</c>.
+            /// </summary>
+            GlobalIndex,
             NativeWorldAccessor,
             PassThrough,
             NativeSetRead,
@@ -2087,6 +2153,9 @@ namespace Trecs.SourceGen
 
             public static AutoJobParam EntityIndex(string name) =>
                 new(AutoJobParamRole.EntityIndex, null, name, "EntityIndex");
+
+            public static AutoJobParam GlobalIndex(string name) =>
+                new(AutoJobParamRole.GlobalIndex, null, name, "int");
 
             public static AutoJobParam NativeWorldAccessor(string name) =>
                 new(AutoJobParamRole.NativeWorldAccessor, null, name, "NativeWorldAccessor");
@@ -2255,6 +2324,7 @@ namespace Trecs.SourceGen
             public IterationCriteria Criteria { get; }
 
             public bool HasEntityIndex => Params.Any(p => p.Role == AutoJobParamRole.EntityIndex);
+            public bool HasGlobalIndex => Params.Any(p => p.Role == AutoJobParamRole.GlobalIndex);
             public bool HasNativeWorldAccessor =>
                 Params.Any(p => p.Role == AutoJobParamRole.NativeWorldAccessor);
 
@@ -2265,6 +2335,14 @@ namespace Trecs.SourceGen
             /// </summary>
             public bool NeedsGroupField =>
                 IterKind == AutoJobIterationKind.Aspect || HasEntityIndex;
+
+            /// <summary>
+            /// True if the generated job needs a <c>_trecs_GlobalIndexOffset</c> field.
+            /// Triggered by any <c>[GlobalIndex]</c> parameter; the schedule overload
+            /// accumulates the offset across groups so the Execute shim's
+            /// <c>_trecs_GlobalIndexOffset + i</c> packs uniquely over the full query.
+            /// </summary>
+            public bool NeedsGlobalIndexOffset => HasGlobalIndex;
 
             public bool HasSets => Criteria.SetTypes.Count > 0;
 

@@ -238,6 +238,41 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
         );
     }
 
+    [Test]
+    public void TRECS008_TwoGlobalIndexParametersOnWrapAsJobMethod()
+    {
+        // The [WrapAsJob] (AutoJobGenerator) path runs its own parameter classifier,
+        // so the "only one [GlobalIndex] is allowed" rule needs its own coverage there.
+        // This guards the duplicate-detection branch in AutoJobGenerator.Validate.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem : Trecs.ISystem
+                {
+                    public void Execute() { }
+
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    [Trecs.WrapAsJob]
+                    static void Process(in CPos a, [Trecs.GlobalIndex] int one, [Trecs.GlobalIndex] int two) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS008",
+            new IIncrementalGenerator[]
+            {
+                new AutoJobGenerator(),
+                new AutoSystemGenerator(),
+                new EntityComponentGenerator(),
+            }
+        );
+    }
+
     static void AssertDiagnostic(
         string source,
         string expectedId,
