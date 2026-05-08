@@ -53,6 +53,8 @@ nav:
       - Jobs & Burst: performance/jobs-and-burst.md
       - Dependency Tracking: performance/dependency-tracking.md
   - Advanced:
+      - Accessor Roles: advanced/accessor-roles.md
+      - System Control: advanced/system-control.md
       - Advanced Job Features: advanced/advanced-jobs.md
       - Groups, GroupIndex & TagSets: advanced/groups-and-tagsets.md
       - Source Generator Reference: advanced/source-generator-reference.md
@@ -65,6 +67,8 @@ nav:
       - Binary Format: advanced/binary-format.md
       - Input System: advanced/input-system.md
       - Time & RNG: advanced/time-and-rng.md
+  - Editor Windows:
+      - Hierarchy: editor-windows/hierarchy.md
   - Samples:
       - Overview: samples/index.md
       - 01 - Hello Entity: samples/01-hello-entity.md
@@ -84,6 +88,7 @@ nav:
       - 15 - Aspect Interfaces: samples/15-aspect-interfaces.md
       - 17 - Blob Storage: samples/17-blob-storage.md
       - 18 - Reactive Events: samples/18-reactive-events.md
+      - 19 - Multiple Worlds: samples/19-multiple-worlds.md
   - Recipes:
       - OOP Integration: recipes/oop-integration.md
       - Entity Subset Patterns: recipes/entity-subset-patterns.md
