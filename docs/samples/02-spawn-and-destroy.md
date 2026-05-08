@@ -27,7 +27,7 @@ Plus `Position` and `GameObjectId` from Common.
 ```csharp
 public struct Sphere : ITag { }
 
-public partial class SphereEntity : ITemplate, IHasTags<SampleTags.Sphere>
+public partial class SphereEntity : ITemplate, ITagged<SampleTags.Sphere>
 {
     Position Position = default;
     Lifetime Lifetime;

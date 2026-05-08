@@ -13,7 +13,7 @@ namespace Trecs.Tests
 
     public partial class FMTestEntity
         : ITemplate,
-            IHasTags<FMTag>,
+            ITagged<FMTag>,
             IHasPartition<FMPartitionA>,
             IHasPartition<FMPartitionB>
     {

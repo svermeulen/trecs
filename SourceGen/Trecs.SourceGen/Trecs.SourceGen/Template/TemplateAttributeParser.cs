@@ -57,7 +57,7 @@ namespace Trecs.SourceGen.Template
         }
 
         /// <summary>
-        /// Extracts tag type names from IHasTags&lt;T1, T2, ...&gt; interfaces
+        /// Extracts tag type names from ITagged&lt;T1, T2, ...&gt; interfaces
         /// </summary>
         private static ImmutableArray<string> ExtractTagTypeNames(INamedTypeSymbol symbol)
         {
@@ -65,7 +65,7 @@ namespace Trecs.SourceGen.Template
 
             foreach (var iface in symbol.Interfaces)
             {
-                if (IsIHasTagsInterface(iface))
+                if (IsITaggedInterface(iface))
                 {
                     foreach (var typeArg in iface.TypeArguments)
                     {
@@ -243,9 +243,9 @@ namespace Trecs.SourceGen.Template
                 if (!iface.IsGenericType || !IsInTrecsNamespace(iface))
                     continue;
 
-                // Check IHasTags<TrecsTags.Globals> (the base globals template itself)
+                // Check ITagged<TrecsTags.Globals> (the base globals template itself)
                 if (
-                    iface.OriginalDefinition.Name == "IHasTags"
+                    iface.OriginalDefinition.Name == "ITagged"
                     && iface.TypeArguments.Length >= 1
                     && iface.TypeArguments[0].Name == "Globals"
                     && iface.TypeArguments[0].ContainingType?.Name == "TrecsTags"
@@ -269,10 +269,10 @@ namespace Trecs.SourceGen.Template
             return false;
         }
 
-        private static bool IsIHasTagsInterface(INamedTypeSymbol iface)
+        private static bool IsITaggedInterface(INamedTypeSymbol iface)
         {
             return iface.IsGenericType
-                && iface.OriginalDefinition.Name == "IHasTags"
+                && iface.OriginalDefinition.Name == "ITagged"
                 && IsInTrecsNamespace(iface);
         }
 

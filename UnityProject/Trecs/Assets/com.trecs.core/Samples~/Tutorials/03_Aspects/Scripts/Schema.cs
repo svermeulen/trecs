@@ -21,7 +21,7 @@ namespace Trecs.Samples.Aspects
 
     public static partial class SampleTemplates
     {
-        public partial class BoidEntity : ITemplate, IHasTags<SampleTags.Boid>
+        public partial class BoidEntity : ITemplate, ITagged<SampleTags.Boid>
         {
             Position Position = default;
             Velocity Velocity;

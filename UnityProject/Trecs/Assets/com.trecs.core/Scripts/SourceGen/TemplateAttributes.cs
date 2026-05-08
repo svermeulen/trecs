@@ -59,22 +59,22 @@ namespace Trecs
     /// <summary>
     /// Declares tags on a template. Type args must implement ITag.
     /// </summary>
-    public interface IHasTags<T1>
+    public interface ITagged<T1>
         where T1 : struct, ITag { }
 
-    /// <inheritdoc cref="IHasTags{T1}"/>
-    public interface IHasTags<T1, T2>
+    /// <inheritdoc cref="ITagged{T1}"/>
+    public interface ITagged<T1, T2>
         where T1 : struct, ITag
         where T2 : struct, ITag { }
 
-    /// <inheritdoc cref="IHasTags{T1}"/>
-    public interface IHasTags<T1, T2, T3>
+    /// <inheritdoc cref="ITagged{T1}"/>
+    public interface ITagged<T1, T2, T3>
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag { }
 
-    /// <inheritdoc cref="IHasTags{T1}"/>
-    public interface IHasTags<T1, T2, T3, T4>
+    /// <inheritdoc cref="ITagged{T1}"/>
+    public interface ITagged<T1, T2, T3, T4>
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag

@@ -16,7 +16,7 @@ Trecs runs simulation at a fixed timestep (default 1/60s), but rendering happens
 In your template, use the `[Interpolated]` attribute:
 
 ```csharp
-public partial class SmoothEntity : ITemplate, IHasTags<MyTags.Smooth>
+public partial class SmoothEntity : ITemplate, ITagged<MyTags.Smooth>
 {
     [Interpolated]
     Position Position = default;
@@ -114,7 +114,7 @@ This means you write just the interpolation math — the boilerplate for schedul
 For comparison, entities without interpolation update visually only at fixed timestep boundaries, causing visible stuttering at low fixed rates or high frame rates:
 
 ```csharp
-public partial class RawEntity : ITemplate, IHasTags<MyTags.Raw>
+public partial class RawEntity : ITemplate, ITagged<MyTags.Raw>
 {
     Position Position = default;  // No [Interpolated]
 }

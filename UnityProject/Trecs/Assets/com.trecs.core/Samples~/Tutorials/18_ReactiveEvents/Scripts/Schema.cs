@@ -28,7 +28,7 @@ namespace Trecs.Samples.ReactiveEvents
 
     public static partial class SampleTemplates
     {
-        public partial class BubbleEntity : ITemplate, IHasTags<SampleTags.Bubble>
+        public partial class BubbleEntity : ITemplate, ITagged<SampleTags.Bubble>
         {
             Position Position;
             Velocity Velocity;

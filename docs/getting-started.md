@@ -79,10 +79,10 @@ public struct Spinner : ITag { }
 
 ### 3. Define a template
 
-A template is the blueprint for an entity kind. It declares which tags the entity has (via `IHasTags<...>`) and which components it carries (as fields):
+A template is the blueprint for an entity kind. It declares which tags the entity has (via `ITagged<...>`) and which components it carries (as fields):
 
 ```csharp
-public partial class SpinnerEntity : ITemplate, IHasTags<Spinner>
+public partial class SpinnerEntity : ITemplate, ITagged<Spinner>
 {
     Rotation Rotation;
 }
@@ -149,7 +149,7 @@ public class GameLoop : MonoBehaviour
 
 A few things to notice:
 
-- `AddEntity<Spinner>()` takes a **tag**, not a template type. Trecs matches `Spinner` to `SpinnerEntity.Template` via the template's `IHasTags<Spinner>` declaration.
+- `AddEntity<Spinner>()` takes a **tag**, not a template type. Trecs matches `Spinner` to `SpinnerEntity.Template` via the template's `ITagged<Spinner>` declaration.
 - The init accessor uses `AccessorRole.Unrestricted` because we're outside the tick loop. Inside systems, accessors are created automatically with the right role for that phase. See [Accessor Roles](advanced/accessor-roles.md).
 - `Tick()` and `LateTick()` are typically driven from Unity's `Update` and `LateUpdate` phases, as shown above.
 

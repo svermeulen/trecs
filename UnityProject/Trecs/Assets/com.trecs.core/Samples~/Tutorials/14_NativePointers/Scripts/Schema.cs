@@ -72,7 +72,7 @@ namespace Trecs.Samples.NativePointers
     {
         public partial class NativePatrolFollowerEntity
             : ITemplate,
-                IHasTags<NativePatrolTags.Follower>
+                ITagged<NativePatrolTags.Follower>
         {
             Position Position;
             Route Route;

@@ -68,7 +68,7 @@ Going through `Read`/`Write` lets Trecs lazily complete any in-flight jobs with 
 When declaring components in a [template](templates.md), fields can be annotated to control their update behavior:
 
 ```csharp
-public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
+public partial class PlayerEntity : ITemplate, ITagged<PlayerTag>
 {
     [Interpolated]
     Position Position = default;               // Smoothed between fixed frames

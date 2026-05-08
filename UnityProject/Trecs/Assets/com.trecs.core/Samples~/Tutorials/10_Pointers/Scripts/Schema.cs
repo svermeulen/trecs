@@ -59,7 +59,7 @@ namespace Trecs.Samples.Pointers
 
     public static partial class SampleTemplates
     {
-        public partial class PatrolFollowerEntity : ITemplate, IHasTags<PatrolTags.Follower>
+        public partial class PatrolFollowerEntity : ITemplate, ITagged<PatrolTags.Follower>
         {
             Position Position;
             Route Route;

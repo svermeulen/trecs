@@ -5,7 +5,7 @@ Templates define the component layout and tag identity of an entity — like a b
 ## Defining a Template
 
 ```csharp
-public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
+public partial class SpinnerEntity : ITemplate, ITagged<SampleTags.Spinner>
 {
     Rotation Rotation = new(quaternion.identity);  // Default value
     GameObjectId GameObjectId;                      // No default (must be set during AddEntity)
@@ -15,7 +15,7 @@ public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
 A template is a `partial class` that:
 
 1. Implements **`ITemplate`**
-2. Declares **tags** via `IHasTags<T1, ...>`
+2. Declares **tags** via `ITagged<T1, ...>`
 3. Declares **component fields** — the entity's data layout
 
 Fields with default values supply fallback initialization. Fields without defaults must be set explicitly via `EntityInitializer.Set()` when the entity is created.
@@ -24,18 +24,18 @@ Fields with default values supply fallback initialization. Fields without defaul
 
 ## Tags
 
-Every template declares one or more tags via `IHasTags`:
+Every template declares one or more tags via `ITagged`:
 
 ```csharp
 // Single tag
-public partial class BulletEntity : ITemplate, IHasTags<GameTags.Bullet>
+public partial class BulletEntity : ITemplate, ITagged<GameTags.Bullet>
 {
     Position Position;
     Velocity Velocity;
 }
 
 // Multiple tags
-public partial class PlayerBullet : ITemplate, IHasTags<GameTags.Bullet, GameTags.Player>
+public partial class PlayerBullet : ITemplate, ITagged<GameTags.Bullet, GameTags.Player>
 {
     Position Position;
     Velocity Velocity;
@@ -69,7 +69,7 @@ Use `IExtends<T>` to inherit components and tags from a base template:
 
 ```csharp
 // Base template
-public partial class Renderable : ITemplate, IHasTags<CommonTags.Renderable>
+public partial class Renderable : ITemplate, ITagged<CommonTags.Renderable>
 {
     Position Position;
     Rotation Rotation;
@@ -80,7 +80,7 @@ public partial class Renderable : ITemplate, IHasTags<CommonTags.Renderable>
 // Extended template — inherits Position, Rotation, Scale, Color
 public partial class FishEntity : ITemplate,
     IExtends<Renderable>,
-    IHasTags<FrenzyTags.Fish>
+    ITagged<FrenzyTags.Fish>
 {
     Velocity Velocity;
     Speed Speed;
@@ -92,7 +92,7 @@ Multiple inheritance is supported
 ```csharp
 public partial class ComplexEntity : ITemplate,
     IExtends<Renderable, Moveable>,
-    IHasTags<GameTags.Complex>
+    ITagged<GameTags.Complex>
 {
     Health Health;
 }
@@ -115,12 +115,12 @@ When the same component appears in more than one base template:
 ```csharp
 // Both bases declare Position — this is fine as long as
 // attributes and defaults are compatible
-public partial class Renderable : ITemplate, IHasTags<CommonTags.Renderable>
+public partial class Renderable : ITemplate, ITagged<CommonTags.Renderable>
 {
     Position Position = new(float3.zero);  // Has default
 }
 
-public partial class Moveable : ITemplate, IHasTags<CommonTags.Moveable>
+public partial class Moveable : ITemplate, ITagged<CommonTags.Moveable>
 {
     Position Position;   // No default — OK, Renderable's default is used
     Velocity Velocity;
@@ -128,7 +128,7 @@ public partial class Moveable : ITemplate, IHasTags<CommonTags.Moveable>
 
 public partial class Player : ITemplate,
     IExtends<Renderable, Moveable>,
-    IHasTags<GameTags.Player>
+    ITagged<GameTags.Player>
 {
     Health Health;
     // Inherits Position (with default from Renderable) and Velocity from Moveable
@@ -141,7 +141,7 @@ Templates can declare multiple **partitions** — mutually exclusive tag combina
 
 ```csharp
 public partial class BallEntity : ITemplate,
-    IHasTags<BallTags.Ball>,
+    ITagged<BallTags.Ball>,
     IHasPartition<BallTags.Active>,
     IHasPartition<BallTags.Resting>
 {

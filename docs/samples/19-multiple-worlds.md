@@ -33,7 +33,7 @@ public partial struct Lifetime : IEntityComponent
     public float Value;
 }
 
-public partial class CritterEntity : ITemplate, IHasTags<SampleTags.Critter>
+public partial class CritterEntity : ITemplate, ITagged<SampleTags.Critter>
 {
     Position Position = default;
     Lifetime Lifetime;

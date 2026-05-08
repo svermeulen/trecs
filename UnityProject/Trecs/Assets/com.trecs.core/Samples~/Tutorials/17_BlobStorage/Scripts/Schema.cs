@@ -46,7 +46,7 @@ namespace Trecs.Samples.BlobStorage
 
     public static partial class SampleTemplates
     {
-        public partial class SwatchEntity : ITemplate, IHasTags<SampleTags.Swatch>
+        public partial class SwatchEntity : ITemplate, ITagged<SampleTags.Swatch>
         {
             Position Position;
             UniformScale Scale = new(1f);

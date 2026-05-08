@@ -19,7 +19,7 @@ Boids (simple agents) move in straight lines and wrap around the edges of a boun
 ```csharp
 public struct Boid : ITag { }
 
-public partial class BoidEntity : ITemplate, IHasTags<SampleTags.Boid>
+public partial class BoidEntity : ITemplate, ITagged<SampleTags.Boid>
 {
     Position Position = default;
     Velocity Velocity;

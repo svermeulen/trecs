@@ -34,7 +34,7 @@ public partial struct Velocity : IEntityComponent { public float3 Value; }
 public struct PlayerTag : ITag { }
 
 // 3. Define an entity template
-public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
+public partial class PlayerEntity : ITemplate, ITagged<PlayerTag>
 {
     Position Position;
     Velocity Velocity;

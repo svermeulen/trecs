@@ -65,7 +65,7 @@ The generator produces partial-type scaffolding for types that implement these i
 | `ISystem` | Simulation system | [Systems](../core/systems.md) |
 | `IJobSystem` | System that schedules jobs | [Jobs & Burst](../performance/jobs-and-burst.md) |
 | `ITemplate` | Entity blueprint | [Templates](../core/templates.md) |
-| `IHasTags<…>` | Declares identity tags on a template | [Templates](../core/templates.md), [Tags](../core/tags.md) |
+| `ITagged<…>` | Declares identity tags on a template | [Templates](../core/templates.md), [Tags](../core/tags.md) |
 | `IHasPartition<…>` | Declares a valid partition on a template | [Templates — Partitions](../core/templates.md#partitions) |
 | `IExtends<…>` | Template inheritance | [Templates — Inheritance](../core/templates.md#template-inheritance) |
 | `IEntityComponent` | Unmanaged component | [Components](../core/components.md) |

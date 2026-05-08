@@ -13,7 +13,7 @@ namespace Trecs.Samples.SpawnAndDestroy
 
     public static partial class SampleTemplates
     {
-        public partial class SphereEntity : ITemplate, IHasTags<SampleTags.Sphere>
+        public partial class SphereEntity : ITemplate, ITagged<SampleTags.Sphere>
         {
             Position Position = default;
             Lifetime Lifetime;

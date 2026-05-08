@@ -24,7 +24,7 @@ public struct IsJobsEnabled : IEntityComponent { public bool Value; }
 ```csharp
 public partial class ParticleEntity : ITemplate,
     IExtends<CommonTemplates.Renderable>,
-    IHasTags<SampleTags.Particle>
+    ITagged<SampleTags.Particle>
 {
     Velocity Velocity;
 }

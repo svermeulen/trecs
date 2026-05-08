@@ -30,7 +30,7 @@ Use `IHasPartition` to define mutually exclusive states that entities can transi
 ```csharp
 // Template with partitions
 public partial class EnemyEntity : ITemplate,
-    IHasTags<GameTags.Enemy>,
+    ITagged<GameTags.Enemy>,
     IHasPartition<GameTags.Alive>,
     IHasPartition<GameTags.Dead>
 {
@@ -105,7 +105,7 @@ Nothing forces you to pick one approach per template. A typical mix is to use **
 ```csharp
 // Partitions: only because Alive/Dead iteration is a measured hot path.
 public partial class Enemy : ITemplate,
-    IHasTags<GameTags.Enemy>,
+    ITagged<GameTags.Enemy>,
     IHasPartition<GameTags.Alive>,
     IHasPartition<GameTags.Dead>
 { ... }

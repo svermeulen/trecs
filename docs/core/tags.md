@@ -17,10 +17,10 @@ public static class GameTags
 
 ## Tags in Templates
 
-Tags are declared on templates via `IHasTags`:
+Tags are declared on templates via `ITagged`:
 
 ```csharp
-public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
+public partial class SpinnerEntity : ITemplate, ITagged<SampleTags.Spinner>
 {
     Rotation Rotation;
 }

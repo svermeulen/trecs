@@ -23,7 +23,7 @@ namespace Trecs.SourceGen.Aspect
             // Extract Read/Write types from IRead<>/IWrite<> interfaces
             // and aspect-interface types (base interfaces that extend Trecs.IAspect) from
             // the base interface list.
-            // Note: IHasTags, IInSet, IWithoutTags, IWithoutComponents are NOT extracted
+            // Note: ITagged, IInSet, IWithoutTags, IWithoutComponents are NOT extracted
             // for aspects — filtering is specified at iteration sites instead.
             InterfaceComponentExtractor.ExtractComponentsFromInterfaces(
                 symbol,

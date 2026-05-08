@@ -28,7 +28,7 @@ Plus `Position`, `Rotation`, `Velocity`, `Speed`, `UniformScale`, `ColorComponen
 ```csharp
 public partial class FishEntity : ITemplate,
     IExtends<CommonTemplates.Renderable>,
-    IHasTags<FrenzyTags.Fish>,
+    ITagged<FrenzyTags.Fish>,
     IHasPartition<FrenzyTags.NotEating>,
     IHasPartition<FrenzyTags.Eating>
 {

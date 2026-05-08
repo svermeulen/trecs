@@ -71,7 +71,7 @@ namespace Trecs.Samples.AspectInterfaces
     // between the template and settings.
     public static partial class SampleTemplates
     {
-        public partial class EnemyEntity : ITemplate, IHasTags<SampleTags.Enemy>
+        public partial class EnemyEntity : ITemplate, ITagged<SampleTags.Enemy>
         {
             Position Position = default;
             Armor Armor = default;
@@ -85,7 +85,7 @@ namespace Trecs.Samples.AspectInterfaces
             GameObjectId GameObjectId;
         }
 
-        public partial class BossEntity : ITemplate, IHasTags<SampleTags.Boss>
+        public partial class BossEntity : ITemplate, ITagged<SampleTags.Boss>
         {
             Position Position = default;
             Armor Armor = default;

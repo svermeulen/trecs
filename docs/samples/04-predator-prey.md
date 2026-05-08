@@ -40,7 +40,7 @@ Template inheritance shares common movement components:
 
 ```csharp
 // Base template
-public partial class Movable : ITemplate, IHasTags<SampleTags.Movable>
+public partial class Movable : ITemplate, ITagged<SampleTags.Movable>
 {
     Position Position = default;
     MoveDirection MoveDirection = default;
@@ -50,7 +50,7 @@ public partial class Movable : ITemplate, IHasTags<SampleTags.Movable>
 
 // Predator extends Movable
 public partial class PredatorEntity : ITemplate,
-    IHasTags<SampleTags.Predator>,
+    ITagged<SampleTags.Predator>,
     IExtends<Movable>
 {
     ChosenPrey ChosenPrey = default;
@@ -58,7 +58,7 @@ public partial class PredatorEntity : ITemplate,
 
 // Prey extends Movable
 public partial class PreyEntity : ITemplate,
-    IHasTags<SampleTags.Prey>,
+    ITagged<SampleTags.Prey>,
     IExtends<Movable>
 {
     ApproachingPredator ApproachingPredator = default;

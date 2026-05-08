@@ -15,7 +15,7 @@ namespace Trecs
     /// </summary>
     public static partial class TrecsTemplates
     {
-        public partial class Globals : ITemplate, IHasTags<TrecsTags.Globals> { }
+        public partial class Globals : ITemplate, ITagged<TrecsTags.Globals> { }
     }
 }
 

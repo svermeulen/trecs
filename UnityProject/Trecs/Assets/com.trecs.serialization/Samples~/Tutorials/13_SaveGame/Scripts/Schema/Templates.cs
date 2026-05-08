@@ -12,22 +12,22 @@ namespace Trecs.Serialization.Samples.SaveGame
             MoveInput MoveInput = default;
         }
 
-        public partial class PlayerEntity : ITemplate, IHasTags<SaveGameTags.Player>
+        public partial class PlayerEntity : ITemplate, ITagged<SaveGameTags.Player>
         {
             GridPos GridPos = default;
         }
 
-        public partial class BoxEntity : ITemplate, IHasTags<SaveGameTags.Box>
+        public partial class BoxEntity : ITemplate, ITagged<SaveGameTags.Box>
         {
             GridPos GridPos = default;
         }
 
-        public partial class TargetEntity : ITemplate, IHasTags<SaveGameTags.Target>
+        public partial class TargetEntity : ITemplate, ITagged<SaveGameTags.Target>
         {
             GridPos GridPos = default;
         }
 
-        public partial class WallEntity : ITemplate, IHasTags<SaveGameTags.Wall>
+        public partial class WallEntity : ITemplate, ITagged<SaveGameTags.Wall>
         {
             GridPos GridPos = default;
         }

@@ -22,7 +22,7 @@ public struct Resting : ITag { }
 
 ```csharp
 public partial class BallEntity : ITemplate,
-    IHasTags<BallTags.Ball>,
+    ITagged<BallTags.Ball>,
     IHasPartition<BallTags.Active>,
     IHasPartition<BallTags.Resting>
 {

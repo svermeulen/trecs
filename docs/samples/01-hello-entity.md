@@ -20,7 +20,7 @@ public static class SampleTags
 
 public static partial class SampleTemplates
 {
-    public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
+    public partial class SpinnerEntity : ITemplate, ITagged<SampleTags.Spinner>
     {
         Rotation Rotation = new(quaternion.identity);
 

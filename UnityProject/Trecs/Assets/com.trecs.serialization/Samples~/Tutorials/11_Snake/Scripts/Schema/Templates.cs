@@ -27,7 +27,7 @@ namespace Trecs.Serialization.Samples.Snake
         public partial class SnakeHeadEntity
             : ITemplate,
                 IExtends<Renderable>,
-                IHasTags<SnakeTags.SnakeHead>
+                ITagged<SnakeTags.SnakeHead>
         {
             GridPos GridPos = default;
             Direction Direction = new(new int2(1, 0));
@@ -37,7 +37,7 @@ namespace Trecs.Serialization.Samples.Snake
         public partial class SnakeSegmentEntity
             : ITemplate,
                 IExtends<Renderable>,
-                IHasTags<SnakeTags.SnakeSegment>
+                ITagged<SnakeTags.SnakeSegment>
         {
             GridPos GridPos = default;
             SegmentAge SegmentAge = default;
@@ -47,7 +47,7 @@ namespace Trecs.Serialization.Samples.Snake
         public partial class SnakeFoodEntity
             : ITemplate,
                 IExtends<Renderable>,
-                IHasTags<SnakeTags.SnakeFood>
+                ITagged<SnakeTags.SnakeFood>
         {
             GridPos GridPos = default;
             PrefabId PrefabId = new(SnakePrefabs.Food);

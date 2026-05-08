@@ -13,7 +13,7 @@ namespace Trecs.Samples.MultipleWorlds
 
     public static partial class SampleTemplates
     {
-        public partial class CritterEntity : ITemplate, IHasTags<SampleTags.Critter>
+        public partial class CritterEntity : ITemplate, ITagged<SampleTags.Critter>
         {
             Position Position = default;
             Lifetime Lifetime;

@@ -12,7 +12,7 @@ namespace Trecs.Tests
 
     public partial class SPTestEntity
         : ITemplate,
-            IHasTags<SPTag>,
+            ITagged<SPTag>,
             IHasPartition<SPPartitionA>,
             IHasPartition<SPPartitionB>
     {

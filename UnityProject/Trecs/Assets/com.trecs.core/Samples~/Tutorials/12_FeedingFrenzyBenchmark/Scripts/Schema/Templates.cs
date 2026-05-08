@@ -28,7 +28,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         public partial class FishEntity
             : ITemplate,
                 IExtends<CommonTemplates.Renderable>,
-                IHasTags<FrenzyTags.Fish>
+                ITagged<FrenzyTags.Fish>
         {
             Position Position;
             Rotation Rotation = new(quaternion.identity);
@@ -49,7 +49,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         public partial class MealEntity
             : ITemplate,
                 IExtends<CommonTemplates.Renderable>,
-                IHasTags<FrenzyTags.Meal>
+                ITagged<FrenzyTags.Meal>
         {
             Rotation Rotation = new(quaternion.identity);
             Position Position;

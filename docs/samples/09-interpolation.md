@@ -28,7 +28,7 @@ public partial struct OrbitParams : IEntityComponent
 
 ```csharp
 // Interpolated — smooth
-public partial class SmoothOrbitEntity : ITemplate, IHasTags<OrbitTags.Smooth>
+public partial class SmoothOrbitEntity : ITemplate, ITagged<OrbitTags.Smooth>
 {
     [Interpolated]
     Position Position = default;
@@ -40,7 +40,7 @@ public partial class SmoothOrbitEntity : ITemplate, IHasTags<OrbitTags.Smooth>
 }
 
 // Not interpolated — jittery
-public partial class RawOrbitEntity : ITemplate, IHasTags<OrbitTags.Raw>
+public partial class RawOrbitEntity : ITemplate, ITagged<OrbitTags.Raw>
 {
     Position Position = default;
     Rotation Rotation = default;

@@ -43,7 +43,7 @@ namespace Trecs.Tests
     /// is only meaningful when iteration spans more than one group: a single-group test
     /// would pass with a buggy offset implementation since the offset is always zero on
     /// the first (and only) group. The two templates here both implement
-    /// <c>IHasTags&lt;QCatA&gt;</c>, so a <c>[ForEachEntity(Tag = typeof(QCatA))]</c>
+    /// <c>ITagged&lt;QCatA&gt;</c>, so a <c>[ForEachEntity(Tag = typeof(QCatA))]</c>
     /// query hits both groups in sequence — the second group's call must receive
     /// indices offset by the first group's entity count for the global-index packing
     /// to be correct.
@@ -85,7 +85,7 @@ namespace Trecs.Tests
         [Test]
         public void GlobalIndex_AcrossTwoGroups_PacksUniquelyOverFullRange()
         {
-            // Both QTestEntityA and QTestEntityAB carry IHasTags<QCatA>, so they
+            // Both QTestEntityA and QTestEntityAB carry ITagged<QCatA>, so they
             // resolve to two distinct groups under a single QCatA query.
             using var env = EcsTestHelper.CreateEnvironment(
                 QTestEntityA.Template,

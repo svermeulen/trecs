@@ -206,7 +206,7 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
                 public partial struct CScore : Trecs.IEntityComponent { public int V; }
 
                 public partial class GameGlobalsTemplate
-                    : Trecs.ITemplate, Trecs.IHasTags<Trecs.TrecsTags.Globals>
+                    : Trecs.ITemplate, Trecs.ITagged<Trecs.TrecsTags.Globals>
                 {
                     CScore Score;  // No `= default;` — should fire TRECS037.
                 }
@@ -227,7 +227,7 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
                 public partial struct CScore : Trecs.IEntityComponent { public int V; }
 
                 public partial class GameGlobalsTemplate
-                    : Trecs.ITemplate, Trecs.IHasTags<Trecs.TrecsTags.Globals>
+                    : Trecs.ITemplate, Trecs.ITagged<Trecs.TrecsTags.Globals>
                 {
                     CScore Score = default;
                 }

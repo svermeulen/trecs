@@ -32,7 +32,7 @@ namespace Trecs.Samples.Sets
 
     public static partial class SampleTemplates
     {
-        public partial class ParticleEntity : ITemplate, IHasTags<SampleTags.Particle>
+        public partial class ParticleEntity : ITemplate, ITagged<SampleTags.Particle>
         {
             Position Position = default;
             WarmIntensity WarmIntensity = default;

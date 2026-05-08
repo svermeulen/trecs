@@ -218,18 +218,18 @@ internal static class TrecsStubs
 
             // Built-in tag/template chain used to mark the singleton globals entity.
             // TemplateAttributeParser.IsGlobalsTemplate looks up
-            // IHasTags<TrecsTags.Globals> by name + containing-type name, so the
+            // ITagged<TrecsTags.Globals> by name + containing-type name, so the
             // shapes here just need to satisfy that lookup.
             public static class TrecsTags
             {
                 public struct Globals : ITag { }
             }
 
-            public interface IHasTags<T1> where T1 : struct, ITag { }
-            public interface IHasTags<T1, T2> where T1 : struct, ITag where T2 : struct, ITag { }
-            public interface IHasTags<T1, T2, T3>
+            public interface ITagged<T1> where T1 : struct, ITag { }
+            public interface ITagged<T1, T2> where T1 : struct, ITag where T2 : struct, ITag { }
+            public interface ITagged<T1, T2, T3>
                 where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
-            public interface IHasTags<T1, T2, T3, T4>
+            public interface ITagged<T1, T2, T3, T4>
                 where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
 
             // Iteration / job attributes consumed by ForEach / Job / RunOnce generators.

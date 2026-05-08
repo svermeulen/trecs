@@ -182,7 +182,7 @@ namespace Trecs.Tests
 
         #endregion
 
-        #region Multiple IHasTags
+        #region Multiple ITagged
 
         [Test]
         public void MultiTag_Query_RequiresBothTags()
@@ -222,7 +222,7 @@ namespace Trecs.Tests
 
         #region ForEachEntity Attribute + Aspect Tag Merging
 
-        // QSingleTagView no longer has IHasTags — attribute specifies both tags
+        // QSingleTagView no longer has ITagged — attribute specifies both tags
         // Should only find entities with BOTH tags
         [ForEachEntity(Tags = new[] { typeof(QCatA), typeof(QCatB) })]
         void ProcessMergedTags(in QSingleTagView view)
@@ -426,7 +426,7 @@ namespace Trecs.Tests
                 .AssertComplete();
             a.SubmitEntities();
 
-            // QSingleTagView no longer has IHasTags<QCatA> — tags moved to call site
+            // QSingleTagView no longer has ITagged<QCatA> — tags moved to call site
             // WithTags<QCatA, QCatB> requires both — should only match entities with BOTH
             var results = new List<int>();
             foreach (var view in QSingleTagView.Query(a).WithTags<QCatA, QCatB>())
