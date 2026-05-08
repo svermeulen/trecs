@@ -88,7 +88,7 @@ public partial class SpinnerEntity : ITemplate, IHasTags<Spinner>
 }
 ```
 
-
+Note that this template class is never actually instantiated and instead is just used as configuration for the trecs source generators.
 
 ### 4. Write a system
 
@@ -116,7 +116,7 @@ public partial class SpinnerSystem : ISystem
 
 ### 5. Build and run
 
-Wire everything from a `MonoBehaviour`. We build the world, add the system, initialize, and spawn one entity. Then `Tick()` drives the simulation each frame.
+In this example let's wire everything from a `MonoBehaviour`. We build the world, add the system, initialize, and spawn one entity. Then `Tick()` drives the simulation each frame.
 
 ```csharp
 using UnityEngine;
@@ -136,14 +136,13 @@ public class GameLoop : MonoBehaviour
 
         _world.Initialize();
 
-        // Init-time accessor: structural changes outside a system tick.
         var accessor = _world.CreateAccessor(AccessorRole.Unrestricted);
         accessor.AddEntity<Spinner>()
-                .Set(new Rotation { Value = quaternion.identity });
+            .Set(new Rotation { Value = quaternion.identity });
     }
 
     void Update()     => _world.Tick();
-    void LateTick()   => _world.LateTick();
+    void LateUpdate()   => _world.LateTick();
     void OnDestroy()  => _world.Dispose();
 }
 ```
@@ -152,7 +151,6 @@ A few things to notice:
 
 - `AddEntity<Spinner>()` takes a **tag**, not a template type. Trecs matches `Spinner` to `SpinnerEntity.Template` via the template's `IHasTags<Spinner>` declaration.
 - The init accessor uses `AccessorRole.Unrestricted` because we're outside the tick loop. Inside systems, accessors are created automatically with the right role for that phase. See [Accessor Roles](advanced/accessor-roles.md).
-- `LateTick()` is the variable-update phase that runs *after* `Tick()`. Use it for presentation systems that read sim state to drive rendering — see [Systems](core/systems.md).
 
 ## Where to Next
 
