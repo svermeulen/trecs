@@ -95,7 +95,7 @@ if (entity.TryGet<Velocity>(out var velAccessor))
 }
 ```
 
-For batch processing, prefer [aspects](../data-access/aspects.md) — they bundle related components into a single typed view.
+For most cases it's often better to use [aspects](../data-access/aspects.md) — they bundle related components into a single typed view into the entity.
 
 ## Counting Entities
 

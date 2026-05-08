@@ -8,7 +8,7 @@ Templates define the component layout and tag identity of an entity — like a b
 public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
 {
     Rotation Rotation = new(quaternion.identity);  // Default value
-    GameObjectId GameObjectId;                      // No default (must be set)
+    GameObjectId GameObjectId;                      // No default (must be set during AddEntity)
 }
 ```
 

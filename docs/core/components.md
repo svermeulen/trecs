@@ -76,7 +76,7 @@ public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
     Velocity Velocity;                          // Plain simulation state — Fixed-only writes
 
     [VariableUpdateOnly]
-    RenderState RenderState;                    // Only writable in variable update
+    RenderState RenderState;                    // Only readable and writable in variable update
 
     [Constant]
     PlayerId PlayerId;                          // Immutable after creation
@@ -93,7 +93,7 @@ public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 | `[Constant]` | Component is immutable after entity creation. Asserted at the write site. |
 | `[Input(...)]` | Marks component as input data. See [Input System](../advanced/input-system.md). |
 
-> Components without any attribute are treated as **simulation state**: any phase may read them, but only `Fixed` systems may write. There is no separate `[FixedUpdateOnly]` attribute — that's the default.
+> Components without any attribute are treated as **simulation state**: any phase may read them, but only `Fixed` systems may write.
 
 ## Global Entity
 
