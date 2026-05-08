@@ -87,7 +87,7 @@ namespace Trecs.Tests
         {
             // Start → Stop with zero stepped frames produces a bundle whose
             // start frame == end frame, with one initial snapshot and zero
-            // anchors / bookmarks. The Checksums dict still contains the
+            // anchors / snapshots. The Checksums dict still contains the
             // start-frame entry (recorded by Start so playback can verify
             // post-LoadInitialState matches).
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
@@ -125,7 +125,7 @@ namespace Trecs.Tests
             NAssert.IsNotNull(bundle.InitialSnapshot);
             NAssert.Greater(bundle.InitialSnapshot.Length, 0);
             NAssert.AreEqual(0, bundle.Anchors.Count, "Should have no anchors");
-            NAssert.AreEqual(0, bundle.Bookmarks.Count, "Should have no bookmarks");
+            NAssert.AreEqual(0, bundle.Snapshots.Count, "Should have no snapshots");
         }
 
         [Test]
@@ -219,7 +219,7 @@ namespace Trecs.Tests
                 InputQueue = Array.Empty<byte>(),
                 Checksums = new DenseDictionary<int, uint>(),
                 Anchors = Array.Empty<BundleAnchor>(),
-                Bookmarks = Array.Empty<BundleBookmark>(),
+                Snapshots = Array.Empty<BundleSnapshot>(),
             };
             NAssert.Throws<InvalidOperationException>(() => player.Start(nullBundle));
 
@@ -231,7 +231,7 @@ namespace Trecs.Tests
                 InputQueue = Array.Empty<byte>(),
                 Checksums = new DenseDictionary<int, uint>(),
                 Anchors = Array.Empty<BundleAnchor>(),
-                Bookmarks = Array.Empty<BundleBookmark>(),
+                Snapshots = Array.Empty<BundleSnapshot>(),
             };
             NAssert.Throws<InvalidOperationException>(() => player.Start(emptyBundle));
 

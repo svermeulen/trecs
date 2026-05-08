@@ -37,7 +37,7 @@ namespace Trecs.Serialization
         readonly SnapshotSerializer _snapshotSerializer;
         readonly RecordingBundleSerializer _bundleSerializer;
         readonly List<BundleAnchor> _anchors = new();
-        readonly List<BundleBookmark> _bookmarks = new();
+        readonly List<BundleSnapshot> _snapshots = new();
 
         // Transient: rolling cache of recent snapshots used to make scrub-back
         // instant. Captured at ScrubCacheIntervalSeconds cadence (much denser
@@ -144,7 +144,7 @@ namespace Trecs.Serialization
         public int StartFrame => _startFrame;
 
         /// <summary>
-        /// Rightmost captured frame across persisted anchors, user bookmarks,
+        /// Rightmost captured frame across persisted anchors, user snapshots,
         /// and the transient scrub cache. Drives the player UI's slider end
         /// position and the "at live edge" check.
         /// </summary>
@@ -155,8 +155,8 @@ namespace Trecs.Serialization
                 int max = int.MinValue;
                 if (_anchors.Count > 0)
                     max = _anchors[_anchors.Count - 1].FixedFrame;
-                if (_bookmarks.Count > 0 && _bookmarks[_bookmarks.Count - 1].FixedFrame > max)
-                    max = _bookmarks[_bookmarks.Count - 1].FixedFrame;
+                if (_snapshots.Count > 0 && _snapshots[_snapshots.Count - 1].FixedFrame > max)
+                    max = _snapshots[_snapshots.Count - 1].FixedFrame;
                 if (_scrubCache.Count > 0 && _scrubCache[_scrubCache.Count - 1].FixedFrame > max)
                     max = _scrubCache[_scrubCache.Count - 1].FixedFrame;
                 return max == int.MinValue ? _startFrame : max;
@@ -167,11 +167,11 @@ namespace Trecs.Serialization
 
         /// <summary>
         /// User-placed full-state snapshots with labels. Independent of
-        /// auto-captured <see cref="Anchors"/>: deleting a bookmark never
-        /// affects an anchor at the same frame, and bookmarks are not subject
+        /// auto-captured <see cref="Anchors"/>: deleting a snapshot never
+        /// affects an anchor at the same frame, and snapshots are not subject
         /// to the auto-recorder's capacity caps.
         /// </summary>
-        public IReadOnlyList<BundleBookmark> Bookmarks => _bookmarks;
+        public IReadOnlyList<BundleSnapshot> Snapshots => _snapshots;
 
         public long TotalBytes => _totalBytes;
 
@@ -341,15 +341,15 @@ namespace Trecs.Serialization
                 {
                     return null;
                 }
-                // Use the earliest scrubbable frame across anchors, bookmarks,
+                // Use the earliest scrubbable frame across anchors, snapshots,
                 // and the scrub cache — replaying from any of those needs
                 // inputs from that frame onward. Falls back to _startFrame
                 // pre-first-capture.
                 int earliest = int.MaxValue;
                 if (_anchors.Count > 0)
                     earliest = _anchors[0].FixedFrame;
-                if (_bookmarks.Count > 0 && _bookmarks[0].FixedFrame < earliest)
-                    earliest = _bookmarks[0].FixedFrame;
+                if (_snapshots.Count > 0 && _snapshots[0].FixedFrame < earliest)
+                    earliest = _snapshots[0].FixedFrame;
                 if (_scrubCache.Count > 0 && _scrubCache[0].FixedFrame < earliest)
                     earliest = _scrubCache[0].FixedFrame;
                 if (earliest == int.MaxValue)
@@ -381,7 +381,7 @@ namespace Trecs.Serialization
             }
 
             _anchors.Clear();
-            _bookmarks.Clear();
+            _snapshots.Clear();
             _scrubCache.Clear();
 #if !TRECS_IS_PROFILING
             _checksums.Clear();
@@ -473,14 +473,14 @@ namespace Trecs.Serialization
             var nearest = FindNearestPersistedAtOrBefore(targetFrame);
             if (nearest == null)
             {
-                if (_anchors.Count == 0 && _bookmarks.Count == 0 && _scrubCache.Count == 0)
+                if (_anchors.Count == 0 && _snapshots.Count == 0 && _scrubCache.Count == 0)
                 {
                     _log.Warning("No anchors recorded yet — cannot jump");
                     return false;
                 }
                 // Target precedes everything in the buffer. Snap up to the
                 // earliest scrubbable frame across anchors / scrub cache /
-                // bookmarks.
+                // snapshots.
                 nearest = FindEarliestPersisted();
                 targetFrame = nearest.Value.frame;
             }
@@ -626,7 +626,7 @@ namespace Trecs.Serialization
 
             // The in-memory anchor list is treated as the initial snapshot
             // (first entry) plus a sequence of trailing anchors (the rest).
-            // User-placed bookmarks live in their own list and round-trip
+            // User-placed snapshots live in their own list and round-trip
             // independently. The per-frame checksums dict is populated under
             // its own cadence in CaptureSnapshotIfDue and persisted into the
             // bundle so BundlePlayer can detect desyncs close to where they
@@ -645,7 +645,7 @@ namespace Trecs.Serialization
                     Version = _settings.Version,
                     StartFixedFrame = initial.FixedFrame,
                     // Current frame, not the last anchor's frame: per-frame
-                    // checksums, scrub-cache entries, and bookmarks can extend
+                    // checksums, scrub-cache entries, and snapshots can extend
                     // past the last anchor when their cadences differ. Matches
                     // BundleRecorder.Stop, which uses _accessor.FixedFrame.
                     EndFixedFrame = _accessor.FixedFrame,
@@ -658,7 +658,7 @@ namespace Trecs.Serialization
                 InputQueue = queueBytes,
                 Checksums = CopyChecksums(),
                 Anchors = anchors,
-                Bookmarks = _bookmarks.ToArray(),
+                Snapshots = _snapshots.ToArray(),
             };
 
             _bundleSerializer.Save(bundle, filePath);
@@ -669,9 +669,9 @@ namespace Trecs.Serialization
             LoadedRecordingPath = filePath;
 
             _log.Debug(
-                "Saved recording: {} anchors, {} bookmarks, {} blob refs, {} bytes input queue",
+                "Saved recording: {} anchors, {} snapshots, {} blob refs, {} bytes input queue",
                 _anchors.Count,
-                _bookmarks.Count,
+                _snapshots.Count,
                 blobs.Count,
                 queueBytes.Length
             );
@@ -780,8 +780,8 @@ namespace Trecs.Serialization
                 // Replace in-memory state with the loaded recording.
                 _anchors.Clear();
                 _anchors.AddRange(loadedAnchors);
-                _bookmarks.Clear();
-                _bookmarks.AddRange(bundle.Bookmarks);
+                _snapshots.Clear();
+                _snapshots.AddRange(bundle.Snapshots);
                 _scrubCache.Clear();
                 _scrubCacheBytes = 0;
 #if !TRECS_IS_PROFILING
@@ -831,7 +831,7 @@ namespace Trecs.Serialization
                 // loaded; stop recording cleanly so the user can decide.
                 _log.Error("LoadRecordingFromFile from {} failed: {}", filePath, e);
                 _anchors.Clear();
-                _bookmarks.Clear();
+                _snapshots.Clear();
                 _scrubCache.Clear();
 #if !TRECS_IS_PROFILING
                 _checksums.Clear();
@@ -883,7 +883,7 @@ namespace Trecs.Serialization
             }
             TrimAnchorsAfter(current);
             TrimScrubCacheAfter(current);
-            TrimBookmarksAfter(current);
+            TrimSnapshotsAfter(current);
             TrimChecksumsAfter(current);
             DropAbandonedTimelineInputs();
             _pendingDivergenceFrame = null;
@@ -926,7 +926,7 @@ namespace Trecs.Serialization
             _anchors.RemoveRange(0, keepFrom);
             _totalBytes -= droppedBytes;
             _startFrame = _anchors[0].FixedFrame;
-            TrimBookmarksBefore(_startFrame);
+            TrimSnapshotsBefore(_startFrame);
             TrimScrubCacheBefore(_startFrame);
             TrimChecksumsBefore(_startFrame);
             if (!_world.IsDisposed)
@@ -959,7 +959,7 @@ namespace Trecs.Serialization
             var bytesBefore = _totalBytes;
             TrimAnchorsAfter(frame);
             TrimScrubCacheAfter(frame);
-            TrimBookmarksAfter(frame);
+            TrimSnapshotsAfter(frame);
             TrimChecksumsAfter(frame);
             var dropped = countBefore - _anchors.Count;
             if (dropped == 0)
@@ -998,7 +998,7 @@ namespace Trecs.Serialization
                 return;
             }
             _anchors.Clear();
-            _bookmarks.Clear();
+            _snapshots.Clear();
             _scrubCache.Clear();
 #if !TRECS_IS_PROFILING
             _checksums.Clear();
@@ -1020,14 +1020,14 @@ namespace Trecs.Serialization
 
         /// <summary>
         /// Capture a labeled full-state snapshot at the world's current
-        /// fixed frame and add it to <see cref="Bookmarks"/>. Replaces any
-        /// existing bookmark at the same frame. Bookmarks survive Save/Load
+        /// fixed frame and add it to <see cref="Snapshots"/>. Replaces any
+        /// existing snapshot at the same frame. Snapshots survive Save/Load
         /// and are independent of auto-captured anchors.
         /// </summary>
         /// <param name="label">Display label for the recorder UI. Empty
         /// string is allowed; null is rejected.</param>
-        /// <returns>True if the bookmark was captured.</returns>
-        public bool CaptureBookmarkAtCurrentFrame(string label)
+        /// <returns>True if the snapshot was captured.</returns>
+        public bool CaptureSnapshotAtCurrentFrame(string label)
         {
             if (label == null)
             {
@@ -1035,7 +1035,7 @@ namespace Trecs.Serialization
             }
             if (!_isRecording)
             {
-                _log.Warning("CaptureBookmarkAtCurrentFrame called while not recording");
+                _log.Warning("CaptureSnapshotAtCurrentFrame called while not recording");
                 return false;
             }
             if (_world.IsDisposed)
@@ -1054,7 +1054,7 @@ namespace Trecs.Serialization
                 _checksumBuffer,
                 SerializationFlags.IsForChecksum
             );
-            var bookmark = new BundleBookmark
+            var snapshot = new BundleSnapshot
             {
                 FixedFrame = _accessor.FixedFrame,
                 Checksum = checksum,
@@ -1062,16 +1062,16 @@ namespace Trecs.Serialization
                 Payload = bytes,
             };
 
-            // Replace any existing bookmark at the same frame; otherwise
+            // Replace any existing snapshot at the same frame; otherwise
             // insert sorted by frame so navigation can scan in order.
-            for (int i = 0; i < _bookmarks.Count; i++)
+            for (int i = 0; i < _snapshots.Count; i++)
             {
-                if (_bookmarks[i].FixedFrame == bookmark.FixedFrame)
+                if (_snapshots[i].FixedFrame == snapshot.FixedFrame)
                 {
-                    _bookmarks[i] = bookmark;
+                    _snapshots[i] = snapshot;
                     _log.Debug(
-                        "Replaced bookmark at frame {} (label='{}')",
-                        bookmark.FixedFrame,
+                        "Replaced snapshot at frame {} (label='{}')",
+                        snapshot.FixedFrame,
                         label
                     );
                     return true;
@@ -1079,13 +1079,13 @@ namespace Trecs.Serialization
             }
             int insertAt = 0;
             while (
-                insertAt < _bookmarks.Count && _bookmarks[insertAt].FixedFrame < bookmark.FixedFrame
+                insertAt < _snapshots.Count && _snapshots[insertAt].FixedFrame < snapshot.FixedFrame
             )
             {
                 insertAt++;
             }
-            _bookmarks.Insert(insertAt, bookmark);
-            _log.Debug("Captured bookmark at frame {} (label='{}')", bookmark.FixedFrame, label);
+            _snapshots.Insert(insertAt, snapshot);
+            _log.Debug("Captured snapshot at frame {} (label='{}')", snapshot.FixedFrame, label);
             return true;
         }
 
@@ -1093,7 +1093,7 @@ namespace Trecs.Serialization
         /// Capture an unlabeled full-state anchor at the world's current
         /// fixed frame, outside the normal
         /// <see cref="AnchorIntervalSeconds"/> cadence. Symmetric with
-        /// <see cref="CaptureBookmarkAtCurrentFrame"/> but without a label —
+        /// <see cref="CaptureSnapshotAtCurrentFrame"/> but without a label —
         /// the captured anchor lives in <see cref="Anchors"/> alongside
         /// auto-captured anchors and is subject to the same
         /// <see cref="MaxAnchorCount"/> cap. Replaces any existing anchor at
@@ -1172,16 +1172,16 @@ namespace Trecs.Serialization
         }
 
         /// <summary>
-        /// Remove the bookmark at <paramref name="frame"/>, if any. Returns
-        /// true iff a bookmark was found and removed.
+        /// Remove the snapshot at <paramref name="frame"/>, if any. Returns
+        /// true iff a snapshot was found and removed.
         /// </summary>
-        public bool RemoveBookmarkAtFrame(int frame)
+        public bool RemoveSnapshotAtFrame(int frame)
         {
-            for (int i = 0; i < _bookmarks.Count; i++)
+            for (int i = 0; i < _snapshots.Count; i++)
             {
-                if (_bookmarks[i].FixedFrame == frame)
+                if (_snapshots[i].FixedFrame == frame)
                 {
-                    _bookmarks.RemoveAt(i);
+                    _snapshots.RemoveAt(i);
                     return true;
                 }
             }
@@ -1209,9 +1209,9 @@ namespace Trecs.Serialization
                     break;
                 }
             }
-            for (int i = _bookmarks.Count - 1; i >= 0; i--)
+            for (int i = _snapshots.Count - 1; i >= 0; i--)
             {
-                var f = _bookmarks[i].FixedFrame;
+                var f = _snapshots[i].FixedFrame;
                 if (f < current && f > target)
                 {
                     target = f;
@@ -1247,9 +1247,9 @@ namespace Trecs.Serialization
                     break;
                 }
             }
-            for (int i = 0; i < _bookmarks.Count; i++)
+            for (int i = 0; i < _snapshots.Count; i++)
             {
-                var f = _bookmarks[i].FixedFrame;
+                var f = _snapshots[i].FixedFrame;
                 if (f > current && f < target)
                 {
                     target = f;
@@ -1277,11 +1277,11 @@ namespace Trecs.Serialization
         }
 
         // Find the nearest scrubbable anchor whose frame is <= target,
-        // searching anchors, bookmarks, and the transient scrub cache. All
+        // searching anchors, snapshots, and the transient scrub cache. All
         // three lists are kept sorted by frame ascending. On a tie at the
-        // same frame, prefers anchors > scrub cache > bookmarks (anchors
+        // same frame, prefers anchors > scrub cache > snapshots (anchors
         // are guaranteed-live-timeline bytes; scrub-cache entries reflect
-        // the same timeline up to drop-oldest eviction; bookmarks may
+        // the same timeline up to drop-oldest eviction; snapshots may
         // capture an earlier divergent moment).
         (int frame, byte[] data)? FindNearestPersistedAtOrBefore(int target)
         {
@@ -1308,9 +1308,9 @@ namespace Trecs.Serialization
                     break;
                 }
             }
-            for (int i = _bookmarks.Count - 1; i >= 0; i--)
+            for (int i = _snapshots.Count - 1; i >= 0; i--)
             {
-                var b = _bookmarks[i];
+                var b = _snapshots[i];
                 if (b.FixedFrame <= target)
                 {
                     if (b.FixedFrame > bestFrame)
@@ -1324,7 +1324,7 @@ namespace Trecs.Serialization
             return bestData == null ? null : (bestFrame, bestData);
         }
 
-        // Earliest scrubbable anchor across anchors, bookmarks, and the
+        // Earliest scrubbable anchor across anchors, snapshots, and the
         // scrub cache, used when JumpToFrame's target precedes everything
         // in the buffer (e.g. the slider's leftmost position).
         (int frame, byte[] data) FindEarliestPersisted()
@@ -1341,32 +1341,32 @@ namespace Trecs.Serialization
                 frame = _scrubCache[0].FixedFrame;
                 data = _scrubCache[0].Payload;
             }
-            if (_bookmarks.Count > 0 && _bookmarks[0].FixedFrame < frame)
+            if (_snapshots.Count > 0 && _snapshots[0].FixedFrame < frame)
             {
-                frame = _bookmarks[0].FixedFrame;
-                data = _bookmarks[0].Payload;
+                frame = _snapshots[0].FixedFrame;
+                data = _snapshots[0].Payload;
             }
             return (frame, data);
         }
 
-        void TrimBookmarksAfter(int frame)
+        void TrimSnapshotsAfter(int frame)
         {
-            while (_bookmarks.Count > 0 && _bookmarks[_bookmarks.Count - 1].FixedFrame > frame)
+            while (_snapshots.Count > 0 && _snapshots[_snapshots.Count - 1].FixedFrame > frame)
             {
-                _bookmarks.RemoveAt(_bookmarks.Count - 1);
+                _snapshots.RemoveAt(_snapshots.Count - 1);
             }
         }
 
-        void TrimBookmarksBefore(int frame)
+        void TrimSnapshotsBefore(int frame)
         {
             int removeCount = 0;
-            while (removeCount < _bookmarks.Count && _bookmarks[removeCount].FixedFrame < frame)
+            while (removeCount < _snapshots.Count && _snapshots[removeCount].FixedFrame < frame)
             {
                 removeCount++;
             }
             if (removeCount > 0)
             {
-                _bookmarks.RemoveRange(0, removeCount);
+                _snapshots.RemoveRange(0, removeCount);
             }
         }
 
@@ -1665,7 +1665,7 @@ namespace Trecs.Serialization
         void BeginLoopRewind()
         {
             // Loop target is the earliest scrubbable frame across anchors,
-            // bookmarks, and the scrub cache — not _startFrame, which can
+            // snapshots, and the scrub cache — not _startFrame, which can
             // predate everything when the anchor cap has rolled. Called
             // only from tail branches, so at least one of the three lists
             // is non-empty.
@@ -1895,7 +1895,7 @@ namespace Trecs.Serialization
 
         // Both stores cap by drop-oldest. Anchors are sparse so they're
         // capped by count; scrub cache is dense so it's capped by bytes.
-        // Bookmarks are user-controlled and never auto-evicted.
+        // Snapshots are user-controlled and never auto-evicted.
         void EnforceCapacityLimits()
         {
             var maxAnchors = _settings.MaxAnchorCount;
@@ -1911,7 +1911,7 @@ namespace Trecs.Serialization
                 {
                     // The recording's earliest scrubbable frame moved
                     // forward; track that and prune queued inputs that
-                    // predate it. Bookmarks before the new earliest are
+                    // predate it. Snapshots before the new earliest are
                     // intentionally kept — the user placed them deliberately
                     // and they're still scrubbable on their own.
                     _startFrame = _anchors[0].FixedFrame;

@@ -8,7 +8,7 @@ namespace Trecs.Serialization
     /// initial world-state snapshot, the input queue covering the recorded
     /// frame range, sparse desync-detection checksums, optional auto-anchor
     /// snapshots used as desync-recovery / scrub-back points, and optional
-    /// user bookmark snapshots placed by the user (e.g. just before a bug)
+    /// user snapshot snapshots placed by the user (e.g. just before a bug)
     /// for navigation in the recorder UI.
     ///
     /// Use <see cref="RecordingBundleSerializer"/> to read or write a bundle
@@ -56,7 +56,7 @@ namespace Trecs.Serialization
         /// User-placed full-state snapshots with labels, surfaced in the
         /// recorder UI for navigation. Ordered by frame.
         /// </summary>
-        public IReadOnlyList<BundleBookmark> Bookmarks { get; init; }
+        public IReadOnlyList<BundleSnapshot> Snapshots { get; init; }
     }
 
     /// <summary>
@@ -164,22 +164,22 @@ namespace Trecs.Serialization
 
     /// <summary>
     /// User-placed full-state snapshot. Carries a label string for display
-    /// in the recorder UI's timeline. Bookmarks are independent of
-    /// <see cref="BundleAnchor"/>s; deleting a bookmark never removes an
+    /// in the recorder UI's timeline. Snapshots are independent of
+    /// <see cref="BundleAnchor"/>s; deleting a snapshot never removes an
     /// auto-anchor that happens to share a frame.
     /// </summary>
-    public sealed class BundleBookmark
+    public sealed class BundleSnapshot
     {
         public int FixedFrame { get; init; }
         public uint Checksum { get; init; }
 
         /// <summary>
         /// Caller-supplied label, displayed in the recorder UI. Must not be
-        /// null (use the empty string for an unlabeled bookmark).
+        /// null (use the empty string for an unlabeled snapshot).
         /// </summary>
         public string Label { get; init; }
 
-        /// <summary>SnapshotSerializer payload bytes for this bookmark's world state.</summary>
+        /// <summary>SnapshotSerializer payload bytes for this snapshot's world state.</summary>
         public byte[] Payload { get; init; }
     }
 }

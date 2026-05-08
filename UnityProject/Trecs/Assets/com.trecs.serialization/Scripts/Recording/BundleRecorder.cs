@@ -10,7 +10,7 @@ namespace Trecs.Serialization
     /// Runtime recorder that captures a Trecs <see cref="World"/> session into
     /// a self-contained <see cref="RecordingBundle"/>: the initial world
     /// snapshot, the EntityInputQueue, sparse desync-detection checksums, and
-    /// optional auto-anchors and user bookmarks.
+    /// optional auto-anchors and user snapshots.
     ///
     /// Lifecycle: Initialize → Start → (per-frame capture happens automatically
     /// while the simulation runs) → Stop → returned bundle is handed to
@@ -32,7 +32,7 @@ namespace Trecs.Serialization
 
         readonly DenseDictionary<int, uint> _checksums = new();
         readonly List<BundleAnchor> _anchors = new();
-        readonly List<BundleBookmark> _bookmarks = new();
+        readonly List<BundleSnapshot> _snapshots = new();
 
         WorldAccessor _accessor;
         RecordingChecksumCalculator _checksumCalculator;
@@ -82,7 +82,7 @@ namespace Trecs.Serialization
         public bool IsRecording => _isRecording;
         public int StartFrame => _startFrame;
         public IReadOnlyList<BundleAnchor> Anchors => _anchors;
-        public IReadOnlyList<BundleBookmark> Bookmarks => _bookmarks;
+        public IReadOnlyList<BundleSnapshot> Snapshots => _snapshots;
 
         /// <summary>
         /// Number of per-frame checksums captured so far this recording.
@@ -134,7 +134,7 @@ namespace Trecs.Serialization
 
             _checksums.Clear();
             _anchors.Clear();
-            _bookmarks.Clear();
+            _snapshots.Clear();
 
             _startFrame = _accessor.FixedFrame;
             _lastAnchorFrame = _startFrame;
@@ -231,14 +231,14 @@ namespace Trecs.Serialization
                 InputQueue = queueBytes,
                 Checksums = CopyChecksums(),
                 Anchors = _anchors.ToArray(),
-                Bookmarks = _bookmarks.ToArray(),
+                Snapshots = _snapshots.ToArray(),
             };
 
             _log.Debug(
-                "Recording stopped: {} frames, {} anchors, {} bookmarks, {} checksums, {} bytes input queue",
+                "Recording stopped: {} frames, {} anchors, {} snapshots, {} checksums, {} bytes input queue",
                 endFrame - _startFrame,
                 _anchors.Count,
-                _bookmarks.Count,
+                _snapshots.Count,
                 _checksums.Count,
                 queueBytes.Length
             );
@@ -248,7 +248,7 @@ namespace Trecs.Serialization
             _initialChecksum = 0;
             _checksums.Clear();
             _anchors.Clear();
-            _bookmarks.Clear();
+            _snapshots.Clear();
 
             return bundle;
         }
@@ -262,7 +262,7 @@ namespace Trecs.Serialization
         /// any existing anchor at the same frame, and resets the auto-anchor
         /// cadence timer so the next auto-capture fires a full interval from
         /// here rather than redundantly moments later. Use
-        /// <see cref="CaptureBookmarkAtCurrentFrame"/> instead when the marker
+        /// <see cref="CaptureSnapshotAtCurrentFrame"/> instead when the marker
         /// needs a user-visible label.
         /// </summary>
         /// <returns>True iff the anchor was captured.</returns>
@@ -289,12 +289,12 @@ namespace Trecs.Serialization
 
         /// <summary>
         /// Capture a labeled full-state snapshot at the current fixed frame.
-        /// Replaces any existing bookmark at the same frame. Bookmarks
+        /// Replaces any existing snapshot at the same frame. Snapshots
         /// survive Save/Load and are independent of auto-anchors and
         /// checksums.
         /// </summary>
-        /// <returns>True iff the bookmark was captured.</returns>
-        public bool CaptureBookmarkAtCurrentFrame(string label)
+        /// <returns>True iff the snapshot was captured.</returns>
+        public bool CaptureSnapshotAtCurrentFrame(string label)
         {
             ThrowIfDisposed();
             if (label == null)
@@ -303,7 +303,7 @@ namespace Trecs.Serialization
             }
             if (!_isRecording)
             {
-                _log.Warning("CaptureBookmarkAtCurrentFrame called while not recording");
+                _log.Warning("CaptureSnapshotAtCurrentFrame called while not recording");
                 return false;
             }
             if (_world.IsDisposed)
@@ -322,7 +322,7 @@ namespace Trecs.Serialization
                 _checksumBuffer,
                 _settings.ChecksumFlags
             );
-            var bookmark = new BundleBookmark
+            var snapshot = new BundleSnapshot
             {
                 FixedFrame = _accessor.FixedFrame,
                 Checksum = checksum,
@@ -330,22 +330,22 @@ namespace Trecs.Serialization
                 Payload = bytes,
             };
 
-            for (int i = 0; i < _bookmarks.Count; i++)
+            for (int i = 0; i < _snapshots.Count; i++)
             {
-                if (_bookmarks[i].FixedFrame == bookmark.FixedFrame)
+                if (_snapshots[i].FixedFrame == snapshot.FixedFrame)
                 {
-                    _bookmarks[i] = bookmark;
+                    _snapshots[i] = snapshot;
                     return true;
                 }
             }
             int insertAt = 0;
             while (
-                insertAt < _bookmarks.Count && _bookmarks[insertAt].FixedFrame < bookmark.FixedFrame
+                insertAt < _snapshots.Count && _snapshots[insertAt].FixedFrame < snapshot.FixedFrame
             )
             {
                 insertAt++;
             }
-            _bookmarks.Insert(insertAt, bookmark);
+            _snapshots.Insert(insertAt, snapshot);
             return true;
         }
 

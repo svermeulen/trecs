@@ -68,18 +68,18 @@ namespace Trecs.Serialization
                     _buffer.WriteBytes("anchorPayload", anchor.Payload, 0, anchor.Payload.Length);
                 }
 
-                _buffer.Write("bookmarkCount", bundle.Bookmarks.Count);
-                for (int i = 0; i < bundle.Bookmarks.Count; i++)
+                _buffer.Write("snapshotCount", bundle.Snapshots.Count);
+                for (int i = 0; i < bundle.Snapshots.Count; i++)
                 {
-                    var bookmark = bundle.Bookmarks[i];
-                    _buffer.Write("bookmarkFrame", bookmark.FixedFrame);
-                    _buffer.Write("bookmarkChecksum", bookmark.Checksum);
-                    _buffer.WriteString("bookmarkLabel", bookmark.Label);
+                    var snapshot = bundle.Snapshots[i];
+                    _buffer.Write("snapshotFrame", snapshot.FixedFrame);
+                    _buffer.Write("snapshotChecksum", snapshot.Checksum);
+                    _buffer.WriteString("snapshotLabel", snapshot.Label);
                     _buffer.WriteBytes(
-                        "bookmarkPayload",
-                        bookmark.Payload,
+                        "snapshotPayload",
+                        snapshot.Payload,
                         0,
-                        bookmark.Payload.Length
+                        snapshot.Payload.Length
                     );
                 }
 
@@ -96,10 +96,10 @@ namespace Trecs.Serialization
             _buffer.MemoryStream.CopyTo(stream);
 
             _log.Debug(
-                "Bundle serialized ({0.00} kb): {} anchors, {} bookmarks",
+                "Bundle serialized ({0.00} kb): {} anchors, {} snapshots",
                 totalBytes / 1024f,
                 bundle.Anchors.Count,
-                bundle.Bookmarks.Count
+                bundle.Snapshots.Count
             );
         }
 
@@ -164,20 +164,20 @@ namespace Trecs.Serialization
                     );
                 }
 
-                var bookmarkCount = _buffer.Read<int>("bookmarkCount");
-                var bookmarks = new List<BundleBookmark>(bookmarkCount);
-                for (int i = 0; i < bookmarkCount; i++)
+                var snapshotCount = _buffer.Read<int>("snapshotCount");
+                var snapshots = new List<BundleSnapshot>(snapshotCount);
+                for (int i = 0; i < snapshotCount; i++)
                 {
-                    var frame = _buffer.Read<int>("bookmarkFrame");
-                    var checksum = _buffer.Read<uint>("bookmarkChecksum");
-                    var label = _buffer.ReadString("bookmarkLabel");
-                    bookmarks.Add(
-                        new BundleBookmark
+                    var frame = _buffer.Read<int>("snapshotFrame");
+                    var checksum = _buffer.Read<uint>("snapshotChecksum");
+                    var label = _buffer.ReadString("snapshotLabel");
+                    snapshots.Add(
+                        new BundleSnapshot
                         {
                             FixedFrame = frame,
                             Checksum = checksum,
                             Label = label,
-                            Payload = ReadByteArray("bookmarkPayload"),
+                            Payload = ReadByteArray("snapshotPayload"),
                         }
                     );
                 }
@@ -195,7 +195,7 @@ namespace Trecs.Serialization
                     InputQueue = inputQueue,
                     Checksums = checksums,
                     Anchors = anchors,
-                    Bookmarks = bookmarks,
+                    Snapshots = snapshots,
                 };
             }
             catch
@@ -291,8 +291,8 @@ namespace Trecs.Serialization
                 throw new ArgumentNullException(nameof(bundle) + ".Checksums");
             if (bundle.Anchors == null)
                 throw new ArgumentNullException(nameof(bundle) + ".Anchors");
-            if (bundle.Bookmarks == null)
-                throw new ArgumentNullException(nameof(bundle) + ".Bookmarks");
+            if (bundle.Snapshots == null)
+                throw new ArgumentNullException(nameof(bundle) + ".Snapshots");
         }
 
         // Read a length-prefixed byte[] payload, returning an exact-length

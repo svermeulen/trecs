@@ -33,7 +33,7 @@ namespace Trecs.Tests
                 InputQueue = Array.Empty<byte>(),
                 Checksums = new DenseDictionary<int, uint>(),
                 Anchors = Array.Empty<BundleAnchor>(),
-                Bookmarks = Array.Empty<BundleBookmark>(),
+                Snapshots = Array.Empty<BundleSnapshot>(),
             };
 
             var roundTripped = RoundTripViaMemory(ser, original);
@@ -43,7 +43,7 @@ namespace Trecs.Tests
             CollectionAssert.AreEqual(original.InputQueue, roundTripped.InputQueue);
             NAssert.AreEqual(0, roundTripped.Checksums.Count);
             NAssert.AreEqual(0, roundTripped.Anchors.Count);
-            NAssert.AreEqual(0, roundTripped.Bookmarks.Count);
+            NAssert.AreEqual(0, roundTripped.Snapshots.Count);
         }
 
         [Test]
@@ -79,7 +79,7 @@ namespace Trecs.Tests
                         Payload = MakeBytes(seed: 4, length: 256),
                     },
                 },
-                Bookmarks = new List<BundleBookmark>
+                Snapshots = new List<BundleSnapshot>
                 {
                     new()
                     {
@@ -92,7 +92,7 @@ namespace Trecs.Tests
                     {
                         FixedFrame = 45,
                         Checksum = 0x44444444u,
-                        // Empty label: documented as the "unlabeled bookmark" sentinel.
+                        // Empty label: documented as the "unlabeled snapshot" sentinel.
                         Label = "",
                         Payload = MakeBytes(seed: 6, length: 96),
                     },
@@ -118,9 +118,9 @@ namespace Trecs.Tests
             AssertAnchorsEqual(original.Anchors[0], roundTripped.Anchors[0]);
             AssertAnchorsEqual(original.Anchors[1], roundTripped.Anchors[1]);
 
-            NAssert.AreEqual(2, roundTripped.Bookmarks.Count);
-            AssertBookmarksEqual(original.Bookmarks[0], roundTripped.Bookmarks[0]);
-            AssertBookmarksEqual(original.Bookmarks[1], roundTripped.Bookmarks[1]);
+            NAssert.AreEqual(2, roundTripped.Snapshots.Count);
+            AssertSnapshotsEqual(original.Snapshots[0], roundTripped.Snapshots[0]);
+            AssertSnapshotsEqual(original.Snapshots[1], roundTripped.Snapshots[1]);
         }
 
         [Test]
@@ -136,7 +136,7 @@ namespace Trecs.Tests
                 InputQueue = MakeBytes(seed: 8, length: 32),
                 Checksums = new DenseDictionary<int, uint>(),
                 Anchors = Array.Empty<BundleAnchor>(),
-                Bookmarks = Array.Empty<BundleBookmark>(),
+                Snapshots = Array.Empty<BundleSnapshot>(),
             };
 
             var path = Path.Combine(
@@ -178,7 +178,7 @@ namespace Trecs.Tests
                 InputQueue = MakeBytes(seed: 10, length: 2048),
                 Checksums = new DenseDictionary<int, uint>(),
                 Anchors = Array.Empty<BundleAnchor>(),
-                Bookmarks = Array.Empty<BundleBookmark>(),
+                Snapshots = Array.Empty<BundleSnapshot>(),
             };
 
             using var saveStream = new MemoryStream();
@@ -252,7 +252,7 @@ namespace Trecs.Tests
                 InputQueue = Array.Empty<byte>(),
                 Checksums = new DenseDictionary<int, uint>(),
                 Anchors = Array.Empty<BundleAnchor>(),
-                Bookmarks = Array.Empty<BundleBookmark>(),
+                Snapshots = Array.Empty<BundleSnapshot>(),
             };
             var loadedBundle = RoundTripViaMemory(bundleSer, bundle);
 
@@ -392,20 +392,20 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void TrecsAutoRecorder_CapturesAndRoundTripsBookmarks()
+        public void TrecsAutoRecorder_CapturesAndRoundTripsSnapshots()
         {
-            // Capture a couple of user bookmarks during recording, save, load,
-            // and verify the labels + frames + bytes survived. Bookmarks are
+            // Capture a couple of user snapshots during recording, save, load,
+            // and verify the labels + frames + bytes survived. Snapshots are
             // independent of auto-captured anchors so this also exercises the
-            // separate bookmark navigation path.
+            // separate snapshot navigation path.
             var path = Path.Combine(
                 Path.GetTempPath(),
-                $"trecs_bookmark_test_{Guid.NewGuid():N}.trec"
+                $"trecs_snapshot_test_{Guid.NewGuid():N}.trec"
             );
             try
             {
-                int firstBookmarkFrame;
-                int secondBookmarkFrame;
+                int firstSnapshotFrame;
+                int secondSnapshotFrame;
 
                 using (var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha))
                 {
@@ -436,19 +436,19 @@ namespace Trecs.Tests
                     recorder.Start();
 
                     env.StepFixedFrames(5);
-                    NAssert.IsTrue(recorder.CaptureBookmarkAtCurrentFrame("before-the-bug"));
-                    firstBookmarkFrame = env.World.FixedFrame;
+                    NAssert.IsTrue(recorder.CaptureSnapshotAtCurrentFrame("before-the-bug"));
+                    firstSnapshotFrame = env.World.FixedFrame;
 
                     env.StepFixedFrames(8);
-                    NAssert.IsTrue(recorder.CaptureBookmarkAtCurrentFrame("after-mitigation"));
-                    secondBookmarkFrame = env.World.FixedFrame;
+                    NAssert.IsTrue(recorder.CaptureSnapshotAtCurrentFrame("after-mitigation"));
+                    secondSnapshotFrame = env.World.FixedFrame;
 
-                    NAssert.AreEqual(2, recorder.Bookmarks.Count);
-                    NAssert.AreEqual("before-the-bug", recorder.Bookmarks[0].Label);
-                    NAssert.AreEqual("after-mitigation", recorder.Bookmarks[1].Label);
+                    NAssert.AreEqual(2, recorder.Snapshots.Count);
+                    NAssert.AreEqual("before-the-bug", recorder.Snapshots[0].Label);
+                    NAssert.AreEqual("after-mitigation", recorder.Snapshots[1].Label);
                     NAssert.Less(
-                        recorder.Bookmarks[0].FixedFrame,
-                        recorder.Bookmarks[1].FixedFrame
+                        recorder.Snapshots[0].FixedFrame,
+                        recorder.Snapshots[1].FixedFrame
                     );
 
                     NAssert.IsTrue(recorder.SaveRecordingToFile(path));
@@ -475,19 +475,19 @@ namespace Trecs.Tests
 
                     NAssert.IsTrue(recorder.LoadRecordingFromFile(path));
 
-                    NAssert.AreEqual(2, recorder.Bookmarks.Count);
-                    NAssert.AreEqual(firstBookmarkFrame, recorder.Bookmarks[0].FixedFrame);
-                    NAssert.AreEqual("before-the-bug", recorder.Bookmarks[0].Label);
-                    NAssert.AreEqual(secondBookmarkFrame, recorder.Bookmarks[1].FixedFrame);
-                    NAssert.AreEqual("after-mitigation", recorder.Bookmarks[1].Label);
+                    NAssert.AreEqual(2, recorder.Snapshots.Count);
+                    NAssert.AreEqual(firstSnapshotFrame, recorder.Snapshots[0].FixedFrame);
+                    NAssert.AreEqual("before-the-bug", recorder.Snapshots[0].Label);
+                    NAssert.AreEqual(secondSnapshotFrame, recorder.Snapshots[1].FixedFrame);
+                    NAssert.AreEqual("after-mitigation", recorder.Snapshots[1].Label);
 
-                    // Remove a bookmark and verify it's gone.
-                    NAssert.IsTrue(recorder.RemoveBookmarkAtFrame(firstBookmarkFrame));
-                    NAssert.AreEqual(1, recorder.Bookmarks.Count);
-                    NAssert.AreEqual("after-mitigation", recorder.Bookmarks[0].Label);
+                    // Remove a snapshot and verify it's gone.
+                    NAssert.IsTrue(recorder.RemoveSnapshotAtFrame(firstSnapshotFrame));
+                    NAssert.AreEqual(1, recorder.Snapshots.Count);
+                    NAssert.AreEqual("after-mitigation", recorder.Snapshots[0].Label);
 
-                    // Removing a frame that no longer has a bookmark is a no-op.
-                    NAssert.IsFalse(recorder.RemoveBookmarkAtFrame(firstBookmarkFrame));
+                    // Removing a frame that no longer has a snapshot is a no-op.
+                    NAssert.IsFalse(recorder.RemoveSnapshotAtFrame(firstSnapshotFrame));
                 }
             }
             finally
@@ -498,7 +498,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void TrecsAutoRecorder_BookmarkOverwritesAtSameFrame()
+        public void TrecsAutoRecorder_SnapshotOverwritesAtSameFrame()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
@@ -524,12 +524,12 @@ namespace Trecs.Tests
 
             env.StepFixedFrames(3);
 
-            NAssert.IsTrue(recorder.CaptureBookmarkAtCurrentFrame("first"));
-            NAssert.IsTrue(recorder.CaptureBookmarkAtCurrentFrame("second"));
+            NAssert.IsTrue(recorder.CaptureSnapshotAtCurrentFrame("first"));
+            NAssert.IsTrue(recorder.CaptureSnapshotAtCurrentFrame("second"));
 
             // Same frame → second call replaces first, count stays at one.
-            NAssert.AreEqual(1, recorder.Bookmarks.Count);
-            NAssert.AreEqual("second", recorder.Bookmarks[0].Label);
+            NAssert.AreEqual(1, recorder.Snapshots.Count);
+            NAssert.AreEqual("second", recorder.Snapshots[0].Label);
         }
 
         [Test]
@@ -958,12 +958,12 @@ namespace Trecs.Tests
             CollectionAssert.AreEqual(expected.Payload, actual.Payload, "Anchor.Payload");
         }
 
-        static void AssertBookmarksEqual(BundleBookmark expected, BundleBookmark actual)
+        static void AssertSnapshotsEqual(BundleSnapshot expected, BundleSnapshot actual)
         {
-            NAssert.AreEqual(expected.FixedFrame, actual.FixedFrame, "Bookmark.FixedFrame");
-            NAssert.AreEqual(expected.Checksum, actual.Checksum, "Bookmark.Checksum");
-            NAssert.AreEqual(expected.Label, actual.Label, "Bookmark.Label");
-            CollectionAssert.AreEqual(expected.Payload, actual.Payload, "Bookmark.Payload");
+            NAssert.AreEqual(expected.FixedFrame, actual.FixedFrame, "Snapshot.FixedFrame");
+            NAssert.AreEqual(expected.Checksum, actual.Checksum, "Snapshot.Checksum");
+            NAssert.AreEqual(expected.Label, actual.Label, "Snapshot.Label");
+            CollectionAssert.AreEqual(expected.Payload, actual.Payload, "Snapshot.Payload");
         }
     }
 }

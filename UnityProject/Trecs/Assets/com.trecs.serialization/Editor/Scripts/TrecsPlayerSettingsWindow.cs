@@ -65,7 +65,7 @@ namespace Trecs.Serialization
             _autoRecordOnStartField.tooltip =
                 "When on, recording starts automatically as soon as a Trecs "
                 + "world appears in play mode (and the Trecs Player window is "
-                + "open) and also when loading bookmarks. When off, you have to press the Record button to "
+                + "open) and also when loading snapshots. When off, you have to press the Record button to "
                 + "begin capturing.";
             root.Add(_autoRecordOnStartField);
 

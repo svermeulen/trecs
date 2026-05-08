@@ -284,9 +284,9 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Bundle_BookmarksSurviveSaveLoadAndRestoreState()
+        public void Bundle_SnapshotsSurviveSaveLoadAndRestoreState()
         {
-            // Bookmarks attach a labelled full-state snapshot to a recording. They
+            // Snapshots attach a labelled full-state snapshot to a recording. They
             // survive the bundle Save/Load round-trip and their payloads are
             // independent SnapshotSerializer streams that LoadSnapshot can replay
             // into a fresh world. This guards the labelled-checkpoint navigation
@@ -294,10 +294,10 @@ namespace Trecs.Tests
             // SnapshotSerializer.LoadSnapshot path against bytes that were embedded
             // in a bundle (rather than a standalone snapshot file).
             byte[] bundleBytes;
-            int firstBookmarkFrame;
-            int secondBookmarkFrame;
-            int firstBookmarkEntityCount;
-            int secondBookmarkEntityCount;
+            int firstSnapshotFrame;
+            int secondSnapshotFrame;
+            int firstSnapshotEntityCount;
+            int secondSnapshotEntityCount;
 
             using (var env = CreateEnv())
             {
@@ -323,12 +323,12 @@ namespace Trecs.Tests
                 recorder.Start();
 
                 env.StepFixedFrames(5);
-                NAssert.IsTrue(recorder.CaptureBookmarkAtCurrentFrame("before-the-bug"));
-                firstBookmarkFrame = env.World.FixedFrame;
-                firstBookmarkEntityCount = env.Accessor.CountEntitiesWithTags(Tag<QId1>.Value);
+                NAssert.IsTrue(recorder.CaptureSnapshotAtCurrentFrame("before-the-bug"));
+                firstSnapshotFrame = env.World.FixedFrame;
+                firstSnapshotEntityCount = env.Accessor.CountEntitiesWithTags(Tag<QId1>.Value);
 
-                // Add a fresh entity between the two bookmarks so the second
-                // bookmark's snapshot must be visibly different from the first.
+                // Add a fresh entity between the two snapshots so the second
+                // snapshot's snapshot must be visibly different from the first.
                 env.Accessor.AddEntity(Tag<QId1>.Value)
                     .Set(new TestInt { Value = 12345 })
                     .Set(new TestFloat { Value = 9.5f })
@@ -336,20 +336,20 @@ namespace Trecs.Tests
                 env.Accessor.SubmitEntities();
 
                 env.StepFixedFrames(7);
-                NAssert.IsTrue(recorder.CaptureBookmarkAtCurrentFrame("after-spawn"));
-                secondBookmarkFrame = env.World.FixedFrame;
-                secondBookmarkEntityCount = env.Accessor.CountEntitiesWithTags(Tag<QId1>.Value);
+                NAssert.IsTrue(recorder.CaptureSnapshotAtCurrentFrame("after-spawn"));
+                secondSnapshotFrame = env.World.FixedFrame;
+                secondSnapshotEntityCount = env.Accessor.CountEntitiesWithTags(Tag<QId1>.Value);
 
                 NAssert.Greater(
-                    secondBookmarkEntityCount,
-                    firstBookmarkEntityCount,
-                    "Test setup: second bookmark should have more entities than the first."
+                    secondSnapshotEntityCount,
+                    firstSnapshotEntityCount,
+                    "Test setup: second snapshot should have more entities than the first."
                 );
 
                 env.StepFixedFrames(5);
                 var bundle = recorder.Stop();
 
-                NAssert.AreEqual(2, bundle.Bookmarks.Count);
+                NAssert.AreEqual(2, bundle.Snapshots.Count);
 
                 using var bundleSer = new RecordingBundleSerializer(registry);
                 using var stream = new MemoryStream();
@@ -357,7 +357,7 @@ namespace Trecs.Tests
                 bundleBytes = stream.ToArray();
             }
 
-            // Reload the bundle from bytes and verify the bookmarks survived the
+            // Reload the bundle from bytes and verify the snapshots survived the
             // wire-format round trip with their payloads intact.
             {
                 var registry = TrecsSerialization.CreateSerializerRegistry();
@@ -365,17 +365,17 @@ namespace Trecs.Tests
                 using var stream = new MemoryStream(bundleBytes);
                 var loaded = bundleSer.Load(stream);
 
-                NAssert.AreEqual(2, loaded.Bookmarks.Count, "Bookmark count should round-trip");
-                NAssert.AreEqual("before-the-bug", loaded.Bookmarks[0].Label);
-                NAssert.AreEqual("after-spawn", loaded.Bookmarks[1].Label);
-                NAssert.AreEqual(firstBookmarkFrame, loaded.Bookmarks[0].FixedFrame);
-                NAssert.AreEqual(secondBookmarkFrame, loaded.Bookmarks[1].FixedFrame);
-                NAssert.IsNotNull(loaded.Bookmarks[0].Payload);
-                NAssert.Greater(loaded.Bookmarks[0].Payload.Length, 0);
-                NAssert.IsNotNull(loaded.Bookmarks[1].Payload);
-                NAssert.Greater(loaded.Bookmarks[1].Payload.Length, 0);
+                NAssert.AreEqual(2, loaded.Snapshots.Count, "Snapshot count should round-trip");
+                NAssert.AreEqual("before-the-bug", loaded.Snapshots[0].Label);
+                NAssert.AreEqual("after-spawn", loaded.Snapshots[1].Label);
+                NAssert.AreEqual(firstSnapshotFrame, loaded.Snapshots[0].FixedFrame);
+                NAssert.AreEqual(secondSnapshotFrame, loaded.Snapshots[1].FixedFrame);
+                NAssert.IsNotNull(loaded.Snapshots[0].Payload);
+                NAssert.Greater(loaded.Snapshots[0].Payload.Length, 0);
+                NAssert.IsNotNull(loaded.Snapshots[1].Payload);
+                NAssert.Greater(loaded.Snapshots[1].Payload.Length, 0);
 
-                // Verify each bookmark's snapshot payload restores the world to
+                // Verify each snapshot's snapshot payload restores the world to
                 // the exact state captured at that frame. This exercises
                 // SnapshotSerializer.LoadSnapshot against bundle-embedded bytes.
                 using (var env = CreateEnv())
@@ -388,11 +388,11 @@ namespace Trecs.Tests
                         env.World
                     );
 
-                    using var snapStream = new MemoryStream(loaded.Bookmarks[0].Payload);
+                    using var snapStream = new MemoryStream(loaded.Snapshots[0].Payload);
                     var meta = snapshots.LoadSnapshot(snapStream);
-                    NAssert.AreEqual(firstBookmarkFrame, meta.FixedFrame);
+                    NAssert.AreEqual(firstSnapshotFrame, meta.FixedFrame);
                     NAssert.AreEqual(
-                        firstBookmarkEntityCount,
+                        firstSnapshotEntityCount,
                         env.Accessor.CountEntitiesWithTags(Tag<QId1>.Value)
                     );
                 }
@@ -407,11 +407,11 @@ namespace Trecs.Tests
                         env.World
                     );
 
-                    using var snapStream = new MemoryStream(loaded.Bookmarks[1].Payload);
+                    using var snapStream = new MemoryStream(loaded.Snapshots[1].Payload);
                     var meta = snapshots.LoadSnapshot(snapStream);
-                    NAssert.AreEqual(secondBookmarkFrame, meta.FixedFrame);
+                    NAssert.AreEqual(secondSnapshotFrame, meta.FixedFrame);
                     NAssert.AreEqual(
-                        secondBookmarkEntityCount,
+                        secondSnapshotEntityCount,
                         env.Accessor.CountEntitiesWithTags(Tag<QId1>.Value)
                     );
                 }
@@ -425,7 +425,7 @@ namespace Trecs.Tests
             // snapshots into the bundle for desync recovery and editor scrubbing.
             // Verify they survive the bundle Save/Load round-trip and that the
             // captured payloads can be replayed back into a world via
-            // SnapshotSerializer.LoadSnapshot — same shape as the bookmark test
+            // SnapshotSerializer.LoadSnapshot — same shape as the snapshot test
             // above but driven by the auto-cadence path rather than the manual
             // capture API.
             byte[] bundleBytes;

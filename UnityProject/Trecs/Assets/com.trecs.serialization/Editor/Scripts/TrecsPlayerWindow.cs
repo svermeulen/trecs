@@ -87,13 +87,13 @@ namespace Trecs.Serialization
         const string LoopButtonDisabledTooltip =
             "Loop playback (L) — only available during Playback (scrub "
             + "back from the live edge or load a saved recording first).";
-        const string BookmarkButtonEnabledTooltip =
-            "Bookmark this frame (B) — capture a labelled snapshot at the "
-            + "current frame. Bookmarks are saved with the recording and "
+        const string SnapshotButtonEnabledTooltip =
+            "Snapshot this frame (B) — capture a labelled snapshot at the "
+            + "current frame. Snapshots are saved with the recording and "
             + "appear as bright markers on the timeline; click a marker to "
             + "jump back, right-click to remove.";
-        const string BookmarkButtonDisabledTooltip =
-            "Bookmark (disabled) — start recording first. Bookmarks live "
+        const string SnapshotButtonDisabledTooltip =
+            "Snapshot (disabled) — start recording first. Snapshots live "
             + "in the in-memory recording buffer.";
 
         DropdownField _worldDropdown;
@@ -149,12 +149,12 @@ namespace Trecs.Serialization
         Button _jumpEndButton;
         Button _loopButton;
 
-        // Bookmark capture: prompts for a label and forwards to
-        // TrecsAutoRecorder.CaptureBookmarkAtCurrentFrame. Disabled when
+        // Snapshot capture: prompts for a label and forwards to
+        // TrecsAutoRecorder.CaptureSnapshotAtCurrentFrame. Disabled when
         // not recording (matches the recorder's own no-op-while-stopped
         // contract). Sits at the right of the transport row, after Loop,
         // so the primary playback controls stay grouped to the left.
-        Button _bookmarkCaptureButton;
+        Button _snapshotCaptureButton;
 
         // Trim lives in the Actions ▾ menu (Playback-only); see
         // OnRecordingActionsClicked.
@@ -175,22 +175,22 @@ namespace Trecs.Serialization
         // back to a Unicode "↻" if the lookup fails.
         static Texture2D _iconLoop;
 
-        // Bookmark icon: Unity ships "Favorite" (a yellow star) which reads
+        // Snapshot icon: Unity ships "Favorite" (a yellow star) which reads
         // well as "pin this moment". Falls back to a Unicode "★" when the
         // icon isn't available on a given Unity version.
-        static Texture2D _iconBookmark;
+        static Texture2D _iconSnapshot;
 
         // Scrubber: slider with hover-cursor indicator + adaptive time ruler.
         SliderInt _timelineSlider;
         VisualElement _hoverIndicator;
 
         // Overlay layered on top of the slider track that hosts per-anchor
-        // and per-bookmark markers. Rebuilt in RefreshScrubber from
-        // recorder.Anchors / recorder.Bookmarks. Anchors render as a faint
-        // tick (subtle — there can be many of them); bookmarks render as a
+        // and per-snapshot markers. Rebuilt in RefreshScrubber from
+        // recorder.Anchors / recorder.Snapshots. Anchors render as a faint
+        // tick (subtle — there can be many of them); snapshots render as a
         // taller, brighter pin-style mark with the user's label tooltip.
         // Markers are clickable (left-click jumps to their frame, right-
-        // click on a bookmark pops a Remove menu) so PickingMode is
+        // click on a snapshot pops a Remove menu) so PickingMode is
         // Position rather than Ignore — but we stop propagation in the
         // marker's own pointer-down handler so a click never starts a
         // scrub against the underlying slider track.
@@ -496,14 +496,14 @@ namespace Trecs.Serialization
                     evt.StopPropagation();
                     break;
                 case KeyCode.B:
-                    // B mirrors the Bookmark capture button. Only act when
+                    // B mirrors the Snapshot capture button. Only act when
                     // recording — outside that state the button is disabled
                     // and the recorder would no-op anyway, so we'd surface
-                    // a misleading "Bookmark unavailable" status if we ran
+                    // a misleading "Snapshot unavailable" status if we ran
                     // unconditionally.
                     if (GetController()?.AutoRecorder?.IsRecording == true)
                     {
-                        OnBookmarkCaptureClicked();
+                        OnSnapshotCaptureClicked();
                     }
                     evt.StopPropagation();
                     break;
@@ -567,23 +567,23 @@ namespace Trecs.Serialization
             _loopButton.SetEnabled(false);
             row.Add(_loopButton);
 
-            // Bookmark capture: prompts for a label and writes a labelled
+            // Snapshot capture: prompts for a label and writes a labelled
             // snapshot at the current fixed frame. Disabled outside the
-            // Recording mode — CaptureBookmarkAtCurrentFrame is a no-op
+            // Recording mode — CaptureSnapshotAtCurrentFrame is a no-op
             // there anyway, so the button reflects what'll actually
             // happen on click.
-            _bookmarkCaptureButton = MakeIconTransportButton(
-                _iconBookmark,
+            _snapshotCaptureButton = MakeIconTransportButton(
+                _iconSnapshot,
                 "★",
-                OnBookmarkCaptureClicked
+                OnSnapshotCaptureClicked
             );
-            ApplyTooltip(_bookmarkCaptureButton, BookmarkButtonDisabledTooltip);
-            _bookmarkCaptureButton.SetEnabled(false);
-            // A small left margin separates the bookmark from the loop
+            ApplyTooltip(_snapshotCaptureButton, SnapshotButtonDisabledTooltip);
+            _snapshotCaptureButton.SetEnabled(false);
+            // A small left margin separates the snapshot from the loop
             // button visually — these aren't both transport-direction
             // controls, so a thin gap reads as "different concern".
-            _bookmarkCaptureButton.style.marginLeft = 6;
-            row.Add(_bookmarkCaptureButton);
+            _snapshotCaptureButton.style.marginLeft = 6;
+            row.Add(_snapshotCaptureButton);
 
             // State badge and Speed dropdown live in the recording header
             // row, not here — see BuildRecordingHeaderRow. That keeps this
@@ -597,8 +597,8 @@ namespace Trecs.Serialization
                 "Drag to scrub through the buffer. Click anywhere on the track "
                 + "to jump there. Type a frame in the input field on the right "
                 + "to jump exactly. Faint white ticks mark anchors (auto-saved "
-                + "recovery points); brighter yellow pins mark bookmarks — "
-                + "click a marker to jump there, right-click a bookmark to "
+                + "recovery points); brighter yellow pins mark snapshots — "
+                + "click a marker to jump there, right-click a snapshot to "
                 + "remove it.";
             _timelineSlider.style.marginTop = 6;
             _timelineSlider.RegisterValueChangedCallback(OnTimelineValueChanged);
@@ -629,7 +629,7 @@ namespace Trecs.Serialization
             _hoverIndicator.style.display = DisplayStyle.None;
             _timelineSlider.Add(_hoverIndicator);
 
-            // Anchor + bookmark markers, layered on top of the slider track.
+            // Anchor + snapshot markers, layered on top of the slider track.
             // The layer's pickingMode is Ignore so it doesn't intercept
             // scrub interactions in empty space — only the individual
             // markers (added in RefreshMarkerLayer) are pickable. Width
@@ -879,10 +879,10 @@ namespace Trecs.Serialization
             // No reliable cross-version Unity loop icon; "↻" text fallback
             // is fine. preAudioLoopOff/On are internal and not always present.
             _iconLoop ??= LoadEditorIcon("preAudioLoopOff");
-            // "Favorite" is Unity's standard bookmark/star icon — used in
+            // "Favorite" is Unity's standard snapshot/star icon — used in
             // the Project window, etc. "★" is the text fallback when the
             // editor icon set doesn't expose it.
-            _iconBookmark ??= LoadEditorIcon("Favorite");
+            _iconSnapshot ??= LoadEditorIcon("Favorite");
         }
 
         static Texture2D LoadEditorIcon(string name)
@@ -933,10 +933,10 @@ namespace Trecs.Serialization
             + "  ↻  Loop (L)  Enabled in PLAY only. When on, reaching "
             + "the end of the recording rewinds to the first snapshot "
             + "instead of pausing. Resets each playback session.\n"
-            + "  ★  Bookmark (B)  Enabled while recording. Prompts for a "
+            + "  ★  Snapshot (B)  Enabled while recording. Prompts for a "
             + "label and pins a labelled snapshot at the current frame; "
             + "appears as a yellow marker on the timeline. Click a "
-            + "marker to jump there, right-click to remove. Bookmarks "
+            + "marker to jump there, right-click to remove. Snapshots "
             + "are saved with the recording.\n\n"
             + "<b>Keyboard shortcuts</b>\n"
             + "  Space          Play / Pause\n"
@@ -945,7 +945,7 @@ namespace Trecs.Serialization
             + "  Shift+← / →    Jump to previous / next anchor\n"
             + "  R              Record (start / stop / fork — see above)\n"
             + "  L              Loop (PLAY only)\n"
-            + "  B              Bookmark frame (recording only)\n\n"
+            + "  B              Snapshot frame (recording only)\n\n"
             + "<b>State badge</b>\n"
             + "  LIVE  Not recording (Record hasn't been pressed, or "
             + "Auto-record on start is off)\n"
@@ -1344,7 +1344,7 @@ namespace Trecs.Serialization
             ResetTimelineSliderValues();
             _timelineSlider.SetEnabled(false);
             SetTransportEnabled(false);
-            UpdateBookmarkButton(recordingActive: false);
+            UpdateSnapshotButton(recordingActive: false);
             SetTimeScaleEnabled(false);
         }
 
@@ -1505,7 +1505,7 @@ namespace Trecs.Serialization
         {
             var recordingActive = recorder != null && recorder.IsRecording;
             SetTransportEnabled(recordingActive);
-            UpdateBookmarkButton(recordingActive);
+            UpdateSnapshotButton(recordingActive);
 
             if (!recordingActive || recorder.Anchors.Count == 0)
             {
@@ -1542,16 +1542,16 @@ namespace Trecs.Serialization
             RefreshMarkerLayer(controller, recorder, startFrame, maxFrame);
         }
 
-        void UpdateBookmarkButton(bool recordingActive)
+        void UpdateSnapshotButton(bool recordingActive)
         {
-            if (_bookmarkCaptureButton == null)
+            if (_snapshotCaptureButton == null)
             {
                 return;
             }
-            _bookmarkCaptureButton.SetEnabled(recordingActive);
+            _snapshotCaptureButton.SetEnabled(recordingActive);
             ApplyTooltip(
-                _bookmarkCaptureButton,
-                recordingActive ? BookmarkButtonEnabledTooltip : BookmarkButtonDisabledTooltip
+                _snapshotCaptureButton,
+                recordingActive ? SnapshotButtonEnabledTooltip : SnapshotButtonDisabledTooltip
             );
         }
 
@@ -1615,16 +1615,16 @@ namespace Trecs.Serialization
             }
         }
 
-        // Anchor / bookmark markers layered on top of the slider track.
+        // Anchor / snapshot markers layered on top of the slider track.
         // Anchors render as a faint half-height tick (background colour
         // matches the ruler ticks for visual consistency) — there can be
-        // dozens of them so they have to stay subtle. Bookmarks render
+        // dozens of them so they have to stay subtle. Snapshots render
         // taller, brighter, and with the user's label as a tooltip;
         // they're the user's deliberate "remember this moment" pins so
         // they earn the visual weight. Both are clickable (left-click
-        // jumps via TrecsGameStateController.JumpToFrame); bookmarks also
+        // jumps via TrecsGameStateController.JumpToFrame); snapshots also
         // get a right-click → Remove menu wired straight to
-        // TrecsAutoRecorder.RemoveBookmarkAtFrame.
+        // TrecsAutoRecorder.RemoveSnapshotAtFrame.
         void RefreshMarkerLayer(
             TrecsGameStateController controller,
             TrecsAutoRecorder recorder,
@@ -1653,8 +1653,8 @@ namespace Trecs.Serialization
                 _timelineMarkerLayer.style.width = trackWidth;
             }
             var span = (float)(maxFrame - startFrame);
-            // Anchors first (rendered behind bookmarks via DOM order, so
-            // a bookmark at the same frame visually wins). The first
+            // Anchors first (rendered behind snapshots via DOM order, so
+            // a snapshot at the same frame visually wins). The first
             // anchor (StartFrame) is always present and lines up with the
             // slider's lowValue end; we still draw it so users can tell
             // "yes there's a recovery point at the start".
@@ -1670,16 +1670,16 @@ namespace Trecs.Serialization
                     BuildAnchorMarker(controller, anchor.FixedFrame, fraction)
                 );
             }
-            for (var i = 0; i < recorder.Bookmarks.Count; i++)
+            for (var i = 0; i < recorder.Snapshots.Count; i++)
             {
-                var bookmark = recorder.Bookmarks[i];
-                if (bookmark.FixedFrame < startFrame || bookmark.FixedFrame > maxFrame)
+                var snapshot = recorder.Snapshots[i];
+                if (snapshot.FixedFrame < startFrame || snapshot.FixedFrame > maxFrame)
                 {
                     continue;
                 }
-                var fraction = Mathf.Clamp01((bookmark.FixedFrame - startFrame) / span);
+                var fraction = Mathf.Clamp01((snapshot.FixedFrame - startFrame) / span);
                 _timelineMarkerLayer.Add(
-                    BuildBookmarkMarker(controller, recorder, bookmark, fraction)
+                    BuildSnapshotMarker(controller, recorder, snapshot, fraction)
                 );
             }
         }
@@ -1691,7 +1691,7 @@ namespace Trecs.Serialization
         )
         {
             // Subtle half-height tick that doesn't compete with the
-            // bookmark pins or the slider thumb. Width is 2px to give
+            // snapshot pins or the slider thumb. Width is 2px to give
             // pointer interaction a usable hit-target without becoming
             // visually heavy. Click jumps; right-click is intentionally
             // not wired — anchors are managed by the recorder's cadence
@@ -1726,10 +1726,10 @@ namespace Trecs.Serialization
             return marker;
         }
 
-        VisualElement BuildBookmarkMarker(
+        VisualElement BuildSnapshotMarker(
             TrecsGameStateController controller,
             TrecsAutoRecorder recorder,
-            BundleBookmark bookmark,
+            BundleSnapshot snapshot,
             float fraction
         )
         {
@@ -1737,7 +1737,7 @@ namespace Trecs.Serialization
             // icon used on the capture button. The flag-shaped layout
             // (vertical line + small label-tag at the top) reads as a
             // pin even at the smallest slider widths. Label text comes
-            // from the user-supplied bookmark label, falling back to
+            // from the user-supplied snapshot label, falling back to
             // "(unlabelled)" so right-click → Remove still has something
             // to identify in the menu.
             var pinColor = new Color(1f, 0.85f, 0.2f, 0.95f);
@@ -1750,9 +1750,9 @@ namespace Trecs.Serialization
             marker.style.width = 3;
             marker.style.backgroundColor = pinColor;
             // Capacity for hover-tooltip text; falls back to "(unlabelled)"
-            // when the bookmark was captured without a label.
-            var labelText = string.IsNullOrEmpty(bookmark.Label) ? "(unlabelled)" : bookmark.Label;
-            marker.tooltip = $"Bookmark: {labelText} @ frame {bookmark.FixedFrame}";
+            // when the snapshot was captured without a label.
+            var labelText = string.IsNullOrEmpty(snapshot.Label) ? "(unlabelled)" : snapshot.Label;
+            marker.tooltip = $"Snapshot: {labelText} @ frame {snapshot.FixedFrame}";
             marker.RegisterCallback<MouseDownEvent>(evt =>
             {
                 if (evt.button == 1)
@@ -1764,10 +1764,10 @@ namespace Trecs.Serialization
                     var menu = new GenericMenu();
                     menu.AddItem(
                         new GUIContent(
-                            $"Remove bookmark '{labelText}' @ frame {bookmark.FixedFrame}"
+                            $"Remove snapshot '{labelText}' @ frame {snapshot.FixedFrame}"
                         ),
                         false,
-                        () => RemoveBookmarkAndRefresh(recorder, bookmark.FixedFrame, labelText)
+                        () => RemoveSnapshotAndRefresh(recorder, snapshot.FixedFrame, labelText)
                     );
                     menu.ShowAsContext();
                     evt.StopPropagation();
@@ -1777,11 +1777,11 @@ namespace Trecs.Serialization
                 {
                     return;
                 }
-                controller?.JumpToFrame(bookmark.FixedFrame);
+                controller?.JumpToFrame(snapshot.FixedFrame);
                 evt.StopPropagation();
             });
 
-            // Optional flag-tag at the top so a row of bookmarks reads
+            // Optional flag-tag at the top so a row of snapshots reads
             // as distinct pins even when they cluster. Just a small
             // square overlay; we don't render the full label here (would
             // collide with neighbours and the time ruler) — the tooltip
@@ -1799,20 +1799,20 @@ namespace Trecs.Serialization
             return marker;
         }
 
-        void RemoveBookmarkAndRefresh(TrecsAutoRecorder recorder, int frame, string label)
+        void RemoveSnapshotAndRefresh(TrecsAutoRecorder recorder, int frame, string label)
         {
             if (recorder == null)
             {
                 return;
             }
-            if (recorder.RemoveBookmarkAtFrame(frame))
+            if (recorder.RemoveSnapshotAtFrame(frame))
             {
-                SetRecordingStatus($"Removed bookmark '{label}' @ frame {frame}.");
+                SetRecordingStatus($"Removed snapshot '{label}' @ frame {frame}.");
                 RefreshTick();
             }
             else
             {
-                SetRecordingStatus($"No bookmark at frame {frame} to remove.");
+                SetRecordingStatus($"No snapshot at frame {frame} to remove.");
             }
         }
 
@@ -2146,20 +2146,20 @@ namespace Trecs.Serialization
             RefreshTick();
         }
 
-        // Bookmark capture: prompt for a label, then write a labelled
-        // snapshot at the current frame via the recorder. CaptureBookmark-
+        // Snapshot capture: prompt for a label, then write a labelled
+        // snapshot at the current frame via the recorder. CaptureSnapshot-
         // AtCurrentFrame is a no-op when not recording — the button is
         // disabled in that state, but we double-check the mode here so
         // the keyboard shortcut path doesn't surface a misleading status
         // message either. Edit-after-capture is intentionally not offered;
         // the workflow is "delete + recreate" via right-click on a marker.
-        void OnBookmarkCaptureClicked()
+        void OnSnapshotCaptureClicked()
         {
             var controller = GetController();
             var recorder = controller?.AutoRecorder;
             if (recorder == null || !recorder.IsRecording)
             {
-                SetRecordingStatus("Bookmark unavailable — not recording.");
+                SetRecordingStatus("Snapshot unavailable — not recording.");
                 return;
             }
             var frame = _selectedAccessor?.FixedFrame ?? recorder.LastAnchorFrame;
@@ -2168,8 +2168,8 @@ namespace Trecs.Serialization
             // ("frame 1234"); the user can re-prompt later by right-click-
             // delete + recapture if they want to refine the name.
             var label = TrecsTextPromptWindow.Prompt(
-                "Bookmark frame",
-                $"Label for bookmark at frame {frame}:",
+                "Snapshot frame",
+                $"Label for snapshot at frame {frame}:",
                 $"frame {frame}",
                 anchor: this
             );
@@ -2179,17 +2179,17 @@ namespace Trecs.Serialization
                 return;
             }
             label = label.Trim();
-            if (recorder.CaptureBookmarkAtCurrentFrame(label))
+            if (recorder.CaptureSnapshotAtCurrentFrame(label))
             {
                 var displayLabel = string.IsNullOrEmpty(label) ? "(unlabelled)" : $"'{label}'";
-                SetRecordingStatus($"Bookmarked frame {frame} {displayLabel}.");
-                // Re-render markers immediately so the new bookmark shows
+                SetRecordingStatus($"Snapshoted frame {frame} {displayLabel}.");
+                // Re-render markers immediately so the new snapshot shows
                 // without waiting for the next poll tick.
                 RefreshTick();
             }
             else
             {
-                SetRecordingStatus("Bookmark failed.");
+                SetRecordingStatus("Snapshot failed.");
             }
         }
 
@@ -2645,10 +2645,8 @@ namespace Trecs.Serialization
         }
 
         // Same EditorPrefs key used by TrecsSavesWindow so a "Don't ask
-        // again" dismissal there silences the Player too. Key still spells
-        // "Bookmarks" — predates the bookmark→snapshot rename; keeping the
-        // original spelling so existing user dismissals carry over.
-        const string SuppressLoadSnapshotConfirmKey = "Trecs.Bookmarks.SuppressLoadConfirm";
+        // again" dismissal there silences the Player too.
+        const string SuppressLoadSnapshotConfirmKey = "Trecs.Snapshots.SuppressLoadConfirm";
 
         void OnSaveSnapshotClicked()
         {

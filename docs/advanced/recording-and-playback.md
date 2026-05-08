@@ -2,7 +2,7 @@
 
 Trecs supports full-state snapshots, deterministic recording/playback,
 sparse desync-detection checksums, and full-state anchors and user
-bookmarks — the features behind networked rollback, save games,
+snapshots — the features behind networked rollback, save games,
 debugging, and QA replay tooling.
 
 This page assumes you have read [Serialization](serialization.md), which
@@ -15,7 +15,7 @@ Four pieces, composed independently:
 | Type | Purpose |
 |---|---|
 | `SnapshotSerializer` | Capture a single full-state snapshot and write it to a stream/file. Restore later. |
-| `BundleRecorder` | Capture a span of fixed frames as a self-contained `RecordingBundle`: the initial snapshot, recorded inputs, sparse per-frame checksums, optional auto-anchors, and optional user bookmarks. |
+| `BundleRecorder` | Capture a span of fixed frames as a self-contained `RecordingBundle`: the initial snapshot, recorded inputs, sparse per-frame checksums, optional auto-anchors, and optional user snapshots. |
 | `BundlePlayer` | Replay a `RecordingBundle` against a live world: restore the bundle's initial snapshot, feed its captured inputs, and verify per-frame checksums to surface desyncs. |
 | `RecordingBundleSerializer` | Read and write `RecordingBundle` instances to streams or files. |
 
@@ -93,7 +93,7 @@ recorder.Start();
 //
 // Optional: drop a marker at an interesting moment.
 recorder.CaptureAnchorAtCurrentFrame();              // unlabeled — recovery / scrub anchor
-recorder.CaptureBookmarkAtCurrentFrame("just before the bug");  // labeled — surfaced in UI
+recorder.CaptureSnapshotAtCurrentFrame("just before the bug");  // labeled — surfaced in UI
 
 // Stop and persist.
 RecordingBundle bundle = recorder.Stop();
@@ -128,11 +128,11 @@ The bundle returned by `recorder.Stop()` (and persisted by
 - `InputQueue` — `EntityInputQueue` payload bytes covering the recorded frame range.
 - `Checksums` — sparse per-frame world-state checksums (`DenseDictionary<int, uint>`), used by `BundlePlayer.Tick` for desync detection.
 - `Anchors` — auto-placed full-state snapshots, ordered by frame. Doubles as runtime desync-recovery points and as scrub anchors in the editor.
-- `Bookmarks` — user-placed labeled full-state snapshots, ordered by frame. Surfaced in the recorder UI's timeline; survive Save/Load.
+- `Snapshots` — user-placed labeled full-state snapshots, ordered by frame. Surfaced in the recorder UI's timeline; survive Save/Load.
 
-`CaptureAnchorAtCurrentFrame` and `CaptureBookmarkAtCurrentFrame` let
+`CaptureAnchorAtCurrentFrame` and `CaptureSnapshotAtCurrentFrame` let
 you place markers manually, outside the auto-cadence. Anchors and
-bookmarks are independent: deleting a bookmark never removes an
+snapshots are independent: deleting a snapshot never removes an
 auto-anchor that happens to share a frame.
 
 !!! note "`ChecksumFlags`"

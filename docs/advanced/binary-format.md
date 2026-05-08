@@ -88,7 +88,7 @@ A snapshot is a payload whose top-level value is a `SnapshotMetadata` followed b
 
 ## Recording bundle payload
 
-A recording bundle is a self-contained payload that embeds an initial-state snapshot, the recorded input queue, sparse per-frame checksums, and any auto-anchors and user bookmarks captured during recording. It is written and read by `RecordingBundleSerializer`.
+A recording bundle is a self-contained payload that embeds an initial-state snapshot, the recorded input queue, sparse per-frame checksums, and any auto-anchors and user snapshots captured during recording. It is written and read by `RecordingBundleSerializer`.
 
 ```
 [Header]                          16 bytes
@@ -101,13 +101,13 @@ A recording bundle is a self-contained payload that embeds an initial-state snap
 [Checksums]                       DenseDictionary<int, uint>
 [int32 anchorCount]
 [ {int32 FixedFrame, uint32 Checksum, byte[] Payload} ... ]
-[int32 bookmarkCount]
+[int32 snapshotCount]
 [ {int32 FixedFrame, uint32 Checksum, string Label, byte[] Payload} ... ]
 [int32 TrecsConstants.RecordingSentinelValue = 584488256]
 [byte EndOfPayloadMarker = 0x5E]
 ```
 
-Each anchor and bookmark `Payload` is itself a full snapshot payload (header, framing, world state, end-of-payload marker) — feeding one to `SnapshotSerializer.LoadSnapshot(stream)` restores world state at that frame. Anchors are auto-placed by the recorder at `BundleRecorderSettings.AnchorIntervalSeconds` cadence and used at runtime as desync-recovery points and as scrub anchors in editor tooling. Bookmarks are user-placed and carry a label.
+Each anchor and snapshot `Payload` is itself a full snapshot payload (header, framing, world state, end-of-payload marker) — feeding one to `SnapshotSerializer.LoadSnapshot(stream)` restores world state at that frame. Anchors are auto-placed by the recorder at `BundleRecorderSettings.AnchorIntervalSeconds` cadence and used at runtime as desync-recovery points and as scrub anchors in editor tooling. Snapshots are user-placed and carry a label.
 
 `RecordingSentinelValue` plays the same role as `WorldStateStreamGuard` but for bundles: it catches drift between writer and reader of the bundle layout.
 

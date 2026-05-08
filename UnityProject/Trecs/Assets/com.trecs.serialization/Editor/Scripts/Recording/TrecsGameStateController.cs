@@ -25,7 +25,7 @@ namespace Trecs.Serialization
         static readonly TrecsLog _log = new(nameof(TrecsGameStateController));
 
         /// <summary>File extension for full <see cref="RecordingBundle"/> files
-        /// (input timeline + periodic snapshots + bookmarks). Distinct from the
+        /// (input timeline + periodic auto-anchors + user snapshots). Distinct from the
         /// snapshot extension so a shared "Saves" directory listing tells the
         /// two file kinds apart at a glance.</summary>
         public const string RecordingExtension = ".trec";
