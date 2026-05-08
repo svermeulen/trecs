@@ -1,12 +1,13 @@
 # Entities
 
-Entities are lightweight identifiers that group components together
+Entities are lightweight identifiers that group components together.
 
 ## EntityHandle vs EntityIndex
 
-Trecs provides two ways of referring to entities for different use cases:
+Trecs has two ways of referring to entities, each suited to different use cases:
 
-`EntityHandle` is a stable reference that survives [structural changes](../entity-management/structural-changes.md) and can be stored in components for cross-entity relationships. `EntityIndex` is a fast, transient reference for immediate use within a system tick — it provides direct buffer access but is invalidated when entities are added, removed, or moved.
+- **`EntityHandle`** — a stable reference that survives [structural changes](../entity-management/structural-changes.md). Store it in components or fields when you need a long-lived link to another entity.
+- **`EntityIndex`** — a fast, transient reference that points directly at the underlying component buffers. It's the right choice inside a single system tick but is invalidated as soon as entities are added, removed, or moved between groups.
 
 | | EntityHandle | EntityIndex |
 |---|---|---|
@@ -15,74 +16,76 @@ Trecs provides two ways of referring to entities for different use cases:
 | **Fields** | `UniqueId`, `Version` | `Index`, `GroupIndex` |
 | **Performance** | Requires lookup to access components | Direct buffer access |
 
-Note that you can always convert between the two as needed:
+Convert between them as needed:
 
 ```csharp
-// EntityHandle — stable reference
-EntityHandle handle = index.ToHandle(world);
+// EntityIndex → EntityHandle (stable)
+EntityHandle handle = index.ToHandle(World);
 
-// EntityIndex — fast but transient
-EntityIndex index = handle.ToIndex(world);
+// EntityHandle → EntityIndex (transient)
+EntityIndex index = handle.ToIndex(World);
 ```
+
+`World` here is the system's source-generated `WorldAccessor` property — see [Systems](systems.md).
 
 ## Creating Entities
 
 Entities are created via `WorldAccessor.AddEntity()`, which returns an `EntityInitializer` for setting component values:
 
 ```csharp
-// Specify tag, which should map to a unique entity type
-world.AddEntity<SampleTags.Spinner>()
+// The tag identifies which template (and therefore which components) to spawn
+World.AddEntity<SampleTags.Spinner>()
     .Set(new Rotation(quaternion.identity))
     .Set(new GameObjectId(42));
 ```
 
 ### EntityInitializer
 
-The initializer is a `ref struct` — it must be used immediately, not stored:
+`EntityInitializer` is a `ref struct` — use it immediately, do not store it across method boundaries:
 
 ```csharp
-var initializer = world.AddEntity<MyTag>();
+var initializer = World.AddEntity<MyTag>();
 initializer.Set(new Position(float3.zero));
 initializer.Set(new Velocity(float3.zero));
 ```
 
-EntityInitializer exposes a `Handle` property which provides the entity's stable reference:
+The entity's stable handle is available right away via the `Handle` field, even though the entity itself only materializes during the next [submission](../entity-management/structural-changes.md):
 
 ```csharp
-var init = world.AddEntity<MyTag>();
-EntityHandle handle = init.Handle;  // Available immediately
+var init = World.AddEntity<MyTag>();
+EntityHandle handle = init.Handle;
 init.Set(new Position(float3.zero));
 ```
 
 !!! tip
-    You can optionally call `AssertComplete()` on the initializer to verify that all non-optional components declared by the template have been set. This check also runs automatically during entity submission, so `AssertComplete()` is only useful for catching mistakes earlier at the call site.  Note that non-optional components are all components declared on the template definition (ITemplate) without an explicit value.
+    Call `AssertComplete()` on the initializer to verify that every non-optional component on the template has been set. The check also runs automatically during submission; explicit calls just surface the error earlier, at the call site. A "non-optional" component is a template field declared without a default value.
 
 ## Removing Entities
 
 ```csharp
 // Remove a single entity
-world.RemoveEntity(entityIndex);
-world.RemoveEntity(entityHandle);
+World.RemoveEntity(entityIndex);
+World.RemoveEntity(entityHandle);
 
-// Remove all entities with specific tags
-world.RemoveEntitiesWithTags<SampleTags.Sphere>();
-world.RemoveEntitiesWithTags<BallTags.Ball, BallTags.Active>();
+// Remove all entities matching a tag combination
+World.RemoveEntitiesWithTags<SampleTags.Sphere>();
+World.RemoveEntitiesWithTags<BallTags.Ball, BallTags.Active>();
 ```
 
 !!! note
-    Entity removal is deferred — the entity is not immediately destroyed. It is removed during the next entity submission phase. See [Structural Changes](../entity-management/structural-changes.md).
+    Entity removal is **deferred** — the entity is not destroyed immediately. It disappears during the next [submission](../entity-management/structural-changes.md).
 
 ## Accessing Entity Data
 
-Use `EntityAccessor` for convenient component access on a single entity:
+`EntityAccessor` is a convenient single-entity component view:
 
 ```csharp
 // From EntityIndex
-var entity = index.ToEntity(world);
+var entity = index.ToEntity(World);
 ref Position pos = ref entity.Get<Position>().Write;
 
 // From EntityHandle
-var entity = handle.ToEntity(world);
+var entity = handle.ToEntity(World);
 ref readonly Velocity vel = ref entity.Get<Velocity>().Read;
 
 // Safe access
@@ -92,13 +95,13 @@ if (entity.TryGet<Velocity>(out var velAccessor))
 }
 ```
 
-However note that in many cases using the [aspects](../data-access/aspects.md) feature is better practice
+For batch processing, prefer [aspects](../data-access/aspects.md) — they bundle related components into a single typed view.
 
 ## Counting Entities
 
 ```csharp
-int total = world.CountAllEntities();
-int spinners = world.CountEntitiesWithTags<SampleTags.Spinner>();
-int activeBalls = world.CountEntitiesWithTags<BallTags.Ball, BallTags.Active>();
-int inGroup = world.CountEntitiesInGroup(group);
+int total       = World.CountAllEntities();
+int spinners    = World.CountEntitiesWithTags<SampleTags.Spinner>();
+int activeBalls = World.CountEntitiesWithTags<BallTags.Ball, BallTags.Active>();
+int inGroup     = World.CountEntitiesInGroup(group);
 ```

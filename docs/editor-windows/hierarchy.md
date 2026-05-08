@@ -1,6 +1,8 @@
 # Hierarchy Window
 
-The **Trecs Hierarchy** window is the editor's main inspector for a running world's schema and live state. Open it from `Window > Trecs > Hierarchy`.
+The **Trecs Hierarchy** window is the editor's main inspector for a running world's schema and live state. It cross-references templates, entities, components, tags, sets, and accessors in a single tree, and stays useful between Play sessions via on-disk schema snapshots.
+
+**To open it:** `Window > Trecs > Hierarchy`. Worlds appear in the dropdown automatically once they call `WorldBuilder.Build()` — give them readable names with [`WorldBuilder.SetDebugName`](../core/world-setup.md) so they're easy to pick when you have more than one.
 
 !!! warning "Screenshot pending: `images/hierarchy-overview.png`"
     Whole window with all five sections expanded; entity rows visible under a couple of templates. FeedingFrenzy sample, light theme.
@@ -155,18 +157,29 @@ Every committed search is recorded (capped at 20 entries, persisted across sessi
 
 ## Row context menu
 
+!!! warning "Screenshot pending: `images/hierarchy-row-context-menu.png`"
+    Right-click a Component row (e.g. `CHealth`) so the full Component menu is visible — its six entries cover the most variety. Tree expanded behind it for context.
+
+<!-- When captured, delete the admonition above and uncomment this block:
+<figure markdown>
+  ![Row context menu opened on a component, showing the scoped Find variants](images/hierarchy-row-context-menu.png){ width="520" }
+  <figcaption>Each "Find…" entry pre-fills the search field with the right predicate and kind selector.</figcaption>
+</figure>
+-->
+
 Right-clicking a row offers actions tailored to the row's kind:
 
 | Row kind | Actions |
 |---|---|
 | Any | Copy Name |
-| Template | Find Entities, Find Derived, Find Base |
-| Component | Find Anything With This (and scoped variants), Accessors That Read or Write This |
-| Tag | Find Anything With This (and scoped variants) |
+| Template | Find Entities Of This Template · Find Templates Derived From This · Find Templates This Derives From |
+| Component | Find Anything With This Component · Find Templates With This Component · Find Entities With This Component · Find Accessors That Read or Write This · Find Accessors That Read This · Find Accessors That Write This |
+| Tag | Find Anything With This Tag · Find Templates With This Tag · Find Entities With This Tag · Find Sets With This Tag |
 | Set | Find Sets With Same Name |
 | Entity | Copy Entity Id |
+| Accessor | (no extra entries — accessor cross-links live in the inspector) |
 
-Each "Find" entry pre-fills the search field with the right predicate and kind selector.
+Each "Find…" entry pre-fills the search field with the right predicate and kind selector.
 
 ## Cog menu
 
@@ -191,7 +204,17 @@ Both visibility toggles are persisted via `EditorPrefs`.
 
 ## Inspector cross-links and hover preview
 
-Selecting a row drives the project's standard Unity inspector to a Trecs-aware view of the entity / template / component / set / tag. Most inspector views include navigation links back to other rows in the hierarchy:
+!!! warning "Screenshot pending: `images/hierarchy-inspector-links.png`"
+    Hierarchy on the left, Unity Inspector on the right showing a template's component list with the cross-link buttons visible. Ideally with a `Shift+hover` preview highlight visible on a row in the tree.
+
+<!-- When captured, delete the admonition above and uncomment this block:
+<figure markdown>
+  ![Hierarchy alongside Unity's Inspector showing cross-link buttons on a template view](images/hierarchy-inspector-links.png){ width="900" }
+  <figcaption>Inspector cross-links navigate the hierarchy by stable identity, so selection survives world transitions and domain reloads.</figcaption>
+</figure>
+-->
+
+Selecting a row drives Unity's standard inspector to a Trecs-aware view of the entity / template / component / set / tag. Component fields are shown as a per-entity component inspector with JSON edit support, and most inspector views include navigation links back to other rows in the hierarchy:
 
 - Clicking a link selects the linked row in the hierarchy (and scrolls it into view).
 - Holding `Shift` while hovering a link previews the destination — the hierarchy scrolls but the selection doesn't change, so the inspector keeps showing your current row.
@@ -213,4 +236,8 @@ The window switches automatically: when a live world appears it takes over the d
 
 ## See also
 
+- [World Setup](../core/world-setup.md) — `WorldBuilder.SetDebugName` controls how a world appears in the dropdown.
 - [Disabling and Pausing Systems](../advanced/system-control.md) — `EnableChannel.Editor` is the channel the hierarchy's per-system enable toggle uses.
+- Sibling editor windows (also under `Window > Trecs`):
+    - **Trecs Player** — record / playback / snapshot / scrub / fork / loop UI for the active world.
+    - **Trecs Saves** — library window for managing recordings and snapshots.

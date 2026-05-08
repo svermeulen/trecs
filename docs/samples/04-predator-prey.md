@@ -2,7 +2,7 @@
 
 Cross-entity relationships using `EntityHandle`. Predators chase prey, and cleanup handlers prevent dangling references.
 
-**Source:** `Samples/04_PredatorPrey/`
+**Source:** `com.trecs.core/Samples~/Tutorials/04_PredatorPrey/`
 
 ## What It Does
 
@@ -26,7 +26,7 @@ public partial struct ApproachingPredator : IEntityComponent
 }
 ```
 
-Plus `Position`, `Velocity`, `Speed`, `MoveDirection`, `GameObjectId`.
+Plus `Speed` and `MoveDirection` defined in this sample, and `Position` / `GameObjectId` from `Common/`.
 
 ### Tags & Templates
 
@@ -153,8 +153,8 @@ public partial class CleanupHandlers
 
 ## Concepts Introduced
 
-- **`EntityHandle`** for stable cross-entity references that survive structural changes
-- **Template inheritance** with `IExtends<T>` to share common components
-- **Nested aspect queries** — iterating one entity type while querying another
-- **Entity events** (`OnRemoved`) for cleanup of cross-references
-- **Bidirectional linking** — predator points to prey and prey points back to predator
+- **`EntityHandle`** for stable cross-entity references that survive structural changes. See [Entities](../core/entities.md).
+- **Template inheritance** with `IExtends<T>` to share common components. See [Templates](../core/templates.md).
+- **Nested aspect queries** — iterating one entity type while querying another. See [Queries & Iteration](../data-access/queries-and-iteration.md).
+- **Entity events** (`OnRemoved`) for cleanup of cross-references. See [Entity Events](../entity-management/entity-events.md).
+- **Bidirectional linking** — predator points to prey and prey points back to predator.

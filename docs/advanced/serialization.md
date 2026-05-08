@@ -11,19 +11,19 @@ Compose just the pieces you need:
 
 - **`SerializerRegistry`** — maps types to their serializers.
 - **`WorldStateSerializer`** — reads/writes the entire ECS world (components, sets, heaps, entity handles).
-- **`SnapshotSerializer`** — captures and restores full state snapshots.
-- **`BundleRecorder` / `BundlePlayer`** — capture and replay simulation history as a self-contained `RecordingBundle` (covered in the next page).
+- **`SnapshotSerializer`** — captures and restores full-state snapshots.
+- **`BundleRecorder` / `BundlePlayer` / `RecordingBundleSerializer`** — capture and replay simulation history as a self-contained `RecordingBundle` (covered on the next page).
 
-The static helper `TrecsSerialization` provides preset registrations so the common path is one line. Users that only need partial setup (e.g. save-game-only projects that skip the recording machinery) can call individual `Register*Serializers` helpers instead.
+`TrecsSerialization.CreateSerializerRegistry()` is the one-call entry point — it returns a registry pre-populated with everything Trecs needs (primitives, math types, ECS internals, recording metadata).
 
 ## Quick start
 
 ```csharp
-// 1. Build a registry pre-populated with all Trecs serializers.
+// 1. Build a registry with all Trecs serializers pre-registered.
 var registry = TrecsSerialization.CreateSerializerRegistry();
 
 // 2. Register any custom serializers your game needs (see below).
-//    All blittable component types are auto-handled — no registration needed.
+//    Blittable component types are auto-handled — no registration needed.
 //    registry.RegisterSerializer<MyCustomSerializer>();
 
 // 3. Compose only the handlers you actually use.
@@ -31,20 +31,11 @@ var worldStateSerializer = new WorldStateSerializer(world);
 var snapshots = new SnapshotSerializer(worldStateSerializer, registry, world);
 ```
 
-For a save-game flow you stop here and use `SnapshotSerializer.SaveSnapshot`/`LoadSnapshot`. For deterministic record/replay also construct `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` (see the [Recording & Playback](recording-and-playback.md) page).
+For a save-game flow stop here and use `SnapshotSerializer.SaveSnapshot` / `LoadSnapshot`. For deterministic record/replay also construct `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` (see [Recording & Playback](recording-and-playback.md)).
 
-## Granular registration
+The samples ship a `SerializationFactory.CreateAll(world)` helper that wires up the full stack in one call — copy `Samples/Serialization/Common/Scripts/SerializationFactory.cs` into your project and trim the parts you don't need.
 
-If you do not want everything, use the building-block helpers:
-
-```csharp
-var registry = new SerializerRegistry();
-TrecsSerialization.RegisterCoreSerializers(registry);   // primitives, math types
-TrecsSerialization.RegisterTrecsSerializers(registry);  // ECS internals
-// (skip RegisterRecordingSerializers — save-game-only project)
-```
-
-`SerializerRegistry` itself contains only generic `RegisterBlit<T>`, `RegisterEnum<T>`, `RegisterSerializer<TSerializer>` etc. — it has no knowledge of Trecs ECS types and can be used standalone.
+`SerializerRegistry` itself is independent of Trecs — it only exposes generic `RegisterBlit<T>`, `RegisterEnum<T>`, `RegisterSerializer<TSerializer>` and can be used standalone in non-ECS code.
 
 ## Authoring a custom serializer
 
@@ -171,12 +162,7 @@ See [Recording & Playback](recording-and-playback.md) for the determinism-sensit
 
 ## Threading
 
-All `SnapshotSerializer`, `BundleRecorder`, `BundlePlayer`, and
-`RecordingBundleSerializer` methods are **main-thread only**. The
-underlying `SerializationBuffer` and the blit fast-path use a shared
-static byte buffer, and every read/write path asserts
-`UnityThreadUtil.IsMainThread`. Do not call save/load from a background
-thread.
+All `SnapshotSerializer`, `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` methods are **main-thread only**. The blit fast-path uses a shared static byte buffer, and every read/write path asserts `UnityThreadHelper.IsMainThread`. Do not call save/load from a background thread.
 
 ## Binary format stability
 

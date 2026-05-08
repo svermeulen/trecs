@@ -2,7 +2,7 @@
 
 Using heap pointers to store managed data (classes, lists, arrays) that can't live in unmanaged components.
 
-**Source:** `Samples/10_Pointers/`
+**Source:** `com.trecs.core/Samples~/Tutorials/10_Pointers/`
 
 ## What It Does
 
@@ -46,39 +46,38 @@ public partial struct Trail : IEntityComponent
 
 ## Allocation
 
-### SharedPtr — Shared Route Data
+`SharedPtr` and `UniquePtr` require a blob store. The sample uses the in-memory store, but a disk-backed store is also available — see [Heap](../advanced/heap.md):
 
 ```csharp
-// Allocate once
-SharedPtr<PatrolRoute> routePtr = world.Heap.AllocShared(new PatrolRoute
+.AddBlobStore(new BlobStoreInMemory(
+    new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 }, null))
+```
+
+### SharedPtr — Shared Route Data
+
+`AllocShared` returns a handle with refcount 1. `Clone` increments the count; each entity stores its own clone. Once spawning is done the original is disposed, leaving the entity clones to keep the underlying object alive:
+
+```csharp
+var routePtr = world.Heap.AllocShared(new PatrolRoute { /* ... */ });
+
+for (int i = 0; i < count; i++)
 {
-    Waypoints = waypoints,
-    Color = Color.red,
-    Speed = 2f
-});
+    world.AddEntity<PatrolTags.Follower>()
+        .Set(new Route { Value = routePtr.Clone(world), Progress = i })
+        .Set(new Trail { Value = world.Heap.AllocUnique(new TrailHistory { MaxLength = 50 }) });
+}
 
-// First entity gets the original
-world.AddEntity<PatrolTags.Follower>()
-    .Set(new Route { Value = routePtr })
-    .Set(new Trail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) });
-
-// Second entity clones (increments ref count, shares same data)
-world.AddEntity<PatrolTags.Follower>()
-    .Set(new Route { Value = routePtr.Clone(world.Heap) })
-    .Set(new Trail { Value = world.Heap.AllocUnique(new TrailHistory { ... }) });
+// Each entity holds its own clone — the original is no longer needed.
+routePtr.Dispose(world);
 ```
 
 ### UniquePtr — Per-Entity Trail
 
 ```csharp
-UniquePtr<TrailHistory> trailPtr = world.Heap.AllocUnique(new TrailHistory
-{
-    Positions = new List<Vector3>(),
-    MaxLength = 100
-});
+var trailPtr = world.Heap.AllocUnique(new TrailHistory { MaxLength = 50 });
 ```
 
-Each entity gets its own `UniquePtr` — the data is not shared.
+Each entity gets its own `UniquePtr` — the data is not shared and is mutated freely by the owning entity.
 
 ## Systems
 
@@ -136,9 +135,10 @@ world.Events.EntitiesWithTags<PatrolTags.Follower>()
 
 ## Concepts Introduced
 
-- **`SharedPtr<T>`** — reference-counted pointer for shared managed data
-- **`UniquePtr<T>`** — single-owner pointer for per-entity managed data
-- **`Clone()`** — increments ref count on shared pointers
-- **`Dispose()`** — decrements ref count (shared) or frees (unique)
-- **`Get(World)`** — dereferences a pointer to access the data
-- **Cleanup handlers** — dispose pointers when entities are removed to prevent leaks
+- **`SharedPtr<T>`** — reference-counted pointer for shared managed data. See [Heap](../advanced/heap.md).
+- **`UniquePtr<T>`** — single-owner pointer for per-entity managed data.
+- **`Clone()`** — increments the ref count on a `SharedPtr`.
+- **`Dispose()`** — decrements ref count (shared) or returns to pool (unique).
+- **`Get(world)`** — dereferences a pointer to access the underlying object.
+- **Cleanup handlers** — dispose pointers when entities are removed to prevent leaks. See [Heap Allocation Rules](../advanced/heap-allocation-rules.md) and [Entity Events](../entity-management/entity-events.md).
+- For Burst-compatible variants used inside jobs, see [Native Pointers](14-native-pointers.md).

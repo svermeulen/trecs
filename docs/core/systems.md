@@ -25,9 +25,9 @@ public partial class SpinnerSystem : ISystem
 
 Key points:
 
-- Systems are `partial class` (source generation fills in boilerplate)
-- Systems are not created by Trecs. Instantiate them however you like and register with the world builder.
-- `World` is a source-generated **instance property** providing the `WorldAccessor` — not the `World` class. It only exists inside types the source generator processes (systems, event handlers, and `[ForEachEntity]` hosts). In a plain helper class you need to inject a `WorldAccessor` explicitly (see [World Setup — WorldAccessor](world-setup.md#worldaccessor)).
+- Systems are `partial class` — the source generator fills in boilerplate.
+- Trecs does not construct systems. Instantiate them yourself and register with the [world builder](world-setup.md#worldbuilder) or via `World.AddSystem`.
+- `World` is a source-generated **instance property** that returns the system's `WorldAccessor` (see [Accessor Roles](../advanced/accessor-roles.md)). It is *not* the `World` class itself, and it only exists inside types the source generator processes — systems, event handlers, and `[ForEachEntity]` hosts. In a plain helper class, inject a `WorldAccessor` explicitly (see [World Setup — WorldAccessor](world-setup.md#worldaccessor)).
 
 ## The Execute Method
 
@@ -277,7 +277,7 @@ public partial struct ScoringJob : IJobFor
 
 ## Update Phases
 
-Systems run in one of five phases, controlled by `[ExecuteIn(...)]`. Phases execute in this order each rendered frame:
+Systems run in one of five phases, controlled by `[ExecuteIn(...)]`. The phases execute in this order each rendered frame:
 
 | Phase | Attribute | Typical Use |
 |-------|-----------|-------------|
@@ -302,9 +302,9 @@ public partial class KeyboardInputSystem : ISystem { ... }
 
 The fixed phase runs at a fixed timestep (default 1/60s) and may run multiple times per frame to catch up (or zero times at fast variable frame rates). Each fixed step is preceded by the input phase. Presentation and LatePresentation run once per rendered frame. See [Input System](../advanced/input-system.md) for details on the input phase.
 
-Trecs does not hook into Unity's update loop automatically — you drive it by calling these methods on the world each frame:
+Trecs does not hook into Unity's update loop automatically — drive it by calling these methods on the world each frame:
 
-- **`world.Tick()`** — Runs `EarlyPresentation`, the input/fixed loop, and `Presentation` phases.
+- **`world.Tick()`** — Runs `EarlyPresentation`, then the `Input` + `Fixed` catch-up loop, then `Presentation`. Call from `MonoBehaviour.Update`.
 - **`world.LateTick()`** — Runs the `LatePresentation` phase. Call from `MonoBehaviour.LateUpdate`.
 
 Typically these are called from a MonoBehaviour like this:
@@ -363,7 +363,7 @@ new WorldBuilder()
 
 ### ExecutePriority
 
-Use `[ExecutePriority]` to influence ordering when no explicit constraints apply. The default priority is `0`. Lower values run earlier, higher values run later:
+Use `[ExecutePriority]` to influence ordering when no explicit constraints apply. The default priority is `0`. Higher values run later within the same phase:
 
 ```csharp
 [ExecutePriority(-10)]  // Runs before systems with default priority
@@ -373,7 +373,7 @@ public partial class EarlySystem : ISystem { ... }
 public partial class LateSystem : ISystem { ... }
 ```
 
-`[ExecuteAfter]` and `[ExecuteBefore]` constraints always take precedence over priority — priority only breaks ties among systems with no ordering constraints between them.
+`[ExecuteAfter]` and `[ExecuteBefore]` always take precedence over priority — priority only breaks ties among systems with no ordering constraint between them.
 
 ## OnReady Hook
 

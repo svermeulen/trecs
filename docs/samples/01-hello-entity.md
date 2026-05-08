@@ -2,47 +2,44 @@
 
 The simplest Trecs sample — a spinning cube. Introduces the fundamental building blocks: components, tags, templates, systems, and world setup.
 
-**Source:** `Samples/01_HelloEntity/`
+**Source:** `com.trecs.core/Samples~/Tutorials/01_HelloEntity/`
 
-## What It Does
+## Goal
 
-A cube rotates continuously around the Y axis. The rotation speed is configured when the system is created.
+By the end you'll have a single entity with a `Rotation` component being rotated each fixed update by a system, and its `GameObject` synced to the rotation each rendered frame.
 
 ## Schema
 
-### Components
+A schema is just the components, tags, and templates that describe your entity types. This sample's schema is tiny:
 
 ```csharp
-[Unwrap]
-public partial struct Rotation : IEntityComponent
+public static class SampleTags
 {
-    public quaternion Value;
+    public struct Spinner : ITag { }
+}
+
+public static partial class SampleTemplates
+{
+    public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
+    {
+        Rotation Rotation = new(quaternion.identity);
+
+        // Components must be unmanaged, so we store an int id that maps
+        // to a GameObject via GameObjectRegistry instead of a reference.
+        GameObjectId GameObjectId;
+    }
 }
 ```
 
-The `GameObjectId` component (from Common) maps the entity to a Unity GameObject.
+`Rotation` and `GameObjectId` come from `Common/` — the samples folder reuses a small set of basic components across tutorials.
 
-### Tags
-
-```csharp
-public struct Spinner : ITag { }
-```
-
-### Template
-
-```csharp
-public partial class SpinnerEntity : ITemplate, IHasTags<SampleTags.Spinner>
-{
-    Rotation Rotation = new(quaternion.identity);
-    GameObjectId GameObjectId;
-}
-```
+See [Components](../core/components.md), [Tags](../core/tags.md), and [Templates](../core/templates.md) for the underlying concepts.
 
 ## Systems
 
 ### SpinnerSystem (Fixed Update)
 
-Rotates all entities that have a `Rotation` component:
+Spins anything that has a `Rotation` component:
 
 ```csharp
 public partial class SpinnerSystem : ISystem
@@ -63,11 +60,11 @@ public partial class SpinnerSystem : ISystem
 }
 ```
 
-Uses `MatchByComponents = true` to iterate all entities with `Rotation`, regardless of tags.
+`MatchByComponents = true` iterates every entity that has the `Rotation` component, regardless of tags. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 
 ### SpinnerGameObjectUpdater (Variable Update)
 
-Syncs the ECS rotation to the Unity transform:
+Syncs the simulation rotation onto the Unity transform:
 
 ```csharp
 [ExecuteIn(SystemPhase.Presentation)]
@@ -89,9 +86,11 @@ public partial class SpinnerGameObjectUpdater : ISystem
 }
 ```
 
-Marked `[ExecuteIn(SystemPhase.Presentation)]` because it touches Unity GameObjects — rendering should happen at the display frame rate, not the fixed timestep.  Though in this case it doesn't matter since rotation is updated in fixed and we aren't using [interpolation](../advanced/interpolation.md) in this sample.
+`[ExecuteIn(SystemPhase.Presentation)]` runs this system at the variable (display) frame rate rather than the fixed timestep — appropriate for anything that touches Unity GameObjects. See [Systems](../core/systems.md) and [Accessor Roles](../advanced/accessor-roles.md).
 
-## World Setup
+## Wiring it up
+
+The composition root builds the world, registers the systems, and hands callbacks back to `Bootstrap`:
 
 ```csharp
 var world = new WorldBuilder()
@@ -100,23 +99,34 @@ var world = new WorldBuilder()
 
 world.AddSystems(new ISystem[]
 {
-    new SpinnerSystem(rotationSpeed: 2f),
+    new SpinnerSystem(RotationSpeed),
     new SpinnerGameObjectUpdater(gameObjectRegistry),
 });
-
-// Initialize is called separately (via the initializables list)
-// Entity creation happens in SceneInitializer.Initialize:
-var worldAccessor = world.CreateAccessor(AccessorRole.Fixed);
-
-worldAccessor.AddEntity<SampleTags.Spinner>()
-    .Set(gameObjectRegistry.Register(cube.gameObject));
 ```
+
+The single entity is created from a separate `SceneInitializer`, which runs once during the init phase. Init code lives outside any system so it uses `AccessorRole.Unrestricted`:
+
+```csharp
+public void Initialize()
+{
+    var world = _world.CreateAccessor(AccessorRole.Unrestricted);
+
+    var cube = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
+    cube.name = "SpinnerCube";
+
+    world
+        .AddEntity<SampleTags.Spinner>()
+        .Set(_gameObjectRegistry.Register(cube.gameObject));
+}
+```
+
+See [World Setup](../core/world-setup.md) and [Entities](../core/entities.md).
 
 ## Concepts Introduced
 
-- **Components** are unmanaged structs implementing `IEntityComponent`
-- **Tags** are empty structs implementing `ITag` that classify entities
-- **Templates** declare which components and tags an entity has
-- **Systems** implement `ISystem` and use `[ForEachEntity]` for iteration
-- **`[ExecuteIn(SystemPhase.Presentation)]`** separates rendering from simulation
-- **`MatchByComponents`** iterates by component presence instead of tags
+- **Components** — unmanaged structs implementing `IEntityComponent`
+- **Tags** — empty structs implementing `ITag`
+- **Templates** — declare an entity's components and tags
+- **Systems** — `ISystem` + `[ForEachEntity]` for iteration
+- **`MatchByComponents`** — iterate by component presence instead of tags
+- **`[ExecuteIn(SystemPhase.Presentation)]`** — run at the display frame rate

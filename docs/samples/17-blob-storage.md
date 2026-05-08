@@ -29,18 +29,23 @@ A long-lived seeder object allocates each blob once at startup under its stable 
 ```csharp
 public class PaletteSeeder
 {
+    readonly World _world;
     SharedPtr<ColorPalette> _warm;
     SharedPtr<ColorPalette> _cool;
 
-    public void Initialize(WorldAccessor world)
+    public PaletteSeeder(World world) => _world = world;
+
+    public void Initialize()
     {
+        var world = _world.CreateAccessor(AccessorRole.Unrestricted);
         // AllocShared(stableId, blob) seeds the blob under a caller-chosen BlobId.
         _warm = world.Heap.AllocShared(PaletteIds.Warm, BuildWarm());
         _cool = world.Heap.AllocShared(PaletteIds.Cool, BuildCool());
     }
 
-    public void Dispose(WorldAccessor world)
+    public void Dispose()
     {
+        var world = _world.CreateAccessor(AccessorRole.Unrestricted);
         _warm.Dispose(world.Heap);
         _cool.Dispose(world.Heap);
     }

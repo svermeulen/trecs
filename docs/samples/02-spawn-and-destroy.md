@@ -2,7 +2,7 @@
 
 Dynamic entity creation and destruction. Spheres spawn at random positions, live for a set duration, then are removed along with their GameObjects.
 
-**Source:** `Samples/02_SpawnAndDestroy/`
+**Source:** `com.trecs.core/Samples~/Tutorials/02_SpawnAndDestroy/`
 
 ## What It Does
 
@@ -88,6 +88,6 @@ Syncs position to GameObjects each visual frame.
 
 - **Dynamic entity creation** with `AddEntity` and component initialization
 - **Entity removal** with `RemoveEntity` (deferred until submission)
-- **`World.Rng`** for deterministic random numbers
-- **Individual component parameters** — `[ForEachEntity]` receives components directly
-- **Inline cleanup** — destroying GameObjects at removal time inside the system
+- **`World.Rng`** for deterministic random numbers — see [Time & RNG](../advanced/time-and-rng.md)
+- **Individual component parameters** — `[ForEachEntity]` receives components directly. See [Queries & Iteration](../data-access/queries-and-iteration.md).
+- **Inline cleanup** — destroying GameObjects at removal time inside the system. See also [Entity Events](../entity-management/entity-events.md) for centralized cleanup via `OnRemoved`, demonstrated in [Predator Prey](04-predator-prey.md).

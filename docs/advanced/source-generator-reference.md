@@ -10,11 +10,12 @@ This page is a **cross-reference index**, not a tutorial. Each row links to the 
 
 | Attribute | Target | See |
 |---|---|---|
-| `[ForEachEntity]` | methods on `ISystem` / `IJobSystem` / event handlers | [Systems](../core/systems.md#foreachentity), [Queries & Iteration](../data-access/queries-and-iteration.md), [Entity Events](../entity-management/entity-events.md) |
+| `[ForEachEntity]` / `[ForEachEntity(typeof(Tag), …)]` | iteration methods on `ISystem` / `IJobSystem` / event handlers — auto-routes to component-iteration or aspect-iteration based on the parameter shape | [Systems](../core/systems.md#foreachentity), [Queries & Iteration](../data-access/queries-and-iteration.md), [Entity Events](../entity-management/entity-events.md) |
 | `[WrapAsJob]` | methods on `IJobSystem` | [Jobs & Burst](../performance/jobs-and-burst.md) |
-| `[FromWorld]` / `[FromWorld(Tag=…)]` / `[FromWorld(Tags=…)]` | fields on a job struct | [Advanced Job Features](advanced-jobs.md) |
+| `[FromWorld]` / `[FromWorld(typeof(Tag), …)]` / `[FromWorld(Tags=…)]` | fields on a job struct | [Advanced Job Features](advanced-jobs.md) |
 | `[PassThroughArgument]` | method parameters | [Systems](../core/systems.md), [Jobs & Burst](../performance/jobs-and-burst.md) |
-| `[SingleEntity]` | individual method parameters or job-struct fields | [Systems — SingleEntity](../core/systems.md#singleentity) |
+| `[SingleEntity]` / `[SingleEntity(typeof(Tag), …)]` | individual method parameters or job-struct fields | [Systems — SingleEntity](../core/systems.md#singleentity) |
+| `[GlobalIndex]` | `int` parameters on iteration `Execute` methods | [Advanced Job Features](advanced-jobs.md) — packed 0..N-1 index across all iterated groups |
 
 ### System lifecycle
 
@@ -31,10 +32,10 @@ This page is a **cross-reference index**, not a tutorial. Each row links to the 
 | Attribute | Target | See |
 |---|---|---|
 | `[Unwrap]` | single-field component structs | [Components — Unwrap](../core/components.md) |
-| `[VariableUpdateOnly]` | component struct | [Components](../core/components.md) |
+| `[VariableUpdateOnly]` | component field **or** template class | [Components](../core/components.md) |
 | `[Constant]` | component field | [Components](../core/components.md) |
 | `[Interpolated]` | template field | [Interpolation](interpolation.md) |
-| `[Input]` | input component field | [Input System](input-system.md) |
+| `[Input(MissingInputBehavior.…)]` | template field on an input component | [Input System](input-system.md) |
 
 ### Interpolation
 
@@ -76,9 +77,11 @@ The generator produces partial-type scaffolding for types that implement these i
 
 The full list of field types `[FromWorld]` can auto-populate is documented at [Advanced Job Features — Supported Field Types](advanced-jobs.md#supported-field-types). At a glance: native component buffers, native component lookups, native set read/write, `NativeWorldAccessor`, and `GroupIndex`.
 
-## When things go wrong
+## Diagnostics
 
-If the generator emits a diagnostic you don't recognize, the message is emitted from `DiagnosticDescriptors.cs` in the generator source. The text usually names the offending attribute or field type — look that up here and cross-reference with the feature page for the usage rules.
+The generator emits structured diagnostics in the `TRECS001`–`TRECS117` range, grouped by area: ForEach iteration, Aspect, Component, Template, AutoSystem, Iteration helper, Hook migration, Job scheduling, FromWorld, WrapAsJob / AutoJob, SingleEntity, GlobalIndex. Two analyzer-emitted codes — `TRECS110` and `TRECS111` — guard against `NativeUniquePtr` copies.
+
+If a diagnostic message isn't self-explanatory, the source of truth is `SourceGen/Trecs.SourceGen/Trecs.SourceGen/DiagnosticDescriptors.cs`. The text usually names the offending attribute or field type — cross-reference with the feature page above for the usage rules.
 
 To rebuild and reinstall the generator DLL after a contributor change:
 

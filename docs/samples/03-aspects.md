@@ -2,7 +2,7 @@
 
 Bundled component access via aspects. Instead of declaring individual component parameters, aspects group related read/write operations into a single reusable struct.
 
-**Source:** `Samples/03_Aspects/`
+**Source:** `com.trecs.core/Samples~/Tutorials/03_Aspects/`
 
 ## What It Does
 
@@ -21,7 +21,7 @@ public struct Boid : ITag { }
 
 public partial class BoidEntity : ITemplate, IHasTags<SampleTags.Boid>
 {
-    Position Position = Position.Default;
+    Position Position = default;
     Velocity Velocity;
     Speed Speed;
     GameObjectId GameObjectId;
@@ -91,7 +91,8 @@ Reads position and velocity to update the GameObject transform and face the move
 
 ## Concepts Introduced
 
-- **Aspects** — `partial struct` implementing `IAspect`, `IRead<T>`, `IWrite<T>`
-- **`[Unwrap]`** components expose their inner value type through aspect properties
-- **Multiple aspects per system** — different systems can define different aspect views over the same components
-- **Read vs Write** — `IRead<T>` provides `ref readonly`, `IWrite<T>` provides `ref`
+- **Aspects** — `partial struct` implementing `IAspect`, `IRead<T>`, `IWrite<T>`. See [Aspects](../data-access/aspects.md).
+- **`[Unwrap]`** components expose their inner value type through aspect properties. See [Components](../core/components.md).
+- **Multiple aspects per system** — different systems can define different aspect views over the same components.
+- **Read vs Write** — `IRead<T>` provides `ref readonly`, `IWrite<T>` provides `ref`.
+- **`Aspect.Query(World).MatchByComponents()`** vs **`[ForEachEntity]`** — two ways to drive iteration over an aspect. See [Queries & Iteration](../data-access/queries-and-iteration.md).

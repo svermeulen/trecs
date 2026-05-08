@@ -57,7 +57,7 @@ partial struct FlexibleJob : IJobFor
 }
 
 // Caller provides the tag at schedule time
-new FlexibleJob().ScheduleParallel(World, TagSet<GameTags.Player>.Value);
+new FlexibleJob().ScheduleParallel(accessor, TagSet<GameTags.Player>.Value);
 ```
 
 This is useful when if the tagset being operated on is not known until runtime, or if you want to reuse the same job struct for multiple tag scopes. The generated `ScheduleParallel` method will have a parameter for each `[FromWorld]` field that doesn't specify tags inline.
@@ -117,18 +117,18 @@ highlightedWrite.RemoveImmediate(entityIndex);
 
 ## External Job Tracking
 
-In the rare case where a job is scheduled manually without using the Trecs source generator (e.g., a third-party job or a custom scheduling pattern), you can register it with the world so the [dependency tracker](../performance/dependency-tracking.md) knows about them, using `TrackExternalJob`:
+In the rare case where a job is scheduled manually without using the Trecs source generator (e.g., a third-party job or a custom scheduling pattern), you can register it with the world so the [dependency tracker](../performance/dependency-tracking.md) knows about it, using `TrackExternalJob` on the system's `WorldAccessor`:
 
 ```csharp
 JobHandle handle = myJob.Schedule(count, batchSize);
 
-World.TrackExternalJob(handle)
+accessor.TrackExternalJob(handle)
     .Writes<Position>(TagSet<GameTags.Player>.Value)
     .Reads<Velocity>(TagSet<GameTags.Player>.Value);
 ```
 
-To force-complete jobs before main-thread access:
+To force-complete tracked jobs before main-thread access:
 
 ```csharp
-World.SyncMainThread<Position>(group);
+accessor.SyncMainThread<Position>(group);
 ```

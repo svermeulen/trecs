@@ -2,8 +2,8 @@
 
 There are three main approaches to filtering entities at runtime. Each has different performance characteristics and use cases.
 
-!!! tip "Start simple — partitions in particular are an optimization"
-    Branching on a component value inside a normal iteration (Approach A) is the simplest option and is fast enough for most gameplay code, so it's a fine default. **Sets** are also a legitimate design tool whenever the subset is itself something you want to name, query, count, or iterate as a first-class concept — don't hesitate to reach for them when they fit the shape of the problem. **Partitions**, on the other hand, are primarily a performance optimization for cache-friendly dense iteration over very large populations; pick them when the profiler (or population size) calls for it, not as a general way to model state.
+!!! tip "Start simple — partitions are an optimization"
+    Branching on a component value (Approach A) is fast enough for most gameplay code and a fine default. Reach for **sets** whenever the subset is itself a first-class concept you want to name, query, or iterate. **Partitions** are a cache-locality optimization for very large populations — pick them when the profiler or population size calls for it, not as a general way to model state.
 
 ## Approach A: Check Component Values
 
@@ -79,13 +79,11 @@ void Execute(in DeadEnemy enemy) { ... }
 
 ### Rules of Thumb
 
-Pick the approach that matches the shape of the problem. Component checks are the simplest default, sets are a reasonable choice whenever a subset is itself a meaningful concept, and partitions are reserved for when iteration cost actually matters.
-
-- **Simple per-iteration filtering, membership not needed elsewhere** → Component value check. No registration, no transitions, no extra memory. Just `if` inside the loop.
-- **The subset is a named concept systems want to query, iterate, or count directly** → Sets. Use them freely when they model your design well — "visible enemies", "units under player control", "entities currently selected" are all natural fits.
-- **One system needs to flag a subset for several downstream systems in the same frame** → Sets, used as per-frame scratch storage. Clear the set at the top of the producer, fill it with `AddImmediate`, and have consumers iterate the set instead of re-running the producer's filter. See [Per-Frame Staging](../entity-management/sets.md#per-frame-staging) for the full pattern (and why the immediate APIs are required here).
-- **3+ dimensions, or many categories** → Sets. Avoids combinatorial explosion of groups.
-- **Very large entity populations (thousands+) where a hot iteration shows up in the profiler** → Template partitions. The dense-array layout gives you cache-friendly iteration, but at the cost of data movement on transitions and extra groups per dimension. Treat this as a performance optimization, not a design primitive — the partition boundary should reflect a real hot path, not just a conceptual state split.
+- **Per-iteration filtering, membership not needed elsewhere** → Component value check. No registration, no transitions.
+- **The subset is a named concept systems want to query, iterate, or count** → Sets. "Visible enemies", "selected units", "poisoned entities" are natural fits.
+- **One system flags a subset for several downstream systems in the same frame** → Sets as per-frame scratch storage. Clear at the top of the producer, fill with `AddImmediate`, and let consumers iterate the set. See [Per-Frame Staging](../entity-management/sets.md#per-frame-staging).
+- **3+ dimensions, or many categories** → Sets. Avoids combinatorial group explosion.
+- **Very large populations where a hot iteration shows up in the profiler** → Template partitions. The dense-array layout buys you cache-friendly iteration at the cost of data movement on transitions and extra groups per dimension. The partition boundary should reflect a real hot path, not just a conceptual state split.
 
 ## Combinatorial Explosion
 

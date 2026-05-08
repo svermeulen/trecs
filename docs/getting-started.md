@@ -1,5 +1,7 @@
 # Getting Started
 
+This walkthrough builds a minimal Trecs setup: one entity, one component, one system that updates it every frame. About five minutes from a blank Unity project to a running tick.
+
 ## Installation
 
 Requires Unity 6000.3+.
@@ -10,11 +12,11 @@ With the [openupm-cli](https://openupm.com/):
 
 ```bash
 openupm add com.trecs.core
-# Optional: serialization features (snapshots, recording/playback, save/load)
+# Optional: snapshots, recording / playback, save / load
 openupm add com.trecs.serialization
 ```
 
-Or add manually to `Packages/manifest.json`:
+Or add the scoped registry to `Packages/manifest.json` manually:
 
 ```json
 {
@@ -34,7 +36,7 @@ Or add manually to `Packages/manifest.json`:
 
 ### Via Git URL
 
-Open **Window > Package Manager**, click **+ > Add package from git URL**, and enter:
+In **Window → Package Manager**, click **+ → Add package from git URL** and enter:
 
 ```
 https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.core
@@ -46,34 +48,38 @@ For the optional serialization package:
 https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.serialization
 ```
 
-When using git URLs, add `com.trecs.core` before `com.trecs.serialization` (Unity can't resolve versioned dependencies from git URLs).
+When using git URLs, add `com.trecs.core` first — Unity can't resolve versioned dependencies from git URLs, so the order matters.
 
-## Your First Project
+## Your First Entity
 
-This walkthrough creates a spinning cube — the "Hello World" of Trecs.
+We'll spin a value forever. The pieces are: a component (the data), a tag (the entity kind), a template (the layout), a system (the logic), and a world (the runtime).
 
-### 1. Define a Component
+### 1. Define a component
 
-Components are unmanaged structs that hold data:
+Components are unmanaged structs that hold per-entity data:
 
 ```csharp
+using Unity.Mathematics;
+
 public partial struct Rotation : IEntityComponent
 {
     public quaternion Value;
 }
 ```
 
-### 2. Define a Tag
+`partial` is required — the source generator emits a companion file with serialization, equality, and reflection hooks.
 
-Tags classify entities. Systems use tags to filter which entities they operate on:
+### 2. Define a tag
+
+Tags classify entities. They're empty marker structs used both at entity-creation time and as system query filters:
 
 ```csharp
 public struct Spinner : ITag { }
 ```
 
-### 3. Define a Template
+### 3. Define a template
 
-Templates are blueprints that declare which components and tags an entity has. The tag on the template is what you use when creating entities and querying them in systems:
+A template is the blueprint for an entity kind. It declares which tags the entity has (via `IHasTags<...>`) and which components it carries (as fields):
 
 ```csharp
 public partial class SpinnerEntity : ITemplate, IHasTags<Spinner>
@@ -82,75 +88,73 @@ public partial class SpinnerEntity : ITemplate, IHasTags<Spinner>
 }
 ```
 
-### 4. Write a System
+### 4. Write a system
 
-Systems contain the logic that operates on entities:
+A system contains the logic that runs over entities each tick. The `[ForEachEntity]` attribute tells the source generator to iterate every entity tagged with `Spinner` and call `Execute` for each:
 
 ```csharp
+using Unity.Mathematics;
+
 public partial class SpinnerSystem : ISystem
 {
     readonly float _speed;
 
-    public SpinnerSystem(float speed) 
-    { 
-      _speed = speed; 
-    }
+    public SpinnerSystem(float speed) { _speed = speed; }
 
-    [ForEachEntity(MatchByComponents = true)]
+    [ForEachEntity(typeof(Spinner))]
     void Execute(ref Rotation rotation)
     {
-        float angle = World.DeltaTime * _speed;
+        var angle = World.DeltaTime * _speed;
         rotation.Value = math.mul(rotation.Value, quaternion.RotateY(angle));
     }
 }
 ```
 
-### 5. Build the World
+`World` here is a source-generated property on the system — a [`WorldAccessor`](core/world-setup.md) scoped to whichever phase the system runs in.
 
-Wire everything together:
+### 5. Build and run
 
-```csharp
-// Build world
-var world = new WorldBuilder()
-    .AddEntityType(SpinnerEntity.Template)
-    .Build();
-
-// Add systems
-world.AddSystems(new ISystem[]
-{
-    new SpinnerSystem(speed: 2f),
-    new SpinnerGameObjectUpdater(gameObjectRegistry),
-});
-
-// Initialize (allocates groups, initializes systems)
-world.Initialize();
-
-// Create accessor
-var worldAccessor = world.CreateAccessor(AccessorRole.Fixed);
-
-// Create an entity
-worldAccessor.AddEntity<Spinner>()
-    .Set(new Rotation { Value = quaternion.identity });
-```
-
-`AddEntity<Spinner>()` takes a **tag** — Trecs matches it to `SpinnerEntity.Template` via the template's `IHasTags<Spinner>` declaration. You pass tags, not template types, when adding entities.
-
-### 6. Run the Game Loop
+Wire everything from a `MonoBehaviour`. We build the world, add the system, initialize, and spawn one entity. Then `Tick()` drives the simulation each frame.
 
 ```csharp
-void Update()
-{
-    world.Tick();
-}
+using UnityEngine;
+using Trecs;
+using Unity.Mathematics;
 
-void LateUpdate()
+public class GameLoop : MonoBehaviour
 {
-    world.LateTick();
-}
+    World _world;
 
-void OnDestroy()
-{
-    world.Dispose();
+    void Start()
+    {
+        _world = new WorldBuilder()
+            .AddEntityType(SpinnerEntity.Template)
+            .AddSystem(new SpinnerSystem(speed: 2f))
+            .Build();
+
+        _world.Initialize();
+
+        // Init-time accessor: structural changes outside a system tick.
+        var accessor = _world.CreateAccessor(AccessorRole.Unrestricted);
+        accessor.AddEntity<Spinner>()
+                .Set(new Rotation { Value = quaternion.identity });
+    }
+
+    void Update()     => _world.Tick();
+    void LateTick()   => _world.LateTick();
+    void OnDestroy()  => _world.Dispose();
 }
 ```
 
+A few things to notice:
+
+- `AddEntity<Spinner>()` takes a **tag**, not a template type. Trecs matches `Spinner` to `SpinnerEntity.Template` via the template's `IHasTags<Spinner>` declaration.
+- The init accessor uses `AccessorRole.Unrestricted` because we're outside the tick loop. Inside systems, accessors are created automatically with the right role for that phase. See [Accessor Roles](advanced/accessor-roles.md).
+- `LateTick()` is the variable-update phase that runs *after* `Tick()`. Use it for presentation systems that read sim state to drive rendering — see [Systems](core/systems.md).
+
+## Where to Next
+
+- A complete runnable version of this walkthrough lives in **`Samples~/Tutorials/01_HelloEntity`** in the `com.trecs.core` package — install it via the Package Manager *Samples* tab.
+- [Core: World Setup](core/world-setup.md) and [Systems](core/systems.md) for the full lifecycle.
+- [Aspects](data-access/aspects.md) and [Queries & Iteration](data-access/queries-and-iteration.md) once you have multiple components per entity.
+- The [Samples](samples/index.md) gallery — each one focuses on a single feature and has a companion doc.

@@ -2,7 +2,7 @@
 
 A complex simulation with multiple interacting systems and job-based processing. Fish hunt meals, grow when they eat, and shrink from starvation.
 
-**Source:** `Samples/07_FeedingFrenzy/`
+**Source:** `com.trecs.core/Samples~/Tutorials/07_FeedingFrenzy/`
 
 ## What It Does
 
@@ -207,10 +207,11 @@ This is an alternative to the formal [interpolation](09-interpolation.md) system
 
 ## Concepts Introduced
 
-- **Native Aspect Factories** for data bundling within jobs via a dynamic entity handle
-- **Complex multi-system simulation** with many interacting systems
-- **Entity population management** — dynamically adjusting fish/meal counts
-- **Bidirectional entity references** with cleanup handlers
-- **Partition transitions** between NotEating and Eating
-- **Generic Tags** NotEating and Eating tags represent dynamic states unrelated to specific entity types
-- **Visual smoothing** — separating simulation position from render position
+- **Native aspect factories** — `MealNutritionView.NativeFactory` lets a job look up another entity's components by handle inside Burst. See [Advanced Job Features](../advanced/advanced-jobs.md) and [Aspects](../data-access/aspects.md).
+- **Complex multi-system simulation** with many interacting systems.
+- **Entity population management** — dynamically adjusting fish/meal counts via [WrapAsJob] and `MaxFishChangePerFrame` throttling.
+- **Bidirectional entity references** with cleanup handlers — see [Entity Events](../entity-management/entity-events.md).
+- **Partition transitions** between NotEating and Eating — see [Partitions](06-partitions.md).
+- **Generic tags** — `NotEating` and `Eating` represent dynamic states reused across entity types.
+- **Visual smoothing** — separating simulation position (`SimPosition`, fixed) from render position (`Position`, variable). For the formal alternative, see [Interpolation](../advanced/interpolation.md) and [sample 09](09-interpolation.md).
+- **`[VariableUpdateOnly]`** components — see [Accessor Roles](../advanced/accessor-roles.md).

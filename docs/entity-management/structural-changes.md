@@ -1,22 +1,20 @@
 # Structural Changes
 
-Entity creation, removal, and partition transitions are **deferred operations** — they are queued during system execution and applied at submission boundaries.
+Add, remove, and move (re-tag) operations are **deferred** — they're queued during system execution and applied later at a submission boundary. This keeps entity indices stable during iteration and is what makes safe parallel processing possible.
 
-## Why Deferred?
-
-Applying structural changes immediately during iteration would not allow for safe concurrent processing, since this would invalidate entity indices. Instead, Trecs queues all changes and applies them in a controlled batch at the end of each update phase.
+In the examples below, `World` is the [`WorldAccessor`](../advanced/accessor-roles.md) injected into a system.
 
 ## When Submission Happens
 
-Structural changes are applied:
+`World.SubmitEntities()` (on `WorldAccessor`) drains the queues. The system runner calls it for you:
 
-1. **After each fixed update iteration** — `World.Tick()` calls `SubmitEntities()` after each fixed timestep step
-2. **At the end of `World.Tick()`** — any remaining changes are submitted
-3. **Manually** — `world.SubmitEntities()` can be called explicitly if needed
+1. **Between fixed steps** — submission runs after each fixed step within a `Tick()`.
+2. **At the end of `World.Tick()`** — any remaining changes are flushed.
+3. **Manually** — call `world.SubmitEntities()` explicitly when needed (outside system `Execute`).
 
 ## Deferred Operations
 
-### Adding Entities
+### Adding entities
 
 ```csharp
 World.AddEntity<GameTags.Bullet>()
@@ -24,9 +22,9 @@ World.AddEntity<GameTags.Bullet>()
     .Set(new Velocity(vel));
 ```
 
-The entity is buffered and added to its group at the next submission.
+The entity is buffered and joins its group on the next submission. The `EntityIndex` is not assigned until then.
 
-### Removing Entities
+### Removing entities
 
 ```csharp
 World.RemoveEntity(entityIndex);
@@ -34,28 +32,29 @@ World.RemoveEntity(entityHandle);
 World.RemoveEntitiesWithTags<GameTags.Bullet>();
 ```
 
-### Moving Entities (Partition Transitions)
+### Moving entities (partition transitions)
 
 ```csharp
+// Move to the group with these destination tags. Component data is preserved.
 World.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
 ```
 
-Moving changes the entity's tag combination, which moves it to a different group. The component data is preserved.
+The type parameters are the **destination** tag set, not the from/to pair. The entity's group changes; its component data is copied across.
 
 ## Conflict Resolution
 
-When multiple operations are queued for the same entity within a single submission, Trecs applies these rules:
+When the same entity has multiple operations queued in a single submission, Trecs resolves them with these rules:
 
-- **Remove supersedes move** — if an entity is scheduled for both removal and a move (from either the managed or native queues), the removal wins and the move is discarded.
-- **First move wins** — if multiple moves are queued for the same entity (e.g., two systems both call `MoveTo`), only the first move is applied. Subsequent moves are silently dropped.
-- **Remove is idempotent** — queuing multiple removes for the same entity is safe; only one removal is performed.
-- **Group removes cascade** — `RemoveEntitiesWithTags<T>()` cancels any queued moves for entities in matching groups (remove supersedes move).
-- **Multiple submission iterations** — if structural changes during submission trigger further changes (e.g., an [`OnAdded`](entity-events.md) handler creates more entities), Trecs runs additional submission iterations until stable, up to `WorldSettings.MaxSubmissionIterations`.
+- **Remove beats move.** If an entity has both a remove and a move queued (from either managed or native queues), the remove wins.
+- **First move wins.** If two systems both queue a move for the same entity, only the first is applied; later moves are dropped silently.
+- **Remove is idempotent.** Queuing the same remove twice is safe — only one removal happens.
+- **`RemoveEntitiesWithTags<T>()` cascades.** Queued moves into matching groups are cancelled.
+- **Cascading submission.** If an observer fires during submission and queues more changes (e.g. an `OnAdded` handler spawning a child), Trecs runs additional submission iterations until the queues drain — bounded by `WorldSettings.MaxSubmissionIterations` (default 10).
 
 !!! note
-    These rules apply at the *queue* level within a single submission. Operations across different submissions never conflict — they are fully resolved before the next one begins.
+    These rules apply within a single submission. Operations queued across separate submissions never conflict — each submission fully resolves before the next.
 
-To react to submission events, see [Entity Events — Frame Events](entity-events.md#frame-events).
+To react to submission boundaries, see [Entity Events — Frame Events](entity-events.md#frame-events).
 
 ## Deterministic Submission
 
@@ -64,14 +63,14 @@ For replay and networking, enable deterministic ordering:
 ```csharp
 var settings = new WorldSettings
 {
-    RequireDeterministicSubmission = true
+    RequireDeterministicSubmission = true,
 };
 ```
 
-This sorts structural operations by a deterministic key before applying them, ensuring identical results across runs. The performance cost is very small — just a sort of the queued operations at each submission — so it's reasonable to enable by default if your game may ever need replay or networking.
+This sorts queued structural operations before applying them, making submission order independent of job-thread interleaving. The cost is a single sort per submission — cheap enough to enable by default if you may ever record, replay, or network the simulation.
 
-When using `NativeWorldAccessor` in jobs, the `sortKey` parameter controls the ordering:
+When you queue structural changes from a Burst job through [`NativeWorldAccessor`](../performance/jobs-and-burst.md), pass a `sortKey` to control the deterministic order:
 
 ```csharp
-nativeAccessor.AddEntity<MyTag>(sortKey: entityId);
+nativeAccessor.AddEntity<MyTag>(sortKey: (uint)i);  // i = the iteration index in the job
 ```

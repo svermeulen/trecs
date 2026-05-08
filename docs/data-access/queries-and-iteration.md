@@ -1,10 +1,13 @@
 # Queries & Iteration
 
-Queries let you find and iterate over entities by their tags, components, or set membership.
+Find and iterate over entities by tag, component, or [set](../entity-management/sets.md) membership.
+
+Two entry points:
+
+- **`[ForEachEntity]`** — the source-generated, declarative form. Use this for the vast majority of system iteration. See [Systems — ForEachEntity](../core/systems.md#foreachentity).
+- **`World.Query()`** — a manual fluent builder. Use this when you need iteration logic the attribute can't express (e.g., nested queries, branching, `Single` lookups outside an iteration body).
 
 ## ForEachEntity
-
-The most common way to iterate entities is with `[ForEachEntity]` on a system method. It supports the same filtering criteria as the query builder:
 
 ```csharp
 // By tag
@@ -15,74 +18,88 @@ void Execute(ref Position position, in Velocity velocity) { ... }
 [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
 void Execute(in ActiveBall ball) { ... }
 
-// By components (matches any entity that has these components, regardless of tags)
+// By components (any group whose template declares these components, regardless of tags)
 [ForEachEntity(MatchByComponents = true)]
 void Execute(ref Position position, in Velocity velocity) { ... }
 
 // By set membership
-[ForEachEntity(Set = typeof(SampleSets.HighlightedParticle))]
+[ForEachEntity(typeof(GameTags.Particle), Set = typeof(SampleSets.Highlighted))]
 void Execute(in ParticleView particle) { ... }
 ```
 
-See [Systems](../core/systems.md#foreachentity) for full details.
+The named `Tag = typeof(...)` / `Tags = new[] { typeof(...) }` properties also work. The constructor-positional form shown above is the canonical style.
 
 ## QueryBuilder
 
-For manual iteration outside of `[ForEachEntity]`, use the query builder via `WorldAccessor.Query()`:
+`WorldAccessor.Query()` returns a fluent `QueryBuilder`. Chain filters, then call a terminator.
+
+### Filtering
 
 ```csharp
-var query = World.Query().WithTags<GameTags.Player>()
+// Tags
+World.Query().WithTags<GameTags.Player>()
+World.Query().WithTags<GameTags.Player, GameTags.Active>()
+World.Query().WithoutTags<GameTags.Dead>()
+
+// Components
+World.Query().WithComponents<Position, Velocity>()
+World.Query().WithoutComponents<Frozen>()
 ```
 
-### Filtering by Tags
+`WithTags` / `WithoutTags` and `WithComponents` / `WithoutComponents` come in 1–4-arg generic overloads. Tag and component filters can be combined — useful when a tag is shared across templates with different component layouts:
 
 ```csharp
-// Include entities with specific tags
-query.WithTags<GameTags.Player>()
-query.WithTags<GameTags.Player, GameTags.Active>()
-
-// Exclude entities with specific tags
-query.WithoutTags<GameTags.Dead>()
-```
-
-### Filtering by Components
-
-```csharp
-// Include entities that have specific components
-query.WithComponents<Position, Velocity>()
-
-// Exclude entities that have specific components
-query.WithoutComponents<Frozen>()
-```
-
-### Filtering by both Components and Tags
-
-Tag and component filters can be combined. This is useful when a tag is shared across multiple entity types that have different component layouts, and you only want to iterate entities that have specific components:
-
-```csharp
-// Only iterate Renderable entities that also have a Velocity component
+// Renderable entities that also have a Velocity component (skips static obstacles).
 var query = World.Query()
     .WithTags<CommonTags.Renderable>()
     .WithComponents<Velocity>();
 ```
 
-For example, if both `FishEntity` and `ObstacleEntity` share a `Renderable` tag but only `FishEntity` has a `Velocity` component, this query will skip obstacles and only visit fish.
+A query must have at least one filter — terminators assert otherwise.
 
-## Iteration Patterns
-
-### EntityIndices — Iterate Entity by Entity
+### Terminators
 
 ```csharp
+// Iterate entity-by-entity
 foreach (EntityIndex entityIndex in World.Query().WithTags<GameTags.Player>().EntityIndices())
 {
     ref Position pos = ref World.Component<Position>(entityIndex).Write;
     pos.Value.y += 1f;
 }
+
+// Count
+int total = World.Query().WithTags<GameTags.Enemy>().Count();
+
+// Single entity (asserts exactly one match)
+EntityAccessor player = World.Query().WithTags<GameTags.Player>().Single();
+ref Health hp = ref player.Get<Health>().Write;
+
+// Single, no-throw form
+if (World.Query().WithTags<GameTags.Player>().TrySingle(out var player))
+{
+    ref readonly Position pos = ref player.Get<Position>().Read;
+}
 ```
 
-### Aspect Queries
+Other counting helpers on `WorldAccessor`: `CountAllEntities()`, `CountEntitiesWithTags<T>()`, `CountEntitiesInGroup(GroupIndex)`.
 
-Aspects provide a generated `Query()` method for manual iteration with bundled component access:
+### Sets
+
+`InSet<T>()` filters to entities that are members of the given [set](../entity-management/sets.md). It returns a `SparseQueryBuilder` (set-filtered iteration is fundamentally sparse) — only one set can be applied per query.
+
+```csharp
+foreach (var entityIndex in World.Query()
+    .WithTags<GameTags.Particle>()
+    .InSet<HighlightedParticles>()
+    .EntityIndices())
+{
+    ...
+}
+```
+
+## Aspect queries
+
+Every [aspect](aspects.md) gets a generated `Query()` method that bundles component access into the iteration variable. Unlike the entity-index form, you read and write through the aspect's properties rather than calling `World.Component<T>(...)`.
 
 ```csharp
 partial struct PlayerView : IAspect, IRead<Position>, IWrite<Health> { }
@@ -95,56 +112,33 @@ foreach (var player in PlayerView.Query(World).WithTags<GameTags.Player>())
 ```
 
 !!! note
-    Aspect queries do **not** automatically filter by the aspect's components — you must provide filtering criteria. Either scope with `WithTags` or call `MatchByComponents()` to filter to only groups that have all the aspect's components:
-
-    ```csharp
-    // Iterates any entity that has Position and Health, regardless of tags
-    foreach (var entity in PlayerView.Query(World).MatchByComponents())
-    {
-        ...
-    }
-    ```
-
-See [Aspects](aspects.md) for details on defining aspects.
-
-### Filtering by Set
-
-Calling `InSet<T>()` filters iteration to only entities that are members of the [set](../entity-management/sets.md):
+    Aspect queries do **not** auto-filter by the aspect's declared components. Always scope with `WithTags<…>()`, `MatchByComponents()`, or `InSet<…>()`. Without one of these, the query has no group scope and asserts.
 
 ```csharp
-partial struct ParticleView : IAspect, IRead<Position>, IWrite<ColorComponent> { }
+// Match all entities that have the aspect's declared components, regardless of tags.
+foreach (var boid in Boid.Query(World).MatchByComponents()) { ... }
+```
 
-foreach (var particle in ParticleView.Query(World).InSet<HighlightedParticles>())
+`PlayerView.Query(World).WithTags<GameTags.Player>().Single()` works as well.
+
+## GlobalIndex
+
+When iteration spans multiple groups, `[GlobalIndex] int` gives each entity a unique packed index from `0` to `total − 1`. Useful for writing into a contiguous output array shared across groups.
+
+```csharp
+[ForEachEntity(typeof(GameTags.Boid))]
+void Execute(in CPosition pos, [GlobalIndex] int globalIndex)
 {
-    particle.Color = Color.yellow;
+    _outputs[globalIndex] = pos.Value;
 }
 ```
 
-### GroupSlices — Low-Level Bulk Access
+The parameter must be `int`. Job-side only — works in manual job structs and in `[WrapAsJob]`-generated jobs. See also [Advanced Job Features](../advanced/advanced-jobs.md).
 
-For advanced performance-critical scenarios, you can iterate per-group and access component buffers directly. See [Groups, GroupIndex & TagSets — GroupSlices](../advanced/groups-and-tagsets.md#groupslices) for details.
+## GroupSlices
 
-## Counting
+For performance-critical loops that need direct buffer access, iterate per group via `GroupSlices()` rather than per entity. See [Groups, GroupIndex & TagSets — GroupSlices](../advanced/groups-and-tagsets.md#groupslices).
 
-```csharp
-int total = World.CountAllEntities();
-int players = World.CountEntitiesWithTags<GameTags.Player>();
-int inGroup = World.CountEntitiesInGroup(group);
-int matched = World.Query().WithTags<GameTags.Enemy>().Count();
-```
+## Where queries are allowed
 
-## Single Entity Access
-
-For queries that should match exactly one entity:
-
-```csharp
-// Assert exactly one match
-EntityAccessor player = World.Query().WithTags<GameTags.Player>().Single();
-ref Health hp = ref player.Get<Health>().Write;
-
-// Try-pattern (returns false if 0 or 2+ matches)
-if (World.Query().WithTags<GameTags.Player>().TrySingle(out var player))
-{
-    ref readonly Position pos = ref player.Get<Position>().Read;
-}
-```
+The accessor's [role](../advanced/accessor-roles.md) determines which groups a query can resolve — Fixed-role accessors can't iterate `[VariableUpdateOnly]`-only groups, for example. The query asserts at the terminator if it would otherwise return groups the accessor isn't permitted to read.

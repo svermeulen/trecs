@@ -1,24 +1,23 @@
 # Aspects
 
-Aspects bundle related component access into a single reusable struct. Instead of declaring individual component parameters, you declare which components you read and write, and the source generator creates the access properties.
+An aspect is a `partial struct` that bundles related component access into one reusable view. You declare which components the aspect reads and writes; the source generator emits the per-component access properties.
 
-## Defining an Aspect
+## Defining an aspect
 
 ```csharp
 partial struct Boid : IAspect, IRead<Velocity, Speed>, IWrite<Position> { }
 ```
 
-This generates properties:
+This generates:
 
-- `ref readonly float3 Velocity` (read-only, unwrapped)
+- `ref readonly float3 Velocity` (read-only, unwrapped — see below)
 - `ref readonly float Speed` (read-only, unwrapped)
 - `ref float3 Position` (read-write, unwrapped)
 - `EntityIndex EntityIndex`
 
-!!! note
-    Components marked with `[Unwrap]` expose their inner field type directly (e.g., `float3` instead of `Position`). Non-unwrapped components expose the struct itself.
+A component marked `[Unwrap]` (single-field struct) exposes its inner value directly. Without `[Unwrap]`, the property exposes the component struct itself (`ref Position` instead of `ref float3`).
 
-## Using Aspects in ForEachEntity
+## Using an aspect in `[ForEachEntity]`
 
 ```csharp
 public partial class BoidMovementSystem : ISystem
@@ -33,11 +32,11 @@ public partial class BoidMovementSystem : ISystem
 }
 ```
 
-The aspect parameter is passed as `in` — the struct itself is read-only, but `IWrite` properties still provide mutable refs to the underlying components.
+The aspect is taken `in`. The struct itself is read-only, but `IWrite` properties still hand out mutable refs to the underlying components.
 
-## Multiple IRead/IWrite Interfaces
+## Multiple `IRead` / `IWrite` interfaces
 
-Each `IRead` or `IWrite` interface supports up to 8 type parameters. If you need more, stack multiple interfaces:
+`IRead` and `IWrite` come in 1- to 8-arg generic overloads. To declare more than 8, stack interfaces:
 
 ```csharp
 partial struct ComplexView : IAspect,
@@ -46,44 +45,40 @@ partial struct ComplexView : IAspect,
     IWrite<UniformScale, Damage> { }
 ```
 
-## Aspect Queries (Manual Iteration)
+## Manual aspect queries
 
-Every aspect gets a generated `Query()` method for manual iteration:
+Every aspect gets a generated `Query()` method for iteration outside `[ForEachEntity]`:
 
 ```csharp
 partial struct ParticleView : IAspect, IRead<Position>, IWrite<Lifetime> { }
 
-// Iterate with tag scope
 foreach (var particle in ParticleView.Query(World).WithTags<SampleTags.Particle>())
 {
-    float3 pos = particle.Position;
     particle.Lifetime -= World.DeltaTime;
 }
 
-// Iterate all entities that have the aspect's components (regardless of tags)
+// Or scope by the aspect's declared component types.
 foreach (var boid in Boid.Query(World).MatchByComponents())
 {
     boid.Position += World.DeltaTime * boid.Speed * boid.Velocity;
 }
 ```
 
-Aspect queries **do not auto-filter by the aspect's declared components** — you must explicitly call either `WithTags<…>()` to scope by tag, or `MatchByComponents()` to scope by the aspect's declared component types. Without one of these, the query has no group scope.
+Aspect queries **do not** auto-filter by the aspect's declared components. Always supply scope: `WithTags<…>()`, `MatchByComponents()`, or `InSet<…>()`.
 
-This is useful when you need iteration logic in `Execute()` beyond what `[ForEachEntity]` supports (e.g., iterating multiple queries at once) or if you just prefer this kind of style.
-
-## Single Entity Access
+`Single()` / `TrySingle(out …)` work too:
 
 ```csharp
-// Get aspect for a single entity from a query
 var player = PlayerView.Query(World).WithTags<GameTags.Player>().Single();
 ```
 
-## Aspects in Multiple Systems
+Use the manual form when iteration logic doesn't fit `[ForEachEntity]` — for instance, nesting one query inside another or selecting a singleton mid-`Execute`. Otherwise prefer `[ForEachEntity]`.
 
-Define aspects inside each system or share them. Since aspects are just partial structs, they can be defined wherever is most convenient:
+## Where to define aspects
+
+Aspects are just partial structs, so they can live anywhere. The convention in samples is to nest them as private `partial struct`s inside the system that uses them, since most aspects pair one-to-one with one system:
 
 ```csharp
-// Defined inside a system
 public partial class PhysicsSystem : ISystem
 {
     [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
@@ -94,63 +89,41 @@ public partial class PhysicsSystem : ISystem
 
     partial struct ActiveBall : IAspect, IWrite<Position, Velocity, RestTimer> { }
 }
-
-// Same system can have multiple aspects for different queries
-public partial class RenderSystem : ISystem
-{
-    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
-    void RenderActive(in ActiveView ball) { ... }
-
-    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
-    void RenderResting(in RestingView ball) { ... }
-
-    public void Execute()
-    {
-        RenderActive();
-        RenderResting();
-    }
-
-    partial struct ActiveView : IAspect, IRead<Position, GameObjectId> { }
-    partial struct RestingView : IAspect, IRead<Position, GameObjectId> { }
-}
 ```
 
-However, it is most common to define aspects as nested private structs inside the system that uses them, since they are typically specific to that system's logic.
+A system can declare multiple aspects, one per query.
 
-## Aspect Interfaces (Shared Contracts) — advanced
+## Aspect interfaces (advanced)
 
-Most aspects pair one-to-one with a single system, and don't need any sharing mechanism beyond C# itself. Aspect interfaces are for the rarer case where you want a helper method that works across several aspects: same shape of component access, different concrete aspect at each callsite. If you're reading this for the first time, you probably don't need it — skip on.
+For the rare case where you want a helper method that works across several aspects with the same component shape — same access surface, different concrete struct at each callsite. Most users won't need this; skip on first read.
 
-An aspect interface is a `partial interface` that extends `IAspect` and declares `IRead<>`/`IWrite<>` just like a concrete aspect struct. Any aspect struct that lists the interface in its base list inherits the declared components and implements the generated property contract.
+An aspect interface is a `partial interface` that extends `IAspect` and lists `IRead<>` / `IWrite<>` like a concrete aspect:
 
 ```csharp
-// Shared contract: anything that has a writable Position is an IPositionedBoid.
 public partial interface IPositionedBoid : IAspect, IWrite<Position> { }
 
-// Two concrete aspects that both implement the contract. Each can still declare
-// additional components; IPositionedBoid only contributes Position.
+// Two aspects that satisfy the contract, each adding its own components.
 partial struct MovementAspect : IPositionedBoid, IRead<Velocity, Speed> { }
 partial struct WrapAspect     : IPositionedBoid { }
 
-// Generic helper constrained on the aspect interface. Works on either aspect
-// above — no boxing, no virtual dispatch.
+// Generic helper — no boxing, no virtual dispatch.
 public static class BoidBounds
 {
     public static void WrapPosition<T>(in T boid, float halfSize) where T : IPositionedBoid
     {
         ref var p = ref boid.Position;
-        if (p.x > halfSize)      p.x -= halfSize * 2;
-        else if (p.x < -halfSize) p.x += halfSize * 2;
-        if (p.z > halfSize)      p.z -= halfSize * 2;
-        else if (p.z < -halfSize) p.z += halfSize * 2;
+        if (p.x >  halfSize) p.x -= halfSize * 2;
+        if (p.x < -halfSize) p.x += halfSize * 2;
+        if (p.z >  halfSize) p.z -= halfSize * 2;
+        if (p.z < -halfSize) p.z += halfSize * 2;
     }
 }
 ```
 
-**Rules:**
+Rules:
 
-- The interface must be declared `partial` — the source generator attaches a partial with the ref-returning property stubs so generic helpers compile against it.
-- The interface must list `IAspect` in its base list. That's the opt-in marker.
-- Aspect interfaces cascade: an interface can extend another aspect interface, and all `IRead<>`/`IWrite<>` types are merged into the concrete aspect. Inheritance cycles between aspect interfaces are rejected by the C# compiler itself (CS0529).
-- Iteration (`[ForEachEntity]`, `[SingleEntity]`) still requires a concrete aspect struct, not an aspect interface. Aspect interfaces are for polymorphic helpers you call *from* iteration, not as the iteration parameter itself.
+- The interface must be `partial` and list `IAspect` in its base list.
+- Aspect interfaces compose: one aspect interface can extend another, and all `IRead<>` / `IWrite<>` types are merged into the concrete aspect.
+- Iteration entry points (`[ForEachEntity]`, `[SingleEntity]`) still require a concrete aspect struct. Aspect interfaces are for polymorphic helpers you call *from* iteration, not the iteration parameter itself.
 
+See [sample 15 — Aspect Interfaces](../samples/15-aspect-interfaces.md) for a worked example.

@@ -2,18 +2,20 @@
 
 Components must be unmanaged structs, so they can't hold classes, arrays, or other managed references. The **heap** system provides pointer types that let components reference data stored outside the component buffer.
 
-## Pointer Types
+This page covers the pointer mechanics. For *which role can allocate which heap*, see [Heap Allocation Rules](heap-allocation-rules.md).
 
-| Type | Ownership | Mutability | Data Type | Burst-Safe |
+## Pointer types
+
+| Type | Ownership | Mutability | Data type | Burst-safe |
 |------|-----------|------------|-----------|------------|
 | `UniquePtr<T>` | Single owner | Mutable | Managed (`class`) | No |
 | `SharedPtr<T>` | Reference counted | Immutable | Managed (`class`) | No |
 | `NativeUniquePtr<T>` | Single owner | Mutable | Unmanaged (`struct`) | Yes |
 | `NativeSharedPtr<T>` | Reference counted | Immutable | Unmanaged (`struct`) | Yes |
 
-## Allocating Pointers
+## Allocating
 
-Access the heap via `WorldAccessor.Heap`:
+`Heap` is a property on `WorldAccessor` (so the source-generated `World` property inside an `ISystem` works directly):
 
 ```csharp
 // Managed unique pointer
@@ -29,72 +31,80 @@ NativeUniquePtr<NativeData> nativeUnique = World.Heap.AllocNativeUnique(new Nati
 NativeSharedPtr<NativeData> nativeShared = World.Heap.AllocNativeShared(new NativeData());
 ```
 
-## Reading Pointer Data
+For shared allocations that need a stable identity across runs (so clones from disk resolve to the same heap entry), use the `BlobId` overloads — see [Stable BlobIds](heap-allocation-rules.md#stable-blobids-when-init-isnt-deterministic).
+
+## Reading
+
+`Get` / `TryGet` / `Dispose` / `Clone` all accept either a `HeapAccessor` or a `WorldAccessor` directly:
 
 ```csharp
 // Managed pointers
-MyData data = unique.Get(World.Heap);
-MyData data = shared.Get(World.Heap);
+MyData data = unique.Get(World);
+MyData data = shared.Get(World);
 
-// Native pointers
-ref NativeData data = ref nativeUnique.Get(World.Heap);
-ref NativeData data = ref nativeShared.Get(World.Heap);
+// Native pointers (return refs)
+ref NativeData data = ref nativeUnique.Get(World);
+ref NativeData data = ref nativeShared.Get(World);
 
 // Safe access
-if (shared.TryGet(World.Heap, out MyData data)) { ... }
+if (shared.TryGet(World, out MyData data)) { ... }
 ```
 
-## Storing Pointers in Components
+## Storing pointers in components
 
 Pointer structs are unmanaged, so they can be stored as component fields:
 
 ```csharp
-public struct MeshReference : IEntityComponent
+public struct CMeshReference : IEntityComponent
 {
     public SharedPtr<Mesh> Mesh;
 }
 
-// Set during entity creation
-world.AddEntity<MyTag>()
-    .Set(new MeshReference { Mesh = World.Heap.AllocShared(mesh) });
+// Set during entity creation (init handler runs under Fixed-role rules)
+World.AddEntity<MyTag>()
+    .Set(new CMeshReference { Mesh = World.Heap.AllocShared(mesh) });
 
 // Read in a system
-ref readonly MeshReference meshRef = ref World.Component<MeshReference>(entity).Read;
-Mesh mesh = meshRef.Mesh.Get(World.Heap);
+ref readonly CMeshReference meshRef = ref World.Component<CMeshReference>(entity).Read;
+Mesh mesh = meshRef.Mesh.Get(World);
 ```
 
-## Shared Pointers and Reference Counting
+## Shared pointers and reference counting
 
 `SharedPtr<T>` and `NativeSharedPtr<T>` use reference counting. Multiple components can reference the same data:
 
 ```csharp
 SharedPtr<MyData> original = World.Heap.AllocShared(new MyData());
-SharedPtr<MyData> clone = original.Clone(World.Heap);  // Increments ref count
+SharedPtr<MyData> clone = original.Clone(World);  // Increments ref count
 ```
 
-## Disposing Pointers
+## Disposing
 
 Pointers must be manually disposed when no longer needed:
 
 ```csharp
-unique.Dispose(World.Heap);
-shared.Dispose(World.Heap);  // Decrements ref count, frees if zero
+unique.Dispose(World);
+shared.Dispose(World);  // Decrements ref count; frees if zero
 ```
+
+The idiomatic place to dispose entity-owned pointers is an `OnRemoved` reactive handler — see [The OnRemoved cleanup convention](heap-allocation-rules.md#cleanup-is-manual).
 
 !!! warning
     Forgetting to dispose pointers causes memory leaks. Trecs detects leaks at world shutdown in debug builds.
 
-## Pointers in Jobs
+## Pointers in jobs
 
-Use native pointer types in jobs via `NativeWorldAccessor`:
+Use native pointer types (`NativeUniquePtr<T>` / `NativeSharedPtr<T>`) in jobs and call `Get` with a `NativeWorldAccessor`:
 
 ```csharp
-ref NativeData data = ref nativeShared.Get(in nativeWorldAccessor);
+ref NativeData data = ref nativeShared.Get(in nativeWorld);
 ```
 
-## Heap Types
+`NativeUniquePtr<T>` is non-copyable — copying it inside a job is a `TRECS110` / `TRECS111` analyzer error. Pass it `ref` or move it explicitly.
 
-Under the hood, Trecs maintains several heaps:
+## Heap types
+
+Under the hood, Trecs maintains several heaps. You don't usually interact with them by name — you call the matching `Alloc…` method on `HeapAccessor`.
 
 | Heap | Lifetime | Use Case |
 |------|----------|----------|
@@ -107,4 +117,4 @@ Under the hood, Trecs maintains several heaps:
 | `FrameScopedNativeUniqueHeap` | Current fixed frame | Temporary native per-frame data |
 | `FrameScopedNativeSharedHeap` | Current fixed frame | Temporary shared native per-frame data |
 
-Frame-scoped heaps automatically clean up at the end of each fixed update — no manual disposal needed. Note that during [recording playback](recording-and-playback.md), frame-scoped data may persist longer than a single fixed frame.
+Frame-scoped heaps automatically clean up at the end of each fixed update — no manual disposal needed. They can only be allocated from `Input` or `Unrestricted` accessors (not `Fixed` or `Variable`); see [Accessor Roles](accessor-roles.md#capability-matrix).

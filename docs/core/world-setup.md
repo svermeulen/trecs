@@ -1,6 +1,6 @@
 # World Setup
 
-Every Trecs application starts by building a `World` — the container that manages all entities, components, and systems.
+Every Trecs application starts by building a `World` — the container that owns all entities, components, and systems.
 
 ## WorldBuilder
 
@@ -29,47 +29,53 @@ world.Initialize();
 
 | Method | Description |
 |--------|-------------|
+| `SetDebugName(string)` | Set a human-readable name (surfaces in editor tooling) |
 | `SetSettings(WorldSettings)` | Configure timing, determinism, and debug options |
 | `AddEntityType(Template)` | Register an entity template |
 | `AddEntityTypes(IEnumerable<Template>)` | Register multiple templates |
-| `AddSet<T>()` | Register an entity set for filtering |
-| `AddBlobStore(IBlobStore)` | Register a blob store for heap data |
+| `AddSet<T>()` | Register an [entity set](../entity-management/sets.md) |
+| `AddBlobStore(IBlobStore)` | Register a blob store for [heap](../advanced/heap.md) data |
 | `SetBlobCacheSettings(BlobCacheSettings)` | Configure blob caching |
-| `AddSystemOrderConstraint(params Type[])` | Define system execution order |
+| `AddSystem(ISystem)` / `AddSystems(IEnumerable<ISystem>)` | Register systems |
+| `AddSystemOrderConstraint(params Type[])` | Declare system execution order |
 | `Build()` | Build the world (returns `World`) |
 | `BuildAndInitialize()` | Build and immediately initialize |
 
 ### Adding Systems
 
-Systems are added to the world after `Build()` and before `Initialize()`:
+Systems can be registered on the builder or on the world directly. The two are equivalent — pick whichever fits your composition:
 
 ```csharp
+// On the builder
+new WorldBuilder()
+    .AddSystem(new PhysicsSystem())
+    .AddSystem(new RenderSystem(gameObjectRegistry))
+    .BuildAndInitialize();
+
+// On the world (between Build and Initialize)
+var world = new WorldBuilder().Build();
 world.AddSystems(new ISystem[]
 {
     new PhysicsSystem(),
     new RenderSystem(gameObjectRegistry),
 });
+world.Initialize();
 ```
 
-This is the standard pattern used throughout Trecs. Adding systems post-Build allows system constructors to receive dependencies that require a built `World` instance.
-
-| Method | Description |
-|--------|-------------|
-| `World.AddSystem(ISystem)` | Register a single system |
-| `World.AddSystems(IEnumerable<ISystem>)` | Register multiple systems |
+The post-`Build()` form is useful when system constructors depend on the built `World` instance (for example, to capture a `WorldAccessor`). Both `World.AddSystem` and `World.AddSystems` must be called before `Initialize()`.
 
 ## WorldSettings
 
 ```csharp
-// Values below are the defaults, shown here for reference. Only set the options you need to change.
+// Values below are the defaults, shown for reference. Only set what you want to change.
 var settings = new WorldSettings
 {
     // Timing
     FixedTimeStep = 1f / 60f,
-    MaxSecondsForFixedUpdatePerFrame = null,    // Cap on fixed update time per frame
+    MaxSecondsForFixedUpdatePerFrame = 1f / 3f, // Cap on fixed-update time per frame; null = uncapped
 
     // Determinism
-    RandomSeed = null,                          // Set to an integer for deterministic RNG; null uses System.Environment.TickCount
+    RandomSeed = null,                          // ulong? — set for deterministic RNG; null seeds from System.Environment.TickCount
     RequireDeterministicSubmission = false,     // Sort structural ops for replay
 
     // Startup
@@ -79,7 +85,7 @@ var settings = new WorldSettings
     TriggerRemoveEventsOnDispose = true,        // Fire removal events on world dispose
 
     // Debug warnings
-    WarnOnFixedUpdateFallingBehind = false,
+    WarnOnFixedUpdateFallingBehind = true,
     WarnOnJobSyncPoints = false,
     WarnOnUnusedTemplates = false,
 
@@ -96,21 +102,20 @@ var world = new WorldBuilder()
     .AddEntityType(...)
     .Build();
 
-// 2. Add systems (between Build and Initialize)
+// 2. Add systems (optional — can also be done on the builder)
 world.AddSystem(new FooSystem());
-world.AddSystems(new ISystem[] { ... });
 
-// 3. Initialize (allocates groups, initializes systems)
+// 3. Initialize (allocates groups, locks system list, runs OnReady hooks)
 world.Initialize();
 
-// 4. Create a WorldAccessor for interacting with the world
-var worldAccessor = world.CreateAccessor(AccessorRole.Fixed);
+// 4. (Optional) Create a standalone WorldAccessor for non-system code
+var worldAccessor = world.CreateAccessor(AccessorRole.Unrestricted);
 
 // 5. Game loop
 while (running)
 {
-    world.Tick();       // Runs input, fixed, and variable update systems
-    world.LateTick();   // Runs late variable update systems
+    world.Tick();       // EarlyPresentation → (Input + Fixed)* → Presentation
+    world.LateTick();   // LatePresentation
 }
 
 // 6. Cleanup
@@ -118,17 +123,19 @@ world.Dispose();
 ```
 
 !!! note
-    `BuildAndInitialize()` combines steps 1 and 3, skipping step 2. Use this only when no systems need to be added post-Build.
+    `BuildAndInitialize()` combines steps 1 and 3. Use it when no systems need to be added post-`Build()`.
 
 ## WorldAccessor
 
-`WorldAccessor` is the primary API for interacting with the world at runtime. Systems receive it automatically via source generation, but you can also create one manually:
+`WorldAccessor` is the primary API for interacting with the world at runtime. Systems receive one automatically via source generation; for non-system code (lifecycle hooks, debug tooling, event callbacks) create one manually:
 
 ```csharp
-var worldAccessor = world.CreateAccessor(AccessorRole.Fixed);
+var worldAccessor = world.CreateAccessor(AccessorRole.Unrestricted);
 ```
 
-`WorldAccessor` provides access to:
+The role argument controls which operations the accessor is allowed to perform — see [Accessor Roles](../advanced/accessor-roles.md) for the full matrix.
+
+`WorldAccessor` provides:
 
 - **Entity operations** — `AddEntity`, `RemoveEntity`, `MoveTo`
 - **Component access** — `Component<T>`, `GlobalComponent<T>`, `ComponentBuffer<T>`
@@ -140,4 +147,4 @@ var worldAccessor = world.CreateAccessor(AccessorRole.Fixed);
 - **Heap** — `Heap` accessor for pointer allocation
 - **Jobs** — `ToNative()` for job-safe access
 
-See individual documentation pages for details on each area.
+See the individual documentation pages for details on each area.

@@ -32,14 +32,14 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 
 ## Running the Samples
 
-Open `UnityProject/Trecs/Assets/Samples/Main.unity` in Unity 6000.3+ to run all samples. Each sample has its own composition root that builds the world and initializes the scene.
+Open `UnityProject/Trecs/Assets/Samples/Main.unity` in Unity 6000.3+ and press Play. The scene includes a `SampleCycler` that lets you switch between samples at runtime. Each sample has its own composition root that builds the world and initializes the scene.
 
 ## Sample Architecture: Bootstrap & CompositionRoot
 
 Each sample uses a simple two-class pattern to wire everything together:
 
-- **`Bootstrap`** — a MonoBehaviour that drives the Unity lifecycle. It calls the composition root's `Construct()` in `Awake()`, then forwards `Update()` → tick, `LateUpdate()` → late tick, and `OnDestroy()` → dispose.
-- **`CompositionRootBase`** — an abstract MonoBehaviour that each sample subclasses. The `Construct()` method builds the `WorldBuilder`, creates systems, and returns lists of callbacks for initialization, tick, late tick, and disposal.
+- **`Bootstrap`** — a MonoBehaviour that drives the Unity lifecycle. In `Awake()` it calls `CompositionRoot.Construct()` and runs the returned initializers; `Update()` and `LateUpdate()` invoke the tickables and late tickables; `OnDestroy()` runs the disposables.
+- **`CompositionRootBase`** — an abstract MonoBehaviour that each sample subclasses. `Construct()` builds the `WorldBuilder`, creates systems, and returns four `List<Action>` callbacks (init, tick, late tick, dispose).
 
 ```csharp
 // Simplified — each sample's composition root looks roughly like this:
@@ -66,15 +66,17 @@ public class MyCompositionRoot : CompositionRootBase
 ```
 
 !!! note
-    This pattern is just a lightweight convenience for the samples. Trecs is deliberately unopinionated about how you structure your application — it doesn't register MonoBehaviours, manage singletons, or hook into Unity's update loop automatically. In a real project, you would use whatever approach you prefer for building your object graph: a dependency injection framework (e.g., Reflex, Zenject, VContainer), plain MonoBehaviours, ScriptableObjects, or anything else. All Trecs needs is for your code to call `world.Tick()`, `world.LateTick()`, and `world.Dispose()` at the appropriate times.
+    This pattern is just a lightweight convenience for the samples. Trecs is deliberately unopinionated about how you structure your application — it doesn't register MonoBehaviours, manage singletons, or hook into Unity's update loop automatically. Use whatever you prefer: a DI framework (Reflex, Zenject, VContainer), plain MonoBehaviours, ScriptableObjects, or anything else. All Trecs needs is for your code to call `world.Tick()`, `world.LateTick()`, and `world.Dispose()` at the appropriate times.
 
 ## Shared Utilities
 
-The `Common/` directory contains utilities shared across samples:
+The `Common/` directory contains helpers shared across samples (these are sample code — not part of Trecs itself):
 
-- **GameObjectRegistry** — maps `GameObjectId` components to Unity GameObjects
-- **RendererSystem** — GPU-instanced indirect rendering for high entity counts
-- **RecordAndPlaybackController** — recording/replay with snapshot support
-- Common components, templates, tags
+- **`GameObjectRegistry`** — maps `GameObjectId` components to Unity GameObjects
+- **`RendererSystem`** — GPU-instanced indirect rendering for high entity counts
+- **`Bootstrap`** / **`CompositionRootBase`** — the lifecycle wiring described above
+- **`SampleUtil`** — primitive/material helpers
+- **`DisposeCollection`** — small `IDisposable` aggregator
+- Common components and templates (`Position`, `Rotation`, `UniformScale`, `ColorComponent`, `CommonTemplates.Renderable`, etc.)
 
-Note that the samples use some of this helper code in Common/ and that this code is not part of the Trecs library itself. So if you copy code from the samples, be sure to also copy any dependencies from Common
+If you copy code from a sample, be sure to also copy any dependencies from `Common/`.

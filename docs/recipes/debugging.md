@@ -55,10 +55,7 @@ See [Sample 10: Pointers](../samples/10-pointers.md) and [Sample 14: Native Poin
 
 ## "NativeSharedPtrResolver could not resolve blob ... created this frame and not yet flushed"
 
-You created a blob via `CreateBlob` on the main thread and then tried to resolve it inside a Burst job before the submission pipeline flushed pending adds into `_allEntries`. Either:
-
-- Let the default pipeline run (the submission boundary flushes pending ops before scheduling its own jobs), or
-- Check `heap.PendingAddCount` and call `heap.FlushPendingOperations()` yourself if you're scheduling custom jobs that consume freshly-created blobs.
+You allocated a `NativeSharedPtr` / `NativeUniquePtr` on the main thread and tried to resolve it inside a Burst job within the same frame, before the submission pipeline made it visible to the resolver. Schedule any custom job that consumes a freshly-created blob *after* the next submission boundary — the simplest fix is to enqueue the work via a system that runs after the writer rather than launching the job inline.
 
 ## Desync during recording playback
 

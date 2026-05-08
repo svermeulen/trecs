@@ -1,74 +1,77 @@
 # Dependency Tracking
 
-Trecs automatically tracks which jobs read and write which data, and ensures safe concurrent access. You never need to manually manage `JobHandle` dependencies — the framework infers them from your declared access patterns.
+Trecs tracks which jobs read and write which data and inserts the right `JobHandle` chain on your behalf. You never call `JobHandle.CombineDependencies` or pass handles between jobs — the framework infers them from the types you declare on jobs and the `.Read` / `.Write` properties you use on the main thread.
 
-## Why This Exists
+## Why this exists
 
-Unity's job system requires explicit dependency management: you must pass the right `JobHandle` to each job and chain them correctly. Trecs eliminates this burden by inferring dependencies from the types you use — `Read` vs `Write` field types in jobs, and `.Read` vs `.Write` properties on the main thread.
+Unity's job system makes dependency wiring your problem: every job needs the right input handle, and forgetting to chain them correctly leads to either race conditions or silent serialization. Trecs reads your access pattern (parameter `in`/`ref` modifiers, the native field types listed in [Jobs & Burst](jobs-and-burst.md#thread-safety-cheat-sheet)) and emits the wiring at schedule time.
 
-## The Reader/Writer Model
+## The reader/writer model
 
-Trecs uses a reader/writer locking model for each piece of data:
+Each piece of data follows a standard reader/writer rule:
 
-- **Multiple readers** can run in parallel — reading the same data concurrently is safe
-- **A writer is exclusive** — it waits for all current readers and the previous writer to complete before starting
+- **Multiple readers** run in parallel.
+- **A writer is exclusive** — it waits for all current readers and the previous writer to finish before starting.
 
-This is tracked at **per-(component, group)** granularity. A job writing `Position` for `Fish` entities does *not* block a job reading `Position` for `Player` entities, because they belong to different groups.
+Granularity is **per (component type, group)**. A job writing `Position` for `Fish` entities does *not* block a job reading `Position` for `Player` entities — they live in different groups. (See [Groups & TagSets](../advanced/groups-and-tagsets.md).)
 
-| Job A | Job B | Can run in parallel? |
-|-------|-------|---------------------|
-| Reads `Position` (Fish) | Reads `Position` (Fish) | Yes — multiple readers are safe |
-| Reads `Position` (Fish) | Writes `Position` (Player) | Yes — different groups |
-| Reads `Position` (Fish) | Writes `Position` (Fish) | No — writer waits for reader |
-| Writes `Position` (Fish) | Writes `Position` (Fish) | No — writer waits for writer |
+| Job A | Job B | Run in parallel? |
+|-------|-------|---|
+| Reads `Position` (Fish) | Reads `Position` (Fish) | Yes |
+| Reads `Position` (Fish) | Writes `Position` (Player) | Yes — different group |
+| Reads `Position` (Fish) | Writes `Position` (Fish) | No — writer waits |
+| Writes `Position` (Fish) | Writes `Position` (Fish) | No — writer waits |
 
-The same model applies to immediate operations on [sets](../entity-management/sets.md) — `NativeSetRead` and `NativeSetWrite` are tracked independently per set type. Note that deferred set operations via `WorldAccessor` or `NativeWorldAccessor` do not require synchronization, since they are applied at submission boundaries when all jobs are guaranteed complete.
+The same rule applies to [sets](../entity-management/sets.md): `NativeSetRead` / `NativeSetWrite` are tracked per set type. Deferred set ops on `WorldAccessor` / `NativeWorldAccessor` don't synchronize — they apply at submission, after every job is complete.
 
-## How Dependencies Are Declared
+## How dependencies get declared
 
-When you define a job that uses Trecs components, the source generator inspects your component access (which parameters are `ref` vs `in`, which native fields/parameters use `Read` vs `Write` types) and emits dependency wiring automatically at schedule time. The generated `ScheduleParallel` method:
+The source generator inspects each job:
 
-1. Waits on all conflicting outstanding jobs before scheduling your job
-2. Registers your job's access after scheduling, so future jobs will depend on it correctly
+- Iteration parameters: `in T` reads `T`, `ref T` writes `T`.
+- Native fields / parameters: the type itself encodes intent (`NativeComponentBufferRead<T>` vs `NativeComponentBufferWrite<T>`, etc.).
 
-This all happens automatically inside the generated method — you just call it and the rest is handled.
+The generated `ScheduleParallel` then:
 
-## Main-Thread Sync
+1. Waits on every outstanding job that conflicts with the declared access.
+2. Registers the new job so subsequent schedules see it as outstanding.
 
-When main-thread code accesses a component through `WorldAccessor`, Trecs lazily completes only the conflicting jobs before returning the reference:
+You only call the generated method — the rest is handled.
 
-- **`.Read`** — completes outstanding writers (readers can continue running)
-- **`.Write`** — completes outstanding writers *and* all readers
+## Main-thread sync
+
+Main-thread access through `WorldAccessor` lazily completes only the conflicting jobs:
+
+- **`.Read`** — completes outstanding writers (readers keep running).
+- **`.Write`** — completes outstanding writers **and** readers.
 
 ```csharp
-// This will complete any jobs currently writing to Position for this group,
-// but jobs reading Position can keep running
-ref readonly Position pos = ref world.Component<Position>(entityIndex).Read;
+// Completes jobs currently writing Position for this group;
+// jobs that only read Position keep running.
+ref readonly var pos = ref world.Component<Position>(entityIndex).Read;
 
-// This will complete any jobs reading OR writing Position for this group
-ref Position pos = ref world.Component<Position>(entityIndex).Write;
+// Completes jobs reading OR writing Position for this group.
+ref var posMut = ref world.Component<Position>(entityIndex).Write;
 ```
 
-This is why component access must all go through `WorldAccessor` — it ensures thread safety automatically without requiring you to call `Complete()` on job handles.
+That lazy sync is why you never call `JobHandle.Complete()` yourself — touching the data is the sync point.
 
 !!! tip
-    Unintentional main-thread sync points can hurt performance. If a system accesses a component on the main thread that a prior job is still writing, it forces that job to complete immediately. Structure your systems so that main-thread access and job-based access to the same components don't overlap within the same phase.
+    Unintentional main-thread access mid-phase forces the in-flight job to complete and stalls the worker threads. If a system mixes main-thread and job access on the same component, schedule jobs first and only `.Read` / `.Write` after the work for that component is done — or move the main-thread work to a different system that the scheduler can order around the job system.
 
-## Phase Boundaries
+## Phase boundaries
 
-At the boundary between [update phases](../core/systems.md#update-phases) (Input → Fixed → Variable → Late Variable), **all outstanding jobs are completed**. This acts as a full fence, guaranteeing a clean slate for the next phase.
+The five [update phases](../core/systems.md#update-phases) — `Input`, `Fixed`, `EarlyPresentation`, `Presentation`, `LatePresentation` — each end with a full job fence: every outstanding job completes before the next phase begins. So:
 
-This means:
-
-- Jobs scheduled during fixed update are guaranteed complete before variable update systems run
-- You can freely mix job-based and main-thread systems within the same phase — the dependency tracker handles ordering automatically
-- Cross-phase data access never requires manual synchronization
+- Fixed-phase jobs finish before any presentation system runs.
+- Within a phase, mix job and main-thread systems freely — the tracker orders them.
+- Cross-phase reads never need manual sync.
 
 ## Summary
 
-| Mechanism | When it happens | What it syncs |
-|-----------|----------------|---------------|
-| Job scheduling | Generated `ScheduleParallel` call | Waits on conflicting jobs, registers new access |
-| `.Read` property | Main-thread component access | Completes outstanding writers |
-| `.Write` property | Main-thread component access | Completes outstanding writers + all readers |
+| Mechanism | When | What it syncs |
+|---|---|---|
+| Generated `ScheduleParallel` | Job scheduling | Waits on conflicting jobs; registers new access |
+| `.Read` | Main-thread component access | Completes outstanding writers |
+| `.Write` | Main-thread component access | Completes outstanding writers + readers |
 | Phase boundary | Between update phases | Completes everything |

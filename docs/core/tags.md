@@ -1,6 +1,6 @@
 # Tags
 
-Tags are zero-cost markers that classify entities. They carry no data — they exist purely to categorize entities for use in templates, systems, and queries.
+Tags are zero-cost markers that classify entities. They carry no data — they exist purely to categorize entities for templates, systems, and queries.
 
 ## Defining Tags
 
@@ -60,12 +60,12 @@ See [Queries & Iteration](../data-access/queries-and-iteration.md) for the full 
 ## Tags in Queries
 
 ```csharp
-int count = world.CountEntitiesWithTags<GameTags.Player>();
-world.RemoveEntitiesWithTags<GameTags.Bullet>();
+int count = World.CountEntitiesWithTags<GameTags.Player>();
+World.RemoveEntitiesWithTags<GameTags.Bullet>();
 ```
 
 ## How Tags Affect Storage
 
-Behind the scenes, entities with the same tag combination are stored together in contiguous memory for cache-friendly iteration. This means that iterating all entities with a given tag is fast — they are packed together, and unrelated entities are skipped entirely.
+Behind the scenes, entities with the same tag combination are stored together in contiguous memory for cache-friendly iteration. Iterating all entities with a given tag is fast — they're packed together, and unrelated entities are skipped entirely.
 
-For more on the underlying storage model and low-level APIs like `TagSet`, `GroupIndex`, and `Tag<T>`, see [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).
+For the underlying storage model and the low-level `TagSet`, `GroupIndex`, and `Tag<T>` APIs, see [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).

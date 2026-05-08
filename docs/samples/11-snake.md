@@ -95,10 +95,10 @@ Every N fixed frames (controlled by `MoveTickCounter`):
 3. Advances the head one cell in the current direction
 4. Wraps around grid edges
 
-Demonstrates `World.GlobalComponent<T>()` for reading/writing global state, and `World.Frame` for tracking creation order:
+The head is pulled in via `[SingleEntity]` — a per-parameter attribute that finds the one entity matching the given tag and binds it to the aspect parameter. Global state is read via `World.GlobalComponent<T>()`, and `World.Frame` stamps each segment with its creation frame:
 
 ```csharp
-public void Execute()
+void Execute([SingleEntity(typeof(SnakeTags.SnakeHead))] in SnakeHead head)
 {
     ref var counter = ref World.GlobalComponent<MoveTickCounter>().Write;
 
@@ -110,11 +110,9 @@ public void Execute()
 
     counter.FramesUntilNextMove = _settings.FramesPerMove - 1;
 
-    var head = SnakeHead.Query(World).WithTags<SnakeTags.SnakeHead>().Single();
-
-    // Read input from global entity
+    // Read input from global entity, apply turn (reject 180° reversals)
     var requested = World.GlobalComponent<MoveInput>().Read.RequestedDirection;
-    // ... apply turn, reject 180° reversals ...
+    // ... apply turn ...
 
     // Spawn segment at head's current position, tagged with creation frame
     World.AddEntity<SnakeTags.SnakeSegment>()
@@ -122,6 +120,7 @@ public void Execute()
         .Set(new SegmentAge(World.Frame));
 
     // Advance head and wrap around grid edges
+    int size = _settings.GridSize;
     var newPos = head.GridPos + head.Direction;
     newPos.x = ((newPos.x % size) + size) % size;
     newPos.y = ((newPos.y % size) + size) % size;
@@ -167,9 +166,10 @@ See [Serialization](../advanced/serialization.md) for custom-serializer authorin
 
 ## Concepts Introduced
 
-- **`[Input(RetainCurrent)]`** — input persists across frames until replaced
+- **`[Input(RetainCurrent)]`** on a template field — input persists across frames until replaced
 - **`[ExecuteIn(SystemPhase.Input)]`** — system runs in the input phase, before fixed update
-- **`AddInput()`** — queues input from outside the ECS tick
+- **`World.AddInput`** — queues input from outside the ECS tick
+- **`[SingleEntity(typeof(Tag))]`** parameter — bind the one tagged entity directly into the `Execute` signature
 - **Grid-based gameplay** — integer positions, discrete movement
 - **FIFO entity management** — `SegmentAge` tracks creation order for oldest-first removal
 - **Deterministic recording/playback** — seeded RNG + deterministic submission

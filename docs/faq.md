@@ -8,13 +8,13 @@ The ideal use case for Trecs is a **deterministic game simulation with recording
 
 ## What's the practical entity ceiling?
 
-Trecs has been exercised in samples with 100k+ entities (see [Sample 05 — Job System](samples/05-job-system.md) and [Sample 12 — Feeding Frenzy Benchmark](samples/12-feeding-frenzy-benchmark.md)). Beyond that, the bottleneck is usually the *rendering* you're driving off entity data, not the ECS itself. Structure-of-arrays storage and per-group iteration scale well past 100k with Burst-compiled jobs.
+Trecs has been exercised in samples with 100k+ entities (see [Sample 05 — Job System](samples/05-job-system.md) and [Sample 12 — Feeding Frenzy Benchmark](samples/12-feeding-frenzy-benchmark.md)). Beyond that, the bottleneck is usually the rendering you're driving off entity data, not the ECS itself. Structure-of-arrays storage and per-group iteration scale well past 100k with Burst-compiled jobs.
 
 ## Why doesn't my aspect compile when I forget `partial`?
 
 The source generator emits the ref-returning property methods for an aspect (e.g. `ref readonly Position Position`) as a partial declaration that merges with your hand-written aspect struct. If your struct is not declared `partial`, the generator's half is rejected by the compiler and you get diagnostic `TRECS009: Aspect must be partial`.
 
-Same rule applies to `ITemplate` classes (`TRECS030`), `AutoSystem` classes (`TRECS040`), and source-generated jobs (`TRECS074`). If you see "method is not defined" on a member you know the generator emits, check that the containing type is `partial`.
+Same rule applies to `ITemplate` classes (`TRECS030`), `ISystem` classes (`TRECS040`), and source-generated jobs (`TRECS074`). If you see "method is not defined" on a member you know the generator emits, check that the containing type is `partial`.
 
 ## How do source-generated files show up in my IDE?
 
@@ -51,7 +51,7 @@ See [OOP Integration](recipes/oop-integration.md) for the boundary-crossing patt
 
 ## Is there a "debug draw" for entities?
 
-Not built in. Tools like [Deep Profiler](https://docs.unity3d.com/6000.3/Documentation/Manual/profiler-deep-profile.html) and the [Entity Debugger](https://docs.unity3d.com/6000.3/Documentation/Manual/SavingYourDebugData.html) work at the Unity level but don't know about Trecs components. A minimal viable debug tool is a `MonoBehaviour` that queries the world each frame and calls `UnityEngine.Debug.Draw*` from a variable-update system. Community contributions here are welcome.
+The [Hierarchy window](editor-windows/hierarchy.md) gives you a tree of every entity in every world along with a JSON-editable component inspector. The [Trecs Player](advanced/recording-and-playback.md) handles record / scrub / fork / loop and is the right tool for "what does the simulation look like at frame N". For ad-hoc visual probes, a `MonoBehaviour` that queries the world from a variable-update system and calls `UnityEngine.Debug.Draw*` is usually enough.
 
 ## Where do I report bugs / request features?
 

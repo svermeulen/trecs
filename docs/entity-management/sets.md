@@ -1,6 +1,6 @@
 # Sets
 
-Sets let you dynamically mark entities as belonging to a subset, without affecting how they are stored or what components they have. You can think of them like lightweight boolean flags — an entity is either in a set or it isn't — but with efficient iteration over just the members.
+A set is a lightweight membership flag for entities — an entity is either in the set or it isn't. Sets are independent of an entity's components and tags, and iteration visits only the members.
 
 ## Defining a Set
 
@@ -8,7 +8,7 @@ Sets let you dynamically mark entities as belonging to a subset, without affecti
 public struct HighlightedParticle : IEntitySet { }
 ```
 
-Optionally, you can scope a set to entities with specific tags. Adding an entity without the required tags will result in an error:
+To restrict membership to entities carrying specific tags, use the generic form. Adding an entity without those tags asserts:
 
 ```csharp
 public struct EatingFish : IEntitySet<FrenzyTags.Fish> { }
@@ -16,7 +16,7 @@ public struct EatingFish : IEntitySet<FrenzyTags.Fish> { }
 
 ## Registering Sets
 
-Sets must be registered with the world builder:
+Register each set on the `WorldBuilder`:
 
 ```csharp
 new WorldBuilder()
@@ -27,9 +27,9 @@ new WorldBuilder()
 
 ## Adding and Removing Entities
 
-### Deferred
+### Deferred (default)
 
-The standard API queues changes that take effect at the next submission. Safe to call during iteration:
+Queued during system execution; applied at the next submission. Safe during iteration:
 
 ```csharp
 World.SetAdd<HighlightedParticle>(particle.EntityIndex);
@@ -38,14 +38,14 @@ World.SetRemove<HighlightedParticle>(particle.EntityIndex);
 
 ### Immediate
 
-`AddImmediate` / `RemoveImmediate` take effect right away. These are thread-safe and can be used from both the main thread and jobs:
+`AddImmediate` / `RemoveImmediate` take effect right away. They're thread-safe — usable from the main thread or a job:
 
 ```csharp
 // Main thread
 World.Set<HighlightedParticle>().Write.AddImmediate(entityIndex);
 World.Set<HighlightedParticle>().Write.RemoveImmediate(entityIndex);
 
-// In a job (via NativeSetWrite)
+// In a Burst job, via a NativeSetWrite captured as a job field
 highlighted.AddImmediate(entityIndex);
 highlighted.RemoveImmediate(entityIndex);
 ```
@@ -79,9 +79,9 @@ int highlighted = World.Query().InSet<HighlightedParticle>().Count();
 
 ## Per-Frame Staging
 
-A useful pattern is to use a set as a **per-frame scratch list** for cross-system communication: clear it at the start of the frame, have one system populate it with entities matching some criterion, then have downstream systems iterate just those members. This avoids re-evaluating the criterion in every consumer (rendering, physics sync, audio cues, etc.).
+A common pattern is to use a set as a **per-frame scratch list**: clear it at the start of the frame, have one system populate it, then have downstream systems iterate only the members. This avoids recomputing the same predicate in every consumer (rendering, physics sync, audio cues, …).
 
-For this to work *within a single frame*, you must use the **immediate** APIs (`AddImmediate`, `RemoveImmediate`, `Clear`). The deferred `SetAdd` / `SetRemove` calls queue until the next entity submission, so any system reading the set later in the same frame would see only the previous frame's contents.
+To make this work *within a single frame*, use the **immediate** APIs (`AddImmediate`, `RemoveImmediate`, `Clear`). Deferred `SetAdd` / `SetRemove` only land at the next submission, so a downstream system in the same frame would see last frame's contents.
 
 ```csharp
 public partial class CullingSystem : ISystem
@@ -91,10 +91,8 @@ public partial class CullingSystem : ISystem
         // Cache the writer once — Set<T>().Write does a sync up front.
         var visible = World.Set<VisibleThisFrame>().Write;
 
-        // Reset the staging set at the start of the frame.
         visible.Clear();
 
-        // Populate it with whatever the camera can see.
         foreach (var r in Renderable.Query(World).WithTags<GameTags.Renderable>())
         {
             if (Frustum.Intersects(r.Bounds))
@@ -114,11 +112,11 @@ public partial class RenderSystem : ISystem
 }
 ```
 
-A few notes:
+Notes:
 
-- Trecs does not auto-clear sets between frames. If you want a fresh set each frame, do the clear yourself in the producer system before populating.
-- Cache the `SetWrite<T>` view (returned by `Set<T>().Write`) outside the loop. The accessor performs a job sync on each access; caching it does the sync once and then writes go straight to the underlying buffer.
-- From a Burst job, use `NativeSetWrite` for the same `AddImmediate` / `RemoveImmediate` semantics with thread-safe writes.
+- Sets are **not auto-cleared** between frames. Clear them yourself in the producer system if that's the contract you want.
+- Cache the `SetWrite<T>` returned by `Set<T>().Write` outside the loop. Each `.Write` access syncs outstanding job writes; caching syncs once and then writes hit the buffer directly.
+- From a Burst job, capture a `NativeSetWrite<T>` as a field for the same `AddImmediate` / `RemoveImmediate` / `Clear` operations with thread-safe writes.
 
 ## When to Use Sets vs Tags
 

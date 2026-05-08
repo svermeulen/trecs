@@ -118,7 +118,7 @@ void Execute(ref Health health, in Position pos) { ... }
 void Execute(ref Position pos, in Velocity vel) { ... }
 ```
 
-Both styles are first-class. `MatchByComponents = true` (and `Query(...).MatchByComponents()`) iterates every entity that has the requested components regardless of tags — useful for cross-cutting systems like rendering, physics sync, or debug overlays that genuinely don't care *what* an entity is, only that it has a `Position` or a `Renderable`. Tag-scoped queries are useful when the subset you want is a design-level concept rather than a component-schema coincidence.
+Both styles are first-class. `MatchByComponents = true` iterates every entity that has the requested components regardless of tags — useful for cross-cutting systems like rendering, physics sync, or debug overlays that genuinely don't care *what* an entity is, only that it has a `Position` or a `Renderable`. The hand-rolled equivalent is `Query().WithComponents<...>()`. Tag-scoped queries are useful when the subset you want is a design-level concept rather than a component-schema coincidence.
 
 In practice the extra identity axis buys you several things that matter more than they look on paper:
 

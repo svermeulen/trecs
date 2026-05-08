@@ -4,8 +4,8 @@ Trecs provides two independent mechanisms for skipping a system's `Execute()` on
 
 | | Channel disable | Paused |
 |---|---|---|
-| API | `World.SetSystemEnabled(idx, channel, bool)` | `WorldAccessor.SetSystemPaused(idx, bool)` |
-| Surface | `World` (application-side) | `WorldAccessor` (simulation-side) |
+| API | `WorldAccessor.SetSystemEnabled(idx, channel, bool)` | `WorldAccessor.SetSystemPaused(idx, bool)` |
+| Caller role | Any (typically a non-system `Unrestricted` accessor) | `Fixed` or `Unrestricted` only |
 | Snapshot / replay | **Not** included — ephemeral | **Included** — round-trips through serialization |
 | Intended for | Editor inspector, recording playback, debug menus, kill switches | Game logic that pauses systems as part of game state (UI overlay, cutscenes) |
 
@@ -24,13 +24,15 @@ public enum EnableChannel
 }
 ```
 
-Game-host / editor code calls these on the `World`:
+Game-host / editor code calls these on a `WorldAccessor` (typically a long-lived `AccessorRole.Unrestricted` accessor created via `world.CreateAccessor(AccessorRole.Unrestricted, "MyHost")`):
 
 ```csharp
-world.SetSystemEnabled(systemIndex, EnableChannel.User, false);  // disable
-world.SetSystemEnabled(systemIndex, EnableChannel.User, true);   // re-enable
-bool enabled = world.IsSystemEnabled(systemIndex, EnableChannel.User);
+accessor.SetSystemEnabled(systemIndex, EnableChannel.User, false);  // disable
+accessor.SetSystemEnabled(systemIndex, EnableChannel.User, true);   // re-enable
+bool enabled = accessor.IsSystemEnabled(systemIndex, EnableChannel.User);
 ```
+
+`SetSystemEnabled` doesn't gate on `AccessorRole`, so any accessor can call it — but in practice you'll want a non-system `Unrestricted` accessor since channel toggles are host-side concerns.
 
 Channel state defaults to "all enabled" at world init and is **not part of snapshot/restore or recording state**. Anything that sets a channel disable is responsible for re-applying it across world resets — `BundlePlayer` does this automatically when playback (re)starts.
 
@@ -50,7 +52,7 @@ Like other deterministic-state mutations, this must be called from a context tha
 
 ## Combined query
 
-For debug UIs and tests, `IsSystemEffectivelyEnabled` answers "would this system run on the next tick" — `true` iff no channel disabled and not paused:
+For debug UIs and tests, `IsSystemEffectivelyEnabled` answers "would this system run on the next tick" — `true` iff no channel disabled and not paused. Available on both `World` and `WorldAccessor`:
 
 ```csharp
 bool willRun = world.IsSystemEffectivelyEnabled(systemIndex);
@@ -58,10 +60,10 @@ bool willRun = world.IsSystemEffectivelyEnabled(systemIndex);
 
 ## Building your own grouping
 
-Trecs deliberately doesn't have a built-in `[SystemGroup]` concept. Instead, the framework exposes the per-system metadata you need to build whatever grouping makes sense for your game:
+Trecs deliberately doesn't have a built-in `[SystemGroup]` concept. Instead, the framework exposes the per-system metadata you need to build whatever grouping makes sense for your game (also available on both `World` and `WorldAccessor`):
 
 ```csharp
-int Count = world.SystemCount;
+int count = world.SystemCount;
 SystemMetadata meta = world.GetSystemMetadata(systemIndex);
 //   meta.System         — the ISystem instance
 //   meta.Phase          — Input / Fixed / Presentation / etc.
@@ -93,12 +95,18 @@ The pause overlay's UI systems aren't in the gameplay bucket, so they keep runni
 
 ## When to use which
 
-- "I want to disable some systems while a debug menu is open" → `World.SetSystemEnabled(..., EnableChannel.User, false)`.
+- "I want to disable some systems while a debug menu is open" → `accessor.SetSystemEnabled(..., EnableChannel.User, false)`.
 - "I want to silence input systems while playing back a recording" → already done by `BundlePlayer` via `EnableChannel.Playback`. Don't reimplement.
 - "I want the editor to let me toggle systems for inspection" → already wired through the [Trecs Hierarchy window](../editor-windows/hierarchy.md) via `EnableChannel.Editor`.
-- "I want gameplay to pause when a UI overlay is up, and have that pause survive a save / replay deterministically" → `WorldAccessor.SetSystemPaused`.
+- "I want gameplay to pause when a UI overlay is up, and have that pause survive a save / replay deterministically" → `accessor.SetSystemPaused` from a Fixed-update system.
 - "I want a kill switch that doesn't need to replay deterministically" → `EnableChannel.User`. It won't show up in checksums or recordings.
 
 ## Threading
 
 Both APIs are **main-thread only**. Neither is exposed on `NativeWorldAccessor`, so jobs cannot toggle systems. Reads and writes happen at main-thread sync points (between ticks, or inside a system's `Execute()`).
+
+## Related
+
+- [Accessor Roles](accessor-roles.md) — why `SetSystemPaused` requires a `Fixed`-role accessor and `SetSystemEnabled` doesn't.
+- [Recording & Playback](recording-and-playback.md) — how `BundlePlayer` uses `EnableChannel.Playback` to silence input systems automatically.
+- [Hierarchy Window](../editor-windows/hierarchy.md) — the editor surface for `EnableChannel.Editor` toggles.

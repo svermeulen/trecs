@@ -2,7 +2,7 @@
 
 Built-in partition transitions via template partitions. Entities in different partitions are stored in separate groups for cache-friendly, targeted iteration.
 
-**Source:** `Samples/06_Partitions/`
+**Source:** `com.trecs.core/Samples~/Tutorials/06_Partitions/`
 
 ## What It Does
 
@@ -118,8 +118,9 @@ public partial class BallRendererSystem : ISystem
 
 ## Concepts Introduced
 
-- **`IHasPartition`** declares valid partitions on a template
-- **`MoveTo<Tag1, Tag2>()`** transitions entities between partitions
-- **Partition-filtered iteration** — systems iterate only entities in a specific partition
-- **Group separation** — Active and Resting balls are stored in separate contiguous arrays
-- **Multiple `[ForEachEntity]` methods** — different queries in the same system, called from an explicit `Execute()`
+- **`IHasPartition`** declares valid partitions on a template. See [Templates](../core/templates.md) and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).
+- **`MoveTo<Tag1, Tag2>()`** transitions entities between partitions. See [Structural Changes](../entity-management/structural-changes.md).
+- **Partition-filtered iteration** — systems iterate only entities in a specific partition. See [Queries & Iteration](../data-access/queries-and-iteration.md).
+- **Group separation** — Active and Resting balls live in separate contiguous arrays for cache-friendly iteration.
+- **Multiple `[ForEachEntity]` methods** — different queries in the same system, called from an explicit `Execute()`. See [Systems](../core/systems.md).
+- For dynamic, overlapping membership where partitions don't fit, see [Sets](08-sets.md).

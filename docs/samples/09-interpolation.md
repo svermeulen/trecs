@@ -2,7 +2,7 @@
 
 Smooth rendering at variable frame rates despite a low fixed timestep. Side-by-side comparison of interpolated vs raw entity movement.
 
-**Source:** `Samples/09_Interpolation/`
+**Source:** `com.trecs.core/Samples~/Tutorials/09_Interpolation/`
 
 ## What It Does
 
@@ -99,43 +99,60 @@ var world = new WorldBuilder()
 
 ### Entity Creation
 
-Smooth entities use `SetInterpolated` to initialize all three components at once:
+Smooth entities use `SetInterpolated`, which initializes the current, previous, and interpolated copies of the component in one call:
 
 ```csharp
-world.AddEntity<OrbitTags.Smooth>()
-    .SetInterpolated(new Position(startPos))
-    .SetInterpolated(new Rotation(startRot))
-    .Set(new OrbitParams { ... });
+entity.SetInterpolated(new Position(position));
+entity.SetInterpolated(new Rotation(quaternion.identity));
 ```
+
+Raw entities use plain `Set` — they only have the single fixed-update component.
 
 ## Rendering
 
-The renderer reads `Interpolated<Position>` and `Interpolated<Rotation>` for smooth entities, and the raw components directly for comparison:
+The renderer uses two aspects — one that reads the interpolated wrappers and one that reads the raw components — and dispatches per partition:
 
 ```csharp
-// Smooth: reads blended values — silky smooth
-[ForEachEntity(typeof(OrbitTags.Smooth))]
-void RenderSmooth(in Interpolated<Position> pos, in Interpolated<Rotation> rot, in GameObjectId id)
+[ExecuteIn(SystemPhase.Presentation)]
+public partial class OrbitRendererSystem : ISystem
 {
-    var go = _registry.Resolve(id);
-    go.transform.SetPositionAndRotation((Vector3)pos.Value.Value, rot.Value.Value);
-}
+    public void Execute()
+    {
+        RenderSmooth();
+        RenderRaw();
+    }
 
-// Raw: reads fixed-update values directly — visibly jittery
-[ForEachEntity(typeof(OrbitTags.Raw))]
-void RenderRaw(in Position pos, in Rotation rot, in GameObjectId id)
-{
-    var go = _registry.Resolve(id);
-    go.transform.SetPositionAndRotation((Vector3)pos.Value, rot.Value);
+    [ForEachEntity(typeof(OrbitTags.Smooth))]
+    void RenderSmooth(in SmoothOrbitView view)
+    {
+        var go = _registry.Resolve(view.GameObjectId);
+        go.transform.position = (Vector3)view.InterpolatedPosition;
+        go.transform.rotation = view.InterpolatedRotation;
+    }
+
+    [ForEachEntity(typeof(OrbitTags.Raw))]
+    void RenderRaw(in RawOrbitView view)
+    {
+        var go = _registry.Resolve(view.GameObjectId);
+        go.transform.position = (Vector3)view.Position;
+        go.transform.rotation = view.Rotation;
+    }
+
+    partial struct SmoothOrbitView
+        : IAspect, IRead<Interpolated<Position>, Interpolated<Rotation>, GameObjectId> { }
+
+    partial struct RawOrbitView : IAspect, IRead<Position, Rotation, GameObjectId> { }
 }
 ```
 
+Because `Position` and `Rotation` are `[Unwrap]`, the aspect exposes `view.InterpolatedPosition` (`float3`) and `view.InterpolatedRotation` (`quaternion`) directly — no double-`.Value` indirection.
+
 ## Concepts Introduced
 
-- **`[Interpolated]`** attribute on template fields generates wrapper components
-- **`[GenerateInterpolatorSystem]`** source-generates Burst-compiled blending systems from simple static methods
-- **`GroupName`** groups related interpolators for single-call registration
-- **`SetInterpolated()`** initializes all three components (current, interpolated, previous)
-- **`Interpolated<T>`** — the blended value, read by renderers for smooth visuals
+- **`[Interpolated]`** attribute on template fields generates the `Interpolated<T>` and `InterpolatedPrevious<T>` wrapper components.
+- **`[GenerateInterpolatorSystem]`** source-generates Burst-compiled blending systems from simple static methods.
+- **`GroupName`** groups related interpolators so a single generated extension method (`AddInterpolationSampleInterpolators()`) registers them all.
+- **`SetInterpolated()`** initializes all three component copies (current, interpolated, previous).
+- **Reading via an aspect** — `IRead<Interpolated<Position>>` together with `[Unwrap]` gives clean `view.InterpolatedPosition` access.
 
-See [Interpolation](../advanced/interpolation.md) for the full reference.
+See [Interpolation](../advanced/interpolation.md) for the full reference. For an alternative pattern using a manual `SimPosition` + lerp, see [Feeding Frenzy](07-feeding-frenzy.md).

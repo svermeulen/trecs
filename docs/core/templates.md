@@ -16,11 +16,11 @@ A template is a `partial class` that:
 
 1. Implements **`ITemplate`**
 2. Declares **tags** via `IHasTags<T1, ...>`
-3. Declares **component fields** (the entity's data layout)
+3. Declares **component fields** — the entity's data layout
 
-Fields with default values provide fallback initialization. Fields without defaults must be set via `EntityInitializer.Set()`.
+Fields with default values supply fallback initialization. Fields without defaults must be set explicitly via `EntityInitializer.Set()` when the entity is created.
 
-> **Field visibility:** template fields must be declared with **no access modifier** — write `Rotation Rotation;`, not `public Rotation Rotation;`. Template fields are a config DSL read by the source generator at compile time, not an API surface, so the modifier would be misleading. The compiler enforces this with diagnostic `TRECS034`.
+> **Field visibility:** template fields must be declared with **no access modifier** — write `Rotation Rotation;`, not `public Rotation Rotation;`. Template fields are a config DSL read by the source generator at compile time, not an API surface. The compiler enforces this with diagnostic `TRECS034`.
 
 ## Tags
 
@@ -47,24 +47,24 @@ See [Tags](tags.md) for details on how tags are used.
 
 ## Templates and Tags: Who Does What
 
-Templates and tags are closely related but play distinct roles, and understanding the split is key to using Trecs idiomatically:
+Templates and tags are closely related but play distinct roles. Understanding the split is key to using Trecs idiomatically:
 
-- **A template is the concrete shape.** It declares the exact component layout an entity is spawned with, along with defaults, partitions, and which tags the entity carries. The template class is referenced when you *define* the entity kind (the partial class itself), when you *register* it with the builder (`AddEntityType(EnemyEntity.Template)`), and when other templates extend it via `IExtends<EnemyEntity>`.
-- **A tag is the identity handle that the rest of the code uses.** Systems, queries, aspects, events, and cross-entity references all refer to entities through their tags, not through their template class. `[ForEachEntity(typeof(GameTags.Enemy))]` and `World.CountEntitiesWithTags<GameTags.Enemy>()` are the normal ways to talk about "enemies" — runtime/system code should not name the template class directly. The split keeps gameplay code from depending on the concrete blueprint.
+- **A template is the concrete shape.** It declares the exact component layout an entity is spawned with — defaults, partitions, and which tags it carries. The template class is referenced when you *define* the entity kind (the partial class itself), when you *register* it with the builder (`AddEntityType(EnemyEntity.Template)`), and when other templates extend it via `IExtends<EnemyEntity>`.
+- **A tag is the identity handle the rest of the code uses.** Systems, queries, aspects, events, and cross-entity references all refer to entities through their tags, not through their template class. `[ForEachEntity(typeof(GameTags.Enemy))]` and `World.CountEntitiesWithTags<GameTags.Enemy>()` are the normal way to talk about "enemies" — runtime code should not name the template class directly.
 
-In other words, **templates describe the shape; tags are the vocabulary**. This separation is deliberate: systems stay decoupled from concrete entity definitions, so you can evolve a template (add a component, split it into two templates, change inheritance) without touching any system code, as long as the tag contract stays the same.
+**Templates describe the shape; tags are the vocabulary.** The separation lets you evolve a template (add a component, split it in two, change inheritance) without touching any system code, as long as the tag contract stays the same.
 
 ### Tags as a Proxy for Entity Type
 
-Because every template declares at least one identity tag, tags effectively act as a proxy for "entity type":
+Because every template declares at least one identity tag, tags effectively act as the proxy for "entity type":
 
-- A tag can correspond **1:1 to a concrete template** — e.g. `GameTags.Spinner` is carried only by `SpinnerEntity`, so querying by that tag is equivalent to querying that specific entity type.
-- A tag can correspond to **an abstract role shared across many templates** — e.g. a `CommonTags.Renderable` tag declared on a base template is inherited by every template that does `IExtends<Renderable>`. Querying by the role tag iterates every entity that fulfills it, regardless of which concrete template produced it. This is the closest analogue Trecs has to "interface" or "base class" polymorphism for entities.
-- A tag can also be **orthogonal state** — e.g. `Alive` / `Dead`, `Active` / `Resting` — used as partition labels or transient markers rather than identity.
+- **1:1 with a concrete template** — `GameTags.Spinner` is carried only by `SpinnerEntity`, so querying by it picks out exactly that template's entities.
+- **An abstract role shared across templates** — a `CommonTags.Renderable` tag declared on a base template is inherited by every template that does `IExtends<Renderable>`. Querying by the role tag iterates every entity that fulfills it. This is Trecs's closest analogue to "interface" or "base class" polymorphism.
+- **Orthogonal state** — markers like `Alive` / `Dead` or `Active` / `Resting`, used as partition labels or transient flags rather than identity.
 
-The pattern to internalize: **systems read tags, templates write tags.** When you introduce a new entity kind, you pick its tags (reusing role tags where it fits, adding a fresh identity tag if it's genuinely new), declare them via `IHasTags<>` / `IExtends<>`, and the rest of the codebase queries by those tags without needing to know which template produced the entity.
+The rule of thumb: **systems read tags, templates write tags.** When you introduce a new entity kind, pick its tags (reusing role tags where they fit, adding a fresh identity tag if it's genuinely new), declare them via `IHasTags<>` / `IExtends<>`, and the rest of the codebase queries by those tags.
 
-See [Tags](tags.md) for the mechanics of declaring and querying tags, and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md) for how tag combinations map to storage.
+See [Tags](tags.md) for the mechanics, and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md) for how tag combinations map to storage.
 
 ## Template Inheritance
 
@@ -198,12 +198,14 @@ void UpdateResting(in RestingBall ball)
 Creating an entity from a template:
 
 ```csharp
-world.AddEntity<SampleTags.Spinner>()
+World.AddEntity<SampleTags.Spinner>()
     .Set(new Rotation(quaternion.identity))
     .Set(new GameObjectId(42));
 ```
 
-The tag type arguments determine which template (and therefore which components) are required, based on what templates were provided via the WorldBuilder.AddEntityType method
+The tag type arguments select the template (and therefore the required components), matched against the templates registered via `WorldBuilder.AddEntityType`.
+
+See [Entities](entities.md) for the full creation API.
 
 ## Global Entity Template
 

@@ -20,7 +20,7 @@ Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours,
 ┌─────────────▼───────────────────────────┐
 │  Layer 3: ECS → Non-ECS (Output)        │
 │  Sync transforms, spawn GameObjects     │
-│  [ExecuteIn(SystemPhase.Presentation)] systems               │
+│  Presentation-phase systems             │
 └─────────────────────────────────────────┘
 ```
 
@@ -28,21 +28,30 @@ Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours,
 
 MonoBehaviours read player input and queue it into the ECS world:
 
-```csharp
-public class InputBridge : MonoBehaviour
-{
-    WorldAccessor _world;
-    EntityHandle _globalEntity;
+An equivalent shape uses an input-phase ECS system, which keeps the input read on the deterministic side of the boundary:
 
-    void Update()
+```csharp
+[ExecuteIn(SystemPhase.Input)]
+public partial class PlayerInputSystem : ISystem
+{
+    readonly WorldAccessor _world;
+    readonly EntityHandle _player;
+
+    public PlayerInputSystem(WorldAccessor world, EntityHandle player)
+    {
+        _world = world;
+        _player = player;
+    }
+
+    public void Execute()
     {
         var dir = new float2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-        _world.AddInput(_globalEntity, new MoveInput { Direction = dir });
+        _world.AddInput(_player, new MoveInput { Direction = dir });
     }
 }
 ```
 
-Use [`[ExecuteIn(SystemPhase.Input)]`](../advanced/input-system.md) systems to process queued input at the start of each fixed update.
+`Input`-phase systems are the only place [`AddInput`](../advanced/input-system.md) is allowed; they run just-in-time before each fixed step so the simulation reads a stable input snapshot.
 
 ## Layer 2: Pure ECS
 
@@ -51,10 +60,14 @@ Simulation systems contain only ECS logic — no `GameObject`, no `MonoBehaviour
 ```csharp
 public partial class MovementSystem : ISystem
 {
+    readonly WorldAccessor _world;
+
+    public MovementSystem(WorldAccessor world) => _world = world;
+
     [ForEachEntity(typeof(GameTags.Player))]
     void Execute(in PlayerView player)
     {
-        player.Position += player.Velocity * World.DeltaTime;
+        player.Position += player.Velocity * _world.FixedDeltaTime;
     }
 }
 ```
@@ -70,6 +83,8 @@ Variable-update systems sync ECS state to GameObjects:
 public partial class GameObjectSyncSystem : ISystem
 {
     readonly GameObjectRegistry _registry;
+
+    public GameObjectSyncSystem(GameObjectRegistry registry) => _registry = registry;
 
     [ForEachEntity(MatchByComponents = true)]
     void Execute(in Position pos, in Rotation rot, in GameObjectId id)

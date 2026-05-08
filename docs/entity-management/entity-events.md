@@ -1,15 +1,15 @@
 # Entity Events
 
-Entity events let you react to structural changes — when entities are added, removed, or moved between partitions. Callbacks are invoked during [submission](structural-changes.md#when-submission-happens), after the queued structural changes have been applied.
+Entity events let a service react to structural changes — when entities are added to, removed from, or moved between groups. Observer callbacks fire during [submission](structural-changes.md#when-submission-happens), after the queued change has been applied.
 
 ## Subscribing to Events
 
-The recommended pattern is to use `[ForEachEntity]` on your event callback method. The source generator handles iterating over the affected entities with proper component access:
+The recommended pattern is to mark your handler with `[ForEachEntity]` so the source generator emits the per-entity iteration with the right component access:
 
 ```csharp
 public partial class RemoveCleanupHandler : IDisposable
 {
-    readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container (see note below)
+    readonly DisposeCollection _disposables = new(); // sample helper — see note below
 
     public RemoveCleanupHandler(World world)
     {
@@ -32,14 +32,11 @@ public partial class RemoveCleanupHandler : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        _disposables.Dispose();
-    }
+    public void Dispose() => _disposables.Dispose();
 }
 ```
 
-The `[ForEachEntity]` attribute generates the iteration code — your callback receives component access for each affected entity, just like in a system.
+Components read inside `OnRemoved` are still valid — removed entities are parked at the end of the backing array (past the active count) until submission finishes, so the buffers haven't been recycled yet.
 
 ## Event Types
 
@@ -91,81 +88,71 @@ public partial class CleanupHandlers : IDisposable
 
 ## Disposing Subscriptions
 
-The `OnRemoved`, `OnAdded`, and `OnMoved` methods return an `IDisposable` that you can use to clean up the subscription when it's no longer needed.
+The chain returned by `EntitiesWithTags` / `EntitiesWithComponents` / `InGroup` / `AllEntities` is an `EntityEventsSubscription` (which implements `IDisposable`). Disposing it unregisters every observer on the chain (`OnAdded`, `OnRemoved`, `OnMoved`).
 
 ```csharp
-IDisposable sub = World.Events.OnSubmission(() => { ... });
-sub.Dispose();
+var sub = World.Events
+    .EntitiesWithTags<GameTags.Bullet>()
+    .OnRemoved(OnBulletRemoved);
+// ...
+sub.Dispose();  // unsubscribes
 ```
 
-Note that Trecs does not include a `DisposeCollection` type — you can use a simple wrapper like the one in the samples, or any `IDisposable` container of your choice.  Or just a `List<IDisposable>` and call `Dispose` on each item in `Dispose()`.
+`OnSubmission`, `OnFixedUpdateStarted`, etc. return a plain `IDisposable` for the same purpose.
+
+Trecs doesn't ship a `DisposeCollection` type. The samples define a small helper, but a plain `List<IDisposable>` you walk in `Dispose()` works fine too.
 
 ## Scoping Events
 
-Events can be scoped to specific groups:
-
 ```csharp
-// By tags
+// By a single tag
 World.Events.EntitiesWithTags<GameTags.Player>()
 
 // By multiple tags
 World.Events.EntitiesWithTags<GameTags.Player, GameTags.Active>()
 
-// By components
+// By component presence (groups whose template declares this component)
 World.Events.EntitiesWithComponents<Health>()
 
-// By specific group
-World.Events.InGroup(specificGroup)
+// By a specific group
+World.Events.InGroup(group)
 
-// All groups
+// All entities
 World.Events.AllEntities()
+```
+
+Call `WithPriority(int)` before `OnAdded` / `OnRemoved` / `OnMoved` to control firing order across observers on the same group:
+
+```csharp
+World.Events
+    .EntitiesWithTags<GameTags.Bullet>()
+    .WithPriority(10)
+    .OnRemoved(OnBulletRemoved);
 ```
 
 ## Cascading Structural Changes from Callbacks
 
-Observer callbacks may themselves queue more structural changes — e.g. an `OnRemoved` handler that removes a follower entity, or an `OnAdded` handler that spawns a child. Trecs handles cascades **iteratively, not recursively**:
+A callback can itself queue structural changes — e.g. an `OnRemoved` handler that removes a follower, or an `OnAdded` handler that spawns a child. Trecs cascades **iteratively, not recursively**:
 
-- Each submission "iteration" snapshots the queued operations, applies them, and fires the matching observers. Any new ops queued from those callbacks land in a fresh buffer and get processed in the *next* iteration of the same `SubmitEntities()` call.
-- This continues until the queues drain, bounded by [`WorldSettings.MaxSubmissionIterations`](structural-changes.md#conflict-resolution) (default 10). Hitting the cap throws `"possible circular submission detected"` in `DEBUG` builds, which usually means an observer is producing changes that re-trigger itself indefinitely.
-- Because cascading is iterative, callback ordering across iterations is fully deterministic: each iteration walks groups and observers in the same fixed order, and native (Burst-queued) operations are sorted at the boundary when [`RequireDeterministicSubmission`](structural-changes.md#deterministic-submission) is enabled.
-- Calling `world.SubmitEntities()` from inside a callback is **not** allowed — it asserts on a re-entrancy guard. Just queue the structural change and let the running submission cascade pick it up.
+- Each submission iteration snapshots the queued ops, applies them, and fires the matching observers. New ops queued from those callbacks land in a fresh buffer and are picked up in the *next* iteration of the same `SubmitEntities()` call.
+- The cascade continues until the queues drain, bounded by `WorldSettings.MaxSubmissionIterations` (default 10). Hitting the cap throws `"possible circular submission detected"` in `DEBUG` builds — usually a sign that an observer is feeding itself.
+- Order is deterministic across iterations: each iteration walks groups and observers in the same fixed order, and native (Burst-queued) ops are sorted at the boundary when [`RequireDeterministicSubmission`](structural-changes.md#deterministic-submission) is enabled.
+- **Don't call `world.SubmitEntities()` from inside a callback** — the re-entrancy guard asserts. Just queue the change and let the running submission pick it up.
 
-The [strict-accessor-during-Fixed-execute rule](../advanced/accessor-roles.md#strict-accessor-during-fixed-execute-rule) does **not** apply inside observer callbacks: the rule short-circuits whenever no `Fixed`-role system is currently inside its `Execute`, and submission runs *between* system executes. Callbacks may therefore use a separately-created service accessor — this is what enables patterns like the [pointer-cleanup `OnRemoved` sample](../samples/10-pointers.md), where a service holds its own `AccessorRole.Fixed` accessor and reads components from the cleanup callback.
+The [strict-accessor-during-Fixed-execute rule](../advanced/accessor-roles.md#strict-accessor-during-fixed-execute-rule) does **not** apply inside observer callbacks: submission runs *between* system executes, so a service can use its own `AccessorRole.Fixed` accessor from the callback. The [pointer cleanup sample](../samples/10-pointers.md) relies on this.
 
 ## Frame Events
 
-Subscribe to simulation lifecycle events:
+Lifecycle hooks for the simulation loop:
 
 ```csharp
-World.Events.OnSubmissionStarted(() =>
-{
-    // Submission is about to begin
-});
-
-World.Events.OnSubmission(() =>
-{
-    // All structural changes applied
-});
-
-World.Events.OnFixedUpdateStarted(() =>
-{
-    // Fixed update phase is beginning
-});
-
-World.Events.OnFixedUpdateCompleted(() =>
-{
-    // Fixed update phase is complete
-});
-
-World.Events.OnVariableUpdateStarted(() =>
-{
-    // Variable update phase is beginning
-});
-
-World.Events.OnPostApplyInputs(() =>
-{
-    // Inputs have been applied for this fixed step —
-    // runs inside the fixed phase, before systems execute
-});
+World.Events.OnFixedUpdateStarted(() => { /* fixed phase begins */ });
+World.Events.OnPostApplyInputs(() =>     { /* inputs applied — inside the fixed step, before systems */ });
+World.Events.OnSubmissionStarted(() =>   { /* submission about to run */ });
+World.Events.OnSubmission(() =>          { /* submission finished — all changes applied */ });
+World.Events.OnFixedUpdateCompleted(() => { /* all fixed steps complete */ });
+World.Events.OnVariableUpdateStarted(() => { /* variable phase begins */ });
 ```
+
+Each returns `IDisposable`; call `.Dispose()` to unsubscribe. Each method also has a `(Action, int priority)` overload for ordering. There's also `OnDeserializeCompleted` for reacting to a snapshot/recording load.
 

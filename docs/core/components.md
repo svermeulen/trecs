@@ -5,7 +5,7 @@ Components are plain data containers attached to entities. In Trecs, components 
 ## Defining Components
 
 ```csharp
-public struct Health : IEntityComponent
+public partial struct Health : IEntityComponent
 {
     public float Current;
     public float Max;
@@ -14,8 +14,9 @@ public struct Health : IEntityComponent
 
 Every component must:
 
-1. Be an **unmanaged struct** (no reference types, strings, or arrays)
-2. Implement **`IEntityComponent`**
+1. Be a **`partial struct`** so the source generator can extend it
+2. Be **unmanaged** (no reference types, strings, or managed arrays)
+3. Implement **`IEntityComponent`**
 
 ### The `[Unwrap]` Shorthand
 
@@ -43,28 +44,28 @@ With `[Unwrap]`, aspect properties return `float3` and `float` directly instead 
 
 ```csharp
 // Read
-ref readonly Position pos = ref world.Component<Position>(entityIndex).Read;
+ref readonly Health hp = ref World.Component<Health>(entityIndex).Read;
 
 // Write
-ref Position pos = ref world.Component<Position>(entityIndex).Write;
-pos.Current -= damage;
+ref Health hp = ref World.Component<Health>(entityIndex).Write;
+hp.Current -= damage;
 
 // Via EntityAccessor
-var entity = entityIndex.ToEntity(world);
+var entity = entityIndex.ToEntity(World);
 ref Health hp = ref entity.Get<Health>().Write;
 
 // Safe access (check if component exists)
-if (world.TryComponent<Health>(entityIndex, out var healthAccessor))
+if (World.TryComponent<Health>(entityIndex, out var healthAccessor))
 {
     ref readonly Health hp = ref healthAccessor.Read;
 }
 ```
 
-Accessing via Read/Write properties allows Trecs to lazily complete any jobs with conflicting access before providing the reference. See [Dependency Tracking](../performance/dependency-tracking.md) for details on how this works.
+Going through `Read`/`Write` lets Trecs lazily complete any in-flight jobs with conflicting access before handing back the reference. See [Dependency Tracking](../performance/dependency-tracking.md) for the details.
 
 ## Component Field Attributes
 
-When declaring components in a [template](templates.md), fields can be annotated with attributes that control their update behavior:
+When declaring components in a [template](templates.md), fields can be annotated to control their update behavior:
 
 ```csharp
 public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
@@ -99,12 +100,12 @@ public partial class PlayerEntity : ITemplate, IHasTags<PlayerTag>
 Every world has a single **global entity** for storing world-wide state. Access it via `GlobalComponent<T>()`:
 
 ```csharp
-// Read global component
-ref readonly Score score = ref world.GlobalComponent<Score>().Read;
+// Read
+ref readonly Score score = ref World.GlobalComponent<Score>().Read;
 
-// Write global component
-ref Score score = ref world.GlobalComponent<Score>().Write;
+// Write
+ref Score score = ref World.GlobalComponent<Score>().Write;
 score.Value += 10;
 ```
 
-To define which components the global entity has, see [Global Entity Template](templates.md#global-entity-template).
+To declare which components the global entity has, see [Global Entity Template](templates.md#global-entity-template).

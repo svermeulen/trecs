@@ -21,8 +21,8 @@ Groups are created **implicitly** from tag combinations. You never create groups
 
 ```csharp
 // These two entities belong to different groups:
-world.AddEntity<GameTags.Player>();                // group: {Player}
-world.AddEntity<GameTags.Player, GameTags.VIP>();  // group: {Player, VIP}
+accessor.AddEntity<GameTags.Player>();                // group: {Player}
+accessor.AddEntity<GameTags.Player, GameTags.VIP>();  // group: {Player, VIP}
 ```
 
 Each unique tag combination maps to exactly one group. Entities in the same group share the same component layout and are stored contiguously in memory.
@@ -56,10 +56,10 @@ Rule of thumb: if you're going to **store** the handle (in a component, on disk,
 ### Dense GroupSlices
 
 ```csharp
-foreach (var slice in World.Query().WithTags<GameTags.Player>().GroupSlices())
+foreach (var slice in accessor.Query().WithTags<GameTags.Player>().GroupSlices())
 {
-    var positions = World.ComponentBuffer<Position>(slice.GroupIndex);
-    var velocities = World.ComponentBuffer<Velocity>(slice.GroupIndex);
+    var positions = accessor.ComponentBuffer<Position>(slice.GroupIndex).Write;
+    var velocities = accessor.ComponentBuffer<Velocity>(slice.GroupIndex).Read;
 
     for (int i = 0; i < slice.Count; i++)
     {
@@ -68,14 +68,16 @@ foreach (var slice in World.Query().WithTags<GameTags.Player>().GroupSlices())
 }
 ```
 
+`ComponentBuffer<T>(group)` returns a `ComponentBufferAccessor<T>` — use its `.Read` or `.Write` property to get the concrete native buffer (`NativeComponentBufferRead<T>` / `NativeComponentBufferWrite<T>`). The choice is what registers the access with the [dependency tracker](../performance/dependency-tracking.md).
+
 ### Sparse GroupSlices (Set Members)
 
 When querying with `InSet<T>()`, iteration is sparse — only set members are visited:
 
 ```csharp
-foreach (var slice in World.Query().InSet<HighlightedParticles>().GroupSlices())
+foreach (var slice in accessor.Query().InSet<HighlightedParticles>().GroupSlices())
 {
-    var colors = World.ComponentBuffer<ColorComponent>(slice.GroupIndex);
+    var colors = accessor.ComponentBuffer<ColorComponent>(slice.GroupIndex).Write;
 
     foreach (int idx in slice.Indices)
     {
@@ -116,9 +118,9 @@ GroupIndex playerGroup = worldInfo.GetSingleGroupWithTags(TagSet<GameTags.Player
 // Null check
 if (playerGroup.IsNull) { /* no group registered for this tag combination */ }
 
-// Use with per-group APIs
-var positions = World.ComponentBuffer<Position>(playerGroup);
-int count = World.CountEntitiesInGroup(playerGroup);
+// Use with per-group APIs (on a WorldAccessor)
+var positions = accessor.ComponentBuffer<Position>(playerGroup).Read;
+int count = accessor.CountEntitiesInGroup(playerGroup);
 ```
 
 `GroupIndex` values are assigned sequentially during `WorldBuilder.Build()` and are stable for the lifetime of a `World`. They are **not** stable across runs — don't store them on disk. Persist the `TagSet` instead and resolve back to a `GroupIndex` after load.
@@ -126,7 +128,7 @@ int count = World.CountEntitiesInGroup(playerGroup);
 `EntityIndex` carries a `GroupIndex` directly:
 
 ```csharp
-EntityIndex idx = handle.ToIndex(World);
+EntityIndex idx = handle.ToIndex(accessor);
 GroupIndex group = idx.GroupIndex;
 int indexInGroup = idx.Index;
 ```
@@ -134,7 +136,7 @@ int indexInGroup = idx.Index;
 Event callbacks also receive `GroupIndex`:
 
 ```csharp
-World.Events.EntitiesWithTags<GameTags.Enemy>()
+accessor.Events.EntitiesWithTags<GameTags.Enemy>()
     .OnRemoved((GroupIndex group, EntityRange indices) => { ... });
 ```
 

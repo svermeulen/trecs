@@ -2,7 +2,7 @@
 
 Dynamic entity subsets with overlapping membership. Unlike partitions (which are mutually exclusive), sets allow an entity to belong to multiple subsets simultaneously.
 
-**Source:** `Samples/08_Sets/`
+**Source:** `com.trecs.core/Samples~/Tutorials/08_Sets/`
 
 ## What It Does
 
@@ -114,8 +114,8 @@ The drawback is that sets are sparse and may have slower iteration than partitio
 
 ## Concepts Introduced
 
-- **`IEntitySet`** — defines a sparse entity subset
-- **`SetAdd` / `SetRemove`** — deferred membership changes
-- **`[ForEachEntity(Set = typeof(...))]`** — iterate only set members
-- **Overlapping membership** — entities can be in multiple sets
-- **Sets vs Partitions trade-off** — sets avoid combinatorial explosion
+- **`IEntitySet`** — defines a sparse entity subset. See [Sets](../entity-management/sets.md).
+- **`SetAdd` / `SetRemove`** — deferred membership changes. See [Structural Changes](../entity-management/structural-changes.md).
+- **`[ForEachEntity(Set = typeof(...))]`** — iterate only set members. See [Queries & Iteration](../data-access/queries-and-iteration.md).
+- **Overlapping membership** — entities can be in multiple sets simultaneously.
+- **Sets vs Partitions trade-off** — see [Partitions](06-partitions.md) for the mutually-exclusive alternative, and [Entity Subset Patterns](../recipes/entity-subset-patterns.md) for how to choose.

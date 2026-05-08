@@ -2,7 +2,7 @@
 
 Parallel entity processing with Unity's job system and Burst compiler. Shows both main-thread and job-based approaches side by side.
 
-**Source:** `Samples/05_JobSystem/`
+**Source:** `com.trecs.core/Samples~/Tutorials/05_JobSystem/`
 
 ## What It Does
 
@@ -113,33 +113,37 @@ The generated `ExecuteAsJob()` method resolves groups, wires up [dependency trac
 
 ### ParticleSpawnerSystem — Job-Based Entity Creation
 
-When spawning entities inside jobs, entity handles must be reserved on the main thread beforehand. This is because multiple job threads may create entities in parallel, and without pre-reserved handles, the assigned IDs would depend on thread scheduling order. Reserving handles upfront guarantees deterministic IDs, which is important because the handles can be used immediately inside the job (e.g., to set up cross-entity references).
+When spawning entities inside jobs, entity handles must be reserved on the main thread beforehand. Without pre-reserved handles, the IDs assigned by parallel threads would depend on scheduling order — non-deterministic. Pre-reserving also lets the job use the handles immediately to set up cross-entity references.
 
 ```csharp
-// Reserve handles on main thread
-var handles = World.ReserveEntityHandles(count, Allocator.TempJob);
+// Reserve handles on the main thread
+var reservedRefs = World.ReserveEntityHandles(count, Allocator.TempJob);
 
-// Schedule spawn job
-new SpawnJob
+var jobHandle = new SpawnParticleJob
 {
-    ReservedHandles = handles,
+    ReservedRefs = reservedRefs,
+    Tags = TagSet<SampleTags.Particle>.Value,
     // ...
-}.Schedule(count, 64);
+}.ScheduleParallel(World, count);
+
+reservedRefs.Dispose(jobHandle);
 ```
 
-Inside the job:
+Inside the job, the matching `AddEntity` overload takes the pre-built `TagSet`, a sort key, and the reserved handle:
 
 ```csharp
-nativeWorld.AddEntity<SampleTags.Particle>(
-    sortKey: (uint)index,
-    reservedRef: reservedHandles[index])
-    .Set(new Position(pos))
-    .Set(new Velocity(vel));
+World
+    .AddEntity(Tags, (uint)i, ReservedRefs[i])
+    .Set(new Position(position))
+    .Set(new Velocity(velocity));
 ```
+
+The sort key controls the deterministic post-submission order of entities created in parallel.
 
 ## Concepts Introduced
 
-- **`[WrapAsJob]`** — source generator creates the parallel burst compiled iteration
-- **`NativeWorldAccessor`** for structural operations in jobs
-- **`ReserveEntityHandles`** for pre-allocating stable handles before parallel creation
-- **Sort keys** for deterministic ordering of job-created entities
+- **`[WrapAsJob]`** — source generator creates a parallel Burst-compiled iteration. See [Jobs & Burst](../performance/jobs-and-burst.md).
+- **`NativeWorldAccessor`** for structural operations and reads inside jobs. See [Advanced Job Features](../advanced/advanced-jobs.md).
+- **`ReserveEntityHandles`** for pre-allocating stable handles before parallel creation.
+- **Sort keys** for deterministic ordering of job-created entities. See [Structural Changes](../entity-management/structural-changes.md).
+- **`[FromWorld]`** / **`[PassThroughArgument]`** — wire job parameters from the world or from outer scope. See [Advanced Job Features](../advanced/advanced-jobs.md).
