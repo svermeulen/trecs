@@ -303,7 +303,7 @@ namespace Trecs
             get { return _debugName; }
         }
 
-        public int Id { get; private set; }
+        public int Id { get; }
 
         public WorldInfo WorldInfo
         {

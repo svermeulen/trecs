@@ -36,6 +36,12 @@ namespace Trecs.Serialization
         /// </summary>
         public int ChecksumFrameInterval = 30;
 
+        /// <summary>
+        /// User-defined schema version stamped onto saved bundles. Trecs does
+        /// not interpret this; it's surfaced as <see cref="BundleHeader.Version"/>
+        /// so callers can decide whether a saved bundle is compatible with the
+        /// current world schema.
+        /// </summary>
         public int Version = 1;
 
         /// <summary>

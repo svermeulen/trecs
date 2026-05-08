@@ -67,7 +67,7 @@ namespace Trecs.Serialization
     /// the header in the wire format.
     /// </summary>
     [TypeId(423917628)]
-    public class BundleHeader
+    public sealed class BundleHeader
     {
         /// <summary>
         /// User-defined schema version. Trecs does not interpret this; it is

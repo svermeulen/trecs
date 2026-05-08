@@ -731,9 +731,9 @@ namespace Trecs.Serialization
             }
 
             // Reconstruct the in-memory anchor list: initial snapshot at the
-            // head, then trailing anchors. The bundle's anchor list is a step-2
-            // simplification — every captured snapshot is a persisted anchor.
-            // Step 3 separates persisted anchors from a transient scrub cache.
+            // head, then trailing anchors. Persisted anchors and the transient
+            // scrub cache are kept separate (anchors survive Save/Load; the
+            // scrub cache is rebuilt per session).
             var loadedAnchors = new List<BundleAnchor>(bundle.Anchors.Count + 1)
             {
                 new BundleAnchor
