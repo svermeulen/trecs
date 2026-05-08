@@ -28,9 +28,7 @@ namespace Trecs.Samples.Partitions
         {
             var gameObjectRegistry = new GameObjectRegistry();
 
-            var world = new WorldBuilder()
-                .AddTemplate(SampleTemplates.BallEntity.Template)
-                .Build();
+            var world = new WorldBuilder().AddTemplate(SampleTemplates.BallEntity.Template).Build();
 
             world.AddSystems(
                 new ISystem[]

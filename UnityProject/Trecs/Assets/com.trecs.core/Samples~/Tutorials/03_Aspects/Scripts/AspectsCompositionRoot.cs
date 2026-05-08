@@ -18,9 +18,7 @@ namespace Trecs.Samples.Aspects
         {
             var gameObjectRegistry = new GameObjectRegistry();
 
-            var world = new WorldBuilder()
-                .AddTemplate(SampleTemplates.BoidEntity.Template)
-                .Build();
+            var world = new WorldBuilder().AddTemplate(SampleTemplates.BoidEntity.Template).Build();
 
             world.AddSystems(
                 new ISystem[]
