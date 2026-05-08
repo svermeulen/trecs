@@ -640,6 +640,19 @@ namespace Trecs.SourceGen
                         );
                         return null;
                     }
+                    if (paramType.SpecialType != SpecialType.System_Int32)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.GlobalIndexParamMustBeInt,
+                                p.GetLocation(),
+                                p.Identifier.Text,
+                                method.Identifier.Text,
+                                paramType.ToDisplayString()
+                            )
+                        );
+                        return null;
+                    }
                     hasGlobalIndex = true;
                     paramSlots.Add(ComponentsParam.GlobalIndexParam(p.Identifier.Text));
                     continue;

@@ -75,5 +75,6 @@ TRECS113 | Trecs | Error | [SingleEntity] parameter has wrong modifier
 TRECS114 | Trecs | Error | [SingleEntity] requires inline Tag or Tags
 TRECS115 | Trecs | Error | [SingleEntity] conflicts with [FromWorld] or [PassThroughArgument]
 TRECS116 | Trecs | Warning | [SingleEntity] write-aspect field on a parallel job needs [NativeDisableParallelForRestriction]
+TRECS117 | Trecs | Error | [GlobalIndex] parameter must be int
 TRECS996 | Trecs | Error | Source generation error
 TRECS999 | Trecs | Error | Source generation error

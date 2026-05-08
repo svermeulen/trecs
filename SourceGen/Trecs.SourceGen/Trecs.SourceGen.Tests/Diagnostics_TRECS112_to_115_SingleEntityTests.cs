@@ -197,6 +197,67 @@ public class Diagnostics_TRECS112_to_115_SingleEntityTests
         );
     }
 
+    [Test]
+    public void TRECS117_GlobalIndexParamMustBeInt_OnManualJobStruct()
+    {
+        // [GlobalIndex] on a manual job struct's iteration Execute parameter
+        // must be int — the source generator emits a packed int counter; any
+        // other type produces a confusing downstream compile failure. Catch
+        // it with a proper diagnostic instead.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct EnemyTag : Trecs.ITag { }
+
+                public partial struct MyJob : Unity.Jobs.IJobFor
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(EnemyTag))]
+                    public void Execute(ref CPos pos, [Trecs.GlobalIndex] float idx) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS117",
+            new IIncrementalGenerator[] { new JobGenerator(), new EntityComponentGenerator() }
+        );
+    }
+
+    [Test]
+    public void TRECS117_GlobalIndexParamMustBeInt_OnWrapAsJobMethod()
+    {
+        // Same rule for the [WrapAsJob] surface (AutoJobGenerator path).
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct EnemyTag : Trecs.ITag { }
+
+                public partial class MySystem : Trecs.ISystem
+                {
+                    public void Execute() { }
+
+                    [Trecs.ForEachEntity(Tag = typeof(EnemyTag))]
+                    [Trecs.WrapAsJob]
+                    static void Process(ref CPos pos, [Trecs.GlobalIndex] long idx) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS117",
+            new IIncrementalGenerator[]
+            {
+                new AutoJobGenerator(),
+                new AutoSystemGenerator(),
+                new EntityComponentGenerator(),
+            }
+        );
+    }
+
     static void AssertDiagnostic(
         string source,
         string expectedId,

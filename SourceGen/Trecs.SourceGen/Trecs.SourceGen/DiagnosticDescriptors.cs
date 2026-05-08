@@ -685,6 +685,15 @@ namespace Trecs.SourceGen
                 isEnabledByDefault: true
             );
 
+        public static readonly DiagnosticDescriptor GlobalIndexParamMustBeInt = new(
+            id: "TRECS117",
+            title: "[GlobalIndex] parameter must be int",
+            messageFormat: "Parameter '{0}' on '{1}' is marked [GlobalIndex] but its type is '{2}'. The packed query index is always an int — change the parameter type to int.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
         public static readonly DiagnosticDescriptor UnhandledSourceGenError = new(
             id: "TRECS999",
             title: "Source generation error",

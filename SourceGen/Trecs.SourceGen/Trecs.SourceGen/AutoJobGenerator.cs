@@ -264,6 +264,19 @@ namespace Trecs.SourceGen
                         );
                         return null;
                     }
+                    if (paramType.SpecialType != SpecialType.System_Int32)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.GlobalIndexParamMustBeInt,
+                                param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
+                                paramName,
+                                methodName,
+                                paramType.ToDisplayString()
+                            )
+                        );
+                        return null;
+                    }
                     hasGlobalIndex = true;
                     paramSlots.Add(AutoJobParam.GlobalIndex(paramName));
                     continue;
