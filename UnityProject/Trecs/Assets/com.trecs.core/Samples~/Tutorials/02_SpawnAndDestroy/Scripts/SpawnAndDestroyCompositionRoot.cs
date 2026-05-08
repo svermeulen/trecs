@@ -21,7 +21,7 @@ namespace Trecs.Samples.SpawnAndDestroy
             var gameObjectRegistry = new GameObjectRegistry();
 
             var world = new WorldBuilder()
-                .AddEntityType(SampleTemplates.SphereEntity.Template)
+                .AddTemplate(SampleTemplates.SphereEntity.Template)
                 .Build();
 
             world.AddSystems(

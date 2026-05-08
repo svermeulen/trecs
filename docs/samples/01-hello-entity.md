@@ -94,7 +94,7 @@ The composition root builds the world, registers the systems, and hands callback
 
 ```csharp
 var world = new WorldBuilder()
-    .AddEntityType(SampleTemplates.SpinnerEntity.Template)
+    .AddTemplate(SampleTemplates.SpinnerEntity.Template)
     .Build();
 
 world.AddSystems(new ISystem[]

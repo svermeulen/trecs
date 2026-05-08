@@ -128,7 +128,7 @@ public class GameLoop : MonoBehaviour
     void Start()
     {
         _world = new WorldBuilder()
-            .AddEntityType(SpinnerEntity.Template)
+            .AddTemplate(SpinnerEntity.Template)
             .AddSystem(new SpinnerSystem(speed: 2f))
             .Build();
 

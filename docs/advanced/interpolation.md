@@ -66,7 +66,7 @@ The source generator creates an extension method named `Add{GroupName}` that reg
 
 ```csharp
 var world = new WorldBuilder()
-    .AddEntityType(SmoothEntity.Template)
+    .AddTemplate(SmoothEntity.Template)
     .AddMyGameInterpolators()  // Generated — registers all interpolators in the group
     .Build();
 ```

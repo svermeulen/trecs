@@ -27,7 +27,7 @@ namespace Trecs.Serialization.Samples.Snake
                         RequireDeterministicSubmission = true,
                     }
                 )
-                .AddEntityTypes(
+                .AddTemplates(
                     new[]
                     {
                         SnakeTemplates.SnakeGlobals.Template,

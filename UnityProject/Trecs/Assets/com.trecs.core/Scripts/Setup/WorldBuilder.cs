@@ -61,7 +61,7 @@ namespace Trecs
         /// directly — base templates used via <c>IExtends</c> are discovered
         /// automatically and should not be registered here.
         /// </summary>
-        public WorldBuilder AddEntityType(Template template)
+        public WorldBuilder AddTemplate(Template template)
         {
             Require.That(template != null, "template must not be null");
             _templates.Add(template);
@@ -95,12 +95,12 @@ namespace Trecs
         /// <summary>
         /// Registers multiple concrete entity types with the world.
         /// </summary>
-        public WorldBuilder AddEntityTypes(IEnumerable<Template> templates)
+        public WorldBuilder AddTemplates(IEnumerable<Template> templates)
         {
             Require.That(templates != null, "templates must not be null");
             foreach (var template in templates)
             {
-                AddEntityType(template);
+                AddTemplate(template);
             }
             return this;
         }

@@ -49,7 +49,7 @@ public partial class MovementSystem : ISystem
 
 // 5. Build and run the world
 var world = new WorldBuilder()
-    .AddEntityType(PlayerEntity.Template)
+    .AddTemplate(PlayerEntity.Template)
     .AddSystem(new MovementSystem())
     .Build();
 

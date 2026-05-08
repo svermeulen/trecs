@@ -29,7 +29,7 @@ namespace Trecs.Serialization.Samples.SaveGame
                         RequireDeterministicSubmission = true,
                     }
                 )
-                .AddEntityTypes(
+                .AddTemplates(
                     new[]
                     {
                         SaveGameTemplates.SaveGameGlobals.Template,

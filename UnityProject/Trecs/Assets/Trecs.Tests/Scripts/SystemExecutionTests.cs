@@ -127,8 +127,8 @@ namespace Trecs.Tests
         {
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
-                .AddEntityType(TestTemplates.SimpleAlpha)
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(TestTemplates.SimpleAlpha)
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             var world = builder.Build();

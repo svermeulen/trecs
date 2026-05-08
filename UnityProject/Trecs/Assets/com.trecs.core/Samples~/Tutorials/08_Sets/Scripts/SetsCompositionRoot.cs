@@ -26,7 +26,7 @@ namespace Trecs.Samples.Sets
             var gameObjectRegistry = new GameObjectRegistry();
 
             var world = new WorldBuilder()
-                .AddEntityType(SampleTemplates.ParticleEntity.Template)
+                .AddTemplate(SampleTemplates.ParticleEntity.Template)
                 .AddSet<SampleSets.WaveX>()
                 .AddSet<SampleSets.WaveZ>()
                 .Build();

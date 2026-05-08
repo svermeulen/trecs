@@ -88,7 +88,7 @@ The generated extension method `AddInterpolationSampleInterpolators()` registers
 
 ```csharp
 var world = new WorldBuilder()
-    .AddEntityTypes(new[]
+    .AddTemplates(new[]
     {
         SampleTemplates.SmoothOrbitEntity.Template,
         SampleTemplates.RawOrbitEntity.Template,

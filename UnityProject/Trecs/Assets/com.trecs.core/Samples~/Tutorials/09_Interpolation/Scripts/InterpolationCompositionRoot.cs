@@ -47,7 +47,7 @@ namespace Trecs.Samples.Interpolation
                         FixedTimeStep = 0.1f, // 10 Hz
                     }
                 )
-                .AddEntityTypes(
+                .AddTemplates(
                     new[]
                     {
                         SampleTemplates.SmoothOrbitEntity.Template,

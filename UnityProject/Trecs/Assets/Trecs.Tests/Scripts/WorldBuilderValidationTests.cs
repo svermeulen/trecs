@@ -22,9 +22,9 @@ namespace Trecs.Tests
             {
                 new WorldBuilder()
                     .SetSettings(new WorldSettings())
-                    .AddEntityType(TrecsTemplates.Globals.Template)
-                    .AddEntityType(template)
-                    .AddEntityType(template)
+                    .AddTemplate(TrecsTemplates.Globals.Template)
+                    .AddTemplate(template)
+                    .AddTemplate(template)
                     .AddBlobStore(EcsTestHelper.CreateBlobStore())
                     .BuildAndInitialize()
                     .Dispose();
@@ -40,7 +40,7 @@ namespace Trecs.Tests
         {
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
+                .AddTemplate(TrecsTemplates.Globals.Template)
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             using var world = builder.BuildAndInitialize();
@@ -101,8 +101,8 @@ namespace Trecs.Tests
         {
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
-                .AddEntityType(TestTemplates.SimpleAlpha)
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(TestTemplates.SimpleAlpha)
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             var world = builder.Build();

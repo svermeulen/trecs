@@ -61,7 +61,7 @@ public partial class MovementSystem : ISystem
 
 // Step 5: Define, initialize, and run the world
 var world = new WorldBuilder()
-    .AddEntityType(PlayerEntity.Template)
+    .AddTemplate(PlayerEntity.Template)
     .Build();
 
 world.AddSystem(new MovementSystem());

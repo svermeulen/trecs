@@ -55,7 +55,7 @@ namespace Trecs.Samples.FeedingFrenzy101
             // ─── World setup ────────────────────────────────────────
             var world = new WorldBuilder()
                 .SetSettings(new WorldSettings { RandomSeed = 42 })
-                .AddEntityTypes(
+                .AddTemplates(
                     new[]
                     {
                         SampleTemplates.Globals.Template,

@@ -317,7 +317,7 @@ public class GameLoop : MonoBehaviour
     void Start()
     {
         _world = new WorldBuilder()
-            .AddEntityType(PlayerEntity.Template)
+            .AddTemplate(PlayerEntity.Template)
             .AddSystem(new MovementSystem())
             .BuildAndInitialize();
     }

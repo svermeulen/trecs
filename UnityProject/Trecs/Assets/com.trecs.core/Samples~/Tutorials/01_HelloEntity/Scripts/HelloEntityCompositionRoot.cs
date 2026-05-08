@@ -21,7 +21,7 @@ namespace Trecs.Samples.HelloEntity
             var gameObjectRegistry = new GameObjectRegistry();
 
             var world = new WorldBuilder()
-                .AddEntityType(SampleTemplates.SpinnerEntity.Template)
+                .AddTemplate(SampleTemplates.SpinnerEntity.Template)
                 .Build();
 
             world.AddSystems(

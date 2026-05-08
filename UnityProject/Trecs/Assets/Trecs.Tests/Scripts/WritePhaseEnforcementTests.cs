@@ -584,8 +584,8 @@ namespace Trecs.Tests
         {
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
-                .AddEntityType(MakeTemplate())
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(MakeTemplate())
                 .AddSet<WritePhaseTestSet>()
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 

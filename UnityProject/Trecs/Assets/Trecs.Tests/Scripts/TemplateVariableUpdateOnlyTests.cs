@@ -190,8 +190,8 @@ namespace Trecs.Tests
         {
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
-                .AddEntityType(MakeVuoTemplate())
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(MakeVuoTemplate())
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             var world = builder.Build();
@@ -251,8 +251,8 @@ namespace Trecs.Tests
         {
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
-                .AddEntityType(MakeVuoTemplate())
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(MakeVuoTemplate())
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             return builder.BuildAndInitialize();
@@ -377,8 +377,8 @@ namespace Trecs.Tests
             // explicitly rejected with "Found X as a base type of Y".
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
-                .AddEntityType(childTemplate)
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(childTemplate)
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             var world = builder.Build();
@@ -399,8 +399,8 @@ namespace Trecs.Tests
             // the snapshot path explicitly.
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
-                .AddEntityType(MakeVuoTemplate())
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(MakeVuoTemplate())
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             using var env = new TestEnvironment(builder.BuildAndInitialize());
@@ -460,8 +460,8 @@ namespace Trecs.Tests
             // caller error at restore time.
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
-                .AddEntityType(MakeVuoTemplate())
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(MakeVuoTemplate())
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             using var env = new TestEnvironment(builder.BuildAndInitialize());
@@ -505,8 +505,8 @@ namespace Trecs.Tests
             // ever inverts, this test catches it.
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
-                .AddEntityType(MakeVuoTemplate())
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(MakeVuoTemplate())
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             using var env = new TestEnvironment(builder.BuildAndInitialize());

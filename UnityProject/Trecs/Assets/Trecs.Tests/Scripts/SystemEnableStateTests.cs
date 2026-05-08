@@ -37,7 +37,7 @@ namespace Trecs.Tests
         {
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddEntityType(TrecsTemplates.Globals.Template)
+                .AddTemplate(TrecsTemplates.Globals.Template)
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             var world = builder.Build();

@@ -108,12 +108,12 @@ namespace Trecs.Tests
 
             var builder = new WorldBuilder()
                 .SetSettings(settings)
-                .AddEntityType(globalsTemplate)
+                .AddTemplate(globalsTemplate)
                 .AddBlobStore(CreateBlobStore());
 
             foreach (var template in templates)
             {
-                builder.AddEntityType(template);
+                builder.AddTemplate(template);
             }
 
             configure?.Invoke(builder);

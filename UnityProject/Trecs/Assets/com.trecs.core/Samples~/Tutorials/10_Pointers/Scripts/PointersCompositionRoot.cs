@@ -44,7 +44,7 @@ namespace Trecs.Samples.Pointers
 
             var world = new WorldBuilder()
                 .SetSettings(new WorldSettings { RandomSeed = 42 })
-                .AddEntityType(SampleTemplates.PatrolFollowerEntity.Template)
+                .AddTemplate(SampleTemplates.PatrolFollowerEntity.Template)
                 .AddBlobStore(blobStore)
                 .Build();
 

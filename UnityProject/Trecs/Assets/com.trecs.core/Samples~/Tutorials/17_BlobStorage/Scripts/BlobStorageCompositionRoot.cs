@@ -22,7 +22,7 @@ namespace Trecs.Samples.BlobStorage
             );
 
             var world = new WorldBuilder()
-                .AddEntityType(SampleTemplates.SwatchEntity.Template)
+                .AddTemplate(SampleTemplates.SwatchEntity.Template)
                 .AddBlobStore(blobStore)
                 .Build();
 

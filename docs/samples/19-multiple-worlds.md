@@ -50,7 +50,7 @@ The interesting part — building two worlds in one `Construct()`:
 ```csharp
 _worldA = new WorldBuilder()
     .SetDebugName("World A — Red Spheres")
-    .AddEntityType(SampleTemplates.CritterEntity.Template)
+    .AddTemplate(SampleTemplates.CritterEntity.Template)
     .Build();
 
 _worldA.AddSystems(new ISystem[]
@@ -64,7 +64,7 @@ _worldA.AddSystems(new ISystem[]
 
 _worldB = new WorldBuilder()
     .SetDebugName("World B — Blue Cubes")
-    .AddEntityType(SampleTemplates.CritterEntity.Template)
+    .AddTemplate(SampleTemplates.CritterEntity.Template)
     .Build();
 
 _worldB.AddSystems(new ISystem[]

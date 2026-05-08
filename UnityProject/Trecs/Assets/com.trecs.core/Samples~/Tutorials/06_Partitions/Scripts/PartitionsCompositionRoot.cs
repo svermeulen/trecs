@@ -29,7 +29,7 @@ namespace Trecs.Samples.Partitions
             var gameObjectRegistry = new GameObjectRegistry();
 
             var world = new WorldBuilder()
-                .AddEntityType(SampleTemplates.BallEntity.Template)
+                .AddTemplate(SampleTemplates.BallEntity.Template)
                 .Build();
 
             world.AddSystems(

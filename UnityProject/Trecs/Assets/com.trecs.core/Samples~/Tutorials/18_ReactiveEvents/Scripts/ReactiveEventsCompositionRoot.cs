@@ -21,7 +21,7 @@ namespace Trecs.Samples.ReactiveEvents
             var registry = new GameObjectRegistry();
 
             var world = new WorldBuilder()
-                .AddEntityTypes(
+                .AddTemplates(
                     new[]
                     {
                         SampleTemplates.Globals.Template,

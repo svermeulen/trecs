@@ -57,7 +57,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                         RequireDeterministicSubmission = config.Deterministic,
                     }
                 )
-                .AddEntityTypes(GetTemplates(config));
+                .AddTemplates(GetTemplates(config));
 
             if (config.SubsetApproach == FrenzySubsetApproach.Sets)
             {

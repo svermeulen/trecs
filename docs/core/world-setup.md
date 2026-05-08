@@ -13,7 +13,7 @@ var world = new WorldBuilder()
         FixedTimeStep = 1f / 60f,
         RandomSeed = 42,
     })
-    .AddEntityType(SampleTemplates.SpinnerEntity.Template)
+    .AddTemplate(SampleTemplates.SpinnerEntity.Template)
     .Build();
 
 world.AddSystems(new ISystem[]
@@ -31,8 +31,8 @@ world.Initialize();
 |--------|-------------|
 | `SetDebugName(string)` | Set a human-readable name (surfaces in editor tooling) |
 | `SetSettings(WorldSettings)` | Configure timing, determinism, and debug options |
-| `AddEntityType(Template)` | Register an entity template |
-| `AddEntityTypes(IEnumerable<Template>)` | Register multiple templates |
+| `AddTemplate(Template)` | Register an entity template |
+| `AddTemplates(IEnumerable<Template>)` | Register multiple templates |
 | `AddSet<T>()` | Register an [entity set](../entity-management/sets.md) |
 | `AddBlobStore(IBlobStore)` | Register a blob store for [heap](../advanced/heap.md) data |
 | `SetBlobCacheSettings(BlobCacheSettings)` | Configure blob caching |
@@ -99,7 +99,7 @@ var settings = new WorldSettings
 ```csharp
 // 1. Build
 var world = new WorldBuilder()
-    .AddEntityType(...)
+    .AddTemplate(...)
     .Build();
 
 // 2. Add systems (optional — can also be done on the builder)

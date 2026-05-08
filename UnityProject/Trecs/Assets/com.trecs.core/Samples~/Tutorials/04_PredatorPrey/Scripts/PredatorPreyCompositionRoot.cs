@@ -19,7 +19,7 @@ namespace Trecs.Samples.PredatorPrey
             var gameObjectRegistry = new GameObjectRegistry();
 
             var world = new WorldBuilder()
-                .AddEntityTypes(
+                .AddTemplates(
                     new[]
                     {
                         SampleTemplates.PredatorEntity.Template,

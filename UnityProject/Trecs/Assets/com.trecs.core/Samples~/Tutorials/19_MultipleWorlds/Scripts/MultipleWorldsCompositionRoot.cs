@@ -33,7 +33,7 @@ namespace Trecs.Samples.MultipleWorlds
 
             _worldA = new WorldBuilder()
                 .SetDebugName("World A — Red Spheres")
-                .AddEntityType(SampleTemplates.CritterEntity.Template)
+                .AddTemplate(SampleTemplates.CritterEntity.Template)
                 .Build();
 
             _worldA.AddSystems(
@@ -55,7 +55,7 @@ namespace Trecs.Samples.MultipleWorlds
 
             _worldB = new WorldBuilder()
                 .SetDebugName("World B — Blue Cubes")
-                .AddEntityType(SampleTemplates.CritterEntity.Template)
+                .AddTemplate(SampleTemplates.CritterEntity.Template)
                 .Build();
 
             _worldB.AddSystems(

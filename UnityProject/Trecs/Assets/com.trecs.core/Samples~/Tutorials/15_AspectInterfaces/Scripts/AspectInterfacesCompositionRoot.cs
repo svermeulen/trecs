@@ -19,8 +19,8 @@ namespace Trecs.Samples.AspectInterfaces
             var gameObjectRegistry = new GameObjectRegistry();
 
             var world = new WorldBuilder()
-                .AddEntityType(SampleTemplates.EnemyEntity.Template)
-                .AddEntityType(SampleTemplates.BossEntity.Template)
+                .AddTemplate(SampleTemplates.EnemyEntity.Template)
+                .AddTemplate(SampleTemplates.BossEntity.Template)
                 .Build();
 
             world.AddSystems(

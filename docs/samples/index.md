@@ -52,7 +52,7 @@ public class MyCompositionRoot : CompositionRootBase
         out List<Action> disposables)
     {
         var world = new WorldBuilder()
-            .AddEntityType(MyEntity.Template)
+            .AddTemplate(MyEntity.Template)
             .Build();
 
         world.AddSystems(new ISystem[] { new MySystem() });

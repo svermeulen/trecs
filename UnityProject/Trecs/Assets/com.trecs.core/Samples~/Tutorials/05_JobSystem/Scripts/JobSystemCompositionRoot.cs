@@ -39,7 +39,7 @@ namespace Trecs.Samples.JobSystem
             );
 
             var world = new WorldBuilder()
-                .AddEntityTypes(
+                .AddTemplates(
                     new[]
                     {
                         SampleTemplates.Globals.Template,
