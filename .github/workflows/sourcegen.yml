@@ -2,7 +2,7 @@ name: Source Generator
 
 on:
   push:
-    branches: [main, 'sverm/**']
+    branches: [main, 'dev/v*']
   pull_request:
     branches: [main]
 
