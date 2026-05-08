@@ -1,6 +1,6 @@
 {
   "name": "com.trecs.core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Trecs (Template-based Reproducible ECS) — Deterministic, template-first Entity Component System for Unity with native memory, Burst-compatible jobs, source-generated aspects, and group-based state management.",
   "dependencies": {
     "com.svkj.unity.core": "<local>"

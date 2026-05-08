@@ -26,8 +26,8 @@ Or add manually to `Packages/manifest.json`:
     }
   ],
   "dependencies": {
-    "com.trecs.core": "0.1.0",
-    "com.trecs.serialization": "0.1.0"
+    "com.trecs.core": "0.2.0",
+    "com.trecs.serialization": "0.2.0"
   }
 }
 ```
