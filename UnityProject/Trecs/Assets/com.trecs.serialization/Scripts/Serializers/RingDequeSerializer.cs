@@ -37,7 +37,7 @@ namespace Trecs.Serialization
 
         public void Serialize(in RingDeque<T> value, ISerializationWriter writer)
         {
-            writer.Write("count", value.Count);
+            writer.Write("count", value.Length);
 
             foreach (var item in value)
             {

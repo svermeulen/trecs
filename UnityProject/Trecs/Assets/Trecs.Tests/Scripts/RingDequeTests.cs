@@ -14,16 +14,16 @@ namespace Trecs.Tests
         public void TestMisc()
         {
             var buffer = new RingDeque<int>(5);
-            Assert.AreEqual(0, buffer.Count);
+            Assert.AreEqual(0, buffer.Length);
             buffer.PushBack(1);
-            Assert.AreEqual(1, buffer.Count);
+            Assert.AreEqual(1, buffer.Length);
             buffer.PushBack(2);
             Assert.AreEqual(1, buffer.PeekFront());
             Assert.AreEqual(1, buffer.PopFront());
             Assert.AreEqual(2, buffer.PeekFront());
             buffer.PushBack(3);
             Assert.AreEqual(2, buffer.PeekFront());
-            Assert.AreEqual(2, buffer.Count);
+            Assert.AreEqual(2, buffer.Length);
         }
 
         [Test]
@@ -43,7 +43,7 @@ namespace Trecs.Tests
             buffer.PushBack(2);
             buffer.PushBack(3);
             buffer.PushBack(4);
-            Assert.AreEqual(4, buffer.Count);
+            Assert.AreEqual(4, buffer.Length);
             Assert.AreEqual(6, buffer.Capacity);
             Assert.AreEqual(1, buffer[0]);
             Assert.AreEqual(2, buffer[1]);
@@ -96,7 +96,7 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 1000; i++)
             {
-                if (buffer.Count > 0 && random.Next(4) == 0) // 25% chance to pop
+                if (buffer.Length > 0 && random.Next(4) == 0) // 25% chance to pop
                 {
                     Assert.AreEqual(expectedValues[0], buffer.PeekFront());
                     int poppedValue = buffer.PopFront();
@@ -114,8 +114,8 @@ namespace Trecs.Tests
                 }
             }
 
-            Assert.AreEqual(expectedValues.Count, buffer.Count);
-            for (int i = 0; i < buffer.Count; i++)
+            Assert.AreEqual(expectedValues.Count, buffer.Length);
+            for (int i = 0; i < buffer.Length; i++)
             {
                 Assert.AreEqual(expectedValues[i], buffer[i]);
             }
@@ -170,7 +170,7 @@ namespace Trecs.Tests
             buffer.PushBack(3);
 
             buffer.Clear();
-            Assert.AreEqual(0, buffer.Count);
+            Assert.AreEqual(0, buffer.Length);
             Assert.That(!buffer.Contains(1));
         }
 

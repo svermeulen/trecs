@@ -42,7 +42,7 @@ namespace Trecs.Internal // not part of public api atm
             _version = 0;
         }
 
-        public int Count => _count;
+        public int Length => _count;
         public int Capacity => _buffer.Length;
         public bool IsEmpty => _count == 0;
 
