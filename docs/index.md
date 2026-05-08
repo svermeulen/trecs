@@ -8,12 +8,12 @@ A high-performance Entity Component System framework for Unity, designed for det
 - **Burst & Jobs** — First-class support for Unity's job system and Burst compiler, with automatic dependency tracking based on declared component access.
 - **Source generation** — Roslyn-powered code generation eliminates boilerplate for systems, aspects, templates, and jobs.
 - **Aspects** — Reusable bundles of read/write component access that systems iterate over a single entity at a time.
-- **Sets** — Dynamic entity subsets that overlap freely with tag groups, for sparse iteration without restructuring storage.
-- **Heap & Pointers** — `SharedPtr`, `UniquePtr`, and native variants for storing managed or large data outside of components.
+- **Sets** — Dynamic entity subsets that can overlap freely for sparse iteration without restructuring storage.
+- **Heap & Pointers** — `SharedPtr` and `UniquePtr` for storing native or managed data outside of components.
 - **Interpolation** — Built-in fixed-to-variable timestep interpolation for smooth rendering off a deterministic simulation.
-- **Templates** — Composable entity blueprints that pre-register tag/component layouts at world-build time.
+- **Templates** — Composable entity blueprints that describe component layouts for common entity types.
 - **Deterministic simulation** — Fixed-timestep loop with deterministic RNG and an isolated input queue, designed for replay and rollback.
-- **Snapshots, Recording & Playback** — Full world serialization, replayable input bundles with checksum desync detection, and snapshot/scrub editor tooling.
+- **Snapshots, Recording & Playback** — Full game state serialization, replayable input recordings with checksum desync detection, and snapshot/scrub editor tooling.
 
 ## Quick Start
 
