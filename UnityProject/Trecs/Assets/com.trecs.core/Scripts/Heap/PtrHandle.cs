@@ -9,9 +9,9 @@ namespace Trecs
     /// and <see cref="NativeSharedPtr{T}"/>. A zero value represents a null handle.
     /// </summary>
     [TypeId(604918273)]
-    public struct PtrHandle : IEquatable<PtrHandle>, IStableHashProvider
+    public readonly struct PtrHandle : IEquatable<PtrHandle>, IStableHashProvider
     {
-        public uint Value;
+        public readonly uint Value;
 
         /// <summary>
         /// Sentinel value representing a null handle. <see cref="IsNull"/> returns <c>true</c> for this value.
