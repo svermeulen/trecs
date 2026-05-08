@@ -456,48 +456,6 @@ namespace Trecs.Internal
             _frameScopedNativeUniqueHeap.Deserialize(reader);
         }
 
-        /// <summary>
-        /// Remaps all stored input frame numbers by adding the given offset.
-        /// Used for InputsOnly playback mode where inputs need to be applied
-        /// relative to the current frame rather than the original recording frame.
-        /// </summary>
-        public void RemapFrameOffsets(int frameOffset)
-        {
-            if (frameOffset == 0)
-            {
-                return;
-            }
-
-            _log.Debug("Remapping input frame offsets by {}", frameOffset);
-
-            foreach (var (_, info) in _componentTypeHelpers)
-            {
-                // Collect all frame entries to remap
-                var framesToRemap =
-                    new List<(int oldFrame, DenseHashSet<EntityHandle> entityHandles)>();
-                foreach (var (frame, entityHandleSet) in info.FrameEntries)
-                {
-                    framesToRemap.Add((frame, entityHandleSet));
-                }
-
-                // Clear and rebuild with new frame numbers
-                info.FrameEntries.Clear();
-                foreach (var (oldFrame, entityHandleSet) in framesToRemap)
-                {
-                    var newFrame = oldFrame + frameOffset;
-                    info.FrameEntries.Add(newFrame, entityHandleSet);
-                }
-
-                // Remap the helper's internal storage
-                info.Helper.RemapFrameOffsets(frameOffset);
-            }
-
-            _frameScopedUniqueHeap.RemapFrameOffsets(frameOffset);
-            _frameScopedSharedHeap.RemapFrameOffsets(frameOffset);
-            _nativeFrameScopedSharedHeap.RemapFrameOffsets(frameOffset);
-            _frameScopedNativeUniqueHeap.RemapFrameOffsets(frameOffset);
-        }
-
         internal void ResetInputs<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
@@ -801,8 +759,6 @@ namespace Trecs.Internal
                 int frame
             );
 
-            void RemapFrameOffsets(int frameOffset);
-
             void SerializeValues(ITrecsSerializationWriter writer);
             void DeserializeValues(ITrecsSerializationReader reader);
         }
@@ -848,27 +804,6 @@ namespace Trecs.Internal
             public void Clear()
             {
                 Values.Clear();
-            }
-
-            public void RemapFrameOffsets(int frameOffset)
-            {
-                // We need to rebuild the dictionary with remapped frame keys
-                var oldValues = new List<(FrameEntityHandlePair key, T value)>();
-                foreach (var (key, value) in Values)
-                {
-                    oldValues.Add((key, value));
-                }
-
-                Values.Clear();
-
-                foreach (var (oldKey, value) in oldValues)
-                {
-                    var newKey = new FrameEntityHandlePair(
-                        oldKey.Frame + frameOffset,
-                        oldKey.EntityHandle
-                    );
-                    Values.Add(newKey, value);
-                }
             }
 
             public void SerializeValues(ITrecsSerializationWriter writer)

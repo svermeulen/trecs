@@ -188,6 +188,50 @@ internal static class TrecsStubs
             )]
             public class VariableUpdateOnlyAttribute : System.Attribute { }
 
+            // [Interpolated] / [Constant] / [Input] — template component-field attributes.
+            // The TemplateAttributeParser detects them by class name and the
+            // TemplateValidator emits TRECS032 on conflicting combinations
+            // (e.g. [Interpolated] + [Constant]). Mirror the runtime
+            // AttributeUsage from Packages/com.trecs.core/Scripts/SourceGen/TemplateAttributes.cs
+            // so misuse on non-field targets is caught by C# (CS0592) rather
+            // than producing a confusing TRECS error.
+            [System.AttributeUsage(System.AttributeTargets.Field, AllowMultiple = false)]
+            public sealed class InterpolatedAttribute : System.Attribute { }
+
+            [System.AttributeUsage(System.AttributeTargets.Field, AllowMultiple = false)]
+            public sealed class ConstantAttribute : System.Attribute { }
+
+            // InputAttribute mirrors the runtime ctor: (MissingInputBehavior, bool warnOnMissing = false).
+            // The parser reads the enum arg via ConstructorArguments[0]; signature has to match.
+            [System.AttributeUsage(System.AttributeTargets.Field, AllowMultiple = false)]
+            public sealed class InputAttribute : System.Attribute
+            {
+                public MissingInputBehavior OnMissing { get; }
+                public bool WarnOnMissing { get; }
+
+                public InputAttribute(MissingInputBehavior onMissing, bool warnOnMissing = false)
+                {
+                    OnMissing = onMissing;
+                    WarnOnMissing = warnOnMissing;
+                }
+            }
+
+            // Built-in tag/template chain used to mark the singleton globals entity.
+            // TemplateAttributeParser.IsGlobalsTemplate looks up
+            // IHasTags<TrecsTags.Globals> by name + containing-type name, so the
+            // shapes here just need to satisfy that lookup.
+            public static class TrecsTags
+            {
+                public struct Globals : ITag { }
+            }
+
+            public interface IHasTags<T1> where T1 : struct, ITag { }
+            public interface IHasTags<T1, T2> where T1 : struct, ITag where T2 : struct, ITag { }
+            public interface IHasTags<T1, T2, T3>
+                where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
+            public interface IHasTags<T1, T2, T3, T4>
+                where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
+
             // Iteration / job attributes consumed by ForEach / Job / RunOnce generators.
             // Properties match the real declarations in Packages/com.trecs.core/Scripts/SourceGen/.
 
@@ -268,6 +312,12 @@ internal static class TrecsStubs
             [System.AttributeUsage(System.AttributeTargets.Parameter, AllowMultiple = false)]
             public class PassThroughArgumentAttribute : System.Attribute { }
 
+            // [GlobalIndex] — see Packages/com.trecs.core/Scripts/SourceGen/GlobalIndexAttribute.cs.
+            // Marks an int parameter on a [ForEachEntity] Execute method to receive the
+            // entity's global index across all groups iterated by the call.
+            [System.AttributeUsage(System.AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
+            public class GlobalIndexAttribute : System.Attribute { }
+
             // ISystem contract — see Packages/com.trecs.core/Scripts/Systems/ISystem.cs.
             // Used by AutoSystemGenerator to detect classes that need ISystemInternal wiring.
             public interface ISystem
@@ -340,6 +390,45 @@ internal static class TrecsStubs
                 where T : unmanaged, IEntityComponent
             {
                 public void Dispose() { }
+            }
+
+            // Single-entity native component access — [FromWorld] field types that
+            // resolve a single component via an EntityIndex (rather than a buffer).
+            // Trigger TRECS082 when [FromWorld] is given inline tags. Real types live in
+            // com.trecs.core/Scripts/Native/.
+            public readonly struct NativeComponentRead<T>
+                where T : unmanaged, IEntityComponent
+            {
+                public ref readonly T this[EntityIndex entityIndex]
+                    => ref Trecs.Internal.RefStash<T>.Slot;
+            }
+
+            public readonly struct NativeComponentWrite<T>
+                where T : unmanaged, IEntityComponent
+            {
+                public ref T this[EntityIndex entityIndex]
+                    => ref Trecs.Internal.RefStash<T>.Slot;
+            }
+
+            // Job-only set accessors. ParameterClassifier emits TRECS099 when one
+            // of these appears in a main-thread iteration method. Real types live in
+            // com.trecs.core/Scripts/Native/.
+            public readonly struct NativeSetRead<T> where T : struct, IEntitySet { }
+            public readonly struct NativeSetWrite<T> where T : struct, IEntitySet { }
+
+            // Main-thread set accessors. ParameterClassifier recognizes these in
+            // [WrapAsJob] methods and emits TRECS098. SetAccessor is iterated; SetRead
+            // is read-only. Real types live in com.trecs.core/Scripts/Sets/.
+            public readonly struct SetAccessor<T> where T : struct, IEntitySet { }
+            public readonly struct SetRead<T> where T : struct, IEntitySet { }
+            public readonly struct SetWrite<T> where T : struct, IEntitySet { }
+
+            // NativeUniquePtr<T> — minimal shape for NativeUniquePtrCopyAnalyzer
+            // (TRECS110 / TRECS111). The analyzer matches by name + namespace + arity,
+            // not by member signatures, so the body just needs to be a generic struct.
+            // Real type lives at Packages/com.trecs.core/Scripts/Heap/NativeUniquePtr.cs.
+            public readonly struct NativeUniquePtr<T> where T : unmanaged
+            {
             }
 
             // Slice types yielded by the dense / sparse iterators below.

@@ -32,7 +32,7 @@ world.SetSystemEnabled(systemIndex, EnableChannel.User, true);   // re-enable
 bool enabled = world.IsSystemEnabled(systemIndex, EnableChannel.User);
 ```
 
-Channel state defaults to "all enabled" at world init and is **not part of snapshot/restore or recording state**. Anything that sets a channel disable is responsible for re-applying it across world resets — `PlaybackHandler` does this automatically when playback (re)starts.
+Channel state defaults to "all enabled" at world init and is **not part of snapshot/restore or recording state**. Anything that sets a channel disable is responsible for re-applying it across world resets — `BundlePlayer` does this automatically when playback (re)starts.
 
 ## SetSystemPaused — deterministic pause
 
@@ -94,7 +94,7 @@ The pause overlay's UI systems aren't in the gameplay bucket, so they keep runni
 ## When to use which
 
 - "I want to disable some systems while a debug menu is open" → `World.SetSystemEnabled(..., EnableChannel.User, false)`.
-- "I want to silence input systems while playing back a recording" → already done by `PlaybackHandler` via `EnableChannel.Playback`. Don't reimplement.
+- "I want to silence input systems while playing back a recording" → already done by `BundlePlayer` via `EnableChannel.Playback`. Don't reimplement.
 - "I want the editor to let me toggle systems for inspection" → already wired through the [Trecs Hierarchy window](../editor-windows/hierarchy.md) via `EnableChannel.Editor`.
 - "I want gameplay to pause when a UI overlay is up, and have that pause survive a save / replay deterministically" → `WorldAccessor.SetSystemPaused`.
 - "I want a kill switch that doesn't need to replay deterministically" → `EnableChannel.User`. It won't show up in checksums or recordings.

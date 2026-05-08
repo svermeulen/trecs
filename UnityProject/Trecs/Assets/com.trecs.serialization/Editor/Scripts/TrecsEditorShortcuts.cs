@@ -51,24 +51,24 @@ namespace Trecs.Serialization
             runner.StepFixedFrame();
         }
 
-        [Shortcut(ShortcutCategory + "/Jump To Previous Snapshot")]
-        public static void JumpToPreviousSnapshot()
+        [Shortcut(ShortcutCategory + "/Jump To Previous Anchor")]
+        public static void JumpToPreviousAnchor()
         {
             if (!TryGetUniqueController(out var controller))
             {
                 return;
             }
-            controller.JumpToPreviousSnapshot();
+            controller.JumpToPreviousAnchor();
         }
 
-        [Shortcut(ShortcutCategory + "/Jump To Next Snapshot")]
-        public static void JumpToNextSnapshot()
+        [Shortcut(ShortcutCategory + "/Jump To Next Anchor")]
+        public static void JumpToNextAnchor()
         {
             if (!TryGetUniqueController(out var controller))
             {
                 return;
             }
-            controller.JumpToNextSnapshot();
+            controller.JumpToNextAnchor();
         }
 
         [Shortcut(ShortcutCategory + "/Reset Auto Recording")]

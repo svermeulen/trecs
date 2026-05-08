@@ -42,7 +42,7 @@ namespace Trecs.Serialization.Samples.SaveGame
                 .Build();
 
             // Compose serialization. For a save-game-only sample the
-            // RecordingHandler / PlaybackHandler are unused but harmless;
+            // BundleRecorder / BundlePlayer are unused but harmless;
             // SerializationFactory.CreateAll wires everything up in one line.
             var serialization = SerializationFactory.CreateAll(world);
 

@@ -15,27 +15,23 @@ namespace Trecs.Serialization
     /// EditorPrefs and propagates Save to any live recorders so changes are
     /// instantly visible mid-session too.
     /// </summary>
-    // EditorPrefs key prefix stays "Trecs.RecorderSettings.*" rather than
-    // "Trecs.PlayerSettings.*" — the window was renamed Player Settings, but
-    // changing the prefs prefix would silently wipe every existing user's
-    // tuning.
     [InitializeOnLoad]
     static class TrecsPlayerSettingsStore
     {
-        const string IntervalKey = "Trecs.RecorderSettings.SnapshotIntervalSeconds";
-        const string MaxCountKey = "Trecs.RecorderSettings.MaxSnapshotCount";
+        const string AnchorIntervalKey = "Trecs.RecorderSettings.AnchorIntervalSeconds";
+        const string ScrubCacheIntervalKey = "Trecs.RecorderSettings.ScrubCacheIntervalSeconds";
+        const string MaxAnchorCountKey = "Trecs.RecorderSettings.MaxAnchorCount";
 
         // long → stored as string since EditorPrefs only exposes int. Default
-        // 256 MB fits in int but users may push past 2 GB on big projects.
-        const string MaxMemoryKey = "Trecs.RecorderSettings.MaxSnapshotMemoryBytes";
-        const string OverflowKey = "Trecs.RecorderSettings.OverflowAction";
+        // 64 MB fits in int but users may push past 2 GB on big projects.
+        const string MaxScrubCacheBytesKey = "Trecs.RecorderSettings.MaxScrubCacheBytes";
 
         // Keep these in sync with TrecsAutoRecorderSettings's field defaults
         // — used only when the EditorPref is absent (first run / fresh user).
-        const float DefaultIntervalSeconds = 0.5f;
-        const int DefaultMaxCount = 0;
-        const long DefaultMaxMemoryBytes = 256L * 1024 * 1024;
-        const CapacityOverflowAction DefaultOverflowAction = CapacityOverflowAction.DropOldest;
+        const float DefaultAnchorIntervalSeconds = 30f;
+        const float DefaultScrubCacheIntervalSeconds = 1f;
+        const int DefaultMaxAnchorCount = 0;
+        const long DefaultMaxScrubCacheBytes = 64L * 1024 * 1024;
 
         static TrecsPlayerSettingsStore()
         {
@@ -48,41 +44,42 @@ namespace Trecs.Serialization
             };
         }
 
-        public static float SnapshotIntervalSeconds =>
-            EditorPrefs.GetFloat(IntervalKey, DefaultIntervalSeconds);
+        public static float AnchorIntervalSeconds =>
+            EditorPrefs.GetFloat(AnchorIntervalKey, DefaultAnchorIntervalSeconds);
 
-        public static int MaxSnapshotCount => EditorPrefs.GetInt(MaxCountKey, DefaultMaxCount);
+        public static float ScrubCacheIntervalSeconds =>
+            EditorPrefs.GetFloat(ScrubCacheIntervalKey, DefaultScrubCacheIntervalSeconds);
 
-        public static long MaxSnapshotMemoryBytes =>
+        public static int MaxAnchorCount =>
+            EditorPrefs.GetInt(MaxAnchorCountKey, DefaultMaxAnchorCount);
+
+        public static long MaxScrubCacheBytes =>
             long.TryParse(
                 EditorPrefs.GetString(
-                    MaxMemoryKey,
-                    DefaultMaxMemoryBytes.ToString(CultureInfo.InvariantCulture)
+                    MaxScrubCacheBytesKey,
+                    DefaultMaxScrubCacheBytes.ToString(CultureInfo.InvariantCulture)
                 ),
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
                 out var v
             )
                 ? v
-                : DefaultMaxMemoryBytes;
-
-        public static CapacityOverflowAction OverflowAction =>
-            (CapacityOverflowAction)EditorPrefs.GetInt(OverflowKey, (int)DefaultOverflowAction);
+                : DefaultMaxScrubCacheBytes;
 
         public static void Save(
-            float intervalSeconds,
-            int maxCount,
-            long maxMemoryBytes,
-            CapacityOverflowAction overflowAction
+            float anchorIntervalSeconds,
+            float scrubCacheIntervalSeconds,
+            int maxAnchorCount,
+            long maxScrubCacheBytes
         )
         {
-            EditorPrefs.SetFloat(IntervalKey, intervalSeconds);
-            EditorPrefs.SetInt(MaxCountKey, maxCount);
+            EditorPrefs.SetFloat(AnchorIntervalKey, anchorIntervalSeconds);
+            EditorPrefs.SetFloat(ScrubCacheIntervalKey, scrubCacheIntervalSeconds);
+            EditorPrefs.SetInt(MaxAnchorCountKey, maxAnchorCount);
             EditorPrefs.SetString(
-                MaxMemoryKey,
-                maxMemoryBytes.ToString(CultureInfo.InvariantCulture)
+                MaxScrubCacheBytesKey,
+                maxScrubCacheBytes.ToString(CultureInfo.InvariantCulture)
             );
-            EditorPrefs.SetInt(OverflowKey, (int)overflowAction);
         }
 
         /// <summary>
@@ -95,10 +92,10 @@ namespace Trecs.Serialization
         {
             if (recorder == null)
                 return;
-            recorder.SnapshotIntervalSeconds = SnapshotIntervalSeconds;
-            recorder.MaxSnapshotCount = MaxSnapshotCount;
-            recorder.MaxSnapshotMemoryBytes = MaxSnapshotMemoryBytes;
-            recorder.OverflowAction = OverflowAction;
+            recorder.AnchorIntervalSeconds = AnchorIntervalSeconds;
+            recorder.ScrubCacheIntervalSeconds = ScrubCacheIntervalSeconds;
+            recorder.MaxAnchorCount = MaxAnchorCount;
+            recorder.MaxScrubCacheBytes = MaxScrubCacheBytes;
         }
 
         /// <summary>

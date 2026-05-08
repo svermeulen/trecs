@@ -1154,7 +1154,7 @@ namespace Trecs.Serialization
         bool HasRecordingBuffer()
         {
             var recorder = GetController()?.AutoRecorder;
-            return recorder != null && recorder.IsRecording && recorder.Snapshots.Count > 0;
+            return recorder != null && recorder.IsRecording && recorder.Anchors.Count > 0;
         }
 
         // Trailing "Save as new" row, rendered as a flat full-width button

@@ -12,28 +12,32 @@ namespace Trecs.Serialization.Samples
         public SerializerRegistry Registry { get; }
         public WorldStateSerializer WorldStateSerializer { get; }
         public SnapshotSerializer Snapshots { get; }
-        public RecordingHandler Recorder { get; }
-        public PlaybackHandler Playback { get; }
+        public RecordingBundleSerializer BundleSerializer { get; }
+        public BundleRecorder Recorder { get; }
+        public BundlePlayer Player { get; }
 
         public SerializationServices(
             SerializerRegistry registry,
             WorldStateSerializer worldStateSerializer,
             SnapshotSerializer snapshots,
-            RecordingHandler recorder,
-            PlaybackHandler playback
+            RecordingBundleSerializer bundleSerializer,
+            BundleRecorder recorder,
+            BundlePlayer player
         )
         {
             Registry = registry;
             WorldStateSerializer = worldStateSerializer;
             Snapshots = snapshots;
+            BundleSerializer = bundleSerializer;
             Recorder = recorder;
-            Playback = playback;
+            Player = player;
         }
 
         public void Dispose()
         {
-            Playback.Dispose();
+            Player.Dispose();
             Recorder.Dispose();
+            BundleSerializer.Dispose();
             Snapshots.Dispose();
         }
     }

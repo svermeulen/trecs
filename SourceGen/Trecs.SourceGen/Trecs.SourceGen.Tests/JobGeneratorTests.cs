@@ -166,6 +166,41 @@ public class JobGeneratorTests
     }
 
     [Test]
+    public void IterationJob_WithGlobalIndex_CompilesCleanly()
+    {
+        // [GlobalIndex] int on a component-iteration Execute method exercises the
+        // NeedsGlobalIndexOffset wiring: the emitted job gets a private
+        // _trecs_GlobalIndexOffset field, the call-site forwards
+        // `_trecs_GlobalIndexOffset + i`, and the per-overload schedule path
+        // assigns `_trecs_job._trecs_GlobalIndexOffset = _trecs_queryIndexOffset`.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial struct GatherJob : Unity.Jobs.IJobFor
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    public void Execute(in CPos pos, [Trecs.GlobalIndex] int globalIndex) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new JobGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+        Assert.That(run.GenErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
     public void IterationJob_FromWorldGenericAttribute_CompilesCleanly()
     {
         // [FromWorld<Tag>] — C# 11 generic-attribute shorthand on the FromWorld field.

@@ -157,9 +157,31 @@ When you have multiple `[ForEachEntity]` methods, you must provide an explicit `
 **Additional parameters** (can be combined with either style above):
 
 - **`EntityIndex`** — the current entity's transient index
+- **`[GlobalIndex] int`** — a unique packed index across *all* groups iterated by the call (`0` to `total − 1`). See [below](#globalindex).
 - **`WorldAccessor`** — the system's world accessor (main-thread methods only)
 - **`NativeWorldAccessor`** — job-safe world access (`[WrapAsJob]` methods only). See [Jobs & Burst](../performance/jobs-and-burst.md).
 - **`[PassThroughArgument]`** — custom values passed in by the caller. See [below](#passthroughargument).
+
+### GlobalIndex
+
+Mark an `int` parameter with `[GlobalIndex]` to receive a unique index that spans every group the call iterates. The first entity visited gets `0`, the next `1`, and so on through `total − 1` — regardless of how many internal groups the query expands to. This is useful when writing per-entity data into a contiguous buffer that's shared across groups (for example, a `NativeArray<InstanceData>` filled by a `[WrapAsJob]` method and then handed off to graphics):
+
+```csharp
+[BurstCompile]
+partial struct BuildInstanceData
+{
+    [WriteOnly] public NativeArray<InstanceData> Instances;
+
+    [ForEachEntity]
+    [WrapAsJob]
+    public void Execute(in Position position, [GlobalIndex] int globalIndex)
+    {
+        Instances[globalIndex] = new InstanceData { Position = position.Value };
+    }
+}
+```
+
+`EntityIndex` resets per group; `[GlobalIndex]` does not. Only one `[GlobalIndex]` parameter per method.
 
 ### PassThroughArgument
 

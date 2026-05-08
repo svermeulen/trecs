@@ -8,13 +8,9 @@ namespace Trecs.SourceGen.Tests;
 /// Negative tests for the [FromWorld] field validation diagnostics group
 /// (TRECS080-084). All emitted from JobGenerator's per-field validator.
 ///
-/// Codes covered: 081, 083, 084.
+/// Codes covered: 081, 082, 083, 084.
 ///
 /// Codes intentionally not covered here:
-/// - TRECS082 (FromWorldInlineTagsNotSupportedForEntityIndex): triggers require
-///   the `NativeComponentRead&lt;T&gt;` / `NativeComponentWrite&lt;T&gt;` (single,
-///   not buffer) stubs in TrecsStubs.cs. The buffer flavors are stubbed; the
-///   single flavors aren't. Deferred until a follow-up that extends the stubs.
 /// - TRECS080: gap in numbering; no descriptor.
 /// </summary>
 [TestFixture]
@@ -45,6 +41,54 @@ public class Diagnostics_TRECS080_to_084_FromWorldFieldTests
             """;
 
         AssertDiagnostic(source, "TRECS081");
+    }
+
+    [Test]
+    public void TRECS082_FromWorldInlineTagsOnNativeComponentRead()
+    {
+        // NativeComponentRead<T> resolves a single component via an EntityIndex,
+        // not via a TagSet. Inline Tag/Tags on the [FromWorld] attribute is
+        // therefore meaningless — the EntityIndex is supplied at schedule time.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial struct SinglePosJob : Unity.Jobs.IJob
+                {
+                    [Trecs.FromWorld(typeof(PlayerTag))]
+                    public Trecs.NativeComponentRead<CPos> Pos;
+
+                    public void Execute() { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(source, "TRECS082");
+    }
+
+    [Test]
+    public void TRECS082_FromWorldInlineTagsOnNativeComponentWrite()
+    {
+        // Same shape as the read-side test above, but for NativeComponentWrite<T>.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial struct SinglePosWriteJob : Unity.Jobs.IJob
+                {
+                    [Trecs.FromWorld(typeof(PlayerTag))]
+                    public Trecs.NativeComponentWrite<CPos> Pos;
+
+                    public void Execute() { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(source, "TRECS082");
     }
 
     [Test]

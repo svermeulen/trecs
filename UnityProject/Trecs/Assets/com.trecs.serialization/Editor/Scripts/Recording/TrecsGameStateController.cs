@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Trecs.Internal;
-using UnityEngine;
 
 namespace Trecs.Serialization
 {
@@ -24,6 +23,16 @@ namespace Trecs.Serialization
     public class TrecsGameStateController : IDisposable
     {
         static readonly TrecsLog _log = new(nameof(TrecsGameStateController));
+
+        /// <summary>File extension for full <see cref="RecordingBundle"/> files
+        /// (input timeline + periodic snapshots + bookmarks). Distinct from the
+        /// snapshot extension so a shared "Saves" directory listing tells the
+        /// two file kinds apart at a glance.</summary>
+        public const string RecordingExtension = ".trec";
+
+        /// <summary>File extension for standalone <see cref="SnapshotSerializer"/>
+        /// files (single full-state save, no input timeline).</summary>
+        public const string SnapshotExtension = ".snap";
 
         readonly World _world;
         readonly TrecsAutoRecorder _autoRecorder;
@@ -272,24 +281,24 @@ namespace Trecs.Serialization
             return ok;
         }
 
-        public bool JumpToPreviousSnapshot()
+        public bool JumpToPreviousAnchor()
         {
             if (!_autoRecorder.IsRecording)
             {
                 return false;
             }
-            var ok = _autoRecorder.JumpToPreviousSnapshot();
+            var ok = _autoRecorder.JumpToPreviousAnchor();
             PollModeChanged();
             return ok;
         }
 
-        public bool JumpToNextSnapshot()
+        public bool JumpToNextAnchor()
         {
             if (!_autoRecorder.IsRecording)
             {
                 return false;
             }
-            var ok = _autoRecorder.JumpToNextSnapshot();
+            var ok = _autoRecorder.JumpToNextAnchor();
             PollModeChanged();
             return ok;
         }
@@ -357,7 +366,7 @@ namespace Trecs.Serialization
         /// <summary>
         /// Persist the current auto-recording (the in-memory snapshot list) to
         /// disk under <paramref name="name"/>. Saved recordings live under
-        /// <c>&lt;project&gt;/svkj_temp/trecs_debug/recordings/</c>.
+        /// <see cref="TrecsPaths.Recordings"/>.
         /// </summary>
         public bool SaveNamedRecording(string name)
         {
@@ -436,10 +445,20 @@ namespace Trecs.Serialization
         /// </summary>
         public static bool RenameNamedRecording(string oldName, string newName)
         {
-            return RenameInDirectory(GetRecordingsDirectory(), oldName, newName);
+            return RenameInDirectory(
+                GetRecordingsDirectory(),
+                oldName,
+                newName,
+                RecordingExtension
+            );
         }
 
-        static bool RenameInDirectory(string directory, string oldName, string newName)
+        static bool RenameInDirectory(
+            string directory,
+            string oldName,
+            string newName,
+            string extension
+        )
         {
             Assert.That(!string.IsNullOrWhiteSpace(oldName));
             Assert.That(!string.IsNullOrWhiteSpace(newName));
@@ -447,8 +466,8 @@ namespace Trecs.Serialization
             {
                 return false;
             }
-            var src = Path.Combine(directory, oldName + ".bin");
-            var dst = Path.Combine(directory, newName + ".bin");
+            var src = Path.Combine(directory, oldName + extension);
+            var dst = Path.Combine(directory, newName + extension);
             if (!File.Exists(src) || File.Exists(dst))
             {
                 return false;
@@ -461,17 +480,17 @@ namespace Trecs.Serialization
 
         public static IReadOnlyList<string> GetSavedRecordingNames()
         {
-            return ListBinFilesIn(GetRecordingsDirectory());
+            return ListSavesIn(GetRecordingsDirectory(), RecordingExtension);
         }
 
         public static string GetRecordingsDirectory()
         {
-            return GetDebugSubdirectory("recordings");
+            return TrecsPaths.Recordings;
         }
 
         public static string GetRecordingPath(string name)
         {
-            return Path.Combine(GetRecordingsDirectory(), name + ".bin");
+            return Path.Combine(GetRecordingsDirectory(), name + RecordingExtension);
         }
 
         // ---- Snapshots (standalone single-frame snapshots) ----
@@ -581,22 +600,22 @@ namespace Trecs.Serialization
 
         public static bool RenameSnapshot(string oldName, string newName)
         {
-            return RenameInDirectory(GetSnapshotsDirectory(), oldName, newName);
+            return RenameInDirectory(GetSnapshotsDirectory(), oldName, newName, SnapshotExtension);
         }
 
         public static IReadOnlyList<string> GetSavedSnapshotNames()
         {
-            return ListBinFilesIn(GetSnapshotsDirectory());
+            return ListSavesIn(GetSnapshotsDirectory(), SnapshotExtension);
         }
 
         public static string GetSnapshotsDirectory()
         {
-            return GetDebugSubdirectory("snapshots");
+            return TrecsPaths.Snapshots;
         }
 
         public static string GetSnapshotPath(string name)
         {
-            return Path.Combine(GetSnapshotsDirectory(), name + ".bin");
+            return Path.Combine(GetSnapshotsDirectory(), name + SnapshotExtension);
         }
 
         /// <summary>
@@ -616,22 +635,14 @@ namespace Trecs.Serialization
             PollModeChanged();
         }
 
-        static string GetDebugSubdirectory(string name)
-        {
-            // Application.dataPath is <project>/Assets — go up one to project root.
-            return Path.GetFullPath(
-                Path.Combine(Application.dataPath, "..", "svkj_temp", "trecs_debug", name)
-            );
-        }
-
-        static IReadOnlyList<string> ListBinFilesIn(string dir)
+        static IReadOnlyList<string> ListSavesIn(string dir, string extension)
         {
             if (!Directory.Exists(dir))
             {
                 return Array.Empty<string>();
             }
             return Directory
-                .EnumerateFiles(dir, "*.bin")
+                .EnumerateFiles(dir, "*" + extension)
                 .Select(Path.GetFileNameWithoutExtension)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();

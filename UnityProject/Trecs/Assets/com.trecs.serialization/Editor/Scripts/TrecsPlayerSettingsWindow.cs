@@ -6,18 +6,18 @@ using UnityEngine.UIElements;
 namespace Trecs.Serialization
 {
     /// <summary>
-    /// Modal popup for tuning the Trecs Player's settings (snapshot interval,
-    /// capacity caps, capacity-overflow action). Backed by
+    /// Modal popup for tuning the Trecs Player's settings (anchor cadence,
+    /// scrub-cache cadence, capacity caps). Backed by
     /// <see cref="TrecsPlayerSettingsStore"/> EditorPrefs so values persist
     /// across editor sessions and apply to all live recorders on Save.
     /// </summary>
     public class TrecsPlayerSettingsWindow : EditorWindow
     {
         Toggle _autoRecordOnStartField;
-        FloatField _intervalField;
-        IntegerField _maxCountField;
-        IntegerField _maxMemoryField;
-        EnumField _overflowField;
+        FloatField _anchorIntervalField;
+        FloatField _scrubCacheIntervalField;
+        IntegerField _maxAnchorCountField;
+        IntegerField _maxScrubCacheMbField;
 
         public static void Show(EditorWindow anchor)
         {
@@ -69,43 +69,48 @@ namespace Trecs.Serialization
                 + "begin capturing.";
             root.Add(_autoRecordOnStartField);
 
-            _intervalField = new FloatField("Snapshot interval (s)")
+            _anchorIntervalField = new FloatField("Anchor interval (s)")
             {
-                value = TrecsPlayerSettingsStore.SnapshotIntervalSeconds,
+                value = TrecsPlayerSettingsStore.AnchorIntervalSeconds,
             };
-            _intervalField.tooltip =
-                "Simulated seconds between captured snapshots. Smaller is "
-                + "faster scrubbing but uses more memory.";
-            root.Add(_intervalField);
+            _anchorIntervalField.tooltip =
+                "Simulated seconds between persisted-anchor captures. Anchors "
+                + "survive Save/Load and bound how far back desync recovery "
+                + "or cold-scrub can jump. Larger is smaller files; smaller "
+                + "is faster recovery.";
+            root.Add(_anchorIntervalField);
 
-            _maxCountField = new IntegerField("Max snapshot count")
+            _scrubCacheIntervalField = new FloatField("Scrub-cache interval (s)")
             {
-                value = TrecsPlayerSettingsStore.MaxSnapshotCount,
+                value = TrecsPlayerSettingsStore.ScrubCacheIntervalSeconds,
             };
-            _maxCountField.tooltip = "0 = unbounded.";
-            root.Add(_maxCountField);
+            _scrubCacheIntervalField.tooltip =
+                "Simulated seconds between transient scrub-cache captures. "
+                + "The scrub cache is in-memory only and makes recent-frame "
+                + "scrub-back instant. Smaller is snappier scrubbing.";
+            root.Add(_scrubCacheIntervalField);
+
+            _maxAnchorCountField = new IntegerField("Max anchor count")
+            {
+                value = TrecsPlayerSettingsStore.MaxAnchorCount,
+            };
+            _maxAnchorCountField.tooltip = "0 = unbounded. Drop-oldest when hit.";
+            root.Add(_maxAnchorCountField);
 
             // MB rather than bytes so the input is human-friendly. Max value is
             // clamped to int.MaxValue MB which is well past anything realistic.
-            _maxMemoryField = new IntegerField("Max memory (MB)")
+            _maxScrubCacheMbField = new IntegerField("Max scrub-cache (MB)")
             {
                 value = (int)
                     Math.Min(
                         int.MaxValue,
-                        TrecsPlayerSettingsStore.MaxSnapshotMemoryBytes / (1024L * 1024L)
+                        TrecsPlayerSettingsStore.MaxScrubCacheBytes / (1024L * 1024L)
                     ),
             };
-            _maxMemoryField.tooltip = "0 = unbounded. Stored in MB; the runtime cap is in bytes.";
-            root.Add(_maxMemoryField);
-
-            _overflowField = new EnumField(
-                "On capacity hit",
-                TrecsPlayerSettingsStore.OverflowAction
-            );
-            _overflowField.tooltip =
-                "DropOldest = roll the buffer (oldest snapshots fall off). "
-                + "Pause = stop the fixed phase so you can save/fork/reset.";
-            root.Add(_overflowField);
+            _maxScrubCacheMbField.tooltip =
+                "0 = unbounded. Stored in MB; the runtime cap is in bytes. "
+                + "Drop-oldest when hit.";
+            root.Add(_maxScrubCacheMbField);
 
             var buttons = new VisualElement();
             buttons.style.flexDirection = FlexDirection.Row;
@@ -155,10 +160,10 @@ namespace Trecs.Serialization
             TrecsGameStateActivator.AutoRecordEnabled = _autoRecordOnStartField.value;
 
             TrecsPlayerSettingsStore.Save(
-                intervalSeconds: _intervalField.value,
-                maxCount: _maxCountField.value,
-                maxMemoryBytes: (long)Math.Max(0, _maxMemoryField.value) * 1024L * 1024L,
-                overflowAction: (CapacityOverflowAction)_overflowField.value
+                anchorIntervalSeconds: _anchorIntervalField.value,
+                scrubCacheIntervalSeconds: _scrubCacheIntervalField.value,
+                maxAnchorCount: _maxAnchorCountField.value,
+                maxScrubCacheBytes: (long)Math.Max(0, _maxScrubCacheMbField.value) * 1024L * 1024L
             );
             // Push onto any currently-running recorders so the change is
             // visible immediately, not only on next play-mode entry.
@@ -174,11 +179,11 @@ namespace Trecs.Serialization
         {
             var defaults = new TrecsAutoRecorderSettings();
             _autoRecordOnStartField.value = true; // matches AutoRecordEnabled's default in TrecsGameStateActivator
-            _intervalField.value = defaults.SnapshotIntervalSeconds;
-            _maxCountField.value = defaults.MaxSnapshotCount;
-            _maxMemoryField.value = (int)
-                Math.Min(int.MaxValue, defaults.MaxSnapshotMemoryBytes / (1024L * 1024L));
-            _overflowField.value = defaults.OverflowAction;
+            _anchorIntervalField.value = defaults.AnchorIntervalSeconds;
+            _scrubCacheIntervalField.value = defaults.ScrubCacheIntervalSeconds;
+            _maxAnchorCountField.value = defaults.MaxAnchorCount;
+            _maxScrubCacheMbField.value = (int)
+                Math.Min(int.MaxValue, defaults.MaxScrubCacheBytes / (1024L * 1024L));
         }
     }
 }

@@ -11,15 +11,7 @@ namespace Trecs.SourceGen.Tests;
 /// emitted from VariableUpdateOnlyValidator for misapplied
 /// [VariableUpdateOnly].
 ///
-/// Codes covered: 030, 031, 033, 034, 035, 036.
-///
-/// Codes intentionally not covered here:
-/// - TRECS032 (TemplateInvalidAttributeCombination): triggers require the
-///   [Interpolated] / [Constant] / [VariableUpdateOnly] / [Input] attribute
-///   stubs in TrecsStubs.cs, which are not currently included.
-///   Adding them is its own scope-of-work; deferred.
-/// - TRECS037 (GlobalsTemplateFieldMustHaveDefault): triggers require the
-///   IHasTags<TrecsTags.Globals> chain stub, also missing. Deferred.
+/// Codes covered: 030, 031, 032, 033, 034, 035, 036, 037.
 /// </summary>
 [TestFixture]
 public class Diagnostics_TRECS030_to_037_TemplateTests
@@ -61,6 +53,51 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
             """;
 
         AssertDiagnostic(source, "TRECS031");
+    }
+
+    [Test]
+    public void TRECS032_InterpolatedAndConstantOnSameField()
+    {
+        // [Interpolated] interpolates between snapshots each variable frame;
+        // [Constant] makes the value immutable. The two are mutually exclusive.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+
+                public partial class PlayerTemplate : Trecs.ITemplate
+                {
+                    [Trecs.Interpolated]
+                    [Trecs.Constant]
+                    CPos Position;
+                }
+            }
+            """;
+
+        AssertDiagnostic(source, "TRECS032");
+    }
+
+    [Test]
+    public void TRECS032_InputAndVariableUpdateOnlyOnSameField()
+    {
+        // [Input] components are written by Input-phase systems and read on
+        // FixedUpdate; [VariableUpdateOnly] restricts a component to the
+        // variable-update phase. Combining them is incoherent.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CCmd : Trecs.IEntityComponent { public int V; }
+
+                public partial class PlayerTemplate : Trecs.ITemplate
+                {
+                    [Trecs.Input(Trecs.MissingInputBehavior.ResetToDefault)]
+                    [Trecs.VariableUpdateOnly]
+                    CCmd Command;
+                }
+            }
+            """;
+
+        AssertDiagnostic(source, "TRECS032");
     }
 
     [Test]
@@ -155,6 +192,49 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
             """;
 
         AssertDiagnostic(source, "TRECS036");
+    }
+
+    [Test]
+    public void TRECS037_GlobalsTemplateFieldMissingDefault()
+    {
+        // The globals entity is created automatically; there's no opportunity to
+        // pass field initializers via a template instance, so every component
+        // field on a Globals-tagged template must carry an explicit `= default;`.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CScore : Trecs.IEntityComponent { public int V; }
+
+                public partial class GameGlobalsTemplate
+                    : Trecs.ITemplate, Trecs.IHasTags<Trecs.TrecsTags.Globals>
+                {
+                    CScore Score;  // No `= default;` — should fire TRECS037.
+                }
+            }
+            """;
+
+        AssertDiagnostic(source, "TRECS037");
+    }
+
+    [Test]
+    public void TRECS037_DoesNotFireOnGlobalsFieldWithDefault()
+    {
+        // Positive control: a Globals template with the required `= default;`
+        // initializer must not trip TRECS037.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CScore : Trecs.IEntityComponent { public int V; }
+
+                public partial class GameGlobalsTemplate
+                    : Trecs.ITemplate, Trecs.IHasTags<Trecs.TrecsTags.Globals>
+                {
+                    CScore Score = default;
+                }
+            }
+            """;
+
+        AssertNoDiagnostic(source, "TRECS037");
     }
 
     static void AssertDiagnostic(string source, string expectedId)

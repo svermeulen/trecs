@@ -42,10 +42,11 @@ namespace Trecs.Serialization.Samples.Snake
             RegisterPrefabs(goManager);
 
             // SerializationFactory bundles the registry + WorldStateSerializer +
-            // SnapshotSerializer + RecordingHandler + PlaybackHandler.
-            // All of Snake's components are blittable so no custom serializers
-            // are needed; if you add a non-blittable component to your own game,
-            // register a custom ISerializer<T> via serialization.Registry here.
+            // SnapshotSerializer + RecordingBundleSerializer + BundleRecorder +
+            // BundlePlayer. All of Snake's components are blittable so no custom
+            // serializers are needed; if you add a non-blittable component to
+            // your own game, register a custom ISerializer<T> via
+            // serialization.Registry here.
             var serialization = SerializationFactory.CreateAll(world);
 
             var recordController = new RecordAndPlaybackController(

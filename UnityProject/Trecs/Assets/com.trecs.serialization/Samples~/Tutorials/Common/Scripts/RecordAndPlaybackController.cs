@@ -18,12 +18,12 @@ namespace Trecs.Serialization.Samples
     {
         static readonly TrecsLog _log = new(nameof(RecordAndPlaybackController));
 
-        readonly RecordingHandler _recordingHandler;
-        readonly PlaybackHandler _playbackHandler;
+        readonly BundleRecorder _recorder;
+        readonly BundlePlayer _player;
+        readonly RecordingBundleSerializer _bundleSerializer;
         readonly SnapshotSerializer _snapshotSerializer;
         readonly WorldAccessor _world;
-        readonly int _serializationVersion;
-        readonly string _recordingPath;
+        readonly string _bundlePath;
         readonly string _snapshotPath;
 
         ControllerState _state;
@@ -31,28 +31,27 @@ namespace Trecs.Serialization.Samples
         public RecordAndPlaybackController(
             SerializationServices serialization,
             World world,
-            string sampleName,
-            int serializationVersion = 1
+            string sampleName
         )
         {
             Assert.That(!string.IsNullOrEmpty(sampleName));
 
-            _recordingHandler = serialization.Recorder;
-            _playbackHandler = serialization.Playback;
+            _recorder = serialization.Recorder;
+            _player = serialization.Player;
+            _bundleSerializer = serialization.BundleSerializer;
             _snapshotSerializer = serialization.Snapshots;
             _world = world.CreateAccessor(
                 AccessorRole.Unrestricted,
                 nameof(RecordAndPlaybackController)
             );
-            _serializationVersion = serializationVersion;
 
             var recordingDir = Path.Combine(
                 Application.persistentDataPath,
                 sampleName,
                 "Recordings"
             );
-            _recordingPath = Path.Combine(recordingDir, "recording.bin");
-            _snapshotPath = Path.Combine(recordingDir, "snapshot.bin");
+            _bundlePath = Path.Combine(recordingDir, "recording.trec");
+            _snapshotPath = Path.Combine(recordingDir, "snapshot.snap");
 
             Directory.CreateDirectory(recordingDir);
 
@@ -118,77 +117,47 @@ namespace Trecs.Serialization.Samples
         void HandleStartRecording()
         {
             _log.Info("Starting recording at frame {}", _world.FixedFrame);
-
-            _recordingHandler.StartRecording(
-                version: _serializationVersion,
-                checksumsEnabled: true,
-                checksumFrameInterval: 30
-            );
-
-            // Save initial state snapshot so playback can start from the correct point
-            _snapshotSerializer.SaveSnapshot(
-                version: _serializationVersion,
-                filePath: _snapshotPath
-            );
-
+            _recorder.Start();
             _state = ControllerState.Recording;
             _log.Info("Recording started");
         }
 
         void HandleStopRecording()
         {
-            _recordingHandler.EndRecording(_recordingPath);
+            var bundle = _recorder.Stop();
+            _bundleSerializer.Save(bundle, _bundlePath);
             _state = ControllerState.Idle;
-            _log.Info("Recording saved to {}", _recordingPath);
+            _log.Info("Recording saved to {}", _bundlePath);
         }
 
         void HandleStopPlayback()
         {
-            _playbackHandler.EndPlayback();
+            _player.Stop();
             _state = ControllerState.Idle;
             _log.Info("Playback stopped");
         }
 
         void HandleStartPlayback()
         {
-            if (!File.Exists(_recordingPath))
+            if (!File.Exists(_bundlePath))
             {
-                _log.Warning("No recording found at {}", _recordingPath);
+                _log.Warning("No recording found at {}", _bundlePath);
                 return;
             }
 
-            _playbackHandler.StartPlayback(
-                _recordingPath,
-                new PlaybackStartParams { InputsOnly = false, Version = _serializationVersion }
-            );
-
-            if (File.Exists(_snapshotPath))
-            {
-                _playbackHandler.LoadInitialState(_snapshotPath, expectedInitialChecksum: null);
-                _log.Info("Loaded initial state from snapshot");
-            }
-            else
-            {
-                _log.Warning(
-                    "No initial state snapshot found, starting playback from current state"
-                );
-            }
-
+            var bundle = _bundleSerializer.Load(_bundlePath);
+            _player.Start(bundle);
             _state = ControllerState.Playback;
             _log.Info(
                 "Playback started from frame {} to {}",
-                _playbackHandler.PlaybackMetadata.StartFixedFrame,
-                _playbackHandler.PlaybackMetadata.EndFixedFrame
+                bundle.Header.StartFixedFrame,
+                bundle.Header.EndFixedFrame
             );
         }
 
         void HandleSaveSnapshot()
         {
-            _snapshotSerializer.SaveSnapshot(
-                version: _serializationVersion,
-                filePath: _snapshotPath
-            );
-
+            _snapshotSerializer.SaveSnapshot(version: 1, filePath: _snapshotPath);
             _log.Info("Snapshot saved at frame {}", _world.FixedFrame);
         }
 

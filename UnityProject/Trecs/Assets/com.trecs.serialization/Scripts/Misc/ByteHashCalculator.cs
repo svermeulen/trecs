@@ -12,7 +12,8 @@ namespace Trecs.Serialization
     // a missed desync on one checksum frame will be caught on the next
     // checksum frame with very high probability, since real desyncs diverge
     // further each frame. The 32-bit output is a deliberate trade-off for
-    // speed and storage density in RecordingMetadata.Checksums.
+    // speed and storage density in the recording bundle's per-frame
+    // checksums dictionary.
     public static class ByteHashCalculator
     {
         const uint FNV_PRIME = 16777619;

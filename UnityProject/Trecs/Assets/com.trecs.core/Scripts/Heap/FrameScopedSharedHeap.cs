@@ -247,18 +247,22 @@ namespace Trecs
 
             Assert.That(_entries.Count == 0);
 
-            // IdCounter handling for frame-scoped heaps is subtle. There are two callers:
+            // IdCounter handling for frame-scoped heaps is subtle. There are two scenarios:
             //
-            //   1) Full state restore (e.g. WorldStateSerializer loading a save). The world has
-            //      been reset, so _idCounter is at its initial value. We want to take the
+            //   1) Full state restore: the EntityInputQueue is being deserialized as part
+            //      of loading a recording bundle whose initial snapshot has already wiped
+            //      world state. _idCounter is at its initial value. We want to take the
             //      saved value to preserve replay determinism — subsequent allocations must
             //      produce the same address sequence as the original run.
             //
-            //   2) InputsOnly playback (PlaybackHandler.StartPlayback when InputsOnly=true).
-            //      The game is RUNNING — ClearAllInputs wiped entries but deliberately did
-            //      NOT reset _idCounter, so it holds whatever value the running game has
-            //      reached. We must NOT clobber it with the (smaller) recorded value, or
-            //      future allocations would collide with the freshly loaded recorded entries.
+            //   2) Deserialize-on-top-of-running: the EntityInputQueue is being replaced
+            //      while the game is RUNNING (e.g. BundlePlayer.Start swaps the input
+            //      queue contents after restoring the bundle's snapshot, but the input
+            //      queue itself is not part of the world snapshot — ClearAllInputs wiped
+            //      entries but deliberately did NOT reset _idCounter, so it holds whatever
+            //      value the running game has reached). We must NOT clobber it with a
+            //      smaller recorded value, or future allocations would collide with the
+            //      freshly loaded recorded entries.
             //
             // EnsureAtLeast(savedValue) handles both cases:
             //   - In case 1, current is small (initial), saved is large → use saved.
@@ -295,37 +299,6 @@ namespace Trecs
             }
 
             _log.Debug("Deserialized {} input heap entries", _entries.Count);
-        }
-
-        internal void RemapFrameOffsets(int frameOffset)
-        {
-            Assert.That(!_isDisposed);
-
-            if (frameOffset == 0)
-            {
-                return;
-            }
-
-            // Collect entries to update (since HeapEntry is readonly)
-            var entriesToUpdate = new List<(uint address, HeapEntry entry)>();
-            foreach (var (address, entry) in _entries)
-            {
-                entriesToUpdate.Add((address, entry));
-            }
-
-            _entries.Clear();
-
-            foreach (var (address, oldEntry) in entriesToUpdate)
-            {
-                var newEntry = new HeapEntry(oldEntry.Frame + frameOffset, oldEntry.BlobId);
-                _entries.Add(address, newEntry);
-            }
-
-            _log.Debug(
-                "Remapped {} managed blob input heap entries by {} frames",
-                entriesToUpdate.Count,
-                frameOffset
-            );
         }
 
         readonly struct HeapEntry

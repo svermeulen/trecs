@@ -2,14 +2,17 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Trecs.SourceGen;
 
 namespace Trecs.SourceGen.Tests;
 
 /// <summary>
-/// Drives Trecs source generators against an in-memory compilation. Two modes:
+/// Drives Trecs source generators (and DiagnosticAnalyzers) against an in-memory
+/// compilation. Three modes:
 ///
 /// <para><see cref="RunGenerator"/> — runs AspectGenerator only and returns its
 /// emitted diagnostics. Used by the existing diagnostic-focused tests.</para>
@@ -18,6 +21,11 @@ namespace Trecs.SourceGen.Tests;
 /// generator(s) AND re-compiles (input + generated output + Trecs stubs), surfacing both the
 /// generators' diagnostics and any C# errors in the generated code. Used by compile-cleanliness
 /// tests to catch regressions where a generator emits invalid C#.</para>
+///
+/// <para><see cref="RunAnalyzers"/> — runs one or more <see cref="DiagnosticAnalyzer"/>s
+/// against an in-memory compilation via Roslyn's <see cref="CompilationWithAnalyzers"/> and
+/// returns the analyzer-emitted diagnostics. Used by the diagnostic tests for descriptors
+/// emitted by analyzers (TRECS070, TRECS110, TRECS111) rather than incremental generators.</para>
 /// </summary>
 internal static class GeneratorTestHarness
 {
@@ -79,6 +87,43 @@ internal static class GeneratorTestHarness
             GenerationDiagnostics: generationDiagnostics,
             GeneratedTrees: generatedTrees
         );
+    }
+
+    /// <summary>
+    /// Runs one or more <see cref="DiagnosticAnalyzer"/>s against an in-memory compilation
+    /// of the Trecs stubs + the user's source. Returns only the analyzer-emitted diagnostics
+    /// (filtered to the analyzers' supported descriptor IDs) — base compile diagnostics are
+    /// not surfaced, since analyzer-focused tests assert on the analyzer's own output.
+    ///
+    /// <para>Some of these diagnostics (TRECS110, TRECS111) are emitted with severity
+    /// <see cref="DiagnosticSeverity.Error"/>, which would cause Roslyn to fail the
+    /// compilation if the analyzer were plugged in via the IDE. Tests intentionally feed
+    /// invalid input to assert the analyzer fires, so we do not assert on absence of errors
+    /// here.</para>
+    /// </summary>
+    public static ImmutableArray<Diagnostic> RunAnalyzers(
+        DiagnosticAnalyzer[] analyzers,
+        string userSource
+    )
+    {
+        var compilation = BuildInputCompilation(userSource);
+
+        var analyzerArray = analyzers.ToImmutableArray();
+        var supportedIds = analyzerArray
+            .SelectMany(a => a.SupportedDiagnostics)
+            .Select(d => d.Id)
+            .ToImmutableHashSet();
+
+        var compilationWithAnalyzers = compilation.WithAnalyzers(analyzerArray);
+        var diagnostics = compilationWithAnalyzers
+            .GetAnalyzerDiagnosticsAsync(CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+
+        // Filter to the analyzers' supported IDs so test assertions don't have to
+        // care about diagnostics emitted by unrelated analyzers (none expected today,
+        // but defensive against future additions to the same project).
+        return diagnostics.Where(d => supportedIds.Contains(d.Id)).ToImmutableArray();
     }
 
     /// <summary>

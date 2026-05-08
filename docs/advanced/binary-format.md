@@ -1,6 +1,6 @@
 # Binary Format Reference
 
-This page documents the on-disk layout of Trecs binary payloads (snapshots and recordings). Most users never need this — the API surface in [Serialization](serialization.md) and [Recording & Playback](recording-and-playback.md) is self-contained. Read this page if you are:
+This page documents the on-disk layout of Trecs binary payloads (snapshots and recording bundles). Most users never need this — the API surface in [Serialization](serialization.md) and [Recording & Playback](recording-and-playback.md) is self-contained. Read this page if you are:
 
 - Building tooling that inspects save files without loading them into Unity.
 - Diagnosing a payload-corruption bug.
@@ -36,7 +36,7 @@ Written by [`SerializationHeaderUtil.WriteHeader`](https://github.com/svermeulen
 These two are unrelated and must not be confused.
 
 - `FormatVersion` is owned by Trecs. It describes the header layout itself. It is bumped only when Trecs adds/removes/reorders header fields; current value is `1`. Mismatch throws — there is no forward-compat path, by design.
-- `version` is owned by your game. It describes the *schema* of the serialized data inside the payload. You bump it whenever you change one of your component or custom-serializer formats. Trecs surfaces it on `SnapshotMetadata.Version` / `RecordingMetadata.Version` but does not interpret it.
+- `version` is owned by your game. It describes the *schema* of the serialized data inside the payload. You bump it whenever you change one of your component or custom-serializer formats. Trecs surfaces it on `SnapshotMetadata.Version` / `BundleHeader.Version` but does not interpret it.
 
 ### `flags`
 
@@ -86,23 +86,32 @@ A snapshot is a payload whose top-level value is a `SnapshotMetadata` followed b
 - `EndOfPayloadMarker` guards the outer stream against truncation.
 - `WorldStateStreamGuard` guards the ECS-state write/read sequence against drift — if some Serialize/Deserialize pair falls out of sync (e.g. a new heap type is added on write but not read), the guard mismatches and fails loudly instead of silently reading garbage into component arrays.
 
-## Recording payload (input + checksum log)
+## Recording bundle payload
 
-A recording is a payload whose top-level value is a `RecordingMetadata` followed by a serialized `EntityInputQueue`.
+A recording bundle is a self-contained payload that embeds an initial-state snapshot, the recorded input queue, sparse per-frame checksums, and any auto-anchors and user bookmarks captured during recording. It is written and read by `RecordingBundleSerializer`.
 
 ```
 [Header]                          16 bytes
 [BitField prelude]                variable
-[RecordingMetadata]               {Version, StartFixedFrame, EndFixedFrame,
-                                   ChecksumFlags, Checksums, BlobIds}
-[EntityInputQueue]                recorded input events
+[BundleHeader]                    {Version, StartFixedFrame, EndFixedFrame,
+                                   FixedDeltaTime, ChecksumFlags, BlobIds}
+[InitialSnapshot bytes]           length-prefixed; full snapshot payload
+[uint32 InitialSnapshotChecksum]
+[InputQueue bytes]                length-prefixed; serialized EntityInputQueue
+[Checksums]                       DenseDictionary<int, uint>
+[int32 anchorCount]
+[ {int32 FixedFrame, uint32 Checksum, byte[] Payload} ... ]
+[int32 bookmarkCount]
+[ {int32 FixedFrame, uint32 Checksum, string Label, byte[] Payload} ... ]
 [int32 TrecsConstants.RecordingSentinelValue = 584488256]
 [byte EndOfPayloadMarker = 0x5E]
 ```
 
-`RecordingSentinelValue` plays the same role as `WorldStateStreamGuard` but for recordings: it catches drift between recording and playback of the input-queue format.
+Each anchor and bookmark `Payload` is itself a full snapshot payload (header, framing, world state, end-of-payload marker) — feeding one to `SnapshotSerializer.LoadSnapshot(stream)` restores world state at that frame. Anchors are auto-placed by the recorder at `BundleRecorderSettings.AnchorIntervalSeconds` cadence and used at runtime as desync-recovery points and as scrub anchors in editor tooling. Bookmarks are user-placed and carry a label.
 
-`RecordingMetadata.Checksums` is a `DenseDictionary<int, uint>` mapping fixed-frame number to a checksum computed at recording time. Playback recomputes the checksum on the same frames and raises a desync when they disagree. The hash algorithm used is FNV-1a (32-bit) — non-cryptographic and not collision-resistant, but sufficient for sanity-check desync detection: a missed collision on one checksum frame is caught by the next one because real desyncs diverge further over time.
+`RecordingSentinelValue` plays the same role as `WorldStateStreamGuard` but for bundles: it catches drift between writer and reader of the bundle layout.
+
+`Checksums` is a `DenseDictionary<int, uint>` mapping fixed-frame number to a world-state checksum computed at recording time. `BundlePlayer` recomputes the checksum on the same frames and raises a desync when they disagree. The hash algorithm used is FNV-1a (32-bit) — non-cryptographic and not collision-resistant, but sufficient for sanity-check desync detection: a missed collision on one checksum frame is caught by the next one because real desyncs diverge further over time.
 
 ## Endianness and portability
 
@@ -111,11 +120,11 @@ The format is a mix of two encodings:
 - **Primitives routed through `BinaryWriter` / `BinaryReader`** — header fields, explicit `Write<int>` / `Write<long>` / `Write<bool>` calls, the sentinels. Always little-endian (the .NET `BinaryWriter` / `BinaryReader` spec).
 - **Blittable structs routed through `MemoryBlitter`** — `BlitWrite<T>`, `BlitWriteArray<T>`, `BlitWriteRawBytes`. Raw memory copy, so host-native endian.
 
-On every platform Unity currently ships (x64, ARM64, WebGL) both encodings are little-endian in practice, so payloads round-trip cleanly. A hypothetical big-endian host would produce files where `BinaryWriter` output is LE while blit output is BE, making those files unreadable on little-endian hosts and vice versa. Treat snapshots and recordings as non-portable across architectures; do not share them between players running different CPUs without an explicit portability test.
+On every platform Unity currently ships (x64, ARM64, WebGL) both encodings are little-endian in practice, so payloads round-trip cleanly. A hypothetical big-endian host would produce files where `BinaryWriter` output is LE while blit output is BE, making those files unreadable on little-endian hosts and vice versa. Treat snapshots and bundles as non-portable across architectures; do not share them between players running different CPUs without an explicit portability test.
 
 ## Integrity
 
-A single `0x5E` byte is the only payload-integrity check. A bit flip inside the data section is not detected; checksums (recordings only) catch most such cases but are FNV-1a, which has known collision risk. When stronger integrity is needed, wrap the stream in your own CRC / HMAC envelope before passing it to `SaveSnapshot(stream)` / `StartPlayback(stream)`.
+A single `0x5E` byte is the only payload-integrity check. A bit flip inside the data section is not detected; the per-frame checksums embedded in a bundle catch most such cases but are FNV-1a, which has known collision risk. When stronger integrity is needed, wrap the stream in your own CRC / HMAC envelope before passing it to `SaveSnapshot(stream)` / `RecordingBundleSerializer.Save(stream)`.
 
 ## Forward compatibility
 

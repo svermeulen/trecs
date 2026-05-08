@@ -15,7 +15,7 @@ namespace Trecs.Serialization.Samples.SaveGame
     ///   F1 / F2 / F3  — Save current state into slot 1 / 2 / 3.
     ///   F5 / F6 / F7  — Load state from slot 1 / 2 / 3 (if present).
     ///
-    /// Save files live under {persistentDataPath}/SaveGame/slot{N}.bin.
+    /// Save files live under {persistentDataPath}/SaveGame/slot{N}.snap.
     /// </summary>
     public class SaveGameController : IDisposable
     {
@@ -43,7 +43,7 @@ namespace Trecs.Serialization.Samples.SaveGame
             {
                 _slots[i] = new SlotInfo(
                     index: i,
-                    filePath: Path.Combine(_saveDir, $"slot{i + 1}.bin")
+                    filePath: Path.Combine(_saveDir, $"slot{i + 1}.snap")
                 );
                 _slots[i].Refresh();
             }

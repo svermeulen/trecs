@@ -185,8 +185,9 @@ namespace Trecs.Internal
             Assert.That(_isInitialized);
 
             // Channels are intentionally NOT serialized — they're ephemeral
-            // and reapplied by their respective owners (PlaybackHandler,
-            // editor, user code) on each session.
+            // and reapplied by their respective owners (BundlePlayer for
+            // EnableChannel.Playback, the editor for EnableChannel.Editor,
+            // and application code for EnableChannel.User) on each session.
             writer.Write("SystemCount", _systemCount);
             writer.Write("WordCount", _wordCount);
 

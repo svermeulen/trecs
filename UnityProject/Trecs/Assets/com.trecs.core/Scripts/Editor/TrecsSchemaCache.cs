@@ -205,9 +205,9 @@ namespace Trecs
     /// Static, editor-only writer/reader for <see cref="TrecsSchema"/>.
     /// Subscribes to <see cref="WorldRegistry"/> events on editor load and
     /// writes a snapshot every time a world is registered or unregistered,
-    /// so the cache always reflects the most recent run. The cache lives at
-    /// <c>&lt;project&gt;/svkj_temp/trecs_inspector_schema.json</c> (gitignored
-    /// alongside other svkj_temp artifacts).
+    /// so the cache always reflects the most recent run. The cache lives
+    /// under <see cref="TrecsPaths.InspectorSchema"/> (Unity's
+    /// <c>Library/</c> tree, gitignored by default).
     /// </summary>
     [InitializeOnLoad]
     public static class TrecsSchemaCache
@@ -216,8 +216,8 @@ namespace Trecs
 
         // Snapshots from worlds that haven't been registered in a long
         // time are almost always stale (renamed test scenes, removed
-        // installer worlds, etc.). Drop them at editor startup so
-        // svkj_temp/trecs_inspector_schema/ doesn't fill up forever.
+        // installer worlds, etc.). Drop them at editor startup so the
+        // inspector schema directory doesn't fill up forever.
         const int _staleSnapshotDays = 30;
 
         static TrecsSchemaCache()
@@ -283,9 +283,7 @@ namespace Trecs
 
         public static string GetSchemaDirectory()
         {
-            return Path.GetFullPath(
-                Path.Combine(Application.dataPath, "..", "svkj_temp", "trecs_inspector_schema")
-            );
+            return TrecsPaths.InspectorSchema;
         }
 
         // Schema is keyed by sanitized world name on disk so the dropdown

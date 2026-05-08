@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -54,10 +55,64 @@ namespace Trecs.Serialization
         }
 #endif
 
+        /// <summary>
+        /// Register a custom serializer for component type <typeparamref name="T"/>.
+        /// If a serializer is already registered for the type the existing one is
+        /// replaced and a warning is logged — callers that want strict
+        /// duplicate-detection should call <see cref="TryGetCustomComponentSerializer{T}"/>
+        /// first and decide what to do.
+        /// </summary>
         public void RegisterCustomComponentSerializer<T>(IComponentArrayCustomSerializer serializer)
             where T : unmanaged, IEntityComponent
         {
-            _customComponentSerializers.Add(typeof(ComponentArray<T>), serializer);
+            Assert.IsNotNull(serializer);
+            var key = typeof(ComponentArray<T>);
+            if (_customComponentSerializers.ContainsKey(key))
+            {
+                _log.Warning(
+                    "Replacing existing custom component serializer for component type {}",
+                    typeof(T)
+                );
+            }
+            _customComponentSerializers[key] = serializer;
+        }
+
+        /// <summary>
+        /// Remove the custom serializer registered for component type
+        /// <typeparamref name="T"/>. Returns <c>true</c> if a serializer was
+        /// removed, <c>false</c> if none was registered.
+        /// </summary>
+        public bool UnregisterCustomComponentSerializer<T>()
+            where T : unmanaged, IEntityComponent
+        {
+            return _customComponentSerializers.Remove(typeof(ComponentArray<T>));
+        }
+
+        /// <summary>
+        /// Retrieve the custom serializer registered for component type
+        /// <typeparamref name="T"/>, if any. Returns <c>true</c> with the
+        /// serializer in <paramref name="serializer"/> when registered,
+        /// <c>false</c> with <c>null</c> when not.
+        /// </summary>
+        public bool TryGetCustomComponentSerializer<T>(
+            out IComponentArrayCustomSerializer serializer
+        )
+            where T : unmanaged, IEntityComponent
+        {
+            return _customComponentSerializers.TryGetValue(
+                typeof(ComponentArray<T>),
+                out serializer
+            );
+        }
+
+        /// <summary>
+        /// Enumerate the component types that currently have a custom serializer
+        /// registered. Returns the component value types (e.g. <c>typeof(CFoo)</c>),
+        /// not the underlying <c>ComponentArray&lt;T&gt;</c> wrappers.
+        /// </summary>
+        public IEnumerable<Type> GetCustomComponentSerializerTypes()
+        {
+            return _customComponentSerializers.Keys.Select(k => k.GetGenericArguments()[0]);
         }
 
         void WriteComponentArray(IComponentArray array, ISerializationWriter writer)

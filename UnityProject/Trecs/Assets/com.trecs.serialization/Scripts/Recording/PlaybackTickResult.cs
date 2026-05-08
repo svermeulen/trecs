@@ -1,8 +1,8 @@
 namespace Trecs.Serialization
 {
     /// <summary>
-    /// Result from a single <see cref="PlaybackHandler.TickPlayback"/> call.
-    /// When the current tick had a recorded checksum, both <see cref="ExpectedChecksum"/>
+    /// Result from a single <see cref="BundlePlayer.Tick"/> call. When the
+    /// current tick had a recorded checksum, both <see cref="ExpectedChecksum"/>
     /// and <see cref="ActualChecksum"/> are populated and <see cref="ChecksumVerified"/>
     /// is true; otherwise both are null and the other flags are false.
     /// </summary>

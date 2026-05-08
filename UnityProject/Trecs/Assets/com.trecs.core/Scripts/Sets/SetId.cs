@@ -7,6 +7,7 @@ namespace Trecs
     /// Stable integer identifier for an entity set definition. Corresponds to a
     /// <see cref="EntitySet"/> registered via <see cref="WorldBuilder.AddSet{T}"/>.
     /// </summary>
+    [TypeId(364820517)]
     public readonly struct SetId
         : IEquatable<SetId>,
             IComparable<SetId>,

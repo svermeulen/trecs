@@ -1,26 +1,66 @@
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 
 namespace Trecs.SourceGen.Tests;
 
 /// <summary>
-/// Negative tests for the Job scheduling diagnostics group (TRECS070-079). All
+/// Negative tests for the Job scheduling diagnostics group (TRECS070-079). Most are
 /// emitted from JobGenerator's validators when a job struct's [FromWorld] /
-/// [ForEachEntity] surface violates a scheduling-shape rule.
+/// [ForEachEntity] surface violates a scheduling-shape rule. TRECS070 is the
+/// exception — it's emitted by <see cref="RawScheduleMethodAnalyzer"/>, a
+/// <see cref="Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer"/>, and is
+/// driven through <see cref="GeneratorTestHarness.RunAnalyzers"/>.
 ///
-/// Codes covered: 071, 073, 074, 075, 076, 077, 078, 079.
+/// Codes covered: 070, 071, 073, 074, 075, 076, 077, 078, 079.
 ///
 /// Codes intentionally not covered here:
-/// - TRECS070 (RawScheduleWithTrecsFields): emitted by RawScheduleMethodAnalyzer,
-///   a DiagnosticAnalyzer rather than an IIncrementalGenerator. The current
-///   GeneratorTestHarness drives generators only — adding analyzer support is
-///   its own scope-of-work.
 /// - TRECS072: gap in numbering; no descriptor.
 /// </summary>
 [TestFixture]
 public class Diagnostics_TRECS070_to_079_JobSchedulingTests
 {
+    [Test]
+    public void TRECS070_RawScheduleParallelOnJobWithTrecsField()
+    {
+        // A job struct with a Trecs typed field (NativeComponentBufferRead<T>)
+        // calling Unity's IJobForExtensions.ScheduleParallel directly should fire
+        // TRECS070. The user must call the JobGenerator-emitted ScheduleParallel
+        // member overload (which threads the world's dep tracking) instead.
+        const string source = """
+            namespace Sample
+            {
+                using Unity.Jobs;
+
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+
+                public partial struct MyJob : Unity.Jobs.IJobFor
+                {
+                    [Trecs.FromWorld]
+                    public Trecs.NativeComponentBufferRead<CPos> Positions;
+
+                    public void Execute(int index) { }
+                }
+
+                public static class Caller
+                {
+                    public static void Go()
+                    {
+                        var job = new MyJob();
+                        job.ScheduleParallel(10, 1, default);
+                    }
+                }
+            }
+            """;
+
+        AssertAnalyzerDiagnostic(
+            source,
+            "TRECS070",
+            new DiagnosticAnalyzer[] { new RawScheduleMethodAnalyzer() }
+        );
+    }
+
     [Test]
     public void TRECS071_UnsupportedFromWorldFieldType()
     {
@@ -225,5 +265,34 @@ public class Diagnostics_TRECS070_to_079_JobSchedulingTests
         );
         var diag = run.GenDiagnostics.FirstOrDefault(d => d.Id == expectedId);
         Assert.That(diag, Is.Not.Null, $"Expected {expectedId}, got:\n{run.Format()}");
+    }
+
+    static void AssertAnalyzerDiagnostic(
+        string source,
+        string expectedId,
+        DiagnosticAnalyzer[] analyzers
+    )
+    {
+        var diagnostics = GeneratorTestHarness.RunAnalyzers(analyzers, source);
+        var diag = diagnostics.FirstOrDefault(d => d.Id == expectedId);
+        Assert.That(
+            diag,
+            Is.Not.Null,
+            $"Expected {expectedId}, got:\n{FormatDiagnostics(diagnostics)}"
+        );
+    }
+
+    static string FormatDiagnostics(
+        System.Collections.Immutable.ImmutableArray<Diagnostic> diagnostics
+    )
+    {
+        if (diagnostics.IsEmpty)
+            return "  (none)";
+        return string.Join(
+            "\n",
+            diagnostics.Select(d =>
+                $"  {d.Severity} {d.Id} at {d.Location.GetLineSpan()}: {d.GetMessage()}"
+            )
+        );
     }
 }

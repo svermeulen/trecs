@@ -211,6 +211,33 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
         );
     }
 
+    [Test]
+    public void TRECS008_TwoGlobalIndexParametersOnComponentJob()
+    {
+        // Component-iteration jobs validate parameter shape; two [GlobalIndex] parameters
+        // is an explicit "only one is allowed" error path. This guards the "more than one
+        // [GlobalIndex] parameter" branch in JobGenerator.ValidateForEachComponentsMethod.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial struct BadJob : Unity.Jobs.IJobFor
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    public void Execute(in CPos a, [Trecs.GlobalIndex] int one, [Trecs.GlobalIndex] int two) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS008",
+            new IIncrementalGenerator[] { new JobGenerator(), new EntityComponentGenerator() }
+        );
+    }
+
     static void AssertDiagnostic(
         string source,
         string expectedId,

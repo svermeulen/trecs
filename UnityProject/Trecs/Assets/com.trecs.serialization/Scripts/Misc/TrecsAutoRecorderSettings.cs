@@ -1,56 +1,55 @@
 namespace Trecs.Serialization
 {
     /// <summary>
-    /// Action taken when the recorder hits its memory or count cap.
+    /// Tunables for <see cref="TrecsAutoRecorder"/>'s capture cadence and
+    /// in-memory caps. Saved per-game via <c>TrecsPlayerSettingsStore</c>
+    /// (EditorPrefs-backed) and pushed onto each new recorder when its
+    /// controller registers.
     /// </summary>
-    public enum CapacityOverflowAction
-    {
-        /// <summary>
-        /// Drop the oldest snapshots to make room (rolling buffer). Useful
-        /// when only the recent past matters.
-        /// </summary>
-        DropOldest,
-
-        /// <summary>
-        /// Pause the SystemRunner's fixed phase so capture stops growing.
-        /// The user can then save/fork/reset before resuming.
-        /// </summary>
-        Pause,
-    }
-
     public class TrecsAutoRecorderSettings
     {
         /// <summary>
         /// Wall-clock seconds (in simulation time, derived from FixedDeltaTime
-        /// and frame counts) between snapshot snapshots. Smaller values give
-        /// faster scrubbing at the cost of memory; larger values save memory
-        /// at the cost of more resimulation when jumping. Per-game tuning
-        /// expected.
+        /// and frame counts) between persisted-anchor captures. Anchors are
+        /// the snapshots that survive Save/Load and serve as desync-recovery
+        /// points during runtime playback. Sparse — larger values reduce file
+        /// size; smaller values reduce the maximum amount of resimulation
+        /// needed during playback recovery.
         /// </summary>
-        public float SnapshotIntervalSeconds = 0.5f;
+        public float AnchorIntervalSeconds = 30f;
+
+        /// <summary>
+        /// Wall-clock seconds (simulation time) between transient scrub-cache
+        /// captures. The scrub cache is in-memory only — never saved — and
+        /// makes recent-frame scrub-back instant. Smaller intervals = snappier
+        /// scrubbing at the cost of memory.
+        /// </summary>
+        public float ScrubCacheIntervalSeconds = 1f;
+
+        /// <summary>
+        /// Capture a checksum every N fixed frames during live recording.
+        /// Persisted into the saved bundle's <c>Checksums</c> dict so
+        /// <see cref="BundlePlayer"/> can detect desyncs close to where they
+        /// happen during playback (rather than only at sparse anchor frames).
+        /// Smaller = catches desyncs earlier; larger = less per-frame cost.
+        /// Must be &gt;= 1. Matches <see cref="BundleRecorderSettings.ChecksumFrameInterval"/>.
+        /// </summary>
+        public int ChecksumFrameInterval = 30;
 
         public int Version = 1;
 
         /// <summary>
-        /// Maximum number of snapshots kept in memory before
-        /// <see cref="OverflowAction"/> kicks in. 0 means unbounded
-        /// (not recommended outside short-lived diagnostic sessions).
+        /// Maximum number of persisted anchors kept in memory. Oldest is
+        /// dropped when the cap is hit. 0 means unbounded — fine for short
+        /// debug sessions, not recommended for hours-long recordings.
         /// </summary>
-        public int MaxSnapshotCount = 0;
+        public int MaxAnchorCount = 0;
 
         /// <summary>
-        /// Maximum total bytes of snapshot data kept in memory before
-        /// <see cref="OverflowAction"/> kicks in. 0 means unbounded.
-        /// Default: 256 MB — chosen as a reasonable safety net for
-        /// editor-side debugging on developer machines.
+        /// Maximum total bytes of transient scrub-cache snapshots kept in
+        /// memory. Oldest is dropped when the cap is hit. Default 64 MB —
+        /// holds about a minute of dense scrub points for a typical world.
         /// </summary>
-        public long MaxSnapshotMemoryBytes = 256L * 1024 * 1024;
-
-        /// <summary>
-        /// What to do when a cap is reached. Defaults to
-        /// <see cref="CapacityOverflowAction.DropOldest"/> so an
-        /// accidentally-left-on recording hard-caps memory via eviction.
-        /// </summary>
-        public CapacityOverflowAction OverflowAction = CapacityOverflowAction.DropOldest;
+        public long MaxScrubCacheBytes = 64L * 1024 * 1024;
     }
 }

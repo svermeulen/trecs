@@ -30,9 +30,10 @@ namespace Trecs
 
         /// <summary>
         /// Advances <see cref="Value"/> to be at least <paramref name="value"/>.
-        /// No-op if <see cref="Value"/> is already greater. Used by frame-scoped heaps
-        /// when deserializing on top of an already-running game (InputsOnly mode):
-        /// the running game's counter must not be clobbered by a smaller saved value.
+        /// No-op if <see cref="Value"/> is already greater. Used by frame-scoped
+        /// heaps when deserializing on top of an already-running game (e.g. when
+        /// BundlePlayer swaps the input queue contents mid-session): the running
+        /// game's counter must not be clobbered by a smaller saved value.
         /// </summary>
         internal void EnsureAtLeast(uint value)
         {

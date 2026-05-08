@@ -277,37 +277,6 @@ namespace Trecs
             _log.Debug("Deserialized {} input heap entries", _entries.Count);
         }
 
-        internal void RemapFrameOffsets(int frameOffset)
-        {
-            Assert.That(!_isDisposed);
-
-            if (frameOffset == 0)
-            {
-                return;
-            }
-
-            // Collect entries to update (since HeapEntry is readonly)
-            var entriesToUpdate = new List<(uint address, HeapEntry entry)>();
-            foreach (var (address, entry) in _entries)
-            {
-                entriesToUpdate.Add((address, entry));
-            }
-
-            _entries.Clear();
-
-            foreach (var (address, oldEntry) in entriesToUpdate)
-            {
-                var newEntry = new HeapEntry(oldEntry.Frame + frameOffset, oldEntry.BlobId);
-                _entries.Add(address, newEntry);
-            }
-
-            _log.Debug(
-                "Remapped {} native blob input heap entries by {} frames",
-                entriesToUpdate.Count,
-                frameOffset
-            );
-        }
-
         readonly struct HeapEntry
         {
             public readonly BlobId BlobId;

@@ -335,40 +335,6 @@ namespace Trecs
             _log.Debug("Deserialized {} frame-scoped native unique entries", _activeEntries.Count);
         }
 
-        internal void RemapFrameOffsets(int frameOffset)
-        {
-            Assert.That(!_isDisposed);
-
-            if (frameOffset == 0)
-            {
-                return;
-            }
-
-            // FrameEntry is a value type with a readonly Frame field, so we can't update in place.
-            // Collect into a temp list, then re-add with the new frame.
-            var entriesToUpdate = new List<(uint address, FrameEntry entry)>();
-            foreach (var (address, entry) in _activeEntries)
-            {
-                entriesToUpdate.Add((address, entry));
-            }
-
-            _activeEntries.Clear();
-
-            foreach (var (address, oldEntry) in entriesToUpdate)
-            {
-                _activeEntries.Add(
-                    address,
-                    new FrameEntry(oldEntry.Box, oldEntry.Frame + frameOffset)
-                );
-            }
-
-            _log.Debug(
-                "Remapped {} frame-scoped native unique entries by {} frames",
-                entriesToUpdate.Count,
-                frameOffset
-            );
-        }
-
         static int BurstHashFromType(Type t)
         {
             return BurstRuntime.GetHashCode32(t);

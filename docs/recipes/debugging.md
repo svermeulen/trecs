@@ -62,7 +62,7 @@ You created a blob via `CreateBlob` on the main thread and then tried to resolve
 
 ## Desync during recording playback
 
-When recording is active, `RecordingChecksumCalculator` snapshots world state every N fixed frames. During playback, `PlaybackHandler` recomputes the checksum at the same frames and compares. A mismatch surfaces as `PlaybackState.Desynced`, with `HasDesynced == true`.
+When recording is active, `BundleRecorder` checksums world state every N fixed frames (`BundleRecorderSettings.ChecksumFrameInterval`). During playback, `BundlePlayer.Tick` recomputes the checksum at the same frames and compares. A mismatch surfaces as `BundlePlaybackState.Desynced`, with `HasDesynced == true` and `DesyncedFrame` set to the first failing frame.
 
 Common causes:
 
@@ -75,7 +75,7 @@ When checksums diverge, the [Determinism](./design-rules.md#determinism) checkli
 
 ## Post-deserialization checksum mismatch
 
-If `PlaybackHandler.LoadInitialState` was called with `expectedInitialChecksum` set and the post-load checksum doesn't match, that points at a **serialization defect** (not a simulation desync). Look for:
+If `BundlePlayer.Start` throws `SerializationException` because the post-deserialization world's checksum disagrees with `RecordingBundle.InitialSnapshotChecksum`, that points at a **serialization defect** (not a simulation desync). Look for:
 
 - A custom `ISerializer<T>` that doesn't round-trip byte-identically.
 - A serializer that writes different bytes depending on `writer.HasFlag(...)` without the same flags being set on load.

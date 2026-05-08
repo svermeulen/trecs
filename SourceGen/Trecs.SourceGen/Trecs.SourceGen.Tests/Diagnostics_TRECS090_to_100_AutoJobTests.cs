@@ -6,15 +6,10 @@ namespace Trecs.SourceGen.Tests;
 
 /// <summary>
 /// Negative tests for the [WrapAsJob] / AutoJob diagnostics group (TRECS090-100).
-/// All emitted from AutoJobGenerator's validators.
+/// All emitted from AutoJobGenerator's validators (TRECS099 is emitted from
+/// ParameterClassifier).
 ///
-/// Codes covered: 090, 091, 093, 094, 096, 097, 098, 100.
-///
-/// Codes intentionally not covered here:
-/// - TRECS099 (NativeSetNotAllowedOnMainThread): emitted from
-///   ParameterClassifier when a NativeSetRead/Write parameter appears in a
-///   main-thread iteration method. Triggering it cleanly needs `NativeSetRead`
-///   / `NativeSetWrite` stubs in TrecsStubs.cs (deferred).
+/// Codes covered: 090, 091, 093, 094, 096, 097, 098, 099, 100.
 /// </summary>
 [TestFixture]
 public class Diagnostics_TRECS090_to_100_AutoJobTests
@@ -197,6 +192,45 @@ public class Diagnostics_TRECS090_to_100_AutoJobTests
             """;
 
         AssertDiagnostic(source, "TRECS098");
+    }
+
+    [Test]
+    public void TRECS099_NativeSetReadOnMainThread()
+    {
+        // NativeSetRead<T> / NativeSetWrite<T> are job-only — using one in a
+        // main-thread [ForEachEntity] (no [WrapAsJob]) trips TRECS099 from
+        // ParameterClassifier. Routes through ForEachAspectGenerator for the
+        // aspect-shaped parameter; the diagnostic itself is parameter-shape only.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public partial struct PlayerView : Trecs.IAspect, Trecs.IRead<CPos> { }
+                public struct PlayerTag : Trecs.ITag { }
+                public struct PlayerSet : Trecs.IEntitySet { }
+
+                public partial class MySystem : Trecs.ISystem
+                {
+                    public void Execute() { }
+
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    void DoStuff(in PlayerView player, in Trecs.NativeSetRead<PlayerSet> set) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS099",
+            new IIncrementalGenerator[]
+            {
+                new ForEachAspectGenerator(),
+                new ForEachGenerator(),
+                new AutoSystemGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
+            }
+        );
     }
 
     [Test]

@@ -12,7 +12,7 @@ Compose just the pieces you need:
 - **`SerializerRegistry`** — maps types to their serializers.
 - **`WorldStateSerializer`** — reads/writes the entire ECS world (components, sets, heaps, entity handles).
 - **`SnapshotSerializer`** — captures and restores full state snapshots.
-- **`RecordingHandler` / `PlaybackHandler`** — capture and replay simulation history (covered in the next page).
+- **`BundleRecorder` / `BundlePlayer`** — capture and replay simulation history as a self-contained `RecordingBundle` (covered in the next page).
 
 The static helper `TrecsSerialization` provides preset registrations so the common path is one line. Users that only need partial setup (e.g. save-game-only projects that skip the recording machinery) can call individual `Register*Serializers` helpers instead.
 
@@ -31,7 +31,7 @@ var worldStateSerializer = new WorldStateSerializer(world);
 var snapshots = new SnapshotSerializer(worldStateSerializer, registry, world);
 ```
 
-For a save-game flow you stop here and use `SnapshotSerializer.SaveSnapshot`/`LoadSnapshot`. For deterministic record/replay also construct `RecordingHandler` and `PlaybackHandler` (see the [Recording & Playback](recording-and-playback.md) page).
+For a save-game flow you stop here and use `SnapshotSerializer.SaveSnapshot`/`LoadSnapshot`. For deterministic record/replay also construct `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` (see the [Recording & Playback](recording-and-playback.md) page).
 
 ## Granular registration
 
@@ -125,7 +125,7 @@ public sealed class MyGameStateSerializer : WorldStateSerializer
     }
 }
 
-// Pass the subclass to SnapshotSerializer / RecordingHandler / PlaybackHandler.
+// Pass the subclass to SnapshotSerializer / BundleRecorder / BundlePlayer.
 var worldStateSer = new MyGameStateSerializer(world, lua);
 var snapshots = new SnapshotSerializer(worldStateSer, registry, world);
 ```
@@ -171,11 +171,12 @@ See [Recording & Playback](recording-and-playback.md) for the determinism-sensit
 
 ## Threading
 
-All `SnapshotSerializer`, `RecordingHandler`, and `PlaybackHandler` methods
-are **main-thread only**. The underlying `SerializationBuffer` and the
-blit fast-path use a shared static byte buffer, and every read/write
-path asserts `UnityThreadUtil.IsMainThread`. Do not call save/load from
-a background thread.
+All `SnapshotSerializer`, `BundleRecorder`, `BundlePlayer`, and
+`RecordingBundleSerializer` methods are **main-thread only**. The
+underlying `SerializationBuffer` and the blit fast-path use a shared
+static byte buffer, and every read/write path asserts
+`UnityThreadUtil.IsMainThread`. Do not call save/load from a background
+thread.
 
 ## Binary format stability
 
@@ -183,11 +184,11 @@ The binary layout is **version-sensitive** and not forward-compatible:
 
 - Adding, removing, or reordering fields on a blittable component changes
   the byte layout, invalidating every previously saved snapshot or
-  recording that used the old shape.
+  bundle that used the old shape.
 - The `version` integer you pass to `SaveSnapshot(version, …)` /
-  `StartRecording(version, …)` is stored in the file header and exposed
-  on `SnapshotMetadata.Version` / `RecordingMetadata.Version`. Trecs does
-  not interpret it — bumping `version` on a breaking change is a
+  `BundleRecorderSettings.Version` is stored in the file header and
+  exposed on `SnapshotMetadata.Version` / `BundleHeader.Version`. Trecs
+  does not interpret it — bumping `version` on a breaking change is a
   convention you own.
 - Use `SnapshotSerializer.PeekMetadata(path)` (or `(stream)`) to inspect
   the saved version before committing to a full `LoadSnapshot`, and
@@ -234,14 +235,14 @@ public void Serialize(in Npc value, ISerializationWriter writer)
 }
 ```
 
-`RecordingHandler` stores the flags on `RecordingMetadata.ChecksumFlags`
-and `PlaybackHandler` passes them back in automatically during checksum
+`BundleRecorder` stores the flags on `BundleHeader.ChecksumFlags` and
+`BundlePlayer` passes them back in automatically during checksum
 verification, so recording and playback always agree on what was
 included.
 
 ### Versioned custom serializers
 
-The `version` integer you pass to `SaveSnapshot` / `StartRecording` is stamped into the file header *and* exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). Because the header records the version the file was written with, the deserializer can recognize older saves and read them with the layout they were written in. As long as you bump the version every time you change the on-disk layout, a single serializer can keep handling all prior versions:
+The `version` integer you pass to `SaveSnapshot` / set on `BundleRecorderSettings.Version` is stamped into the file header *and* exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). Because the header records the version the file was written with, the deserializer can recognize older saves and read them with the layout they were written in. As long as you bump the version every time you change the on-disk layout, a single serializer can keep handling all prior versions:
 
 ```csharp
 public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>

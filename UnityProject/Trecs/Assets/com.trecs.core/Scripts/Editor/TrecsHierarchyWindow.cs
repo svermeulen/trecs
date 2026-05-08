@@ -1313,9 +1313,9 @@ namespace Trecs
                     if (
                         EditorUtility.DisplayDialog(
                             "Clear all cached schemas",
-                            "Delete every on-disk schema snapshot under svkj_temp/"
-                                + "trecs_inspector_schema/?\n\nAccumulated runtime access "
-                                + "data for every world will be lost.",
+                            "Delete every on-disk schema snapshot under "
+                                + "Library/com.trecs/inspector_schema/?\n\nAccumulated "
+                                + "runtime access data for every world will be lost.",
                             "Clear all",
                             "Cancel"
                         )

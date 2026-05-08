@@ -75,7 +75,7 @@ namespace Trecs.Tests
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
-            var path = Path.Combine(Path.GetTempPath(), $"trecs_test_{Guid.NewGuid():N}.bin");
+            var path = Path.Combine(Path.GetTempPath(), $"trecs_test_{Guid.NewGuid():N}.snap");
             try
             {
                 snapshots.SaveSnapshot(version: 1, filePath: path);
@@ -178,7 +178,7 @@ namespace Trecs.Tests
             NAssert.Throws<ArgumentNullException>(() => snapshots.LoadSnapshot((Stream)null));
             NAssert.Throws<FileNotFoundException>(() =>
                 snapshots.LoadSnapshot(
-                    Path.Combine(Path.GetTempPath(), $"trecs_nonexistent_{Guid.NewGuid():N}.bin")
+                    Path.Combine(Path.GetTempPath(), $"trecs_nonexistent_{Guid.NewGuid():N}.snap")
                 )
             );
         }

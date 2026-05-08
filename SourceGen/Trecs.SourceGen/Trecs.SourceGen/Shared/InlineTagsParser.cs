@@ -17,6 +17,11 @@ namespace Trecs.SourceGen.Shared
     /// runtime overload). Empty / missing inline tags are returned as an empty list —
     /// the caller decides whether that's acceptable for the kind being parsed.
     /// </para>
+    /// <para>
+    /// Tag-source extraction (positional / generic / named) and the TRECS053
+    /// mutual-exclusion check are delegated to <see cref="TagSourceParser"/>;
+    /// only the FromWorld-specific tag-count cap is enforced here.
+    /// </para>
     /// </summary>
     internal static class InlineTagsParser
     {
@@ -37,99 +42,17 @@ namespace Trecs.SourceGen.Shared
             System.Action<Diagnostic> reportDiagnostic
         )
         {
-            var tagTypes = new List<ITypeSymbol>();
-            ITypeSymbol? singleTag = null;
-            // Positional ctor: [SingleEntity(typeof(A))] / [SingleEntity(typeof(A), typeof(B))]
-            // expanded as either a single Type arg or an array via params Type[].
-            var ctorTags = new List<ITypeSymbol>();
-            // C# 11 generic-attribute form: [SingleEntity<A>] / [SingleEntity<A, B>].
-            // Tags are pulled from the attribute class's TypeArguments. Roslyn returns
-            // the same Name ("SingleEntityAttribute") for the generic and non-generic
-            // variants, so callers' attribute-name matching already routes both here.
-            var genericTags = new List<ITypeSymbol>();
-            if (attribute.AttributeClass is INamedTypeSymbol namedAttrClass)
-            {
-                foreach (var typeArg in namedAttrClass.TypeArguments)
-                {
-                    // TypeParameterSymbol means an unbound generic — skip; only add
-                    // concrete ITypeSymbol args.
-                    if (typeArg.TypeKind != TypeKind.TypeParameter)
-                        genericTags.Add(typeArg);
-                }
-            }
-            foreach (var ctorArg in attribute.ConstructorArguments)
-            {
-                if (ctorArg.Kind == TypedConstantKind.Array)
-                {
-                    foreach (var element in ctorArg.Values)
-                        if (
-                            element.Kind == TypedConstantKind.Type
-                            && element.Value is ITypeSymbol cet
-                        )
-                            ctorTags.Add(cet);
-                }
-                else if (ctorArg.Kind == TypedConstantKind.Type && ctorArg.Value is ITypeSymbol ct)
-                {
-                    ctorTags.Add(ct);
-                }
-            }
-            foreach (var named in attribute.NamedArguments)
-            {
-                switch (named.Key)
-                {
-                    case "Tags" when named.Value.Kind == TypedConstantKind.Array:
-                        foreach (var element in named.Value.Values)
-                            if (
-                                element.Kind == TypedConstantKind.Type
-                                && element.Value is ITypeSymbol et
-                            )
-                                tagTypes.Add(et);
-                        break;
-                    case "Tag"
-                        when named.Value.Kind == TypedConstantKind.Type
-                            && named.Value.Value is ITypeSymbol t1:
-                        singleTag = t1;
-                        break;
-                }
-            }
-            // Mixing tag-source forms is ambiguous (named setters would silently
-            // overwrite ctor-set Tags; generic args + Tag/Tags double-specifies).
-            // Reuse the existing "both Tag and Tags" diagnostic — same root cause.
-            bool hasNamedTags = singleTag != null || tagTypes.Count > 0;
-            bool hasCtorTags = ctorTags.Count > 0;
-            bool hasGenericTags = genericTags.Count > 0;
-            int sourcesPresent =
-                (hasNamedTags ? 1 : 0) + (hasCtorTags ? 1 : 0) + (hasGenericTags ? 1 : 0);
-            if (sourcesPresent > 1)
-            {
-                reportDiagnostic(
-                    Diagnostic.Create(
-                        DiagnosticDescriptors.TagAndTagsBothSpecified,
-                        diagnosticLocation,
-                        targetName,
-                        attributeShortName
-                    )
-                );
+            var result = TagSourceParser.Parse(
+                attribute,
+                reportDiagnostic,
+                diagnosticLocation,
+                targetName,
+                attributeShortName
+            );
+            if (!result.Ok)
                 return null;
-            }
-            if (singleTag != null && tagTypes.Count > 0)
-            {
-                reportDiagnostic(
-                    Diagnostic.Create(
-                        DiagnosticDescriptors.TagAndTagsBothSpecified,
-                        diagnosticLocation,
-                        targetName,
-                        attributeShortName
-                    )
-                );
-                return null;
-            }
-            if (singleTag != null)
-                tagTypes.Add(singleTag);
-            if (hasCtorTags)
-                tagTypes.AddRange(ctorTags);
-            if (hasGenericTags)
-                tagTypes.AddRange(genericTags);
+
+            var tagTypes = result.TagTypes!;
             if (tagTypes.Count > 4)
             {
                 // TagSet<T1, T2, T3, T4>.Value is the highest runtime overload.
@@ -174,12 +97,7 @@ namespace Trecs.SourceGen.Shared
                     attr,
                     diagnosticLocation,
                     targetName,
-                    attributeShortName.EndsWith("Attribute")
-                        ? attributeShortName.Substring(
-                            0,
-                            attributeShortName.Length - "Attribute".Length
-                        )
-                        : attributeShortName,
+                    TagSourceParser.StripAttributeSuffix(attributeShortName),
                     reportDiagnostic
                 );
             }

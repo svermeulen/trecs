@@ -14,7 +14,7 @@ Push every box onto a target square. Boxes can only be pushed (never pulled), so
 | F1 / F2 / F3 | Save to slot 1 / 2 / 3 |
 | F5 / F6 / F7 | Load slot 1 / 2 / 3 |
 
-Slot files live under `{Application.persistentDataPath}/SaveGame/slot{N}.bin` and persist across editor restarts. The HUD shows each slot's last-save timestamp and a "Boxes on targets" counter.
+Slot files live under `{Application.persistentDataPath}/SaveGame/slot{N}.snap` and persist across editor restarts. The HUD shows each slot's last-save timestamp and a "Boxes on targets" counter.
 
 ## Serialization Setup
 

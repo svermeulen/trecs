@@ -16,7 +16,6 @@ namespace Trecs.Internal
         void ClearAllInputs();
         void Serialize(ITrecsSerializationWriter writer);
         void Deserialize(ITrecsSerializationReader reader);
-        void RemapFrameOffsets(int frameOffset);
         void AddHistoryLocker(IInputHistoryLocker locker);
         void RemoveHistoryLocker(IInputHistoryLocker locker);
         bool HasInputFrame<T>(int frame, EntityHandle entityHandle)
