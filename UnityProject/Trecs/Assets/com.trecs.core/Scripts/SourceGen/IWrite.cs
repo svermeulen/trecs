@@ -11,8 +11,7 @@ namespace Trecs
     /// </remarks>
     /// <example>
     /// <code>
-    /// [Aspect]
-    /// partial struct DoofusView : IRead&lt;CVelocity&gt;, IWrite&lt;CPosition&gt; { }
+    /// partial struct DoofusView : IAspect, IRead&lt;CVelocity&gt;, IWrite&lt;CPosition&gt; { }
     ///
     /// // Generated properties:
     /// //   ref readonly CVelocity Velocity { get; }

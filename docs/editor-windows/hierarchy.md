@@ -239,5 +239,5 @@ The window switches automatically: when a live world appears it takes over the d
 - [World Setup](../core/world-setup.md) — `WorldBuilder.SetDebugName` controls how a world appears in the dropdown.
 - [Disabling and Pausing Systems](../advanced/system-control.md) — `EnableChannel.Editor` is the channel the hierarchy's per-system enable toggle uses.
 - Sibling editor windows (also under `Window > Trecs`):
-    - **Trecs Player** — record / playback / snapshot / scrub / fork / loop UI for the active world.
-    - **Trecs Saves** — library window for managing recordings and snapshots.
+    - [**Trecs Player**](player.md) — record / playback / snapshot / scrub / fork / loop UI for the active world.
+    - [**Trecs Saves**](saves.md) — library window for managing recordings and snapshots.

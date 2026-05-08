@@ -96,7 +96,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor AspectMustBePartial = new(
             id: "TRECS009",
             title: "Aspect must be partial",
-            messageFormat: "Aspect '{0}' must be marked as partial since it uses [Aspect]",
+            messageFormat: "Aspect '{0}' must be marked as partial since it implements IAspect",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true

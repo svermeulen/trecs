@@ -11,8 +11,7 @@ namespace Trecs
     /// </remarks>
     /// <example>
     /// <code>
-    /// [Aspect]
-    /// partial struct EnemyView : IRead&lt;CPosition, CHealth&gt;, IWrite&lt;CVelocity&gt; { }
+    /// partial struct EnemyView : IAspect, IRead&lt;CPosition, CHealth&gt;, IWrite&lt;CVelocity&gt; { }
     ///
     /// // Generated properties:
     /// //   ref readonly CPosition Position { get; }   (or unwrapped value type if [Unwrap])

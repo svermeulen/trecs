@@ -8,9 +8,8 @@ namespace Trecs
     /// </summary>
     /// <remarks>
     /// <para>
-    /// An Aspect is a <c>partial struct</c> annotated with the
-    /// <c>[Aspect]</c> attribute that implements <c>IAspect</c> plus any
-    /// combination of <see cref="IRead{T1}"/> / <see cref="IWrite{T1}"/>
+    /// An Aspect is a <c>partial struct</c> that implements <c>IAspect</c>
+    /// plus any combination of <see cref="IRead{T1}"/> / <see cref="IWrite{T1}"/>
     /// (1‑arity through 8‑arity). The source generator emits:
     /// </para>
     /// <list type="bullet">
@@ -21,7 +20,7 @@ namespace Trecs
     /// </list>
     /// <para>
     /// Tags are not part of the Aspect — they're specified at iteration time
-    /// (<c>[ForEachAspect(typeof(MyTag))]</c> on the iterating method, or
+    /// (<c>[ForEachEntity(typeof(MyTag))]</c> on the iterating method, or
     /// <c>MyAspect.Query(Ecs).WithTags&lt;MyTag&gt;()</c> for fluent queries).
     /// This keeps an Aspect a pure component bundle that's reusable across
     /// any entity that has the listed components, regardless of which
@@ -34,12 +33,11 @@ namespace Trecs
     /// </para>
     /// <example>
     /// <code>
-    /// [Aspect]
-    /// partial struct PlayerView : IRead&lt;CHealth, CPosition&gt;, IWrite&lt;CBatteryLevel&gt;
+    /// partial struct PlayerView : IAspect, IRead&lt;CHealth, CPosition&gt;, IWrite&lt;CBatteryLevel&gt;
     /// {
     /// }
     ///
-    /// [ForEachAspect(typeof(EcsTags.LocalPlayer))]
+    /// [ForEachEntity(typeof(EcsTags.LocalPlayer))]
     /// void Tick(ref PlayerView player)
     /// {
     ///     var pos = player.Position;        // ref readonly CPosition

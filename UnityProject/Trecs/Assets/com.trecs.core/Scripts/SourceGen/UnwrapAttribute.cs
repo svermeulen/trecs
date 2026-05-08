@@ -25,8 +25,7 @@ namespace Trecs
     ///     public float3 Value;
     /// }
     ///
-    /// [Aspect]
-    /// partial struct MyView : IWrite&lt;Position&gt; { }
+    /// partial struct MyView : IAspect, IWrite&lt;Position&gt; { }
     ///
     /// // With [Unwrap]: myView.Position is ref float3
     /// // Without [Unwrap]: myView.Position would be ref Position

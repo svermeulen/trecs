@@ -220,7 +220,7 @@ namespace Trecs.Tests
 
         #endregion
 
-        #region ForEachAspect Attribute + Aspect Tag Merging
+        #region ForEachEntity Attribute + Aspect Tag Merging
 
         // QSingleTagView no longer has IHasTags — attribute specifies both tags
         // Should only find entities with BOTH tags
@@ -263,7 +263,7 @@ namespace Trecs.Tests
 
         #endregion
 
-        #region ForEachAspect Set
+        #region ForEachEntity Set
 
         [ForEachEntity(Tags = new[] { typeof(QCatA) }, Set = typeof(QTestSetA))]
         void ProcessFilterForEach(in QFilterTagView view)
@@ -304,7 +304,7 @@ namespace Trecs.Tests
 
         #endregion
 
-        #region ForEachAspect Dynamic Criteria Composition
+        #region ForEachEntity Dynamic Criteria Composition
 
         // Method with attribute-baked tags. Callers can pass an arbitrary
         // QueryBuilder/SparseQueryBuilder; the attribute tags are merged additively.
@@ -868,7 +868,7 @@ namespace Trecs.Tests
 
         #endregion
 
-        #region ForEachAspect EntityIndex Parameter
+        #region ForEachEntity EntityIndex Parameter
 
         [ForEachEntity(Tags = new[] { typeof(QCatA) })]
         void ProcessWithEntityIndex(in QSingleTagView view, EntityIndex entityIndex)

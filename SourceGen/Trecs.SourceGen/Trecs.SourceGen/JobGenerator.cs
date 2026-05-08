@@ -17,9 +17,9 @@ namespace Trecs.SourceGen
     /// <summary>
     /// Source generator for Trecs jobs declared as <c>partial struct</c>s with either:
     /// <list type="bullet">
-    /// <item><description>An <c>Execute</c> method decorated with <c>[ForEachAspect]</c>
-    /// or <c>[ForEachComponents]</c> (iteration job — replaces the marker-interface
-    /// <c>IForEachAspectJob</c> / <c>IForEachComponentsJob</c> patterns), or</description></item>
+    /// <item><description>An <c>Execute</c> method decorated with <c>[ForEachEntity]</c>
+    /// (iteration job — auto-routes to component-iteration or aspect-iteration based on
+    /// the parameter type), or</description></item>
     /// <item><description>One or more <c>[FromWorld]</c>-decorated fields with no
     /// iteration attribute (custom non-iteration job; emits an <c>IJob</c> wrapper).</description></item>
     /// </list>
@@ -41,7 +41,7 @@ namespace Trecs.SourceGen
             // Detect partial structs that look like Trecs jobs in the new pattern.
             //
             // We discriminate at the syntax level on the struct's declaration:
-            //   1. Has at least one [ForEachAspect] / [ForEachComponents] on a method, or
+            //   1. Has at least one [ForEachEntity] on a method, or
             //   2. Has at least one [FromWorld] on a field.
             //
             // The semantic-model verification happens in the transform stage.

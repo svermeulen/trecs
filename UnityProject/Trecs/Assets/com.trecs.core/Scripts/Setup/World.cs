@@ -196,7 +196,7 @@ namespace Trecs
         /// Total number of systems registered in this world. Stable for the lifetime
         /// of the world; system indices are in the range <c>[0, SystemCount)</c> and
         /// can be used with <see cref="GetSystemMetadata"/> and
-        /// <see cref="SetSystemEnabled"/>.
+        /// <see cref="WorldAccessor.SetSystemEnabled"/>.
         /// </summary>
         public int SystemCount
         {
@@ -210,7 +210,7 @@ namespace Trecs
         /// <summary>
         /// Returns metadata for the system at <paramref name="systemIndex"/>. Use this to
         /// iterate systems and build custom groupings (e.g. "all systems matching some tag")
-        /// that drive <see cref="SetSystemEnabled"/> or
+        /// that drive <see cref="WorldAccessor.SetSystemEnabled"/> or
         /// <see cref="WorldAccessor.SetSystemPaused"/> calls.
         /// </summary>
         public SystemMetadata GetSystemMetadata(int systemIndex)

@@ -69,6 +69,8 @@ nav:
       - Time & RNG: advanced/time-and-rng.md
   - Editor Windows:
       - Hierarchy: editor-windows/hierarchy.md
+      - Player: editor-windows/player.md
+      - Saves: editor-windows/saves.md
   - Samples:
       - Overview: samples/index.md
       - 01 - Hello Entity: samples/01-hello-entity.md

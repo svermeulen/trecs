@@ -185,7 +185,7 @@ namespace Trecs.Tests
             NAssert.IsTrue(_altAccessorIsSame);
         }
 
-        // ─── 5. ForEachAspect: aspect param NOT first in declaration order ───────
+        // ─── 5. ForEachEntity (aspect mode): aspect param NOT first in declaration order ───
 
         readonly List<int> _aspectAfterCustomArgResults = new();
 
