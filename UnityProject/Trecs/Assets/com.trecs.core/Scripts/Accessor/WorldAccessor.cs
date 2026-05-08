@@ -305,35 +305,14 @@ namespace Trecs
 
         public int Id { get; }
 
-        public WorldInfo WorldInfo
-        {
-            get
-            {
-
-                return _worldInfo;
-            }
-        }
+        public WorldInfo WorldInfo => _worldInfo;
 
         /// <summary>Whether there are any outstanding jobs that haven't completed yet.</summary>
         public bool HasOutstandingJobs => JobScheduler.HasOutstandingJobs;
 
-        public EntityHandle GlobalEntityHandle
-        {
-            get
-            {
+        public EntityHandle GlobalEntityHandle => _world.GlobalEntityHandle;
 
-                return _world.GlobalEntityHandle;
-            }
-        }
-
-        public EntityIndex GlobalEntityIndex
-        {
-            get
-            {
-
-                return _worldInfo.GlobalEntityIndex;
-            }
-        }
+        public EntityIndex GlobalEntityIndex => _worldInfo.GlobalEntityIndex;
 
         public float VariableElapsedTime
         {
@@ -373,14 +352,7 @@ namespace Trecs
             }
         }
 
-        public int FixedFrame
-        {
-            get
-            {
-
-                return _systemRunner.FixedFrame;
-            }
-        }
+        public int FixedFrame => _systemRunner.FixedFrame;
 
         public int VariableFrame
         {
@@ -407,23 +379,9 @@ namespace Trecs
             get { return _world; }
         }
 
-        internal IReadOnlyList<ExecutableSystemInfo> Systems
-        {
-            get
-            {
+        internal IReadOnlyList<ExecutableSystemInfo> Systems => _systemRunner.Systems;
 
-                return _systemRunner.Systems;
-            }
-        }
-
-        internal IReadOnlyList<int> SortedFixedSystems
-        {
-            get
-            {
-
-                return _systemRunner.SortedFixedSystems;
-            }
-        }
+        internal IReadOnlyList<int> SortedFixedSystems => _systemRunner.SortedFixedSystems;
 
         internal IReadOnlyList<int> SortedInputSystems
         {
