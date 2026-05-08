@@ -15,11 +15,13 @@ using Trecs.SourceGen.Shared;
 namespace Trecs.SourceGen
 {
     /// <summary>
-    /// Source generator that generates efficient iteration methods for aspects
-    /// marked with the ForEachAspectAttribute. Uses incremental generation for better performance.
+    /// Source generator that generates efficient iteration methods for the
+    /// aspect-iteration mode of <c>[ForEachEntity]</c> (i.e. methods whose
+    /// loop parameter is an <c>IAspect</c> rather than a component). Uses
+    /// incremental generation for better performance.
     /// </summary>
     [Generator]
-    public class ForEachAspectGenerator : IIncrementalGenerator
+    public class ForEachEntityAspectGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
@@ -28,8 +30,8 @@ namespace Trecs.SourceGen
             // ForEachGenerator for the caching rationale.
             var forEachMethodProvider = context
                 .SyntaxProvider.CreateSyntaxProvider(
-                    predicate: static (s, _) => IsMethodWithForEachAspectAttribute(s),
-                    transform: static (ctx, _) => GetForEachAspectData(ctx)
+                    predicate: static (s, _) => IsMethodWithForEachEntityAttribute(s),
+                    transform: static (ctx, _) => GetForEachEntityAspectData(ctx)
                 )
                 .Where(static m => m is not null);
 
@@ -42,11 +44,11 @@ namespace Trecs.SourceGen
 
             context.RegisterSourceOutput(
                 forEachWithGlobalNs,
-                static (spc, source) => GenerateForEachAspectSource(spc, source.Left!, source.Right)
+                static (spc, source) => GenerateForEachEntityAspectSource(spc, source.Left!, source.Right)
             );
         }
 
-        private static bool IsMethodWithForEachAspectAttribute(SyntaxNode node)
+        private static bool IsMethodWithForEachEntityAttribute(SyntaxNode node)
         {
             return node is MethodDeclarationSyntax methodDecl
                 && methodDecl.AttributeLists.Count > 0
@@ -58,7 +60,7 @@ namespace Trecs.SourceGen
                     );
         }
 
-        private static ForEachAspectData? GetForEachAspectData(GeneratorSyntaxContext context)
+        private static ForEachEntityAspectData? GetForEachEntityAspectData(GeneratorSyntaxContext context)
         {
             var methodDecl = (MethodDeclarationSyntax)context.Node;
 
@@ -110,7 +112,7 @@ namespace Trecs.SourceGen
                     Diagnostic.Create(
                         DiagnosticDescriptors.SourceGenerationError,
                         methodDecl.GetLocation(),
-                        "ForEachAspect method validation",
+                        "ForEachEntity (aspect mode) method validation",
                         ex.Message
                     )
                 );
@@ -118,7 +120,7 @@ namespace Trecs.SourceGen
                 validated = null;
             }
 
-            return new ForEachAspectData(
+            return new ForEachEntityAspectData(
                 classDecl,
                 methodDecl,
                 methodSymbol,
@@ -128,9 +130,9 @@ namespace Trecs.SourceGen
             );
         }
 
-        private static void GenerateForEachAspectSource(
+        private static void GenerateForEachEntityAspectSource(
             SourceProductionContext context,
-            ForEachAspectData data,
+            ForEachEntityAspectData data,
             string globalNamespaceName
         )
         {
@@ -139,7 +141,7 @@ namespace Trecs.SourceGen
             var methodName = data.MethodDecl.Identifier.Text;
             var fileName = SymbolAnalyzer.GetSafeFileName(
                 data.MethodSymbol.ContainingType,
-                $"{methodName}_ForEachAspect"
+                $"{methodName}_ForEachEntityAspect"
             );
 
             // Replay diagnostics collected in the transform phase.
@@ -155,9 +157,9 @@ namespace Trecs.SourceGen
 
             try
             {
-                using var _ = SourceGenTimer.Time("ForEachAspectGenerator.Total");
+                using var _ = SourceGenTimer.Time("ForEachEntityAspectGenerator.Total");
                 SourceGenLogger.Log(
-                    $"[ForEachAspectGenerator] Processing {className}.{methodName}"
+                    $"[ForEachEntityAspectGenerator] Processing {className}.{methodName}"
                 );
 
                 var source = ErrorRecovery.TryExecute(
@@ -171,7 +173,7 @@ namespace Trecs.SourceGen
                         ),
                     context,
                     location,
-                    "ForEachAspect code generation"
+                    "ForEachEntity (aspect mode) code generation"
                 );
 
                 if (source != null)
@@ -197,7 +199,7 @@ namespace Trecs.SourceGen
                 ErrorRecovery.ReportError(
                     context,
                     location,
-                    $"ForEachAspect {className}.{methodName}",
+                    $"ForEachEntity (aspect mode) {className}.{methodName}",
                     ex
                 );
             }
@@ -499,8 +501,9 @@ namespace Trecs.SourceGen
         }
 
         /// <summary>
-        /// Builds the comma-separated argument list for the call to the user's [ForEachAspect]
-        /// method, preserving the user's declaration order via <see cref="ValidatedMethodInfo.ParameterSlots"/>.
+        /// Builds the comma-separated argument list for the call to the user's
+        /// aspect-mode <c>[ForEachEntity]</c> method, preserving the user's
+        /// declaration order via <see cref="ValidatedMethodInfo.ParameterSlots"/>.
         /// </summary>
         private static string BuildUserMethodCallArgs(
             ValidatedMethodInfo info,
@@ -997,12 +1000,12 @@ namespace Trecs.SourceGen
     }
 
     /// <summary>
-    /// Data structure for ForEachAspect information used in incremental generation.
+    /// Data structure for aspect-mode <c>[ForEachEntity]</c> information used in incremental generation.
     /// Carries validation results + diagnostics forward from the transform phase so that
     /// the terminal stage doesn't need access to a <see cref="Compilation"/> or
     /// <see cref="SemanticModel"/>.
     /// </summary>
-    internal class ForEachAspectData
+    internal class ForEachEntityAspectData
     {
         public ClassDeclarationSyntax ClassDecl { get; }
         public MethodDeclarationSyntax MethodDecl { get; }
@@ -1011,7 +1014,7 @@ namespace Trecs.SourceGen
         public ValidatedMethodInfo? ValidatedInfo { get; }
         public ImmutableArray<Diagnostic> Diagnostics { get; }
 
-        public ForEachAspectData(
+        public ForEachEntityAspectData(
             ClassDeclarationSyntax classDecl,
             MethodDeclarationSyntax methodDecl,
             IMethodSymbol methodSymbol,

@@ -126,3 +126,7 @@ public partial class RawEntity : ITemplate, IHasTags<MyTags.Raw>
 - **Use `SetInterpolated()` at creation** — this ensures all three components start in sync with the same default and avoids a visual pop on the first frame.
 - **Group interpolators by project** — use a shared `GroupName` constant so a single `Add{GroupName}()` call registers everything.
 - **Prefer `nlerp` over `slerp` for rotations** — the angular delta between fixed frames is typically small enough that the difference is imperceptible, and `nlerp` is significantly cheaper.
+
+## See also
+
+- [Sample 09 — Interpolation](../samples/09-interpolation.md): a full interpolation setup with custom blend functions.

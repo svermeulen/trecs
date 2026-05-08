@@ -7,7 +7,7 @@ namespace Trecs.SourceGen
 {
     // The JobGenerator emits an additional partial struct definition that adds fields
     // (component buffers, group, etc.) to partial structs declared with
-    // [ForEachAspect]/[ForEachComponents] on Execute, or with any [FromWorld] field.
+    // [ForEachEntity] on Execute, or with any [FromWorld] field.
     // C# emits CS0282 ("there is no defined ordering between fields in multiple
     // declarations of partial struct") for these — suppress it for our generated cases.
     [DiagnosticAnalyzer(LanguageNames.CSharp)]

@@ -2,6 +2,9 @@
 
 Every Trecs application starts by building a `World` — the container that owns all entities, components, and systems.
 
+!!! tip "New to Trecs?"
+    Start with [Getting Started](../getting-started.md) for a five-minute end-to-end walkthrough, then come back here for the deeper reference.
+
 ## WorldBuilder
 
 Use the fluent `WorldBuilder` API to configure and construct a world:

@@ -233,7 +233,7 @@ namespace Trecs.Tests
         List<int> _forEachResults = new List<int>();
 
         [Test]
-        public void ForEachAspect_MergesAttributeAndAspectTags()
+        public void ForEachEntity_AspectMode_MergesAttributeAndAspectTags()
         {
             using var env = CreateMultiTagEnv();
             var a = env.Accessor;
@@ -274,7 +274,7 @@ namespace Trecs.Tests
         List<int> _forEachFilterResults = new List<int>();
 
         [Test]
-        public void ForEachAspect_Filter_RespectsTagsAndFilter()
+        public void ForEachEntity_AspectMode_Filter_RespectsTagsAndFilter()
         {
             using var env = CreateSetEnv();
             var a = env.Accessor;
@@ -317,7 +317,7 @@ namespace Trecs.Tests
         List<int> _dynamicResults = new List<int>();
 
         [Test]
-        public void ForEachAspect_QueryBuilderArg_MergesAttributeTags()
+        public void ForEachEntity_AspectMode_QueryBuilderArg_MergesAttributeTags()
         {
             // Attribute has Tags=[QCatA]. Pass an extra WithTags<QCatB> at the call site.
             // Should iterate entities matching BOTH QCatA AND QCatB.
@@ -344,7 +344,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void ForEachAspect_SparseQueryBuilderArg_MergesAttributeTagsWithRuntimeSet()
+        public void ForEachEntity_AspectMode_SparseQueryBuilderArg_MergesAttributeTagsWithRuntimeSet()
         {
             // Attribute has Tags=[QCatA]. Pass a SparseQueryBuilder with InSet at the call site.
             // Should iterate entities in QCatA AND in the specified set.
@@ -381,7 +381,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void ForEachAspect_NoAttribute_QueryBuilderArg_FiltersByCallSiteTagsOnly()
+        public void ForEachEntity_AspectMode_NoAttribute_QueryBuilderArg_FiltersByCallSiteTagsOnly()
         {
             using var env = CreateMultiTagEnv();
             var a = env.Accessor;
@@ -879,7 +879,7 @@ namespace Trecs.Tests
         List<EntityIndex> _entityIndexResults = new List<EntityIndex>();
 
         [Test]
-        public void ForEachAspect_EntityIndex_ReceivesCorrectIndices()
+        public void ForEachEntity_AspectMode_EntityIndex_ReceivesCorrectIndices()
         {
             using var env = CreateMultiTagEnv();
             var a = env.Accessor;

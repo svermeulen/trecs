@@ -199,7 +199,7 @@ public class Diagnostics_TRECS090_to_100_AutoJobTests
     {
         // NativeSetRead<T> / NativeSetWrite<T> are job-only — using one in a
         // main-thread [ForEachEntity] (no [WrapAsJob]) trips TRECS099 from
-        // ParameterClassifier. Routes through ForEachAspectGenerator for the
+        // ParameterClassifier. Routes through ForEachEntityAspectGenerator for the
         // aspect-shaped parameter; the diagnostic itself is parameter-shape only.
         const string source = """
             namespace Sample
@@ -224,7 +224,7 @@ public class Diagnostics_TRECS090_to_100_AutoJobTests
             "TRECS099",
             new IIncrementalGenerator[]
             {
-                new ForEachAspectGenerator(),
+                new ForEachEntityAspectGenerator(),
                 new ForEachGenerator(),
                 new AutoSystemGenerator(),
                 new AspectGenerator(),

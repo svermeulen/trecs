@@ -354,7 +354,7 @@ namespace Trecs.SourceGen
             // Decide aspect-vs-components routing: aspect path iff the first parameter
             // implements IAspect, otherwise components path. (The aspect parameter is
             // always first by convention; the source-gen rejects mixed signatures via
-            // the TRECS026 diagnostic emitted in ValidateForEachAspectMethod.)
+            // the TRECS026 diagnostic emitted in ValidateForEachEntityAspectMethod.)
             //
             // A first parameter marked [PassThroughArgument] is forwarded verbatim from
             // the call site and is not the iteration target, even if its type happens to
@@ -387,7 +387,7 @@ namespace Trecs.SourceGen
 
             if (useAspectPath)
             {
-                var aspectInfo = ValidateForEachAspectMethod(
+                var aspectInfo = ValidateForEachEntityAspectMethod(
                     context,
                     structDecl,
                     iterationMethod,
@@ -429,7 +429,7 @@ namespace Trecs.SourceGen
             }
         }
 
-        static AspectIterationInfo? ValidateForEachAspectMethod(
+        static AspectIterationInfo? ValidateForEachEntityAspectMethod(
             SourceProductionContext context,
             StructDeclarationSyntax structDecl,
             MethodDeclarationSyntax method,

@@ -143,7 +143,7 @@ namespace Trecs.SourceGen.Shared
 
     /// <summary>
     /// Validated method info extracted from a <c>[ForEachEntity]</c> method (aspect path).
-    /// Used by <c>ForEachAspectGenerator</c>.
+    /// Used by <c>ForEachEntityAspectGenerator</c>.
     /// </summary>
     internal class ValidatedMethodInfo
     {

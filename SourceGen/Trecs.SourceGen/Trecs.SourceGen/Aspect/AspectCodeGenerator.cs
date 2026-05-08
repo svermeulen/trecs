@@ -254,7 +254,7 @@ namespace Trecs.SourceGen.Aspect
         {
             var allTypes = attributeData.AllComponentTypes;
 
-            // Generate EntityIndex constructor (used by ForEachAspect, AspectJob, Single/TrySingle)
+            // Generate EntityIndex constructor (used by aspect-mode [ForEachEntity], AspectJob, Single/TrySingle)
             var entityIndexConstructorParams = new List<string> { "EntityIndex entityIndex" };
             entityIndexConstructorParams.AddRange(
                 allTypes.Select(componentType =>
@@ -287,7 +287,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel, "}");
             sb.AppendLine();
 
-            // Generate GroupIndex-only constructor (used by ForEachAspect hoisted iteration)
+            // Generate GroupIndex-only constructor (used by aspect-mode [ForEachEntity] hoisted iteration)
             var groupConstructorParams = new List<string> { "GroupIndex group" };
             groupConstructorParams.AddRange(
                 allTypes.Select(componentType =>

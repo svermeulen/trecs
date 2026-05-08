@@ -92,7 +92,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void ForEachAspect_WithSingletonAspect_HoistsAndPassesPerEntity()
+        public void ForEachEntity_AspectMode_WithSingletonAspect_HoistsAndPassesPerEntity()
         {
             using var env = CreateEnv();
             var a = env.Accessor;

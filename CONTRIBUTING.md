@@ -79,6 +79,21 @@ To check formatting without modifying files:
 dotnet csharpier --check .
 ```
 
+### Documentation
+
+The docs site is built with [MkDocs](https://www.mkdocs.org/) (Material theme). To preview locally:
+
+```bash
+pip install mkdocs mkdocs-material
+mkdocs serve
+```
+
+`mkdocs build --strict` runs in CI and must pass before merging — broken cross-references and dangling anchors will fail the build.
+
+### Source Generator Diagnostics
+
+The Roslyn generator emits structured diagnostics in the `TRECS001`–`TRECS117` range. Each diagnostic has a dedicated test under `SourceGen/Trecs.SourceGen/Trecs.SourceGen.Tests/` — when you add a new diagnostic, add a matching test, and update `AnalyzerReleases.Shipped.md` (or `.Unshipped.md` while it's in flight).
+
 ## Pull Request Process
 
 1. Create a feature branch from `main`

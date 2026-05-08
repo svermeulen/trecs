@@ -68,6 +68,7 @@ nav:
       - Input System: advanced/input-system.md
       - Time & RNG: advanced/time-and-rng.md
   - Editor Windows:
+      - Overview: editor-windows/index.md
       - Hierarchy: editor-windows/hierarchy.md
       - Player: editor-windows/player.md
       - Saves: editor-windows/saves.md

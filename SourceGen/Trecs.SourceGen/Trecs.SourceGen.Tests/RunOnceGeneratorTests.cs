@@ -90,7 +90,7 @@ public class RunOnceGeneratorTests
     [Test]
     public void RunOnce_NestedSystemClass_CompilesCleanly()
     {
-        // Same nested-scope concern as ForEach / ForEachAspect — the generator must walk
+        // Same nested-scope concern as ForEach / ForEachEntityAspect — the generator must walk
         // the system class's containing-type chain so the emitted partial merges with the
         // user's nested class.
         const string source = """

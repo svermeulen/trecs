@@ -127,3 +127,8 @@ Rules:
 - Iteration entry points (`[ForEachEntity]`, `[SingleEntity]`) still require a concrete aspect struct. Aspect interfaces are for polymorphic helpers you call *from* iteration, not the iteration parameter itself.
 
 See [sample 15 — Aspect Interfaces](../samples/15-aspect-interfaces.md) for a worked example.
+
+## See also
+
+- [Sample 03 — Aspects](../samples/03-aspects.md): a minimal aspect with `IRead` / `IWrite` parameters.
+- [Sample 15 — Aspect Interfaces](../samples/15-aspect-interfaces.md): polymorphic helpers built on aspect interfaces.

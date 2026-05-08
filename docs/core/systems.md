@@ -275,6 +275,8 @@ public partial struct ScoringJob : IJobFor
 }
 ```
 
+For a worked example using `[SingleEntity]` to track a single head entity across systems, see [Sample 11 — Snake](../samples/11-snake.md).
+
 ## Update Phases
 
 Systems run in one of five phases, controlled by `[ExecuteIn(...)]`. The phases execute in this order each rendered frame:

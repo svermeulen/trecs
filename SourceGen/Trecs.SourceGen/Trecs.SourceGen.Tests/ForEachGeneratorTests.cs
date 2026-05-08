@@ -76,7 +76,7 @@ public class ForEachGeneratorTests
     [Test]
     public void ForEachWithNestedSystemClass_CompilesCleanly()
     {
-        // Same nested-scope concern as ForEachAspect / RunOnce — the generator must walk
+        // Same nested-scope concern as ForEachEntityAspect / RunOnce — the generator must walk
         // the system class's containing-type chain so the emitted partial merges with the
         // user's nested class.
         const string source = """

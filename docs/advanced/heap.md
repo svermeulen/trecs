@@ -118,3 +118,8 @@ Under the hood, Trecs maintains several heaps. You don't usually interact with t
 | `FrameScopedNativeSharedHeap` | Current fixed frame | Temporary shared native per-frame data |
 
 Frame-scoped heaps automatically clean up at the end of each fixed update — no manual disposal needed. They can only be allocated from `Input` or `Unrestricted` accessors (not `Fixed` or `Variable`); see [Accessor Roles](accessor-roles.md#capability-matrix).
+
+## See also
+
+- [Sample 10 — Pointers](../samples/10-pointers.md): unique and shared managed pointers stored on entities.
+- [Sample 17 — Blob Storage](../samples/17-blob-storage.md): the seeder pattern with stable `BlobId` for shared assets.

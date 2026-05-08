@@ -19,7 +19,7 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
     public void TRECS001_AspectParameterMissingInModifier()
     {
         // The aspect parameter on an [ForEachEntity] aspect-iteration method must be
-        // declared `in`. A bare `PlayerView player` trips ForEachAspectGenerator's
+        // declared `in`. A bare `PlayerView player` trips ForEachEntityAspectGenerator's
         // modifier check.
         const string source = """
             namespace Sample
@@ -41,7 +41,7 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
             "TRECS001",
             new IIncrementalGenerator[]
             {
-                new ForEachAspectGenerator(),
+                new ForEachEntityAspectGenerator(),
                 new AspectGenerator(),
                 new EntityComponentGenerator(),
             }

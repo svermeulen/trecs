@@ -121,7 +121,7 @@ public class Diagnostics_TRECS009_to_023_AspectTests
             "TRECS022",
             new IIncrementalGenerator[]
             {
-                new ForEachAspectGenerator(),
+                new ForEachEntityAspectGenerator(),
                 new AspectGenerator(),
                 new EntityComponentGenerator(),
             }
@@ -150,7 +150,7 @@ public class Diagnostics_TRECS009_to_023_AspectTests
         AssertDiagnostic(
             source,
             "TRECS023",
-            new IIncrementalGenerator[] { new ForEachAspectGenerator(), new AspectGenerator() }
+            new IIncrementalGenerator[] { new ForEachEntityAspectGenerator(), new AspectGenerator() }
         );
     }
 

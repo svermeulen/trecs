@@ -112,7 +112,7 @@ namespace Trecs.SourceGen.Shared
         /// <summary>
         /// True if the method carries the <c>[WrapAsJob]</c> attribute. Methods with this
         /// attribute are claimed by the AutoJobGenerator and should be skipped by
-        /// ForEachAspect/IncrementalForEach generators.
+        /// ForEach generators (component or aspect mode).
         /// </summary>
         public static bool HasWrapAsJobAttribute(IMethodSymbol method) =>
             PerformanceCache.HasAttributeByName(

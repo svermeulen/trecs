@@ -16,7 +16,7 @@ namespace Trecs.SourceGen
     /// <summary>
     /// Source generator for [ForEachEntity] methods that iterate over ECS components
     /// (component-parameter shape). The aspect-parameter shape is handled by
-    /// ForEachAspectGenerator; routing is decided by IterationAttributeRouting.
+    /// ForEachEntityAspectGenerator; routing is decided by IterationAttributeRouting.
     /// </summary>
     [Generator]
     public class ForEachGenerator : IIncrementalGenerator
@@ -93,7 +93,7 @@ namespace Trecs.SourceGen
 
             // [ForEachEntity] only routes to this generator when the method has NO
             // IAspect parameter — otherwise the aspect-side generator
-            // (ForEachAspectGenerator) takes it.
+            // (ForEachEntityAspectGenerator) takes it.
             if (!IterationAttributeRouting.HasEntityFilter(methodSymbol))
                 return null;
             if (IterationAttributeRouting.HasWrapAsJobAttribute(methodSymbol))
@@ -329,7 +329,7 @@ namespace Trecs.SourceGen
             }
 
             // (4) Range overload for event handlers — always emitted (event observers may forward
-            // their callback args + custom event args). Mirrors [ForEachAspect].
+            // their callback args + custom event args). Mirrors the aspect-mode generator.
             sb.AppendLine(
                 2,
                 $"void {methodName}(GroupIndex __group, EntityRange __indices, WorldAccessor __world{customArgsDecStr})"

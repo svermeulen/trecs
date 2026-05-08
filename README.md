@@ -118,7 +118,7 @@ For the optional serialization package:
 https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.serialization
 ```
 
-When using git URLs, add `com.trecs.core` before `com.trecs.serialization` (Unity can't resolve versioned dependencies from git URLs).
+When using git URLs, add `com.trecs.core` before `com.trecs.serialization` — Unity can't resolve versioned dependencies from git URLs.
 
 ## Documentation
 
@@ -151,7 +151,7 @@ The project includes 18 samples covering everything from basic entity creation t
 
 ## Acknowledgments
 
-Trecs was originally based on [Svelto.ECS](https://github.com/sebas77/Svelto.ECS) by Sebastiano Mandalà
+Trecs was originally based on [Svelto.ECS](https://github.com/sebas77/Svelto.ECS) by Sebastiano Mandalà.
 
 ## License
 

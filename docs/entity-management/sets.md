@@ -127,3 +127,7 @@ Notes:
 | **Best for** | Core identity, maximum cache locality | Dynamic membership, temporary flags, filtering |
 
 Both tags (via [partitions](../core/templates.md#partitions)) and sets can represent state, but the trade-offs differ. Tag changes move entity data in memory, giving you dense iteration. Set changes are cheap but iteration is sparse. See [Entity Subset Patterns](../recipes/entity-subset-patterns.md) for a deeper comparison.
+
+## See also
+
+- [Sample 08 — Sets](../samples/08-sets.md): a worked example of producer/consumer set membership across systems.

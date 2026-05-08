@@ -4,17 +4,17 @@ using Trecs.SourceGen;
 namespace Trecs.SourceGen.Tests;
 
 /// <summary>
-/// Compile-cleanliness tests for ForEachAspectGenerator. Routed to from any
+/// Compile-cleanliness tests for ForEachEntityAspectGenerator. Routed to from any
 /// <c>[ForEachEntity]</c> method whose first parameter implements <c>IAspect</c>. The
 /// generator emits convenience overloads that drive the aspect's own per-aspect
 /// AspectQuery / Enumerator machinery (which AspectGenerator emits on the
 /// aspect type itself).
 /// </summary>
 [TestFixture]
-public class ForEachAspectGeneratorTests
+public class ForEachEntityAspectGeneratorTests
 {
     [Test]
-    public void ForEachAspect_WithSingleTag_CompilesCleanly()
+    public void ForEachEntity_AspectMode_WithSingleTag_CompilesCleanly()
     {
         const string source = """
             namespace Sample
@@ -34,7 +34,7 @@ public class ForEachAspectGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new ForEachAspectGenerator(),
+                new ForEachEntityAspectGenerator(),
                 new AspectGenerator(),
                 new EntityComponentGenerator(),
             },
@@ -46,7 +46,7 @@ public class ForEachAspectGeneratorTests
     }
 
     [Test]
-    public void ForEachAspect_WithMultipleTags_CompilesCleanly()
+    public void ForEachEntity_AspectMode_WithMultipleTags_CompilesCleanly()
     {
         const string source = """
             namespace Sample
@@ -70,7 +70,7 @@ public class ForEachAspectGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new ForEachAspectGenerator(),
+                new ForEachEntityAspectGenerator(),
                 new AspectGenerator(),
                 new EntityComponentGenerator(),
             },
@@ -81,7 +81,7 @@ public class ForEachAspectGeneratorTests
     }
 
     [Test]
-    public void ForEachAspect_NestedSystemClass_CompilesCleanly()
+    public void ForEachEntity_AspectMode_NestedSystemClass_CompilesCleanly()
     {
         // [ForEachEntity] methods on a system class nested inside an outer class need the
         // generator to emit matching outer-type scopes so the emitted partial merges with
@@ -109,7 +109,7 @@ public class ForEachAspectGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new ForEachAspectGenerator(),
+                new ForEachEntityAspectGenerator(),
                 new AspectGenerator(),
                 new EntityComponentGenerator(),
             },
@@ -120,7 +120,7 @@ public class ForEachAspectGeneratorTests
     }
 
     [Test]
-    public void ForEachAspect_WithMatchByComponents_CompilesCleanly()
+    public void ForEachEntity_AspectMode_WithMatchByComponents_CompilesCleanly()
     {
         // MatchByComponents iterates over any group whose archetype contains the aspect's
         // declared components (no tag filter). Catches a regression in the alternate
@@ -142,7 +142,7 @@ public class ForEachAspectGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new ForEachAspectGenerator(),
+                new ForEachEntityAspectGenerator(),
                 new AspectGenerator(),
                 new EntityComponentGenerator(),
             },
@@ -153,7 +153,7 @@ public class ForEachAspectGeneratorTests
     }
 
     [Test]
-    public void ForEachAspect_PositionalCtorTag_CompilesCleanly()
+    public void ForEachEntity_AspectMode_PositionalCtorTag_CompilesCleanly()
     {
         // [ForEachEntity(typeof(Tag))] — positional-ctor shorthand on the iteration
         // attribute, exercised through IterationCriteriaParser's ConstructorArguments
@@ -176,7 +176,7 @@ public class ForEachAspectGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new ForEachAspectGenerator(),
+                new ForEachEntityAspectGenerator(),
                 new AspectGenerator(),
                 new EntityComponentGenerator(),
             },
@@ -188,7 +188,7 @@ public class ForEachAspectGeneratorTests
     }
 
     [Test]
-    public void ForEachAspect_GenericAttribute_CompilesCleanly()
+    public void ForEachEntity_AspectMode_GenericAttribute_CompilesCleanly()
     {
         // [ForEachEntity<Tag>] — C# 11 generic-attribute shorthand, exercised through
         // IterationCriteriaParser's TypeArguments branch.
@@ -210,7 +210,7 @@ public class ForEachAspectGeneratorTests
         var run = GeneratorTestHarness.Run(
             new Microsoft.CodeAnalysis.IIncrementalGenerator[]
             {
-                new ForEachAspectGenerator(),
+                new ForEachEntityAspectGenerator(),
                 new AspectGenerator(),
                 new EntityComponentGenerator(),
             },

@@ -88,6 +88,8 @@ public partial class SpinnerEntity : ITemplate, IHasTags<Spinner>
 }
 ```
 
+
+
 ### 4. Write a system
 
 A system contains the logic that runs over entities each tick. The `[ForEachEntity]` attribute tells the source generator to iterate every entity tagged with `Spinner` and call `Execute` for each:
@@ -154,7 +156,8 @@ A few things to notice:
 
 ## Where to Next
 
+- **Start with [Core: World Setup](core/world-setup.md)** — the deeper reference for `WorldBuilder`, `WorldSettings`, lifecycle, and `WorldAccessor`. Read this next.
+- [Systems](core/systems.md) — defining systems, iteration, and update phases.
 - A complete runnable version of this walkthrough lives in **`Samples~/Tutorials/01_HelloEntity`** in the `com.trecs.core` package — install it via the Package Manager *Samples* tab.
-- [Core: World Setup](core/world-setup.md) and [Systems](core/systems.md) for the full lifecycle.
 - [Aspects](data-access/aspects.md) and [Queries & Iteration](data-access/queries-and-iteration.md) once you have multiple components per entity.
 - The [Samples](samples/index.md) gallery — each one focuses on a single feature and has a companion doc.
