@@ -153,9 +153,7 @@ namespace Trecs.Serialization.Samples
             // Tick the player after each fixed update so per-frame checksum
             // mismatches surface as desyncs. Without this, BundlePlayer.Tick
             // is never called and HasDesynced never flips.
-            _playbackTickSubscription = _world.Events.OnFixedUpdateCompleted(
-                () => _player.Tick()
-            );
+            _playbackTickSubscription = _world.Events.OnFixedUpdateCompleted(() => _player.Tick());
             _state = ControllerState.Playback;
             _log.Info(
                 "Playback started from frame {} to {}",
