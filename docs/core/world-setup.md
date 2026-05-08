@@ -1,6 +1,6 @@
 # World Setup
 
-Every Trecs application starts by building a `World` — the container that owns all entities, components, and systems.
+Every Trecs application starts by building a `World` — the container that owns all entities and components, and which triggers the system update.
 
 !!! tip "New to Trecs?"
     Start with [Getting Started](../getting-started.md) for a five-minute end-to-end walkthrough, then come back here for the deeper reference.

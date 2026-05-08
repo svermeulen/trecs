@@ -151,6 +151,7 @@ A few things to notice:
 
 - `AddEntity<Spinner>()` takes a **tag**, not a template type. Trecs matches `Spinner` to `SpinnerEntity.Template` via the template's `IHasTags<Spinner>` declaration.
 - The init accessor uses `AccessorRole.Unrestricted` because we're outside the tick loop. Inside systems, accessors are created automatically with the right role for that phase. See [Accessor Roles](advanced/accessor-roles.md).
+- `Tick()` and `LateTick()` are typically driven from Unity's `Update` and `LateUpdate` phases, as shown above.
 
 ## Where to Next
 
