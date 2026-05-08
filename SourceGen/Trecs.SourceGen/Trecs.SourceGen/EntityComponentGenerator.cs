@@ -239,10 +239,7 @@ namespace Trecs.SourceGen
 
             sb.AppendLine($"{methodIndent}public override readonly int GetHashCode()");
             sb.AppendLine($"{methodIndent}{{");
-            sb.AppendLine($"{methodIndent}    throw new NotImplementedException(");
-            sb.AppendLine(
-                $"{methodIndent}        \"GetHashCode not supported for IEntityComponent derived types\");"
-            );
+            sb.AppendLine($"{methodIndent}    return UnmanagedUtil.BlittableHashCode(this);");
             sb.AppendLine($"{methodIndent}}}");
             sb.AppendLine();
 

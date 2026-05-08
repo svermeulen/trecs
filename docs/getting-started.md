@@ -67,7 +67,7 @@ public partial struct Rotation : IEntityComponent
 }
 ```
 
-`partial` is required — the source generator emits a companion file with serialization, equality, and reflection hooks.
+`partial` is required — the source generator emits a companion file with `Equals`, `GetHashCode`, and `==`/`!=` operators.
 
 ### 2. Define a tag
 
