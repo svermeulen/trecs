@@ -43,7 +43,7 @@ The "Input system" column is a system-owned accessor with `[ExecuteIn(SystemPhas
 
 [^none-input]: `Unrestricted` is intentionally allowed to call `AddInput<T>` because the same rule (`AssertCanAddInputsSystem`) is the documented escape hatch for non-system code that needs to enqueue inputs (e.g. a `MonoBehaviour` driver wrapping `world.CreateAccessor(AccessorRole.Unrestricted, ...)`).
 
-[^framescoped]: Frame-scoped heap allocation gates on `IsNone || IsInput` — the same predicate as `AddInput<T>` — so `Fixed` and `Variable` (without the input flag) accessors are both rejected. Frame-scoped pointers are an input-side mechanism for handing transient payloads into the simulation; from `Fixed`, allocate persistent (`AllocShared` / `AllocUnique`) instead.
+[^framescoped]: Frame-scoped heap allocation gates on `IsUnrestricted || IsInput` — the same predicate as `AddInput<T>` — so `Fixed` and `Variable` (without the input flag) accessors are both rejected. Frame-scoped pointers are an input-side mechanism for handing transient payloads into the simulation; from `Fixed`, allocate persistent (`AllocShared` / `AllocUnique`) instead.
 
 ## Picking a role for a standalone accessor
 
