@@ -27,6 +27,7 @@ namespace Trecs.Serialization.Samples
         readonly string _snapshotPath;
 
         ControllerState _state;
+        IDisposable _playbackTickSubscription;
 
         public RecordAndPlaybackController(
             SerializationServices serialization,
@@ -132,6 +133,8 @@ namespace Trecs.Serialization.Samples
 
         void HandleStopPlayback()
         {
+            _playbackTickSubscription?.Dispose();
+            _playbackTickSubscription = null;
             _player.Stop();
             _state = ControllerState.Idle;
             _log.Info("Playback stopped");
@@ -147,6 +150,12 @@ namespace Trecs.Serialization.Samples
 
             var bundle = _bundleSerializer.Load(_bundlePath);
             _player.Start(bundle);
+            // Tick the player after each fixed update so per-frame checksum
+            // mismatches surface as desyncs. Without this, BundlePlayer.Tick
+            // is never called and HasDesynced never flips.
+            _playbackTickSubscription = _world.Events.OnFixedUpdateCompleted(
+                () => _player.Tick()
+            );
             _state = ControllerState.Playback;
             _log.Info(
                 "Playback started from frame {} to {}",
@@ -181,7 +190,8 @@ namespace Trecs.Serialization.Samples
 
         public void Dispose()
         {
-            // Handlers' Dispose now gracefully stops mid-op work; nothing extra to do here.
+            _playbackTickSubscription?.Dispose();
+            _playbackTickSubscription = null;
         }
 
         public enum ControllerState
