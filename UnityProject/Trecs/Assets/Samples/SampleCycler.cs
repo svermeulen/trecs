@@ -19,7 +19,8 @@ namespace Trecs.Samples
     /// Controls:
     ///   Right Arrow / N  — Next sample
     ///   Left Arrow  / P  — Previous sample
-    ///   1-9              — Jump to sample by number
+    ///   1-9              — Jump to one of the first nine samples by number
+    ///                      (use the arrow keys to reach samples 10+)
     ///   Escape           — Return to first scene
     /// </summary>
     public class SampleCycler : MonoBehaviour

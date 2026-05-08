@@ -162,6 +162,11 @@ MonoBehaviour:
   - {fileID: 102900000, guid: 325eb2f5c41c949db8ff03a4d6307174, type: 3}
   - {fileID: 102900000, guid: 1f78097489b0d47a18e7110cf94c1e32, type: 3}
   - {fileID: 102900000, guid: 1d5a33dbe6384099a166c1941b4c7571, type: 3}
+  - {fileID: 102900000, guid: 1680bd4fdbe6495cb6c1e6bd9ba26664, type: 3}
+  - {fileID: 102900000, guid: 357d8a818fc54fd785c1b21c1913b839, type: 3}
+  - {fileID: 102900000, guid: a64fac2817adb4eb088372efed7c3e4c, type: 3}
+  - {fileID: 102900000, guid: 41ca5e85fa5eb40978d96f529fa81986, type: 3}
+  - {fileID: 102900000, guid: 2dac7cdfb00842abb39db71fc493766a, type: 3}
   _sceneNames:
   - HelloEntity
   - SpawnAndDestroy
@@ -176,6 +181,11 @@ MonoBehaviour:
   - Snake
   - FeedingFrenzyBenchmark
   - SaveGame
+  - NativePointers
+  - AspectInterfaces
+  - BlobStorage
+  - ReactiveEvents
+  - MultipleWorlds
 --- !u!4 &1001531147
 Transform:
   m_ObjectHideFlags: 0
