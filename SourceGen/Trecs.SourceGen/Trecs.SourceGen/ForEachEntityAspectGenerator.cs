@@ -44,7 +44,8 @@ namespace Trecs.SourceGen
 
             context.RegisterSourceOutput(
                 forEachWithGlobalNs,
-                static (spc, source) => GenerateForEachEntityAspectSource(spc, source.Left!, source.Right)
+                static (spc, source) =>
+                    GenerateForEachEntityAspectSource(spc, source.Left!, source.Right)
             );
         }
 
@@ -60,7 +61,9 @@ namespace Trecs.SourceGen
                     );
         }
 
-        private static ForEachEntityAspectData? GetForEachEntityAspectData(GeneratorSyntaxContext context)
+        private static ForEachEntityAspectData? GetForEachEntityAspectData(
+            GeneratorSyntaxContext context
+        )
         {
             var methodDecl = (MethodDeclarationSyntax)context.Node;
 
