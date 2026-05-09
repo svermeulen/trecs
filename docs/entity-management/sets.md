@@ -50,6 +50,18 @@ highlighted.AddImmediate(entityIndex);
 highlighted.RemoveImmediate(entityIndex);
 ```
 
+!!! warning "Don't mutate a set while iterating it"
+    `AddImmediate`, `RemoveImmediate`, and `Clear` modify the set's storage in place. Calling them on the same set + same group you're currently iterating corrupts iteration — entries get skipped, revisited, or (when an `Add` grows the underlying buffer) read from freed memory.
+
+    | Op during iteration of set `S`, group `G` | Same set + same group | Same set, different group | Different set |
+    |---|---|---|---|
+    | `AddImmediate` / `RemoveImmediate` / `Clear` | **Unsafe** | Safe | Safe |
+    | Deferred `SetAdd` / `SetRemove` | Safe (applied at next submission) | Safe | Safe |
+
+    DEBUG builds throw at the point of misuse. Release builds corrupt silently.
+
+    To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `List<EntityIndex>` and apply them after the loop.
+
 ## Querying by Set
 
 ### With ForEachEntity
@@ -79,7 +91,7 @@ int highlighted = World.Query().InSet<HighlightedParticle>().Count();
 
 ## Per-Frame Staging
 
-A common pattern is to use a set as a **per-frame scratch list**: clear it at the start of the frame, have one system populate it, then have downstream systems iterate only the members. This avoids recomputing the same predicate in every consumer (rendering, physics sync, audio cues, …).
+A common pattern is to use a set as a **per-frame scratch list**: clear it at the start of the frame, have one system populate it, then have downstream systems iterate only the members. This avoids recomputing the same predicate in every consumer (rendering, physics sync, audio cues, etc).
 
 To make this work *within a single frame*, use the **immediate** APIs (`AddImmediate`, `RemoveImmediate`, `Clear`). Deferred `SetAdd` / `SetRemove` only land at the next submission, so a downstream system in the same frame would see last frame's contents.
 
