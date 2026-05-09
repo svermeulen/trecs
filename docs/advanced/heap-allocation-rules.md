@@ -15,7 +15,7 @@ Every `WorldAccessor` carries an [`AccessorRole`](accessor-roles.md) that contro
 | `Variable` | ❌ Not allowed | ❌ Not allowed |
 | `Unrestricted` | ✅ Allowed | ✅ Allowed |
 
-The framework asserts at the allocation site. Calling `accessor.Heap.AllocShared(...)` from a `Variable` accessor or input-system accessor throws an immediate `AssertException` rather than producing silent desync later. The input-system error message points at the `FrameScoped` variant explicitly, since that's almost always what the caller wanted.
+The framework asserts at the allocation site. Calling `accessor.Heap.AllocShared(...)` from a `Variable` accessor or input-system accessor throws an immediate `TrecsException` rather than producing silent desync later. The input-system error message points at the `FrameScoped` variant explicitly, since that's almost always what the caller wanted.
 
 The shape comes out of the role design: persistent allocations participate in deterministic ID minting (next section), so only the deterministic-state pickers (`Fixed`, `Unrestricted`) may make them; frame-scoped allocations are an input-side mechanism for handing transient payloads into the simulation, so only input-system and `Unrestricted` accessors may make them. `Variable` accessors can do neither because presentation-cadence code runs at a non-deterministic frame rate.
 

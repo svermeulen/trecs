@@ -4,7 +4,7 @@ Every `WorldAccessor` is tagged with an `AccessorRole` that controls what the ac
 
 Roles are **permission tiers, not timing slots.** They don't say *when* the accessor runs (that's the system's `SystemPhase`); they say *what kind of work* the accessor is allowed to do. System-owned accessors get their role automatically from their `SystemPhase` (see [System-owned accessors](#system-owned-accessors-vs-standalone-accessors) below); standalone accessors created via `world.CreateAccessor(AccessorRole, ...)` pick the role explicitly.
 
-The framework asserts every rule below at the call site. Crossing a role boundary throws an immediate, clear `AssertException` rather than producing silent desync later.
+The framework asserts every rule below at the call site. Crossing a role boundary throws an immediate, clear `TrecsException` rather than producing silent desync later.
 
 ## The three roles
 
