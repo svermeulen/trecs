@@ -48,11 +48,7 @@ When the same entity has multiple operations queued in a single submission, Trec
 - **Remove beats move.** If an entity has both a remove and a move queued (from either managed or native queues), the remove wins.
 - **First move wins.** If two systems both queue a move for the same entity, only the first is applied; later moves are dropped silently.
 - **Remove is idempotent.** Queuing the same remove twice is safe — only one removal happens.
-- **`RemoveEntitiesWithTags<T>()` cascades.** Queued moves into matching groups are cancelled.
 - **Cascading submission.** If an observer fires during submission and queues more changes (e.g. an `OnAdded` handler spawning a child), Trecs runs additional submission iterations until the queues drain — bounded by `WorldSettings.MaxSubmissionIterations` (default 10).
-
-!!! note
-    These rules apply within a single submission. Operations queued across separate submissions never conflict — each submission fully resolves before the next.
 
 To react to submission boundaries, see [Entity Events — Frame Events](entity-events.md#frame-events).
 
