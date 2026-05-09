@@ -89,7 +89,7 @@ public partial class PhysicsSystem : ISystem
 }
 ```
 
-A system can declare multiple aspects, one per query.
+A system can declare multiple aspects.  It's common to use one per query.
 
 ## Aspect interfaces (advanced)
 
