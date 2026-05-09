@@ -35,6 +35,7 @@ theme:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Glossary: glossary.md
   - Core:
       - World Setup: core/world-setup.md
       - Entities: core/entities.md
