@@ -61,12 +61,6 @@ namespace Trecs
         [Conditional("DEBUG")]
         readonly void AssertNotMutatedDuringIteration()
         {
-            // _sourceDict is default for callers that haven't been migrated yet
-            // (e.g. user code constructing EntitySetIndices directly). Skip the
-            // check rather than firing a misleading assert in those cases.
-            if (!_sourceDict.IsCreated)
-                return;
-
             Assert.That(
                 _sourceDict.Count == _count,
                 "Set entry mutated during iteration. AddImmediate / RemoveImmediate / "
@@ -118,9 +112,6 @@ namespace Trecs
             [Conditional("DEBUG")]
             readonly void AssertNotMutatedDuringIteration()
             {
-                if (!_sourceDict.IsCreated)
-                    return;
-
                 Assert.That(
                     _sourceDict.Count == _count,
                     "Set entry mutated during iteration. AddImmediate / RemoveImmediate / "
