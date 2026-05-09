@@ -721,7 +721,8 @@ namespace Trecs.Internal
                         continue;
                     }
 
-                    Assert.That(rangeEnumerator.MoveNext());
+                    var advanced = rangeEnumerator.MoveNext();
+                    Assert.That(advanced);
 
                     if (
                         ecsRoot._eventsManager.ReactiveOnRemovedObservers.TryGetValue(
@@ -1082,7 +1083,8 @@ namespace Trecs.Internal
                     if (fromEntityToEntityIDs.Count == 0)
                         continue;
 
-                    Assert.That(rangeEnumerator.MoveNext());
+                    var advanced = rangeEnumerator.MoveNext();
+                    Assert.That(advanced);
 
                     if (
                         ecsRoot._eventsManager.ReactiveOnMovedObservers.TryGetValue(
@@ -1205,7 +1207,8 @@ namespace Trecs.Internal
                                 var groupId = groupToSubmit.GroupIndex;
                                 var groupDB = GetDBGroup(groupId);
 
-                                Assert.That(enumerator.MoveNext());
+                                var advanced = enumerator.MoveNext();
+                                Assert.That(advanced);
 
                                 if (
                                     _eventsManager.ReactiveOnAddedObservers.TryGetValue(
