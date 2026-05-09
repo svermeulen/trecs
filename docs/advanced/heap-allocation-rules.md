@@ -19,17 +19,19 @@ The framework asserts at the allocation site. Calling `accessor.Heap.AllocShared
 
 The shape comes out of the role design: persistent allocations participate in deterministic ID minting (next section), so only the deterministic-state pickers (`Fixed`, `Unrestricted`) may make them; frame-scoped allocations are an input-side mechanism for handing transient payloads into the simulation, so only input-system and `Unrestricted` accessors may make them. `Variable` accessors can do neither because presentation-cadence code runs at a non-deterministic frame rate.
 
-Entity creation (`AddEntity` / `RemoveEntity` / `MoveTo`) follows the same shape — `Fixed` and `Unrestricted` only — for the same reason: structural changes are part of the simulation state that gets serialized in snapshots and replay-checked.
+Entity creation (`AddEntity` / `RemoveEntity` / `MoveTo`) follows the same shape for entities of normal (non-VUO) templates — `Fixed` and `Unrestricted` only — for the same reason: structural changes against simulation-state templates are part of the deterministic state that gets serialized in snapshots and replay-checked. Templates declared `[VariableUpdateOnly]` invert the rule (`Variable` / input-system / `Unrestricted` may add / remove / move them; `Fixed` is rejected); see [Accessor Roles](accessor-roles.md#capability-matrix).
 
-## Why presentation-phase systems can't allocate or spawn entities
+## Why presentation-phase systems can't allocate heap or spawn simulation entities
 
 Two reasons:
 
 1. **Heap allocation IDs.** Trecs draws all allocation IDs from a single deterministic RNG (`_fixedRng`) shared across initialization and all fixed systems. If presentation-phase systems were allowed to mint IDs, they'd either pollute that stream (breaking determinism for fixed systems) or need a non-deterministic fallback (silently breaking replay for any handle stored in a fixed component).
 
-2. **Entity creation is structural.** Adding an entity changes group counts and component arrays — that's part of the simulation state that gets serialized in snapshots and checked for desyncs in replay. Presentation systems run at a per-render-frame cadence that isn't deterministic across runs (frame rate varies), so structural changes from them would break those guarantees.
+2. **Entity creation in normal templates is structural simulation state.** Adding an entity changes group counts and component arrays — that's part of the simulation state that gets serialized in snapshots and checked for desyncs in replay. Presentation systems run at a per-render-frame cadence that isn't deterministic across runs (frame rate varies), so structural changes against simulation-state templates from them would break those guarantees.
 
-If you find yourself wanting to allocate or spawn from a presentation system, the data probably belongs in a fixed component or a `[VariableUpdateOnly]` component populated by the presentation system from existing fixed state.
+   `[VariableUpdateOnly]` templates are the explicit exception: their groups are render-cadence state, skipped during the determinism checksum, so presentation- and input-phase systems *can* spawn entities of a VUO template (cameras, view-only helpers). They still cannot allocate heap.
+
+If you find yourself wanting to allocate heap or spawn a non-VUO entity from a presentation system, the data probably belongs in a fixed component, a `[VariableUpdateOnly]` component populated from existing fixed state, or a dedicated `[VariableUpdateOnly]` template.
 
 ## ID minting — how auto-IDs work
 
@@ -122,4 +124,4 @@ See [Sample 10 — Pointers](../samples/10-pointers.md) for a complete reference
 - **Use explicit `BlobId`s** when you want stable identity independent of startup ordering — particularly for content-pipeline assets.
 - **Seeder pattern**: a long-lived class holds `SharedPtr<T>` members for shared assets, allocated once at init with a stable `BlobId`, looked up by entities via `AllocShared(BlobId)`.
 - **Always dispose** pointers stored on components from an `OnRemoved` observer.
-- **Presentation systems read; they don't allocate or spawn.** If a presentation system needs new state, populate it from a `[VariableUpdateOnly]` component or a fixed system.
+- **Presentation systems read; they don't allocate heap, and they only spawn `[VariableUpdateOnly]` templates.** If a presentation system needs new sim-state, populate it from a `[VariableUpdateOnly]` component or a fixed system; if it needs new render-only entities, declare the template `[VariableUpdateOnly]` and spawn from there.

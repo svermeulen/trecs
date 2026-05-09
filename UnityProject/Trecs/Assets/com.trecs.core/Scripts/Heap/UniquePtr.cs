@@ -13,6 +13,13 @@ namespace Trecs
     /// Frame-scoped pointers are automatically cleaned up; persistent pointers must be
     /// disposed explicitly via <see cref="Dispose(HeapAccessor)"/>.
     /// </para>
+    /// <para>
+    /// Public verb set: <c>Get</c>, <c>TryGet</c>, <c>CanGet</c>, <c>Set</c>, <c>Dispose</c>,
+    /// <c>IsNull</c>. There is intentionally no <c>Clone</c> — exclusive ownership means
+    /// duplicating a <see cref="UniquePtr{T}"/> would create two owners of the same heap
+    /// entry, which would corrupt the lifetime model. To copy the underlying value, allocate
+    /// a new <see cref="UniquePtr{T}"/> and <c>Set</c> it.
+    /// </para>
     /// </summary>
     public readonly struct UniquePtr<T> : IEquatable<UniquePtr<T>>
         where T : class
@@ -24,19 +31,19 @@ namespace Trecs
             Handle = handle;
         }
 
-        public bool IsNull
+        public readonly bool IsNull
         {
             get { return Handle.IsNull; }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal T Get(UniqueHeap heap)
+        internal readonly T Get(UniqueHeap heap)
         {
             return heap.GetEntry<T>(Handle.Value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal T Get(World world)
+        internal readonly T Get(World world)
         {
             if (world.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
             {
@@ -54,7 +61,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T Get(HeapAccessor heap)
+        public readonly T Get(HeapAccessor heap)
         {
             if (heap.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
             {
@@ -72,10 +79,10 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T Get(WorldAccessor accessor) => Get(accessor.Heap);
+        public readonly T Get(WorldAccessor accessor) => Get(accessor.Heap);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool TryGet(UniqueHeap heap, out T value)
+        internal readonly bool TryGet(UniqueHeap heap, out T value)
         {
             if (IsNull)
             {
@@ -88,7 +95,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool TryGet(World world, out T value)
+        internal readonly bool TryGet(World world, out T value)
         {
             if (IsNull)
             {
@@ -125,7 +132,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGet(HeapAccessor heap, out T value)
+        public readonly bool TryGet(HeapAccessor heap, out T value)
         {
             if (IsNull)
             {
@@ -162,10 +169,11 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGet(WorldAccessor accessor, out T value) => TryGet(accessor.Heap, out value);
+        public readonly bool TryGet(WorldAccessor accessor, out T value) =>
+            TryGet(accessor.Heap, out value);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool CanGet(World world)
+        internal readonly bool CanGet(World world)
         {
             if (IsNull)
             {
@@ -177,7 +185,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool CanGet(HeapAccessor heap)
+        public readonly bool CanGet(HeapAccessor heap)
         {
             if (IsNull)
             {
@@ -189,36 +197,36 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool CanGet(WorldAccessor accessor) => CanGet(accessor.Heap);
+        public readonly bool CanGet(WorldAccessor accessor) => CanGet(accessor.Heap);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Set(UniqueHeap heap, T value)
+        public readonly void Set(UniqueHeap heap, T value)
         {
             heap.SetEntry(Handle.Value, value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Set(HeapAccessor heap, T value)
+        public readonly void Set(HeapAccessor heap, T value)
         {
             Set(heap.UniqueHeap, value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Set(WorldAccessor accessor, T value) => Set(accessor.Heap, value);
+        public readonly void Set(WorldAccessor accessor, T value) => Set(accessor.Heap, value);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Set(World world, T value)
+        public readonly void Set(World world, T value)
         {
             Set(world.UniqueHeap, value);
         }
 
-        internal void Dispose(UniqueHeap heap)
+        internal readonly void Dispose(UniqueHeap heap)
         {
             Assert.That(!IsNull);
             heap.DisposeEntry<T>(Handle.Value);
         }
 
-        internal void Dispose(World world)
+        internal readonly void Dispose(World world)
         {
             Assert.That(
                 !world.FrameScopedUniqueHeap.ContainsEntry(Handle.Value),
@@ -227,7 +235,7 @@ namespace Trecs
             Dispose(world.UniqueHeap);
         }
 
-        public void Dispose(HeapAccessor heap)
+        public readonly void Dispose(HeapAccessor heap)
         {
             Assert.That(
                 !heap.FrameScopedUniqueHeap.ContainsEntry(Handle.Value),
@@ -236,19 +244,27 @@ namespace Trecs
             Dispose(heap.UniqueHeap);
         }
 
-        public void Dispose(WorldAccessor accessor) => Dispose(accessor.Heap);
+        public readonly void Dispose(WorldAccessor accessor) => Dispose(accessor.Heap);
 
-        public bool Equals(UniquePtr<T> other)
+        /// <remarks>
+        /// Equality compares only <see cref="Handle"/>. <see cref="UniquePtr{T}"/> has no
+        /// separate blob ID — the handle <i>is</i> the identity (each handle uniquely owns
+        /// one heap entry). The shared variants (<see cref="SharedPtr{T}"/> /
+        /// <see cref="NativeSharedPtr{T}"/>) additionally compare a <see cref="BlobId"/>
+        /// because multiple handles can reference the same underlying blob; that doesn't
+        /// apply here.
+        /// </remarks>
+        public readonly bool Equals(UniquePtr<T> other)
         {
             return Handle.Equals(other.Handle);
         }
 
-        public override bool Equals(object obj)
+        public override readonly bool Equals(object obj)
         {
             return obj is UniquePtr<T> other && Equals(other);
         }
 
-        public override int GetHashCode()
+        public override readonly int GetHashCode()
         {
             return Handle.GetHashCode();
         }

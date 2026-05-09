@@ -16,6 +16,17 @@ namespace Trecs
     /// Allocate via <see cref="HeapAccessor.AllocNativeShared{T}"/>. Cloning increments the
     /// reference count; disposing decrements it and frees when zero.
     /// </para>
+    /// <para>
+    /// Public verb set: <c>GetUnsafePtr</c>, <c>Get</c>, <c>Clone</c>, <c>Dispose</c>,
+    /// <c>IsNull</c>. <c>Get</c> / <c>GetUnsafePtr</c> have job-side overloads
+    /// (<see cref="NativeSharedPtrResolver"/> / <see cref="NativeWorldAccessor"/>) and main-thread
+    /// overloads (<see cref="HeapAccessor"/> / <see cref="WorldAccessor"/>). <c>Clone</c> and
+    /// <c>Dispose</c> are main-thread-only by design — they mutate ref-count bookkeeping in the
+    /// shared heap, which isn't accessible from a Burst job. There is no public <c>TryGet</c> /
+    /// <c>CanGet</c>: a live <see cref="NativeSharedPtr{T}"/> is expected to resolve, since
+    /// disposal mirrors managed <see cref="SharedPtr{T}"/> — if you're worried about lifetimes,
+    /// you're holding a stale ptr.
+    /// </para>
     /// </summary>
     /// <remarks>
     /// Packed with <c>LayoutKind.Sequential, Pack = 1</c> to minimize component size (12 bytes).
@@ -81,7 +92,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public NativeSharedPtr<T> Clone(HeapAccessor heap)
+        public readonly NativeSharedPtr<T> Clone(HeapAccessor heap)
         {
             if (IsNull)
             {
@@ -99,7 +110,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public NativeSharedPtr<T> Clone(WorldAccessor world) => Clone(world.Heap);
+        public readonly NativeSharedPtr<T> Clone(WorldAccessor world) => Clone(world.Heap);
 
         public readonly void Dispose(HeapAccessor heap)
         {
@@ -117,17 +128,25 @@ namespace Trecs
             get { return BlobId.IsNull; }
         }
 
-        public bool Equals(NativeSharedPtr<T> other)
+        /// <remarks>
+        /// Equality compares both <see cref="Handle"/> and <see cref="BlobId"/>. Two
+        /// <see cref="NativeSharedPtr{T}"/> instances pointing at the same underlying blob
+        /// (same <see cref="BlobId"/>) but holding different <see cref="PtrHandle"/>s —
+        /// e.g. one cloned from the other — are <i>not</i> equal here, since each handle
+        /// represents a distinct reference-count slot. Compare <see cref="BlobId"/> directly
+        /// when "do these point at the same blob?" is the actual question.
+        /// </remarks>
+        public readonly bool Equals(NativeSharedPtr<T> other)
         {
             return Handle.Equals(other.Handle) && BlobId.Equals(other.BlobId);
         }
 
-        public override bool Equals(object obj)
+        public override readonly bool Equals(object obj)
         {
             return obj is NativeSharedPtr<T> other && Equals(other);
         }
 
-        public override int GetHashCode()
+        public override readonly int GetHashCode()
         {
             return unchecked((int)math.hash(new int2(Handle.GetHashCode(), BlobId.GetHashCode())));
         }
