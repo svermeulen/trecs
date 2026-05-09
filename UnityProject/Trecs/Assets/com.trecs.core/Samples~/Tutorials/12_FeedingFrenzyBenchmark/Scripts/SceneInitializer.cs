@@ -20,6 +20,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             var globals = Globals.Query(World).WithTags<TrecsTags.Globals>().Single();
 
             globals.DesiredPreset = _settings.DefaultPresetIndex;
+            globals.DesiredIterationStyle = _config.IterationStyle;
             globals.FrenzyConfig = new FrenzyConfig
             {
                 SubsetApproach = _config.SubsetApproach,
@@ -28,6 +29,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             };
         }
 
-        partial struct Globals : IAspect, IWrite<DesiredPreset, FrenzyConfig> { }
+        partial struct Globals
+            : IAspect,
+                IWrite<DesiredPreset, DesiredIterationStyle, FrenzyConfig> { }
     }
 }

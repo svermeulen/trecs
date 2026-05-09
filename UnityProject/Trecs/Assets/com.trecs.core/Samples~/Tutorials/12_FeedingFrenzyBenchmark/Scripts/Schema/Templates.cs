@@ -13,6 +13,9 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             [Input(MissingInputBehavior.RetainCurrent)]
             DesiredPreset DesiredPreset = default;
 
+            [Input(MissingInputBehavior.RetainCurrent)]
+            DesiredIterationStyle DesiredIterationStyle = default;
+
             DesiredFishCount DesiredFishCount = default;
             DesiredMealCount DesiredMealCount = default;
 

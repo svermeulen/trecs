@@ -20,10 +20,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         {
             if (_pendingIterationStyleDelta != 0)
             {
-                ref var config = ref World.GlobalComponent<FrenzyConfig>().Write;
+                var current = World.GlobalComponent<DesiredIterationStyle>().Read.Value;
                 int count = Enum.GetValues(typeof(IterationStyle)).Length;
-                config.IterationStyle = (IterationStyle)(
-                    ((int)config.IterationStyle + _pendingIterationStyleDelta + count) % count
+                var next = (IterationStyle)(
+                    ((int)current + _pendingIterationStyleDelta + count) % count
+                );
+                World.AddInput(
+                    World.GlobalEntityHandle,
+                    new DesiredIterationStyle { Value = next }
                 );
                 _pendingIterationStyleDelta = 0;
             }
