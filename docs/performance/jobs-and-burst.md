@@ -73,8 +73,13 @@ nativeWorld.RemoveEntity(entityIndex);
 nativeWorld.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
 ```
 
-!!! warning "Structural changes are simulation-only"
-    `AddEntity`, `RemoveEntity`, and `MoveTo` are only allowed from jobs scheduled by systems with [`AccessorRole.Fixed`](../advanced/accessor-roles.md) (the default for `[ExecuteIn(SystemPhase.Fixed)]`, including the implicit default). Calling them from any presentation- or input-phase job asserts in debug builds. Read-only ops (entity resolution, shared-pointer resolution) are allowed from any role.
+!!! warning "Structural changes must match template cadence"
+    `AddEntity`, `RemoveEntity`, and `MoveTo` require an accessor whose role matches the target template's cadence:
+
+    - **Normal templates:** require [`AccessorRole.Fixed`](../advanced/accessor-roles.md) (the default for `[ExecuteIn(SystemPhase.Fixed)]`, including the implicit default). Calling them from a presentation- or input-phase job asserts in debug builds.
+    - **`[VariableUpdateOnly]` templates** (e.g. cameras, view-only helpers): the rule is inverted — structural changes require an `AccessorRole.Variable` accessor (presentation/input phases) and are rejected from Fixed-role jobs.
+
+    `AccessorRole.Unrestricted` bypasses both rules. 
 
 ### Sort keys
 
@@ -86,7 +91,7 @@ When [`RequireDeterministicSubmission`](../core/world-setup.md) is enabled, `sor
 |-----------|-------------|------|
 | Read a single component | `world.Component<T>(idx).Read` | `NativeComponentRead<T>` (single entity), `NativeComponentBufferRead<T>` (one group), `NativeComponentLookupRead<T>` (across groups) |
 | Write a single component | `world.Component<T>(idx).Write` | `NativeComponentWrite<T>`, `NativeComponentBufferWrite<T>`, `NativeComponentLookupWrite<T>` |
-| Add / remove / move entity | `WorldAccessor` (deferred) | `NativeWorldAccessor` (deferred + sort key, sim only) |
+| Add / remove / move entity | `WorldAccessor` (deferred) | `NativeWorldAccessor` (deferred + sort key) |
 | Read a set | `world.Set<T>().Read` | `NativeSetRead<T>` |
 | Mutate a set | `world.Set<T>().Write` | `NativeSetWrite<T>` (deferred) |
 
