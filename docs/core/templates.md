@@ -100,7 +100,7 @@ public partial class ComplexEntity : ITemplate,
 
 When a template extends multiple bases, all components, tags, and partitions are merged together:
 
-- **Components** — The union of all components from all bases and the concrete template. If the same component appears in multiple bases, the declarations are merged as long as they are compatible.
+- **Components** — The union of all components from all bases and the concrete template. If the same component appears in multiple bases, the declarations are merged as long as their attributes and defaults are compatible (see below).
 - **Tags** — Combined into a union set. Duplicates are deduplicated automatically.
 - **Partitions** — Combined from all bases.
 
