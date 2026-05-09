@@ -140,7 +140,7 @@ accessor.Events.EntitiesWithTags<GameTags.Enemy>()
     .OnRemoved((GroupIndex group, EntityRange indices) => { ... });
 ```
 
-## Tag&lt;T&gt;
+## `Tag<T>`
 
 For runtime tag operations, use the `Tag<T>` cache:
 
