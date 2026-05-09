@@ -66,9 +66,9 @@ Trecs uses several similar-sounding terms with distinct meanings. This page is a
 
 ## Quick mental model
 
-- **Tags** describe identity at creation.
+- **Tags** are describe an entity's identity
 - **Groups** are where those tags place the entity in memory.
-- **Partitions** are groups that double as state (entities move between them).
+- **Partitions** are groups that double as runtime state (entities move between them).
 - **TagSets** are portable handles naming a tag combination.
 - **Sets** are ad-hoc subsets you maintain yourself.
 - **Aspects** are reusable bundles of read/write component access.
