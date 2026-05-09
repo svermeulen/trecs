@@ -1,12 +1,11 @@
 # Recording & Playback
 
-Trecs supports full-state snapshots, deterministic recording/playback,
-sparse desync-detection checksums, and full-state anchors and user
-snapshots — the features behind networked rollback, save games,
-debugging, and QA replay tooling.
+!!! note "When you need this page"
+    Read this if you want **deterministic replay**, **networked rollback**, **save games beyond a single snapshot**, or **debug-replay tooling**. For just save/load of a single world snapshot, the [Snapshots section](#snapshots-save-games) is the only part you need.
 
-This page assumes you have read [Serialization](serialization.md), which
-covers `SerializerRegistry` and `WorldStateSerializer`.
+Trecs supports full-state snapshots, deterministic recording/playback, sparse desync-detection checksums, and full-state anchors and user snapshots — the features behind networked rollback, save games, debugging, and QA replay tooling.
+
+This page assumes you have read [Serialization](serialization.md), which covers `SerializerRegistry` and `WorldStateSerializer`.
 
 ## Overview
 

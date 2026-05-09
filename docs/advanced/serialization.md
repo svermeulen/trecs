@@ -1,7 +1,7 @@
 # Serialization
 
-!!! note
-    Serialization types live in the `com.trecs.serialization` package, which must be installed separately from `com.trecs.core`.
+!!! note "When you need this page"
+    Read this if you're implementing **save/load** or hooking into the **recording / replay** system. The types here live in the optional `com.trecs.serialization` package — `com.trecs.core` does not depend on them.
 
 Trecs ships an optional binary serialization framework for full ECS world state. It is the foundation for [Recording & Playback](recording-and-playback.md) and for save/load systems.
 

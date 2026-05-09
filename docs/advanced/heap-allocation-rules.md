@@ -1,5 +1,8 @@
 # Heap Allocation Rules
 
+!!! note "When you need this page"
+    Read this if you're **allocating heap pointers from non-`Fixed` code** (input systems, services, init hooks), if you need **stable `BlobId`s for shared assets** (palettes, animation curves, anything content-pipeline-driven), or if you're **debugging a "cannot allocate" assertion**. The basic mechanics of `SharedPtr` / `UniquePtr` are on the [Heap](heap.md) page.
+
 This article covers **when and where** you're allowed to allocate heap pointers and create entities, and how Trecs assigns stable IDs to allocations. These rules exist because Trecs is built around deterministic simulation — for replay, networked rollback, and snapshot/restore to work, the same code must produce the same world state on every run.
 
 For an introduction to the pointer types themselves (`SharedPtr<T>`, `UniquePtr<T>`, native variants), see [Heap](heap.md). For the broader set of per-role permissions (component reads / writes, structural changes, RNG streams) see [Accessor Roles](accessor-roles.md) — this page covers only the heap-allocation slice.
