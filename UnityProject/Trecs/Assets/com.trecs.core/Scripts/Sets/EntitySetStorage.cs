@@ -80,26 +80,23 @@ namespace Trecs.Internal
 
         // ── Internal immediate operations (structural updates) ─────────
         //
-        // Add and Remove handle null GroupIndex asymmetrically, preserving the
-        // original dict semantics: the old dict's indexer threw on unknown key
-        // (including null) so Add crashes on null; the old dict's TryGetValue
-        // silently returned false, so Remove silently no-ops on null. Callers
-        // of *Unchecked paths that enqueue bad entity indices (e.g. remove-
-        // supersedes-move flush) rely on the silent Remove.
+        // *Unchecked paths skip the AssertValidGroup check that the public
+        // immediate paths enforce. Both still assert that the group is non-null
+        // so callers can't silently drop ops on a stale or default EntityIndex —
+        // null-group entries in the deferred queues are caller bugs to surface.
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void AddImmediateUnchecked(EntityIndex entityIndex)
         {
+            Assert.That(!entityIndex.GroupIndex.IsNull);
             _entriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void RemoveImmediateUnchecked(EntityIndex entityIndex)
         {
-            var group = entityIndex.GroupIndex;
-            if (group.IsNull)
-                return;
-            var entry = _entriesPerGroup[group.Index];
+            Assert.That(!entityIndex.GroupIndex.IsNull);
+            var entry = _entriesPerGroup[entityIndex.GroupIndex.Index];
             if (entry.IsValid)
             {
                 entry.Remove(entityIndex.Index);

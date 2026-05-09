@@ -96,6 +96,7 @@ namespace Trecs.Internal
 
         public readonly void Dispose(BlobCache blobCache)
         {
+            Assert.That(!IsNull);
             blobCache.DisposeHandle(Handle);
         }
 
