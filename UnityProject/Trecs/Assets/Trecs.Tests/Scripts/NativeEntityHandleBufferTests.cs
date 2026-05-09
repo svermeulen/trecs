@@ -180,20 +180,14 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void EntityHandleMapElement_SizeIs12Bytes()
+        public void EntityHandleMapElement_SizeIs8Bytes()
         {
-            // int Index (4) + ushort GroupIndex._raw (2) + 2 padding before
-            // 4-byte aligned int Version (4) = 12 bytes. Version is int-width
-            // (matching EntityHandle.Version) so it cannot wrap during a long
-            // session and silently re-validate stale handles — see
-            // EntityHandleTests.EntityHandle_StaleHandle_DoesNotRevalidate_AfterManyVersionBumps.
-            // If this size changes, update this assertion deliberately.
             NAssert.AreEqual(
-                12,
+                8,
                 UnsafeUtility.SizeOf<EntityHandleMapElement>(),
-                "EntityHandleMapElement is expected to be 12 bytes "
-                    + "(int Index + ushort GroupIndex + 2 byte padding + int Version). "
-                    + "If this changes, update this assertion deliberately."
+                "EntityHandleMapElement is expected to be 8 bytes "
+                    + "(int Index + ushort GroupIndex + ushort Version). If this changes, "
+                    + "update this assertion deliberately."
             );
         }
 
