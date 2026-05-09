@@ -14,13 +14,6 @@ namespace Trecs.Tests
     [TestFixture]
     public class SetIterationMutationTests
     {
-        const string PendingGuardReason =
-            "Pending iteration-guard implementation in EntitySetStorage. "
-            + "AddImmediate/RemoveImmediate/Clear during iteration of the same set + same group "
-            + "currently corrupts the underlying NativeDenseDictionary silently "
-            + "(buffer growth invalidates the iterator's captured pointer; "
-            + "RemoveAtSwapBack shifts past the iterator's count snapshot).";
-
         TestEnvironment CreateSingleGroupEnv() =>
             EcsTestHelper.CreateEnvironment(
                 b =>
@@ -275,10 +268,9 @@ namespace Trecs.Tests
             NAssert.AreEqual(9, pairs);
         }
 
-        // ── Pending iteration-guard: red until guard is implemented ────────────
+        // ── Iteration guard: mutating the same set + same group must throw ────
 
         [Test]
-        [Ignore(PendingGuardReason)]
         public void Iterate_AddImmediateToSameSetSameGroup_Throws()
         {
             using var env = CreateSingleGroupEnv();
@@ -298,30 +290,6 @@ namespace Trecs.Tests
         }
 
         [Test]
-        [Ignore(PendingGuardReason)]
-        public void Iterate_AddImmediateAlreadyPresent_SameSetSameGroup_Throws()
-        {
-            // Even when the add is a no-op (entity already in the dict, TryAdd returns false),
-            // the iteration guard should still fire — the contract is "no mutation calls",
-            // not "no observable mutation".
-            using var env = CreateSingleGroupEnv();
-            var a = env.Accessor;
-            var group = SpawnA(a, 2);
-
-            for (int i = 0; i < 2; i++)
-                a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(i, group));
-
-            NAssert.Catch<Exception>(() =>
-            {
-                foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
-                {
-                    a.Set<ItMutSetA>().Write.AddImmediate(ei);
-                }
-            });
-        }
-
-        [Test]
-        [Ignore(PendingGuardReason)]
         public void Iterate_RemoveImmediateFromSameSetSameGroup_Throws()
         {
             using var env = CreateSingleGroupEnv();
@@ -341,7 +309,6 @@ namespace Trecs.Tests
         }
 
         [Test]
-        [Ignore(PendingGuardReason)]
         public void Iterate_ClearOnSameSet_Throws()
         {
             using var env = CreateSingleGroupEnv();
@@ -361,7 +328,6 @@ namespace Trecs.Tests
         }
 
         [Test]
-        [Ignore(PendingGuardReason)]
         public void Iterate_DirectSetReadEnumerator_AddImmediate_Throws()
         {
             // Same scenario but iterating Set<T>().Read directly rather than via Query.

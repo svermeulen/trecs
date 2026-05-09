@@ -26,7 +26,11 @@ namespace Trecs
             get
             {
                 var values = _entityIdToDenseIndex.UnsafeValues;
-                return new EntitySetIndices(values, _entityIdToDenseIndex.Count);
+                return new EntitySetIndices(
+                    values,
+                    _entityIdToDenseIndex.Count,
+                    _entityIdToDenseIndex
+                );
             }
         }
 
