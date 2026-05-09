@@ -143,11 +143,16 @@ namespace Trecs.Internal
         {
             // Clear supersedes pending Add/Remove for this set, regardless of
             // call order — analogous to remove-supersedes-move on entity ops.
+            // Job-side write queues (_jobAddQueue / _jobRemoveQueue inside
+            // EntitySetStorage) are already empty by submission time — their
+            // SetFlushJobs ran when the writer jobs completed — so the
+            // deferred-clear path uses ClearEntriesOnly() rather than the
+            // full Clear() that the immediate path needs.
             if (queues.ConsumeClearRequest())
             {
-                DrainBagsDiscard(queues.AddQueue);
-                DrainBagsDiscard(queues.RemoveQueue);
-                set.Clear();
+                EntitySetStorage.DrainEntityIndexBags(queues.AddQueue);
+                EntitySetStorage.DrainEntityIndexBags(queues.RemoveQueue);
+                set.ClearEntriesOnly();
                 return;
             }
 
@@ -155,16 +160,6 @@ namespace Trecs.Internal
                 FlushDeferredOpsDeterministic(ref set, ref queues);
             else
                 FlushDeferredOpsNonDeterministic(ref set, ref queues);
-        }
-
-        static void DrainBagsDiscard(AtomicNativeBags bags)
-        {
-            for (int i = 0; i < bags.ThreadSlotCount; i++)
-            {
-                ref var bag = ref bags.GetBag(i);
-                while (!bag.IsEmpty)
-                    bag.Dequeue<EntityIndex>();
-            }
         }
 
         static void FlushDeferredOpsNonDeterministic(

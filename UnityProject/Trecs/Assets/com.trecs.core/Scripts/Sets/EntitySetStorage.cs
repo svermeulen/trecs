@@ -175,22 +175,50 @@ namespace Trecs.Internal
         // ── Bulk operations ────────────────────────────────────────────
 
         /// <summary>
-        /// Clear all entries and drain pending job write queues.
-        /// Deferred queues are drained separately by the caller.
+        /// Clear all entries and drain pending job write queues. Used by
+        /// the immediate-clear path (<see cref="WorldAccessor.ClearSet"/>),
+        /// where a writer job may have completed but its enqueued entries
+        /// haven't been flushed yet — those need to be discarded so the set
+        /// stays empty after the call.
+        /// <para>
+        /// The deferred-clear path uses <see cref="ClearEntriesOnly"/>
+        /// instead: by submission time, all writer jobs have completed and
+        /// their <see cref="SetFlushJob"/>s have already drained the job
+        /// queues, so re-draining is unnecessary.
+        /// </para>
+        /// <para>
+        /// Neither variant touches <see cref="NativeSetDeferredQueues"/> —
+        /// those are owned by <see cref="SetStore"/> and drained there.
+        /// </para>
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear()
         {
-            DrainBags(_jobAddQueue);
-            DrainBags(_jobRemoveQueue);
+            DrainEntityIndexBags(_jobAddQueue);
+            DrainEntityIndexBags(_jobRemoveQueue);
+            ClearEntriesOnly();
+        }
 
+        /// <summary>
+        /// Clear all entries without touching any of the queue structures.
+        /// See <see cref="Clear"/> for when each variant applies.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ClearEntriesOnly()
+        {
             for (int i = 0; i < _registeredGroups.Length; i++)
             {
                 _entriesPerGroup[_registeredGroups[i].Index].Clear();
             }
         }
 
-        static void DrainBags(AtomicNativeBags bags)
+        /// <summary>
+        /// Drain all entries from a bag-set, discarding the dequeued values.
+        /// Shared by the immediate-clear path (job-write queues) and the
+        /// deferred-clear path (deferred Add/Remove queues, when superseded
+        /// by a queued <c>SetClear</c>).
+        /// </summary>
+        internal static void DrainEntityIndexBags(AtomicNativeBags bags)
         {
             for (int i = 0; i < bags.ThreadSlotCount; i++)
             {

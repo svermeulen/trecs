@@ -1235,6 +1235,15 @@ namespace Trecs.Internal
             }
         }
 
+        // Drives the cascade loop in SubmitEntitiesImpl: returns true while
+        // there's still entity-level work to apply. Deferred set ops
+        // (SetAdd / SetRemove / SetClear) are intentionally excluded here.
+        // They get drained by FlushAllDeferredOps at the end of each loop
+        // iteration, so a set op queued by an observer in iteration N is
+        // applied at the boundary between N and N+1. The hidden invariant
+        // is that no observer fires *on a set change* — if observers ever
+        // need to react to set membership changes, this check must include
+        // a "any set op queued" probe to keep the cascade running.
         internal bool HasMadeNewStructuralChangesInThisIteration()
         {
             return _groupedEntityToAdd.AnyEntityCreated()
