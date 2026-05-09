@@ -52,14 +52,12 @@ Templates and tags are closely related but play distinct roles. Understanding th
 - **A template is the concrete shape.** It declares the exact component layout an entity is spawned with — defaults, partitions, and which tags it carries. The template class is referenced when you *define* the entity kind (the partial class itself), when you *register* it with the builder (`AddTemplate(EnemyEntity.Template)`), and when other templates extend it via `IExtends<EnemyEntity>`.
 - **A tag is the identity handle the rest of the code uses.** Systems, queries, aspects, and events all refer to entities through their tags, not through their template class. `[ForEachEntity(typeof(GameTags.Enemy))]` and `World.CountEntitiesWithTags<GameTags.Enemy>()` are the normal way to talk about "enemies" — runtime code should not name the template class directly. This is important to keep code loosely coupled, testable, and re-usable across different application configurations.
 
-The separation lets you evolve a template (add a component, split it in two, change inheritance) without touching any system code, as long as the tag contract stays the same.
-
 ### Tags as Template Identity
 
 Because every template declares at least one identity tag, tags effectively become the runtime way to identify which template an entity belongs to:
 
 - **1:1 with a concrete template** — `GameTags.Spinner` is carried only by `SpinnerEntity`, so querying by it picks out exactly that template's entities.
-- **An abstract role shared across templates** — a `CommonTags.Renderable` tag declared on a base template is inherited by every template that does `IExtends<Renderable>`. Querying by the role tag iterates every entity that fulfills it. This is Trecs's closest analogue to "interface" or "base class" polymorphism.  Alternatively, can add `CommonTags.Renderable` directly to each template instead of using template inheritance
+- **An abstract role shared across templates** — a `CommonTags.Renderable` tag declared on a base template is inherited by every template that does `IExtends<Renderable>`. Querying by the role tag iterates every entity that fulfills it. This is Trecs's closest analogue to "interface" or "base class" polymorphism.  Alternatively, you can add `CommonTags.Renderable` directly to each template instead of using template inheritance for the same result.
 
 See [Tags](tags.md) for the mechanics, and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md) for how tag combinations map to storage.
 
