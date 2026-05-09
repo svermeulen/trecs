@@ -11,9 +11,9 @@ namespace Trecs
     /// A zero value represents a null (unallocated) blob.
     /// </summary>
     [TypeId(283746019)]
-    public struct BlobId : IEquatable<BlobId>, IStableHashProvider
+    public readonly struct BlobId : IEquatable<BlobId>, IStableHashProvider
     {
-        public long Value;
+        public readonly long Value;
 
         public BlobId(long value)
         {
@@ -22,27 +22,27 @@ namespace Trecs
 
         public static readonly BlobId Null = default;
 
-        public readonly bool IsNull
+        public bool IsNull
         {
             get { return Value == 0; }
         }
 
-        public readonly bool Equals(BlobId other)
+        public bool Equals(BlobId other)
         {
             return Value == other.Value;
         }
 
-        public override readonly bool Equals(object obj)
+        public override bool Equals(object obj)
         {
             return obj is BlobId other && Equals(other);
         }
 
-        public override readonly int GetHashCode()
+        public override int GetHashCode()
         {
             return GetStableHashCode();
         }
 
-        public readonly int GetStableHashCode()
+        public int GetStableHashCode()
         {
             return Value.GetHashCode();
         }
@@ -57,7 +57,7 @@ namespace Trecs
             return !left.Equals(right);
         }
 
-        public override readonly string ToString()
+        public override string ToString()
         {
             return Value.ToString();
         }
