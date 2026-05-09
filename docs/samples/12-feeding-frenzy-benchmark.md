@@ -4,11 +4,11 @@ A performance benchmark that implements the same gameplay using three different 
 
 **Source:** `Samples/12_FeedingFrenzyBenchmark/`
 
-## What It Does
+## What it does
 
 The same fish-eating-meals simulation as [07 — Feeding Frenzy](07-feeding-frenzy.md), but implemented three different ways. You can switch approaches and iteration styles at runtime to compare performance with up to 200,000+ entities.
 
-## Three Approaches
+## Three approaches
 
 ### Branching
 
@@ -50,7 +50,7 @@ void IdleBob(in Fish fish) { ... }
 
 **Trade-off:** Dense, cache-friendly iteration. But partition changes copy component data between groups.
 
-## Nine Iteration Styles
+## Nine iteration styles
 
 Each approach is tested with multiple iteration patterns:
 
@@ -66,7 +66,7 @@ Each approach is tested with multiple iteration patterns:
 | WrapAsJobAspect | Static `[WrapAsJob]` method with aspect |
 | WrapAsJobComponents | Static `[WrapAsJob]` method with components |
 
-## Runtime Controls
+## Runtime controls
 
 | Key | Action |
 |-----|--------|
@@ -76,21 +76,21 @@ Each approach is tested with multiple iteration patterns:
 
 The display shows real-time performance stats: simulation Hz, FPS, entity count, and memory usage.
 
-## Fish Count Presets
+## Fish count presets
 
 Logarithmically spaced from 5,000 to 1,000,000 entities for testing at different scales.
 
-## Key Implementation Details
+## Key implementation details
 
-### Population Management
+### Population management
 
 Fish and meal counts smoothly lerp toward the desired preset. The spawning system prioritizes removing idle entities first to minimize disruption.
 
-### GPU Rendering
+### GPU rendering
 
 At high entity counts, the `RendererSystem` uses GPU-instanced indirect rendering. A Burst job marshals Position, Rotation, Scale, and Color from ECS components to GPU instance buffers each frame.
 
-### Bidirectional Entity References
+### Bidirectional entity references
 
 Fish ↔ Meal pairing uses `EntityHandle` cross-references with cleanup handlers to prevent dangling references when either entity is removed.
 

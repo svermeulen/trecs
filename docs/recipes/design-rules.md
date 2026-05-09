@@ -19,7 +19,7 @@ Opinionated rules for building with Trecs. Each one points at a longer reference
 - **Templates name design concepts.** `Bullet`, `Player`, `Enemy` — not `EntityWithHealthAndPosition`.
 - **No runtime composition changes.** A template's component set is fixed at compile time; entities don't gain or lose components at runtime. The escape hatches are [partitions](../core/templates.md#partitions) (declared moves between groups), boolean fields, and [sets](../entity-management/sets.md).
 
-## Structural Changes & Heap
+## Structural changes & heap
 
 - **Structural changes are deferred.** `AddEntity`, `RemoveEntity`, and `MoveTo` don't take effect until the next submission. Order systems so writers run before readers within the tick, or accept a one-frame lag.
 - **Honour the [accessor-role rules](../advanced/accessor-roles.md).** `Fixed` writes deterministic state and makes structural changes against non-VUO templates; `Variable` reads everything, writes `[VariableUpdateOnly]` components, and makes structural changes against `[VariableUpdateOnly]` templates only; `Unrestricted` is for non-system code (init, lifecycle hooks, editor tooling).
@@ -32,7 +32,7 @@ Opinionated rules for building with Trecs. Each one points at a longer reference
 - **Provide sort keys in parallel structural-change jobs.** `NativeWorldAccessor` ops (`AddEntity` / `RemoveEntity` / `MoveTo` from a job) need a deterministic sort key for replay determinism.
 - **Enable [`RequireDeterministicSubmission`](../entity-management/structural-changes.md#deterministic-submission)** for any project that records, replays, or networks state.
 
-## Common Anti-Patterns
+## Common anti-patterns
 
 | Anti-Pattern | Problem | Solution |
 |---|---|---|

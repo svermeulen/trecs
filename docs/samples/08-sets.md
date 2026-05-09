@@ -4,7 +4,7 @@ Dynamic entity subsets with overlapping membership. Unlike partitions (which are
 
 **Source:** `com.trecs.core/Samples~/Tutorials/08_Sets/`
 
-## What It Does
+## What it does
 
 A grid of particles is affected by two overlapping wave effects — a warm (orange) horizontal wave and a cool (blue) vertical wave. Where the waves overlap, particles turn purple. Particles rise when in the warm wave and scale when in the cool wave.
 
@@ -104,7 +104,7 @@ Same pattern, scoped to `WaveZ` set.
 
 Composites the final color from warm and cool intensities. A particle in both waves gets both effects blended together.
 
-## Why Sets, Not Partitions?
+## Why sets, not partitions?
 
 With partitions, an entity can only be in one partition at a time. To represent "in WaveX", "in WaveZ", and "in both", you'd need four partitions (None, X, Z, XZ) — and that grows as 2^N for N wave effects.
 
@@ -112,7 +112,7 @@ With sets, each wave is independent. A particle can be in zero, one, or both set
 
 The drawback is that sets are sparse and may have slower iteration than partitions due to less memory locality
 
-## Concepts Introduced
+## Concepts introduced
 
 - **`IEntitySet`** — defines a sparse entity subset. See [Sets](../entity-management/sets.md).
 - **`SetAdd` / `SetRemove`** — deferred membership changes. See [Structural Changes](../entity-management/structural-changes.md).

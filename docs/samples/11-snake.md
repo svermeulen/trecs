@@ -4,7 +4,7 @@ A complete grid-based game with deterministic input handling, recording/playback
 
 **Source:** `Samples/11_Snake/`
 
-## What It Does
+## What it does
 
 Classic Snake — a head moves on a grid, eats food to grow, and leaves a trail of body segments. The game supports deterministic recording and playback via hotkeys:
 
@@ -164,7 +164,7 @@ Serialization is wired in via the sample-side `SerializationFactory.CreateAll(wo
 
 See [Serialization](../advanced/serialization.md) for custom-serializer authoring and [Recording & Playback](../advanced/recording-and-playback.md) for the full bundle API.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **`[Input(RetainCurrent)]`** on a template field — input persists across frames until replaced
 - **`[ExecuteIn(SystemPhase.Input)]`** — system runs in the input phase, before fixed update

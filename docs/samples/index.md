@@ -2,7 +2,7 @@
 
 Trecs includes a progressive tutorial series and two full game samples. Each sample builds on concepts from previous ones.
 
-## Tutorial Series (Trecs 101)
+## Tutorial series (Trecs 101)
 
 | # | Sample | Concepts |
 |---|--------|----------|
@@ -22,7 +22,7 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 | 18 | [Reactive Events](18-reactive-events.md) | `OnAdded` / `OnRemoved` observers for cleanup and stat tracking |
 | 19 | [Multiple Worlds](19-multiple-worlds.md) | Two independent `World` instances ticking side-by-side |
 
-## Game Samples
+## Game samples
 
 | # | Sample | Description |
 |---|--------|-------------|
@@ -34,7 +34,7 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 
 Open `UnityProject/Trecs/Assets/Samples/Main.unity` in Unity 6000.3+ and press Play. The scene includes a `SampleCycler` that lets you switch between samples at runtime. Each sample has its own composition root that builds the world and initializes the scene.
 
-## Sample Architecture: Bootstrap & CompositionRoot
+## Sample architecture: Bootstrap & CompositionRoot
 
 Each sample uses a simple two-class pattern to wire everything together:
 
@@ -68,7 +68,7 @@ public class MyCompositionRoot : CompositionRootBase
 !!! note
     This pattern is just a lightweight convenience for the samples. Trecs is deliberately unopinionated about how you structure your application — it doesn't register MonoBehaviours, manage singletons, or hook into Unity's update loop automatically. Use whatever you prefer: a DI framework (Reflex, Zenject, VContainer), plain MonoBehaviours, ScriptableObjects, or anything else. All Trecs needs is for your code to call `world.Tick()`, `world.LateTick()`, and `world.Dispose()` at the appropriate times.
 
-## Shared Utilities
+## Shared utilities
 
 The `Common/` directory contains helpers shared across samples (these are sample code — not part of Trecs itself):
 

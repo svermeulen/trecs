@@ -4,11 +4,11 @@ Storing large immutable assets on the shared heap under caller-authored `BlobId`
 
 **Source:** `Samples/17_BlobStorage/`
 
-## What It Does
+## What it does
 
 A 6×6 grid of cubes cycles through one of two colour palettes. The palettes are `class ColorPalette { List<Color> Colors }` instances — managed data that can't live in a component — stored once on the shared heap. Each cube holds a 12-byte `SharedPtr<ColorPalette>` handle pointing at its palette. The two palettes are seeded under **stable, hand-authored `BlobId`s**, so the same identifier always refers to the same blob regardless of init-time call order.
 
-## Why Stable BlobIds?
+## Why stable BlobIds?
 
 `HeapAccessor.AllocShared(T blob)` (no ID argument) auto-mints a `BlobId` from the world's deterministic RNG. That's fine when your init code is itself deterministic, but it breaks in workflows where startup ordering varies — e.g. assets discovered on disk in non-deterministic order, or content loaded in parallel. Hand-authored IDs side-step that entirely:
 
@@ -22,7 +22,7 @@ public static class PaletteIds
 
 For the simpler "allocate and go" pattern where IDs are auto-minted, see [Sample 10 — Pointers](10-pointers.md). This sample is the content-pipeline variant.
 
-## The Seeder Pattern
+## The seeder pattern
 
 A long-lived seeder object allocates each blob once at startup under its stable ID and **holds the resulting `SharedPtr<T>` as a member field**. Without that anchor, the blob's refcount would drop to zero in the window between init and the first entity spawn, and the heap would evict it.
 
@@ -95,7 +95,7 @@ public partial class PaletteCycleSystem : ISystem
 
 Because the blob lives once in the shared heap, all 36 entities pointing at the same palette see identical data — and changing the palette (if you adapted this to a mutable case) would update every entity in one write.
 
-## Cleanup Discipline
+## Cleanup discipline
 
 Pointers stored on components must be disposed when the entity is removed — the framework does **not** auto-dispose, because there's no way for it to know whether you copied the handle elsewhere. This sample doesn't remove entities once spawned, so no cleanup observer is needed in the example code.
 
@@ -109,7 +109,7 @@ If you adapt the pattern to entities that come and go, register an `OnRemoved` o
 
 For per-entity managed data that isn't shared, use `UniquePtr<T>` instead ([Sample 10](10-pointers.md)).
 
-## Concepts Introduced
+## Concepts introduced
 
 - **Stable `BlobId`** — caller-authored identifiers that keep the same identity across runs, independent of init-time ordering
 - **Seeder pattern** — a long-lived object that allocates shared blobs at startup and anchors their lifetime

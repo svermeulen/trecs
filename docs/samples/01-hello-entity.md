@@ -122,7 +122,7 @@ public void Initialize()
 
 See [World Setup](../core/world-setup.md) and [Entities](../core/entities.md).
 
-## Concepts Introduced
+## Concepts introduced
 
 - **Components** — unmanaged structs implementing `IEntityComponent`
 - **Tags** — empty structs implementing `ITag`

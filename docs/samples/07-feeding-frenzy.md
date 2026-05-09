@@ -4,7 +4,7 @@ A complex simulation with multiple interacting systems and job-based processing.
 
 **Source:** `com.trecs.core/Samples~/Tutorials/07_FeedingFrenzy/`
 
-## What It Does
+## What it does
 
 Fish swim toward meals. When a fish reaches a meal, it consumes it, grows slightly, and looks for the next one. Fish slowly shrink from starvation — if they get too small, they die. Up/down arrows adjust the fish population.
 
@@ -43,7 +43,7 @@ public partial class FishEntity : ITemplate,
 
 Fish have two partitions: **NotEating** (idle, bobbing) and **Eating** (moving toward a meal).
 
-## Key Systems
+## Key systems
 
 ### LookingForMealSystem
 
@@ -193,7 +193,7 @@ public partial class RemoveCleanupHandler : IDisposable
 }
 ```
 
-## Architecture Pattern: SimPosition vs Position
+## Architecture pattern: SimPosition vs Position
 
 The simulation writes to `SimPosition` (the "true" position at fixed rate). A variable-update system smoothly interpolates `Position` toward `SimPosition` at the display frame rate:
 
@@ -205,7 +205,7 @@ Rendering:  Reads Position for smooth visual movement
 
 This is an alternative to the formal [interpolation](09-interpolation.md) system.  This approach is nice because it interpolates over longer time intervals so fish rotate smoothly to new directions.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **Native aspect factories** — `MealNutritionView.NativeFactory` lets a job look up another entity's components by handle inside Burst. See [Advanced Job Features](../advanced/advanced-jobs.md) and [Aspects](../data-access/aspects.md).
 - **Complex multi-system simulation** with many interacting systems.

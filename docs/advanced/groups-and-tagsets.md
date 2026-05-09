@@ -27,7 +27,7 @@ accessor.AddEntity<GameTags.Player, GameTags.VIP>();  // group: {Player, VIP}
 
 Each unique tag combination maps to exactly one group. Entities in the same group share the same component layout and are stored contiguously in memory.
 
-### Why Groups Matter
+### Why groups matter
 
 Groups are the foundation of Trecs' performance model:
 
@@ -70,7 +70,7 @@ foreach (var slice in accessor.Query().WithTags<GameTags.Player>().GroupSlices()
 
 `ComponentBuffer<T>(group)` returns a `ComponentBufferAccessor<T>` — use its `.Read` or `.Write` property to get the concrete native buffer (`NativeComponentBufferRead<T>` / `NativeComponentBufferWrite<T>`). The choice is what registers the access with the [dependency tracker](../performance/dependency-tracking.md).
 
-### Sparse GroupSlices (Set Members)
+### Sparse GroupSlices (set members)
 
 When querying with `InSet<T>()`, iteration is sparse — only set members are visited:
 

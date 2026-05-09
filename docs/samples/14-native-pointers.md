@@ -4,7 +4,7 @@ Using Burst-compatible heap pointers to store unmanaged data that a parallel job
 
 **Source:** `Samples/14_NativePointers/`
 
-## What It Does
+## What it does
 
 Mirrors [Sample 10](10-pointers.md) — entities follow shared patrol routes and each draws a trail of recent positions — but the route and trail payloads are now **unmanaged structs**, allocated in native heap blobs via `NativeSharedPtr` / `NativeUniquePtr`, and the movement system runs as a Burst-compiled job that resolves the pointers inline.
 
@@ -12,7 +12,7 @@ This is the shape you reach for whenever you want heap-allocated data in a Burst
 
 ## Schema
 
-### Unmanaged Payloads
+### Unmanaged payloads
 
 ```csharp
 public readonly struct PatrolRoute
@@ -195,7 +195,7 @@ public partial class PointerCleanupHandler : IDisposable
 
 The cleanup handler is registered in the composition root *before* the scene initializer spawns entities, so it also catches removals that happen during world disposal.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **`NativeSharedPtr<T>`** — Burst-compatible reference-counted pointer to an unmanaged blob. Mirrors `SharedPtr<T>` from Sample 10.
 - **`NativeUniquePtr<T>`** — Burst-compatible single-owner pointer. Mirrors `UniquePtr<T>`.

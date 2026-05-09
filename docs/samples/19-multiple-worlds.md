@@ -4,7 +4,7 @@ Two independent Trecs `World` instances running side-by-side in a single Unity s
 
 **Source:** `Samples/19_MultipleWorlds/`
 
-## What It Does
+## What it does
 
 Two worlds tick every frame:
 
@@ -43,7 +43,7 @@ public partial class CritterEntity : ITemplate, ITagged<SampleTags.Critter>
 
 `Position` and `GameObjectId` come from `Common/`.
 
-## Composition Root
+## Composition root
 
 The interesting part — building two worlds in one `Construct()`:
 
@@ -81,7 +81,7 @@ Each world gets its own `SpawnSystem`/`LifetimeSystem`/`PrimitiveRendererSystem`
 
 The two worlds happen to register the *same template type* (`CritterEntity`) — that's allowed and common. Templates describe a shape; each world independently allocates per-group component arrays for that shape. An entity created in World A is not visible to any query in World B.
 
-## Lifecycle Wiring
+## Lifecycle wiring
 
 Two worlds means two of every lifecycle hook:
 
@@ -117,7 +117,7 @@ Both worlds share a single `GameObjectRegistry` instance. That's a deliberate ch
 
 This split is what lets the same template type be registered in multiple worlds without conflict.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **Multiple `World` instances in the same process** — supported and isolated.
 - **`WorldBuilder.SetDebugName`** for editor disambiguation.

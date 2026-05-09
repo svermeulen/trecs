@@ -4,7 +4,7 @@ Dynamic entity creation and destruction. Spheres spawn at random positions, live
 
 **Source:** `com.trecs.core/Samples~/Tutorials/02_SpawnAndDestroy/`
 
-## What It Does
+## What it does
 
 Colored spheres appear at random positions around the origin. Each has a countdown timer — when it expires, the entity and its GameObject are destroyed.
 
@@ -84,7 +84,7 @@ public partial class LifetimeSystem : ISystem
 
 Syncs position to GameObjects each visual frame.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **Dynamic entity creation** with `AddEntity` and component initialization
 - **Entity removal** with `RemoveEntity` (deferred until submission)

@@ -26,7 +26,7 @@ partial struct MyJob : IJobFor
 }
 ```
 
-### Supported Field Types
+### Supported field types
 
 | Field Type | Purpose | Requires Tag? |
 |-----------|---------|---------------|
@@ -39,7 +39,7 @@ partial struct MyJob : IJobFor
 | `NativeWorldAccessor` | Job-safe world operations | No |
 | `GroupIndex` | Runtime handle for the resolved group | Yes |
 
-### Tag Resolution
+### Tag resolution
 
 Fields that require a tag scope (buffers, lookups, `GroupIndex`) can get their tags in two ways:
 
@@ -64,7 +64,7 @@ This is useful when if the tagset being operated on is not known until runtime, 
 
 Fields that don't require tags (`NativeSetRead`, `NativeSetWrite`, `NativeWorldAccessor`) are populated automatically and never generate schedule parameters.
 
-## Native Component Access
+## Native component access
 
 ### Buffers — Single Group
 
@@ -96,7 +96,7 @@ if (healthLookup.Exists(entityIndex)) { ... }
 if (healthLookup.TryGet(entityIndex, out Health hp)) { ... }
 ```
 
-## Native Set Operations
+## Native set operations
 
 Sets can be read and modified from jobs:
 
@@ -115,7 +115,7 @@ highlightedWrite.AddImmediate(entityIndex);
 highlightedWrite.RemoveImmediate(entityIndex);
 ```
 
-## External Job Tracking
+## External job tracking
 
 In the rare case where a job is scheduled manually without using the Trecs source generator (e.g., a third-party job or a custom scheduling pattern), you can register it with the world so the [dependency tracker](../performance/dependency-tracking.md) knows about it, using `TrackExternalJob` on the system's `WorldAccessor`:
 

@@ -4,13 +4,13 @@ Using heap pointers to store managed data (classes, lists, arrays) that can't li
 
 **Source:** `com.trecs.core/Samples~/Tutorials/10_Pointers/`
 
-## What It Does
+## What it does
 
 Entities follow shared patrol routes (displayed as waypoints). Each entity has its own trail history (displayed as a LineRenderer). Multiple entities share the same route data via `SharedPtr`, while each has a unique trail via `UniquePtr`.
 
 ## Schema
 
-### Managed Classes (Heap Data)
+### Managed classes (heap data)
 
 ```csharp
 public class PatrolRoute
@@ -133,7 +133,7 @@ world.Events.EntitiesWithTags<PatrolTags.Follower>()
     .AddTo(_eventDisposables);
 ```
 
-## Concepts Introduced
+## Concepts introduced
 
 - **`SharedPtr<T>`** — reference-counted pointer for shared managed data. See [Heap](../advanced/heap.md).
 - **`UniquePtr<T>`** — single-owner pointer for per-entity managed data.

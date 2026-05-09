@@ -4,7 +4,7 @@ Smooth rendering at variable frame rates despite a low fixed timestep. Side-by-s
 
 **Source:** `com.trecs.core/Samples~/Tutorials/09_Interpolation/`
 
-## What It Does
+## What it does
 
 Two sets of entities orbit in circles. "Smooth" entities use interpolation and appear silky smooth. "Raw" entities read the fixed-update position directly and visibly stutter at high frame rates.
 
@@ -51,7 +51,7 @@ public partial class RawOrbitEntity : ITemplate, ITagged<OrbitTags.Raw>
 
 The `[Interpolated]` attribute on `Position` and `Rotation` automatically generates `Interpolated<T>` and `InterpolatedPrevious<T>` wrapper components.
 
-## Interpolation Functions
+## Interpolation functions
 
 Define static methods with `[GenerateInterpolatorSystem]` that specify how each component type should be blended. The source generator creates a Burst-compiled job system for each:
 
@@ -97,7 +97,7 @@ var world = new WorldBuilder()
     .Build();
 ```
 
-### Entity Creation
+### Entity creation
 
 Smooth entities use `SetInterpolated`, which initializes the current, previous, and interpolated copies of the component in one call:
 
@@ -147,7 +147,7 @@ public partial class OrbitRendererSystem : ISystem
 
 Because `Position` and `Rotation` are `[Unwrap]`, the aspect exposes `view.InterpolatedPosition` (`float3`) and `view.InterpolatedRotation` (`quaternion`) directly — no double-`.Value` indirection.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **`[Interpolated]`** attribute on template fields generates the `Interpolated<T>` and `InterpolatedPrevious<T>` wrapper components.
 - **`[GenerateInterpolatorSystem]`** source-generates Burst-compiled blending systems from simple static methods.

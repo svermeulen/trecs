@@ -4,7 +4,7 @@ Subscribing to entity add / remove / move events with `WorldAccessor.Events` so 
 
 **Source:** `Samples/18_ReactiveEvents/`
 
-## What It Does
+## What it does
 
 A spawner adds a new `Bubble` entity every 0.3s. Each entity has a companion `GameObject` registered in the `GameObjectRegistry`. A lifetime system removes bubbles whose timer runs out. A **stats updater** object subscribes to `OnAdded` and `OnRemoved` for the `Bubble` tag:
 
@@ -13,7 +13,7 @@ A spawner adds a new `Bubble` entity every 0.3s. Each entity has a companion `Ga
 
 This is the canonical pattern for managing external, non-ECS resources tied to entities — one place that owns the cleanup side of destruction.
 
-## The Three Pieces
+## The three pieces
 
 ```csharp
 public partial class GameStatsUpdater : IDisposable
@@ -65,7 +65,7 @@ public partial class GameStatsUpdater : IDisposable
 
 **3. Lifetime** — the subscription returns an `IDisposable`. `.AddTo(_disposables)` parks it in a collection that's disposed when the handler class itself is disposed.
 
-## Reading Components in `OnRemoved`
+## Reading components in `OnRemoved`
 
 Events fire during submission, and each entity's component data is still readable — including in `OnRemoved`, because removed entities are parked at the end of the group's backing array (past the active count) until submission completes. Declare whichever components you need as `in` / `ref` parameters on your `[ForEachEntity]` method and the source generator wires them up:
 
@@ -84,11 +84,11 @@ This is what makes `OnRemoved` the right place to dispose external resources key
 
 For intra-ECS reactions (e.g. "when an enemy is added, spawn a spawn-VFX entity"), you can often do it in a normal system or init hook instead — reserve observers for crossing the ECS/external boundary, which is the problem they solve best.
 
-## Frame Events
+## Frame events
 
 Outside of per-entity events, `Events` also exposes frame-level callbacks: `OnSubmissionStarted`, `OnSubmission`, `OnFixedUpdateStarted`, `OnFixedUpdateCompleted`, `OnVariableUpdateStarted`, `OnPostApplyInputs`. See [Entity Events — Frame Events](../entity-management/entity-events.md#frame-events) for the full list.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **`Events.EntitiesWithTags<T>()`** — scope-builder for entity lifecycle subscriptions
 - **`OnAdded` / `OnRemoved` / `OnMoved`** — observers that fire during submission

@@ -4,7 +4,7 @@ Parallel entity processing with Unity's job system and Burst compiler. Shows bot
 
 **Source:** `com.trecs.core/Samples~/Tutorials/05_JobSystem/`
 
-## What It Does
+## What it does
 
 Particles spawn, move, and bounce off boundaries. A toggle switches between main-thread and Burst-compiled parallel job execution, so we can see performance changes (using burst+jobs is often 10x faster). Arrow keys adjust particle count.
 
@@ -140,7 +140,7 @@ World
 
 The sort key controls the deterministic post-submission order of entities created in parallel.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **`[WrapAsJob]`** — source generator creates a parallel Burst-compiled iteration. See [Jobs & Burst](../performance/jobs-and-burst.md).
 - **`NativeWorldAccessor`** for structural operations and reads inside jobs. See [Advanced Job Features](../advanced/advanced-jobs.md).

@@ -4,11 +4,11 @@ Composable, reusable aspect contracts so different templates can share the same 
 
 **Source:** `Samples/15_AspectInterfaces/`
 
-## What It Does
+## What it does
 
 An arena has one **boss** and a flock of **enemies** that charge and flee. They share nothing structurally — the boss has no `Mood`, `ChaseSpeed`, or `FleeEndTime`; the enemies have no boss-only fields — but both can take a hit. The sample uses an **aspect interface** (`IHittable`) to express "anything that can take a hit" once, and then reuses it from a single `Combat.TryTakeHit<T>` helper that both species call.
 
-## The Idea
+## The idea
 
 A regular aspect is a concrete `partial struct` declaring `IRead<>` / `IWrite<>` constraints. An **aspect interface** is a `partial interface` that declares those same constraints, and can be inherited by concrete aspects to compose the shared contract with species-specific extras:
 
@@ -36,7 +36,7 @@ partial struct EnemyView
 partial struct BossView : IHittable, IWrite<Position> { }
 ```
 
-## The Payoff — Generic Helpers
+## The payoff — generic helpers
 
 Because both aspects satisfy `IHittable`, `Combat.TryTakeHit` can be written **once** with a generic constraint, and called from both the enemy AI and (in this sample) the boss path without duplication:
 
@@ -108,7 +108,7 @@ Enemies and the boss both have this component set, so the same renderer drives b
 
 If only one concrete aspect needs the component set, skip the interface and use a regular aspect.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **Aspect interfaces** — `partial interface` declarations inheriting `IAspect` + `IRead<>` / `IWrite<>` to express a shared capability contract
 - **Generic aspect constraints** — `where T : struct, IHittable` on helper methods so one implementation serves every aspect that satisfies the interface

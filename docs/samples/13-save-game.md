@@ -4,7 +4,7 @@ A small Sokoban puzzle demonstrating the `SnapshotSerializer` file API in the cl
 
 **Source:** `Samples/13_SaveGame/`
 
-## What It Does
+## What it does
 
 Push every box onto a target square. Boxes can only be pushed (never pulled), so a box shoved into a corner is stuck forever — load a snapshot to undo.
 
@@ -16,7 +16,7 @@ Push every box onto a target square. Boxes can only be pushed (never pulled), so
 
 Slot files live under `{Application.persistentDataPath}/SaveGame/slot{N}.snap` and persist across editor restarts. The HUD shows each slot's last-save timestamp and a "Boxes on targets" counter.
 
-## Serialization Setup
+## Serialization setup
 
 The sample uses the full `SerializationFactory.CreateAll(world)` helper (from `Samples/Common/Scripts/`) for simplicity, but a save-game-only project does not need the recording handlers. If you want the leanest possible stack:
 
@@ -65,7 +65,7 @@ snapshots.LoadSnapshot(path);
 
 Trecs does not interpret `version` itself — bumping it on breaking schema changes is a convention you own.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **`SnapshotSerializer.SaveSnapshot(path)` / `LoadSnapshot(path)`** — the file-based save/load API.
 - **Multiple save slots** — each file is an independent snapshot.

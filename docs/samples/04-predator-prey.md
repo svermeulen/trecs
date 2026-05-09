@@ -4,7 +4,7 @@ Cross-entity relationships using `EntityHandle`. Predators chase prey, and clean
 
 **Source:** `com.trecs.core/Samples~/Tutorials/04_PredatorPrey/`
 
-## What It Does
+## What it does
 
 Predators (red) chase the nearest prey (green). When a predator catches its prey, the prey is removed and a new one spawns. Predators continuously re-target the nearest available prey.
 
@@ -113,7 +113,7 @@ Steers predators toward their target prey, removes prey on contact.
 
 Maintains the prey population by spawning replacements.
 
-### Cleanup Handler
+### Cleanup handler
 
 When prey are removed, clean up their GameObjects using an `OnRemoved` event handler. Using events for cleanup is good practice for two reasons:
 
@@ -151,7 +151,7 @@ public partial class CleanupHandlers
 }
 ```
 
-## Concepts Introduced
+## Concepts introduced
 
 - **`EntityHandle`** for stable cross-entity references that survive structural changes. See [Entities](../core/entities.md).
 - **Template inheritance** with `IExtends<T>` to share common components. See [Templates](../core/templates.md).

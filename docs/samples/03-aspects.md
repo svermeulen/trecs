@@ -4,7 +4,7 @@ Bundled component access via aspects. Instead of declaring individual component 
 
 **Source:** `com.trecs.core/Samples~/Tutorials/03_Aspects/`
 
-## What It Does
+## What it does
 
 Boids (simple agents) move in straight lines and wrap around the edges of a bounded area. Their GameObjects are rotated to face the direction of movement.
 
@@ -89,7 +89,7 @@ public partial class BoidWrapSystem : ISystem
 
 Reads position and velocity to update the GameObject transform and face the movement direction.
 
-## Concepts Introduced
+## Concepts introduced
 
 - **Aspects** — `partial struct` implementing `IAspect`, `IRead<T>`, `IWrite<T>`. See [Aspects](../data-access/aspects.md).
 - **`[Unwrap]`** components expose their inner value type through aspect properties. See [Components](../core/components.md).

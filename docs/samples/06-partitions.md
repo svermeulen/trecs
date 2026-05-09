@@ -4,7 +4,7 @@ Built-in partition transitions via template partitions. Entities in different pa
 
 **Source:** `com.trecs.core/Samples~/Tutorials/06_Partitions/`
 
-## What It Does
+## What it does
 
 Balls bounce under gravity. When a ball's energy drops below a threshold, it transitions to a "Resting" partition and turns gray. After a rest timer expires, it launches back into the air and returns to "Active".
 
@@ -116,7 +116,7 @@ public partial class BallRendererSystem : ISystem
 }
 ```
 
-## Concepts Introduced
+## Concepts introduced
 
 - **`IHasPartition`** declares valid partitions on a template. See [Templates](../core/templates.md) and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).
 - **`MoveTo<Tag1, Tag2>()`** transitions entities between partitions. See [Structural Changes](../entity-management/structural-changes.md).

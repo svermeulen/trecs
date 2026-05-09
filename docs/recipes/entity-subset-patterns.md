@@ -5,7 +5,7 @@ There are three main approaches to filtering entities at runtime. Each has diffe
 !!! tip "Start simple — partitions are an optimization"
     Branching on a component value (Approach A) is fast enough for most gameplay code and a fine default. Reach for **sets** whenever the subset is itself a first-class concept you want to name, query, or iterate. **Partitions** are a cache-locality optimization for very large populations — pick them when the profiler or population size calls for it, not as a general way to model state.
 
-## Approach A: Check Component Values
+## Approach A: check component values
 
 Iterate all entities and check a condition:
 
@@ -23,7 +23,7 @@ void Execute(ref Health health)
 **Pros:** Simple, no setup required. State stays colocated with the data it describes, so there's nothing to keep in sync.
 **Cons:** Visits every entity the query matches (every group with the requested components when using `MatchByComponents`, or every entity in the tag-scoped groups otherwise), including those that fail the branch. Only a real problem when the population is large *and* the check sits in a hot loop.
 
-## Approach B: Template [Partitions](../core/templates.md#partitions)
+## Approach B: template [partitions](../core/templates.md#partitions)
 
 Use `IHasPartition` to define mutually exclusive states that entities can transition between:
 
@@ -49,7 +49,7 @@ void Execute(in DeadEnemy enemy) { ... }
 **Pros:** Dense iteration — only matching entities are visited. Cache-friendly.
 **Cons:** Moving between groups copies component data. Adding dimensions multiplies the number of groups (2^N for N boolean partitions).
 
-## Approach C: [Sets](../entity-management/sets.md) (Indexed Subsets)
+## Approach C: [sets](../entity-management/sets.md) (indexed subsets)
 
 Use sets for dynamic, sparse membership. Sets must be registered with the world builder via `AddSet<T>()`:
 
@@ -67,7 +67,7 @@ void Execute(in DeadEnemy enemy) { ... }
 **Pros:** No data movement. Unlimited dimensions without group explosion. Fast add/remove.
 **Cons:** Sparse iteration (indexed access, less cache-friendly than dense).
 
-## Decision Guide
+## Decision guide
 
 | Factor | Component Check | Template Partitions | Sets |
 |--------|----------------|---------------------|------|
@@ -85,7 +85,7 @@ void Execute(in DeadEnemy enemy) { ... }
 - **3+ dimensions, or many categories** → Sets. Avoids combinatorial group explosion.
 - **Very large populations where a hot iteration shows up in the profiler** → Template partitions. The dense-array layout buys you cache-friendly iteration at the cost of data movement on transitions and extra groups per dimension. The partition boundary should reflect a real hot path, not just a conceptual state split.
 
-## Combinatorial Explosion
+## Combinatorial explosion
 
 With template partitions, each dimension doubles the number of groups:
 
@@ -98,7 +98,7 @@ With template partitions, each dimension doubles the number of groups:
 
 At 3+ dimensions, prefer sets — they don't create additional groups.
 
-## Mixing Approaches
+## Mixing approaches
 
 Nothing forces you to pick one approach per template. A typical mix is to use **partitions** when a lifecycle split (e.g. `Alive` / `Dead`) is hot enough that splitting the storage is worth it, and **sets** for everything else — dynamic categorizations, designer-meaningful subsets, multi-dimensional filters. Component-value branching covers the rest.
 
