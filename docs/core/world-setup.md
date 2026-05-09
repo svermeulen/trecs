@@ -25,7 +25,7 @@ var world = new WorldBuilder()
 |--------|-------------|
 | `SetDebugName(string)` | Human-readable name (surfaces in editor tooling) |
 | `SetSettings(WorldSettings)` | Configure timing, determinism, debug options — see [WorldSettings](#worldsettings) |
-| `AddTemplate(Template)` / `AddTemplates(...)` | Register entity [templates](templates.md) |
+| `AddTemplate(Template)` / `AddTemplates(...)` | Register entity [templates](templates.md). Each contributes one or more [groups](../advanced/groups-and-tagsets.md#groups), allocated at `Initialize`. |
 | `AddSet<T>()` | Register an [entity set](../entity-management/sets.md) |
 | `AddBlobStore(IBlobStore)` | Register a blob store for [heap](../advanced/heap.md) data |
 | `SetBlobCacheSettings(...)` | Configure blob caching |
