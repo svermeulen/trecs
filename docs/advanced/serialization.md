@@ -134,8 +134,7 @@ var roundTripped = buffer.ReadAll<MyType>();
 
 ## Determinism notes
 
-- Always use `World.Rng` / `World.FixedRng` in fixed update — never `UnityEngine.Random` or `System.Random`.
-- Set `RequireDeterministicSubmission = true` in `WorldSettings` if you intend to record and replay.
+The full determinism checklist (RNG, fixed-time, sort keys, isolated inputs) lives on the [Recording & Playback](recording-and-playback.md#determinism-requirements) page. One serialization-specific flag is worth flagging here:
 
 ### `WorldSettings.AssertNoTimeInFixedPhase`
 
@@ -164,42 +163,11 @@ See [Recording & Playback](recording-and-playback.md) for the determinism-sensit
 
 All `SnapshotSerializer`, `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` methods are **main-thread only**. The blit fast-path uses a shared static byte buffer, and every read/write path asserts `UnityThreadHelper.IsMainThread`. Do not call save/load from a background thread.
 
-## Binary format stability
-
-The binary layout is **version-sensitive** and not forward-compatible:
-
-- Adding, removing, or reordering fields on a blittable component changes
-  the byte layout, invalidating every previously saved snapshot or
-  bundle that used the old shape.
-- The `version` integer you pass to `SaveSnapshot(version, …)` /
-  `BundleRecorderSettings.Version` is stored in the file header and
-  exposed on `SnapshotMetadata.Version` / `BundleHeader.Version`. Trecs
-  does not interpret it — bumping `version` on a breaking change is a
-  convention you own.
-- Use `SnapshotSerializer.PeekMetadata(path)` (or `(stream)`) to inspect
-  the saved version before committing to a full `LoadSnapshot`, and
-  surface a user-facing error for incompatible saves.
-
-!!! note "Two different 'versions'"
-    Don't confuse the user `version` above with Trecs's own internal
-    `FormatVersion` byte written at the start of every payload by
-    `SerializationHeaderUtil`. The format version describes the layout
-    of the header itself (magic bytes + fields); it is bumped only when
-    Trecs changes the framing, and users never set it. Your
-    `version` parameter is the schema version of your game's serialized
-    data — bump it whenever *your* serializers change shape.
-
 ## Writer / reader flags
 
-Every `ISerializationWriter`/`ISerializationReader` carries a `long Flags`
-bitmask you can consult from inside a custom serializer. Flags are
-threaded in at the top level (`WriteAll(value, version, includeTypeChecks,
-flags: …)`, `StartWrite(version, includeTypeChecks, flags: …)`) and
-propagate to every nested serializer.
+Every `ISerializationWriter` / `ISerializationReader` carries a `long Flags` bitmask you can consult from inside a custom serializer. Flags are threaded in at the top level (`WriteAll(value, version, includeTypeChecks, flags: …)`, `StartWrite(version, includeTypeChecks, flags: …)`) and propagate to every nested serializer.
 
-Typical use: excluding non-deterministic state from checksums. Define a
-constant, set it from the recording's `checksumFlags` parameter, then
-branch inside your serializer:
+Typical use: excluding non-deterministic state from checksums. Define a constant, set it from the recording's `checksumFlags` parameter, then branch inside your serializer:
 
 ```csharp
 public static class MyAppFlags
@@ -221,14 +189,20 @@ public void Serialize(in Npc value, ISerializationWriter writer)
 }
 ```
 
-`BundleRecorder` stores the flags on `BundleHeader.ChecksumFlags` and
-`BundlePlayer` passes them back in automatically during checksum
-verification, so recording and playback always agree on what was
-included.
+`BundleRecorder` stores the flags on `BundleHeader.ChecksumFlags` and `BundlePlayer` passes them back in automatically during checksum verification, so recording and playback always agree on what was included.
+
+## Schema versioning
+
+The binary layout is **version-sensitive** and not forward-compatible. Adding, removing, or reordering fields on a blittable component changes the byte layout, invalidating every previously saved snapshot or bundle that used the old shape.
+
+The `version` integer you pass to `SaveSnapshot(version, …)` / `BundleRecorderSettings.Version` is stored in the file header and exposed on `SnapshotMetadata.Version` / `BundleHeader.Version`. Trecs doesn't interpret it — bumping `version` on a breaking change is your convention. Use `SnapshotSerializer.PeekMetadata(path)` to inspect the version before committing to a full `LoadSnapshot`, and surface a user-facing error for incompatible saves.
+
+!!! note "Two different 'versions'"
+    Don't confuse the user `version` above with Trecs's own internal `FormatVersion` byte written at the start of every payload by `SerializationHeaderUtil`. The format version describes the layout of the header itself; it is bumped only when Trecs changes the framing, and users never set it. Your `version` parameter is the schema version of your game's serialized data — bump it whenever *your* serializers change shape.
 
 ### Versioned custom serializers
 
-The `version` integer you pass to `SaveSnapshot` / set on `BundleRecorderSettings.Version` is stamped into the file header *and* exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). Because the header records the version the file was written with, the deserializer can recognize older saves and read them with the layout they were written in. As long as you bump the version every time you change the on-disk layout, a single serializer can keep handling all prior versions:
+The `version` integer is also exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). The deserializer can therefore recognize older saves and read them with the layout they were written in. Bump the version on every layout change, and a single serializer can keep handling all prior versions:
 
 ```csharp
 public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
