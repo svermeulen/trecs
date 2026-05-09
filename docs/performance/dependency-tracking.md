@@ -33,7 +33,7 @@ The source generator inspects each job:
 
 The generated `ScheduleParallel` then:
 
-1. Waits on every outstanding job that conflicts with the declared access.
+1. Combines the `JobHandle`s of every outstanding job that conflicts with the declared access and passes the result as the new job's input dependency — so the new job won't start until those finish, but the main thread doesn't block.
 2. Registers the new job so subsequent schedules see it as outstanding.
 
 You only call the generated method — the rest is handled.
@@ -69,9 +69,9 @@ The five [update phases](../core/systems.md#update-phases) — `Input`, `Fixed`,
 
 ## Summary
 
-| Mechanism | When | What it syncs |
+| Mechanism | When | What it does |
 |---|---|---|
-| Generated `ScheduleParallel` | Job scheduling | Waits on conflicting jobs; registers new access |
+| Generated `ScheduleParallel` | Job scheduling | Chains the new job's `JobHandle` behind conflicting jobs (no main-thread wait); registers new access |
 | `.Read` | Main-thread component access | Completes outstanding writers |
 | `.Write` | Main-thread component access | Completes outstanding writers + readers |
 | Phase boundary | Between update phases | Completes everything |
