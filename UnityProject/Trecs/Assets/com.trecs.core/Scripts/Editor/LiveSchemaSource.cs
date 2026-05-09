@@ -383,7 +383,7 @@ namespace Trecs
             var manual = new List<AccessorRef>();
             try
             {
-                foreach (var entry in _world.GetAllAccessors())
+                foreach (var entry in _world.GetAccessorsById())
                 {
                     var id = entry.Key;
                     var acc = entry.Value;

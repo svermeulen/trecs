@@ -163,8 +163,8 @@ namespace Trecs
         internal ReadOnlyDenseDictionary<ISystem, WorldAccessor> ExecuteAccessors =>
             _accessorRegistry.ExecuteAccessors;
 
-        internal ReadOnlyDenseDictionary<int, WorldAccessor> AllAccessors =>
-            _accessorRegistry.AllAccessors;
+        internal ReadOnlyDenseDictionary<int, WorldAccessor> AccessorsById =>
+            _accessorRegistry.AccessorsById;
 
         // Expose WorldInfo since this is often needed inside the accessor declaration method
         public WorldInfo WorldInfo
@@ -466,7 +466,7 @@ namespace Trecs
 
         public void Dispose()
         {
-            Assert.That(!_isDisposed, "Attempted to dispose WorldAccessor multiple times");
+            Assert.That(!_isDisposed, "Attempted to dispose World multiple times");
 
             WorldRegistry.Unregister(this);
 
@@ -772,8 +772,8 @@ namespace Trecs
         /// only for non-system code (lifecycle hooks, debug tooling, event callbacks, networking,
         /// scripting bridges); runtime gameplay code that runs as part of system execution should
         /// declare a real role so rule violations surface loudly. Manually-created accessors never
-        /// gain input-system permissions; reach for <c>None</c> if you need to enqueue inputs from
-        /// non-system code.
+        /// gain input-system permissions — input-queue access is only granted to system-owned
+        /// accessors created from a system declared with <c>[ExecuteIn(SystemPhase.Input)]</c>.
         /// </summary>
         public WorldAccessor CreateAccessor(
             AccessorRole role,
@@ -880,7 +880,7 @@ namespace Trecs
         public void SetAccessRecorder(IAccessRecorder recorder)
         {
             _accessRecorder = recorder;
-            foreach (var kvp in _accessorRegistry.AllAccessors)
+            foreach (var kvp in _accessorRegistry.AccessorsById)
             {
                 kvp.Value.AccessRecorder = recorder;
             }
@@ -975,9 +975,9 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static ReadOnlyDenseDictionary<int, WorldAccessor> GetAllAccessors(this World world)
+        public static ReadOnlyDenseDictionary<int, WorldAccessor> GetAccessorsById(this World world)
         {
-            return world.AllAccessors;
+            return world.AccessorsById;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]

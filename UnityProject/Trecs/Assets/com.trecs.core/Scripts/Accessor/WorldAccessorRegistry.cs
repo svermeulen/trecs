@@ -45,11 +45,6 @@ namespace Trecs.Internal
             _log.Trace("Registered execute accessor for system {}", debugName);
         }
 
-        public ReadOnlyDenseDictionary<int, WorldAccessor> AllAccessors
-        {
-            get { return _accessorById; }
-        }
-
         public WorldAccessor GetAccessorById(int id)
         {
             return _accessorById[id];

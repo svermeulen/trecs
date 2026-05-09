@@ -1208,7 +1208,7 @@ namespace Trecs
                 return 0;
             }
             int n = 0;
-            foreach (var entry in _selectedWorld.GetAllAccessors())
+            foreach (var entry in _selectedWorld.GetAccessorsById())
             {
                 var dbg = entry.Value?.DebugName;
                 if (dbg == null || !TrecsEditorAccessorNames.Contains(dbg))

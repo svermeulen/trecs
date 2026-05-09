@@ -868,7 +868,7 @@ namespace Trecs
                             systemAccessorIds.Add(s.Metadata.Accessor.Id);
                         }
                     }
-                    foreach (var entry in world.GetAllAccessors())
+                    foreach (var entry in world.GetAccessorsById())
                     {
                         var a = entry.Value;
                         if (a == null || systemAccessorIds.Contains(entry.Key))
