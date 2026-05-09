@@ -24,7 +24,7 @@ Trecs uses several similar-sounding terms with distinct meanings. This page is a
 
 | Term | What it is |
 |---|---|
-| **[Group](advanced/groups-and-tagsets.md#groups)** | One tag combination from a template, paired with the contiguous memory block holding every entity that carries that combination. Created implicitly. |
+| **[Group](advanced/groups-and-tagsets.md#groups)** | A unique tag combination some entities carry, paired with the contiguous memory block holding them all. Created implicitly. |
 | **[`GroupIndex`](advanced/groups-and-tagsets.md#groupindex)** | A small `ushort` runtime handle for a group, valid only for the lifetime of one `World`. |
 | **[Partition](core/templates.md#partitions)** | A group an entity *moves between* at runtime, to improve cache locality for entities that share dynamic state. Each partition that an entity moves between is based on the same template and therefore has the same component types. |
 | **[Set](entity-management/sets.md)** | A dynamic membership flag on entities (`IEntitySet`). Independent of tags and groups; iteration visits only members. Allows for efficient sparse iteration over entities across groups. |
