@@ -11,15 +11,13 @@ public partial class ParticleMoveSystem : ISystem
 {
     [ForEachEntity(typeof(SampleTags.Particle))]
     [WrapAsJob]
-    static void MoveParticles(
+    static void Execute(
         in Velocity velocity,
         ref Position position,
         in NativeWorldAccessor world)
     {
         position.Value += world.DeltaTime * velocity.Value;
     }
-
-    public void Execute() => MoveParticles();
 }
 ```
 
@@ -28,11 +26,11 @@ Two requirements:
 - **`static`** — calling instance state (e.g. `World`) from inside a Burst job is unsafe; the C# compiler enforces this at the call site instead of inside generated code.
 - **Use `NativeWorldAccessor`, not `WorldAccessor`**, for any world-level reads (`DeltaTime`, structural ops, set ops) inside the body.
 
-Calling the wrapped method (`MoveParticles()` above) invokes the generated schedule call, not the user method directly.
+Then, instead of calling your system `Execute()` method directly, Trecs will schedule a job instead, and inside the job it will call your static method.
 
 ## Manual job structs
 
-When you need fields on the job (e.g. precomputed values, native arrays, lookups), declare a `[BurstCompile] partial struct` with a `[ForEachEntity]` Execute method and let the generator add a `ScheduleParallel` extension:
+In some cases you might want to define a custom Job instead of always using `WrapAsJob`.  You can do this just by using `[ForEachEntity]` on your job `Execute()` method:
 
 ```csharp
 public partial class ParticleJobSystem : ISystem
@@ -56,7 +54,11 @@ public partial class ParticleJobSystem : ISystem
 }
 ```
 
-For most cases you can stay on `[WrapAsJob]` and use [`[PassThroughArgument]`](../core/systems.md#passthroughargument) to forward values into the generated job — see [Advanced Job Features](../advanced/advanced-jobs.md) for `[FromWorld]` field wiring, lookups, and `[GlobalIndex]`.
+In this example, Trecs source generates a ScheduleParallel method that we can call and pass in our `World`
+
+`[WrapAsJob]` should work for most cases though.  If you do have custom parameters you need in the Execute you can use [`[PassThroughArgument]`](../core/systems.md#passthroughargument) and pass this to the `[WrapAsJob]` method.
+
+See [Advanced Job Features](../advanced/advanced-jobs.md) for `[FromWorld]` field wiring, lookups, and `[GlobalIndex]`.
 
 ## `NativeWorldAccessor`
 

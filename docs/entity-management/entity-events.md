@@ -36,7 +36,7 @@ public partial class RemoveCleanupHandler : IDisposable
 }
 ```
 
-Components read inside `OnRemoved` are still valid — removed entities are parked at the end of the backing array (past the active count) until submission finishes, so the buffers haven't been recycled yet.
+Components read inside `OnRemoved` are still valid — removed entities are parked at the end of the backing array (past the active count) until submission finishes, so the buffers haven't been clear yet.  This also means that all the removed components are contiguous in memory, which is a nice cache-friendly pattern for cleanup.
 
 ## Event Types
 
