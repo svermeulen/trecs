@@ -463,5 +463,19 @@ namespace Trecs
         {
             SetRemove<TSet>(GetEntityIndex(entityHandle));
         }
+
+        /// <summary>
+        /// Defer a clear of an entity set until the next submission. The clear
+        /// supersedes any pending <see cref="SetAdd{TSet}"/> /
+        /// <see cref="SetRemove{TSet}"/> for the same set, regardless of call
+        /// order or originating thread.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetClear<TSet>()
+            where TSet : struct, IEntitySet
+        {
+            AssertStructuralChangesAllowed();
+            _deferredQueues.GetValueByRef(EntitySetId<TSet>.Value).RequestClear();
+        }
     }
 }

@@ -826,6 +826,24 @@ namespace Trecs
             SetRemove<T>(entityHandle.ToIndex(this));
         }
 
+        /// <summary>
+        /// Defer a clear of an entity set until the next submission.
+        /// At submission time, the clear supersedes any pending
+        /// <see cref="SetAdd{T}"/> / <see cref="SetRemove{T}"/> for the same
+        /// set queued during this frame, regardless of call order — analogous
+        /// to how a queued remove supersedes a queued move on an entity. Use
+        /// <see cref="SetWrite{T}.ClearImmediate"/> if you need the clear to
+        /// take effect within the current frame.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetClear<T>()
+            where T : struct, IEntitySet
+        {
+            AssertCanMakeStructuralChanges();
+            ref var queues = ref _structuralOps.GetDeferredQueues(EntitySet<T>.Value.Id);
+            queues.RequestClear();
+        }
+
         internal void ClearSet(SetId setId)
         {
             GetSetCollection(setId).Clear();

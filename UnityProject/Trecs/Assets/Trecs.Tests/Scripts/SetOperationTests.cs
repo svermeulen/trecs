@@ -223,12 +223,194 @@ namespace Trecs.Tests
             a.SetAdd<FiltOpTestSet>(new EntityIndex(2, group));
             a.SubmitEntities();
 
-            set.Write.Clear();
+            set.Write.ClearImmediate();
 
             var read = set.Read;
             NAssert.IsFalse(read.Exists(new EntityIndex(0, group)));
             NAssert.IsFalse(read.Exists(new EntityIndex(1, group)));
             NAssert.IsFalse(read.Exists(new EntityIndex(2, group)));
+        }
+
+        [Test]
+        public void Filter_DeferredClear_AppliedAtSubmission()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 3; i++)
+            {
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            }
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+            var set = a.Set<FiltOpTestSet>();
+
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
+            a.SubmitEntities();
+            NAssert.AreEqual(2, set.Read.Count);
+
+            a.SetClear<FiltOpTestSet>();
+            // Still populated until submission lands.
+            NAssert.AreEqual(2, set.Read.Count);
+
+            a.SubmitEntities();
+            NAssert.AreEqual(0, set.Read.Count);
+        }
+
+        [Test]
+        public void Filter_DeferredClear_SupersedesPendingAddInSameSubmission()
+        {
+            // Adds queued before Clear in the same submission window are
+            // dropped. Mirrors remove-supersedes-move on entity ops.
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            a.AddEntity(Tag<QId1>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+            a.AddEntity(Tag<QId1>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
+            a.SetClear<FiltOpTestSet>();
+            a.SubmitEntities();
+
+            NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
+        }
+
+        [Test]
+        public void Filter_DeferredClear_SupersedesPendingAddRegardlessOfOrder()
+        {
+            // Adds queued *after* Clear are also dropped — Clear wins by rule,
+            // not by call order. Use ClearImmediate if you want sequential
+            // semantics within a single system.
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            a.AddEntity(Tag<QId1>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+            a.AddEntity(Tag<QId1>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+
+            a.SetClear<FiltOpTestSet>();
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
+            a.SubmitEntities();
+
+            NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
+        }
+
+        [Test]
+        public void Filter_DeferredClear_SupersedesPendingRemove()
+        {
+            // Remove of an entity not in the set would be a no-op anyway, but
+            // the clear path should still drain it correctly without crashing.
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 3; i++)
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt())
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+
+            // Pre-populate
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(2, group));
+            a.SubmitEntities();
+            NAssert.AreEqual(3, a.Set<FiltOpTestSet>().Read.Count);
+
+            a.SetRemove<FiltOpTestSet>(new EntityIndex(1, group));
+            a.SetClear<FiltOpTestSet>();
+            a.SubmitEntities();
+
+            NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
+        }
+
+        [Test]
+        public void Filter_DeferredClear_OnlyAffectsTargetSet()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 2; i++)
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt())
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.SetAdd<FiltOpTestSet2>(new EntityIndex(0, group));
+            a.SetAdd<FiltOpTestSet2>(new EntityIndex(1, group));
+            a.SubmitEntities();
+
+            a.SetClear<FiltOpTestSet>();
+            a.SubmitEntities();
+
+            NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
+            NAssert.AreEqual(2, a.Set<FiltOpTestSet2>().Read.Count);
+        }
+
+        [Test]
+        public void Filter_DeferredClear_ConsumedAfterFlush()
+        {
+            // Clear flag must reset after flush so a subsequent Add takes
+            // effect on the next submission.
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            a.AddEntity(Tag<QId1>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+
+            a.SetClear<FiltOpTestSet>();
+            a.SubmitEntities();
+
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.SubmitEntities();
+
+            NAssert.AreEqual(1, a.Set<FiltOpTestSet>().Read.Count);
+        }
+
+        [Test]
+        public void Filter_DeferredClear_FromNativeAccessor_AppliedAtSubmission()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 2; i++)
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt())
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
+            a.SubmitEntities();
+            NAssert.AreEqual(2, a.Set<FiltOpTestSet>().Read.Count);
+
+            var nativeEcs = a.ToNative();
+            nativeEcs.SetClear<FiltOpTestSet>();
+            a.SubmitEntities();
+
+            NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
         }
 
         #endregion

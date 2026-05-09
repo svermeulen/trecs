@@ -106,7 +106,7 @@ namespace Trecs.Tests
             NAssert.Greater(set.Read.Count, 0, "Set should have entries after job flush");
 
             // Manual clear
-            set.Write.Clear();
+            set.Write.ClearImmediate();
             NAssert.AreEqual(0, set.Read.Count, "Set should be empty after manual clear");
         }
 
@@ -271,7 +271,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(2, set.Read.Count);
 
             // Manual clear
-            set.Write.Clear();
+            set.Write.ClearImmediate();
 
             var setAfter = a.Set<TFJTestTransientSet>();
             NAssert.AreEqual(0, setAfter.Read.Count, "Set should be empty after manual clear");

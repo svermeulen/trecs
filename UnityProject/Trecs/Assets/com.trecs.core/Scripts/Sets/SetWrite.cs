@@ -59,7 +59,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Clear()
+        public void ClearImmediate()
         {
             _world.ClearSet(_setId);
         }

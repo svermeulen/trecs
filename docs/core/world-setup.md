@@ -143,7 +143,7 @@ The role argument controls which operations the accessor is allowed to perform �
 - **[Entity operations](../entity-management/structural-changes.md)** — `AddEntity`, `RemoveEntity`, `MoveTo`
 - **[Component access](components.md)** — `Component<T>`, `GlobalComponent<T>`, `ComponentBuffer<T>`
 - **[Queries](../data-access/queries-and-iteration.md)** — `Query()`, `CountEntitiesWithTags<T>()`
-- **[Sets](../entity-management/sets.md)** — `SetAdd<T>`, `SetRemove<T>`
+- **[Sets](../entity-management/sets.md)** — `SetAdd<T>`, `SetRemove<T>`, `SetClear<T>`
 - **[Events](../entity-management/entity-events.md)** — `Events` builder for entity lifecycle subscriptions
 - **[Time](../advanced/time-and-rng.md)** — `DeltaTime`, `ElapsedTime`, `Frame` (phase-aware)
 - **[RNG](../advanced/time-and-rng.md)** — `Rng`, `FixedRng`, `VariableRng`

@@ -34,7 +34,7 @@ The "Input system" column is a system-owned accessor with `[ExecuteIn(SystemPhas
 | Persistent heap alloc (`AllocShared`, `AllocUnique`, native variants) | ❌ | ✅ | ❌ | ✅ |
 | Frame-scoped heap alloc (`AllocSharedFrameScoped`, etc.) | ✅ | ❌ [^framescoped] | ❌ | ✅ |
 | Structural change (`AddEntity` / `RemoveEntity` / `MoveTo`) | ❌ | ✅ | ❌ | ✅ |
-| Set ops (`SetAdd` / `SetRemove`, `Set<T>().Write`) | ❌ | ✅ | ❌ | ✅ |
+| Set ops (`SetAdd` / `SetRemove` / `SetClear`, `Set<T>().Write`) | ❌ | ✅ | ❌ | ✅ |
 | `SetSystemPaused` | ❌ | ✅ | ❌ | ✅ |
 | `FixedRng` | ❌ | ✅ | ❌ | ✅ |
 | `VariableRng` | ✅ | ❌ | ✅ | ✅ |

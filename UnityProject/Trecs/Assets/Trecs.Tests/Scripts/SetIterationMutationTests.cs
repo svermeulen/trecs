@@ -113,7 +113,7 @@ namespace Trecs.Tests
                 visited.Add(ei.Index);
                 if (!cleared)
                 {
-                    a.Set<ItMutSetB>().Write.Clear();
+                    a.Set<ItMutSetB>().Write.ClearImmediate();
                     cleared = true;
                 }
             }
@@ -133,7 +133,10 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 3; i++)
             {
-                a.AddEntity(Tag<QId1>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt())
+                    .Set(new TestFloat())
+                    .AssertComplete();
             }
             a.AddEntity(Tag<QId2>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
             a.SubmitEntities();
@@ -166,7 +169,10 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 3; i++)
             {
-                a.AddEntity(Tag<QId1>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt())
+                    .Set(new TestFloat())
+                    .AssertComplete();
             }
             a.AddEntity(Tag<QId2>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
             a.SubmitEntities();
@@ -322,7 +328,7 @@ namespace Trecs.Tests
             {
                 foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
                 {
-                    a.Set<ItMutSetA>().Write.Clear();
+                    a.Set<ItMutSetA>().Write.ClearImmediate();
                 }
             });
         }

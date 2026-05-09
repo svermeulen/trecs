@@ -73,7 +73,8 @@ namespace Trecs.Internal
                 entitySet.Id,
                 new NativeSetDeferredQueues(
                     AtomicNativeBags.Create(Allocator.Persistent),
-                    AtomicNativeBags.Create(Allocator.Persistent)
+                    AtomicNativeBags.Create(Allocator.Persistent),
+                    Allocator.Persistent
                 )
             );
 
@@ -140,10 +141,30 @@ namespace Trecs.Internal
             bool requireDeterministic
         )
         {
+            // Clear supersedes pending Add/Remove for this set, regardless of
+            // call order — analogous to remove-supersedes-move on entity ops.
+            if (queues.ConsumeClearRequest())
+            {
+                DrainBagsDiscard(queues.AddQueue);
+                DrainBagsDiscard(queues.RemoveQueue);
+                set.Clear();
+                return;
+            }
+
             if (requireDeterministic)
                 FlushDeferredOpsDeterministic(ref set, ref queues);
             else
                 FlushDeferredOpsNonDeterministic(ref set, ref queues);
+        }
+
+        static void DrainBagsDiscard(AtomicNativeBags bags)
+        {
+            for (int i = 0; i < bags.ThreadSlotCount; i++)
+            {
+                ref var bag = ref bags.GetBag(i);
+                while (!bag.IsEmpty)
+                    bag.Dequeue<EntityIndex>();
+            }
         }
 
         static void FlushDeferredOpsNonDeterministic(
@@ -205,8 +226,7 @@ namespace Trecs.Internal
 
             foreach (var queues in DeferredQueues)
             {
-                queues.Value.AddQueue.Dispose();
-                queues.Value.RemoveQueue.Dispose();
+                queues.Value.Dispose();
             }
 
             for (int i = 0; i < SetIdsByGroup.Length; i++)
