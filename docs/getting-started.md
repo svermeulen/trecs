@@ -12,6 +12,7 @@ With the [openupm-cli](https://openupm.com/):
 
 ```bash
 openupm add com.trecs.core
+
 # Optional: snapshots, recording / playback, save / load
 openupm add com.trecs.serialization
 ```
