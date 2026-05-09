@@ -6,11 +6,9 @@ In the examples below, `World` is the [`WorldAccessor`](../advanced/accessor-rol
 
 ## When Submission Happens
 
-`World.SubmitEntities()` (on `WorldAccessor`) drains the queues. The system runner calls it for you:
+The submission drains the queues of entity operations. The system runner calls it for you automatically at the end of each frame (that is - both at the end of every fixed update and at the end of `World.Tick()`).
 
-1. **Between fixed steps** — submission runs after each fixed step within a `Tick()`.
-2. **At the end of frame** — any remaining changes are flushed at the end of `World.Tick()`
-3. **Manually** — call `world.SubmitEntities()` explicitly when needed (outside system `Execute`).
+You may also call it manually via `World.SubmitEntities()` (on `WorldAccessor`)
 
 ## Deferred Operations
 
