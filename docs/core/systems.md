@@ -161,6 +161,7 @@ When you have multiple `[ForEachEntity]` methods, you must provide an explicit `
 - **`WorldAccessor`** — the system's world accessor (main-thread methods only)
 - **`NativeWorldAccessor`** — job-safe world access (`[WrapAsJob]` methods only). See [Jobs & Burst](../performance/jobs-and-burst.md).
 - **`[PassThroughArgument]`** — custom values passed in by the caller. See [below](#passthroughargument).
+- **`[SingleEntity]`** — bind a singleton entity (component or aspect) looked up once and hoisted out of the loop. See [below](#singleentity).
 
 ### GlobalIndex
 
@@ -219,7 +220,7 @@ This is useful for passing configuration, precomputed values, or other data that
 
 `[SingleEntity]` marks an individual parameter (or a job-struct field) that should be resolved to the unique entity matching the given tag(s). The framework runs the equivalent of `World.Query().WithTags<...>().Single()` before the user method body, asserts exactly one match, and binds the result to the parameter or field.
 
-Inline tags are mandatory — `[SingleEntity]` has no runtime override and no `Optional` mode. If you need a runtime-supplied query, call `World.Query().WithTags(...).Single()` directly inside the method body.
+Inline tags are mandatory — `[SingleEntity]` has no runtime override and no `Optional` mode. If you need a runtime-supplied query (eg. tag is dynamic), call `World.Query().WithTags(...).Single()` directly inside the method body.
 
 ```csharp
 void Execute([SingleEntity(typeof(GlobalTag))] ref Score score)
@@ -283,11 +284,11 @@ Systems run in one of five phases, controlled by `[ExecuteIn(...)]`. The phases 
 
 | Phase | Attribute | Typical Use |
 |-------|-----------|-------------|
-| `EarlyPresentation` | `[ExecuteIn(SystemPhase.EarlyPresentation)]` | Variable-cadence sampling that needs to feed into the fixed loop (e.g. raw mouse delta accumulation) |
-| `Input` | `[ExecuteIn(SystemPhase.Input)]` | Reading player input — runs just-in-time before each fixed step (0..N times per frame) |
+| `EarlyPresentation` | `[ExecuteIn(SystemPhase.EarlyPresentation)]` | Variable-cadence sampling that needs to execute before fixed update |
+| `Input` | `[ExecuteIn(SystemPhase.Input)]` | Reading player input — runs just-in-time before each fixed step (0..N times per variable frame) |
 | `Fixed` | *(default)* | Deterministic simulation, physics, game logic |
 | `Presentation` | `[ExecuteIn(SystemPhase.Presentation)]` | Rendering, transform sync, interpolation reads |
-| `LatePresentation` | `[ExecuteIn(SystemPhase.LatePresentation)]` | Post-animation corrections — runs in Unity's `LateUpdate` |
+| `LatePresentation` | `[ExecuteIn(SystemPhase.LatePresentation)]` | Post-animation corrections — Triggered via `World.LateTick` which typically is called from Unity's `LateUpdate` |
 
 ```csharp
 // Fixed (default — no attribute needed)

@@ -32,7 +32,7 @@ public partial class BoidMovementSystem : ISystem
 }
 ```
 
-The aspect is taken `in`. The struct itself is read-only, but `IWrite` properties still hand out mutable refs to the underlying components.
+The aspect is passed as an `in` parameter. The struct itself is read-only, but `IWrite` properties still hand out mutable refs to the underlying components.
 
 ## Multiple `IRead` / `IWrite` interfaces
 
@@ -71,8 +71,6 @@ Aspect queries **do not** auto-filter by the aspect's declared components. Alway
 ```csharp
 var player = PlayerView.Query(World).WithTags<GameTags.Player>().Single();
 ```
-
-Use the manual form when iteration logic doesn't fit `[ForEachEntity]` — for instance, nesting one query inside another or selecting a singleton mid-`Execute`. Otherwise prefer `[ForEachEntity]`.
 
 ## Where to define aspects
 

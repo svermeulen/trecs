@@ -4,8 +4,8 @@ Find and iterate over entities by tag, component, or [set](../entity-management/
 
 Two entry points:
 
-- **`[ForEachEntity]`** — the source-generated, declarative form. Use this for the vast majority of system iteration. See [Systems — ForEachEntity](../core/systems.md#foreachentity).
-- **`World.Query()`** — a manual fluent builder. Use this when you need iteration logic the attribute can't express (e.g., nested queries, branching, `Single` lookups outside an iteration body).
+- **`[ForEachEntity]`** — A method that will serve as the body of the loop over matching entities. See [Systems — ForEachEntity](../core/systems.md#foreachentity).
+- **`World.Query()`** — A manual fluent query builder that can be used with `foreach` loops
 
 ## ForEachEntity
 
@@ -85,7 +85,7 @@ Other counting helpers on `WorldAccessor`: `CountAllEntities()`, `CountEntitiesW
 
 ### Sets
 
-`InSet<T>()` filters to entities that are members of the given [set](../entity-management/sets.md). It returns a `SparseQueryBuilder` (set-filtered iteration is fundamentally sparse) — only one set can be applied per query.
+`InSet<T>()` filters to entities that are members of the given [set](../entity-management/sets.md). It returns a `SparseQueryBuilder` (set-filtered iteration is fundamentally sparse) — only one set can be applied per query.  To match on extra sets, test for set membership within the loop body.
 
 ```csharp
 foreach (var entityIndex in World.Query()
