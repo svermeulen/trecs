@@ -1,6 +1,6 @@
 # Getting Started
 
-This walkthrough builds a minimal Trecs setup: one entity, one component, one system that updates it every frame. About five minutes from a blank Unity project to a running tick.
+A five-minute walkthrough: one entity, one component, one system, ticking inside a Unity scene.
 
 ## Installation
 
@@ -48,15 +48,19 @@ For the optional serialization package:
 https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.serialization
 ```
 
-When using git URLs, add `com.trecs.core` first — Unity can't resolve versioned dependencies from git URLs, so the order matters.
+Add `com.trecs.core` first — Unity can't resolve versioned dependencies from git URLs, so order matters.
 
-## Your First Entity
+## Your first entity
 
-We'll spin a value forever. The pieces are: a component (the data), a tag (the entity kind), a template (the layout), a system (the logic), and a world (the runtime).
+We'll build a spinning cube. The pieces:
+
+- **Component** — the data
+- **Tag** — what kind of entity this is
+- **Template** — the blueprint (which components, which tags)
+- **System** — the logic
+- **World** — the runtime
 
 ### 1. Define a component
-
-Components are unmanaged structs that hold per-entity data:
 
 ```csharp
 using Unity.Mathematics;
@@ -67,11 +71,11 @@ public partial struct Rotation : IEntityComponent
 }
 ```
 
-`partial` is required — the source generator emits a companion file with `Equals`, `GetHashCode`, and `==`/`!=` operators.
+`partial` is required — the source generator emits a companion file with `Equals`, `GetHashCode`, and equality operators.
 
 ### 2. Define a tag
 
-Tags classify entities. They're empty marker structs used both at entity-creation time and as system query filters:
+Tags are empty marker structs that classify entities and serve as query filters:
 
 ```csharp
 public struct Spinner : ITag { }
@@ -79,7 +83,7 @@ public struct Spinner : ITag { }
 
 ### 3. Define a template
 
-A template is the blueprint for an entity kind. It declares which tags the entity has (via `ITagged<...>`) and which components it carries (as fields):
+A template is the blueprint for an entity kind — its tags (`ITagged<...>`) and its components (declared as fields):
 
 ```csharp
 public partial class SpinnerEntity : ITemplate, ITagged<Spinner>
@@ -88,11 +92,11 @@ public partial class SpinnerEntity : ITemplate, ITagged<Spinner>
 }
 ```
 
-Note that this template class is never actually instantiated and instead is just used as configuration for the trecs source generators.
+The template class is never instantiated at runtime — it's read by the source generator at compile time.
 
 ### 4. Write a system
 
-A system contains the logic that runs over entities each tick. The `[ForEachEntity]` attribute tells the source generator to iterate every entity tagged with `Spinner` and call `Execute` for each:
+`[ForEachEntity]` tells the generator to iterate every entity tagged with `Spinner` and call this method for each one:
 
 ```csharp
 using Unity.Mathematics;
@@ -112,11 +116,11 @@ public partial class SpinnerSystem : ISystem
 }
 ```
 
-`World` here is a source-generated property on the system — a [`WorldAccessor`](core/world-setup.md) scoped to whichever phase the system runs in.
+`World` here is a source-generated property on the system — see [World Setup](core/world-setup.md).
 
 ### 5. Build and run
 
-In this example let's wire everything from a `MonoBehaviour`. We build the world, add the system, initialize, and spawn one entity. Then `Tick()` drives the simulation each frame.
+Wire it from a `MonoBehaviour`:
 
 ```csharp
 using UnityEngine;
@@ -132,31 +136,27 @@ public class GameLoop : MonoBehaviour
         _world = new WorldBuilder()
             .AddTemplate(SpinnerEntity.Template)
             .AddSystem(new SpinnerSystem(speed: 2f))
-            .Build();
-
-        _world.Initialize();
+            .BuildAndInitialize();
 
         var accessor = _world.CreateAccessor(AccessorRole.Unrestricted);
         accessor.AddEntity<Spinner>()
             .Set(new Rotation { Value = quaternion.identity });
     }
 
-    void Update()     => _world.Tick();
-    void LateUpdate()   => _world.LateTick();
-    void OnDestroy()  => _world.Dispose();
+    void Update()    => _world.Tick();
+    void LateUpdate()  => _world.LateTick();
+    void OnDestroy() => _world.Dispose();
 }
 ```
 
-A few things to notice:
+Two things to notice:
 
-- `AddEntity<Spinner>()` takes a **tag**, not a template type. Trecs matches `Spinner` to `SpinnerEntity.Template` via the template's `ITagged<Spinner>` declaration.
-- The init accessor uses `AccessorRole.Unrestricted` because we're outside the tick loop. Inside systems, accessors are created automatically with the right role for that phase. See [Accessor Roles](advanced/accessor-roles.md).
-- `Tick()` and `LateTick()` are typically driven from Unity's `Update` and `LateUpdate` phases, as shown above.
+- `AddEntity<Spinner>()` takes the **tag**, not the template. Trecs matches `Spinner` to `SpinnerEntity` via `ITagged<Spinner>`.
+- `AccessorRole.Unrestricted` is used for setup outside the tick loop. Inside systems, the right role is wired automatically — see [Accessor Roles](advanced/accessor-roles.md).
 
-## Where to Next
+## Where to next
 
-- **Start with [Core: World Setup](core/world-setup.md)** — the deeper reference for `WorldBuilder`, `WorldSettings`, lifecycle, and `WorldAccessor`. Read this next.
-- [Systems](core/systems.md) — defining systems, iteration, and update phases.
-- A complete runnable version of this walkthrough lives in **`Samples~/Tutorials/01_HelloEntity`** in the `com.trecs.core` package — install it via the Package Manager *Samples* tab.
-- [Aspects](data-access/aspects.md) and [Queries & Iteration](data-access/queries-and-iteration.md) once you have multiple components per entity.
-- The [Samples](samples/index.md) gallery — each one focuses on a single feature and has a companion doc.
+- **[World Setup](core/world-setup.md)** — `WorldBuilder`, `WorldSettings`, lifecycle, `WorldAccessor`. Read this next.
+- **[Systems](core/systems.md)** — defining systems, iteration, update phases.
+- **[Aspects](data-access/aspects.md)** and **[Queries & Iteration](data-access/queries-and-iteration.md)** once you have multiple components per entity.
+- **[Samples](samples/index.md)** — each one focuses on a single feature, with a companion doc. The runnable version of this walkthrough lives in `Samples~/Tutorials/01_HelloEntity` (install via the Package Manager *Samples* tab).

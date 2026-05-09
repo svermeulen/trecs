@@ -2,16 +2,16 @@
 
 Trecs runs simulation at a fixed timestep (default 1/60s), but rendering happens at the variable frame rate. Interpolation smooths component values between fixed frames to prevent visual stuttering.
 
-## How It Works
+## How it works
 
-1. **Before fixed update:** The previous component value is saved (`InterpolatedPrevious<T>`)
-2. **During fixed update:** Systems update the component normally
-3. **During variable update:** The interpolated value is computed by blending previous → current based on how far through the fixed frame we are (`Interpolated<T>`)
-4. **Rendering:** Read from `Interpolated<T>` for smooth visuals
+1. **Before each fixed update:** the previous component value is saved (`InterpolatedPrevious<T>`).
+2. **During fixed update:** systems update the component normally.
+3. **During variable update:** the interpolated value is computed by blending previous → current based on how far through the fixed frame we are (`Interpolated<T>`).
+4. **Rendering:** read `Interpolated<T>` for smooth visuals.
 
 ## Setup
 
-### 1. Mark Fields as Interpolated
+### 1. Mark fields as interpolated
 
 In your template, use the `[Interpolated]` attribute:
 
@@ -30,7 +30,7 @@ public partial class SmoothEntity : ITemplate, ITagged<MyTags.Smooth>
 
 This automatically generates three components per interpolated field: `Position`, `Interpolated<Position>`, and `InterpolatedPrevious<Position>`.
 
-### 2. Define Interpolation Functions
+### 2. Define interpolation functions
 
 Write static methods with `[GenerateInterpolatorSystem]` that define how each component type should be blended. The source generator creates a Burst-compiled job system for each:
 
@@ -58,7 +58,7 @@ public static class MyInterpolators
 }
 ```
 
-The `GroupName` parameter groups related interpolators so they can be registered together.
+`GroupName` groups related interpolators so they can be registered together.
 
 ### 3. Register with WorldBuilder
 
@@ -67,11 +67,11 @@ The source generator creates an extension method named `Add{GroupName}` that reg
 ```csharp
 var world = new WorldBuilder()
     .AddTemplate(SmoothEntity.Template)
-    .AddMyGameInterpolators()  // Generated — registers all interpolators in the group
+    .AddMyGameInterpolators()  // Generated
     .Build();
 ```
 
-### 4. Create Entities with Interpolated Values
+### 4. Create entities with interpolated values
 
 Use `SetInterpolated()` to initialize all three components (current, interpolated, previous) in sync:
 
@@ -82,7 +82,7 @@ world.AddEntity<MyTags.Smooth>()
     .Set(new OrbitParams { ... });
 ```
 
-### 5. Read Interpolated Values for Rendering
+### 5. Read interpolated values for rendering
 
 In your variable-update rendering system, read from `Interpolated<T>` instead of the raw component:
 
@@ -100,32 +100,12 @@ public partial class RenderSystem : ISystem
 }
 ```
 
-## What Gets Generated
+## Best practices
 
-For each `[GenerateInterpolatorSystem]` method, the source generator creates:
-
-- A **Burst-compiled `IJobFor` system** that runs during variable update, iterating all entities with the component and blending previous → current using your function
-- An **extension method** on `WorldBuilder` (one per group) that registers all `InterpolatedPreviousSaver<T>` instances and interpolator systems in the group
-
-This means you write just the interpolation math — the boilerplate for scheduling, dependency tracking, and registration is handled automatically.
-
-## Without Interpolation
-
-For comparison, entities without interpolation update visually only at fixed timestep boundaries, causing visible stuttering at low fixed rates or high frame rates:
-
-```csharp
-public partial class RawEntity : ITemplate, ITagged<MyTags.Raw>
-{
-    Position Position = default;  // No [Interpolated]
-}
-```
-
-## Best Practices
-
-- **Only interpolate visual components** — positions, rotations, scales, and colors that affect rendering. Don't interpolate gameplay state like health or ammo.
-- **Use `SetInterpolated()` at creation** — this ensures all three components start in sync with the same default and avoids a visual pop on the first frame.
-- **Group interpolators by project** — use a shared `GroupName` constant so a single `Add{GroupName}()` call registers everything.
-- **Prefer `nlerp` over `slerp` for rotations** — the angular delta between fixed frames is typically small enough that the difference is imperceptible, and `nlerp` is significantly cheaper.
+- **Only interpolate visual components** — positions, rotations, scales, colors. Don't interpolate gameplay state like health or ammo.
+- **Use `SetInterpolated()` at creation** — ensures all three components start in sync, avoiding a visual pop on the first frame.
+- **Group interpolators by project** — use a shared `GroupName` constant so a single `Add{GroupName}()` registers everything.
+- **Prefer `nlerp` over `slerp` for rotations** — angular deltas between fixed frames are typically small enough that the difference is imperceptible, and `nlerp` is significantly cheaper.
 
 ## See also
 

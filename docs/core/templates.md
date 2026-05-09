@@ -1,30 +1,30 @@
 # Templates
 
-Templates define the component layout and tag identity of an entity — like a blueprint.
+A template is the blueprint for an entity kind — it declares the components an entity carries and the tags that identify it.
 
-## Defining a Template
+## Defining a template
 
 ```csharp
 public partial class SpinnerEntity : ITemplate, ITagged<SampleTags.Spinner>
 {
     Rotation Rotation = new(quaternion.identity);  // Default value
-    GameObjectId GameObjectId;                      // No default (must be set during AddEntity)
+    GameObjectId GameObjectId;                      // No default — must be set on AddEntity
 }
 ```
 
 A template is a `partial class` that:
 
-1. Implements **`ITemplate`**
-2. Declares **tags** via `ITagged<T1, ...>`
+1. Implements `ITemplate`
+2. Declares **tags** via `ITagged<...>`
 3. Declares **component fields** — the entity's data layout
 
 Fields with default values supply fallback initialization. Fields without defaults must be set explicitly via `EntityInitializer.Set()` when the entity is created.
 
-> **Field visibility:** template fields must be declared with **no access modifier** — write `Rotation Rotation;`, not `public Rotation Rotation;`. Template fields are a config DSL read by the source generator at compile time, not an API surface. The compiler enforces this with diagnostic `TRECS034`.
+> **Field visibility:** template fields must have **no access modifier** — write `Rotation Rotation;`, not `public Rotation Rotation;`. Template fields are a config DSL read by the source generator at compile time, not an API surface. The compiler enforces this with diagnostic `TRECS034`.
 
 ## Tags
 
-Every template declares one or more tags via `ITagged`:
+Every template declares one or more tags:
 
 ```csharp
 // Single tag
@@ -43,30 +43,16 @@ public partial class PlayerBullet : ITemplate, ITagged<GameTags.Bullet, GameTags
 }
 ```
 
-See [Tags](tags.md) for details on how tags are used.
+Tags are how systems and queries refer to entities at runtime: `[ForEachEntity(typeof(GameTags.Enemy))]` and `World.CountEntitiesWithTags<GameTags.Enemy>()` name the *tag*, not the template class. Runtime code shouldn't reference template classes directly — that keeps systems decoupled from concrete entity definitions.
 
-## Templates and Tags: Who Does What
+A tag can be 1:1 with a template (e.g. `GameTags.Spinner` carried only by `SpinnerEntity`) or shared across many templates as a role (a `CommonTags.Renderable` tag declared on a base template, inherited by every template that extends it). See [Tags](tags.md) and [Groups & TagSets](../advanced/groups-and-tagsets.md) for the storage details.
 
-Templates and tags are closely related but play distinct roles. Understanding the split is key to using Trecs idiomatically:
-
-- **A template is the concrete shape.** It declares the exact component layout an entity is spawned with — defaults, partitions, and which tags it carries. The template class is referenced when you *define* the entity kind (the partial class itself), when you *register* it with the builder (`AddTemplate(EnemyEntity.Template)`), and when other templates extend it via `IExtends<EnemyEntity>`.
-- **A tag is the identity handle the rest of the code uses.** Systems, queries, aspects, and events all refer to entities through their tags, not through their template class. `[ForEachEntity(typeof(GameTags.Enemy))]` and `World.CountEntitiesWithTags<GameTags.Enemy>()` are the normal way to talk about "enemies" — runtime code should not name the template class directly. This is important to keep code loosely coupled, testable, and re-usable across different application configurations.
-
-### Tags as Template Identity
-
-Because every template declares at least one identity tag, tags effectively become the runtime way to identify which template an entity belongs to:
-
-- **1:1 with a concrete template** — `GameTags.Spinner` is carried only by `SpinnerEntity`, so querying by it picks out exactly that template's entities.
-- **An abstract role shared across templates** — a `CommonTags.Renderable` tag declared on a base template is inherited by every template that does `IExtends<Renderable>`. Querying by the role tag iterates every entity that fulfills it. This is Trecs's closest analogue to "interface" or "base class" polymorphism.  Alternatively, you can add `CommonTags.Renderable` directly to each template instead of using template inheritance for the same result.
-
-See [Tags](tags.md) for the mechanics, and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md) for how tag combinations map to storage.
-
-## Template Inheritance
+## Template inheritance
 
 Use `IExtends<T>` to inherit components and tags from a base template:
 
 ```csharp
-// Base template
+// Base
 public partial class Renderable : ITemplate, ITagged<CommonTags.Renderable>
 {
     Position Position;
@@ -75,7 +61,7 @@ public partial class Renderable : ITemplate, ITagged<CommonTags.Renderable>
     ColorComponent Color = new(Color.white);
 }
 
-// Extended template — inherits Position, Rotation, Scale, Color
+// Extended — inherits everything from Renderable
 public partial class FishEntity : ITemplate,
     IExtends<Renderable>,
     ITagged<FrenzyTags.Fish>
@@ -85,7 +71,7 @@ public partial class FishEntity : ITemplate,
 }
 ```
 
-Multiple inheritance is supported
+Multiple bases work too:
 
 ```csharp
 public partial class ComplexEntity : ITemplate,
@@ -96,46 +82,15 @@ public partial class ComplexEntity : ITemplate,
 }
 ```
 
-### How Inherited Definitions Are Merged
+When the same component appears in multiple bases:
 
-When a template extends multiple bases, all components, tags, and partitions are merged together:
-
-- **Components** — The union of all components from all bases and the concrete template. If the same component appears in multiple bases, the declarations are merged as long as their attributes and defaults are compatible (see below).
-- **Tags** — Combined into a union set. Duplicates are deduplicated automatically.
-- **Partitions** — Combined from all bases.
-
-When the same component appears in more than one base template:
-
-- **Attributes must agree** — If multiple bases declare the same component with different attributes (e.g. one marks it `[Interpolated]` and another marks it `[VariableUpdateOnly]`), this is an error.
-- **Default values must match** — If multiple bases provide default values for the same component, the values must be identical. Providing different defaults is an error.
-- **One default is enough** — If only one base provides a default and others don't, the default is used. The component becomes optional at the `AddEntity` call site.
-
-```csharp
-// Both bases declare Position — this is fine as long as
-// attributes and defaults are compatible
-public partial class Renderable : ITemplate, ITagged<CommonTags.Renderable>
-{
-    Position Position = new(float3.zero);  // Has default
-}
-
-public partial class Moveable : ITemplate, ITagged<CommonTags.Moveable>
-{
-    Position Position;   // No default — OK, Renderable's default is used
-    Velocity Velocity;
-}
-
-public partial class Player : ITemplate,
-    IExtends<Renderable, Moveable>,
-    ITagged<GameTags.Player>
-{
-    Health Health;
-    // Inherits Position (with default from Renderable) and Velocity from Moveable
-}
-```
+- **Attributes must agree** — declaring `[Interpolated]` on one base and `[VariableUpdateOnly]` on another is an error.
+- **Defaults must match** — different defaults for the same component is an error.
+- **One default is enough** — if only one base supplies a default, that default is used. The component becomes optional at the `AddEntity` call site.
 
 ## Partitions
 
-Templates can declare multiple **partitions** — mutually exclusive tag combinations that define which sections of memory the entity belongs to. Entities in different partitions are stored in separate contiguous arrays, enabling efficient partition transitions and targeted iteration.
+Partitions are mutually exclusive tag combinations a template can move between at runtime. Entities in different partitions are stored in separate contiguous arrays — useful when a hot iteration over one state (`Active`) needs to be cache-friendly:
 
 ```csharp
 public partial class BallEntity : ITemplate,
@@ -150,47 +105,33 @@ public partial class BallEntity : ITemplate,
 }
 ```
 
-Each `IHasPartition` declares a valid partition. The entity always has the base tags (`BallTags.Ball`) plus one of the partition tag sets.
+Each `IHasPartition` declares a valid partition. The entity always carries the base tag (`BallTags.Ball`) plus one of the partition tag sets.
 
-### Partition Transitions
+### Transitions
 
-Move entities between partitions with `MoveTo`. In aspects, use the generated extension method:
+Move an entity between partitions with `MoveTo`:
 
 ```csharp
-// Ball hits the ground → transition to Resting
-ball.MoveTo<BallTags.Ball, BallTags.Resting>(World);
+// Hits the ground → Resting
+World.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
 
-// Rest timer expires → transition to Active
+// Or via an aspect
 ball.MoveTo<BallTags.Ball, BallTags.Active>(World);
 ```
 
-Or call `MoveTo` directly on the `WorldAccessor` with an `EntityIndex`:
+Systems target specific partitions like any other tag combination:
 
 ```csharp
-World.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
-```
-
-Systems can target specific partitions:
-
-```csharp
-// Only processes Active balls
 [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
-void UpdateActive(in ActiveBall ball)
-{
-    ball.Velocity += Gravity * World.DeltaTime;
-}
+void UpdateActive(in ActiveBall ball) { /* ... */ }
 
-// Only processes Resting balls
 [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
-void UpdateResting(in RestingBall ball)
-{
-    ball.RestTimer -= World.DeltaTime;
-}
+void UpdateResting(in RestingBall ball) { /* ... */ }
 ```
 
-## Entity Creation
+Partitions are an optimization — see [Entity Subset Patterns](../recipes/entity-subset-patterns.md) for when to reach for partitions vs. sets vs. component-value branching.
 
-Creating an entity from a template:
+## Entity creation
 
 ```csharp
 World.AddEntity<SampleTags.Spinner>()
@@ -198,11 +139,9 @@ World.AddEntity<SampleTags.Spinner>()
     .Set(new GameObjectId(42));
 ```
 
-The tag type arguments select the template (and therefore the required components), matched against the templates registered via `WorldBuilder.AddTemplate`.
+The tag arguments select the template. See [Entities](entities.md) for the full creation API.
 
-See [Entities](entities.md) for the full creation API.
-
-## Global Entity Template
+## Global entity template
 
 Extend the framework's global template to add world-wide components:
 
@@ -217,4 +156,4 @@ public partial class MyGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 }
 ```
 
-The global entity is created automatically during world initialization — there is no `AddEntity` call or `EntityInitializer` to set values. Because of this, **all fields in a global template must have explicit default values**.
+The global entity is created automatically during world initialization — there is no `AddEntity` or `EntityInitializer`. Because of this, **all fields in a global template must have explicit default values**.

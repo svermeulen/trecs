@@ -4,19 +4,18 @@ Entities are lightweight identifiers that group components together.
 
 ## EntityHandle vs EntityIndex
 
-Trecs has two ways of referring to entities, each suited to different use cases:
+Trecs has two ways of referring to entities:
 
-- **`EntityHandle`** — a stable reference that survives [structural changes](../entity-management/structural-changes.md). Store it in components or fields when you need a long-lived link to another entity.
-- **`EntityIndex`** — a fast, transient reference that points directly at the underlying component buffers. It's the right choice inside a single system tick but is invalidated as soon as entities are added, removed, or moved between groups.
+- **`EntityHandle`** — a stable reference that survives [structural changes](../entity-management/structural-changes.md). Use it whenever you need to store a long-lived pointer to another entity (e.g. on a component or on a managed object).
+- **`EntityIndex`** — a fast, transient reference that points directly into the underlying buffers. It's invalidated by any structural change, so it's only safe within a single system tick.
 
 | | EntityHandle | EntityIndex |
 |---|---|---|
 | **Stability** | Stable across structural changes | Invalidated by structural changes |
-| **Use case** | Long-lived references (eg. store in components) | Immediate access within a system tick |
-| **Fields** | `UniqueId`, `Version` | `Index`, `GroupIndex` |
-| **Performance** | Requires lookup to access components | Direct buffer access |
+| **Use case** | Long-lived references | Immediate access within a tick |
+| **Performance** | Requires a lookup | Direct buffer access |
 
-Convert between them as needed:
+Convert between them:
 
 ```csharp
 // EntityIndex → EntityHandle (stable)
@@ -26,30 +25,21 @@ EntityHandle handle = index.ToHandle(World);
 EntityIndex index = handle.ToIndex(World);
 ```
 
-`World` here is the system's source-generated `WorldAccessor` property — see [Systems](systems.md).
+`World` is the system's source-generated `WorldAccessor` property — see [Systems](systems.md).
 
-## Creating Entities
+## Creating entities
 
 Entities are created via `WorldAccessor.AddEntity()`, which returns an `EntityInitializer` for setting component values:
 
 ```csharp
-// The tag identifies which template (and therefore which components) to spawn
 World.AddEntity<SampleTags.Spinner>()
     .Set(new Rotation(quaternion.identity))
     .Set(new GameObjectId(42));
 ```
 
-### EntityInitializer
+The tag selects which template to spawn — Trecs looks up the template registered with that identity tag.
 
-`EntityInitializer` is a `ref struct` — use it immediately, do not store it across method boundaries:
-
-```csharp
-var initializer = World.AddEntity<MyTag>();
-initializer.Set(new Position(float3.zero));
-initializer.Set(new Velocity(float3.zero));
-```
-
-The entity's stable handle is available right away via the `Handle` field, even though the entity itself only materializes during the next [submission](../entity-management/structural-changes.md):
+`EntityInitializer` is a `ref struct`. Use it immediately; don't store it across method boundaries. The stable handle is available before the next [submission](../entity-management/structural-changes.md):
 
 ```csharp
 var init = World.AddEntity<MyTag>();
@@ -57,47 +47,43 @@ EntityHandle handle = init.Handle;
 init.Set(new Position(float3.zero));
 ```
 
-!!! tip
-    Call `AssertComplete()` on the initializer to verify that every non-optional component on the template has been set. The check also runs automatically during submission; explicit calls just surface the error earlier, at the call site. A "non-optional" component is a template field declared without a default value.
+Calling `init.AssertComplete()` verifies that every non-optional field on the template has been set. The same check runs automatically during submission; an explicit call just surfaces the error earlier, at the call site.
 
-## Removing Entities
+## Removing entities
 
 ```csharp
-// Remove a single entity
 World.RemoveEntity(entityIndex);
 World.RemoveEntity(entityHandle);
 
-// Remove all entities matching a tag combination
+// Remove every entity matching a tag combination
 World.RemoveEntitiesWithTags<SampleTags.Sphere>();
 World.RemoveEntitiesWithTags<BallTags.Ball, BallTags.Active>();
 ```
 
-!!! note
-    Entity removal is **deferred** — the entity is not destroyed immediately. It disappears during the next [submission](../entity-management/structural-changes.md).
+Removal is **deferred** — the entity disappears at the next [submission](../entity-management/structural-changes.md).
 
-## Accessing Entity Data
+## Accessing entity data
 
 `EntityAccessor` is a convenient single-entity component view:
 
 ```csharp
-// From EntityIndex
 var entity = index.ToEntity(World);
 ref Position pos = ref entity.Get<Position>().Write;
 
-// From EntityHandle
-var entity = handle.ToEntity(World);
-ref readonly Velocity vel = ref entity.Get<Velocity>().Read;
+// Or from a handle
+var entity2 = handle.ToEntity(World);
+ref readonly Velocity vel = ref entity2.Get<Velocity>().Read;
 
 // Safe access
 if (entity.TryGet<Velocity>(out var velAccessor))
 {
-    // Entity has Velocity component
+    // ...
 }
 ```
 
-For most cases it's often better to use [aspects](../data-access/aspects.md) — they bundle related components into a single typed view into the entity.
+For most cases prefer [aspects](../data-access/aspects.md) — they bundle related components into a single typed view with auto-generated read/write properties.
 
-## Counting Entities
+## Counting entities
 
 ```csharp
 int total       = World.CountAllEntities();

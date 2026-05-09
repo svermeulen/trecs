@@ -10,12 +10,12 @@ partial struct Boid : IAspect, IRead<Velocity, Speed>, IWrite<Position> { }
 
 This generates:
 
-- `ref readonly float3 Velocity` (read-only, unwrapped — see below)
+- `ref readonly float3 Velocity` (read-only, unwrapped)
 - `ref readonly float Speed` (read-only, unwrapped)
 - `ref float3 Position` (read-write, unwrapped)
 - `EntityIndex EntityIndex`
 
-A component marked `[Unwrap]` (single-field struct) exposes its inner value directly. Without `[Unwrap]`, the property exposes the component struct itself (`ref Position` instead of `ref float3`).
+A component marked `[Unwrap]` (single-field struct) exposes its inner value through the property. Without `[Unwrap]`, the property returns the wrapping struct (`ref Position` instead of `ref float3`).
 
 ## Using an aspect in `[ForEachEntity]`
 
@@ -32,11 +32,11 @@ public partial class BoidMovementSystem : ISystem
 }
 ```
 
-The aspect is passed as an `in` parameter. The struct itself is read-only, but `IWrite` properties still hand out mutable refs to the underlying components.
+The aspect is passed `in`. The struct itself is read-only, but `IWrite` properties still return mutable refs to the underlying components.
 
 ## Multiple `IRead` / `IWrite` interfaces
 
-`IRead` and `IWrite` come in 1- to 8-arg generic overloads. To declare more than 8, stack interfaces:
+`IRead` and `IWrite` come in 1- to 8-arg generic overloads. To declare more, stack interfaces:
 
 ```csharp
 partial struct ComplexView : IAspect,
@@ -57,16 +57,16 @@ foreach (var particle in ParticleView.Query(World).WithTags<SampleTags.Particle>
     particle.Lifetime -= World.DeltaTime;
 }
 
-// Or scope by the aspect's declared component types.
+// Scope by the aspect's declared component types
 foreach (var boid in Boid.Query(World).MatchByComponents())
 {
     boid.Position += World.DeltaTime * boid.Speed * boid.Velocity;
 }
 ```
 
-Aspect queries **do not** auto-filter by the aspect's declared components. Always supply scope: `WithTags<…>()`, `MatchByComponents()`, or `InSet<…>()`.
+Aspect queries don't auto-filter by the aspect's declared components. **Always supply scope**: `WithTags<…>()`, `MatchByComponents()`, or `InSet<…>()`.
 
-`Single()` / `TrySingle(out …)` work too:
+`Single()` / `TrySingle(out ...)` work too:
 
 ```csharp
 var player = PlayerView.Query(World).WithTags<GameTags.Player>().Single();
@@ -74,7 +74,7 @@ var player = PlayerView.Query(World).WithTags<GameTags.Player>().Single();
 
 ## Where to define aspects
 
-Aspects are just partial structs, so they can live anywhere. The convention in samples is to nest them as private `partial struct`s inside the system that uses them, since most aspects pair one-to-one with one system:
+Aspects are just partial structs — they can live anywhere. The convention in samples is to nest them as private `partial struct`s inside the system that uses them, since most aspects pair one-to-one with one system:
 
 ```csharp
 public partial class PhysicsSystem : ISystem
@@ -89,10 +89,10 @@ public partial class PhysicsSystem : ISystem
 }
 ```
 
-A system can declare multiple aspects.  It's common to use one per query.
+A system can declare multiple aspects — typically one per query.
 
 ## See also
 
 - [Sample 03 — Aspects](../samples/03-aspects.md): a minimal aspect with `IRead` / `IWrite` parameters.
 - [Aspect Interfaces](../advanced/aspect-interfaces.md): polymorphic helpers across multiple aspects sharing the same access surface.
-- [Sample 15 — Aspect Interfaces](../samples/15-aspect-interfaces.md): worked example of aspect interfaces.
+- [Sample 15 — Aspect Interfaces](../samples/15-aspect-interfaces.md): worked example.

@@ -1,20 +1,17 @@
 # Systems
 
-Systems contain the logic that operates on entities. Every system implements `ISystem` and its `Execute()` method is called once per frame at the appropriate update phase.
+Systems contain the logic that runs over entities each frame. Every system implements `ISystem`.
 
-## Defining a System
+## A first system
 
 ```csharp
 public partial class SpinnerSystem : ISystem
 {
     readonly float _rotationSpeed;
 
-    public SpinnerSystem(float rotationSpeed)
-    {
-        _rotationSpeed = rotationSpeed;
-    }
+    public SpinnerSystem(float rotationSpeed) => _rotationSpeed = rotationSpeed;
 
-    [ForEachEntity(MatchByComponents = true)]
+    [ForEachEntity(typeof(Spinner))]
     void Execute(ref Rotation rotation)
     {
         float angle = World.DeltaTime * _rotationSpeed;
@@ -23,32 +20,66 @@ public partial class SpinnerSystem : ISystem
 }
 ```
 
-Key points:
+Three things to know:
 
-- Systems are `partial class` — the source generator fills in boilerplate.
-- Trecs does not construct systems. Instantiate them yourself and register with the [world builder](world-setup.md#worldbuilder) or via `World.AddSystem`.
-- `World` is a source-generated **instance property** that returns the system's `WorldAccessor` (see [Accessor Roles](../advanced/accessor-roles.md)). It is *not* the `World` class itself, and it only exists inside types the source generator processes — systems, event handlers, and `[ForEachEntity]` hosts. For plain helper classes, create a `WorldAccessor` explicitly (see [World Setup — WorldAccessor](world-setup.md#worldaccessor)).
+- Systems are `partial class` — the source generator fills in the rest.
+- You construct systems yourself (`new SpinnerSystem(...)`) and register them with [`WorldBuilder`](world-setup.md#worldbuilder).
+- `World` is a source-generated property that returns the system's [`WorldAccessor`](../advanced/accessor-roles.md). It is *not* the `World` class itself; it only exists inside types the source generator processes (systems, event handlers, `[ForEachEntity]` hosts).
 
-## The Execute Method
+## ForEachEntity
 
-Every system must define exactly one method named `Execute`. This is the system's entry point, called once per frame. There are several forms it can take:
+`[ForEachEntity]` marks a method for source-generated entity iteration. The generator emits the query and loop for you.
 
-- **`[ForEachEntity]` method** — Source-generated iteration over matching entities. This is the most common form.
-- **`public void Execute()`** — A manual entry point where you write your own logic, queries, and iteration. Required when you have [multiple `[ForEachEntity]` methods](#multiple-foreachentity-methods) and need to call them explicitly.
-- **`[WrapAsJob]` static method** — A `[ForEachEntity]` method that runs as a Burst-compiled parallel job instead of on the main thread. See [Jobs & Burst](../performance/jobs-and-burst.md).
+### Scoping
 
 ```csharp
-// Option 1: ForEachEntity (most common)
-public partial class MovementSystem : ISystem
-{
-    [ForEachEntity(typeof(GameTags.Player))]
-    void Execute(in PlayerView player)
-    {
-        player.Position += player.Velocity * World.DeltaTime;
-    }
-}
+// Single tag
+[ForEachEntity(typeof(SampleTags.Spinner))]
+void Execute(ref Rotation rotation) { ... }
 
-// Option 2: Manual Execute
+// Multiple tags (entities must have all of them)
+[ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
+void Execute(in ActiveBall ball) { ... }
+
+// Match by component shape — every group whose template declares these components
+[ForEachEntity(MatchByComponents = true)]
+void Execute(ref Position position, in Velocity velocity) { ... }
+
+// Restrict to members of a set
+[ForEachEntity(Set = typeof(SampleSets.HighlightedParticle))]
+void Execute(in ParticleView particle) { ... }
+```
+
+See [Sets](../entity-management/sets.md) for set-scoped iteration.
+
+### Parameters
+
+`[ForEachEntity]` methods accept these parameter shapes. The generator wires each one automatically.
+
+**Component data** (pick one style per method):
+
+- **Component refs** — `ref T` (read-write) or `in T` (read-only) for `IEntityComponent` types. Multiple components can be listed.
+- **Aspect** — `in MyAspect` for bundled access. Only one aspect per method. See [Aspects](../data-access/aspects.md).
+
+**Optional extras:**
+
+- **`EntityIndex`** — the current entity's transient index.
+- **`WorldAccessor`** — the system's accessor (main-thread only).
+- **`NativeWorldAccessor`** — job-safe world access (`[WrapAsJob]` only).
+- **`[GlobalIndex] int`** — see [Cross-group index](#cross-group-index).
+- **`[PassThroughArgument]`** — a value the caller forwards in. See [PassThroughArgument](#passthroughargument).
+- **`[SingleEntity]`** — a singleton entity hoisted out of the loop. See [SingleEntity](#singleentity).
+
+### The Execute method
+
+A system has exactly one method named `Execute`. It can take three forms:
+
+- **`[ForEachEntity]`** — source-generated iteration. The most common form.
+- **Plain `Execute()`** — manual entry point where you write your own queries and loops. Required when a system has multiple `[ForEachEntity]` methods, since you need to call them in order.
+- **`[WrapAsJob]` static method** — a `[ForEachEntity]` method that runs as a Burst-compiled parallel job. See [Jobs & Burst](../performance/jobs-and-burst.md).
+
+```csharp
+// Manual Execute
 public partial class DamageSystem : ISystem
 {
     public void Execute()
@@ -62,75 +93,21 @@ public partial class DamageSystem : ISystem
 
     partial struct EnemyView : IAspect, IRead<Health>, IAspectEntityIndex { }
 }
-
-// Option 3: WrapAsJob (parallel, Burst-compiled)
-public partial class ParticleMoveSystem : ISystem
-{
-    [ForEachEntity(typeof(SampleTags.Particle))]
-    [WrapAsJob]
-    static void Execute(in Velocity velocity, ref Position position, in NativeWorldAccessor world)
-    {
-        position.Value += world.DeltaTime * velocity.Value;
-    }
-}
 ```
 
-## ForEachEntity
+### Multiple ForEachEntity methods
 
-The `[ForEachEntity]` attribute marks a method for source-generated entity iteration. The generator creates the query and loop code automatically.
-
-### Scoping by Tags
-
-```csharp
-// Single tag
-[ForEachEntity(typeof(SampleTags.Spinner))]
-void Execute(ref Rotation rotation) { ... }
-
-// Multiple tags
-[ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
-void Execute(in ActiveBall ball) { ... }
-```
-
-### Scoping by Components
-
-When you don't want to target specific tags, use `MatchByComponents` to iterate all entities that have the required components:
-
-```csharp
-[ForEachEntity(MatchByComponents = true)]
-void Execute(ref Position position, in Velocity velocity)
-{
-    position.Value += velocity.Value * World.DeltaTime;
-}
-```
-
-### Scoping by Set
-
-```csharp
-[ForEachEntity(Set = typeof(SampleSets.HighlightedParticle))]
-void Execute(in ParticleView particle) { ... }
-```
-
-See [Sets](../entity-management/sets.md) for more on defining and using sets.
-
-### Multiple ForEachEntity Methods
-
-A system can have multiple iteration methods for different entity groups:
+A system can iterate several entity groups. Provide an explicit `Execute()` that calls each in the order you want:
 
 ```csharp
 [ExecuteIn(SystemPhase.Presentation)]
 public partial class BallRendererSystem : ISystem
 {
     [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
-    void RenderActive(in ActiveBallView ball)
-    {
-        // Render active balls as red
-    }
+    void RenderActive(in ActiveBallView ball) { /* ... */ }
 
     [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
-    void RenderResting(in RestingBallView ball)
-    {
-        // Render resting balls as gray
-    }
+    void RenderResting(in RestingBallView ball) { /* ... */ }
 
     public void Execute()
     {
@@ -143,29 +120,154 @@ public partial class BallRendererSystem : ISystem
 }
 ```
 
-When you have multiple `[ForEachEntity]` methods, you must provide an explicit `Execute()` that calls them.
+## Update phases
 
-### Parameters
+Systems run in one of five phases, controlled by `[ExecuteIn(...)]`. Each rendered frame they execute in this order:
 
-`[ForEachEntity]` methods accept the following parameter types. The source generator wires them automatically.
+| Phase | Attribute | Typical use |
+|-------|-----------|-------------|
+| `EarlyPresentation` | `[ExecuteIn(SystemPhase.EarlyPresentation)]` | Variable-cadence sampling that needs to run before fixed update |
+| `Input` | `[ExecuteIn(SystemPhase.Input)]` | Reading player input — runs just-in-time before each fixed step |
+| `Fixed` | *(default)* | Deterministic simulation, physics, game logic |
+| `Presentation` | `[ExecuteIn(SystemPhase.Presentation)]` | Rendering, transform sync, interpolation reads |
+| `LatePresentation` | `[ExecuteIn(SystemPhase.LatePresentation)]` | Post-animation corrections — driven by `World.LateTick` |
 
-**Entity data** (choose one style per method — cannot be mixed):
+The fixed phase runs at a fixed timestep (default 1/60s) and may run multiple times per rendered frame to catch up — or zero times if rendering is faster than the fixed rate. Each fixed step is preceded by the input phase. Presentation and LatePresentation run once per rendered frame.
 
-- **Component refs** — `ref T` (read-write) or `in T` (read-only) for `IEntityComponent` types. Multiple components can be listed.
-- **Aspect** — `in MyAspect` for bundled component access (see [Aspects](../data-access/aspects.md)). Only one aspect per method.
+Trecs doesn't hook into Unity's update loop automatically — drive it from a `MonoBehaviour`:
 
-**Additional parameters** (can be combined with either style above):
+```csharp
+public class GameLoop : MonoBehaviour
+{
+    World _world;
 
-- **`EntityIndex`** — the current entity's transient index
-- **`[GlobalIndex] int`** — a unique packed index across *all* groups iterated by the call (`0` to `total − 1`). See [below](#globalindex).
-- **`WorldAccessor`** — the system's world accessor (main-thread methods only)
-- **`NativeWorldAccessor`** — job-safe world access (`[WrapAsJob]` methods only). See [Jobs & Burst](../performance/jobs-and-burst.md).
-- **`[PassThroughArgument]`** — custom values passed in by the caller. See [below](#passthroughargument).
-- **`[SingleEntity]`** — bind a singleton entity (component or aspect) looked up once and hoisted out of the loop. See [below](#singleentity).
+    void Start()
+    {
+        _world = new WorldBuilder()
+            .AddTemplate(PlayerEntity.Template)
+            .AddSystem(new MovementSystem())
+            .BuildAndInitialize();
+    }
 
-### GlobalIndex
+    void Update()     => _world.Tick();      // EarlyPresentation → Input+Fixed catch-up → Presentation
+    void LateUpdate() => _world.LateTick();  // LatePresentation
+    void OnDestroy()  => _world.Dispose();
+}
+```
 
-Mark an `int` parameter with `[GlobalIndex]` to receive a unique index that spans every group the call iterates. The first entity visited gets `0`, the next `1`, and so on through `total − 1` — regardless of how many internal groups the query expands to. This is useful when writing per-entity data into a contiguous buffer that's shared across groups (for example, a `NativeArray<InstanceData>` filled by a `[WrapAsJob]` method and then handed off to graphics):
+All outstanding jobs are completed at every phase boundary. See [Dependency Tracking](../performance/dependency-tracking.md#phase-boundaries).
+
+## System ordering
+
+Within a phase, declare execution order with `[ExecuteAfter]` and `[ExecuteBefore]`:
+
+```csharp
+[ExecuteAfter(typeof(SpawnSystem))]
+public partial class LifetimeSystem : ISystem { }
+
+[ExecuteBefore(typeof(RenderSystem))]
+public partial class PhysicsSystem : ISystem { }
+```
+
+Or declare the constraint at the builder level:
+
+```csharp
+new WorldBuilder()
+    .AddSystemOrderConstraint(typeof(SpawnSystem), typeof(LifetimeSystem))
+    // ...
+```
+
+For tie-breaking when no explicit constraint applies, use `[ExecutePriority(int)]` (default `0`; higher = later within the same phase). Explicit constraints always win over priority.
+
+## OnReady hook
+
+Declare `partial void OnReady()` on a system to run one-time setup once the world is fully built but before the first tick. This is the right place to cache references, validate state, or precompute data that depends on registered templates.
+
+```csharp
+public partial class RendererSystem : ISystem
+{
+    readonly List<RenderInfo> _renderables = new();
+
+    partial void OnReady()
+    {
+        // World, World.WorldInfo, queries, and other systems' state are all available here.
+    }
+
+    public void Execute() { /* ... */ }
+}
+```
+
+`OnReady` runs in the same order systems will execute (by phase, then by `[ExecuteAfter]` / `[ExecuteBefore]` / `[ExecutePriority]`), so a system can rely on state set up by systems that run before it.
+
+## Registering systems
+
+Systems are registered with the world builder:
+
+```csharp
+new WorldBuilder()
+    .AddSystem(new SpinnerSystem(rotationSpeed: 2f))
+    .AddSystem(new SpinnerGameObjectUpdater(gameObjectRegistry))
+    .AddSystem(new LifetimeSystem())
+    .BuildAndInitialize();
+```
+
+You can also register on the `World` after `Build()` — useful when system constructors need a live `World`. See [World Setup](world-setup.md#adding-systems).
+
+---
+
+## Less common features
+
+### PassThroughArgument
+
+`[PassThroughArgument]` lets the caller pass values into a `[ForEachEntity]` method. The generated method takes one parameter per `[PassThroughArgument]`:
+
+```csharp
+public partial class ParticleBoundSystem : ISystem
+{
+    readonly float _halfSize;
+
+    [ForEachEntity(typeof(SampleTags.Particle))]
+    [WrapAsJob]
+    static void ExecuteAsJob(
+        ref Velocity velocity,
+        ref Position position,
+        [PassThroughArgument] float halfSize)
+    {
+        if (position.Value.x > halfSize || position.Value.x < -halfSize)
+            velocity.Value.x = -velocity.Value.x;
+    }
+
+    public void Execute() => ExecuteAsJob(_halfSize);
+}
+```
+
+Useful for configuration values or precomputed data that aren't components on the iterated entities. Works with both main-thread and `[WrapAsJob]` methods. Values must be unmanaged when used with jobs.
+
+### SingleEntity
+
+`[SingleEntity]` resolves a parameter to the unique entity with a given tag. The framework runs the equivalent of `World.Query().WithTags<...>().Single()` once before the body, asserts exactly one match, and binds the result.
+
+```csharp
+void Execute([SingleEntity(typeof(GlobalTag))] ref Score score)
+{
+    score.Value += 1;
+}
+```
+
+Tags are required and must be specified inline — `[SingleEntity]` has no runtime override or `Optional` mode. For dynamic tag lookup, call `World.Query().WithTags(...).Single()` directly.
+
+`[SingleEntity]` works in four contexts:
+
+- **Plain `Execute`** — runs once per call; every singleton is hoisted before the body.
+- **Mixed with `[ForEachEntity]`** — the singleton is resolved once before the loop and reused for every iterated entity.
+- **`[WrapAsJob]` static methods** — singletons become job-struct fields wired up at schedule time.
+- **Hand-written job-struct fields** — `[SingleEntity]` directly on a field of an `IJobFor` makes the generator populate it (the same way `[FromWorld]` works for other field kinds).
+
+For a worked example using `[SingleEntity]` to track a single head entity, see [Sample 11 — Snake](../samples/11-snake.md).
+
+### Cross-group index
+
+Mark an `int` parameter with `[GlobalIndex]` to receive a unique index spanning every group iterated by the call. The first entity gets `0`, the next `1`, and so on through `total − 1` — even when the iteration covers multiple groups.
 
 ```csharp
 [BurstCompile]
@@ -182,274 +284,22 @@ partial struct BuildInstanceData
 }
 ```
 
-`EntityIndex` resets per group; `[GlobalIndex]` does not. Only one `[GlobalIndex]` parameter per method.
+Useful when filling a contiguous output buffer across groups — for example, packed data for instanced rendering. `EntityIndex` resets per group; `[GlobalIndex]` doesn't.
 
-### PassThroughArgument
+### Entity operations from inside a system
 
-Mark a parameter with `[PassThroughArgument]` to pass custom values into a `[ForEachEntity]` method. The generated method will include matching parameters that the caller must provide:
-
-```csharp
-public partial class ParticleBoundSystem : ISystem
-{
-    readonly float _halfSize;
-
-    [ForEachEntity(typeof(SampleTags.Particle))]
-    [WrapAsJob]
-    static void ExecuteAsJob(
-        ref Velocity velocity,
-        ref Position position,
-        [PassThroughArgument] float halfSize
-    )
-    {
-        // halfSize is passed in by the caller, not looked up from the world
-        if (position.Value.x > halfSize || position.Value.x < -halfSize)
-            velocity.Value.x = -velocity.Value.x;
-    }
-
-    public void Execute()
-    {
-        // Pass _halfSize to the generated method
-        ExecuteAsJob(_halfSize);
-    }
-}
-```
-
-This is useful for passing configuration, precomputed values, or other data that isn't a component on the iterated entities. `[PassThroughArgument]` works with both main-thread and `[WrapAsJob]` methods, but the value must be an unmanaged type when used with jobs.
-
-## SingleEntity
-
-`[SingleEntity]` marks an individual parameter (or a job-struct field) that should be resolved to the unique entity matching the given tag(s). The framework runs the equivalent of `World.Query().WithTags<...>().Single()` before the user method body, asserts exactly one match, and binds the result to the parameter or field.
-
-Inline tags are mandatory — `[SingleEntity]` has no runtime override and no `Optional` mode. If you need a runtime-supplied query (eg. tag is dynamic), call `World.Query().WithTags(...).Single()` directly inside the method body.
+Systems can mutate world state through the source-generated `World` property:
 
 ```csharp
-void Execute([SingleEntity(typeof(GlobalTag))] ref Score score)
-{
-    score.Value += 1;
-}
+World.AddEntity<SampleTags.Sphere>()
+    .Set(new Position(float3.zero))
+    .Set(new Lifetime(5f));
+
+World.RemoveEntity(entityIndex);
+World.MoveTo<BallTags.Ball, BallTags.Resting>(ball.EntityIndex);
+
+float dt = World.DeltaTime;
+float random = World.Rng.Next();
 ```
 
-`[SingleEntity]` works in four contexts:
-
-**Plain `Execute` methods.** A method whose only iteration markers are per-parameter `[SingleEntity]` runs *once* per call; the framework hoists every singleton lookup before the body.
-
-```csharp
-void Execute(
-    [SingleEntity(typeof(PlayerTag))] in PlayerView player,
-    [SingleEntity(typeof(GlobalsTag))] in GlobalsView globals)
-{
-    // ...
-}
-```
-
-**Mixed with `[ForEachEntity]`.** A method that already iterates can also receive singleton parameters; the lookup is hoisted out of the loop and bound once per call.
-
-```csharp
-[ForEachEntity(Tag = typeof(EnemyTag))]
-void Process(in EnemyView enemy, [SingleEntity(typeof(PlayerTag))] in PlayerView player)
-{
-    // 'player' is resolved once before the loop and reused for every enemy.
-}
-```
-
-**`[WrapAsJob]` static methods.** Singleton parameters become job-struct fields that the generator wires up at schedule time, so the body remains Burst-clean.
-
-```csharp
-[ForEachEntity(Tag = typeof(EnemyTag))]
-[WrapAsJob]
-static void Process(
-    in EnemyView enemy,
-    [SingleEntity(typeof(PlayerTag))] in PlayerView player)
-{
-    // ...
-}
-```
-
-**Hand-written job-struct fields.** Adding `[SingleEntity]` directly on a field of an `IJobFor` (or other custom job struct) makes the generator populate it at schedule time, the same way `[FromWorld]` populates other field kinds.
-
-```csharp
-public partial struct ScoringJob : IJobFor
-{
-    [SingleEntity(typeof(GlobalTag))]
-    public NativeWrite<Score> Score;
-    // ...
-}
-```
-
-For a worked example using `[SingleEntity]` to track a single head entity across systems, see [Sample 11 — Snake](../samples/11-snake.md).
-
-## Update Phases
-
-Systems run in one of five phases, controlled by `[ExecuteIn(...)]`. The phases execute in this order each rendered frame:
-
-| Phase | Attribute | Typical Use |
-|-------|-----------|-------------|
-| `EarlyPresentation` | `[ExecuteIn(SystemPhase.EarlyPresentation)]` | Variable-cadence sampling that needs to execute before fixed update |
-| `Input` | `[ExecuteIn(SystemPhase.Input)]` | Reading player input — runs just-in-time before each fixed step (0..N times per variable frame) |
-| `Fixed` | *(default)* | Deterministic simulation, physics, game logic |
-| `Presentation` | `[ExecuteIn(SystemPhase.Presentation)]` | Rendering, transform sync, interpolation reads |
-| `LatePresentation` | `[ExecuteIn(SystemPhase.LatePresentation)]` | Post-animation corrections — Triggered via `World.LateTick` which typically is called from Unity's `LateUpdate` |
-
-```csharp
-// Fixed (default — no attribute needed)
-public partial class PhysicsSystem : ISystem { ... }
-
-// Presentation
-[ExecuteIn(SystemPhase.Presentation)]
-public partial class RenderSystem : ISystem { ... }
-
-// Input
-[ExecuteIn(SystemPhase.Input)]
-public partial class KeyboardInputSystem : ISystem { ... }
-```
-
-The fixed phase runs at a fixed timestep (default 1/60s) and may run multiple times per frame to catch up (or zero times at fast variable frame rates). Each fixed step is preceded by the input phase. Presentation and LatePresentation run once per rendered frame. See [Input System](../advanced/input-system.md) for details on the input phase.
-
-Trecs does not hook into Unity's update loop automatically — drive it by calling these methods on the world each frame:
-
-- **`world.Tick()`** — Runs `EarlyPresentation`, then the `Input` + `Fixed` catch-up loop, then `Presentation`. Call from `MonoBehaviour.Update`.
-- **`world.LateTick()`** — Runs the `LatePresentation` phase. Call from `MonoBehaviour.LateUpdate`.
-
-Typically these are called from a MonoBehaviour like this:
-
-```csharp
-public class GameLoop : MonoBehaviour
-{
-    World _world;
-
-    void Start()
-    {
-        _world = new WorldBuilder()
-            .AddTemplate(PlayerEntity.Template)
-            .AddSystem(new MovementSystem())
-            .BuildAndInitialize();
-    }
-
-    void Update()
-    {
-        _world.Tick();
-    }
-
-    void LateUpdate()
-    {
-        _world.LateTick();
-    }
-
-    void OnDestroy()
-    {
-        _world.Dispose();
-    }
-}
-```
-
-All outstanding jobs are completed at the boundary between phases. See [Dependency Tracking](../performance/dependency-tracking.md#phase-boundaries).
-
-## System Ordering
-
-Control execution order within a phase using `[ExecuteAfter]` and `[ExecuteBefore]`:
-
-```csharp
-[ExecuteAfter(typeof(SpawnSystem))]
-public partial class LifetimeSystem : ISystem { ... }
-
-[ExecuteBefore(typeof(RenderSystem))]
-public partial class PhysicsSystem : ISystem { ... }
-```
-
-Order constraints can also be declared at the builder level:
-
-```csharp
-new WorldBuilder()
-    .AddSystemOrderConstraint(typeof(SpawnSystem), typeof(LifetimeSystem))
-    // ...
-```
-
-### ExecutePriority
-
-Use `[ExecutePriority]` to influence ordering when no explicit constraints apply. The default priority is `0`. Higher values run later within the same phase:
-
-```csharp
-[ExecutePriority(-10)]  // Runs before systems with default priority
-public partial class EarlySystem : ISystem { ... }
-
-[ExecutePriority(10)]   // Runs after systems with default priority
-public partial class LateSystem : ISystem { ... }
-```
-
-`[ExecuteAfter]` and `[ExecuteBefore]` always take precedence over priority — priority only breaks ties among systems with no ordering constraint between them.
-
-## OnReady Hook
-
-A system can declare `partial void OnReady()` to run one-time setup once the world is fully built but before the first tick. This is the right place to cache references, validate world state, or precompute data that depends on the registered templates.
-
-```csharp
-public partial class RendererSystem : ISystem
-{
-    readonly List<RenderInfo> _renderables = new();
-
-    partial void OnReady()
-    {
-        // World, World.WorldInfo, queries, and other systems' state are all available here.
-        foreach (var info in _renderables)
-        {
-            foreach (var group in World.WorldInfo.GetGroupsWithTags(info.Tags))
-            {
-                // ...
-            }
-        }
-    }
-
-    public void Execute() { /* ... */ }
-}
-```
-
-`OnReady` is wired by source generation — declare it as a `partial void` and leave the implementation in the system's main partial. If you don't need it, simply don't declare it.
-
-### OnReady Ordering
-
-`OnReady` runs in the same order systems will execute, so a system can rely on any state set up by systems that run before it:
-
-1. **By phase** — `EarlyPresentation` → `Input` → `Fixed` → `Presentation` → `LatePresentation`
-2. **Within each phase** — `[ExecuteAfter]`, `[ExecuteBefore]`, and `[ExecutePriority]` are honored, exactly as they are at execution time
-
-Order is *not* tied to the order systems were passed to `AddSystem` / `AddSystems`. If you need one system's `OnReady` to run after another's, declare it with `[ExecuteAfter]` (or place both in the appropriate phases) — the same constraint that controls runtime order also controls `OnReady` order.
-
-## Entity Operations in Systems
-
-Systems access the world via the source-generated `World` property:
-
-```csharp
-public partial class SpawnSystem : ISystem
-{
-    public void Execute()
-    {
-        // Create entities
-        World.AddEntity<SampleTags.Sphere>()
-            .Set(new Position(float3.zero))
-            .Set(new Lifetime(5f));
-
-        // Remove entities
-        World.RemoveEntity(entityIndex);
-
-        // Partition transitions
-        World.MoveTo<BallTags.Ball, BallTags.Resting>(ball.EntityIndex);
-
-        // Access time and RNG
-        float dt = World.DeltaTime;
-        float random = World.Rng.Next();
-    }
-}
-```
-
-## Registering Systems
-
-Systems are registered with the world builder:
-
-```csharp
-new WorldBuilder()
-    .AddSystem(new SpinnerSystem(rotationSpeed: 2f))
-    .AddSystem(new SpinnerGameObjectUpdater(gameObjectRegistry))
-    .AddSystem(new LifetimeSystem())
-    .BuildAndInitialize();
-```
-
+See [Structural Changes](../entity-management/structural-changes.md) for the deferred-submission semantics.

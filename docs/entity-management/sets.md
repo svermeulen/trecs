@@ -2,7 +2,7 @@
 
 A set is a lightweight membership flag for entities — an entity is either in the set or it isn't. Sets are independent of an entity's components and tags, and iteration visits only the members.
 
-## Defining a Set
+## Defining a set
 
 ```csharp
 public struct HighlightedParticle : IEntitySet { }
@@ -14,9 +14,7 @@ To restrict membership to entities carrying specific tags, use the generic form.
 public struct EatingFish : IEntitySet<FrenzyTags.Fish> { }
 ```
 
-## Registering Sets
-
-Register each set on the `WorldBuilder`:
+## Registering sets
 
 ```csharp
 new WorldBuilder()
@@ -25,7 +23,7 @@ new WorldBuilder()
     // ...
 ```
 
-## Adding, Removing, and Clearing Entities
+## Adding, removing, and clearing
 
 ### Deferred (default)
 
@@ -37,7 +35,7 @@ World.SetRemove<HighlightedParticle>(particle.EntityIndex);
 World.SetClear<HighlightedParticle>();
 ```
 
-A queued `SetClear<T>` **supersedes** any `SetAdd<T>` / `SetRemove<T>` queued for the same set in the same submission, regardless of call order — analogous to how a queued remove supersedes a queued move on an entity. If you want sequential semantics within a single frame ("clear, then add these"), use `ClearImmediate` (below) followed by `AddImmediate` calls instead.
+A queued `SetClear<T>` **supersedes** any `SetAdd<T>` / `SetRemove<T>` queued for the same set in the same submission, regardless of call order — analogous to how a queued remove supersedes a queued move. If you want sequential semantics within a single frame ("clear, then add these"), use the immediate APIs below.
 
 ### Immediate
 
@@ -66,38 +64,28 @@ highlighted.RemoveImmediate(entityIndex);
 
     To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `List<EntityIndex>` and apply them after the loop.
 
-## Querying by Set
-
-### With ForEachEntity
+## Querying by set
 
 ```csharp
+// ForEachEntity
 [ForEachEntity(Set = typeof(HighlightedParticle))]
-void Execute(in ParticleView particle)
-{
-    // Only visits entities in the HighlightedParticle set
-}
-```
+void Execute(in ParticleView particle) { /* only visits set members */ }
 
-### With Aspect Queries
-
-```csharp
+// Aspect query
 foreach (var particle in ParticleView.Query(World).InSet<HighlightedParticle>())
 {
     particle.Color = Color.yellow;
 }
-```
 
-### Counting
-
-```csharp
+// Count
 int highlighted = World.Query().InSet<HighlightedParticle>().Count();
 ```
 
-## Per-Frame Staging
+## Per-frame staging
 
-A common pattern is to use a set as a **per-frame scratch list**: clear it at the start of the frame, have one system populate it, then have downstream systems iterate only the members. This avoids recomputing the same predicate in every consumer (rendering, physics sync, audio cues, etc).
+A common pattern: use a set as a **per-frame scratch list**. One system clears and populates it; downstream systems iterate only the members. This avoids recomputing the same predicate in every consumer (rendering, physics sync, audio cues, etc.).
 
-To make this work *within a single frame*, use the **immediate** APIs (`AddImmediate`, `RemoveImmediate`, `ClearImmediate`). Deferred `SetAdd` / `SetRemove` / `SetClear` only land at the next submission, so a downstream system in the same frame would see last frame's contents.
+To make this work *within a single frame*, use the **immediate** APIs. Deferred set ops only land at the next submission, so a downstream system in the same frame would see last frame's contents.
 
 ```csharp
 public partial class CullingSystem : ISystem
@@ -122,7 +110,6 @@ public partial class CullingSystem : ISystem
 [ExecuteAfter(typeof(CullingSystem))]
 public partial class RenderSystem : ISystem
 {
-    // Iterates only the entities CullingSystem flagged this frame.
     [ForEachEntity(Set = typeof(VisibleThisFrame))]
     void Render(in MeshInfo mesh, in WorldTransform xform) { ... }
 }
@@ -132,9 +119,9 @@ Notes:
 
 - Sets are **not auto-cleared** between frames. Clear them yourself in the producer system if that's the contract you want.
 - Cache the `SetWrite<T>` returned by `Set<T>().Write` outside the loop. Each `.Write` access syncs outstanding job writes; caching syncs once and then writes hit the buffer directly.
-- From a Burst job, capture a `NativeSetWrite<T>` as a field for `AddImmediate` / `RemoveImmediate` with thread-safe writes. Clearing from inside a job isn't supported — call `World.SetClear<T>()` (deferred) before the job dispatches, or `ClearImmediate` on the main thread.
+- From a Burst job, capture a `NativeSetWrite<T>` as a field for thread-safe `AddImmediate` / `RemoveImmediate`. Clearing from inside a job isn't supported — call `World.SetClear<T>()` (deferred) before the job dispatches, or `ClearImmediate` on the main thread.
 
-## When to Use Sets vs Tags
+## Sets vs tags
 
 | | Tags | Sets |
 |---|---|---|

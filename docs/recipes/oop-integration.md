@@ -2,7 +2,7 @@
 
 Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours, and other managed objects. This recipe describes a three-layer architecture for bridging ECS and non-ECS code cleanly.
 
-## The Three Layers
+## The three layers
 
 ```
 ┌─────────────────────────────────────────┐
@@ -24,59 +24,48 @@ Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours,
 └─────────────────────────────────────────┘
 ```
 
-## Layer 1: Input Bridge
+## Layer 1: input bridge
 
-MonoBehaviours read player input and queue it into the ECS world:
-
-An equivalent shape uses an input-phase ECS system, which keeps the input read on the deterministic side of the boundary:
+An input-phase ECS system reads player input and queues it into the world. Keeping the read on the deterministic side of the boundary means the same input data flows through both live play and replay:
 
 ```csharp
 [ExecuteIn(SystemPhase.Input)]
 public partial class PlayerInputSystem : ISystem
 {
-    readonly WorldAccessor _world;
     readonly EntityHandle _player;
 
-    public PlayerInputSystem(WorldAccessor world, EntityHandle player)
-    {
-        _world = world;
-        _player = player;
-    }
+    public PlayerInputSystem(EntityHandle player) => _player = player;
 
     public void Execute()
     {
         var dir = new float2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-        _world.AddInput(_player, new MoveInput { Direction = dir });
+        World.AddInput(_player, new MoveInput { Direction = dir });
     }
 }
 ```
 
 `Input`-phase systems are the only place [`AddInput`](../advanced/input-system.md) is allowed; they run just-in-time before each fixed step so the simulation reads a stable input snapshot.
 
-## Layer 2: Pure ECS
+## Layer 2: pure ECS
 
 Simulation systems contain only ECS logic — no `GameObject`, no `MonoBehaviour`, no `UnityEngine` APIs:
 
 ```csharp
 public partial class MovementSystem : ISystem
 {
-    readonly WorldAccessor _world;
-
-    public MovementSystem(WorldAccessor world) => _world = world;
-
     [ForEachEntity(typeof(GameTags.Player))]
     void Execute(in PlayerView player)
     {
-        player.Position += player.Velocity * _world.FixedDeltaTime;
+        player.Position += player.Velocity * World.FixedDeltaTime;
     }
 }
 ```
 
-This layer is fully deterministic and can be recorded/replayed.
+This layer is fully deterministic and can be recorded / replayed.
 
-## Layer 3: Output Bridge
+## Layer 3: output bridge
 
-Variable-update systems sync ECS state to GameObjects:
+Variable-update systems sync ECS state out to GameObjects:
 
 ```csharp
 [ExecuteIn(SystemPhase.Presentation)]
@@ -96,7 +85,7 @@ public partial class GameObjectSyncSystem : ISystem
 }
 ```
 
-### Spawning and Despawning GameObjects
+### Spawning and despawning GameObjects
 
 Use [entity events](../entity-management/entity-events.md) with `[ForEachEntity]` to manage GameObject lifecycle:
 
@@ -104,7 +93,7 @@ Use [entity events](../entity-management/entity-events.md) with `[ForEachEntity]
 public partial class EnemyGameObjectManager : IDisposable
 {
     readonly GameObjectRegistry _registry;
-    readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container
+    readonly DisposeCollection _disposables = new();
 
     public EnemyGameObjectManager(World world, GameObjectRegistry registry)
     {
@@ -130,7 +119,7 @@ public partial class EnemyGameObjectManager : IDisposable
 }
 ```
 
-## Referencing Managed Objects
+## Referencing managed objects
 
 Use [heap pointer types](../advanced/heap.md) to store managed references in components:
 
@@ -142,11 +131,11 @@ public struct AudioSourceRef : IEntityComponent
 ```
 
 !!! warning "Heap blob types must be serializable"
-    If you save/load or record/replay your world, every `T` you allocate on the heap (`SharedPtr<T>`, `UniquePtr<T>`, `NativeSharedPtr<T>`, `NativeUniquePtr<T>`) must have a serializer registered — blobs are written as part of world state using their registered `ISerializer<T>`. Unmanaged `T` is covered by `RegisterBlit<T>`; managed types like Unity `AudioClip` / `Mesh` need a custom `ISerializer<T>` (or `RegisterSkip<T>` if the pointed-to data can be safely reconstructed from elsewhere on load). See [Serialization](../advanced/serialization.md) for details.
+    If you save/load or record/replay your world, every `T` you allocate on the heap (`SharedPtr<T>`, `UniquePtr<T>`, `NativeSharedPtr<T>`, `NativeUniquePtr<T>`) must have a serializer registered — blobs are written as part of world state. Unmanaged `T` is covered by `RegisterBlit<T>`; managed types like Unity `AudioClip` / `Mesh` need a custom `ISerializer<T>` (or `RegisterSkip<T>` if the data can be reconstructed elsewhere on load). See [Serialization](../advanced/serialization.md).
 
-## Why This Separation Matters
+## Why this separation matters
 
-- **Determinism** — Layer 2 has no external dependencies, enabling recording and replay
-- **Testability** — pure ECS logic can be tested without Unity
-- **Portability** — simulation code doesn't depend on specific rendering or input systems
-- **Clarity** — each layer has a single responsibility
+- **Determinism** — Layer 2 has no external dependencies, enabling recording and replay.
+- **Testability** — pure ECS logic can be tested without Unity.
+- **Portability** — simulation code doesn't depend on specific rendering or input systems.
+- **Clarity** — each layer has a single responsibility.

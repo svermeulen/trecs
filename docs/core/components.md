@@ -1,8 +1,8 @@
 # Components
 
-Components are plain data containers attached to entities. In Trecs, components are **unmanaged structs** — no classes, no managed references, no garbage collection.
+Components are plain data attached to entities. They're **unmanaged structs** — no classes, no managed references, no garbage collection.
 
-## Defining Components
+## Defining components
 
 ```csharp
 public partial struct Health : IEntityComponent
@@ -12,15 +12,15 @@ public partial struct Health : IEntityComponent
 }
 ```
 
-Every component must:
+A component must:
 
-1. Be a **`partial struct`** so the source generator can extend it
-2. Be **unmanaged** (no reference types, strings, or managed arrays)
-3. Implement **`IEntityComponent`**
+1. Be a `partial struct` (so the source generator can extend it)
+2. Be unmanaged (no reference types, strings, or managed arrays)
+3. Implement `IEntityComponent`
 
-### The `[Unwrap]` Shorthand
+## The `[Unwrap]` shorthand
 
-For single-field components, use `[Unwrap]` to expose the inner value directly in [aspects](../data-access/aspects.md):
+For single-field components, `[Unwrap]` exposes the inner value directly through [aspects](../data-access/aspects.md):
 
 ```csharp
 [Unwrap]
@@ -28,44 +28,28 @@ public partial struct Position : IEntityComponent
 {
     public float3 Value;
 }
-
-[Unwrap]
-public partial struct Speed : IEntityComponent
-{
-    public float Value;
-}
 ```
 
-With `[Unwrap]`, aspect properties return `float3` and `float` directly instead of the wrapper struct.
+Inside an aspect that reads `Position`, `aspect.Position` returns a `float3` rather than the wrapping struct.
 
-## Reading and Writing Components
+## Reading and writing components
 
-### Single Entity Access
+The most common access happens through [aspects](../data-access/aspects.md) and `[ForEachEntity]` parameters — those are the patterns you'll use day-to-day. For ad-hoc access by `EntityIndex`:
 
 ```csharp
-// Read
 ref readonly Health hp = ref World.Component<Health>(entityIndex).Read;
 
-// Write
-ref Health hp = ref World.Component<Health>(entityIndex).Write;
-hp.Current -= damage;
-
-// Via EntityAccessor
-var entity = entityIndex.ToEntity(World);
-ref Health hp = ref entity.Get<Health>().Write;
-
-// Safe access (check if component exists)
-if (World.TryComponent<Health>(entityIndex, out var healthAccessor))
-{
-    ref readonly Health hp = ref healthAccessor.Read;
-}
+ref Health hpW = ref World.Component<Health>(entityIndex).Write;
+hpW.Current -= damage;
 ```
 
-Going through `Read`/`Write` lets Trecs lazily complete any in-flight jobs with conflicting access before handing back the reference. See [Dependency Tracking](../performance/dependency-tracking.md) for the details.
+The `.Read` / `.Write` split lets Trecs lazily complete any in-flight jobs with conflicting access before handing back the reference. See [Dependency Tracking](../performance/dependency-tracking.md).
 
-## Component Field Attributes
+For a single-entity view bundling several components, see [`EntityAccessor`](entities.md#accessing-entity-data). For the safe `TryComponent<T>` form, see the API reference.
 
-When declaring components in a [template](templates.md), fields can be annotated to control their update behavior:
+## Component field attributes
+
+When components are declared in a [template](templates.md), fields can be annotated to control update behavior:
 
 ```csharp
 public partial class PlayerEntity : ITemplate, ITagged<PlayerTag>
@@ -76,36 +60,34 @@ public partial class PlayerEntity : ITemplate, ITagged<PlayerTag>
     Velocity Velocity;                          // Plain simulation state — Fixed-only writes
 
     [VariableUpdateOnly]
-    RenderState RenderState;                    // Only readable and writable in variable update
+    RenderState RenderState;                    // Render-only state
 
     [Constant]
     PlayerId PlayerId;                          // Immutable after creation
 
     [Input(MissingInputBehavior.RetainCurrent)]
-    MoveInput MoveInput;                        // Player input, retains last value
+    MoveInput MoveInput;                        // Player input
 }
 ```
 
 | Attribute | Effect |
 |-----------|--------|
-| `[Interpolated]` | Generates interpolation components for smooth rendering. See [Interpolation](../advanced/interpolation.md). |
-| `[VariableUpdateOnly]` | Component is render-only state — only variable-cadence phases (`Input` / `EarlyPresentation` / `Presentation` / `LatePresentation`) may read or write it. `Fixed` systems may not touch it. Asserted at the access site — see [Accessor Roles](../advanced/accessor-roles.md#capability-matrix) for the full role × access matrix. |
-| `[Constant]` | Component is immutable after entity creation. Asserted at the write site. |
-| `[Input(...)]` | Marks component as input data. See [Input System](../advanced/input-system.md). |
+| `[Interpolated]` | Generates interpolation companions for smooth rendering. See [Interpolation](../advanced/interpolation.md). |
+| `[VariableUpdateOnly]` | Only variable-cadence phases (Input / Presentation) may read or write it. Asserted at the access site — see [Accessor Roles](../advanced/accessor-roles.md#capability-matrix). |
+| `[Constant]` | Immutable after entity creation. Asserted at the write site. |
+| `[Input(...)]` | Marks the component as input data. See [Input System](../advanced/input-system.md). |
 
-> Components without any attribute are treated as **simulation state**: any phase may read them, but only `Fixed` systems may write.
+A component without an attribute is **simulation state**: any phase may read it, but only `Fixed` systems may write it.
 
-## Global Entity
+## Global entity
 
-Every world has a single **global entity** for storing world-wide state. Access it via `GlobalComponent<T>()`:
+Every world has a single **global entity** for world-wide state. Access it with `GlobalComponent<T>()`:
 
 ```csharp
-// Read
 ref readonly Score score = ref World.GlobalComponent<Score>().Read;
 
-// Write
-ref Score score = ref World.GlobalComponent<Score>().Write;
-score.Value += 10;
+ref Score scoreW = ref World.GlobalComponent<Score>().Write;
+scoreW.Value += 10;
 ```
 
 To declare which components the global entity has, see [Global Entity Template](templates.md#global-entity-template).

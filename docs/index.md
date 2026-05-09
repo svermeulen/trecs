@@ -1,68 +1,58 @@
 # Trecs
 
-A high-performance Entity Component System framework for Unity, designed for deterministic simulation, recording/playback, and Burst/Jobs integration.
+A high-performance Entity Component System framework for Unity, designed for **deterministic simulation, recording/playback, and Burst/Jobs**.
 
-## Features
+## Why Trecs
 
-- **High-performance storage** — Components are stored in contiguous arrays (structure-of-arrays), grouped by tag set for cache-friendly iteration.
-- **Burst & Jobs** — First-class support for Unity's job system and Burst compiler, with automatic dependency tracking based on declared component access.
-- **Source generation** — Roslyn-powered code generation eliminates boilerplate for systems, aspects, templates, and jobs.
-- **Aspects** — Reusable bundles of read/write component access that systems iterate over a single entity at a time.
-- **Sets** — Dynamic entity subsets that can overlap freely for sparse iteration without restructuring storage.
-- **Heap & Pointers** — `SharedPtr` and `UniquePtr` for storing native or managed data outside of components.
-- **Interpolation** — Built-in fixed-to-variable timestep interpolation for smooth rendering off a deterministic simulation.
-- **Templates** — Composable blueprints describing an entity's components, tags, partitions, and inheritance.
-- **Deterministic simulation** — Fixed-timestep loop with deterministic RNG and an isolated input queue, designed for replay and rollback.
-- **Snapshots, Recording & Playback** — Full game state serialization, replayable input recordings with checksum desync detection, and snapshot/scrub editor tooling.
+- **Designed for determinism.** Fixed-timestep simulation, deterministic RNG, isolated input, and built-in snapshot / record / replay with desync detection.
+- **Burst & Jobs out of the box.** A source generator emits the job structs and chains the right `JobHandle` dependencies based on the components you read and write — no manual wiring.
+- **Cache-friendly storage.** Components live in contiguous structure-of-arrays buffers grouped by tag set.
+- **Small surface, lots of leverage.** Aspects bundle component access; sets give you sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; pointers (`SharedPtr` / `UniquePtr`) let components reference data on the heap.
+- **Editor tooling.** A live entity inspector and a record / scrub / fork timeline window for diagnosing transient bugs.
 
-## Quick Start
+## A taste
 
 ```csharp
-// 1. Define components
-[Unwrap]
+// 1. Components — unmanaged structs holding per-entity data
 public partial struct Position : IEntityComponent { public float3 Value; }
-
-[Unwrap]
 public partial struct Velocity : IEntityComponent { public float3 Value; }
 
-// 2. Define a tag
+// 2. A tag — a zero-cost marker
 public struct PlayerTag : ITag { }
 
-// 3. Define an entity template
+// 3. A template — the entity blueprint
 public partial class PlayerEntity : ITemplate, ITagged<PlayerTag>
 {
     Position Position;
     Velocity Velocity;
 }
 
-// 4. Define a system
+// 4. A system — logic that runs over matching entities
 public partial class MovementSystem : ISystem
 {
     [ForEachEntity(typeof(PlayerTag))]
-    void Execute(in Player player)
+    void Execute(ref Position position, in Velocity velocity)
     {
-        player.Position += player.Velocity * World.DeltaTime;
+        position.Value += velocity.Value * World.DeltaTime;
     }
-
-    partial struct Player : IAspect, IRead<Velocity>, IWrite<Position> { }
 }
 
-// 5. Build and run the world
+// 5. Build and run
 var world = new WorldBuilder()
     .AddTemplate(PlayerEntity.Template)
     .AddSystem(new MovementSystem())
-    .Build();
-
-world.Initialize();
+    .BuildAndInitialize();
 
 // In a MonoBehaviour:
-void Update()    { world.Tick(); }
-void OnDestroy() { world.Dispose(); }
+void Update()    => world.Tick();
+void OnDestroy() => world.Dispose();
 ```
 
-A few things in that snippet that are worth knowing up front:
+`World` inside a system body is a source-generated property — your access into the running world for that phase. See [Getting Started](getting-started.md) for the full walkthrough.
 
-- `[Unwrap]` lets aspects expose the component's inner field directly, so `player.Position` is a `float3` rather than a `Position` wrapper. See [Components — the `[Unwrap]` shorthand](core/components.md#the-unwrap-shorthand).
-- `World` inside a system body is a source-generated **instance property** (a [`WorldAccessor`](data-access/aspects.md)), not the `World` class. Outside systems, you create a `WorldAccessor` from `World.CreateAccessor(...)` explicitly.
+## Where to go next
 
-For a complete walkthrough that creates entities and runs them in a Unity scene, see [Getting Started](getting-started.md).
+- **[Getting Started](getting-started.md)** — install Trecs and run your first entity in a Unity scene.
+- **[Core: World Setup](core/world-setup.md)** — the deeper reference for `WorldBuilder`, lifecycle, and `WorldAccessor`.
+- **[Samples](samples/index.md)** — a progressive tutorial series plus full sample games.
+- **[FAQ](faq.md)** and **[Trecs vs Unity ECS](recipes/trecs-vs-unity-ecs.md)** if you're sizing up the framework.

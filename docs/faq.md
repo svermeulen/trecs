@@ -51,7 +51,7 @@ See [OOP Integration](recipes/oop-integration.md) for the boundary-crossing patt
 
 ## Is there a "debug draw" for entities?
 
-The [Hierarchy window](editor-windows/hierarchy.md) gives you a tree of every entity in every world along with a JSON-editable component inspector. The [Trecs Player](advanced/recording-and-playback.md) handles record / scrub / fork / loop and is the right tool for "what does the simulation look like at frame N". For ad-hoc visual probes, a `MonoBehaviour` that queries the world from a variable-update system and calls `UnityEngine.Debug.Draw*` is usually enough.
+The [Hierarchy window](editor-windows/hierarchy.md) gives you a tree of every entity in every world along with a JSON-editable component inspector. The [Trecs Player window](editor-windows/player.md) handles record / scrub / fork / loop and is the right tool for "what does the simulation look like at frame N". For ad-hoc visual probes, a `MonoBehaviour` that queries the world from a variable-update system and calls `UnityEngine.Debug.Draw*` is usually enough.
 
 ## Where do I report bugs / request features?
 
