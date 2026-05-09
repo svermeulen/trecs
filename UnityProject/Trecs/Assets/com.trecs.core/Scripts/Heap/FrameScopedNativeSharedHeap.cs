@@ -68,7 +68,10 @@ namespace Trecs
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
-            Assert.That(_store.HasNativeBlob<T>(blobId, updateAccessTime: true));
+            // Refresh LRU access time on the existing blob entry; the assert
+            // is only a debug guard, but the side effect must run in release.
+            var hasBlob = _store.HasNativeBlob<T>(blobId, updateAccessTime: true);
+            Assert.That(hasBlob);
             var blobCacheHandleId = _store.CreateHandle(blobId);
             return CreateBlobImpl<T>(frame, blobId, blobCacheHandleId);
         }
