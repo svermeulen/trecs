@@ -9,7 +9,7 @@ In the examples below, `World` is the [`WorldAccessor`](../advanced/accessor-rol
 `World.SubmitEntities()` (on `WorldAccessor`) drains the queues. The system runner calls it for you:
 
 1. **Between fixed steps** — submission runs after each fixed step within a `Tick()`.
-2. **At the end of `World.Tick()`** — any remaining changes are flushed.
+2. **At the end of frame** — any remaining changes are flushed at the end of `World.Tick()`
 3. **Manually** — call `world.SubmitEntities()` explicitly when needed (outside system `Execute`).
 
 ## Deferred Operations
