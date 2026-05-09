@@ -53,6 +53,12 @@ nav:
   - Performance:
       - Jobs & Burst: performance/jobs-and-burst.md
       - Dependency Tracking: performance/dependency-tracking.md
+  - Recipes:
+      - OOP Integration: recipes/oop-integration.md
+      - Entity Subset Patterns: recipes/entity-subset-patterns.md
+      - Design Rules: recipes/design-rules.md
+      - Debugging & Troubleshooting: recipes/debugging.md
+      - Trecs vs Unity ECS: recipes/trecs-vs-unity-ecs.md
   - Advanced:
       - Accessor Roles: advanced/accessor-roles.md
       - Aspect Interfaces: advanced/aspect-interfaces.md
@@ -94,12 +100,6 @@ nav:
       - 17 - Blob Storage: samples/17-blob-storage.md
       - 18 - Reactive Events: samples/18-reactive-events.md
       - 19 - Multiple Worlds: samples/19-multiple-worlds.md
-  - Recipes:
-      - OOP Integration: recipes/oop-integration.md
-      - Entity Subset Patterns: recipes/entity-subset-patterns.md
-      - Design Rules: recipes/design-rules.md
-      - Debugging & Troubleshooting: recipes/debugging.md
-      - Trecs vs Unity ECS: recipes/trecs-vs-unity-ecs.md
   - FAQ: faq.md
   - Changelog: changelog.md
 
