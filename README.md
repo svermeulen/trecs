@@ -7,6 +7,8 @@
 
 A high-performance Entity Component System framework for Unity, designed for **deterministic simulation, recording/playback, and Burst/Jobs**.
 
+**Full docs: [svermeulen.github.io/trecs](https://svermeulen.github.io/trecs)** — [Getting Started](https://svermeulen.github.io/trecs/getting-started/) · [Glossary](https://svermeulen.github.io/trecs/glossary/) · [Samples](https://svermeulen.github.io/trecs/samples/) · [FAQ](https://svermeulen.github.io/trecs/faq/) · [Trecs vs Unity ECS](https://svermeulen.github.io/trecs/recipes/trecs-vs-unity-ecs/)
+
 ## Why Trecs
 
 - **Designed for determinism.** Fixed-timestep simulation, deterministic RNG, isolated input, and built-in snapshot / record / replay with desync detection.
@@ -103,10 +105,6 @@ https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs
 ```
 
 Add `com.trecs.core` first — Unity can't resolve versioned dependencies from git URLs, so order matters.
-
-## Documentation
-
-See full documentation at **[svermeulen.github.io/trecs](https://svermeulen.github.io/trecs)**.
 
 ## Samples
 
