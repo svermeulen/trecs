@@ -63,7 +63,7 @@ var settings = new WorldSettings
 };
 ```
 
-This sorts queued structural operations before applying them, making submission order independent of job-thread interleaving. The cost is a single sort per submission — cheap enough to enable by default if you may ever record, replay, or network the simulation.
+This sorts structural operations queued from Burst jobs (via [`NativeWorldAccessor`](../performance/jobs-and-burst.md)) before applying them, making submission order independent of job-thread interleaving. Operations queued from the main thread via `WorldAccessor` are already deterministic — they're applied in the order user code queued them — so this setting only affects the native path. The cost is a single sort per submission — cheap enough to enable by default if you may ever record, replay, or network the simulation.
 
 When you queue structural changes from a Burst job through [`NativeWorldAccessor`](../performance/jobs-and-burst.md), pass a `sortKey` to control the deterministic order:
 
