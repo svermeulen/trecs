@@ -22,7 +22,7 @@ public partial struct Lifetime : IEntityComponent
 
 Plus `Position` and `GameObjectId` from Common.
 
-### Tags & Template
+### Tags & template
 
 ```csharp
 public struct Sphere : ITag { }
@@ -80,7 +80,7 @@ public partial class LifetimeSystem : ISystem
 }
 ```
 
-### SphereRendererSystem (Variable Update)
+### SphereRendererSystem (variable update)
 
 Syncs position to GameObjects each visual frame.
 

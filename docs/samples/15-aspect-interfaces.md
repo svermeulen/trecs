@@ -75,7 +75,7 @@ Combat.TryTakeHit(boss, damage, cooldown, World);
 
 Without the aspect interface, this helper would need to either (a) take four individual component refs (`ref Health`, `in Armor`, …) on every call, or (b) be written twice — once for enemies, once for bosses. The aspect interface collapses both into a single `in T` argument.
 
-## Cross-Species Rendering
+## Cross-species rendering
 
 The sample also shows the other half of the pattern: a `HitFlashRenderer` that iterates **by components, not by tags**, rendering any entity that has the required shape regardless of species:
 
@@ -100,7 +100,7 @@ public partial class HitFlashRenderer : ISystem
 
 Enemies and the boss both have this component set, so the same renderer drives both. Aspect interfaces and `MatchByComponents` are the two halves of the same idea — letting behaviour hang off *capabilities* rather than *identities*.
 
-## When to Reach for This
+## When to reach for this
 
 - You have multiple templates that participate in the same mechanic (damage, pickups, AI targeting, selection, saving) but differ in their extras.
 - You want a single helper method or system to handle all of them without copy-paste or tag-dispatch branches.

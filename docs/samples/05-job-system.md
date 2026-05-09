@@ -38,7 +38,7 @@ public partial class Globals : ITemplate, IExtends<TrecsTemplates.Globals>
 
 ## Systems
 
-### ParticleMoveSystem — Job vs Main Thread
+### ParticleMoveSystem — job vs main thread
 
 The system defines both a main-thread and a `[WrapAsJob]` version of the same logic, and switches between them at runtime:
 
@@ -111,7 +111,7 @@ struct ExecuteAsJob_AutoJob : IJobFor
 
 The generated `ExecuteAsJob()` method resolves groups, wires up [dependency tracking](../performance/dependency-tracking.md), and schedules the job — so you just call it and the rest is handled.
 
-### ParticleSpawnerSystem — Job-Based Entity Creation
+### ParticleSpawnerSystem — job-based entity creation
 
 When spawning entities inside jobs, entity handles must be reserved on the main thread beforehand. Without pre-reserved handles, the IDs assigned by parallel threads would depend on scheduling order — non-deterministic. Pre-reserving also lets the job use the handles immediately to set up cross-entity references.
 

@@ -4,7 +4,7 @@ The simplest Trecs sample — a spinning cube. Introduces the fundamental buildi
 
 **Source:** `com.trecs.core/Samples~/Tutorials/01_HelloEntity/`
 
-## Goal
+## What it does
 
 By the end you'll have a single entity with a `Rotation` component being rotated each fixed update by a system, and its `GameObject` synced to the rotation each rendered frame.
 
@@ -37,7 +37,7 @@ See [Components](../core/components.md), [Tags](../core/tags.md), and [Templates
 
 ## Systems
 
-### SpinnerSystem (Fixed Update)
+### SpinnerSystem (fixed update)
 
 Spins anything that has a `Rotation` component:
 
@@ -62,7 +62,7 @@ public partial class SpinnerSystem : ISystem
 
 `MatchByComponents = true` iterates every entity that has the `Rotation` component, regardless of tags. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 
-### SpinnerGameObjectUpdater (Variable Update)
+### SpinnerGameObjectUpdater (variable update)
 
 Syncs the simulation rotation onto the Unity transform:
 

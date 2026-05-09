@@ -81,7 +81,7 @@ public void Execute()
 }
 ```
 
-### WaveXEffectSystem — Iterate Only WaveX Members
+### WaveXEffectSystem — iterate only WaveX members
 
 ```csharp
 [ForEachEntity(
@@ -96,7 +96,7 @@ void Execute(in WaveXView view)
 }
 ```
 
-### WaveZEffectSystem — Iterate Only WaveZ Members
+### WaveZEffectSystem — iterate only WaveZ members
 
 Same pattern, scoped to `WaveZ` set.
 

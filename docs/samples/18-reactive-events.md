@@ -76,7 +76,7 @@ void OnBubbleRemoved(in GameObjectId id) { /* cleanup uses `id` */ }
 
 This is what makes `OnRemoved` the right place to dispose external resources keyed off entity data — the mapping from entity to GameObject, heap pointer, handle, etc. is still available at the moment of removal.
 
-## When to Reach for This
+## When to reach for this
 
 - Entities that own external resources — GameObjects, audio sources, particle systems, native handles, managed pointers — which need explicit cleanup when the entity is removed.
 - Global counters, analytics, or stat tracking that should update whenever a population changes, without a system polling each frame.

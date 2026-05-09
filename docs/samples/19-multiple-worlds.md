@@ -110,7 +110,7 @@ Pausing one world while the other keeps ticking is just "skip the call." The wor
 
 Both worlds share a single `GameObjectRegistry` instance. That's a deliberate choice: `GameObjectId` is just a process-wide integer handle into Unity's scene, and the registry has nothing to do with ECS isolation. Each world still has its own entity store, system instances, and accessors. Splitting the registry per-world would work too — the registry is application code, not Trecs.
 
-## What's Process-Global vs Per-World
+## What's process-global vs per-world
 
 - **Per-world** — entity store, component arrays, system instances, accessors, RNG, blob cache, event manager, interpolation. Everything that holds simulation state.
 - **Process-global** — component / tag / set type IDs (`ComponentTypeId<T>`, `Tag<T>`, `EntitySetId<T>`), plus the `WorldRegistry` that lists active worlds. These are stable identifiers, not state.

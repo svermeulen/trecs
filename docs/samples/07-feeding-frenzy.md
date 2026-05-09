@@ -23,7 +23,7 @@ public struct MealNutrition : IEntityComponent { public float Value; }
 
 Plus `Position`, `Rotation`, `Velocity`, `Speed`, `UniformScale`, `ColorComponent` from Common.
 
-### Templates with Partitions
+### Templates with partitions
 
 ```csharp
 public partial class FishEntity : ITemplate,

@@ -52,7 +52,7 @@ public class PaletteSeeder
 }
 ```
 
-## Entity-Side Lookup
+## Entity-side lookup
 
 Entity spawners call `AllocShared(stableId)` — the **lookup-only** overload that doesn't pass a blob. It finds the existing blob by ID, bumps its refcount, and returns a fresh handle:
 
@@ -77,7 +77,7 @@ public partial struct PaletteRef : IEntityComponent
 }
 ```
 
-## Reading the Blob from a System
+## Reading the blob from a system
 
 Systems dereference the handle through the heap accessor — same as any `SharedPtr<T>`:
 
@@ -101,7 +101,7 @@ Pointers stored on components must be disposed when the entity is removed — th
 
 If you adapt the pattern to entities that come and go, register an `OnRemoved` observer as shown in [Sample 10 — Pointers](10-pointers.md), or follow the template in [Heap Allocation Rules](../advanced/heap-allocation-rules.md).
 
-## When to Reach for This
+## When to reach for this
 
 - Large, immutable assets that many entities share (colour palettes, lookup tables, mesh metadata, spline definitions, AI behaviour trees).
 - Content pipelines where the blob's identity must survive across runs, recordings, or snapshots — and auto-minted IDs would drift.

@@ -59,7 +59,7 @@ The pointer handles are small value types (12 bytes and 4 bytes respectively) st
 
 ## Allocation
 
-### NativeSharedPtr — Shared Route Data
+### NativeSharedPtr — shared route data
 
 ```csharp
 var waypoints = new FixedList64<float3>();
@@ -83,7 +83,7 @@ for (int i = 0; i < count; i++)
 routePtr.Dispose(world);
 ```
 
-### NativeUniquePtr — Per-Entity Trail
+### NativeUniquePtr — per-entity trail
 
 ```csharp
 var trailPtr = world.Heap.AllocNativeUnique(
@@ -94,7 +94,7 @@ Each entity gets its own `NativeUniquePtr` — no sharing, no refcount.
 
 ## Systems
 
-### PatrolMovementSystem — Burst Job
+### PatrolMovementSystem — Burst job
 
 This is the point of the sample: the pointer resolution happens inside a Burst-compiled job.
 
@@ -138,7 +138,7 @@ Key points:
 - **`trail.Value.GetMut(world)`** is the **mutable** counterpart for `NativeUniquePtr`. It's an extension method with `ref this`, which forces the caller to hold a writable reference to the component — the framework uses this to track write dependencies without any extra bookkeeping.
 - The movement system uses `ref Trail trail` so that `trail.Value.GetMut(...)` is callable. `in Route route` is enough for the shared side because we only read.
 
-### PatrolRendererSystem — Main Thread
+### PatrolRendererSystem — main thread
 
 ```csharp
 [ExecuteIn(SystemPhase.Presentation)]

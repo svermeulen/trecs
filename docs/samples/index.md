@@ -30,7 +30,7 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 | 12 | [Feeding Frenzy Benchmark](12-feeding-frenzy-benchmark.md) | Performance benchmark comparing partition approaches and iteration styles |
 | 13 | [Save Game](13-save-game.md) | Sokoban puzzle demonstrating snapshot-based save/load slots |
 
-## Running the Samples
+## Running the samples
 
 Open `UnityProject/Trecs/Assets/Samples/Main.unity` in Unity 6000.3+ and press Play. The scene includes a `SampleCycler` that lets you switch between samples at runtime. Each sample has its own composition root that builds the world and initializes the scene.
 

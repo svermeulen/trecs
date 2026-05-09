@@ -94,7 +94,7 @@ At high entity counts, the `RendererSystem` uses GPU-instanced indirect renderin
 
 Fish ↔ Meal pairing uses `EntityHandle` cross-references with cleanup handlers to prevent dangling references when either entity is removed.
 
-## What to Learn from This Sample
+## Concepts introduced
 
 - **Partitions are fastest for dense iteration** — entities are contiguous in memory
 - **Sets avoid group explosion** — no combinatorial blowup with multiple dimensions

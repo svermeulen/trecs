@@ -18,7 +18,7 @@ public struct Active : ITag { }
 public struct Resting : ITag { }
 ```
 
-### Template with Partitions
+### Template with partitions
 
 ```csharp
 public partial class BallEntity : ITemplate,
@@ -37,7 +37,7 @@ Each `IHasPartition` declares a valid partition. The entity always has the `Ball
 
 ## Systems
 
-### PhysicsSystem — Active Balls Only
+### PhysicsSystem — active balls only
 
 Only processes balls in the Active partition:
 
@@ -65,7 +65,7 @@ void Execute(in ActiveBall ball)
 partial struct ActiveBall : IAspect, IWrite<Position, Velocity, RestTimer> { }
 ```
 
-### WakeUpSystem — Resting Balls Only
+### WakeUpSystem — resting balls only
 
 ```csharp
 [ExecuteAfter(typeof(PhysicsSystem))]
@@ -88,7 +88,7 @@ public partial class WakeUpSystem : ISystem
 }
 ```
 
-### BallRendererSystem — Different Rendering Per Partition
+### BallRendererSystem — different rendering per partition
 
 Two `[ForEachEntity]` methods with different tag filters:
 

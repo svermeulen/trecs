@@ -28,7 +28,7 @@ public partial struct ApproachingPredator : IEntityComponent
 
 Plus `Speed` and `MoveDirection` defined in this sample, and `Position` / `GameObjectId` from `Common/`.
 
-### Tags & Templates
+### Tags & templates
 
 ```csharp
 public struct Predator : ITag { }

@@ -14,7 +14,7 @@ Boids (simple agents) move in straight lines and wrap around the edges of a boun
 
 `Position`, `Velocity`, `Speed`, `GameObjectId` from Common.
 
-### Tags & Template
+### Tags & template
 
 ```csharp
 public struct Boid : ITag { }
@@ -85,7 +85,7 @@ public partial class BoidWrapSystem : ISystem
 }
 ```
 
-### BoidRendererSystem (Variable Update)
+### BoidRendererSystem (variable update)
 
 Reads position and velocity to update the GameObject transform and face the movement direction.
 

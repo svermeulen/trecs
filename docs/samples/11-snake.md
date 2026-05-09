@@ -54,7 +54,7 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 
 The `[Input(RetainCurrent)]` attribute ensures the last input persists until a new one is received — critical for a game where the snake keeps moving in its current direction.
 
-## Systems (Execution Order)
+## Systems (execution order)
 
 ### 1. SnakeInputSystem (`[ExecuteIn(SystemPhase.Input)]`)
 
@@ -146,7 +146,7 @@ Spawns food up to a maximum count at random unoccupied grid cells using `World.R
 
 Maps `GridPos` to world coordinates for rendering.
 
-## Determinism & Recording
+## Determinism & recording
 
 The world is configured for deterministic replay:
 

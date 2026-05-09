@@ -53,7 +53,7 @@ public partial struct Trail : IEntityComponent
     new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 }, null))
 ```
 
-### SharedPtr — Shared Route Data
+### SharedPtr — shared route data
 
 `AllocShared` returns a handle with refcount 1. `Clone` increments the count; each entity stores its own clone. Once spawning is done the original is disposed, leaving the entity clones to keep the underlying object alive:
 
@@ -71,7 +71,7 @@ for (int i = 0; i < count; i++)
 routePtr.Dispose(world);
 ```
 
-### UniquePtr — Per-Entity Trail
+### UniquePtr — per-entity trail
 
 ```csharp
 var trailPtr = world.Heap.AllocUnique(new TrailHistory { MaxLength = 50 });
