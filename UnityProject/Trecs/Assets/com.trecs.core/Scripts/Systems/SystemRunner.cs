@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public partial class SystemRunner
+    public sealed partial class SystemRunner
     {
         static readonly TrecsLog _log = new(nameof(SystemRunner));
 

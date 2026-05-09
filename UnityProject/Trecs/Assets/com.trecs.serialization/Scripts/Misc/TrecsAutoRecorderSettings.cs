@@ -6,7 +6,7 @@ namespace Trecs.Serialization
     /// (EditorPrefs-backed) and pushed onto each new recorder when its
     /// controller registers.
     /// </summary>
-    public class TrecsAutoRecorderSettings
+    public sealed class TrecsAutoRecorderSettings
     {
         /// <summary>
         /// Wall-clock seconds (in simulation time, derived from FixedDeltaTime

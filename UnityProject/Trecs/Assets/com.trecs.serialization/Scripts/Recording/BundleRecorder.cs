@@ -20,7 +20,7 @@ namespace Trecs.Serialization
     ///
     /// Main-thread only.
     /// </summary>
-    public class BundleRecorder : IInputHistoryLocker, IDisposable
+    public sealed class BundleRecorder : IInputHistoryLocker, IDisposable
     {
         static readonly TrecsLog _log = new(nameof(BundleRecorder));
 

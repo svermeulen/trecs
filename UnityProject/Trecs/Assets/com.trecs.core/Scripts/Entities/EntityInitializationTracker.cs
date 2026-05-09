@@ -7,7 +7,7 @@ using System.Text;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class EntityInitializationTracker
+    public sealed class EntityInitializationTracker
     {
         struct TrackedEntity
         {

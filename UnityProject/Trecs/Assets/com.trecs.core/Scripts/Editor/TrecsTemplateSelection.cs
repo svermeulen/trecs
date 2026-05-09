@@ -15,10 +15,10 @@ namespace Trecs
     /// the live <see cref="TemplateRef"/> dynamically against
     /// <see cref="TrecsHierarchyWindow.ActiveSource"/> on every refresh.
     /// </summary>
-    public class TrecsTemplateSelection : TrecsSelectionProxy { }
+    public sealed class TrecsTemplateSelection : TrecsSelectionProxy { }
 
     [CustomEditor(typeof(TrecsTemplateSelection))]
-    public class TrecsTemplateSelectionInspector : Editor
+    public sealed class TrecsTemplateSelectionInspector : Editor
     {
         [InitializeOnLoadMethod]
         static void RegisterEditorAccessorName() =>

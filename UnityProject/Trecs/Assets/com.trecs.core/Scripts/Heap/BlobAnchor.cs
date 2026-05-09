@@ -12,7 +12,7 @@ namespace Trecs
     /// Concrete <see cref="IBlobAnchor"/> backed by a <see cref="PtrHandle"/>.
     /// Disposing releases the blob cache entry.
     /// </summary>
-    public class BlobAnchor : IBlobAnchor
+    public sealed class BlobAnchor : IBlobAnchor
     {
         public readonly PtrHandle Handle;
 

@@ -6,7 +6,7 @@ using Trecs.Collections;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class ComponentStore : IDisposable
+    public sealed class ComponentStore : IDisposable
     {
         static readonly TrecsLog _log = new(nameof(ComponentStore));
 

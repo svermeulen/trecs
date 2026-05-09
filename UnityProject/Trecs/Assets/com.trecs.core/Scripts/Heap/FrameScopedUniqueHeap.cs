@@ -9,7 +9,7 @@ namespace Trecs
     /// Entries are tagged with the frame they were allocated on and can be bulk-cleared
     /// by frame range, supporting rollback and replay scenarios.
     /// </summary>
-    public class FrameScopedUniqueHeap
+    public sealed class FrameScopedUniqueHeap
     {
         static readonly TrecsLog _log = new(nameof(FrameScopedUniqueHeap));
 

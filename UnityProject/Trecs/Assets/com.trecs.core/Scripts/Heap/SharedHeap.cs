@@ -10,7 +10,7 @@ namespace Trecs
     /// Manages reference-counted managed (class) allocations backing <see cref="SharedPtr{T}"/>.
     /// Accessed internally through <see cref="HeapAccessor"/>; not typically used directly.
     /// </summary>
-    public class SharedHeap
+    public sealed class SharedHeap
     {
         static readonly TrecsLog _log = new(nameof(SharedHeap));
 

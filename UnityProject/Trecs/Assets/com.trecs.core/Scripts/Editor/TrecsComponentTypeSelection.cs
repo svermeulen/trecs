@@ -14,10 +14,10 @@ namespace Trecs
     /// the live <see cref="ComponentTypeRef"/> dynamically against
     /// <see cref="TrecsHierarchyWindow.ActiveSource"/> on every refresh.
     /// </summary>
-    public class TrecsComponentTypeSelection : TrecsSelectionProxy { }
+    public sealed class TrecsComponentTypeSelection : TrecsSelectionProxy { }
 
     [CustomEditor(typeof(TrecsComponentTypeSelection))]
-    public class TrecsComponentTypeSelectionInspector : Editor
+    public sealed class TrecsComponentTypeSelectionInspector : Editor
     {
         [InitializeOnLoadMethod]
         static void RegisterEditorAccessorName() =>

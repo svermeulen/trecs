@@ -25,7 +25,7 @@ namespace Trecs
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class ComponentDeclaration<T> : IComponentDeclaration
+    public sealed class ComponentDeclaration<T> : IComponentDeclaration
         where T : unmanaged, IEntityComponent
     {
         static readonly Type _componentType = typeof(T);

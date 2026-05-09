@@ -20,7 +20,7 @@ namespace Trecs.Internal
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class ComponentBuilder<T> : IComponentBuilder
+    public sealed class ComponentBuilder<T> : IComponentBuilder
         where T : unmanaged, IEntityComponent
     {
         static readonly Type _componentType;

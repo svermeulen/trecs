@@ -14,7 +14,7 @@ namespace Trecs.Collections
     // * Can get ref to items
     // * Can get underlying array for fast access
     // * No garbage during enumeration
-    public class FastList<T> : IEnumerable<T>
+    public sealed class FastList<T> : IEnumerable<T>
     {
         static readonly EqualityComparer<T> _comp = EqualityComparer<T>.Default;
 

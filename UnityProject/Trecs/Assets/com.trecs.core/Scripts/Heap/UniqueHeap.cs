@@ -12,7 +12,7 @@ namespace Trecs.Internal
     ///   this value needs to be persistent across runs, and these latter ones use things like assembly name
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class UniqueHeap
+    public sealed class UniqueHeap
     {
         static readonly TrecsLog _log = new(nameof(UniqueHeap));
 

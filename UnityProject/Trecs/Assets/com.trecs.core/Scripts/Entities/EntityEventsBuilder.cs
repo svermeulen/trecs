@@ -199,7 +199,7 @@ namespace Trecs
     /// callbacks. Dispose to unsubscribe all registered observers. Optionally call
     /// <see cref="WithPriority"/> before registering observers to control callback ordering.
     /// </summary>
-    public class EntityEventsSubscription : IDisposable
+    public sealed class EntityEventsSubscription : IDisposable
     {
         readonly EventsManager _eventsManager;
         readonly WorldAccessor _world;

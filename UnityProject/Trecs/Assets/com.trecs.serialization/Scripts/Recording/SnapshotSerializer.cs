@@ -22,7 +22,7 @@ namespace Trecs.Serialization
     ///
     /// All methods are synchronous and run on the calling thread.
     /// </remarks>
-    public class SnapshotSerializer : IDisposable
+    public sealed class SnapshotSerializer : IDisposable
     {
         static readonly TrecsLog _log = new(nameof(SnapshotSerializer));
 

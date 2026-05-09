@@ -13,7 +13,7 @@ namespace Trecs
     /// Provides a <see cref="NativeUniquePtrResolver"/> for Burst-compatible pointer resolution in jobs.
     /// Accessed internally through <see cref="HeapAccessor"/>; not typically used directly.
     /// </summary>
-    public class NativeUniqueHeap
+    public sealed class NativeUniqueHeap
     {
         static readonly TrecsLog _log = new(nameof(NativeUniqueHeap));
 

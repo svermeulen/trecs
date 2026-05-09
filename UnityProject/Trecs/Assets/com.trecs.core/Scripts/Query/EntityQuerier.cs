@@ -5,7 +5,7 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Internal
 {
-    public class EntityQuerier
+    public sealed class EntityQuerier
     {
         static readonly TrecsLog _log = new(nameof(EntityQuerier));
 

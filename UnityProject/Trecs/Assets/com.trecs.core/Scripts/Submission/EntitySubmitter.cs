@@ -10,7 +10,7 @@ using Unity.Jobs;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class EntitySubmitter : IDisposable
+    public sealed class EntitySubmitter : IDisposable
     {
         static readonly TrecsLog _log = new(nameof(EntitySubmitter));
 

@@ -7,7 +7,7 @@ namespace Trecs.Internal
     // Where there are no streams or LINQ and instead all we retain is the concept
     // of subscriptions as disposables
 
-    public class SimpleSubject : ISimpleObservable
+    public sealed class SimpleSubject : ISimpleObservable
     {
         readonly List<Action> _observers = new();
         readonly List<int> _priorities = new();
@@ -110,7 +110,7 @@ namespace Trecs.Internal
         }
     }
 
-    public class SimpleSubject<T1> : ISimpleObservable<T1>
+    public sealed class SimpleSubject<T1> : ISimpleObservable<T1>
     {
         readonly List<Action<T1>> _observers = new();
         readonly List<int> _priorities = new();
@@ -213,7 +213,7 @@ namespace Trecs.Internal
         }
     }
 
-    public class SimpleSubject<T1, T2> : ISimpleObservable<T1, T2>
+    public sealed class SimpleSubject<T1, T2> : ISimpleObservable<T1, T2>
     {
         readonly List<Action<T1, T2>> _observers = new();
         readonly List<int> _priorities = new();

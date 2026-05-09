@@ -6,7 +6,7 @@ namespace Trecs.Serialization
     /// frame checksums catch desyncs close to where they happen during
     /// playback.
     /// </summary>
-    public class BundleRecorderSettings
+    public sealed class BundleRecorderSettings
     {
         /// <summary>
         /// User-defined schema version stored on the produced bundle.

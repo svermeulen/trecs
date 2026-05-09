@@ -10,7 +10,7 @@ namespace Trecs
     /// Created during <see cref="WorldBuilder.Build"/> by flattening the template inheritance
     /// chain. Use <see cref="WorldInfo"/> to access resolved templates at runtime.
     /// </summary>
-    public class ResolvedTemplate
+    public sealed class ResolvedTemplate
     {
         public ResolvedTemplate(
             Template template,

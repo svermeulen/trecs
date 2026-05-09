@@ -20,7 +20,7 @@ namespace Trecs
     /// runtime counts are not captured.
     /// </summary>
     [Serializable]
-    public class TrecsSchema
+    public sealed class TrecsSchema
     {
         public string SchemaVersion = "1";
         public string WorldName;
@@ -53,7 +53,7 @@ namespace Trecs
     }
 
     [Serializable]
-    public class TrecsSchemaTemplate
+    public sealed class TrecsSchemaTemplate
     {
         public string DebugName;
         public bool IsResolved;
@@ -83,13 +83,13 @@ namespace Trecs
     }
 
     [Serializable]
-    public class TrecsSchemaPartition
+    public sealed class TrecsSchemaPartition
     {
         public List<string> TagNames = new();
     }
 
     [Serializable]
-    public class TrecsSchemaComponentType
+    public sealed class TrecsSchemaComponentType
     {
         public string DisplayName;
         public string FullName;
@@ -97,14 +97,14 @@ namespace Trecs
     }
 
     [Serializable]
-    public class TrecsSchemaField
+    public sealed class TrecsSchemaField
     {
         public string Name;
         public string TypeName;
     }
 
     [Serializable]
-    public class TrecsSchemaSystem
+    public sealed class TrecsSchemaSystem
     {
         public string DebugName;
         public string TypeName;
@@ -129,7 +129,7 @@ namespace Trecs
     }
 
     [Serializable]
-    public class TrecsSchemaAccessor
+    public sealed class TrecsSchemaAccessor
     {
         public string DebugName;
 
@@ -149,7 +149,7 @@ namespace Trecs
     }
 
     [Serializable]
-    public class TrecsSchemaSet
+    public sealed class TrecsSchemaSet
     {
         public string DebugName;
         public int Id;
@@ -159,7 +159,7 @@ namespace Trecs
     }
 
     [Serializable]
-    public class TrecsSchemaTag
+    public sealed class TrecsSchemaTag
     {
         public string Name;
         public int Guid;
@@ -168,7 +168,7 @@ namespace Trecs
     }
 
     [Serializable]
-    public class TrecsSchemaAccessInfo
+    public sealed class TrecsSchemaAccessInfo
     {
         // Display name as rendered in the hierarchy's Components section
         // (matches TrecsHierarchyWindow.ComponentTypeDisplayName).
@@ -182,14 +182,14 @@ namespace Trecs
     }
 
     [Serializable]
-    public class TrecsSchemaTagsTouchedInfo
+    public sealed class TrecsSchemaTagsTouchedInfo
     {
         public string AccessorDebugName;
         public List<string> TagNames = new();
     }
 
     [Serializable]
-    public class TrecsSchemaStructuralInfo
+    public sealed class TrecsSchemaStructuralInfo
     {
         public string AccessorDebugName;
 

@@ -25,7 +25,7 @@ namespace Trecs
     ///
     /// Replaces <c>TrecsEntitiesWindow</c> and <c>TrecsSystemsWindow</c>.
     /// </summary>
-    public class TrecsHierarchyWindow : EditorWindow, IHasCustomMenu
+    public sealed class TrecsHierarchyWindow : EditorWindow, IHasCustomMenu
     {
         [InitializeOnLoadMethod]
         static void RegisterEditorAccessorName() =>

@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Trecs.Internal
 {
-    public class TopologicalSorter
+    public sealed class TopologicalSorter
     {
         static readonly TrecsLog _log = new(nameof(TopologicalSorter));
 

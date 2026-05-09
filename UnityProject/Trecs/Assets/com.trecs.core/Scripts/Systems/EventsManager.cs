@@ -20,7 +20,7 @@ namespace Trecs.Internal
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class EventsManager : IDisposable
+    public sealed class EventsManager : IDisposable
     {
         static readonly TrecsLog _log = new(nameof(EventsManager));
 

@@ -7,7 +7,7 @@ using Unity.Collections.LowLevel.Unsafe;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class SetStore : IDisposable
+    public sealed class SetStore : IDisposable
     {
         internal NativeDenseDictionary<SetId, EntitySetStorage> EntitySets;
         internal NativeDenseDictionary<SetId, NativeSetDeferredQueues> DeferredQueues;

@@ -9,7 +9,7 @@ namespace Trecs
     /// Provides heap allocation and pointer resolution operations for the ECS world.
     /// Access via <see cref="WorldAccessor.Heap"/>.
     /// </summary>
-    public class HeapAccessor
+    public sealed class HeapAccessor
     {
         readonly EcsHeapAllocator _heapAllocator;
         readonly SystemRunner _systemRunner;

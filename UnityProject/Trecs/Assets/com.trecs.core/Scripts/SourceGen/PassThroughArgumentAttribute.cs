@@ -40,5 +40,5 @@ namespace Trecs
     /// </code>
     /// </example>
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    public class PassThroughArgumentAttribute : Attribute { }
+    public sealed class PassThroughArgumentAttribute : Attribute { }
 }

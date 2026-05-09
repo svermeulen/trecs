@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Trecs.Internal
 {
-    public class SimpleReactiveBuffer
+    public sealed class SimpleReactiveBuffer
     {
         readonly List<Action> _bufferedActions = new();
         bool _isFlushing;

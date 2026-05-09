@@ -20,7 +20,7 @@ namespace Trecs
     /// deterministic ordering via sort keys.
     /// </para>
     /// </summary>
-    public class WorldAccessor
+    public sealed class WorldAccessor
     {
         static readonly TrecsLog _log = new(nameof(WorldAccessor));
 

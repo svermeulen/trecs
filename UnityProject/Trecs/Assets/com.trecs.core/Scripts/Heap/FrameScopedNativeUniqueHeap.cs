@@ -13,7 +13,7 @@ namespace Trecs
     /// by frame range. Removals are deferred until <c>FlushPendingOperations</c> to avoid
     /// racing with Burst jobs that may still be reading through the native resolver.
     /// </summary>
-    public class FrameScopedNativeUniqueHeap
+    public sealed class FrameScopedNativeUniqueHeap
     {
         static readonly TrecsLog _log = new(nameof(FrameScopedNativeUniqueHeap));
 

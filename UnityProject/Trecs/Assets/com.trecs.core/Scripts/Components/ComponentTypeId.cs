@@ -9,7 +9,7 @@ namespace Trecs
     /// Access via <c>ComponentTypeId&lt;MyComponent&gt;.Value</c>. The ID is derived from the
     /// type's <see cref="TypeIdAttribute"/> and stored in a <c>SharedStatic</c> for Burst compatibility.
     /// </summary>
-    public class ComponentTypeId<T>
+    public sealed class ComponentTypeId<T>
         where T : unmanaged, IEntityComponent
     {
         static readonly SharedStaticWrapper<ComponentId, ComponentTypeId<T>> _id;

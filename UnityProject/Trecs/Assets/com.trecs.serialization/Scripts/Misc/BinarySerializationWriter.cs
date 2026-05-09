@@ -4,7 +4,7 @@ using Trecs.Internal;
 
 namespace Trecs.Serialization
 {
-    public class BinarySerializationWriter : ISerializationWriter, IDisposable
+    public sealed class BinarySerializationWriter : ISerializationWriter, IDisposable
     {
         static readonly TrecsLog _log = new(nameof(BinarySerializationWriter));
 

@@ -10,7 +10,7 @@ namespace Trecs.Serialization
     /// <see cref="SnapshotSerializer.PeekMetadata(System.IO.Stream)"/>.
     /// </summary>
     [TypeId(136305329)]
-    public class SnapshotMetadata
+    public sealed class SnapshotMetadata
     {
         /// <summary>
         /// User-defined schema version written at save time. Trecs does not

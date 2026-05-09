@@ -6,7 +6,7 @@ using System.Text;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class SystemLoader
+    public sealed class SystemLoader
     {
         static readonly TrecsLog _log = new(nameof(SystemLoader));
 
@@ -227,7 +227,7 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public class SystemInfo
+        public sealed class SystemInfo
         {
             public SystemInfo(
                 WorldAccessor querier,
@@ -249,7 +249,7 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public class LoadInfo
+        public sealed class LoadInfo
         {
             public List<SystemInfo> Systems;
 

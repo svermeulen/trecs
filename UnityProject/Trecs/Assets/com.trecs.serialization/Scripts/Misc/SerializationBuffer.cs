@@ -8,7 +8,10 @@ namespace Trecs.Serialization
     /// For cases where you are serializing / deserializing multiple times
     /// you can use this class to re-use the same buffers etc. and avoid allocs
     /// </summary>
-    public class SerializationBuffer : IDisposable, ISerializationReader, ISerializationWriter
+    public sealed class SerializationBuffer
+        : IDisposable,
+            ISerializationReader,
+            ISerializationWriter
     {
         static readonly TrecsLog _log = new(nameof(SerializationBuffer));
         readonly MemoryStream _memoryStream;

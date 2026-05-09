@@ -4,7 +4,7 @@ using Trecs.Serialization;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class RecordingChecksumCalculator
+    public sealed class RecordingChecksumCalculator
     {
         readonly IWorldStateSerializer _worldStateSerializer;
 

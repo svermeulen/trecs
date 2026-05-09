@@ -19,10 +19,10 @@ namespace Trecs
     /// Same identity covers both system-owned and manually-created
     /// accessors; the source's projection decides which.
     /// </summary>
-    public class TrecsAccessorSelection : TrecsSelectionProxy { }
+    public sealed class TrecsAccessorSelection : TrecsSelectionProxy { }
 
     [CustomEditor(typeof(TrecsAccessorSelection))]
-    public class TrecsAccessorSelectionInspector : Editor
+    public sealed class TrecsAccessorSelectionInspector : Editor
     {
         [InitializeOnLoadMethod]
         static void RegisterEditorAccessorName() =>

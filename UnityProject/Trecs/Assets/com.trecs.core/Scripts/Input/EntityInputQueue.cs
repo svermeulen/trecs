@@ -8,7 +8,7 @@ using Unity.Mathematics;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class EntityInputQueue : IEntityInputQueue
+    public sealed class EntityInputQueue : IEntityInputQueue
     {
         static readonly TrecsLog _log = new(nameof(EntityInputQueue));
 

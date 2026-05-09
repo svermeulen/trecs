@@ -6,7 +6,7 @@ using Trecs.Serialization;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class BitReader
+    public sealed class BitReader
     {
         byte[] _bytes;
         int _byteIndex = 0;

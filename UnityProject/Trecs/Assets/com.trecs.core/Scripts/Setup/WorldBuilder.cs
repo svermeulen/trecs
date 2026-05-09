@@ -9,7 +9,7 @@ namespace Trecs
     /// <summary>
     /// Fluent builder for constructing and configuring a Trecs <see cref="World"/> instance.
     /// </summary>
-    public class WorldBuilder
+    public sealed class WorldBuilder
     {
         readonly List<ISystem> _systems = new();
         readonly List<IBlobStore> _blobStores = new();

@@ -9,7 +9,7 @@ namespace Trecs
     /// specified order during topological sorting. Register instances via
     /// <see cref="WorldBuilder"/> to impose cross-system ordering guarantees.
     /// </summary>
-    public class SystemOrderConstraint
+    public sealed class SystemOrderConstraint
     {
         public readonly IReadOnlyList<Type> SystemOrder;
 

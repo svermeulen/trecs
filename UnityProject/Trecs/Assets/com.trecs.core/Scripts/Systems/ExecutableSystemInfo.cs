@@ -1,6 +1,6 @@
 namespace Trecs
 {
-    public class ExecutableSystemInfo
+    public sealed class ExecutableSystemInfo
     {
         public ExecutableSystemInfo(ISystem system, SystemMetadata metadata, int declarationIndex)
         {

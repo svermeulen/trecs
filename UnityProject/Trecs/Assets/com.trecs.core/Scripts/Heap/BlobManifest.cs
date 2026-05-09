@@ -20,7 +20,7 @@ namespace Trecs
     /// <see cref="BlobId"/> to <see cref="BlobMetadata"/>.
     /// </summary>
     [TypeId(767600239)]
-    public class BlobManifest
+    public sealed class BlobManifest
     {
         public readonly DenseDictionary<BlobId, BlobMetadata> Values = new();
 

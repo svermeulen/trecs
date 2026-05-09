@@ -20,7 +20,7 @@ namespace Trecs.Internal
     /// Every mutating method asserts it's running on the main thread in debug builds.
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class RuntimeJobScheduler
+    public sealed class RuntimeJobScheduler
     {
         // Key: composite of (ResourceId, GroupIndex) packed into a long.
         // Writer: the last outstanding job that writes this (resource, group) pair.

@@ -26,7 +26,7 @@ namespace Trecs
     /// Runtime descriptor for a registered system, holding its <see cref="ISystem"/> instance,
     /// dependency graph edges, <see cref="SystemPhase"/>, and associated <see cref="WorldAccessor"/>.
     /// </summary>
-    public class SystemMetadata
+    public sealed class SystemMetadata
     {
         public SystemMetadata(
             ISystem system,

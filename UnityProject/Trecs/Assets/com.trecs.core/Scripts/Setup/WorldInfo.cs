@@ -11,7 +11,7 @@ namespace Trecs
     /// Use to discover which groups exist, resolve tag sets to groups, and inspect component layouts.
     /// Accessed via <see cref="WorldAccessor.WorldInfo"/> or <see cref="World.WorldInfo"/>.
     /// </summary>
-    public class WorldInfo
+    public sealed class WorldInfo
     {
         static readonly TrecsLog _log = new(nameof(WorldInfo));
 

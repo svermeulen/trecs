@@ -8,7 +8,7 @@ namespace Trecs.Collections
     /// Reference: https://prng.di.unimi.it/ (public domain / CC0)
     /// Seeded via SplitMix64 to expand a single ulong seed into 128-bit state.
     /// </summary>
-    public class Rng
+    public sealed class Rng
     {
         uint _s0,
             _s1,

@@ -8,7 +8,7 @@ namespace Trecs.Serialization
     /// initial world-state snapshot, the input queue covering the recorded
     /// frame range, sparse desync-detection checksums, optional auto-anchor
     /// snapshots used as desync-recovery / scrub-back points, and optional
-    /// user snapshot snapshots placed by the user (e.g. just before a bug)
+    /// user snapshots placed by the user (e.g. just before a bug)
     /// for navigation in the recorder UI.
     ///
     /// Use <see cref="RecordingBundleSerializer"/> to read or write a bundle

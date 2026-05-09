@@ -44,7 +44,7 @@ namespace Trecs.Internal
     /// </list>
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class SystemEnableState
+    public sealed class SystemEnableState
     {
         const int BitsPerWord = 64;
         const int WordMask = BitsPerWord - 1;

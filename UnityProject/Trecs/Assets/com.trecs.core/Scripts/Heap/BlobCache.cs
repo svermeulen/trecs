@@ -11,7 +11,7 @@ namespace Trecs
     /// <summary>
     /// Configuration for the <see cref="BlobCache"/> cleanup interval and serialization version.
     /// </summary>
-    public class BlobCacheSettings
+    public sealed class BlobCacheSettings
     {
         public float CleanIntervalSeconds;
         public int SerializationVersion;
@@ -40,7 +40,7 @@ namespace Trecs
     /// cache cleanup, and asynchronous blob loading. Register blob stores via
     /// <see cref="WorldBuilder.AddBlobStore"/>.
     /// </summary>
-    public class BlobCache
+    public sealed class BlobCache
     {
         static readonly TrecsLog _log = new(nameof(BlobCache));
 

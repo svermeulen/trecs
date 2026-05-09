@@ -4,7 +4,7 @@ namespace Trecs
     /// Configuration options passed to <see cref="WorldBuilder.SetSettings"/> that control
     /// simulation timing, determinism, diagnostics, and lifecycle behavior.
     /// </summary>
-    public class WorldSettings
+    public sealed class WorldSettings
     {
         public const float DefaultFixedTimeStep = 1.0f / 60.0f;
         public const float DefaultMaxSecondsForFixedUpdatePerFrame = 1.0f / 3.0f;

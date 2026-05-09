@@ -13,7 +13,7 @@ namespace Trecs
     /// (which the Editor owns and destroys on teardown) so cached
     /// SerializedProperty paths can't outlive the layout that created them.
     /// </summary>
-    public class TrecsEntitySelection : TrecsSelectionProxy
+    public sealed class TrecsEntitySelection : TrecsSelectionProxy
     {
         [NonSerialized]
         public EntityHandle Handle;

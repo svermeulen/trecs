@@ -9,7 +9,7 @@ using EditorBrowsableState = System.ComponentModel.EditorBrowsableState;
 namespace Trecs
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class InterpolatedPreviousSaver<T> : IInterpolatedPreviousSaver
+    public sealed class InterpolatedPreviousSaver<T> : IInterpolatedPreviousSaver
         where T : unmanaged, IEntityComponent
     {
         WorldAccessor _world;

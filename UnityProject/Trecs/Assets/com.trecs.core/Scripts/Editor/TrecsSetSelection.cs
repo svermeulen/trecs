@@ -13,10 +13,10 @@ namespace Trecs
     /// <see cref="SetRef"/> dynamically against
     /// <see cref="TrecsHierarchyWindow.ActiveSource"/> on every refresh.
     /// </summary>
-    public class TrecsSetSelection : TrecsSelectionProxy { }
+    public sealed class TrecsSetSelection : TrecsSelectionProxy { }
 
     [CustomEditor(typeof(TrecsSetSelection))]
-    public class TrecsSetSelectionInspector : Editor
+    public sealed class TrecsSetSelectionInspector : Editor
     {
         [InitializeOnLoadMethod]
         static void RegisterEditorAccessorName() =>

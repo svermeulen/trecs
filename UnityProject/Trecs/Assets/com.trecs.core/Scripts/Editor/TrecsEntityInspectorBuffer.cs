@@ -21,7 +21,7 @@ namespace Trecs
     /// inspector selection logs "No script asset for TrecsEntityInspectorBuffer.
     /// Check that the definition is in a file of the same name."
     /// </summary>
-    public class TrecsEntityInspectorBuffer : ScriptableObject
+    public sealed class TrecsEntityInspectorBuffer : ScriptableObject
     {
         // [SerializeReference] holds the polymorphic generic boxes — one per
         // component on the resolved template — so a single non-generic SO can
@@ -58,7 +58,7 @@ namespace Trecs
     /// <c>[SerializeField] T</c> on a MonoBehaviour or ScriptableObject.
     /// </summary>
     [Serializable]
-    public class TrecsComponentBox<T> : TrecsComponentBoxBase
+    public sealed class TrecsComponentBox<T> : TrecsComponentBoxBase
         where T : unmanaged, IEntityComponent
     {
         [SerializeField]

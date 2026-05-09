@@ -25,7 +25,7 @@ namespace Trecs
     /// World methods from multiple threads.
     /// </para>
     /// </summary>
-    public class World : IDisposable
+    public sealed class World : IDisposable
     {
         static readonly TrecsLog _log = new(nameof(World));
 

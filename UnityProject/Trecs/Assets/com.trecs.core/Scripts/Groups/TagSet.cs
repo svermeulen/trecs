@@ -135,7 +135,7 @@ namespace Trecs
     /// Zero-allocation cache for a <see cref="TagSet"/> composed of a single tag type.
     /// Access via <c>TagSet&lt;T1&gt;.Value</c>.
     /// </summary>
-    public class TagSet<T1>
+    public sealed class TagSet<T1>
         where T1 : struct, ITag
     {
         public static readonly TagSet Value = TagSet.FromTags(Tag<T1>.Value);
@@ -144,7 +144,7 @@ namespace Trecs
     }
 
     /// <inheritdoc cref="TagSet{T1}"/>
-    public class TagSet<T1, T2>
+    public sealed class TagSet<T1, T2>
         where T1 : struct, ITag
         where T2 : struct, ITag
     {
@@ -156,7 +156,7 @@ namespace Trecs
     }
 
     /// <inheritdoc cref="TagSet{T1}"/>
-    public class TagSet<T1, T2, T3>
+    public sealed class TagSet<T1, T2, T3>
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag
@@ -173,7 +173,7 @@ namespace Trecs
     }
 
     /// <inheritdoc cref="TagSet{T1}"/>
-    public class TagSet<T1, T2, T3, T4>
+    public sealed class TagSet<T1, T2, T3, T4>
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag

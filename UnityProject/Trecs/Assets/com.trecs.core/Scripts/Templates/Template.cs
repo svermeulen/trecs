@@ -8,7 +8,7 @@ namespace Trecs
     /// produces concrete <see cref="Template"/> instances automatically. Register via
     /// <see cref="WorldBuilder.AddTemplate"/>.
     /// </summary>
-    public class Template
+    public sealed class Template
     {
         public Template(
             string debugName,

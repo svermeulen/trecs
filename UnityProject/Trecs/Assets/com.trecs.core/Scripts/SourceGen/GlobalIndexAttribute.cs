@@ -29,5 +29,5 @@ namespace Trecs
     /// </code>
     /// </example>
     [AttributeUsage(AttributeTargets.Parameter, AllowMultiple = false, Inherited = false)]
-    public class GlobalIndexAttribute : Attribute { }
+    public sealed class GlobalIndexAttribute : Attribute { }
 }

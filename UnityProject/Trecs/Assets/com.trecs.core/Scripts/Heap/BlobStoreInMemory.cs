@@ -7,7 +7,7 @@ namespace Trecs
     /// <summary>
     /// Configuration for <see cref="BlobStoreInMemory"/>.
     /// </summary>
-    public class BlobStoreInMemorySettings
+    public sealed class BlobStoreInMemorySettings
     {
         /// <summary>
         /// Maximum memory (MB) before the LRU cache begins evicting unused blobs.
@@ -19,7 +19,7 @@ namespace Trecs
     /// In-memory <see cref="IBlobStore"/> implementation that holds all blobs in a dictionary.
     /// Supports LRU eviction when the memory limit is exceeded.
     /// </summary>
-    public class BlobStoreInMemory : IBlobStore
+    public sealed class BlobStoreInMemory : IBlobStore
     {
         static readonly TrecsLog _log = new(nameof(BlobStoreInMemory));
 

@@ -14,7 +14,7 @@ namespace Trecs
         menuName = "Trecs/Debug Window Settings",
         fileName = "TrecsDebugWindowSettings"
     )]
-    public class TrecsDebugWindowSettings : ScriptableObject
+    public sealed class TrecsDebugWindowSettings : ScriptableObject
     {
         [SerializeField, Min(50)]
         [Tooltip(

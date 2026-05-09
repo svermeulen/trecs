@@ -14,10 +14,10 @@ namespace Trecs
     /// <see cref="TagRef"/> dynamically against
     /// <see cref="TrecsHierarchyWindow.ActiveSource"/> on every refresh.
     /// </summary>
-    public class TrecsTagSelection : TrecsSelectionProxy { }
+    public sealed class TrecsTagSelection : TrecsSelectionProxy { }
 
     [CustomEditor(typeof(TrecsTagSelection))]
-    public class TrecsTagSelectionInspector : Editor
+    public sealed class TrecsTagSelectionInspector : Editor
     {
         VisualElement _bodyContainer;
         Label _statusLabel;

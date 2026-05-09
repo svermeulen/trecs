@@ -32,5 +32,5 @@ namespace Trecs
     /// </code>
     /// </example>
     [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false)]
-    public class UnwrapAttribute : Attribute { }
+    public sealed class UnwrapAttribute : Attribute { }
 }

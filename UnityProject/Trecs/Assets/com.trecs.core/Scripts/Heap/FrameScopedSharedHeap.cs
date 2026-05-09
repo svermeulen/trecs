@@ -9,7 +9,7 @@ namespace Trecs
     /// by a <see cref="BlobCache"/>. Entries are tagged with the frame they were allocated
     /// on and can be bulk-cleared by frame range for rollback and replay.
     /// </summary>
-    public class FrameScopedSharedHeap
+    public sealed class FrameScopedSharedHeap
     {
         static readonly TrecsLog _log = new(nameof(FrameScopedSharedHeap));
 

@@ -5,7 +5,7 @@ namespace Trecs
     /// <summary>
     /// Base exception type for errors originating from the Trecs framework.
     /// </summary>
-    public class TrecsException : Exception
+    public sealed class TrecsException : Exception
     {
         public TrecsException(string message)
             : base(message) { }

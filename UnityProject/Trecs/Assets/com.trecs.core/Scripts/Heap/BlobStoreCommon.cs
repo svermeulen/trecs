@@ -5,7 +5,7 @@ using Trecs.Collections;
 
 namespace Trecs.Internal
 {
-    public class BlobStoreCommon
+    public sealed class BlobStoreCommon
     {
         static readonly TrecsLog _log = new(nameof(BlobStoreCommon));
 

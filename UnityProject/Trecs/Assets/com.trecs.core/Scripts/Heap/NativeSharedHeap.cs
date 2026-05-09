@@ -25,7 +25,7 @@ namespace Trecs
     ///     creation until the previous frame.</description></item>
     /// </list>
     /// </summary>
-    public class NativeSharedHeap
+    public sealed class NativeSharedHeap
     {
         static readonly TrecsLog _log = new(nameof(NativeSharedHeap));
 

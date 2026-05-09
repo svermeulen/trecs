@@ -20,7 +20,8 @@ namespace Trecs.Collections
     ///
     /// Supports any key type that implements IEquatable<T>, including strings, enums, and custom types.
     /// </summary>
-    public class DenseDictionary<TKey, TValue> : IEnumerable<DenseDictionary<TKey, TValue>.KvPair>
+    public sealed class DenseDictionary<TKey, TValue>
+        : IEnumerable<DenseDictionary<TKey, TValue>.KvPair>
     {
         Node[] _valuesInfo;
         TValue[] _values;

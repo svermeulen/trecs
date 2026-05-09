@@ -12,7 +12,7 @@ namespace Trecs.Internal // not part of public api atm
     /// PopFront/PopBack and the indexer all run in O(1).
     /// </remarks>
     /// <typeparam name="T">The element type.</typeparam>
-    public class RingDeque<T> : IEnumerable<T>
+    public sealed class RingDeque<T> : IEnumerable<T>
     {
         public const int DefaultCapacity = 16;
 

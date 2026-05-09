@@ -6,7 +6,7 @@ using Unity.Jobs;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public class InterpolatedPreviousSaverManager
+    public sealed class InterpolatedPreviousSaverManager
     {
         readonly List<IInterpolatedPreviousSaver> _savers;
 

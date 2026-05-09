@@ -2,7 +2,7 @@ using System;
 
 namespace Trecs.Serialization
 {
-    public class SerializationException : Exception
+    public sealed class SerializationException : Exception
     {
         public SerializationException(string message)
             : base(message) { }

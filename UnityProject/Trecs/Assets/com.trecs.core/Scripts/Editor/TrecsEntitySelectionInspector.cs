@@ -12,7 +12,7 @@ using UnityEngine.UIElements;
 namespace Trecs
 {
     [CustomEditor(typeof(TrecsEntitySelection))]
-    public class TrecsEntitySelectionInspector : Editor
+    public sealed class TrecsEntitySelectionInspector : Editor
     {
         [InitializeOnLoadMethod]
         static void RegisterEditorAccessorName() =>

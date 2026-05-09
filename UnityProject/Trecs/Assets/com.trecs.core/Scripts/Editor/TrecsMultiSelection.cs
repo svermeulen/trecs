@@ -11,13 +11,13 @@ namespace Trecs
     /// yet — a single-row selection still routes through the per-kind
     /// proxies (entity / template / accessor / component type).
     /// </summary>
-    public class TrecsMultiSelection : ScriptableObject
+    public sealed class TrecsMultiSelection : ScriptableObject
     {
         public int Count;
     }
 
     [CustomEditor(typeof(TrecsMultiSelection))]
-    public class TrecsMultiSelectionInspector : Editor
+    public sealed class TrecsMultiSelectionInspector : Editor
     {
         Label _label;
 

@@ -22,7 +22,7 @@ namespace Trecs.Serialization
     /// <summary>
     /// Optional class that can be used to serialize/deserialize the entire game state.
     /// </summary>
-    public class WorldStateSerializer : IWorldStateSerializer
+    public sealed class WorldStateSerializer : IWorldStateSerializer
     {
         static readonly TrecsLog _log = new(nameof(WorldStateSerializer));
 

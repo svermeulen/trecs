@@ -23,7 +23,7 @@ namespace Trecs.Serialization
     ///   specify all these generic instantiations of the serializers which is annoying).
     ///
     /// </summary>
-    public class SerializerRegistry
+    public sealed class SerializerRegistry
     {
         static readonly TrecsLog _log = new(nameof(SerializerRegistry));
 
