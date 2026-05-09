@@ -57,7 +57,7 @@ ref var posMut = ref world.Component<Position>(entityIndex).Write;
 That lazy sync is why you never call `JobHandle.Complete()` yourself — touching the data is the sync point.
 
 !!! tip
-    Unintentional main-thread access mid-phase forces the in-flight job to complete and stalls the worker threads. If a system mixes main-thread and job access on the same component, schedule jobs first and only `.Read` / `.Write` after the work for that component is done — or move the main-thread work to a different system that the scheduler can order around the job system.
+    Main-thread access mid-phase forces the in-flight job to complete and stalls the worker threads.  For optimal performance it is best to minimize these main thread sync points, which you can do by pushing those main thread reads/writes to a job, or changing to run it later in the frame after the job has more time to execute.
 
 ## Phase boundaries
 
