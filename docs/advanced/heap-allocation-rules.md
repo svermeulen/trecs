@@ -3,13 +3,13 @@
 !!! note "When you need this page"
     Read this if you're **allocating heap pointers from non-`Fixed` code** (input systems, services, init hooks), if you need **stable `BlobId`s for shared assets** (palettes, animation curves, anything content-pipeline-driven), or if you're **debugging a "cannot allocate" assertion**. The basic mechanics of `SharedPtr` / `UniquePtr` are on the [Heap](heap.md) page.
 
-This article covers **when and where** you're allowed to allocate heap pointers and create entities, and how Trecs assigns stable IDs to allocations. These rules exist because Trecs is built around deterministic simulation — for replay, networked rollback, and snapshot/restore to work, the same code must produce the same world state on every run.
+This page covers when and where you're allowed to allocate heap pointers and create entities. The rules exist because Trecs is built around deterministic simulation — for replay and snapshot/restore to work, the same code must produce the same world state on every run.
 
-For an introduction to the pointer types themselves (`SharedPtr<T>`, `UniquePtr<T>`, native variants), see [Heap](heap.md). For the broader set of per-role permissions (component reads / writes, structural changes, RNG streams) see [Accessor Roles](accessor-roles.md) — this page covers only the heap-allocation slice.
+Pointer mechanics themselves (`SharedPtr<T>`, `UniquePtr<T>`, native variants) are on the [Heap](heap.md) page. Per-role permissions for non-heap concerns (components, structural changes, RNG) are on [Accessor Roles](accessor-roles.md).
 
 ## Heap allocation by role
 
-Every `WorldAccessor` carries an [`AccessorRole`](accessor-roles.md) that controls what kinds of heap allocation it can perform. Input-system accessors (system-owned accessors created from `[ExecuteIn(SystemPhase.Input)]`) carry the role `Variable` plus an internal input flag — that combination is shown as "Input system" below.
+Every `WorldAccessor` carries an [`AccessorRole`](accessor-roles.md) that controls what kinds of heap allocation it can perform. Input-system accessors (system-owned accessors created from `[ExecuteIn(SystemPhase.Input)]`) carry `Variable` plus an internal input flag — shown as "Input system" below.
 
 | Accessor | Persistent (`AllocShared`, `AllocUnique`, native variants) | Frame-scoped (`AllocSharedFrameScoped`, etc.) |
 |------|--------|--------|
@@ -18,35 +18,25 @@ Every `WorldAccessor` carries an [`AccessorRole`](accessor-roles.md) that contro
 | `Variable` | ❌ Not allowed | ❌ Not allowed |
 | `Unrestricted` | ✅ Allowed | ✅ Allowed |
 
-The framework asserts at the allocation site. Calling `accessor.Heap.AllocShared(...)` from a `Variable` accessor or input-system accessor throws an immediate `TrecsException` rather than producing silent desync later. The input-system error message points at the `FrameScoped` variant explicitly, since that's almost always what the caller wanted.
+Violations throw an immediate `TrecsException` at the allocation site rather than producing silent desync later. The input-system error message points at the `FrameScoped` variant explicitly, since that's almost always what the caller wanted.
 
-The shape comes out of the role design: persistent allocations participate in deterministic ID minting (next section), so only the deterministic-state pickers (`Fixed`, `Unrestricted`) may make them; frame-scoped allocations are an input-side mechanism for handing transient payloads into the simulation, so only input-system and `Unrestricted` accessors may make them. `Variable` accessors can do neither because presentation-cadence code runs at a non-deterministic frame rate.
+The shape: persistent allocations participate in deterministic ID minting (next section), so only deterministic-state pickers (`Fixed`, `Unrestricted`) may make them; frame-scoped allocations exist for input-side transient payloads, so only input-system and `Unrestricted` accessors may make them. `Variable` accessors can do neither.
 
-Entity creation (`AddEntity` / `RemoveEntity` / `MoveTo`) follows the same shape for entities of normal (non-VUO) templates — `Fixed` and `Unrestricted` only — for the same reason: structural changes against simulation-state templates are part of the deterministic state that gets serialized in snapshots and replay-checked. Templates declared `[VariableUpdateOnly]` invert the rule (`Variable` / input-system / `Unrestricted` may add / remove / move them; `Fixed` is rejected); see [Accessor Roles](accessor-roles.md#capability-matrix).
+Entity creation (`AddEntity` / `RemoveEntity` / `MoveTo`) follows the same pattern: `Fixed` and `Unrestricted` for non-VUO templates; `Variable` / input-system / `Unrestricted` for `[VariableUpdateOnly]` templates. See [Accessor Roles](accessor-roles.md#capability-matrix).
 
-## Why presentation-phase systems can't allocate heap or spawn simulation entities
+### Why presentation-phase systems are excluded
 
-Two reasons:
+Heap IDs are drawn from a single deterministic RNG shared across init and all fixed systems. If presentation systems could mint IDs, they'd either pollute that stream or need a non-deterministic fallback — both break replay. Same logic for structural changes: simulation-state templates participate in the snapshot checksum, and presentation systems run at non-deterministic per-render-frame cadence.
 
-1. **Heap allocation IDs.** Trecs draws all allocation IDs from a single deterministic RNG (`_fixedRng`) shared across initialization and all fixed systems. If presentation-phase systems were allowed to mint IDs, they'd either pollute that stream (breaking determinism for fixed systems) or need a non-deterministic fallback (silently breaking replay for any handle stored in a fixed component).
+`[VariableUpdateOnly]` templates are the exception (cameras, view-only helpers): their groups are render-cadence state, skipped from the checksum, so presentation- and input-phase systems *can* spawn entities of a VUO template. They still can't allocate heap.
 
-2. **Entity creation in normal templates is structural simulation state.** Adding an entity changes group counts and component arrays — that's part of the simulation state that gets serialized in snapshots and checked for desyncs in replay. Presentation systems run at a per-render-frame cadence that isn't deterministic across runs (frame rate varies), so structural changes against simulation-state templates from them would break those guarantees.
-
-   `[VariableUpdateOnly]` templates are the explicit exception: their groups are render-cadence state, skipped during the determinism checksum, so presentation- and input-phase systems *can* spawn entities of a VUO template (cameras, view-only helpers). They still cannot allocate heap.
-
-If you find yourself wanting to allocate heap or spawn a non-VUO entity from a presentation system, the data probably belongs in a fixed component, a `[VariableUpdateOnly]` component populated from existing fixed state, or a dedicated `[VariableUpdateOnly]` template.
+If you want to allocate heap or spawn a non-VUO entity from a presentation system, the data probably belongs in a fixed component, a `[VariableUpdateOnly]` component populated from fixed state, or a dedicated `[VariableUpdateOnly]` template.
 
 ## ID minting — how auto-IDs work
 
-Every allocation has a `BlobId` that uniquely identifies the underlying blob. The `AllocShared(T blob)` overload (and friends) mints this ID for you by drawing from `_fixedRng`:
+Every allocation has a `BlobId`. The `AllocShared(T blob)` overload (and friends) mints one for you by drawing from a single deterministic RNG shared across init and all fixed systems, seeded from `WorldSettings.RandomSeed`. As long as the calling code is itself deterministic, the IDs assigned by auto-`AllocShared` are deterministic too — and snapshots and replays work transparently.
 
-- `_fixedRng` is a single shared deterministic RNG owned by the world, seeded from `WorldSettings.RandomSeed`.
-- Every initialization callback and every fixed-update system pulls from the same stream.
-- Because of this, the IDs assigned by auto-`AllocShared` calls are **deterministic** as long as the calling code is itself deterministic.
-
-This is the same determinism discipline that already applies to fixed-update systems. If your initialization logic conditionally allocates based on `UnityEngine.Random` or `DateTime.Now`, the auto-IDs change between runs — the same way fixed-update systems with non-deterministic code would desync. The rule is: **init and fixed code must be deterministic.**
-
-When this is satisfied, snapshots and replays work transparently — the IDs assigned at startup match across runs because the same code runs in the same order against the same RNG seed.
+The discipline is the same as fixed-update systems: **init and fixed code must be deterministic.** Conditional allocation based on `UnityEngine.Random`, `DateTime.Now`, filesystem ordering, etc. changes the IDs between runs the same way it would desync a fixed-update system. When you can't satisfy that, use explicit `BlobId`s (next section).
 
 ## Stable BlobIds — when init isn't deterministic
 
