@@ -100,6 +100,15 @@ public partial class RenderSystem : ISystem
 }
 ```
 
+## What gets generated
+
+For each `[GenerateInterpolatorSystem]` method, the source generator produces:
+
+- A **Burst-compiled `IJobFor` system** that runs during variable update, iterating all entities with the component and blending previous → current using your function.
+- An **extension method on `WorldBuilder`** (one per group) that registers all `InterpolatedPreviousSaver<T>` instances and interpolator systems in the group.
+
+You write the interpolation math; scheduling, dependency tracking, and registration are handled.
+
 ## Best practices
 
 - **Only interpolate visual components** — positions, rotations, scales, colors. Don't interpolate gameplay state like health or ammo.

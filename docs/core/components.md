@@ -45,7 +45,17 @@ hpW.Current -= damage;
 
 The `.Read` / `.Write` split lets Trecs lazily complete any in-flight jobs with conflicting access before handing back the reference. See [Dependency Tracking](../performance/dependency-tracking.md).
 
-For a single-entity view bundling several components, see [`EntityAccessor`](entities.md#accessing-entity-data). For the safe `TryComponent<T>` form, see the API reference.
+When the entity may not have the component, use the safe `TryComponent` form:
+
+```csharp
+if (World.TryComponent<Health>(entityIndex, out var healthAccessor))
+{
+    ref readonly Health hp = ref healthAccessor.Read;
+    // ...
+}
+```
+
+For a single-entity view bundling several components, see [`EntityAccessor`](entities.md#accessing-entity-data).
 
 ## Component field attributes
 

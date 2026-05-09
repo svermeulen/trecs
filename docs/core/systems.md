@@ -177,7 +177,17 @@ new WorldBuilder()
     // ...
 ```
 
-For tie-breaking when no explicit constraint applies, use `[ExecutePriority(int)]` (default `0`; higher = later within the same phase). Explicit constraints always win over priority.
+For tie-breaking when no explicit constraint applies, use `[ExecutePriority(int)]` (default `0`; higher = later within the same phase):
+
+```csharp
+[ExecutePriority(-10)]  // Runs before systems with default priority
+public partial class EarlySystem : ISystem { }
+
+[ExecutePriority(10)]   // Runs after systems with default priority
+public partial class LateSystem : ISystem { }
+```
+
+Explicit constraints (`[ExecuteAfter]` / `[ExecuteBefore]`) always win over priority — priority only breaks ties among systems with no ordering constraint between them.
 
 ## OnReady hook
 
@@ -197,7 +207,9 @@ public partial class RendererSystem : ISystem
 }
 ```
 
-`OnReady` runs in the same order systems will execute (by phase, then by `[ExecuteAfter]` / `[ExecuteBefore]` / `[ExecutePriority]`), so a system can rely on state set up by systems that run before it.
+`OnReady` is wired by source generation — declare it as a `partial void` and leave the implementation in the system's main partial. Don't declare it if you don't need it.
+
+`OnReady` runs in the same order systems will execute: by phase first (`EarlyPresentation` → `Input` → `Fixed` → `Presentation` → `LatePresentation`), then by `[ExecuteAfter]` / `[ExecuteBefore]` / `[ExecutePriority]` within each phase. Order is **not** tied to the order systems were passed to `AddSystem` / `AddSystems`. If you need one system's `OnReady` to run after another's, declare it with `[ExecuteAfter]` — the same constraint controls runtime order.
 
 ## Registering systems
 

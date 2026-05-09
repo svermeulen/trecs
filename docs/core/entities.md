@@ -13,6 +13,7 @@ Trecs has two ways of referring to entities:
 |---|---|---|
 | **Stability** | Stable across structural changes | Invalidated by structural changes |
 | **Use case** | Long-lived references | Immediate access within a tick |
+| **Fields** | `UniqueId`, `Version` | `Index`, `GroupIndex` |
 | **Performance** | Requires a lookup | Direct buffer access |
 
 Convert between them:

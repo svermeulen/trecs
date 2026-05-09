@@ -72,6 +72,8 @@ Trecs has a deliberately small API surface — a handful of core concepts, with 
 | Trecs | Unity ECS |
 |---|---|
 | Full world state serialization (runtime save/load, snapshots, replays) | Subscene baking (edit-time); limited runtime serialization |
+| Stable type IDs (auto-generated from type name) | `TypeIndex` (auto-generated) |
+| Delta serialization support | No built-in equivalent |
 | Per-save versioning via `Reader.Version` / `Writer.Version` for evolving custom serializers | No canonical equivalent — handled outside the engine |
 
 ### Editor tooling

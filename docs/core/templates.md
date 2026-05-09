@@ -45,7 +45,12 @@ public partial class PlayerBullet : ITemplate, ITagged<GameTags.Bullet, GameTags
 
 Tags are how systems and queries refer to entities at runtime: `[ForEachEntity(typeof(GameTags.Enemy))]` and `World.CountEntitiesWithTags<GameTags.Enemy>()` name the *tag*, not the template class. Runtime code shouldn't reference template classes directly — that keeps systems decoupled from concrete entity definitions.
 
-A tag can be 1:1 with a template (e.g. `GameTags.Spinner` carried only by `SpinnerEntity`) or shared across many templates as a role (a `CommonTags.Renderable` tag declared on a base template, inherited by every template that extends it). See [Tags](tags.md) and [Groups & TagSets](../advanced/groups-and-tagsets.md) for the storage details.
+A tag can play two distinct roles:
+
+- **1:1 with a template** — e.g. `GameTags.Spinner` is carried only by `SpinnerEntity`, so querying by it picks out exactly that template's entities.
+- **An abstract role across templates** — a `CommonTags.Renderable` tag declared on a base template is inherited by every template that does `IExtends<Renderable>`. Querying by the role tag iterates every entity that fulfills it. This is Trecs's closest analogue to "interface" or "base class" polymorphism. (You can also add the role tag directly to each template instead of using inheritance — same result.)
+
+See [Tags](tags.md) and [Groups & TagSets](../advanced/groups-and-tagsets.md) for the storage details.
 
 ## Template inheritance
 
@@ -87,6 +92,28 @@ When the same component appears in multiple bases:
 - **Attributes must agree** — declaring `[Interpolated]` on one base and `[VariableUpdateOnly]` on another is an error.
 - **Defaults must match** — different defaults for the same component is an error.
 - **One default is enough** — if only one base supplies a default, that default is used. The component becomes optional at the `AddEntity` call site.
+
+```csharp
+// Position in two bases — fine as long as attributes and defaults are compatible.
+public partial class Renderable : ITemplate, ITagged<CommonTags.Renderable>
+{
+    Position Position = new(float3.zero);  // Has default
+}
+
+public partial class Moveable : ITemplate, ITagged<CommonTags.Moveable>
+{
+    Position Position;   // No default — OK, Renderable's default is used
+    Velocity Velocity;
+}
+
+public partial class Player : ITemplate,
+    IExtends<Renderable, Moveable>,
+    ITagged<GameTags.Player>
+{
+    Health Health;
+    // Inherits Position (with default from Renderable) and Velocity from Moveable
+}
+```
 
 ## Partitions
 
