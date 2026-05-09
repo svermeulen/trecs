@@ -28,6 +28,8 @@ Two requirements:
 
 Then, instead of calling your system `Execute()` method directly, Trecs will schedule a job instead, and inside the job it will call your static method.
 
+Note that [`[PassThroughArgument]`](../core/systems.md#passthroughargument) is supported in this case as well and will forward the data to the generated job.
+
 ## Manual job structs
 
 In some cases you might want to define a custom Job instead of always using `WrapAsJob`.  You can do this just by using `[ForEachEntity]` on your job `Execute()` method:
@@ -54,9 +56,7 @@ public partial class ParticleJobSystem : ISystem
 }
 ```
 
-In this example, Trecs source generates a ScheduleParallel method that we can call and pass in our `World`
-
-`[WrapAsJob]` should work for most cases though.  If you do have custom parameters you need in the Execute you can use [`[PassThroughArgument]`](../core/systems.md#passthroughargument) and pass this to the `[WrapAsJob]` method.
+Then the Trecs source will generate a ScheduleParallel method that you can call and pass in `World`
 
 See [Advanced Job Features](../advanced/advanced-jobs.md) for `[FromWorld]` field wiring, lookups, and `[GlobalIndex]`.
 
