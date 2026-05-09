@@ -126,7 +126,7 @@ namespace Trecs
         )
         {
             AssertStructuralChangesAllowed();
-            NativeBag bag = _addQueue.GetBag(_threadIndex + 1);
+            NativeBag bag = _addQueue.GetBag(_threadIndex);
 
             bag.Enqueue(_accessorId);
             bag.Enqueue((int)-1); // sentinel: TagSet ID follows
@@ -155,7 +155,7 @@ namespace Trecs
             where T1 : struct, ITag
         {
             AssertStructuralChangesAllowed();
-            NativeBag bag = _addQueue.GetBag(_threadIndex + 1);
+            NativeBag bag = _addQueue.GetBag(_threadIndex);
             bag.Enqueue(_accessorId);
             bag.Enqueue((int)1); // tag count
             bag.Enqueue(Tag<T1>.NativeGuid);
@@ -184,7 +184,7 @@ namespace Trecs
             where T2 : struct, ITag
         {
             AssertStructuralChangesAllowed();
-            NativeBag bag = _addQueue.GetBag(_threadIndex + 1);
+            NativeBag bag = _addQueue.GetBag(_threadIndex);
             bag.Enqueue(_accessorId);
             bag.Enqueue((int)2); // tag count
             bag.Enqueue(Tag<T1>.NativeGuid);
@@ -216,7 +216,7 @@ namespace Trecs
             where T3 : struct, ITag
         {
             AssertStructuralChangesAllowed();
-            NativeBag bag = _addQueue.GetBag(_threadIndex + 1);
+            NativeBag bag = _addQueue.GetBag(_threadIndex);
             bag.Enqueue(_accessorId);
             bag.Enqueue((int)3); // tag count
             bag.Enqueue(Tag<T1>.NativeGuid);
@@ -251,7 +251,7 @@ namespace Trecs
             where T4 : struct, ITag
         {
             AssertStructuralChangesAllowed();
-            NativeBag bag = _addQueue.GetBag(_threadIndex + 1);
+            NativeBag bag = _addQueue.GetBag(_threadIndex);
             bag.Enqueue(_accessorId);
             bag.Enqueue((int)4); // tag count
             bag.Enqueue(Tag<T1>.NativeGuid);

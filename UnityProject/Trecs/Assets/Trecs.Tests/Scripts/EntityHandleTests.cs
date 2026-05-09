@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -287,6 +288,74 @@ namespace Trecs.Tests
             var entityIndex2 = entityHandle.ToIndex(a);
 
             NAssert.AreEqual(entityIndex1, entityIndex2);
+        }
+
+        #endregion
+
+        #region Version Storage
+
+        // Regression for the previous 16-bit (ushort) Version storage in
+        // EntityHandleMapElement. Bumping past ushort.MaxValue used to wrap to 0,
+        // colliding with handles previously issued at version 0 — a silent
+        // determinism bug. Storage is now int-width, matching EntityHandle.Version.
+        [Test]
+        public void EntityHandleMapElement_BumpVersion_PastUshortMaxValue_DoesNotWrap()
+        {
+            var element = new EntityHandleMapElement(EntityIndex.Null, ushort.MaxValue);
+            NAssert.AreEqual(ushort.MaxValue, element.Version);
+
+            element.BumpVersion();
+            NAssert.AreEqual(ushort.MaxValue + 1, element.Version);
+            NAssert.AreNotEqual(0, element.Version);
+
+            for (int i = 0; i < 1000; i++)
+            {
+                element.BumpVersion();
+            }
+            NAssert.AreEqual(ushort.MaxValue + 1 + 1000, element.Version);
+        }
+
+        // Integration-level regression: the previous storage made the slot's
+        // version wrap to 0 after 65 536 reuses, so a stale handle (uniqueId,
+        // version=0) recorded at the start would falsely re-validate after the
+        // wrap. This test runs more than that many add+remove cycles on the
+        // same recycled slot and asserts the original handle never resolves.
+        // ~70 000 cycles × ~simple submit overhead — runs in a few seconds.
+        [Test]
+        [Category("Slow")]
+        public void EntityHandle_StaleHandle_DoesNotRevalidate_AfterManyVersionBumps()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            // Initial entity — captures the (uniqueId, version=0) handle.
+            var init = a.AddEntity(TestTags.Alpha).AssertComplete();
+            var staleHandle = init.Handle;
+            a.SubmitEntities();
+
+            a.RemoveEntity(staleHandle);
+            a.SubmitEntities();
+            NAssert.IsFalse(
+                a.EntityExists(staleHandle),
+                "stale handle should be invalid immediately after remove"
+            );
+
+            // Drive the same slot through > ushort.MaxValue recycle cycles. With
+            // 16-bit storage, version on this slot would wrap to 0 around cycle
+            // 65 536 and the stale handle would resolve as live again.
+            const int cycles = ushort.MaxValue + 5; // 65 540
+            for (int i = 0; i < cycles; i++)
+            {
+                var h = a.AddEntity(TestTags.Alpha).AssertComplete().Handle;
+                a.SubmitEntities();
+                a.RemoveEntity(h);
+                a.SubmitEntities();
+            }
+
+            NAssert.IsFalse(
+                a.EntityExists(staleHandle),
+                "stale handle must not re-resolve after > ushort.MaxValue version bumps on the same slot"
+            );
         }
 
         #endregion
