@@ -35,7 +35,17 @@ The framework asserts every rule below at the call site. Crossing a role boundar
 
 [^constant]: `[Constant]` components are immutable after entity creation regardless of role. Init-time writes go through `EntityInitializer.SetRawImpl` at `AddEntity` time, which doesn't go through the role-checked write path. Even `Unrestricted` cannot rewrite a `[Constant]` component post-creation.
 
-[^vuo-template]: A template declared `[VariableUpdateOnly]` (e.g. cameras, view-only helpers) is render-cadence state, so the structural-change rule inverts: `Fixed` is rejected outright, while `Variable`, input systems, and `Unrestricted` may add / remove / move entities of that template. The component-level `[VariableUpdateOnly]` attribute does not change the structural-change rule on its own — only template-level VUO does. See [`[VariableUpdateOnly]`](../core/components.md#component-field-attributes) and the [source-generator reference](source-generator-reference.md#components-and-templates) for the field-vs-template distinction.
+[^vuo-template]: See the [VUO field vs VUO template](#vuo-field-vs-vuo-template) section below.
+
+### VUO field vs VUO template
+
+`[VariableUpdateOnly]` can apply at two scopes, and they don't behave the same. The distinction matters when reading the structural-change rows of the matrix above.
+
+- **`[VariableUpdateOnly]` on a component field** — the component is render-only state. `Fixed` accessors can't read or write it; `Variable` / input / `Unrestricted` can. **The structural-change rule is unaffected** — entities of the parent template are still simulation state and follow the normal rule (`Fixed` and `Unrestricted` create / remove / move them).
+
+- **`[VariableUpdateOnly]` on a template class** — the entire template is render-cadence state (cameras, view-only helpers). The structural-change rule **inverts**: `Fixed` is rejected outright, and `Variable` / input / `Unrestricted` create / remove / move them. These groups are skipped from the determinism checksum.
+
+See the [Components attribute reference](../core/components.md#component-field-attributes) for field-level usage and the [source-generator reference](source-generator-reference.md#components-and-templates) for both.
 
 ## Picking a role for a standalone accessor
 
