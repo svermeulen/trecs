@@ -17,7 +17,7 @@ Trecs uses several similar-sounding terms with distinct meanings. This page is a
 |---|---|
 | **[Tag](core/tags.md)** | A zero-cost marker struct (`ITag`) that classifies entities. Used at template definition time and as query filter. |
 | **[`Tag<T>`](advanced/groups-and-tagsets.md#tagt)** | The runtime value/handle for a single tag type. |
-| **[`TagSet`](advanced/groups-and-tagsets.md#tagset)** | A *stable* identity for a tag combination — a 32-bit hash of the tag GUIDs. Portable across runs and serializable. |
+| **[`TagSet`](advanced/groups-and-tagsets.md#tagset)** | A stable identity for a tag combination — a 32-bit hash of the tag GUIDs. Portable across runs and serializable. |
 | **[Template](core/templates.md)** | A compile-time blueprint declaring an entity's tags, components, partitions, and inheritance. |
 
 ## Where entities live in memory
@@ -25,16 +25,16 @@ Trecs uses several similar-sounding terms with distinct meanings. This page is a
 | Term | What it is |
 |---|---|
 | **[Group](advanced/groups-and-tagsets.md#groups)** | The concrete storage bucket for one unique tag combination. Holds the contiguous component arrays for entities with that exact tag set. Created implicitly. |
-| **[`GroupIndex`](advanced/groups-and-tagsets.md#groupindex)** | A small `ushort` runtime handle for a group, valid only for the lifetime of one `World`. **Not** safe to serialize — use `TagSet` instead. |
-| **[Partition](core/templates.md#partitions)** | A group an entity *moves between* at runtime to represent state. "Partition" is the role a group plays — the storage is still just a group. |
-| **[Set](entity-management/sets.md)** | A dynamic membership flag on entities (`IEntitySet`). Independent of tags and groups; iteration visits only members. |
+| **[`GroupIndex`](advanced/groups-and-tagsets.md#groupindex)** | A small `ushort` runtime handle for a group, valid only for the lifetime of one `World`. |
+| **[Partition](core/templates.md#partitions)** | A group an entity *moves between* at runtime, to improve cache locality for entities that share dynamic state. Each partition that an entity moves between is based on the same template and therefore has the same component types. |
+| **[Set](entity-management/sets.md)** | A dynamic membership flag on entities (`IEntitySet`). Independent of tags and groups; iteration visits only members. Allows for efficient sparse iteration over entities across groups. |
 
 ## Bundling component access
 
 | Term | What it is |
 |---|---|
 | **[Component](core/components.md)** | An unmanaged struct (`IEntityComponent`) holding per-entity data. |
-| **[Aspect](data-access/aspects.md)** | A `partial struct` (`IAspect` + `IRead<>` / `IWrite<>`) that bundles related component access into one reusable view. |
+| **[Aspect](data-access/aspects.md)** | A `partial struct` (with interfaces `IAspect` + `IRead<>` / `IWrite<>`) that bundles related component access into one reusable view. |
 | **[Aspect interface](advanced/aspect-interfaces.md)** | A `partial interface` extending `IAspect` for polymorphic helpers across multiple aspects sharing the same component shape. |
 
 ## Touching the world
