@@ -54,6 +54,7 @@ nav:
       - Dependency Tracking: performance/dependency-tracking.md
   - Advanced:
       - Accessor Roles: advanced/accessor-roles.md
+      - Aspect Interfaces: advanced/aspect-interfaces.md
       - System Control: advanced/system-control.md
       - Advanced Job Features: advanced/advanced-jobs.md
       - Groups, GroupIndex & TagSets: advanced/groups-and-tagsets.md
