@@ -90,7 +90,6 @@ namespace Trecs.SourceGen.Shared
         /// <param name="mode">Aspect or Components iteration.</param>
         /// <param name="context">Source production context for reporting diagnostics.</param>
         /// <param name="methodName">Method name for diagnostic messages (aspect mode only, used in MixedAspectAndComponentParams).</param>
-        /// <param name="supportsEntityIndex">Whether EntityIndex is a valid parameter (false for ForSingleAspect).</param>
         /// <param name="aspectParam">
         /// For Aspect mode: the pre-detected aspect ParameterSyntax (already validated).
         /// The classifier will record it as LoopAspect and skip classification for that parameter.
@@ -109,7 +108,6 @@ namespace Trecs.SourceGen.Shared
             IterationMode mode,
             System.Action<Diagnostic> reportDiagnostic,
             string? methodName,
-            bool supportsEntityIndex,
             ParameterSyntax? aspectParam,
             ref bool isValid
         )
@@ -381,152 +379,77 @@ namespace Trecs.SourceGen.Shared
 
                 if (!isPassThrough && isEntityIndex)
                 {
-                    if (!supportsEntityIndex)
-                    {
-                        // EntityIndex not supported in this mode — treat as unrecognized.
-                        reportDiagnostic(
-                            Diagnostic.Create(
-                                DiagnosticDescriptors.UnrecognizedParameterType,
-                                param.GetLocation(),
-                                param.Identifier.Text,
-                                PerformanceCache.GetDisplayString(paramType)
-                            )
-                        );
-                        isValid = false;
-                        continue;
-                    }
-
-                    if (isRef || isIn)
-                    {
-                        reportDiagnostic(
-                            Diagnostic.Create(
-                                DiagnosticDescriptors.ParameterMustBeByValue,
-                                param.GetLocation(),
-                                param.Identifier.Text
-                            )
-                        );
-                        isValid = false;
-                        continue;
-                    }
-
-                    if (result.HasEntityIndex)
-                    {
-                        reportDiagnostic(
-                            Diagnostic.Create(
-                                DiagnosticDescriptors.DuplicateLoopParameter,
-                                param.GetLocation(),
-                                param.Identifier.Text,
-                                "EntityIndex"
-                            )
-                        );
-                        isValid = false;
-                        continue;
-                    }
-
-                    result.HasEntityIndex = true;
-                    result.ParameterSlots.Add(new ParamSlot(ParamSlotKind.LoopEntityIndex, 0));
+                    if (
+                        TryClassifyByValueLoopParam(
+                            param,
+                            isRef,
+                            isIn,
+                            alreadyPresent: result.HasEntityIndex,
+                            typeName: "EntityIndex",
+                            slotKind: ParamSlotKind.LoopEntityIndex,
+                            result,
+                            reportDiagnostic,
+                            ref isValid
+                        )
+                    )
+                        result.HasEntityIndex = true;
                     continue;
                 }
 
                 if (!isPassThrough && isEntityHandle)
                 {
-                    if (isRef || isIn)
-                    {
-                        reportDiagnostic(
-                            Diagnostic.Create(
-                                DiagnosticDescriptors.ParameterMustBeByValue,
-                                param.GetLocation(),
-                                param.Identifier.Text
-                            )
-                        );
-                        isValid = false;
-                        continue;
-                    }
-
-                    if (result.HasEntityHandle)
-                    {
-                        reportDiagnostic(
-                            Diagnostic.Create(
-                                DiagnosticDescriptors.DuplicateLoopParameter,
-                                param.GetLocation(),
-                                param.Identifier.Text,
-                                "EntityHandle"
-                            )
-                        );
-                        isValid = false;
-                        continue;
-                    }
-
-                    result.HasEntityHandle = true;
-                    result.ParameterSlots.Add(new ParamSlot(ParamSlotKind.LoopEntityHandle, 0));
+                    if (
+                        TryClassifyByValueLoopParam(
+                            param,
+                            isRef,
+                            isIn,
+                            alreadyPresent: result.HasEntityHandle,
+                            typeName: "EntityHandle",
+                            slotKind: ParamSlotKind.LoopEntityHandle,
+                            result,
+                            reportDiagnostic,
+                            ref isValid
+                        )
+                    )
+                        result.HasEntityHandle = true;
                     continue;
                 }
 
                 if (!isPassThrough && isEntityAccessor)
                 {
-                    if (isRef || isIn)
-                    {
-                        reportDiagnostic(
-                            Diagnostic.Create(
-                                DiagnosticDescriptors.ParameterMustBeByValue,
-                                param.GetLocation(),
-                                param.Identifier.Text
-                            )
-                        );
-                        isValid = false;
-                        continue;
-                    }
-
-                    if (result.HasEntityAccessor)
-                    {
-                        reportDiagnostic(
-                            Diagnostic.Create(
-                                DiagnosticDescriptors.DuplicateLoopParameter,
-                                param.GetLocation(),
-                                param.Identifier.Text,
-                                "EntityAccessor"
-                            )
-                        );
-                        isValid = false;
-                        continue;
-                    }
-
-                    result.HasEntityAccessor = true;
-                    result.ParameterSlots.Add(new ParamSlot(ParamSlotKind.LoopEntityAccessor, 0));
+                    if (
+                        TryClassifyByValueLoopParam(
+                            param,
+                            isRef,
+                            isIn,
+                            alreadyPresent: result.HasEntityAccessor,
+                            typeName: "EntityAccessor",
+                            slotKind: ParamSlotKind.LoopEntityAccessor,
+                            result,
+                            reportDiagnostic,
+                            ref isValid
+                        )
+                    )
+                        result.HasEntityAccessor = true;
                     continue;
                 }
 
                 if (!isPassThrough && isWorldAccessor)
                 {
-                    if (isRef || isIn)
-                    {
-                        reportDiagnostic(
-                            Diagnostic.Create(
-                                DiagnosticDescriptors.ParameterMustBeByValue,
-                                param.GetLocation(),
-                                param.Identifier.Text
-                            )
-                        );
-                        isValid = false;
-                        continue;
-                    }
-
-                    if (result.HasWorldAccessor)
-                    {
-                        reportDiagnostic(
-                            Diagnostic.Create(
-                                DiagnosticDescriptors.DuplicateLoopParameter,
-                                param.GetLocation(),
-                                param.Identifier.Text,
-                                "WorldAccessor"
-                            )
-                        );
-                        isValid = false;
-                        continue;
-                    }
-
-                    result.HasWorldAccessor = true;
-                    result.ParameterSlots.Add(new ParamSlot(ParamSlotKind.LoopWorldAccessor, 0));
+                    if (
+                        TryClassifyByValueLoopParam(
+                            param,
+                            isRef,
+                            isIn,
+                            alreadyPresent: result.HasWorldAccessor,
+                            typeName: "WorldAccessor",
+                            slotKind: ParamSlotKind.LoopWorldAccessor,
+                            result,
+                            reportDiagnostic,
+                            ref isValid
+                        )
+                    )
+                        result.HasWorldAccessor = true;
                     continue;
                 }
 
@@ -600,6 +523,61 @@ namespace Trecs.SourceGen.Shared
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Validates and records a by-value loop parameter (no <c>ref</c> / <c>in</c>,
+        /// at most one per method). Used by every entity-shaped slot
+        /// (<c>EntityIndex</c> / <c>EntityHandle</c> / <c>EntityAccessor</c> /
+        /// <c>WorldAccessor</c>) since they share the same shape: validate
+        /// modifiers, reject duplicates, register a <see cref="ParamSlot"/>.
+        /// Returns <c>true</c> if the slot was successfully registered (caller
+        /// should set its <c>HasXxx</c> flag); <c>false</c> if validation failed
+        /// (caller should not set the flag, but may still <c>continue</c> — the
+        /// diagnostic has already been reported and <paramref name="isValid"/>
+        /// flipped to <c>false</c>).
+        /// </summary>
+        private static bool TryClassifyByValueLoopParam(
+            ParameterSyntax param,
+            bool isRef,
+            bool isIn,
+            bool alreadyPresent,
+            string typeName,
+            ParamSlotKind slotKind,
+            ClassifiedParameters result,
+            System.Action<Diagnostic> reportDiagnostic,
+            ref bool isValid
+        )
+        {
+            if (isRef || isIn)
+            {
+                reportDiagnostic(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.ParameterMustBeByValue,
+                        param.GetLocation(),
+                        param.Identifier.Text
+                    )
+                );
+                isValid = false;
+                return false;
+            }
+
+            if (alreadyPresent)
+            {
+                reportDiagnostic(
+                    Diagnostic.Create(
+                        DiagnosticDescriptors.DuplicateLoopParameter,
+                        param.GetLocation(),
+                        param.Identifier.Text,
+                        typeName
+                    )
+                );
+                isValid = false;
+                return false;
+            }
+
+            result.ParameterSlots.Add(new ParamSlot(slotKind, 0));
+            return true;
         }
 
         /// <summary>

@@ -122,10 +122,10 @@ internal static class TrecsStubs
                 public EntityIndex ToIndex(NativeWorldAccessor world) => default;
             }
 
-            // EntityAccessor — main-thread live entity reference. The real type is a
-            // ref struct bound to a WorldAccessor. Stubbed as a plain readonly struct
-            // because the generator only ever passes it through to the user method.
-            public readonly struct EntityAccessor { }
+            // EntityAccessor — main-thread live entity reference. Mirrors the real
+            // type's `ref struct` shape so test scenarios that try to box / capture /
+            // store one would surface as compile errors here too.
+            public readonly ref struct EntityAccessor { }
 
             public readonly struct Tag { }
             public readonly struct TagSet

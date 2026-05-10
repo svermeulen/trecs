@@ -164,6 +164,107 @@ public class Diagnostics_TRECS025_to_029_ComponentTests
         );
     }
 
+    [Test]
+    public void TRECS025_DuplicateEntityHandleParameter()
+    {
+        // Two EntityHandle parameters on the same [ForEachEntity] method trips the
+        // duplicate-loop-parameter check the same way two EntityIndex params would.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    void Process(in CPos pos, Trecs.EntityHandle one, Trecs.EntityHandle two) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS025",
+            new IIncrementalGenerator[] { new ForEachGenerator(), new EntityComponentGenerator() }
+        );
+    }
+
+    [Test]
+    public void TRECS025_DuplicateEntityAccessorParameter()
+    {
+        // Same duplicate-check applies to EntityAccessor parameters.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    void Process(in CPos pos, Trecs.EntityAccessor a, Trecs.EntityAccessor b) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS025",
+            new IIncrementalGenerator[] { new ForEachGenerator(), new EntityComponentGenerator() }
+        );
+    }
+
+    [Test]
+    public void TRECS028_EntityHandleParameterUsesRefModifier()
+    {
+        // EntityHandle must be passed by value — `ref` is rejected.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    void Process(in CPos pos, ref Trecs.EntityHandle handle) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS028",
+            new IIncrementalGenerator[] { new ForEachGenerator(), new EntityComponentGenerator() }
+        );
+    }
+
+    [Test]
+    public void TRECS028_EntityAccessorParameterUsesInModifier()
+    {
+        // EntityAccessor must be passed by value — `in` is rejected.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    void Process(in CPos pos, in Trecs.EntityAccessor entity) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS028",
+            new IIncrementalGenerator[] { new ForEachGenerator(), new EntityComponentGenerator() }
+        );
+    }
+
     static void AssertDiagnostic(
         string source,
         string expectedId,

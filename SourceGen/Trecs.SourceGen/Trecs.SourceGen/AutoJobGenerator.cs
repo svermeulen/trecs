@@ -512,6 +512,32 @@ namespace Trecs.SourceGen
                     continue;
                 }
 
+                // Targeted diagnostic for EntityHandle / EntityAccessor — both are
+                // accepted in main-thread [ForEachEntity] callbacks but not in jobs.
+                if (
+                    !paramHasSingleEntity
+                    && (
+                        SymbolAnalyzer.IsExactType(paramType, "EntityHandle", TrecsNamespaces.Trecs)
+                        || SymbolAnalyzer.IsExactType(
+                            paramType,
+                            "EntityAccessor",
+                            TrecsNamespaces.Trecs
+                        )
+                    )
+                )
+                {
+                    var typeName = paramType.Name;
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.InvalidParameterList,
+                            param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
+                            $"Parameter '{paramName}' is {typeName}, which is supported in main-thread [ForEachEntity] callbacks but not in jobs. "
+                                + "Use EntityIndex (with `using Trecs.Internal;`) and convert to a handle via `ei.ToHandle(world)` if needed."
+                        )
+                    );
+                    return null;
+                }
+
                 // Check for IAspect. [SingleEntity]-marked aspect params skip the
                 // iteration-target classifier — they're hoisted out of the loop.
                 // (paramHasSingleEntity is hoisted further up the method, before the
@@ -937,7 +963,8 @@ namespace Trecs.SourceGen
                         DiagnosticDescriptors.InvalidParameterList,
                         param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                         $"Parameter '{paramName}' of type '{PerformanceCache.GetDisplayString(paramType)}' is not recognized. "
-                            + "Expected: IAspect (in), IEntityComponent (in/ref), EntityIndex, NativeWorldAccessor, NativeSetRead<T>, NativeSetCommandBuffer<T>, [PassThroughArgument], or [FromWorld]."
+                            + "Expected: IAspect (in), IEntityComponent (in/ref), EntityIndex, NativeWorldAccessor, NativeSetRead<T>, NativeSetCommandBuffer<T>, [PassThroughArgument], or [FromWorld]. "
+                            + "Note: EntityHandle / EntityAccessor are accepted in main-thread [ForEachEntity] callbacks but not in jobs — use EntityIndex (with `using Trecs.Internal;`) and convert to a handle via `ei.ToHandle(world)` if needed."
                     )
                 );
                 return null;

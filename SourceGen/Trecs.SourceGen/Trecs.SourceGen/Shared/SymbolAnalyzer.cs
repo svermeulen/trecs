@@ -101,13 +101,15 @@ namespace Trecs.SourceGen.Shared
 
         /// <summary>
         /// Returns true if <paramref name="type"/> is a loop-managed parameter type that the
-        /// iteration generators handle internally (EntityIndex, WorldAccessor, SetAccessor&lt;T&gt;,
-        /// SetRead&lt;T&gt;, SetWrite&lt;T&gt;).
+        /// iteration generators handle internally (EntityIndex, EntityHandle, EntityAccessor,
+        /// WorldAccessor, SetAccessor&lt;T&gt;, SetRead&lt;T&gt;, SetWrite&lt;T&gt;).
         /// These should not be treated as custom pass-through arguments.
         /// </summary>
         public static bool IsLoopManagedType(ITypeSymbol type)
         {
             return IsExactType(type, "EntityIndex", TrecsNamespaces.TrecsInternal)
+                || IsExactType(type, "EntityHandle", TrecsNamespaces.Trecs)
+                || IsExactType(type, "EntityAccessor", TrecsNamespaces.Trecs)
                 || IsExactType(type, "WorldAccessor", TrecsNamespaces.Trecs)
                 || IsSetAccessorType(type)
                 || IsSetReadOrWriteType(type);

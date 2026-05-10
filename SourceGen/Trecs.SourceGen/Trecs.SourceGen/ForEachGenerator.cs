@@ -558,7 +558,7 @@ namespace Trecs.SourceGen
                 );
             }
 
-            EmitEntityRefDeclarations(
+            EntityRefEmitter.EmitDeclarations(
                 sb,
                 info,
                 indentLevel + 2,
@@ -619,7 +619,7 @@ namespace Trecs.SourceGen
                 );
             }
 
-            EmitEntityRefDeclarations(
+            EntityRefEmitter.EmitDeclarations(
                 sb,
                 info,
                 indentLevel + 2,
@@ -699,7 +699,7 @@ namespace Trecs.SourceGen
                 );
             }
 
-            EmitEntityRefDeclarations(
+            EntityRefEmitter.EmitDeclarations(
                 sb,
                 validatedParamsInfo,
                 indentLevel + 1,
@@ -709,39 +709,6 @@ namespace Trecs.SourceGen
 
             EmitUserBodyOrCall(sb, indentLevel + 1, methodName, validatedParamsInfo, "__world");
             sb.AppendLine(indentLevel, "}");
-        }
-
-        /// <summary>
-        /// Emits the per-iteration declarations for entity-shaped parameters
-        /// (<c>EntityIndex</c>, <c>EntityHandle</c>, <c>EntityAccessor</c>).
-        /// Each declaration is only emitted when the user took that parameter
-        /// type. <c>__entityIndex</c> is also emitted whenever a handle or accessor
-        /// is requested, because both derive from it.
-        /// </summary>
-        private static void EmitEntityRefDeclarations(
-            OptimizedStringBuilder sb,
-            ValidatedMethodInfo info,
-            int indentLevel,
-            string indexExpr,
-            string worldVar
-        )
-        {
-            bool needsIndex =
-                info.HasEntityIndexParameter
-                || info.HasEntityHandleParameter
-                || info.HasEntityAccessorParameter;
-            if (needsIndex)
-                sb.AppendLine(indentLevel, $"var __entityIndex = {indexExpr};");
-            if (info.HasEntityHandleParameter)
-                sb.AppendLine(
-                    indentLevel,
-                    $"var __entityHandle = {worldVar}.GetEntityHandle(__entityIndex);"
-                );
-            if (info.HasEntityAccessorParameter)
-                sb.AppendLine(
-                    indentLevel,
-                    $"var __entityAccessor = {worldVar}.Entity(__entityIndex);"
-                );
         }
 
         // Validation and parameter info classes (reused from original ForEachGenerator)
@@ -803,7 +770,6 @@ namespace Trecs.SourceGen
                 IterationMode.Components,
                 reportDiagnostic,
                 methodName: null,
-                supportsEntityIndex: true,
                 aspectParam: null,
                 isValid: ref isValid
             );

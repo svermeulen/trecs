@@ -680,6 +680,30 @@ namespace Trecs.SourceGen
                     continue;
                 }
 
+                // Targeted diagnostic for EntityHandle / EntityAccessor — both are
+                // accepted in main-thread [ForEachEntity] callbacks but not in jobs.
+                bool isEntityHandle =
+                    paramType.Name == "EntityHandle"
+                    && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
+                        == TrecsNamespaces.Trecs;
+                bool isEntityAccessor =
+                    paramType.Name == "EntityAccessor"
+                    && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
+                        == TrecsNamespaces.Trecs;
+                if (isEntityHandle || isEntityAccessor)
+                {
+                    var typeName = isEntityHandle ? "EntityHandle" : "EntityAccessor";
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.InvalidJobParameterList,
+                            p.GetLocation(),
+                            $"Parameter '{p.Identifier.Text}' is {typeName}, which is supported in main-thread [ForEachEntity] callbacks but not in jobs. "
+                                + "Use EntityIndex (with `using Trecs.Internal;`) and convert to a handle via `ei.ToHandle(world)` if needed."
+                        )
+                    );
+                    return null;
+                }
+
                 // Otherwise expect an in/ref IEntityComponent parameter.
                 bool isRef = p.Modifiers.Any(m => m.IsKind(SyntaxKind.RefKeyword));
                 bool isIn = p.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword));

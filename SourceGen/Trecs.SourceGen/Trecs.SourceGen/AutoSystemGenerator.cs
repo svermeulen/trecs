@@ -264,8 +264,6 @@ namespace Trecs.SourceGen
                 if (iterationType == IterationType.EntityFilterComponents)
                 {
                     bool readingComponents = true;
-                    var methodReadTypes = new List<ITypeSymbol>();
-                    var methodWriteTypes = new List<ITypeSymbol>();
 
                     foreach (var param in methodDecl.ParameterList.Parameters)
                     {
@@ -274,7 +272,7 @@ namespace Trecs.SourceGen
                         if (paramType == null)
                             continue;
 
-                        // Skip loop-managed types (WorldAccessor, EntityIndex, SetAccessor<T>)
+                        // Skip loop-managed types (WorldAccessor, EntityIndex, SetAccessor<T>, etc.)
                         if (SymbolAnalyzer.IsLoopManagedType(paramType))
                         {
                             readingComponents = false;
@@ -288,44 +286,32 @@ namespace Trecs.SourceGen
                             readingComponents = false;
 
                         if (readingComponents && isComponent)
-                        {
-                            var isRef = param.Modifiers.Any(m => m.IsKind(SyntaxKind.RefKeyword));
-                            var isIn = param.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword));
+                            continue;
 
-                            if (isRef)
-                                methodWriteTypes.Add(paramType);
-                            else if (isIn)
-                                methodReadTypes.Add(paramType);
-                        }
-                        else if (!readingComponents)
-                        {
-                            // Only include params explicitly marked [PassThroughArgument]
-                            var paramSymbol = semanticModel.GetDeclaredSymbol(param);
-                            if (
-                                paramSymbol != null
-                                && PerformanceCache.HasAttributeByName(
-                                    paramSymbol,
-                                    TrecsAttributeNames.PassThroughArgument,
-                                    TrecsNamespaces.Trecs
-                                )
+                        // Only include params explicitly marked [PassThroughArgument]
+                        var paramSymbol = semanticModel.GetDeclaredSymbol(param);
+                        if (
+                            paramSymbol != null
+                            && PerformanceCache.HasAttributeByName(
+                                paramSymbol,
+                                TrecsAttributeNames.PassThroughArgument,
+                                TrecsNamespaces.Trecs
                             )
-                            {
-                                var paramIsRef = param.Modifiers.Any(m =>
-                                    m.IsKind(SyntaxKind.RefKeyword)
-                                );
-                                var paramIsIn = param.Modifiers.Any(m =>
-                                    m.IsKind(SyntaxKind.InKeyword)
-                                );
-                                customParams.Add(
-                                    new CustomParamInfo(
-                                        PerformanceCache.GetDisplayString(paramType),
-                                        paramType,
-                                        param.Identifier.ToString(),
-                                        paramIsRef,
-                                        paramIsIn
-                                    )
-                                );
-                            }
+                        )
+                        {
+                            var paramIsRef = param.Modifiers.Any(m =>
+                                m.IsKind(SyntaxKind.RefKeyword)
+                            );
+                            var paramIsIn = param.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword));
+                            customParams.Add(
+                                new CustomParamInfo(
+                                    PerformanceCache.GetDisplayString(paramType),
+                                    paramType,
+                                    param.Identifier.ToString(),
+                                    paramIsRef,
+                                    paramIsIn
+                                )
+                            );
                         }
                     }
                 }
