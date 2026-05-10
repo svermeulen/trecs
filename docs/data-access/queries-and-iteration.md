@@ -85,7 +85,7 @@ Other counting helpers on `WorldAccessor`: `CountAllEntities()`, `CountEntitiesW
 
 ### Sets
 
-`InSet<T>()` filters to members of the given [set](../entity-management/sets.md). It returns a `SparseQueryBuilder` (set-filtered iteration is fundamentally sparse) — only one set per query. To match additional sets, test for membership inside the loop body.
+`InSet<T>()` filters to members of the given [set](../entity-management/sets.md). The query builder is limited to one set filter.  To match additional sets, test for membership inside the loop body.
 
 ```csharp
 foreach (var idx in World.Query()
@@ -131,8 +131,6 @@ void Execute(in CPosition pos, [GlobalIndex] int globalIndex)
     _outputs[globalIndex] = pos.Value;
 }
 ```
-
-Job-side only — works in manual job structs and `[WrapAsJob]`-generated jobs. See [Advanced Job Features](../advanced/advanced-jobs.md).
 
 ## GroupSlices
 
