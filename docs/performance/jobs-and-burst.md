@@ -1,6 +1,6 @@
 # Jobs & Burst
 
-Trecs integrates with [Unity's job system and Burst compiler](https://docs.unity3d.com/Packages/com.unity.burst@latest) for parallel, high-performance entity processing. The source generator emits the job struct, the schedule call, and [dependency tracking](dependency-tracking.md) so you don't write any of that boilerplate yourself.
+Trecs integrates with [Unity's job system and Burst compiler](https://docs.unity3d.com/Packages/com.unity.burst@latest) for parallel, high-performance entity processing. You can write job structs by hand — Trecs's source generator just handles the scheduling boilerplate (`ScheduleParallel`, [dependency tracking](dependency-tracking.md), field auto-wiring) for you. And for the simplest cases, the generator emits the entire job struct from a single annotated method.
 
 ## `[WrapAsJob]` — the simplest approach
 
