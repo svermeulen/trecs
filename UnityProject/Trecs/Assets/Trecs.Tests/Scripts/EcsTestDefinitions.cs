@@ -55,7 +55,6 @@ namespace Trecs.Tests
                         null,
                         null,
                         null,
-                        null,
                         default(TestInt)
                     ),
                 },
@@ -75,11 +74,9 @@ namespace Trecs.Tests
                         null,
                         null,
                         null,
-                        null,
                         default(TestInt)
                     ),
                     new ComponentDeclaration<TestFloat>(
-                        null,
                         null,
                         null,
                         null,
@@ -108,11 +105,9 @@ namespace Trecs.Tests
                         null,
                         null,
                         null,
-                        null,
                         default(TestInt)
                     ),
                     new ComponentDeclaration<TestVec>(
-                        null,
                         null,
                         null,
                         null,
@@ -137,11 +132,9 @@ namespace Trecs.Tests
                         null,
                         null,
                         null,
-                        null,
                         new TestInt { Value = 42 }
                     ),
                     new ComponentDeclaration<TestFloat>(
-                        null,
                         null,
                         null,
                         null,
@@ -166,7 +159,6 @@ namespace Trecs.Tests
                         null,
                         null,
                         null,
-                        null,
                         default(TestFloat)
                     ),
                 },
@@ -181,7 +173,6 @@ namespace Trecs.Tests
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<TestVec>(
-                        null,
                         null,
                         null,
                         null,

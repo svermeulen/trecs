@@ -605,7 +605,6 @@ namespace Trecs.Tests
                         null,
                         null,
                         null,
-                        null,
                         default(WritePhaseSimComp)
                     ),
                     new ComponentDeclaration<WritePhaseRenderComp>(
@@ -614,11 +613,9 @@ namespace Trecs.Tests
                         null,
                         null,
                         null,
-                        null,
                         default(WritePhaseRenderComp)
                     ),
                     new ComponentDeclaration<WritePhaseConstantComp>(
-                        null,
                         null,
                         null,
                         null,
@@ -630,7 +627,6 @@ namespace Trecs.Tests
                         null,
                         isInput: true,
                         inputFrameBehaviour: MissingInputBehavior.Retain,
-                        null,
                         null,
                         null,
                         default(WritePhaseInputComp)

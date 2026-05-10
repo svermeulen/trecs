@@ -24,12 +24,10 @@ namespace Trecs.Tests
                 null,
                 null,
                 null,
-                null,
                 null
             );
             var dec2 = new ComponentDeclaration<ConflictTestComp>(
                 variableUpdateOnly: false,
-                null,
                 null,
                 null,
                 null,
@@ -59,13 +57,11 @@ namespace Trecs.Tests
                 MissingInputBehavior.Reset,
                 null,
                 null,
-                null,
                 null
             );
             var dec2 = new ComponentDeclaration<ConflictTestComp>(
                 null,
                 isInput: false,
-                null,
                 null,
                 null,
                 null,
@@ -92,13 +88,11 @@ namespace Trecs.Tests
                 null,
                 null,
                 null,
-                null,
                 isConstant: true,
                 null,
                 null
             );
             var dec2 = new ComponentDeclaration<ConflictTestComp>(
-                null,
                 null,
                 null,
                 null,
@@ -127,13 +121,11 @@ namespace Trecs.Tests
                 null,
                 null,
                 null,
-                null,
                 isConstant: true,
                 isInterpolated: null,
                 null
             );
             var dec2 = new ComponentDeclaration<ConflictTestComp>(
-                null,
                 null,
                 null,
                 null,
@@ -164,11 +156,9 @@ namespace Trecs.Tests
                 MissingInputBehavior.Reset,
                 null,
                 null,
-                null,
                 null
             );
             var dec2 = new ComponentDeclaration<ConflictTestComp>(
-                null,
                 null,
                 null,
                 null,
@@ -199,12 +189,10 @@ namespace Trecs.Tests
                 null,
                 null,
                 null,
-                null,
                 new ConflictTestComp { Value = 42 }
             );
             var dec2 = new ComponentDeclaration<ConflictTestComp>(
                 variableUpdateOnly: true,
-                null,
                 null,
                 null,
                 null,
@@ -234,11 +222,9 @@ namespace Trecs.Tests
                 null,
                 null,
                 null,
-                null,
                 new ConflictTestComp { Value = 10 }
             );
             var dec2 = new ComponentDeclaration<ConflictTestComp>(
-                null,
                 null,
                 null,
                 null,

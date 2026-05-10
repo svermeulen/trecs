@@ -135,7 +135,6 @@ namespace Trecs.Tests
                         null,
                         null,
                         null,
-                        null,
                         default(VuoTemplateRenderComp)
                     ),
                 },
@@ -172,7 +171,6 @@ namespace Trecs.Tests
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<VuoTemplateRenderComp>(
-                        null,
                         null,
                         null,
                         null,

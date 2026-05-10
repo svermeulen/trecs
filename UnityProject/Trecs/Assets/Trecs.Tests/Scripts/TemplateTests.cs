@@ -50,7 +50,7 @@ namespace Trecs.Tests
                 partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null, null),
+                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Alpha }
             );
@@ -67,9 +67,9 @@ namespace Trecs.Tests
                 partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null, null),
-                    new ComponentDeclaration<TestFloat>(null, null, null, null, null, null, null),
-                    new ComponentDeclaration<TestVec>(null, null, null, null, null, null, null),
+                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null),
+                    new ComponentDeclaration<TestFloat>(null, null, null, null, null, null),
+                    new ComponentDeclaration<TestVec>(null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Alpha }
             );
@@ -90,7 +90,7 @@ namespace Trecs.Tests
                 },
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null, null),
+                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Gamma }
             );
@@ -111,7 +111,7 @@ namespace Trecs.Tests
                 partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null, null),
+                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Alpha }
             );
@@ -137,7 +137,7 @@ namespace Trecs.Tests
                 partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null, null),
+                    new ComponentDeclaration<TestInt>(null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Alpha }
             );
@@ -148,7 +148,7 @@ namespace Trecs.Tests
                 partitions: Array.Empty<TagSet>(),
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
-                    new ComponentDeclaration<TestFloat>(null, null, null, null, null, null, null),
+                    new ComponentDeclaration<TestFloat>(null, null, null, null, null, null),
                 },
                 localTags: new Tag[] { TestTags.Beta }
             );

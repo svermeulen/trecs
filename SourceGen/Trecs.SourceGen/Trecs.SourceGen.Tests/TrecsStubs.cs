@@ -662,7 +662,6 @@ internal static class TrecsStubs
                 where T : unmanaged, IEntityComponent
             {
                 public ComponentDeclaration(
-                    bool? fixedUpdateOnly,
                     bool? variableUpdateOnly,
                     bool? isInput,
                     object? inputFrameBehaviour,

@@ -174,7 +174,7 @@ namespace Trecs.SourceGen.Template
             {
                 sb.AppendLine(
                     indentLevel,
-                    $"new ComponentDeclaration<{component.ComponentTypeFullName}>(null, null, null, null, null, null, null),"
+                    $"new ComponentDeclaration<{component.ComponentTypeFullName}>(null, null, null, null, null, null),"
                 );
                 return;
             }
