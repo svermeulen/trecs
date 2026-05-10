@@ -302,7 +302,9 @@ namespace Trecs.SourceGen
                             var paramIsRef = param.Modifiers.Any(m =>
                                 m.IsKind(SyntaxKind.RefKeyword)
                             );
-                            var paramIsIn = param.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword));
+                            var paramIsIn = param.Modifiers.Any(m =>
+                                m.IsKind(SyntaxKind.InKeyword)
+                            );
                             customParams.Add(
                                 new CustomParamInfo(
                                     PerformanceCache.GetDisplayString(paramType),

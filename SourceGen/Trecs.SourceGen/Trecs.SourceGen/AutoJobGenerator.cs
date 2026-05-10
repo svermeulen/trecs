@@ -554,7 +554,11 @@ namespace Trecs.SourceGen
                 // EntityHandle (the value-type equivalent) instead.
                 if (
                     !paramHasSingleEntity
-                    && SymbolAnalyzer.IsExactType(paramType, "EntityAccessor", TrecsNamespaces.Trecs)
+                    && SymbolAnalyzer.IsExactType(
+                        paramType,
+                        "EntityAccessor",
+                        TrecsNamespaces.Trecs
+                    )
                 )
                 {
                     context.ReportDiagnostic(

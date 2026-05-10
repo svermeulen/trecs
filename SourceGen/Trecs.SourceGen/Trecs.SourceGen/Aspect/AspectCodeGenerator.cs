@@ -500,7 +500,6 @@ namespace Trecs.SourceGen.Aspect
                     );
                     sb.AppendLine();
                 }
-
             }
         }
 
