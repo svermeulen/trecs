@@ -62,6 +62,17 @@ namespace Trecs
         }
 
         /// <summary>
+        /// Queue an entity (by stable handle) to be added to the set. Resolves the
+        /// handle to an <see cref="EntityIndex"/> via the supplied accessor, then
+        /// enqueues. Lock-free.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(EntityHandle entityHandle, in NativeWorldAccessor world)
+        {
+            Add(entityHandle.ToIndex(world));
+        }
+
+        /// <summary>
         /// Queue an entity to be removed from the set.
         /// Lock-free — safe to call from any job thread.
         /// Writes are flushed immediately after the writer job completes.
@@ -71,6 +82,17 @@ namespace Trecs
         {
             var bag = _removeQueue.GetBag(_threadIndex);
             bag.Enqueue(entityIndex);
+        }
+
+        /// <summary>
+        /// Queue an entity (by stable handle) to be removed from the set. Resolves
+        /// the handle to an <see cref="EntityIndex"/> via the supplied accessor, then
+        /// enqueues. Lock-free.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Remove(EntityHandle entityHandle, in NativeWorldAccessor world)
+        {
+            Remove(entityHandle.ToIndex(world));
         }
 
         /// <summary>

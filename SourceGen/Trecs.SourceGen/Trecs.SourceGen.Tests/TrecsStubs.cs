@@ -418,7 +418,9 @@ internal static class TrecsStubs
                 where T : struct, IEntitySet
             {
                 public void Add(EntityIndex entityIndex) { }
+                public void Add(EntityHandle entityHandle, in NativeWorldAccessor world) { }
                 public void Remove(EntityIndex entityIndex) { }
+                public void Remove(EntityHandle entityHandle, in NativeWorldAccessor world) { }
                 public void Clear() { }
             }
 

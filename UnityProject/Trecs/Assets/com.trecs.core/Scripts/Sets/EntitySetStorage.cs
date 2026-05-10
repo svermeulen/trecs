@@ -141,9 +141,23 @@ namespace Trecs.Internal
         /// Drain all pending job writes into the actual group entries.
         /// Called on the main thread after outstanding writer jobs have completed.
         /// Removes are processed before adds so that re-add-after-remove works correctly.
+        /// <para>
+        /// Hidden invariant: by the time this runs, the writer's <see cref="SetFlushJob"/>
+        /// has already executed (because the scheduler completes it during sync) and consumed
+        /// the clear flag. So <c>*_jobClearRequested</c> is always 0 here. If a future code
+        /// path ever fills the bags without going through a writer-job-cycle, this assertion
+        /// will surface the missed flag-handling.
+        /// </para>
         /// </summary>
         internal void FlushJobWrites()
         {
+            Assert.That(
+                *_jobClearRequested == 0,
+                "FlushJobWrites called with a pending clear flag — a code path filled "
+                    + "the job bags without going through a SetFlushJob, leaving the flag "
+                    + "set. The clear must be handled (drain bags + clear entries) by the "
+                    + "same path that set the flag."
+            );
             for (int i = 0; i < _jobRemoveQueue.ThreadSlotCount; i++)
             {
                 ref var bag = ref _jobRemoveQueue.GetBag(i);
