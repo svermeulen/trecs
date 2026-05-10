@@ -11,8 +11,8 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | **Storage** | Group-based (entities grouped by tag combination) | Archetype-based (entities grouped by component set) |
 | **Memory layout** | Structure-of-arrays: one contiguous buffer per component per group, indexed by the entity's position in the group | Fixed-size 16 KB chunks per archetype; entities split across many chunks |
 | **Entity identity** | `EntityHandle` (stable) + `EntityIndex` (transient) | `Entity` (stable, wraps index + version) |
-| **Definition** | Templates (`ITemplate` + `ITagged`) | No explicit templates (archetype emerges from components) |
-| **Structural changes** | Deferred, applied at submission | Deferred via `EntityCommandBuffer` |
+| **Definition** | [Templates](../core/templates.md) (`ITemplate` + `ITagged`) | No explicit templates (archetype emerges from components) |
+| **Structural changes** | Deferred, applied at [submission](../entity-management/structural-changes.md) | Deferred via `EntityCommandBuffer` |
 | **Multi-world** | Multiple `World` instances; no built-in roles or cross-world bridging | Explicit Client / Server / ThinClient worlds wired into NetCode for Entities |
 
 ## Key differences
@@ -47,7 +47,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | Aspects (`IAspect` + `IRead`/`IWrite`) | Aspects (`IAspect` + `RefRO`/`RefRW`) |
 | `[ForEachEntity]` with tag/component scope | `IJobEntity` with query attributes |
 | [Sets](../entity-management/sets.md) for sparse filtering | Enableable components |
-| Reactive lifecycle via `World.Events.EntitiesWithTags<T>().OnAdded` / `OnRemoved` | No first-class equivalent |
+| [Reactive lifecycle](../entity-management/entity-events.md) via `World.Events.EntitiesWithTags<T>().OnAdded` / `OnRemoved` | No first-class equivalent |
 
 ### Jobs
 
@@ -63,15 +63,15 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | Trecs | Unity ECS |
 |---|---|
 | Core design goal | Nice-to-have |
-| Built-in recording / playback with desync detection | No built-in equivalent |
-| Deterministic RNG (`World.Rng`) | No built-in equivalent |
+| Built-in [recording / playback](../advanced/recording-and-playback.md) with desync detection | No built-in equivalent |
+| Deterministic RNG ([`World.Rng`](../advanced/time-and-rng.md)) | No built-in equivalent |
 | [Input system](../core/input-system.md) with frame isolation for perfect replay | NetCode for Entities (separate package) |
 
 ### Serialization
 
 | Trecs | Unity ECS |
 |---|---|
-| Full world state serialization (runtime save/load, snapshots, replays) | Subscene baking (edit-time); limited runtime serialization |
+| Full world state [serialization](../advanced/serialization.md) (runtime save/load, snapshots, replays) | Subscene baking (edit-time); limited runtime serialization |
 | Stable type IDs (auto-generated from type name) | `TypeIndex` (auto-generated) |
 | Delta serialization support | No built-in equivalent |
 | Per-save versioning via `Reader.Version` / `Writer.Version` for evolving custom serializers | No canonical equivalent — handled outside the engine |
@@ -80,7 +80,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 
 | Trecs | Unity ECS |
 |---|---|
-| Hierarchy inspector + transport / scrub / record window | Entity Debugger, Hierarchy window |
+| [Hierarchy inspector](../editor-windows/hierarchy.md) + [transport / scrub / record window](../editor-windows/player.md) | Entity Debugger, Hierarchy window |
 
 ### Authoring
 
@@ -146,9 +146,9 @@ Neither layout is universally better — chunks shine when you have many small a
 - **Built-in recording / playback** — with checksum validation and snapshot seeking
 - **Deterministic RNG** — framework-level `Rng` with fork support
 - **Input system** — frame-isolated input queuing for replay
-- **Interpolation** — built-in fixed-to-variable timestep smoothing
+- **[Interpolation](../advanced/interpolation.md)** — built-in fixed-to-variable timestep smoothing
 - **Sets** — sparse entity subsets without group changes
-- **Heap system** — managed/native pointer types for non-component data
+- **[Heap system](../advanced/heap.md)** — managed/native pointer types for non-component data
 - **Reactive entity lifecycle events** — first-class `OnAdded` / `OnRemoved` subscriptions
 - **Versioned save format support** — `Reader.Version` / `Writer.Version` for evolving custom serializers
 

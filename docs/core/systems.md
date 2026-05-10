@@ -220,7 +220,7 @@ public partial class ScoreSystem : ISystem
 
 `OnReady` is wired by source generation — declare it as a `partial void` and leave the implementation in the system's main partial. Don't declare it if you don't need it.
 
-`OnReady` runs in the same order systems will execute: by phase first (`EarlyPresentation` → `Input` → `Fixed` → `Presentation` → `LatePresentation`), then by `[ExecuteAfter]` / `[ExecuteBefore]` / `[ExecutePriority]` within each phase. Order is **not** tied to the order systems were passed to `AddSystem` / `AddSystems`. If you need one system's `OnReady` to run after another's, declare it with `[ExecuteAfter]` — the same constraint controls runtime order.
+`OnReady` runs in the same order systems will execute: by phase first (`EarlyPresentation` → `Input` → `Fixed` → `Presentation` → `LatePresentation`), then within each phase by `[ExecuteAfter]` / `[ExecuteBefore]` edges, then by `[ExecutePriority]`, and finally by the order systems were passed to `AddSystem` / `AddSystems` as a tie-breaker. If you need one system's `OnReady` to run after another's, prefer `[ExecuteAfter]` over relying on registration order — the same constraint controls runtime order.
 
 ## Registering systems
 
