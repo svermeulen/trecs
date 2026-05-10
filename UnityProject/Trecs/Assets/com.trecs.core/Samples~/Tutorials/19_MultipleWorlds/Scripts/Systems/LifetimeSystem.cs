@@ -1,5 +1,4 @@
 using UnityEngine;
-using Trecs.Internal;
 
 namespace Trecs.Samples.MultipleWorlds
 {
@@ -13,7 +12,7 @@ namespace Trecs.Samples.MultipleWorlds
         }
 
         [ForEachEntity(typeof(SampleTags.Critter))]
-        void Execute(in GameObjectId gameObjectId, ref Lifetime lifetime, EntityIndex entityIndex)
+        void Execute(in GameObjectId gameObjectId, ref Lifetime lifetime, EntityAccessor entity)
         {
             lifetime.Value -= World.DeltaTime;
 
@@ -22,7 +21,7 @@ namespace Trecs.Samples.MultipleWorlds
                 var go = _gameObjectRegistry.Resolve(gameObjectId);
                 Object.Destroy(go);
                 _gameObjectRegistry.Unregister(gameObjectId);
-                World.RemoveEntity(entityIndex);
+                entity.Remove();
             }
         }
     }

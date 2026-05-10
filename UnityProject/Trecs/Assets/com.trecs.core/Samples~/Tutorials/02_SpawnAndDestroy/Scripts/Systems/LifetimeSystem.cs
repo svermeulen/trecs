@@ -1,5 +1,4 @@
 using UnityEngine;
-using Trecs.Internal;
 
 namespace Trecs.Samples.SpawnAndDestroy
 {
@@ -13,7 +12,7 @@ namespace Trecs.Samples.SpawnAndDestroy
         }
 
         [ForEachEntity(typeof(SampleTags.Sphere))]
-        void Execute(in GameObjectId gameObjectId, ref Lifetime lifetime, EntityIndex entityIndex)
+        void Execute(in GameObjectId gameObjectId, ref Lifetime lifetime, EntityAccessor entity)
         {
             lifetime.Value -= World.DeltaTime;
 
@@ -23,7 +22,7 @@ namespace Trecs.Samples.SpawnAndDestroy
                 Object.Destroy(go);
                 _gameObjectRegistry.Unregister(gameObjectId);
                 // Removal is deferred — the entity continues to exist until the next submission
-                World.RemoveEntity(entityIndex);
+                entity.Remove();
             }
         }
     }

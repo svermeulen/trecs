@@ -1,5 +1,3 @@
-using Trecs.Internal;
-
 namespace Trecs.Samples.ReactiveEvents
 {
     /// <summary>
@@ -10,12 +8,12 @@ namespace Trecs.Samples.ReactiveEvents
     public partial class BubbleLifetimeSystem : ISystem
     {
         [ForEachEntity(typeof(SampleTags.Bubble))]
-        void Execute(EntityIndex entity, ref Lifetime lifetime)
+        void Execute(EntityAccessor entity, ref Lifetime lifetime)
         {
             lifetime.Value -= World.DeltaTime;
             if (lifetime.Value <= 0f)
             {
-                World.RemoveEntity(entity);
+                entity.Remove();
             }
         }
     }
