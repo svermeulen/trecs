@@ -23,16 +23,16 @@ public partial class ParticleMoveSystem : ISystem
 
 Two requirements:
 
-- **`static`** — the generated Burst job calls your method directly, with no system instance to call against. Marking it `static` makes that compile-time-enforced — accidental references to instance state (like `World`) get rejected at the call site rather than failing later inside Burst.
+- **`static`** — the generated Burst job calls your method directly, with no system instance to call against, therefore it must be marked `static`.
 - **Use `NativeWorldAccessor`, not `WorldAccessor`**, for any world-level reads (`DeltaTime`, structural ops, set ops) inside the body.
 
-Then, instead of calling your system `Execute()` method directly, Trecs will schedule a job instead, and inside the job it will call your static method.
+Then, instead of calling your system `Execute()` method directly, Trecs will schedule a job instead.
 
 Note that [`[PassThroughArgument]`](../core/systems.md#passthroughargument) is supported in this case as well and will forward the data to the generated job.
 
 ## Manual job structs
 
-In some cases you might want to define a custom Job instead of always using `WrapAsJob`.  You can do this just by using `[ForEachEntity]` on your job `Execute()` method:
+In some cases you might want to define a custom job struct instead of using `[WrapAsJob]`. The simplest way is to put `[ForEachEntity]` on the job's `Execute` method — Trecs generates a `ScheduleParallel` for it just like it does for `[WrapAsJob]`:
 
 ```csharp
 public partial class ParticleJobSystem : ISystem
@@ -56,7 +56,7 @@ public partial class ParticleJobSystem : ISystem
 }
 ```
 
-Then the Trecs source will generate a ScheduleParallel method that you can call and pass in `World`
+`[ForEachEntity]` is **not** required, though. You can write an entirely hand-rolled `IJobFor` / `IJobParallelFor` / etc. with no Trecs-specific markers and schedule it yourself — register it with the dependency tracker via [`accessor.TrackExternalJob`](../advanced/advanced-jobs.md#external-job-tracking) so concurrent reads/writes are still ordered correctly.
 
 See [Advanced Job Features](../advanced/advanced-jobs.md) for `[FromWorld]` field wiring, lookups, and `[GlobalIndex]`.
 
