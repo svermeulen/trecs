@@ -1,6 +1,16 @@
 # Input System
 
-The input system is a deterministic pipeline for player input. `[ExecuteIn(SystemPhase.Input)]` systems run just before each fixed step — in lockstep with the simulation — and queue inputs via `World.AddInput<T>(...)`. The queued inputs are applied to the global entity at the start of the fixed step that follows, so the simulation reads them deterministically: record the input stream, replay it, get the same world state. See [recording and playback](../advanced/recording-and-playback.md).
+A Trecs simulation is designed to be **deterministic** — given the same starting state, every run produces the same world. But the values you feed *into* the simulation often aren't: keyboard / mouse / gamepad state, network packets, system clocks, asset-load timings. The input system is the controlled gateway through which those non-deterministic values enter the simulation, in a form that recording and playback can capture and replay losslessly.
+
+Despite the name, "input" here isn't limited to user input — it covers **any non-deterministic value entering the simulation**. A network message, a wall-clock reading, a response from an external service all qualify, and they all use the same pipeline.
+
+The mechanics:
+
+- Mark template fields with `[Input]`.
+- Inside an `[ExecuteIn(SystemPhase.Input)]` system, call `World.AddInput<T>(entity, value)`. Input systems run just before each fixed step, in lockstep with the simulation.
+- The queued value is applied to the target entity at the start of the upcoming fixed step.
+
+During [recording](../advanced/recording-and-playback.md), every `AddInput` call is captured into the recording bundle alongside the frame number it targets. During playback, every Input-phase system is disabled and the recorded inputs are replayed onto the exact same frames they originally targeted — so the simulation sees byte-identical input on every run, regardless of what the live keyboard / network / clock are doing.
 
 ## Marking input fields
 
@@ -21,7 +31,7 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 | `Retain` | Keep the previous frame's value |
 | `Reset` | Reset to the component's default value |
 
-`Retain` is right when an input represents a sustained intent (e.g. "currently holding a movement direction"). `Reset` fits one-shot signals (e.g. "fire button pressed this frame").
+`Retain` is right when an input represents a sustained intent (e.g. "currently holding a movement direction"). `Reset` fits one-shot signals (e.g. "fire button pressed this frame"). Both are replay-stable: the same frame produces the same component value whether or not an input was actually queued at record time.
 
 ## Queuing input
 
@@ -91,14 +101,7 @@ public partial class ProcessInputSystem : ISystem
 }
 ```
 
-## Determinism notes
-
-- Inputs are stamped with the next fixed-frame number when `AddInput` is called and applied at the boundary of that fixed step. Because the Input phase itself runs at fixed cadence, the input → simulation handoff is fully deterministic.
-- During [recording](../advanced/recording-and-playback.md), inputs are captured into the `RecordingBundle`'s `InputQueue` alongside per-frame checksums.
-- During playback, `BundlePlayer.Start` disables every Input-phase system via `EnableChannel.Playback`; recorded inputs are replayed instead, and live keystrokes are ignored.
-- `MissingInputBehavior` is replay-stable: the same frame produces the same component value whether or not an input was actually queued at record time.
-
 ## See also
 
 - [Sample 11 — Snake](../samples/11-snake.md) — full keyboard-driven input wired to a recordable global entity.
-- [Recording & Playback](../advanced/recording-and-playback.md) — how the `InputQueue` is captured and replayed.
+- [Recording & Playback](../advanced/recording-and-playback.md) — full record / replay workflow, the `RecordingBundle` format, and the desync detection that piggybacks on the input pipeline.
