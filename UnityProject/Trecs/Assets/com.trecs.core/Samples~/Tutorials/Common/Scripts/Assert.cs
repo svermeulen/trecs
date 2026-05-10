@@ -23,5 +23,40 @@ namespace Trecs.Samples
             if (!condition)
                 throw new InvalidOperationException("Sample assertion failed: " + message);
         }
+
+        // Generic overloads so the format args aren't evaluated/boxed unless
+        // the assert actually fires.
+        [Conditional("DEBUG")]
+        public static void That<T>(bool condition, string message, T arg0)
+        {
+            if (!condition)
+                throw new InvalidOperationException(
+                    "Sample assertion failed: " + string.Format(message, arg0)
+                );
+        }
+
+        [Conditional("DEBUG")]
+        public static void That<T0, T1>(bool condition, string message, T0 arg0, T1 arg1)
+        {
+            if (!condition)
+                throw new InvalidOperationException(
+                    "Sample assertion failed: " + string.Format(message, arg0, arg1)
+                );
+        }
+
+        [Conditional("DEBUG")]
+        public static void That<T0, T1, T2>(
+            bool condition,
+            string message,
+            T0 arg0,
+            T1 arg1,
+            T2 arg2
+        )
+        {
+            if (!condition)
+                throw new InvalidOperationException(
+                    "Sample assertion failed: " + string.Format(message, arg0, arg1, arg2)
+                );
+        }
     }
 }

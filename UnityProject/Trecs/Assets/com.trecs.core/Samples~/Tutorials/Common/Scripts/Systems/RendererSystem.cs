@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -113,7 +112,7 @@ namespace Trecs.Samples
             foreach (var group in World.WorldInfo.GetGroupsWithTags<CommonTags.Renderable>())
             {
                 var wasRemoved = groupsProcessed.Remove(group);
-                Assert.That(wasRemoved, $"No renderable registered for group {group}");
+                Assert.That(wasRemoved, "No renderable registered for group {0}", group);
             }
         }
 
@@ -161,12 +160,12 @@ namespace Trecs.Samples
                 );
             }
 
-            using (TrecsProfiling.Start("Building native positions buffer"))
+            using (Trecs.Internal.TrecsProfiling.Start("Building native positions buffer"))
             {
                 combined.Complete();
             }
 
-            using (TrecsProfiling.Start("Sending data to gpu"))
+            using (Trecs.Internal.TrecsProfiling.Start("Sending data to gpu"))
             {
                 foreach (var info in _renderables)
                 {
@@ -186,7 +185,7 @@ namespace Trecs.Samples
                 }
             }
 
-            using (TrecsProfiling.Start("Graphics.RenderMeshIndirect"))
+            using (Trecs.Internal.TrecsProfiling.Start("Graphics.RenderMeshIndirect"))
             {
                 foreach (var info in _renderables)
                 {
@@ -223,12 +222,12 @@ namespace Trecs.Samples
                 );
             }
 
-            using (TrecsProfiling.Start("Building native positions buffer"))
+            using (Trecs.Internal.TrecsProfiling.Start("Building native positions buffer"))
             {
                 combined.Complete();
             }
 
-            using (TrecsProfiling.Start("Graphics.RenderMeshInstanced"))
+            using (Trecs.Internal.TrecsProfiling.Start("Graphics.RenderMeshInstanced"))
             {
                 foreach (var info in _renderables)
                 {
