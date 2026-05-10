@@ -85,6 +85,8 @@ public partial class GameObjectSyncSystem : ISystem
 }
 ```
 
+Note here that GameObjectRegistry and GameObjectId are not part of Trecs.  See Sample projects for example implementations.
+
 ### Spawning and despawning GameObjects
 
 Use [entity events](../entity-management/entity-events.md) with `[ForEachEntity]` to manage GameObject lifecycle:
@@ -119,19 +121,7 @@ public partial class EnemyGameObjectManager : IDisposable
 }
 ```
 
-## Referencing managed objects
-
-Use [heap pointer types](../advanced/heap.md) to store managed references in components:
-
-```csharp
-public struct AudioSourceRef : IEntityComponent
-{
-    public SharedPtr<AudioClip> Clip;
-}
-```
-
-!!! warning "Heap blob types must be serializable"
-    If you save/load or record/replay your world, every `T` you allocate on the heap (`SharedPtr<T>`, `UniquePtr<T>`, `NativeSharedPtr<T>`, `NativeUniquePtr<T>`) must have a serializer registered — blobs are written as part of world state. Unmanaged `T` is covered by `RegisterBlit<T>`; managed types like Unity `AudioClip` / `Mesh` need a custom `ISerializer<T>` (or `RegisterSkip<T>` if the data can be reconstructed elsewhere on load). See [Serialization](../advanced/serialization.md).
+Note here that GameObjectRegistry and GameObjectId are not part of Trecs.  See Sample projects for example implementations.
 
 ## Why this separation matters
 

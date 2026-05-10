@@ -14,23 +14,17 @@ System fields are not serialized. Anything mutable kept on a system silently div
 
 **Fix.** Store dynamic state in components. Constructor parameters for immutable configuration are fine, or to cache some data to members in OnReady.
 
-### Reading continuous time in fixed update with float-sensitive code
+### Mutating a set while iterating it
 
-`DeltaTime` / `ElapsedTime` accumulate floating-point error that drifts across machines. For lockstep-deterministic workloads (RTS netcode etc.) this causes desync even when everything else is deterministic.
+Using an immediate `Add` / `Remove` / `Clear` on the same set in the group you're currently iterating throws in DEBUG. In release the assertion is compiled out and iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
 
-**Fix.** Set `WorldSettings.AssertNoTimeInFixedPhase = true` (throws on access during fixed phase) and use `World.FixedFrame` (a discrete tick counter) as your time source. See [`AssertNoTimeInFixedPhase`](../advanced/serialization.md#worldsettingsassertnotimeinfixedphase).  Only applicable for multiplayer games that require cross machine sync.
+**Fix.** Use the deferred set ops (the default) for changes-during-iteration, or stage them in a `NativeList<EntityHandle>` and apply after the loop. See [Sets — Immediate](../entity-management/sets.md#immediate).
 
-### Service-class accessor used during a Fixed system's `Execute`
+### Forgetting to dispose pointers
 
-Strict-accessor rule: during a `Fixed` system's `Execute`, only that system's own accessor may touch ECS state. A service holding a separately-created accessor — even a `Fixed`-role one — throws.
+Pointers must be manually disposed. DEBUG builds catch leaks at world shutdown and report them; release builds leak silently.
 
-**Fix.** Pass the calling system's `WorldAccessor` into the service rather than holding a separate one. Variable-cadence phases and observer callbacks don't enforce this rule. See [Strict-accessor rule](../advanced/accessor-roles.md#strict-accessor-during-fixed-execute-rule).
-
-### Just-spawned entities haven't been fixed-updated when Presentation sees them
-
-An entity spawned in a Fixed system is submitted in time for the same Tick's Presentation, but no fixed-update cycle has run on it yet — Presentation sees the spawn-time initial values, not the post-tick values. Therefore the entity will render at its initial state for one frame and then jump to the correct state on the next tick. Visible as a brief stutter or wrong-position pop on spawn.
-
-**Fix.** Initialize *everything Presentation reads* at spawn time. If that's impractical, use an enabled flag, default this to false, then flip it during fixed update.
+**Fix.** Dispose entity-owned pointers in an `OnRemoved` handler. See [Cleanup is manual](../advanced/heap-allocation-rules.md#cleanup-is-manual).
 
 ### Raw native collections in components don't round-trip through save/load
 
@@ -46,21 +40,26 @@ The wrapped collection's storage is allocated in Unity's allocator, not Trecs's 
 
 **Fix.** Dispose the inner collection, then the unique ptr. See [Wrapping native collections](../advanced/heap.md#wrapping-native-collections).
 
-### Forgetting to dispose pointers
+### Just-spawned entities haven't been fixed-updated when Presentation sees them
 
-Pointers must be manually disposed. DEBUG builds catch leaks at world shutdown and report them; release builds leak silently.
+An entity spawned in a Fixed system is submitted in time for the same Tick's Presentation, but no fixed-update cycle has run on it yet — Presentation sees the spawn-time initial values, not the post-tick values. Therefore the entity will render at its initial state for one frame and then jump to the correct state on the next tick. Visible as a brief stutter or wrong-position pop on spawn.
 
-**Fix.** Dispose entity-owned pointers in an `OnRemoved` handler. See [Cleanup is manual](../advanced/heap-allocation-rules.md#cleanup-is-manual).
+**Fix.** Initialize *everything Presentation reads* at spawn time. If that's impractical, use an enabled flag, default this to false, then flip it during fixed update.
 
-### Mutating a set while iterating it
+### Service-class accessor used during a Fixed system's `Execute`
 
-Using an immediate `Add` / `Remove` / `Clear` on the same set in the group you're currently iterating throws in DEBUG. In release the assertion is compiled out and iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
+Strict-accessor rule: during a `Fixed` system's `Execute`, only that system's own accessor may touch ECS state. A service holding a separately-created accessor — even a `Fixed`-role one — throws.
 
-**Fix.** Use the deferred set ops (the default) for changes-during-iteration, or stage them in a `NativeList<EntityHandle>` and apply after the loop. See [Sets — Immediate](../entity-management/sets.md#immediate).
+**Fix.** Pass the calling system's `WorldAccessor` into the service rather than holding a separate one. Variable-cadence phases and observer callbacks don't enforce this rule. See [Strict-accessor rule](../advanced/accessor-roles.md#strict-accessor-during-fixed-execute-rule).
+
+### Reading continuous time in fixed update with float-sensitive code
+
+`DeltaTime` / `ElapsedTime` accumulate floating-point error that drifts across machines. For lockstep-deterministic workloads (RTS netcode etc.) this causes desync even when everything else is deterministic.
+
+**Fix.** Set `WorldSettings.AssertNoTimeInFixedPhase = true` (throws on access during fixed phase) and use `World.FixedFrame` (a discrete tick counter) as your time source. See [`AssertNoTimeInFixedPhase`](../advanced/serialization.md#worldsettingsassertnotimeinfixedphase).  Only applicable for multiplayer games that require cross machine sync.
 
 ### Main-thread sync mid-phase stalls workers
 
 Main-thread access through `WorldAccessor` (`.Read` / `.Write`) lazily completes conflicting in-flight jobs. Doing this in the middle of a phase while jobs are running stops the in-flight job, idles the workers, and tanks throughput.
 
 **Fix.** Push main-thread reads/writes into a job, or order them after the job has had time to complete. See [Main-thread sync](../performance/dependency-tracking.md#main-thread-sync).
-
