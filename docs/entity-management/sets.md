@@ -35,7 +35,7 @@ World.SetRemove<HighlightedParticle>(particle.EntityIndex);
 World.SetClear<HighlightedParticle>();
 ```
 
-A queued `SetClear<T>` **supersedes** any `SetAdd<T>` / `SetRemove<T>` queued for the same set in the same submission, regardless of call order — analogous to how a queued remove supersedes a queued move. If you want sequential semantics within a single frame ("clear, then add these"), use the immediate APIs below.
+A queued `SetClear<T>` **supersedes** any `SetAdd<T>` / `SetRemove<T>` queued for the same set in the same submission, regardless of call order.  If you want sequential semantics within a single frame ("clear, then add these"), use the immediate APIs below.
 
 ### Immediate
 

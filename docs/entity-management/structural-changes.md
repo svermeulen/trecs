@@ -52,7 +52,7 @@ To react to submission boundaries, see [Entity Events — Frame Events](entity-e
 
 ## Deterministic submission
 
-Any workflow that needs the simulation to evolve identically across runs — recording / replay, networked rollback, snapshot-load consistency, reproducible tests, debug-replay tooling — wants deterministic submission ordering:
+Any workflow that needs the simulation to evolve identically across runs — recording / replay, networked rollback, snapshot-load consistency, reproducible tests, debug-replay tooling — needs deterministic submission ordering, so should include this flag:
 
 ```csharp
 var settings = new WorldSettings
@@ -63,7 +63,7 @@ var settings = new WorldSettings
 
 This sorts structural operations queued from Burst jobs (via [`NativeWorldAccessor`](../performance/jobs-and-burst.md)) before applying them, so submission order doesn't depend on job-thread interleaving. Operations queued from the main thread are already deterministic — they apply in the order user code queued them — so the setting only affects the native path. The cost is a single sort per submission, cheap enough to leave on by default if you may ever need a reproducible run.
 
-When you queue structural changes from a Burst job through `NativeWorldAccessor`, pass a `sortKey` to control the deterministic order:
+This is also why, when you queue structural changes from a Burst job through `NativeWorldAccessor`, we require a `sortKey` (so we can maintain deterministic order):
 
 ```csharp
 nativeAccessor.AddEntity<MyTag>(sortKey: (uint)i);  // i = the iteration index in the job
