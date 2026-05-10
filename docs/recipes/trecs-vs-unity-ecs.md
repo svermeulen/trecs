@@ -12,7 +12,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | **Memory layout** | Fixed-size 16 KB chunks per archetype; entities split across many chunks | Structure-of-arrays: one contiguous buffer per component per group, indexed by the entity's position in the group |
 | **Entity identity** | `Entity` (stable, wraps index + version) | `EntityHandle` (stable, wraps index + version) |
 | **Definition** | No explicit templates (archetype emerges from components) | [Templates](../core/templates.md) (`ITemplate` + `ITagged`) |
-| **Structural changes** | `EntityManager` calls are synchronous (a sync point). For deferral, opt into an `EntityCommandBuffer`; ECBs play back automatically at built-in command-buffer systems (e.g. `EndSimulationEntityCommandBufferSystem`), or manually via `Playback()`. | All structural changes are deferred — [submission](../entity-management/structural-changes.md) runs automatically at the end of every fixed step, or manually via `World.SubmitEntities()`. No synchronous path. |
+| **Structural changes** | `EntityManager` calls are synchronous (a sync point). For deferral, opt into an `EntityCommandBuffer`; ECBs play back automatically at built-in command-buffer systems (e.g. `EndSimulationEntityCommandBufferSystem`), or manually via `Playback()`. | Structural changes are deferred — [submission](../entity-management/structural-changes.md) runs automatically at the end of every fixed step.  Alternatively can run synchronously via `World.SubmitEntities()` |
 | **Multi-world** | Multiple `World` instances; default world auto-created. NetCode for Entities (separate package) adds explicit Client / Server / ThinClient world roles on top. | Multiple `World` instances; no built-in roles or cross-world bridging |
 
 ## Key differences
@@ -23,7 +23,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 |---|---|
 | `IComponentData` (unmanaged struct) | `IEntityComponent` (unmanaged struct) |
 | `class IComponentData` (managed) | No managed components |
-| `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) | [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline) |
+| `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) | [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline) for bounded cases, or a [heap pointer](../advanced/heap.md) (`UniquePtr<List<T>>` / `NativeUniquePtr<NativeList<T>>`) for unbounded |
 | Zero-field `IComponentData` acts as tag | Tags via `ITag` (separate from components) |
 | No equivalent | `[Unwrap]` for single-field components |
 | Singletons via `SystemAPI.GetSingleton<T>()` | Global state via `World.GlobalComponent<T>()` on a `Globals` template |
