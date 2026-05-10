@@ -4,7 +4,7 @@ Entities are lightweight identifiers that group components together.
 
 ## EntityHandle
 
-`EntityHandle` is the public, stable reference to an entity. It survives [structural changes](../entity-management/structural-changes.md), so it is what you use whenever you need to store a long-lived reference to another entity (for example on a component, on a managed object, or across frames).
+`EntityHandle` is the stable reference to an entity. It survives [structural changes](../entity-management/structural-changes.md), so it is what you use whenever you need to store a long-lived reference to another entity (for example on a component, on a managed object, or across frames).
 
 You typically obtain a handle from one of these entry points:
 
@@ -68,7 +68,7 @@ Removal is **deferred** — the entity disappears at the next [submission](../en
 
 ## Accessing entity data
 
-`EntityAccessor` is a live single-entity view, bound to a `WorldAccessor`. It exposes component access plus no-arg structural / set / input ops on the bound entity:
+`EntityAccessor` is a live single-entity view, bound to a `WorldAccessor`. It exposes component access plus no-arg structural / input ops on the bound entity. (Set membership goes through `World.Set<T>()` so you can pick deferred or immediate.)
 
 ```csharp
 EntityAccessor entity = World.Entity(handle);

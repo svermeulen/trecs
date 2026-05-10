@@ -452,8 +452,15 @@ namespace Trecs.SourceGen.Aspect
         }
 
         /// <summary>
-        /// Generates Remove and MoveTo convenience methods that forward to
-        /// WorldAccessor / NativeWorldAccessor.
+        /// Generates the generic <c>MoveTo&lt;T1..T4&gt;</c> overloads on each
+        /// aspect, for both <c>WorldAccessor</c> and <c>NativeWorldAccessor</c>.
+        /// (The 1-arg <c>Remove</c> and <c>MoveTo(TagSet)</c> live in
+        /// <c>AspectExtensions</c>; only the generic forms need to be emitted
+        /// here because C# can't infer the aspect's concrete type through a
+        /// generic extension method on the open type parameter.)
+        /// Set membership is handled exclusively through
+        /// <c>World.Set&lt;TSet&gt;()</c> — users pick deferred vs immediate
+        /// there, so the aspect doesn't pre-bake one or the other.
         /// </summary>
         private static void GenerateEntityOperationMethods(
             OptimizedStringBuilder sb,
@@ -494,32 +501,6 @@ namespace Trecs.SourceGen.Aspect
                     sb.AppendLine();
                 }
 
-                // AddToSet / RemoveFromSet
-                // (Can't be extension methods due to C# partial type inference limitation)
-                // WorldAccessor exposes deferred ops via the Set<T>().Defer gateway;
-                // NativeWorldAccessor still uses flat SetAdd / SetRemove verbs.
-                var addBody =
-                    accessorType == "WorldAccessor"
-                        ? "world.Set<TSet>().Defer.Add(_entityIndex)"
-                        : "world.SetAdd<TSet>(_entityIndex)";
-                var removeBody =
-                    accessorType == "WorldAccessor"
-                        ? "world.Set<TSet>().Defer.Remove(_entityIndex)"
-                        : "world.SetRemove<TSet>(_entityIndex)";
-
-                sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
-                sb.AppendLine(
-                    indentLevel,
-                    $"public readonly void AddToSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => {addBody};"
-                );
-                sb.AppendLine();
-
-                sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
-                sb.AppendLine(
-                    indentLevel,
-                    $"public readonly void RemoveFromSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => {removeBody};"
-                );
-                sb.AppendLine();
             }
         }
 
