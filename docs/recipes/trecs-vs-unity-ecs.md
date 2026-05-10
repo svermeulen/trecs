@@ -1,6 +1,6 @@
 # Trecs vs Unity ECS
 
-A comparison for developers familiar with Unity's built-in ECS (Entities package).
+A comparison for developers familiar with Unity's built-in ECS (Entities package). Targets the current Entities 1.x line.
 
 Trecs has a deliberately small API surface — a handful of core high level concepts, with source generation doing the heavy lifting for low level operations.
 
@@ -51,12 +51,12 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | | Unity ECS | Trecs |
 |---|---|---|
 | **Building a query** | `SystemAPI.Query<T>()`, `EntityQuery` via `GetEntityQuery()` | [`World.Query()`](../data-access/queries-and-iteration.md) builder (chain `WithTags<T>` / `WithComponents<T>` / `InSet<T>`), `MyAspect.Query(World)` for typed aspect iteration, or [`[ForEachEntity]`](../core/systems.md#foreachentity) method |
-| **Bundled component access** | Aspects (`IAspect` + `RefRO`/`RefRW`) | [Aspects](../data-access/aspects.md) (`IAspect` + `IRead`/`IWrite`) |
+| **Bundled component access** | Aspects (`IAspect` + `RefRO`/`RefRW`) — *deprecated in Entities 1.x; Unity plans to remove them in a future major release in favour of using `IComponentData` and `EntityQuery` directly* | [Aspects](../data-access/aspects.md) (`IAspect` + `IRead`/`IWrite`) |
 | **Iterating in a job** | `IJobEntity` filtered by `Execute` parameter types and `[WithAll]` / `[WithAny]` / `[WithNone]` attributes | `[ForEachEntity]` method on `IJobFor`, or [`[WrapAsJob]`](../performance/jobs-and-burst.md) |
 | **Sparse / dynamic membership** | Enableable components (toggle without structural change) | [Sets](../entity-management/sets.md) — independent membership index, doesn't touch component storage |
 | **Reactive lifecycle** | Change filters or `EntityCommandBuffer` patterns | First-class [`OnAdded` / `OnRemoved` / `OnMoved`](../entity-management/entity-events.md) subscriptions |
 | **Detect component modifications** | Built-in change filters | None built-in |
-| **Polymorphic aspect helpers** | Generic methods over `IAspect` work but no declared contract | [Aspect interfaces](../advanced/aspect-interfaces.md) — `partial interface : IAspect` declares a contract that multiple aspects with matching component shapes can satisfy, enabling generic helpers without boxing or virtual dispatch |
+| **Polymorphic aspect helpers** | Generic methods over `IAspect` work but no declared contract (and `IAspect` itself is deprecated — see above) | [Aspect interfaces](../advanced/aspect-interfaces.md) — `partial interface : IAspect` declares a contract that multiple aspects with matching component shapes can satisfy, enabling generic helpers without boxing or virtual dispatch |
 
 ## Jobs
 
