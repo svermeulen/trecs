@@ -1,10 +1,39 @@
 # Entity Events
 
-Entity events let a service react to structural changes — that is, whenever entities are added, removed, or moved between groups. Observer callbacks fire during [submission](structural-changes.md#when-submission-happens), after the queued change has been applied.
+Entity events let a service react to structural changes — whenever entities are added, removed, or moved between groups. Observer callbacks fire during [submission](structural-changes.md#when-submission-happens), after the queued change has been applied.
 
-## Subscribing
+## Anatomy of a subscription
 
-The recommended pattern is to mark your event handler with `[ForEachEntity]` so the source generator emits the per-entity iteration with the right component access:
+Every entity-event subscription is built fluently in three parts: pick the **scope** (which groups to watch), pick the **event** (add / remove / move), and supply a **handler**:
+
+```csharp
+World.Events
+    .EntitiesWithTags<MyTag>()    // 1. scope
+    .OnRemoved(OnEntityRemoved);  // 2. event   (3. handler is the method passed in)
+```
+
+### Scopes
+
+A scope picks which groups the subscription watches. One of:
+
+| Method | Matches |
+|---|---|
+| `EntitiesWithTags<...>()` | Groups whose tag set includes all of the given tags |
+| `EntitiesWithComponents<T>()` | Groups whose template declares this component |
+| `InGroup(GroupIndex)` | One specific group |
+| `AllEntities()` | Every group |
+
+### Events
+
+| Event | Trigger |
+|-------|---------|
+| `OnAdded` | Entities added to a matching group |
+| `OnRemoved` | Entities removed from a matching group |
+| `OnMoved` | Entities moved from one group to another |
+
+### Handlers
+
+The recommended pattern is to mark the handler with `[ForEachEntity]` so the source generator emits the per-entity iteration with the right component access:
 
 ```csharp
 public partial class RemoveCleanupHandler : IDisposable
@@ -34,19 +63,11 @@ public partial class RemoveCleanupHandler : IDisposable
 }
 ```
 
-Components read inside `OnRemoved` are still valid, even though the callback is triggered _after_ removal.  This is possible because removed entities are parked at the end of the backing array (past the active count), so the buffers haven't been cleared yet. This also means that the removed components are contiguous in memory and therefore cache-friendly for any cleanup.
-
-## Event types
-
-| Event | Trigger |
-|-------|---------|
-| `OnAdded` | Entities added to a matching group |
-| `OnRemoved` | Entities removed from a matching group |
-| `OnMoved` | Entities moved from one group to another |
+Components read inside `OnRemoved` are still valid, even though the callback fires *after* removal — removed entities are parked at the end of the backing array (past the active count), so the buffers haven't been cleared yet. The removed components are also contiguous in memory, which is cache-friendly for cleanup.
 
 ## Aspects in event callbacks
 
-You can use aspects for bundled component access, just like in systems:
+Aspects work in event handlers the same way they do in systems — declare a `partial struct` with `IRead` / `IWrite` and use it as the handler parameter:
 
 ```csharp
 public partial class CleanupHandlers : IDisposable
@@ -81,6 +102,17 @@ public partial class CleanupHandlers : IDisposable
 }
 ```
 
+## Priorities
+
+Call `WithPriority(int)` before `OnAdded` / `OnRemoved` / `OnMoved` to control firing order across observers on the same group (higher = later; default `0`):
+
+```csharp
+World.Events
+    .EntitiesWithTags<GameTags.Bullet>()
+    .WithPriority(10)
+    .OnRemoved(OnBulletRemoved);
+```
+
 ## Disposing subscriptions
 
 Subscriptions returned by `EntitiesWithTags` / `EntitiesWithComponents` / `InGroup` / `AllEntities` all implement `IDisposable`. Dispose the subscription to unregister the handler.
@@ -93,28 +125,7 @@ var sub = World.Events
 sub.Dispose();
 ```
 
-`OnSubmission`, `OnFixedUpdateStarted`, etc. return a plain `IDisposable` for the same purpose.
-
 Trecs doesn't ship a `DisposeCollection` type. The samples define a small helper, but a `List<IDisposable>` walked in `Dispose()` works fine too.
-
-## Scoping events
-
-```csharp
-World.Events.EntitiesWithTags<GameTags.Player>()
-World.Events.EntitiesWithTags<GameTags.Player, GameTags.Active>()
-World.Events.EntitiesWithComponents<Health>()    // groups whose template declares this component
-World.Events.InGroup(group)
-World.Events.AllEntities()
-```
-
-Call `WithPriority(int)` before `OnAdded` / `OnRemoved` / `OnMoved` to control firing order across observers on the same group:
-
-```csharp
-World.Events
-    .EntitiesWithTags<GameTags.Bullet>()
-    .WithPriority(10)
-    .OnRemoved(OnBulletRemoved);
-```
 
 ## Cascading structural changes from callbacks
 
@@ -129,7 +140,7 @@ The [strict-accessor-during-Fixed-execute rule](../advanced/accessor-roles.md#st
 
 ## Frame events
 
-Lifecycle hooks for the simulation loop:
+Separate from entity events, `World.Events` also exposes lifecycle hooks for the simulation loop:
 
 ```csharp
 World.Events.OnFixedUpdateStarted(() => { /* fixed phase begins */ });
@@ -140,4 +151,4 @@ World.Events.OnFixedUpdateCompleted(() => { /* all fixed steps complete */ });
 World.Events.OnVariableUpdateStarted(() => { /* variable phase begins */ });
 ```
 
-Each returns `IDisposable`; call `.Dispose()` to unsubscribe. Each method also has a `(Action, int priority)` overload for ordering. `OnDeserializeCompleted` is also available for reacting to a snapshot/recording load.
+Each returns `IDisposable`; call `.Dispose()` to unsubscribe. Each method also has a `(Action, int priority)` overload for ordering. `OnDeserializeCompleted` is also available for reacting to a snapshot / recording load.
