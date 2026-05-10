@@ -3,6 +3,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
+using Trecs.Internal;
 
 // Unlike Branching/Filters, the Partitions approach uses tag-based groups to
 // ensure NotEating fish and NotEating meals are in the same group with matching

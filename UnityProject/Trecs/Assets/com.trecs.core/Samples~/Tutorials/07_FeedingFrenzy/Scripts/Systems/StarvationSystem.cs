@@ -1,6 +1,7 @@
 using System;
 using Unity.Mathematics;
 using UnityEngine;
+using Trecs.Internal;
 
 namespace Trecs.Samples.FeedingFrenzy101
 {

@@ -27,6 +27,7 @@ namespace Trecs.SourceGen
     internal static class TrecsNamespaces
     {
         public const string Trecs = "Trecs";
+        public const string TrecsInternal = "Trecs.Internal";
     }
 
     internal static class TrecsCodeGenConstants

@@ -1,3 +1,5 @@
+using Trecs.Internal;
+
 namespace Trecs.Serialization.Samples.Snake
 {
     /// <summary>

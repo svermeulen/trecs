@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using Trecs.Internal;
 
 namespace Trecs.Samples.Pointers
 {

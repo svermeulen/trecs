@@ -1,3 +1,5 @@
+using Trecs.Internal;
+
 namespace Trecs.Samples.ReactiveEvents
 {
     /// <summary>

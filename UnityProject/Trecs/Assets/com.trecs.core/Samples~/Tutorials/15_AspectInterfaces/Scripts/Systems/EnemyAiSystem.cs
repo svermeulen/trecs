@@ -1,5 +1,6 @@
 using Unity.Mathematics;
 using Random = Unity.Mathematics.Random;
+using Trecs.Internal;
 
 namespace Trecs.Samples.AspectInterfaces
 {

@@ -1,4 +1,5 @@
 using UnityEngine;
+using Trecs.Internal;
 
 namespace Trecs.Samples.SpawnAndDestroy
 {

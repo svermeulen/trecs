@@ -661,7 +661,7 @@ namespace Trecs.SourceGen
                 if (
                     paramType.Name == "EntityIndex"
                     && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
-                        == TrecsNamespaces.Trecs
+                        == TrecsNamespaces.TrecsInternal
                 )
                 {
                     if (hasEntityIndex)

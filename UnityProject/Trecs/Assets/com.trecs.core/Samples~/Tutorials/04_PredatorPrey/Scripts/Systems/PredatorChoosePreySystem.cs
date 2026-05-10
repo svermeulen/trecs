@@ -1,4 +1,5 @@
 using Unity.Mathematics;
+using Trecs.Internal;
 
 namespace Trecs.Samples.PredatorPrey
 {

@@ -1,13 +1,17 @@
 using System;
 using System.Runtime.CompilerServices;
-using Trecs.Internal;
 using Unity.Mathematics;
 
-namespace Trecs
+namespace Trecs.Internal
 {
     /// <summary>
     /// A transient entity identifier composed of a buffer index within a specific group.
     /// Unlike <see cref="EntityHandle"/>, this value may change when entities are added or removed.
+    /// <para>
+    /// This type lives in <c>Trecs.Internal</c> to communicate that it is not part of the
+    /// public API. It remains <c>public</c> so source-generated code can reference it.
+    /// User code should use <see cref="EntityHandle"/> and <see cref="EntityAccessor"/>.
+    /// </para>
     /// </summary>
     public readonly struct EntityIndex
         : IEquatable<EntityIndex>,

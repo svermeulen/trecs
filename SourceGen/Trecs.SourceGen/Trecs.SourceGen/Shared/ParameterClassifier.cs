@@ -355,7 +355,7 @@ namespace Trecs.SourceGen.Shared
                 bool isEntityIndex = SymbolAnalyzer.IsExactType(
                     paramType,
                     "EntityIndex",
-                    TrecsNamespaces.Trecs
+                    TrecsNamespaces.TrecsInternal
                 );
                 bool isWorldAccessor = SymbolAnalyzer.IsExactType(
                     paramType,

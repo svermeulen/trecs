@@ -1,4 +1,5 @@
 using System;
+using Trecs.Internal;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark
 {

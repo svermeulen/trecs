@@ -91,6 +91,8 @@ internal static class TrecsStubs
 
         namespace Trecs
         {
+            using Trecs.Internal;
+
             // Marker interfaces consumed by EntityComponentGenerator and
             // AspectGenerator base-list scanning.
             public interface IEntityComponent { }
@@ -106,20 +108,6 @@ internal static class TrecsStubs
                 public int Index => 0;
                 public bool IsNull => true;
                 public static GroupIndex Null => default;
-            }
-
-            public readonly struct EntityIndex
-            {
-                public readonly int Index;
-                public readonly GroupIndex GroupIndex;
-                public static EntityIndex Null => default;
-                public bool IsNull => false;
-
-                public EntityIndex(int index, GroupIndex group) { Index = index; GroupIndex = group; }
-
-                // Aspect ctors call `_entityIndex.WithIndex(...)` to advance the index field
-                // during iteration without rebuilding the GroupIndex.
-                public EntityIndex WithIndex(int index) => new EntityIndex(index, GroupIndex);
             }
 
             public readonly struct EntityHandle
@@ -745,6 +733,22 @@ internal static class TrecsStubs
 
         namespace Trecs.Internal
         {
+            // EntityIndex lives in Trecs.Internal — the public Trecs API uses EntityHandle.
+            // The type stays public so source-generated code in user assemblies can reference it.
+            public readonly struct EntityIndex
+            {
+                public readonly int Index;
+                public readonly GroupIndex GroupIndex;
+                public static EntityIndex Null => default;
+                public bool IsNull => false;
+
+                public EntityIndex(int index, GroupIndex group) { Index = index; GroupIndex = group; }
+
+                // Aspect ctors call `_entityIndex.WithIndex(...)` to advance the index field
+                // during iteration without rebuilding the GroupIndex.
+                public EntityIndex WithIndex(int index) => new EntityIndex(index, GroupIndex);
+            }
+
             // Real signature lives at Packages/com.trecs.core/Scripts/Util/UnmanagedUtil.cs.
             // Generated equality / operator overloads in EntityComponentGenerator
             // call BlittableEquals; the body doesn't matter for compile-cleanliness tests.
