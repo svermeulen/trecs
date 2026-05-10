@@ -23,7 +23,7 @@ public partial class ParticleMoveSystem : ISystem
 
 Two requirements:
 
-- **`static`** — calling instance state (e.g. `World`) from inside a Burst job is unsafe; the C# compiler enforces this at the call site instead of inside generated code.
+- **`static`** — your method runs inside a generated Burst job, so it can't capture instance state (like the system's `World` property). Declaring it `static` lets the C# compiler reject accidental references at the call site rather than failing later inside Burst.
 - **Use `NativeWorldAccessor`, not `WorldAccessor`**, for any world-level reads (`DeltaTime`, structural ops, set ops) inside the body.
 
 Then, instead of calling your system `Execute()` method directly, Trecs will schedule a job instead, and inside the job it will call your static method.
