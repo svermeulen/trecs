@@ -62,14 +62,9 @@ highlighted.Remove(entityIndex);
 ```
 
 !!! warning "Don't mutate a set while iterating it"
-    Immediate `Add`, `Remove`, and `Clear` modify the set's storage in place. Calling them on the same set + same group you're currently iterating corrupts iteration — entries get skipped, revisited, or (when an `Add` grows the underlying buffer) read from freed memory.
+    The one unsafe combination is using an immediate `Add` / `Remove` / `Clear` on the **same set in the same group** you're currently iterating — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
 
-    | Op during iteration of set `S`, group `G` | Same set + same group | Same set, different group | Different set |
-    |---|---|---|---|
-    | Immediate `Add` / `Remove` / `Clear` (`Set<T>().Write`) | **Unsafe** | Safe | Safe |
-    | Deferred `Add` / `Remove` / `Clear` (`Set<T>().Defer`) | Safe (applied at next submission) | Safe | Safe |
-
-    DEBUG builds throw at the point of misuse. Release builds corrupt silently.
+    Everything else is safe: mutating a different set, mutating the same set in a different group, or using the deferred API (`Set<T>().Defer`) on the iterated set (it applies at the next submission). DEBUG builds throw at the point of misuse; release builds corrupt silently.
 
     To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `List<EntityIndex>` and apply them after the loop.
 
@@ -128,7 +123,7 @@ Notes:
 
 - Sets are **not auto-cleared** between frames. Clear them yourself in the producer system if that's the contract you want.
 - Cache the `SetWrite<T>` returned by `Set<T>().Write` outside the loop. Each `.Write` access syncs outstanding job writes; caching syncs once and then writes hit the buffer directly.
-- From a Burst job, capture a `NativeSetCommandBuffer<T>` as a field for thread-safe `Add` / `Remove`. Clearing from inside a job isn't supported — call `World.Set<T>().Defer.Clear()` (deferred) before the job dispatches, or `Set<T>().Write.Clear()` on the main thread.
+- From a Burst job, capture a `NativeSetCommandBuffer<T>` as a field for thread-safe `Add` / `Remove` / `Clear`. Job-side `Clear` wipes the set's pre-existing contents and supersedes any `Add` / `Remove` queued in the same writer-job-cycle, regardless of call order — analogous to the deferred-clear semantics on `Set<T>().Defer.Clear()`.
 
 ## Sets vs tags
 
