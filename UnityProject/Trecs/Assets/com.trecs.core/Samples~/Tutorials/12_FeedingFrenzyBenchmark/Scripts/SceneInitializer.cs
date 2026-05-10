@@ -10,7 +10,12 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             _settings = settings;
             _config = config;
 
-            World = world.CreateAccessor(AccessorRole.Fixed);
+            // Unrestricted because the initial values for the [Input]-marked
+            // DesiredPreset / DesiredIterationStyle fields come from runtime
+            // settings rather than the template default. World.AddInput is
+            // only callable from Input-phase systems, so pre-tick scene
+            // setup uses the documented escape-hatch role instead.
+            World = world.CreateAccessor(AccessorRole.Unrestricted);
         }
 
         WorldAccessor World { get; }

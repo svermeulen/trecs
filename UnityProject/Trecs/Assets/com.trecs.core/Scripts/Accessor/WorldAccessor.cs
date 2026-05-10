@@ -961,6 +961,14 @@ namespace Trecs
                 return;
             }
 
+            Assert.That(
+                !dec.IsInput,
+                "Cannot write [Input] component {} from {}-role accessor {}. Input components are externally driven — values must be supplied via World.AddInput<T>(...) inside an [ExecuteIn(SystemPhase.Input)] system so that recording / playback can replay them deterministically.",
+                typeof(T),
+                _role,
+                DebugName
+            );
+
             if (IsFixed)
             {
                 Assert.That(

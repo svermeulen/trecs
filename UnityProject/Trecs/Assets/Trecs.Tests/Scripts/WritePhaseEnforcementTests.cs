@@ -525,6 +525,44 @@ namespace Trecs.Tests
         }
     }
 
+    partial class FixedInputCompWriter : ISystem
+    {
+        public void Execute()
+        {
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            {
+                ref var v = ref World.Component<WritePhaseInputComp>(idx).Write;
+                v.Value = 1;
+            }
+        }
+    }
+
+    [ExecuteIn(SystemPhase.Presentation)]
+    partial class PresentationInputCompWriter : ISystem
+    {
+        public void Execute()
+        {
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            {
+                ref var v = ref World.Component<WritePhaseInputComp>(idx).Write;
+                v.Value = 1;
+            }
+        }
+    }
+
+    [ExecuteIn(SystemPhase.Input)]
+    partial class InputInputCompWriter : ISystem
+    {
+        public void Execute()
+        {
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            {
+                ref var v = ref World.Component<WritePhaseInputComp>(idx).Write;
+                v.Value = 1;
+            }
+        }
+    }
+
     [TestFixture]
     public class WritePhaseEnforcementTests
     {
@@ -963,6 +1001,54 @@ namespace Trecs.Tests
             // desync replay across runs.
             using var env = CreateEnvWithSystem(new InputFixedRngReader());
             NAssert.Throws<TrecsException>(() => env.World.Tick());
+        }
+
+        // ── [Input] write guard ─────────────────────────────────────
+        //
+        // [Input] components are externally-driven values; the only legal
+        // writers are the Input-phase apply step (Unrestricted accessor) and
+        // the Unrestricted escape hatch. Direct .Write from any system role
+        // is rejected — Input-role systems must go through World.AddInput<T>.
+
+        [Test]
+        public void Write_FromFixed_ToInputComponent_Throws()
+        {
+            using var env = CreateEnvWithSystem(new FixedInputCompWriter());
+            NAssert.Throws<TrecsException>(() => env.World.Tick());
+        }
+
+        [Test]
+        public void Write_FromPresentation_ToInputComponent_Throws()
+        {
+            using var env = CreateEnvWithSystem(new PresentationInputCompWriter());
+            NAssert.Throws<TrecsException>(() => env.World.Tick());
+        }
+
+        [Test]
+        public void Write_FromInput_ToInputComponent_Throws()
+        {
+            // Input-role systems may enqueue values via AddInput, but direct
+            // .Write to an [Input] component is still rejected — the rule is
+            // "only Unrestricted writes," not "Input-or-Unrestricted writes."
+            using var env = CreateEnvWithSystem(new InputInputCompWriter());
+            NAssert.Throws<TrecsException>(() => env.World.Tick());
+        }
+
+        [Test]
+        public void Write_FromUnrestricted_ToInputComponent_Succeeds()
+        {
+            // Unrestricted is the documented escape hatch. The apply step
+            // itself runs through an Unrestricted accessor, so the new IsInput
+            // guard must sit *after* the IsUnrestricted early-return in
+            // AssertCanWriteComponent. This test pins that ordering.
+            using var env = CreateEnvWithSystem(new FixedSimWriter());
+            foreach (var idx in env.Accessor.Query().WithTags(TestTags.Alpha).EntityIndices())
+            {
+                ref var v = ref env.Accessor.Component<WritePhaseInputComp>(idx).Write;
+                v.Value = 7;
+                NAssert.AreEqual(7, env.Accessor.Component<WritePhaseInputComp>(idx).Read.Value);
+                return;
+            }
         }
     }
 }
