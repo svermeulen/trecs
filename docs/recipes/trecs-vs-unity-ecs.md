@@ -85,6 +85,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | **Edit-time authoring → entities** | Subscene baking — designers author with `MonoBehaviour`s, baked at edit/build time | No direct equivalent (yet) |
 | **Runtime save/load of full world state** | Limited runtime serialization | Built-in full game state [serialization](../advanced/serialization.md) (snapshots, save/load, replays) |
 | **Incremental scene streaming** | Subscenes load incrementally (open-world / large-scale streaming) | None built-in — full snapshots only |
+| **Custom type serializers** | None built-in for ECS save/load; managed/non-blittable types need bespoke save/load code | Built in full serialization library — register `ISerializer<T>` for any managed type and reuse across snapshots, recording bundles, or your own save format |
 | **Per-save versioning** | Handled outside the engine | `Reader.Version` / `Writer.Version` for evolving custom serializers across save format revisions |
 
 ## Editor tooling
@@ -92,17 +93,17 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | | Unity ECS | Trecs |
 |---|---|---|
 | **Entity inspector** | Entity Debugger, Hierarchy window | [Hierarchy inspector](../editor-windows/hierarchy.md) |
-| **Live editing of running entities** | Live baking — edits to subscene `MonoBehaviour` authoring sources are re-baked and flowed into the running entity world | [Hierarchy window](../editor-windows/hierarchy.md) — per-entity JSON-editable component inspector mutates running entities directly |
+| **Live editing of running entities** | Live baking — edits to subscene `MonoBehaviour` authoring sources are re-baked and flowed into the running entity world | [Hierarchy window](../editor-windows/hierarchy.md) — per-entity component inspector mutates running entities directly |
 | **Record / scrub / fork timeline** | None built-in | [Player window](../editor-windows/player.md) — record a session, scrub back through earlier frames, fork the timeline |
 
 ## Physics & rendering
 
 | | Unity ECS | Trecs |
 |---|---|---|
-| **Physics** | Unity Physics (built-in) | External (via OOP bridge) |
-| **Rendering** | Entities Graphics package | User-owned — bring your own approach |
+| **Physics** | com.unity.physics | None |
+| **Rendering** | Entities Graphics package | User-owned — DIY. Samples provide some common approaches |
 | **Transform hierarchy** | Built-in `LocalTransform` + `Parent` / `Child` system maintaining `LocalToWorld` | None built-in — define your own components |
-| **GameObject ↔ Entity hybrid** | Companion Components — an entity can carry a managed Unity `GameObject` "shadow" maintained by the framework | Manual bridging via a `GameObjectId` component plus a user-side registry (the samples ship a `GameObjectRegistry` helper) |
+| **GameObject ↔ Entity hybrid** | Companion Components — an entity can carry a managed Unity `GameObject` "shadow" maintained by the framework | User-owned. Samples provide some common approaches |
 
 ## Tag-based identity
 

@@ -248,7 +248,7 @@ public partial class RendererSystem : ISystem
 
 `OnShutdown` is wired by source generation — declare it as a `partial void` and leave the implementation in the system's main partial. Don't declare it if you don't need it.
 
-`OnShutdown` runs in the **reverse** of `OnReady` order: phases reversed (`LatePresentation` → `Presentation` → `EarlyPresentation` → `Fixed` → `Input`), and within each phase, sorted systems traversed in reverse. This mirrors the standard last-in-first-out teardown pattern, so a system that depends on another at `OnReady` time can rely on its dependency still being alive at `OnShutdown` time.
+`OnShutdown` runs in the **reverse** of `OnReady` order: phases reversed (`LatePresentation` → `Presentation` → `Fixed` → `Input` → `EarlyPresentation`), and within each phase, sorted systems traversed in reverse. This mirrors the standard last-in-first-out teardown pattern, so a system that depends on another at `OnReady` time can rely on its dependency still being alive at `OnShutdown` time.
 
 `OnShutdown` is **not** called if `World.Initialize()` was never reached or did not complete — there's nothing to tear down in that case.
 

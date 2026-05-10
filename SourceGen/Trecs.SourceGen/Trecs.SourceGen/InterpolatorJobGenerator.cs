@@ -163,6 +163,10 @@ namespace {nameSpace}
         {{
         }}
 
+        void Trecs.Internal.ISystemInternal.Shutdown()
+        {{
+        }}
+
         public void Execute()
         {{
             var percentThroughFixedFrame = InterpolationUtil.CalculatePercentThroughFixedFrame(_world);

@@ -30,5 +30,6 @@ namespace Trecs.Internal
     {
         WorldAccessor World { get; set; }
         void Ready();
+        void Shutdown();
     }
 }

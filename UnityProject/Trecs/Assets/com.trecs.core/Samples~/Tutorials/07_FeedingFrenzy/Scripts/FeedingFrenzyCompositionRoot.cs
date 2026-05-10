@@ -87,7 +87,7 @@ namespace Trecs.Samples.FeedingFrenzy101
             initializables = new() { world.Initialize };
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { cleanupHandler.Dispose, renderer.Dispose, world.Dispose };
+            disposables = new() { cleanupHandler.Dispose, world.Dispose };
         }
     }
 }

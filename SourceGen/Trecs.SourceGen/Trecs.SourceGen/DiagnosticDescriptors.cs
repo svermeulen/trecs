@@ -342,26 +342,6 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // Hook method migration diagnostics (TRECS061-062)
-
-        public static readonly DiagnosticDescriptor OldStyleInitializeHook = new(
-            id: "TRECS061",
-            title: "Old-style Ready hook detected",
-            messageFormat: "Replace 'void Ready()' with 'partial void OnReady()'. The old hook pattern is no longer supported.",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
-        public static readonly DiagnosticDescriptor PartialMethodWrongName = new(
-            id: "TRECS062",
-            title: "Partial method uses old hook name",
-            messageFormat: "Rename 'partial void {0}(...)' to 'partial void {1}(...)'. The hook method name has changed.",
-            category: TrecsCategory,
-            DiagnosticSeverity.Error,
-            isEnabledByDefault: true
-        );
-
         // Job scheduling diagnostics (TRECS070, 071, 073-079; 072 unused)
 
         public static readonly DiagnosticDescriptor JobInsideGenericOuterTypeNotSupported = new(

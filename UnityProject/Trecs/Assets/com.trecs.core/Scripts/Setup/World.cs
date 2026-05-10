@@ -477,6 +477,15 @@ namespace Trecs
             }
 #endif
 
+            // OnShutdown user hooks run while the world is still fully functional —
+            // queries and events still work. Mirrors OnReady's "world is fully built"
+            // contract on the teardown side. Skipped if Initialize never completed,
+            // because no system reached Ready().
+            if (_initializeCompleted)
+            {
+                CallSystemShutdownHooks();
+            }
+
             if (_settings.TriggerRemoveEventsOnDispose && _initializeCompleted)
             {
                 TriggerAllRemoveEvents();
@@ -618,7 +627,7 @@ namespace Trecs
             }
         }
 
-        // OnReady runs in execute order: Input → Fixed → EarlyPresentation → Presentation → LatePresentation,
+        // OnReady runs in runtime execute order: EarlyPresentation → Input → Fixed → Presentation → LatePresentation,
         // with [ExecuteAfter]/[ExecuteBefore]/[ExecutePriority] applied within each phase.
         void CallSystemReadyHooks(SystemLoader.LoadInfo loadInfo)
         {
@@ -628,15 +637,15 @@ namespace Trecs
                 systemInternal.Ready();
             }
 
+            foreach (var globalIndex in loadInfo.SortedEarlyPresentationSystems)
+            {
+                CallReady(globalIndex);
+            }
             foreach (var globalIndex in loadInfo.SortedInputSystems)
             {
                 CallReady(globalIndex);
             }
             foreach (var globalIndex in loadInfo.SortedFixedSystems)
-            {
-                CallReady(globalIndex);
-            }
-            foreach (var globalIndex in loadInfo.SortedEarlyPresentationSystems)
             {
                 CallReady(globalIndex);
             }
@@ -648,6 +657,32 @@ namespace Trecs
             {
                 CallReady(globalIndex);
             }
+        }
+
+        // Strict reverse of CallSystemReadyHooks: phases in reverse, and within each
+        // phase, sorted systems in reverse. Driven from _systemRunner because loadInfo
+        // is not retained past Initialize.
+        void CallSystemShutdownHooks()
+        {
+            void CallShutdown(int globalIndex)
+            {
+                var systemInternal = (ISystemInternal)_systemRunner.Systems[globalIndex].System;
+                systemInternal.Shutdown();
+            }
+
+            void IterateReverse(IReadOnlyList<int> sorted)
+            {
+                for (int i = sorted.Count - 1; i >= 0; i--)
+                {
+                    CallShutdown(sorted[i]);
+                }
+            }
+
+            IterateReverse(_systemRunner.SortedLatePresentationSystems);
+            IterateReverse(_systemRunner.SortedPresentationSystems);
+            IterateReverse(_systemRunner.SortedFixedSystems);
+            IterateReverse(_systemRunner.SortedInputSystems);
+            IterateReverse(_systemRunner.SortedEarlyPresentationSystems);
         }
 
         /// <summary>

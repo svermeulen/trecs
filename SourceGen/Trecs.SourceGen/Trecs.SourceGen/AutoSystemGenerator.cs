@@ -445,61 +445,6 @@ namespace Trecs.SourceGen
                 {
                     hasUserDefinedExecute = true;
                 }
-
-                if (member.ExplicitInterfaceImplementations.Length > 0)
-                    continue;
-
-                var location = member.Locations.FirstOrDefault() ?? Location.None;
-
-                // Old-style Ready() — not partial
-                if (
-                    member.Name == "Ready"
-                    && member.Parameters.Length == 0
-                    && !member.IsPartialDefinition
-                    && member.PartialDefinitionPart == null
-                )
-                {
-                    reportDiagnostic(
-                        Diagnostic.Create(DiagnosticDescriptors.OldStyleInitializeHook, location)
-                    );
-                    isValid = false;
-                }
-
-                // Partial method with wrong name (user wrote "partial void Ready()" instead of "partial void OnReady()")
-                if (
-                    member.Name == "Ready"
-                    && member.Parameters.Length == 0
-                    && (member.IsPartialDefinition || member.PartialDefinitionPart != null)
-                )
-                {
-                    reportDiagnostic(
-                        Diagnostic.Create(
-                            DiagnosticDescriptors.PartialMethodWrongName,
-                            location,
-                            "Ready",
-                            "OnReady"
-                        )
-                    );
-                    isValid = false;
-                }
-
-                if (
-                    member.Name == "DeclareDependencies"
-                    && member.Parameters.Length == 1
-                    && member.Parameters[0].Type.Name == "IAccessDeclarations"
-                    && (member.IsPartialDefinition || member.PartialDefinitionPart != null)
-                )
-                {
-                    reportDiagnostic(
-                        Diagnostic.Create(
-                            DiagnosticDescriptors.PartialMethodWrongName,
-                            location,
-                            "DeclareDependencies",
-                            "OnDeclareDependencies"
-                        )
-                    );
-                    isValid = false;
-                }
             }
 
             // Check for TRECS044: user-defined Execute() AND iteration method named Execute
@@ -725,6 +670,13 @@ namespace Trecs.SourceGen
             sb.AppendLine(2, "void Trecs.Internal.ISystemInternal.Ready()");
             sb.AppendLine(2, "{");
             sb.AppendLine(3, "OnReady();");
+            sb.AppendLine(2, "}");
+            sb.AppendLine();
+            sb.AppendLine(2, "partial void OnShutdown();");
+            sb.AppendLine();
+            sb.AppendLine(2, "void Trecs.Internal.ISystemInternal.Shutdown()");
+            sb.AppendLine(2, "{");
+            sb.AppendLine(3, "OnShutdown();");
             sb.AppendLine(2, "}");
             sb.AppendLine();
         }

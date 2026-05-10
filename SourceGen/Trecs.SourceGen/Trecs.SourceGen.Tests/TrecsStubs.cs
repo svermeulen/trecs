@@ -795,6 +795,7 @@ internal static class TrecsStubs
             {
                 Trecs.WorldAccessor World { get; set; }
                 void Ready();
+                void Shutdown();
             }
 
             // Assert.That — generated code (e.g. AutoSystemGenerator's World setter, aspect

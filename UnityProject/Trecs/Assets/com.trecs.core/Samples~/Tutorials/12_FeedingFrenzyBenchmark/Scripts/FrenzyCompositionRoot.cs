@@ -150,7 +150,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 perfStats.Dispose,
                 world.Dispose,
                 () => CurrentWorld = null,
-                renderer.Dispose,
             };
         }
 

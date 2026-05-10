@@ -42,8 +42,6 @@ TRECS047 | Trecs | Error | System has no Execute method
 TRECS050 | Trecs | Error | Iteration method cannot be static
 TRECS051 | Trecs | Error | Iteration method cannot be abstract
 TRECS053 | Trecs | Error | Both Tag and Tags specified
-TRECS061 | Trecs | Error | Old-style Ready hook detected
-TRECS062 | Trecs | Error | Partial method uses old hook name
 TRECS070 | Trecs | Warning | Use the generated ScheduleParallel/Schedule member instead of Unity's raw schedule extension
 TRECS071 | Trecs | Error | Unsupported [FromWorld] field type
 TRECS073 | Trecs | Error | Job nested inside generic outer type

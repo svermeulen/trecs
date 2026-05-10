@@ -69,7 +69,7 @@ namespace Trecs.Samples.JobSystem
             initializables = new() { world.Initialize };
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { renderer.Dispose, world.Dispose };
+            disposables = new() { world.Dispose };
         }
     }
 }

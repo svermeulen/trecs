@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Trecs.Internal;
@@ -12,7 +11,7 @@ using UnityEngine.Rendering;
 namespace Trecs.Samples
 {
     [ExecuteIn(SystemPhase.Presentation)]
-    public partial class RendererSystem : ISystem, IDisposable
+    public partial class RendererSystem : ISystem
     {
         // Batch size for the fallback path. Must match the shader's
         // `instancing_options maxcount:250`. 250 keeps the instanced cbuffer
@@ -118,7 +117,7 @@ namespace Trecs.Samples
             }
         }
 
-        public void Dispose()
+        partial void OnShutdown()
         {
             foreach (var info in _renderables)
             {
