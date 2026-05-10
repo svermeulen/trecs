@@ -2,7 +2,7 @@
 
 A comparison for developers familiar with Unity's built-in ECS (Entities package).
 
-Trecs has a deliberately small API surface — a handful of core concepts, with source generation doing the heavy lifting. Unity ECS covers more ground (multiple system base types, several iteration patterns, several component flavors, the baking pipeline, NetCode) and exposes a much larger surface to match. For the simulation-focused workloads Trecs targets, the smaller surface is part of the point — less to learn, less to get wrong.
+Trecs has a deliberately small API surface — a handful of core concepts, with source generation doing the heavy lifting. Unity ECS covers more ground (multiple system base types, several iteration patterns, several component flavors, the baking pipeline, NetCode) and exposes a much larger API surface to match. For the kind of project Trecs targets — games where determinism, replays, and networked rollback are first-class concerns — the smaller surface is part of the point: less to learn, less to get wrong.
 
 ## Architecture
 
