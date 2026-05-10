@@ -32,17 +32,17 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | Unity ECS | Trecs |
 |---|---|
 | `ISystem` with `OnUpdate()` | `ISystem` with `Execute()` |
-| `SystemAPI.Query<T>()` | `[ForEachEntity]` source generation, or `World.Query()` / `Aspect.Query(World)` for hand-rolled iteration |
+| `SystemAPI.Query<T>()` | `[ForEachEntity]` source generation |
 | `[UpdateAfter]` / `[UpdateBefore]` | `[ExecuteAfter]` / `[ExecuteBefore]` |
 | System groups (`InitializationSystemGroup`, etc.) | Five phases (EarlyPresentation, Input, Fixed, Presentation, LatePresentation) |
-| Framework discovers and instantiates systems via reflection | User instantiates systems explicitly (`new FooSystem(dep1, dep2)`) and registers them |
+| Framework discovers and instantiates systems via reflection | User instantiates systems themselves and registers them |
 | Struct `ISystem` can be Burst-compiled wholesale | Systems are managed classes; Burst is opt-in per job via `[WrapAsJob]` |
 
 ### Queries
 
 | Unity ECS | Trecs |
 |---|---|
-| `EntityQuery` via `GetEntityQuery()` | `World.Query().WithTags<T>()` |
+| `EntityQuery` via `GetEntityQuery()` | `World.Query()` builder (chain `WithTags<T>` / `WithComponents<T>` / `InSet<T>`), or `MyAspect.Query(World)` for typed aspect iteration |
 | Aspects (`IAspect` + `RefRO`/`RefRW`) | Aspects (`IAspect` + `IRead`/`IWrite`) |
 | `IJobEntity` with query attributes | `[ForEachEntity]` with tag/component scope |
 | Enableable components | [Sets](../entity-management/sets.md) for sparse filtering |
