@@ -28,6 +28,8 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | **Runtime add / remove of components** | Yes (`AddComponent` / `RemoveComponent`; causes archetype move) | No — a template's component set is fixed at compile time. Use [partitions](../core/templates.md#partitions), boolean / enum fields, [sets](../entity-management/sets.md), or child entities for the equivalents |
 | **Components shared across many entities** | `ISharedComponentData` | No equivalent; share by reference via a heap pointer |
 | **Cleanup-after-destroy components** | `ICleanupComponentData` — persists past entity destruction so a system can finalize and explicitly remove them | None — use [`OnRemoved`](../entity-management/entity-events.md) observer events for finalization |
+| **Per-chunk shared data** | Chunk components — one value attached per chunk (a 16 KB block of entities in the same archetype) | None — Trecs uses flat per-group buffers without sub-chunks; share via a [heap pointer](../advanced/heap.md) or a `Globals` component |
+| **Shared immutable blob assets** | `BlobAssetReference<T>` — structured immutable blobs shared across entities, baked into subscenes by a stable hash | [`SharedPtr<T>` / `NativeSharedPtr<T>`](../advanced/heap.md) with [stable `BlobId`s](../advanced/heap-allocation-rules.md#stable-blobids-when-init-isnt-deterministic) for cross-run identity |
 
 ## Systems
 
@@ -54,6 +56,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | **Sparse / dynamic membership** | Enableable components (toggle without structural change) | [Sets](../entity-management/sets.md) — independent membership index, doesn't touch component storage |
 | **Reactive lifecycle** | Change filters or `EntityCommandBuffer` patterns | First-class [`OnAdded` / `OnRemoved` / `OnMoved`](../entity-management/entity-events.md) subscriptions |
 | **Detect component modifications** | Built-in change filters | None built-in |
+| **Polymorphic aspect helpers** | Generic methods over `IAspect` work but no declared contract | [Aspect interfaces](../advanced/aspect-interfaces.md) — `partial interface : IAspect` declares a contract that multiple aspects with matching component shapes can satisfy, enabling generic helpers without boxing or virtual dispatch |
 
 ## Jobs
 
