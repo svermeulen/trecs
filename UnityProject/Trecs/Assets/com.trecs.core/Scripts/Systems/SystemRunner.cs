@@ -32,6 +32,7 @@ namespace Trecs.Internal
         SimpleSubject _fixedUpdateCompleted;
         SimpleSubject _fixedUpdateStarted;
         SimpleSubject _variableUpdateStarted;
+        SimpleSubject _variableUpdateCompleted;
 
         SystemEnableState _enableState;
         List<ExecutableSystemInfo> _systems;
@@ -413,10 +414,12 @@ namespace Trecs.Internal
             Assert.IsNull(_fixedUpdateStarted);
             Assert.IsNull(_fixedUpdateCompleted);
             Assert.IsNull(_variableUpdateStarted);
+            Assert.IsNull(_variableUpdateCompleted);
 
             _fixedUpdateStarted = eventsManager.FixedUpdateStartedEvent;
             _fixedUpdateCompleted = eventsManager.FixedUpdateCompletedEvent;
             _variableUpdateStarted = eventsManager.VariableUpdateStartedEvent;
+            _variableUpdateCompleted = eventsManager.VariableUpdateCompletedEvent;
         }
 
         public void Dispose()
@@ -938,6 +941,11 @@ namespace Trecs.Internal
 
             _elapsedVariableTime += _variableDeltaTime.Value;
             _elapsedVariableTimeChangeEvent.Invoke(_elapsedVariableTime);
+
+            using (TrecsProfiling.Start("VariableUpdateCompleted Handlers"))
+            {
+                _variableUpdateCompleted.Invoke();
+            }
         }
 
         internal void OnEcsDeserializeCompleted()

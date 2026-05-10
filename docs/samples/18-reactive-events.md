@@ -86,7 +86,7 @@ For intra-ECS reactions (e.g. "when an enemy is added, spawn a spawn-VFX entity"
 
 ## Frame events
 
-Outside of per-entity events, `Events` also exposes frame-level callbacks: `OnSubmissionStarted`, `OnSubmission`, `OnFixedUpdateStarted`, `OnFixedUpdateCompleted`, `OnVariableUpdateStarted`, `OnPostApplyInputs`. See [Entity Events — Frame Events](../entity-management/entity-events.md#frame-events) for the full list.
+Outside of per-entity events, `Events` also exposes frame-level callbacks: `OnSubmissionStarted`, `OnSubmissionCompleted`, `OnFixedUpdateStarted`, `OnFixedUpdateCompleted`, `OnVariableUpdateStarted`, `OnVariableUpdateCompleted`, `OnInputsApplied`. See [Entity Events — Frame Events](../entity-management/entity-events.md#frame-events) for the full list.
 
 ## Concepts introduced
 

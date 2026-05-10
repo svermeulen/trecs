@@ -259,9 +259,9 @@ namespace Trecs.Internal
 #endif
                 if (hasEverSubmitted)
                 {
-                    using (TrecsProfiling.Start("NotifyOnSubmission"))
+                    using (TrecsProfiling.Start("NotifyOnSubmissionCompleted"))
                     {
-                        _eventsManager.NotifyOnSubmission();
+                        _eventsManager.NotifyOnSubmissionCompleted();
                     }
                 }
             }

@@ -157,16 +157,17 @@ namespace Trecs
         public IDisposable OnDeserializeCompleted(Action cb, int priority) =>
             _eventsManager.DeserializeCompletedEvent.Subscribe(cb, priority);
 
-        public IDisposable OnSubmission(Action cb) => _eventsManager.SubmissionEvent.Subscribe(cb);
-
-        public IDisposable OnSubmission(Action cb, int priority) =>
-            _eventsManager.SubmissionEvent.Subscribe(cb, priority);
-
         public IDisposable OnSubmissionStarted(Action cb) =>
             _eventsManager.SubmissionStartedEvent.Subscribe(cb);
 
         public IDisposable OnSubmissionStarted(Action cb, int priority) =>
             _eventsManager.SubmissionStartedEvent.Subscribe(cb, priority);
+
+        public IDisposable OnSubmissionCompleted(Action cb) =>
+            _eventsManager.SubmissionCompletedEvent.Subscribe(cb);
+
+        public IDisposable OnSubmissionCompleted(Action cb, int priority) =>
+            _eventsManager.SubmissionCompletedEvent.Subscribe(cb, priority);
 
         public IDisposable OnFixedUpdateStarted(Action cb) =>
             _eventsManager.FixedUpdateStartedEvent.Subscribe(cb);
@@ -186,11 +187,17 @@ namespace Trecs
         public IDisposable OnVariableUpdateStarted(Action cb, int priority) =>
             _eventsManager.VariableUpdateStartedEvent.Subscribe(cb, priority);
 
-        public IDisposable OnPostApplyInputs(Action cb) =>
-            _eventsManager.PostApplyInputsEvent.Subscribe(cb);
+        public IDisposable OnVariableUpdateCompleted(Action cb) =>
+            _eventsManager.VariableUpdateCompletedEvent.Subscribe(cb);
 
-        public IDisposable OnPostApplyInputs(Action cb, int priority) =>
-            _eventsManager.PostApplyInputsEvent.Subscribe(cb, priority);
+        public IDisposable OnVariableUpdateCompleted(Action cb, int priority) =>
+            _eventsManager.VariableUpdateCompletedEvent.Subscribe(cb, priority);
+
+        public IDisposable OnInputsApplied(Action cb) =>
+            _eventsManager.InputsAppliedEvent.Subscribe(cb);
+
+        public IDisposable OnInputsApplied(Action cb, int priority) =>
+            _eventsManager.InputsAppliedEvent.Subscribe(cb, priority);
     }
 
     /// <summary>

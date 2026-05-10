@@ -26,12 +26,13 @@ namespace Trecs.Internal
 
         readonly SimpleSubject _deserializeStartedEvent = new();
         readonly SimpleSubject _deserializeCompletedEvent = new();
-        readonly SimpleSubject _submissionEvent = new();
         readonly SimpleSubject _submissionStartedEvent = new();
+        readonly SimpleSubject _submissionCompletedEvent = new();
         readonly SimpleSubject _fixedUpdateStartedEvent = new();
         readonly SimpleSubject _fixedUpdateCompletedEvent = new();
         readonly SimpleSubject _variableUpdateStartedEvent = new();
-        readonly SimpleSubject _postApplyInputsEvent = new();
+        readonly SimpleSubject _variableUpdateCompletedEvent = new();
+        readonly SimpleSubject _inputsAppliedEvent = new();
 
         readonly DenseDictionary<
             GroupIndex,
@@ -50,12 +51,13 @@ namespace Trecs.Internal
 
         internal SimpleSubject DeserializeStartedEvent => _deserializeStartedEvent;
         internal SimpleSubject DeserializeCompletedEvent => _deserializeCompletedEvent;
-        internal SimpleSubject SubmissionEvent => _submissionEvent;
         internal SimpleSubject SubmissionStartedEvent => _submissionStartedEvent;
+        internal SimpleSubject SubmissionCompletedEvent => _submissionCompletedEvent;
         internal SimpleSubject FixedUpdateStartedEvent => _fixedUpdateStartedEvent;
         internal SimpleSubject FixedUpdateCompletedEvent => _fixedUpdateCompletedEvent;
         internal SimpleSubject VariableUpdateStartedEvent => _variableUpdateStartedEvent;
-        internal SimpleSubject PostApplyInputsEvent => _postApplyInputsEvent;
+        internal SimpleSubject VariableUpdateCompletedEvent => _variableUpdateCompletedEvent;
+        internal SimpleSubject InputsAppliedEvent => _inputsAppliedEvent;
 
         internal DenseDictionary<
             GroupIndex,
@@ -203,14 +205,14 @@ namespace Trecs.Internal
             return new EntityEventsBuilder(this, worldInfo, world);
         }
 
-        internal void NotifyOnSubmission()
-        {
-            _submissionEvent.Invoke();
-        }
-
         internal void NotifyOnSubmissionStarted()
         {
             _submissionStartedEvent.Invoke();
+        }
+
+        internal void NotifyOnSubmissionCompleted()
+        {
+            _submissionCompletedEvent.Invoke();
         }
 
         public void Dispose()
@@ -227,15 +229,15 @@ namespace Trecs.Internal
                         "DeserializeCompleted observers not cleaned up (count: {})",
                         _deserializeCompletedEvent.NumObservers
                     );
-                if (_submissionEvent.NumObservers > 0)
-                    _log.Warning(
-                        "Submission observers not cleaned up (count: {})",
-                        _submissionEvent.NumObservers
-                    );
                 if (_submissionStartedEvent.NumObservers > 0)
                     _log.Warning(
                         "SubmissionStarted observers not cleaned up (count: {})",
                         _submissionStartedEvent.NumObservers
+                    );
+                if (_submissionCompletedEvent.NumObservers > 0)
+                    _log.Warning(
+                        "SubmissionCompleted observers not cleaned up (count: {})",
+                        _submissionCompletedEvent.NumObservers
                     );
                 if (_fixedUpdateStartedEvent.NumObservers > 0)
                     _log.Warning(
@@ -252,10 +254,15 @@ namespace Trecs.Internal
                         "VariableUpdateStarted observers not cleaned up (count: {})",
                         _variableUpdateStartedEvent.NumObservers
                     );
-                if (_postApplyInputsEvent.NumObservers > 0)
+                if (_variableUpdateCompletedEvent.NumObservers > 0)
                     _log.Warning(
-                        "PostApplyInputs observers not cleaned up (count: {})",
-                        _postApplyInputsEvent.NumObservers
+                        "VariableUpdateCompleted observers not cleaned up (count: {})",
+                        _variableUpdateCompletedEvent.NumObservers
+                    );
+                if (_inputsAppliedEvent.NumObservers > 0)
+                    _log.Warning(
+                        "InputsApplied observers not cleaned up (count: {})",
+                        _inputsAppliedEvent.NumObservers
                     );
                 foreach (var (group, observers) in _reactiveOnAddedObservers)
                     if (observers.Count > 0)

@@ -687,7 +687,7 @@ namespace Trecs
                 .DeserializeCompletedEvent.Subscribe(_systemRunner.OnEcsDeserializeCompleted)
                 .AddTo(_eventSubscriptions);
 
-            _entityInputQueue.SetPostApplyInputsSubject(_eventsManager.PostApplyInputsEvent);
+            _entityInputQueue.SetInputsAppliedSubject(_eventsManager.InputsAppliedEvent);
 
             _systemAddLocked = true;
             InitializeSystemAccessors(); // This has to happen before LoadSystems

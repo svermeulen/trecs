@@ -29,7 +29,7 @@ namespace Trecs.Internal
         readonly HashSet<GroupComponentTypePair> _warnOnMissingTempBuffer = new();
 #endif
 
-        SimpleSubject _systemRegistryPostApplyInputsEvent;
+        SimpleSubject _systemRegistryInputsAppliedEvent;
         WorldAccessor _accessor;
         int _maxClearFrame = -1;
 
@@ -104,10 +104,10 @@ namespace Trecs.Internal
             }
         }
 
-        internal void SetPostApplyInputsSubject(SimpleSubject systemRegistrySubject)
+        internal void SetInputsAppliedSubject(SimpleSubject systemRegistrySubject)
         {
-            Assert.IsNull(_systemRegistryPostApplyInputsEvent);
-            _systemRegistryPostApplyInputsEvent = systemRegistrySubject;
+            Assert.IsNull(_systemRegistryInputsAppliedEvent);
+            _systemRegistryInputsAppliedEvent = systemRegistrySubject;
         }
 
         public bool HasInputFrame<T>(int frame, EntityHandle entityHandle)
@@ -643,7 +643,7 @@ namespace Trecs.Internal
                 ClearInputsBeforeOrAt(_maxClearFrame);
             }
 
-            _systemRegistryPostApplyInputsEvent?.Invoke();
+            _systemRegistryInputsAppliedEvent?.Invoke();
         }
 
         public void Dispose()
@@ -656,7 +656,7 @@ namespace Trecs.Internal
             }
             _componentTypeHelpers.Clear();
 
-            // Note: post-apply-inputs event is owned by EventsManager, not EntityInputQueue
+            // Note: inputs-applied event is owned by EventsManager, not EntityInputQueue
         }
 
         internal readonly struct FrameEntityHandlePair : IEquatable<FrameEntityHandlePair>

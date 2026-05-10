@@ -137,17 +137,18 @@ Separate from the per-entity events above, `World.Events` exposes lifecycle hook
 |---|---|
 | `OnVariableUpdateStarted` | At the start of every `World.Tick()`. |
 | `OnFixedUpdateStarted` | At the start of each fixed-update step (zero or more times per `Tick()`, depending on catch-up). |
-| `OnPostApplyInputs` | Inside each fixed step, after inputs have been applied to the global entity. |
+| `OnInputsApplied` | Inside each fixed step, after inputs have been applied to the global entity. |
 | `OnSubmissionStarted` | Submission is about to run (end of each fixed step). |
-| `OnSubmission` | Submission finished — all queued structural changes applied. |
+| `OnSubmissionCompleted` | Submission finished — all queued structural changes applied. |
 | `OnFixedUpdateCompleted` | At the end of each fixed-update step. |
+| `OnVariableUpdateCompleted` | At the end of every `World.LateTick()`, after the final submission for the frame. |
 | `OnDeserializeStarted` | A snapshot or recording is about to load into the world. |
 | `OnDeserializeCompleted` | A snapshot or recording has finished loading. |
 
 Each takes an `Action` (or `Action, int priority` for ordering) and returns `IDisposable`. Dispose to unsubscribe.
 
 ```csharp
-var sub = World.Events.OnSubmission(() => Debug.Log("Submission complete"));
+var sub = World.Events.OnSubmissionCompleted(() => Debug.Log("Submission complete"));
 // ...
 sub.Dispose();
 ```
