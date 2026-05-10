@@ -255,6 +255,26 @@ namespace Trecs
         }
 
         /// <summary>
+        /// Returns an iterator that yields a stable <see cref="EntityHandle"/> per matched entity.
+        /// </summary>
+        public readonly EntityHandlesQueryIterator EntityHandles()
+        {
+            AssertHasAnyCriteria();
+            return new EntityHandlesQueryIterator(CreateIterator(), _world);
+        }
+
+        /// <summary>
+        /// Returns an iterator that yields an <see cref="EntityAccessor"/> per matched entity,
+        /// bound to the world and the entity's transient index. Use this for structural / set /
+        /// input operations on iterated entities — the bound index avoids a per-call lookup.
+        /// </summary>
+        public readonly EntitiesQueryIterator Entities()
+        {
+            AssertHasAnyCriteria();
+            return new EntitiesQueryIterator(CreateIterator(), _world);
+        }
+
+        /// <summary>
         /// Returns a dense group slice iterator for queries without set filters.
         /// Each slice has GroupIndex, Count, and an identity indexer.
         /// </summary>

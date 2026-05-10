@@ -272,6 +272,23 @@ namespace Trecs
             return CreateIterator();
         }
 
+        /// <summary>
+        /// Returns an iterator that yields a stable <see cref="EntityHandle"/> per matched entity.
+        /// </summary>
+        public readonly EntityHandlesQueryIterator EntityHandles()
+        {
+            return new EntityHandlesQueryIterator(CreateIterator(), _world);
+        }
+
+        /// <summary>
+        /// Returns an iterator that yields an <see cref="EntityAccessor"/> per matched entity,
+        /// bound to the world and the entity's transient index.
+        /// </summary>
+        public readonly EntitiesQueryIterator Entities()
+        {
+            return new EntitiesQueryIterator(CreateIterator(), _world);
+        }
+
         public readonly QueryIterator CreateIterator()
         {
             var groups = ResolveGroups();
