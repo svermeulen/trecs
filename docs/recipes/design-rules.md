@@ -25,7 +25,7 @@ Opinionated rules for building with Trecs. Each one points at a longer reference
 
 ## Structural changes & heap
 
-- **Structural changes are deferred.** `AddEntity`, `RemoveEntity`, and `MoveTo` are queued and applied at the next submission, which runs at the end of each fixed step. A system later in the same tick won't see the new state — readers see the change on the next tick. If you need same-tick visibility, call `World.SubmitEntities()` manually between the writing and reading systems.
+- **Structural changes are deferred.** `AddEntity`, `RemoveEntity`, and `MoveTo` are queued and applied at the next submission, which runs at the end of each fixed step. Presentation systems within the same `Tick()` therefore see the new state — submission runs between Fixed and Presentation. A Fixed system later in the same step does *not*, though — it sees the change on the next tick, or call `World.SubmitEntities()` manually for same-step visibility.
 - **Honour the [accessor-role rules](../advanced/accessor-roles.md).** `Fixed` writes deterministic state and makes structural changes against non-VUO templates; `Variable` reads everything, writes `[VariableUpdateOnly]` components, and makes structural changes against `[VariableUpdateOnly]` templates only; `Unrestricted` is for non-system code (init, lifecycle hooks, editor tooling).
 - **Allocate the heap from the right role.** Persistent heap (`SharedPtr` / `NativeSharedPtr`) is `Fixed`-only; frame-scoped heap is `Input`-only. See [Heap Allocation Rules](../advanced/heap-allocation-rules.md).
 
