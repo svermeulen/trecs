@@ -4,9 +4,9 @@ Recommended practices for building with Trecs.  We assume here that determinism 
 
 ## Systems
 
-- **Keep fixed-update systems stateless.** Constructor parameters for immutable configuration are fine; mutable state belongs in components, where it's serialized, deterministic, and visible to tooling. State on a system field diverges between record and replay.
 - **Declare system dependencies explicitly.** Use [`[ExecuteAfter]` / `[ExecuteBefore]`](../core/systems.md#system-ordering) instead of relying on registration order.
 - **Pick the right phase.** `Fixed` for simulation, `Input` for queueing inputs, `Presentation` / `LatePresentation` for rendering and transform sync. The phase determines which [Accessor Role](../advanced/accessor-roles.md) you get and what you're allowed to do in it.
+- **Keep fixed-update objects stateless.** This includes systems but also service classes used by fixed update systems. Constructor parameters for immutable configuration after initialization are fine. Mutable state belongs in components, where it's serialized, deterministic, and visible to tooling. Otherwise, state diverges between record and replay.  This applies less strongly to variable update systems, since desyncs aren't possible there, though it's still often best to keep state in components in those cases too (using `[VariableUpdateOnly]` entities/components) for the same reasons.
 
 ## Components
 
@@ -24,18 +24,10 @@ Recommended practices for building with Trecs.  We assume here that determinism 
     - **[Sets](../entity-management/sets.md)** — sparse membership flags, independent of component storage.
     - **Child entity** — when the conditional shape needs *different* components, spawn a separate entity (possibly one of several templates) and reference it via an `EntityHandle` on a component of the parent.
 
-## Structural changes & heap
+## General
 
-- **Honour the [accessor-role rules](../advanced/accessor-roles.md).** `Fixed` writes deterministic state and makes structural changes against non-VUO templates; `Variable` reads everything, writes `[VariableUpdateOnly]` components, and makes structural changes against `[VariableUpdateOnly]` templates only; `Unrestricted` is for non-system code (init, lifecycle hooks, editor tooling).
-- **Allocate the heap from the right role.** Persistent heap (`SharedPtr` / `NativeSharedPtr`) is `Fixed`-only; frame-scoped heap is `Input`-only. See [Heap Allocation Rules](../advanced/heap-allocation-rules.md).
-
-## Determinism
-
-Skip this section if your game doesn't need replay determinism (see intro).
-
-- **Use `World.Rng`, never `UnityEngine.Random`.** External RNG breaks replay. `FixedRng` and `VariableRng` are independent streams.
-- **Use `world.FixedDeltaTime` in fixed-update systems.** `UnityEngine.Time.deltaTime` varies per render frame and breaks replay.
-- **Provide sort keys in parallel structural-change jobs.** `NativeWorldAccessor` ops (`AddEntity` / `RemoveEntity` / `MoveTo` from a job) need a deterministic sort key for replay determinism.
+- **Prefer `World.Rng`, not `UnityEngine.Random`.** External RNG breaks replay. `FixedRng` and `VariableRng` are independent streams.
+- **Prefer `World.DeltaTime` / `World.ElapsedTime`, not `UnityEngine.Time.deltaTime`, `UnityEngine.Time.time` or `DateTime` / `Stopwatch` **
 - **Enable [`RequireDeterministicSubmission`](../entity-management/structural-changes.md#deterministic-submission)** for any project that records, replays, or networks state.
 
 ## See also

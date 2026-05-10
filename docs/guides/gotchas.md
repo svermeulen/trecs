@@ -56,6 +56,14 @@ Strict-accessor rule: during a `Fixed` system's `Execute`, only that system's ow
 
 **Fix.** Call `World.SubmitEntities()` manually if same-step visibility is required, or accept the one-tick delay (typically fine).
 
+### Just-spawned entities haven't been fixed-updated when Presentation sees them
+
+Submission runs at end of fixed step (and end of `Tick()`), so an entity spawned in a Fixed system *does* exist in time for Presentation in the same Tick. But it's been through **zero** fixed-update cycles — Presentation sees its spawn-time initial values, not whatever a fixed tick of physics / AI / logic would have produced.
+
+If presentation logic implicitly assumes "at least one fixed tick has run on this entity" — interpolation between fixed-step snapshots, derived per-tick state, transform-sync that depends on a value integrated in Fixed, a GameObject created in `OnAdded` whose pose is driven from `[VariableUpdateOnly]` fields populated by a fixed system — the entity will render at its initial state for one frame and then jump to the correct state on the next tick. Visible as a brief stutter or wrong-position pop on spawn.
+
+**Fix.** Initialize *everything Presentation reads* at spawn time, including interpolation snapshots and any derived state that fixed-update would normally produce. If that's impractical, mark new entities with a "Spawning" tag/set/flag that Presentation skips for one tick, and clear the marker on the entity's first Fixed pass.
+
 ### Runtime add / remove of components doesn't exist
 
 A template's component set is fixed at compile time. There is no `AddComponent<T>(entity)` / `RemoveComponent<T>(entity)`.
