@@ -414,7 +414,7 @@ internal static class TrecsStubs
             // of these appears in a main-thread iteration method. Real types live in
             // com.trecs.core/Scripts/Native/.
             public readonly struct NativeSetRead<T> where T : struct, IEntitySet { }
-            public readonly struct NativeSetWrite<T> where T : struct, IEntitySet { }
+            public readonly struct NativeSetCommandBuffer<T> where T : struct, IEntitySet { }
 
             // Main-thread set accessors. ParameterClassifier recognizes these in
             // [WrapAsJob] methods and emits TRECS098. SetAccessor is the gateway

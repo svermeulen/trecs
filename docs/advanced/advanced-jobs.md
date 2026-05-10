@@ -35,7 +35,7 @@ partial struct MyJob : IJobFor
 | `NativeComponentLookupRead<T>` | Read-only lookup across multiple groups | Yes |
 | `NativeComponentLookupWrite<T>` | Writable lookup across multiple groups | Yes |
 | `NativeSetRead<TSet>` | Read-only set access | No |
-| `NativeSetWrite<TSet>` | Writable set access | No |
+| `NativeSetCommandBuffer<TSet>` | Writable set access | No |
 | `NativeWorldAccessor` | Job-safe world operations | No |
 | `GroupIndex` | Runtime handle for the resolved group | Yes |
 
@@ -62,7 +62,7 @@ new FlexibleJob().ScheduleParallel(accessor, TagSet<GameTags.Player>.Value);
 
 This is useful when if the tagset being operated on is not known until runtime, or if you want to reuse the same job struct for multiple tag scopes. The generated `ScheduleParallel` method will have a parameter for each `[FromWorld]` field that doesn't specify tags inline.
 
-Fields that don't require tags (`NativeSetRead`, `NativeSetWrite`, `NativeWorldAccessor`) are populated automatically and never generate schedule parameters.
+Fields that don't require tags (`NativeSetRead`, `NativeSetCommandBuffer`, `NativeWorldAccessor`) are populated automatically and never generate schedule parameters.
 
 ## Native component access
 
@@ -105,14 +105,14 @@ Sets can be read and modified from jobs:
 NativeSetRead<HighlightedParticle> highlightedRead;
 
 [FromWorld]
-NativeSetWrite<HighlightedParticle> highlightedWrite;
+NativeSetCommandBuffer<HighlightedParticle> highlightedWrite;
 
 // Check membership
 bool isHighlighted = highlightedRead.Exists(entityIndex);
 
 // Modify (thread-safe, immediate within job)
-highlightedWrite.AddImmediate(entityIndex);
-highlightedWrite.RemoveImmediate(entityIndex);
+highlightedWrite.Add(entityIndex);
+highlightedWrite.Remove(entityIndex);
 ```
 
 ## External job tracking

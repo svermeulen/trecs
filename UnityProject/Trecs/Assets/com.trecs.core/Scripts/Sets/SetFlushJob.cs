@@ -8,11 +8,11 @@ namespace Trecs
 {
     /// <summary>
     /// Burst-compiled job that drains per-thread <see cref="AtomicNativeBags"/> produced by
-    /// <see cref="NativeSetWrite{TSet}"/> into the actual <see cref="SetGroupEntry"/>
+    /// <see cref="NativeSetCommandBuffer{TSet}"/> into the actual <see cref="SetGroupEntry"/>
     /// data, making the writes visible to subsequent reader jobs.
     ///
     /// Scheduled eagerly after every writer job by
-    /// <see cref="JobGenSchedulingExtensions.TrackNativeSetWriteDepsForJob{TSet}"/>,
+    /// <see cref="JobGenSchedulingExtensions.TrackNativeSetCommandBufferDepsForJob{TSet}"/>,
     /// and tracked as the new writer so readers naturally depend on it.
     ///
     /// When <see cref="RequireDeterministic"/> is true, entries are collected, sorted by

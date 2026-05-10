@@ -41,7 +41,7 @@ namespace Trecs.SourceGen
             "NativeComponentRead", // NativeComponentRead<T>
             "NativeComponentWrite", // NativeComponentWrite<T>
             "NativeComponentLookup", // NativeComponentLookupRead<T>, NativeComponentLookupWrite<T>
-            "NativeSetWrite", // NativeSetWrite<TSet>
+            "NativeSetCommandBuffer", // NativeSetCommandBuffer<TSet>
             "NativeSetRead", // NativeSetRead<TSet>
             "NativeEntitySetIndices", // NativeEntitySetIndices<TSet>
         };

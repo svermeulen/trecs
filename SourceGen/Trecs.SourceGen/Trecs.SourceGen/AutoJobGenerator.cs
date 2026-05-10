@@ -422,11 +422,11 @@ namespace Trecs.SourceGen
                     continue;
                 }
 
-                // Check for NativeSetWrite<T>.
+                // Check for NativeSetCommandBuffer<T>.
                 if (
                     !paramHasSingleEntity
                     && paramType is INamedTypeSymbol namedNsw
-                    && namedNsw.Name == "NativeSetWrite"
+                    && namedNsw.Name == "NativeSetCommandBuffer"
                     && namedNsw.TypeArguments.Length == 1
                     && PerformanceCache.GetDisplayString(namedNsw.ContainingNamespace) == "Trecs"
                 )
@@ -445,7 +445,7 @@ namespace Trecs.SourceGen
                     var setTypeArgSymbol = namedNsw.TypeArguments[0];
                     var setTypeArg = PerformanceCache.GetDisplayString(setTypeArgSymbol);
                     paramSlots.Add(
-                        AutoJobParam.NativeSetWrite(paramName, setTypeArg, setTypeArgSymbol)
+                        AutoJobParam.NativeSetCommandBuffer(paramName, setTypeArg, setTypeArgSymbol)
                     );
                     continue;
                 }
@@ -826,7 +826,7 @@ namespace Trecs.SourceGen
                         fwKind == FromWorldFieldKind.Unsupported
                         || fwKind == FromWorldFieldKind.NativeWorldAccessor
                         || fwKind == FromWorldFieldKind.NativeSetRead
-                        || fwKind == FromWorldFieldKind.NativeSetWrite
+                        || fwKind == FromWorldFieldKind.NativeSetCommandBuffer
                         || fwKind == FromWorldFieldKind.NativeComponentRead
                         || fwKind == FromWorldFieldKind.NativeComponentWrite
                     )
@@ -933,7 +933,7 @@ namespace Trecs.SourceGen
                         DiagnosticDescriptors.InvalidParameterList,
                         param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                         $"Parameter '{paramName}' of type '{PerformanceCache.GetDisplayString(paramType)}' is not recognized. "
-                            + "Expected: IAspect (in), IEntityComponent (in/ref), EntityIndex, NativeWorldAccessor, NativeSetRead<T>, NativeSetWrite<T>, [PassThroughArgument], or [FromWorld]."
+                            + "Expected: IAspect (in), IEntityComponent (in/ref), EntityIndex, NativeWorldAccessor, NativeSetRead<T>, NativeSetCommandBuffer<T>, [PassThroughArgument], or [FromWorld]."
                     )
                 );
                 return null;
@@ -1046,13 +1046,13 @@ namespace Trecs.SourceGen
                 "Unity.Jobs",
             };
 
-            // Add namespaces for NativeSetRead/NativeSetWrite type arguments.
+            // Add namespaces for NativeSetRead/NativeSetCommandBuffer type arguments.
             foreach (var p in info.Params)
             {
                 if (
                     (
                         p.Role == AutoJobParamRole.NativeSetRead
-                        || p.Role == AutoJobParamRole.NativeSetWrite
+                        || p.Role == AutoJobParamRole.NativeSetCommandBuffer
                     )
                     && p.SetTypeArgSymbol != null
                 )
@@ -1228,12 +1228,12 @@ namespace Trecs.SourceGen
                     );
             }
 
-            // NativeSetWrite fields.
+            // NativeSetCommandBuffer fields.
             foreach (var p in info.Params)
             {
-                if (p.Role == AutoJobParamRole.NativeSetWrite)
+                if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
                     sb.AppendLine(
-                        $"{fieldInd}public NativeSetWrite<{p.SetTypeArg}> {GenPrefix}nsw_{p.Name};"
+                        $"{fieldInd}public NativeSetCommandBuffer<{p.SetTypeArg}> {GenPrefix}nscb_{p.Name};"
                     );
             }
 
@@ -1393,8 +1393,8 @@ namespace Trecs.SourceGen
                     case AutoJobParamRole.NativeSetRead:
                         callArgs.Add($"in {GenPrefix}nsr_{p.Name}");
                         break;
-                    case AutoJobParamRole.NativeSetWrite:
-                        callArgs.Add($"in {GenPrefix}nsw_{p.Name}");
+                    case AutoJobParamRole.NativeSetCommandBuffer:
+                        callArgs.Add($"in {GenPrefix}nscb_{p.Name}");
                         break;
                     case AutoJobParamRole.FromWorld:
                         callArgs.Add($"in {GenPrefix}fw_{p.Name}");
@@ -1556,9 +1556,9 @@ namespace Trecs.SourceGen
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetReadDepsForJob<{p.SetTypeArg}>({GenPrefix}deps);"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetWrite)
+                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetWriteDepsForJob<{p.SetTypeArg}>({GenPrefix}deps);"
+                        $"{innerBody}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetCommandBufferDepsForJob<{p.SetTypeArg}>({GenPrefix}deps);"
                     );
             }
 
@@ -1614,9 +1614,9 @@ namespace Trecs.SourceGen
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}job.{GenPrefix}nsr_{p.Name} = {GenPrefix}world.CreateNativeSetReadForJob<{p.SetTypeArg}>();"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetWrite)
+                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}job.{GenPrefix}nsw_{p.Name} = {GenPrefix}world.CreateNativeSetWriteForJob<{p.SetTypeArg}>();"
+                        $"{innerBody}{GenPrefix}job.{GenPrefix}nscb_{p.Name} = {GenPrefix}world.CreateNativeSetCommandBufferForJob<{p.SetTypeArg}>();"
                     );
             }
 
@@ -1649,9 +1649,9 @@ namespace Trecs.SourceGen
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}world.TrackNativeSetReadDepsForJob<{p.SetTypeArg}>({GenPrefix}handle);"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetWrite)
+                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}world.TrackNativeSetWriteDepsForJob<{p.SetTypeArg}>({GenPrefix}handle);"
+                        $"{innerBody}{GenPrefix}world.TrackNativeSetCommandBufferDepsForJob<{p.SetTypeArg}>({GenPrefix}handle);"
                     );
             }
 
@@ -1757,9 +1757,9 @@ namespace Trecs.SourceGen
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetReadDepsForJob<{p.SetTypeArg}>({GenPrefix}deps);"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetWrite)
+                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetWriteDepsForJob<{p.SetTypeArg}>({GenPrefix}deps);"
+                        $"{innerBody}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetCommandBufferDepsForJob<{p.SetTypeArg}>({GenPrefix}deps);"
                     );
             }
 
@@ -1815,9 +1815,9 @@ namespace Trecs.SourceGen
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}job.{GenPrefix}nsr_{p.Name} = {GenPrefix}world.CreateNativeSetReadForJob<{p.SetTypeArg}>();"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetWrite)
+                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}job.{GenPrefix}nsw_{p.Name} = {GenPrefix}world.CreateNativeSetWriteForJob<{p.SetTypeArg}>();"
+                        $"{innerBody}{GenPrefix}job.{GenPrefix}nscb_{p.Name} = {GenPrefix}world.CreateNativeSetCommandBufferForJob<{p.SetTypeArg}>();"
                     );
             }
 
@@ -1854,9 +1854,9 @@ namespace Trecs.SourceGen
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}world.TrackNativeSetReadDepsForJob<{p.SetTypeArg}>({GenPrefix}handle);"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetWrite)
+                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}world.TrackNativeSetWriteDepsForJob<{p.SetTypeArg}>({GenPrefix}handle);"
+                        $"{innerBody}{GenPrefix}world.TrackNativeSetCommandBufferDepsForJob<{p.SetTypeArg}>({GenPrefix}handle);"
                     );
             }
 
@@ -2058,7 +2058,7 @@ namespace Trecs.SourceGen
             NativeWorldAccessor,
             PassThrough,
             NativeSetRead,
-            NativeSetWrite,
+            NativeSetCommandBuffer,
             FromWorld,
 
             /// <summary>
@@ -2095,13 +2095,13 @@ namespace Trecs.SourceGen
             public int BufferIndex { get; }
 
             /// <summary>
-            /// For NativeSetRead/NativeSetWrite roles, the generic type argument display string
+            /// For NativeSetRead/NativeSetCommandBuffer roles, the generic type argument display string
             /// (e.g. "MyNamespace.MySet"). Null for other roles.
             /// </summary>
             public string? SetTypeArg { get; }
 
             /// <summary>
-            /// For NativeSetRead/NativeSetWrite roles, the resolved type symbol for the generic
+            /// For NativeSetRead/NativeSetCommandBuffer roles, the resolved type symbol for the generic
             /// type argument. Used for namespace resolution. Null for other roles.
             /// </summary>
             public ITypeSymbol? SetTypeArgSymbol { get; }
@@ -2193,16 +2193,16 @@ namespace Trecs.SourceGen
                     setTypeArgSymbol: setTypeArgSymbol
                 );
 
-            public static AutoJobParam NativeSetWrite(
+            public static AutoJobParam NativeSetCommandBuffer(
                 string name,
                 string setTypeArg,
                 ITypeSymbol setTypeArgSymbol
             ) =>
                 new(
-                    AutoJobParamRole.NativeSetWrite,
+                    AutoJobParamRole.NativeSetCommandBuffer,
                     null,
                     name,
-                    $"NativeSetWrite<{setTypeArg}>",
+                    $"NativeSetCommandBuffer<{setTypeArg}>",
                     setTypeArg: setTypeArg,
                     setTypeArgSymbol: setTypeArgSymbol
                 );

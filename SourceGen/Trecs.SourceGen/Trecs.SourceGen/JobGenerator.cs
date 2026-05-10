@@ -71,7 +71,7 @@ namespace Trecs.SourceGen
             "NativeComponentWrite",
             "NativeComponentLookupRead",
             "NativeComponentLookupWrite",
-            "NativeSetWrite",
+            "NativeSetCommandBuffer",
             "NativeEntitySetIndices",
             "NativeSetRead",
         };
@@ -1709,7 +1709,7 @@ namespace Trecs.SourceGen
         static void EmitScheduleOverloads(StringBuilder sb, JobInfo info, string ind)
         {
             // Build the [FromWorld] field params (shared across all schedule overloads).
-            // Some field kinds (e.g. NativeSetWrite<TSet>) take no schedule param —
+            // Some field kinds (e.g. NativeSetCommandBuffer<TSet>) take no schedule param —
             // their type info lives entirely on the field's generic argument. We keep
             // those in `fromWorldFields` (for dep tracking emission) but exclude them
             // from `paramFields` (the actual schedule-method parameters).
@@ -2147,7 +2147,7 @@ namespace Trecs.SourceGen
         static void EmitCustomScheduleOverload(StringBuilder sb, JobInfo info, string ind)
         {
             // Build per-field emit info; only fields that need a schedule param contribute
-            // a method parameter (NativeSetWrite<TSet> contributes none).
+            // a method parameter (NativeSetCommandBuffer<TSet> contributes none).
             var orderedEmits = info
                 .FromWorldFields.Select(f => FromWorldFieldEmit.Build(f))
                 .ToList();

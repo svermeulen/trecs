@@ -207,14 +207,14 @@ namespace Trecs.SourceGen.Shared
                     continue;
                 }
 
-                // NativeSetRead<T> / NativeSetWrite<T> detection — these are job-only,
+                // NativeSetRead<T> / NativeSetCommandBuffer<T> detection — these are job-only,
                 // forbidden in main-thread iteration methods.
                 if (
                     !isPassThrough
                     && paramType is INamedTypeSymbol namedNativeSet
                     && (
                         namedNativeSet.Name == "NativeSetRead"
-                        || namedNativeSet.Name == "NativeSetWrite"
+                        || namedNativeSet.Name == "NativeSetCommandBuffer"
                     )
                     && namedNativeSet.TypeArguments.Length == 1
                     && PerformanceCache.GetDisplayString(namedNativeSet.ContainingNamespace)

@@ -171,7 +171,7 @@ public class Diagnostics_TRECS090_to_100_AutoJobTests
     public void TRECS098_SetAccessorInWrapAsJob()
     {
         // SetAccessor / SetRead / SetWrite are main-thread only. Inside a
-        // [WrapAsJob] method, you need the job-side NativeSetRead / NativeSetWrite.
+        // [WrapAsJob] method, you need the job-side NativeSetRead / NativeSetCommandBuffer.
         const string source = """
             namespace Sample
             {
@@ -197,7 +197,7 @@ public class Diagnostics_TRECS090_to_100_AutoJobTests
     [Test]
     public void TRECS099_NativeSetReadOnMainThread()
     {
-        // NativeSetRead<T> / NativeSetWrite<T> are job-only — using one in a
+        // NativeSetRead<T> / NativeSetCommandBuffer<T> are job-only — using one in a
         // main-thread [ForEachEntity] (no [WrapAsJob]) trips TRECS099 from
         // ParameterClassifier. Routes through ForEachEntityAspectGenerator for the
         // aspect-shaped parameter; the diagnostic itself is parameter-shape only.

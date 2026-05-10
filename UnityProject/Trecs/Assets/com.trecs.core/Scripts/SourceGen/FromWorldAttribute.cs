@@ -39,7 +39,7 @@ namespace Trecs
     /// <see cref="NativeComponentLookupWrite{T}"/></term>
     /// <description><see cref="TagSet"/> — may resolve to multiple groups;
     /// each contributes a per-group dependency.</description></item>
-    /// <item><term><c>NativeSetWrite&lt;TSet&gt;</c></term>
+    /// <item><term><c>NativeSetCommandBuffer&lt;TSet&gt;</c></term>
     /// <description>(no extra parameter — the set type is on the field's
     /// generic argument).</description></item>
     /// <item><term><c>NativeSetRead&lt;TSet&gt;</c></term>

@@ -143,10 +143,10 @@ namespace Trecs.Internal
         )
             where T : unmanaged, IEntityComponent => lookup.GetBufferForGroupInternal(group);
 
-        // ── NativeSetWrite (immediate set writes, flushed by SetFlushJob) ──
+        // ── NativeSetCommandBuffer (job-side set writes, flushed by SetFlushJob) ──
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static NativeSetWrite<TSet> CreateNativeSetWriteForJob<TSet>(
+        public static NativeSetCommandBuffer<TSet> CreateNativeSetCommandBufferForJob<TSet>(
             this WorldAccessor world
         )
             where TSet : struct, IEntitySet
@@ -156,7 +156,7 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static JobHandle IncludeNativeSetWriteDepsForJob<TSet>(
+        public static JobHandle IncludeNativeSetCommandBufferDepsForJob<TSet>(
             this WorldAccessor world,
             JobHandle deps
         )
@@ -171,7 +171,7 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static void TrackNativeSetWriteDepsForJob<TSet>(
+        public static void TrackNativeSetCommandBufferDepsForJob<TSet>(
             this WorldAccessor world,
             JobHandle handle
         )

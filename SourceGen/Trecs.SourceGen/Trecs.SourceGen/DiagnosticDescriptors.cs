@@ -421,7 +421,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor UnsupportedFromWorldFieldType = new(
             id: "TRECS071",
             title: "Unsupported [FromWorld] field type",
-            messageFormat: "Field type '{0}' is not supported by [FromWorld]. Expected one of: NativeComponentBufferRead<T>, NativeComponentBufferWrite<T>, NativeComponentRead<T>, NativeComponentWrite<T>, NativeComponentLookupRead<T>, NativeComponentLookupWrite<T>, NativeSetWrite<TSet>, NativeSetRead<TSet>, NativeEntitySetIndices<TSet>, or Aspect.NativeFactory.",
+            messageFormat: "Field type '{0}' is not supported by [FromWorld]. Expected one of: NativeComponentBufferRead<T>, NativeComponentBufferWrite<T>, NativeComponentRead<T>, NativeComponentWrite<T>, NativeComponentLookupRead<T>, NativeComponentLookupWrite<T>, NativeSetCommandBuffer<TSet>, NativeSetRead<TSet>, NativeEntitySetIndices<TSet>, or Aspect.NativeFactory.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -527,7 +527,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor SetAccessorNotAllowedInJob = new(
             id: "TRECS098",
             title: "SetAccessor/SetRead/SetWrite cannot be used in [WrapAsJob] methods",
-            messageFormat: "Parameter '{0}' uses a main-thread-only set type for set type '{1}'. Use NativeSetRead<{1}> or NativeSetWrite<{1}> for job-compatible set access.",
+            messageFormat: "Parameter '{0}' uses a main-thread-only set type for set type '{1}'. Use NativeSetRead<{1}> or NativeSetCommandBuffer<{1}> for job-compatible set access.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -535,7 +535,7 @@ namespace Trecs.SourceGen
 
         public static readonly DiagnosticDescriptor NativeSetNotAllowedOnMainThread = new(
             id: "TRECS099",
-            title: "NativeSetRead/NativeSetWrite cannot be used in main-thread [ForEachEntity] methods",
+            title: "NativeSetRead/NativeSetCommandBuffer cannot be used in main-thread [ForEachEntity] methods",
             messageFormat: "Parameter '{0}' uses {1} which is job-only. Use SetAccessor<{2}>, SetRead<{2}>, or SetWrite<{2}> for main-thread set access.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,

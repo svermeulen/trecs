@@ -122,10 +122,10 @@ namespace Trecs.SourceGen.Shared
                         EmitNativeFactoryDeps(sb, body, e, isTracking: false);
                         break;
                     }
-                    case FromWorldFieldKind.NativeSetWrite:
+                    case FromWorldFieldKind.NativeSetCommandBuffer:
                     {
                         sb.AppendLine(
-                            $"{body}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetWriteDepsForJob<{t}>({GenPrefix}deps);"
+                            $"{body}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetCommandBufferDepsForJob<{t}>({GenPrefix}deps);"
                         );
                         break;
                     }
@@ -316,9 +316,9 @@ namespace Trecs.SourceGen.Shared
                         EmitNativeFactoryFieldAssignment(sb, body, e);
                         break;
                     }
-                    case FromWorldFieldKind.NativeSetWrite:
+                    case FromWorldFieldKind.NativeSetCommandBuffer:
                         sb.AppendLine(
-                            $"{body}{GenPrefix}job.{e.FieldName} = {GenPrefix}world.CreateNativeSetWriteForJob<{t}>();"
+                            $"{body}{GenPrefix}job.{e.FieldName} = {GenPrefix}world.CreateNativeSetCommandBufferForJob<{t}>();"
                         );
                         break;
                     case FromWorldFieldKind.NativeEntitySetIndices:
@@ -411,9 +411,9 @@ namespace Trecs.SourceGen.Shared
                         EmitNativeFactoryDeps(sb, body, e, isTracking: true);
                         break;
                     }
-                    case FromWorldFieldKind.NativeSetWrite:
+                    case FromWorldFieldKind.NativeSetCommandBuffer:
                         sb.AppendLine(
-                            $"{body}{GenPrefix}world.TrackNativeSetWriteDepsForJob<{t}>({GenPrefix}handle);"
+                            $"{body}{GenPrefix}world.TrackNativeSetCommandBufferDepsForJob<{t}>({GenPrefix}handle);"
                         );
                         break;
                     case FromWorldFieldKind.NativeEntitySetIndices:

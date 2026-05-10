@@ -121,7 +121,7 @@ namespace Trecs.Internal
 
         // ── Job write support ──────────────────────────────────────────
 
-        internal NativeSetWrite<TSet> CreateWriter<TSet>()
+        internal NativeSetCommandBuffer<TSet> CreateWriter<TSet>()
             where TSet : struct, IEntitySet => new(_jobAddQueue, _jobRemoveQueue);
 
         /// <summary>

@@ -19,7 +19,7 @@ namespace Trecs.Tests
         partial struct FlagEntitiesJob
         {
             [FromWorld]
-            public NativeSetWrite<TFJTestTransientSet> Writer;
+            public NativeSetCommandBuffer<TFJTestTransientSet> Writer;
 
             [ForEachEntity(Tag = typeof(QId1))]
             void Execute(in TestInt value, EntityIndex entityIndex)
@@ -27,7 +27,7 @@ namespace Trecs.Tests
                 // Flag every other entity
                 if (entityIndex.Index % 2 == 0)
                 {
-                    Writer.AddImmediate(entityIndex);
+                    Writer.Add(entityIndex);
                 }
             }
         }
@@ -35,12 +35,12 @@ namespace Trecs.Tests
         partial struct FlagAllEntitiesJob
         {
             [FromWorld]
-            public NativeSetWrite<TFJTestTransientSet> Writer;
+            public NativeSetCommandBuffer<TFJTestTransientSet> Writer;
 
             [ForEachEntity(Tag = typeof(QId1))]
             void Execute(in TestInt value, EntityIndex entityIndex)
             {
-                Writer.AddImmediate(entityIndex);
+                Writer.Add(entityIndex);
             }
         }
 

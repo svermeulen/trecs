@@ -22,7 +22,7 @@ Granularity is **per (component type, group)**. A job writing `Position` for `Fi
 | Reads `Position` (Fish) | Writes `Position` (Fish) | No — writer waits |
 | Writes `Position` (Fish) | Writes `Position` (Fish) | No — writer waits |
 
-The same rule applies to [sets](../entity-management/sets.md): `NativeSetRead` / `NativeSetWrite` are tracked per set type. Deferred set ops on `WorldAccessor` / `NativeWorldAccessor` don't synchronize — they apply at submission, after every job is complete.
+The same rule applies to [sets](../entity-management/sets.md): `NativeSetRead` / `NativeSetCommandBuffer` are tracked per set type. Deferred set ops on `WorldAccessor` / `NativeWorldAccessor` don't synchronize — they apply at submission, after every job is complete.
 
 ## How dependencies get declared
 

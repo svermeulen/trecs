@@ -56,9 +56,9 @@ highlighted.Add(entityIndex);
 highlighted.Remove(entityIndex);
 highlighted.Clear();
 
-// In a Burst job, via a NativeSetWrite captured as a job field
-highlighted.AddImmediate(entityIndex);
-highlighted.RemoveImmediate(entityIndex);
+// In a Burst job, via a NativeSetCommandBuffer captured as a job field
+highlighted.Add(entityIndex);
+highlighted.Remove(entityIndex);
 ```
 
 !!! warning "Don't mutate a set while iterating it"
@@ -128,7 +128,7 @@ Notes:
 
 - Sets are **not auto-cleared** between frames. Clear them yourself in the producer system if that's the contract you want.
 - Cache the `SetWrite<T>` returned by `Set<T>().Write` outside the loop. Each `.Write` access syncs outstanding job writes; caching syncs once and then writes hit the buffer directly.
-- From a Burst job, capture a `NativeSetWrite<T>` as a field for thread-safe `AddImmediate` / `RemoveImmediate`. Clearing from inside a job isn't supported — call `World.Set<T>().Defer.Clear()` (deferred) before the job dispatches, or `Set<T>().Write.Clear()` on the main thread.
+- From a Burst job, capture a `NativeSetCommandBuffer<T>` as a field for thread-safe `Add` / `Remove`. Clearing from inside a job isn't supported — call `World.Set<T>().Defer.Clear()` (deferred) before the job dispatches, or `Set<T>().Write.Clear()` on the main thread.
 
 ## Sets vs tags
 

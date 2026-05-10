@@ -93,7 +93,7 @@ When [`RequireDeterministicSubmission`](../core/world-setup.md) is enabled, `sor
 | Write a single component | `world.Component<T>(idx).Write` | `NativeComponentWrite<T>`, `NativeComponentBufferWrite<T>`, `NativeComponentLookupWrite<T>` |
 | Add / remove / move entity | `WorldAccessor` (deferred) | `NativeWorldAccessor` (deferred + sort key) |
 | Read a set | `world.Set<T>().Read` | `NativeSetRead<T>` |
-| Mutate a set | `world.Set<T>().Write` | `NativeSetWrite<T>` (deferred) |
+| Mutate a set | `world.Set<T>().Write` | `NativeSetCommandBuffer<T>` (deferred) |
 
 !!! warning
     `WorldAccessor` is **main-thread only**. Inside jobs always use `NativeWorldAccessor` and the native read/write types — see [Advanced Job Features](../advanced/advanced-jobs.md) for how to wire them via `[FromWorld]`.

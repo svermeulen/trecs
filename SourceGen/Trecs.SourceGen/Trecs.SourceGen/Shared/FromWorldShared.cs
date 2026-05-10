@@ -17,7 +17,7 @@ namespace Trecs.SourceGen.Shared
         NativeComponentWrite,
         NativeComponentLookupRead,
         NativeComponentLookupWrite,
-        NativeSetWrite,
+        NativeSetCommandBuffer,
         NativeEntitySetIndices,
         NativeSetRead,
         NativeFactory,
@@ -97,7 +97,7 @@ namespace Trecs.SourceGen.Shared
         /// The expression that resolves to the final TagSet for this field's group(s).
         /// For fields with inline tags, this is a local variable that holds the combined result.
         /// For runtime-only fields, this is the schedule parameter name.
-        /// Empty for fields that don't use TagSets (NativeComponentRead/Write, NativeSetWrite, NativeSetRead).
+        /// Empty for fields that don't use TagSets (NativeComponentRead/Write, NativeSetCommandBuffer, NativeSetRead).
         /// </summary>
         public string TagSetExpression { get; }
 
@@ -280,7 +280,7 @@ namespace Trecs.SourceGen.Shared
                         inlineTagSetExpression: inlineExpr,
                         tagSetExpression: resolvedTagsLocal
                     );
-                case FromWorldFieldKind.NativeSetWrite:
+                case FromWorldFieldKind.NativeSetCommandBuffer:
                     // No schedule param: set type is on the field's generic arg, the writer
                     // is constructed unconditionally from the world.
                     return new(
@@ -432,7 +432,7 @@ namespace Trecs.SourceGen.Shared
                 "NativeComponentWrite" => FromWorldFieldKind.NativeComponentWrite,
                 "NativeComponentLookupRead" => FromWorldFieldKind.NativeComponentLookupRead,
                 "NativeComponentLookupWrite" => FromWorldFieldKind.NativeComponentLookupWrite,
-                "NativeSetWrite" => FromWorldFieldKind.NativeSetWrite,
+                "NativeSetCommandBuffer" => FromWorldFieldKind.NativeSetCommandBuffer,
                 "NativeEntitySetIndices" => FromWorldFieldKind.NativeEntitySetIndices,
                 "NativeSetRead" => FromWorldFieldKind.NativeSetRead,
                 _ => FromWorldFieldKind.Unsupported,
