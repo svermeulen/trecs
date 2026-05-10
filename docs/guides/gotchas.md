@@ -32,12 +32,6 @@ Strict-accessor rule: during a `Fixed` system's `Execute`, only that system's ow
 
 ## Structural changes
 
-### Same-step Fixed visibility
-
-`AddEntity` / `RemoveEntity` / `MoveTo` are queued and applied at submission, which runs at the end of each fixed step. A Fixed system later in the same step does *not* see the new state — it sees it on the next tick. Presentation systems within the same `Tick()` *do* see it, since submission runs between Fixed and Presentation.
-
-**Fix.** Call `World.SubmitEntities()` manually if same-step visibility is required, or accept the one-tick delay (typically fine).
-
 ### Just-spawned entities haven't been fixed-updated when Presentation sees them
 
 Submission runs at end of fixed step (and end of `Tick()`), so an entity spawned in a Fixed system *does* exist in time for Presentation in the same Tick. But it's been through **zero** fixed-update cycles — Presentation sees its spawn-time initial values, not whatever a fixed tick of physics / AI / logic would have produced.
