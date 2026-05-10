@@ -56,13 +56,11 @@ public partial class ParticleJobSystem : ISystem
 }
 ```
 
-`[ForEachEntity]` is **not** required, though. You can write an entirely hand-rolled `IJobFor` / `IJobParallelFor` / etc. with no Trecs-specific markers and schedule it yourself — register it with the dependency tracker via [`accessor.TrackExternalJob`](../advanced/advanced-jobs.md#external-job-tracking) so concurrent reads/writes are still ordered correctly.
-
-See [Advanced Job Features](../advanced/advanced-jobs.md) for `[FromWorld]` field wiring, lookups, and `[GlobalIndex]`.
+`[ForEachEntity]` is **not** required, though. You can write an entirely hand-rolled `IJobFor` / `IJobParallelFor` / etc. and still pass in Trecs data into it. See [Advanced Job Features](../advanced/advanced-jobs.md) for details.
 
 ## `NativeWorldAccessor`
 
-`NativeWorldAccessor` is the Burst-compatible counterpart to `WorldAccessor`. Get one with `world.ToNative()` (or take it as an `in NativeWorldAccessor` parameter — `[WrapAsJob]` auto-injects it). Structural ops take a `sortKey` so concurrent writes apply in deterministic order:
+`NativeWorldAccessor` is the Burst-compatible counterpart to `WorldAccessor`. Get one with `world.ToNative()` (or take it as an `in NativeWorldAccessor` parameter — `[WrapAsJob]` auto-injects it):
 
 ```csharp
 // In a job:
@@ -73,27 +71,15 @@ nativeWorld.RemoveEntity(entityIndex);
 nativeWorld.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
 ```
 
-!!! warning "Structural changes must match template cadence"
-    `AddEntity`, `RemoveEntity`, and `MoveTo` require an accessor whose role matches the target template's cadence:
-
-    - **Normal templates:** require [`AccessorRole.Fixed`](../advanced/accessor-roles.md) (the default for `[ExecuteIn(SystemPhase.Fixed)]`, including the implicit default). Calling them from a presentation- or input-phase job asserts in debug builds.
-    - **`[VariableUpdateOnly]` templates** (e.g. cameras, view-only helpers): the rule is inverted — structural changes require an `AccessorRole.Variable` accessor (presentation/input phases) and are rejected from Fixed-role jobs.
-
-    `AccessorRole.Unrestricted` bypasses both rules. 
-
-### Sort keys
-
-When [`RequireDeterministicSubmission`](../core/world-setup.md) is enabled, `sortKey` determines the application order of buffered structural ops. Use the iteration index or a stable entity-derived value — anything reproducible across runs.
-
 ## Thread-safety cheat sheet
 
 | Operation | Main thread | Jobs |
 |-----------|-------------|------|
 | Read a single component | `world.Component<T>(idx).Read` | `NativeComponentRead<T>` (single entity), `NativeComponentBufferRead<T>` (one group), `NativeComponentLookupRead<T>` (across groups) |
 | Write a single component | `world.Component<T>(idx).Write` | `NativeComponentWrite<T>`, `NativeComponentBufferWrite<T>`, `NativeComponentLookupWrite<T>` |
-| Add / remove / move entity | `WorldAccessor` (deferred) | `NativeWorldAccessor` (deferred + sort key) |
+| Add / remove / move entity | `world.Set<T>().Deferred` (deferred until next frame) | `NativeWorldAccessor` (deferred until next frame + sort key) |
 | Read a set | `world.Set<T>().Read` | `NativeSetRead<T>` |
-| Mutate a set | `world.Set<T>().Write` | `NativeSetCommandBuffer<T>` (deferred) |
+| Mutate a set | `world.Set<T>().Write` | `NativeSetCommandBuffer<T>` (deferred but only until job completion) |
 
 !!! warning
     `WorldAccessor` is **main-thread only**. Inside jobs always use `NativeWorldAccessor` and the native read/write types — see [Advanced Job Features](../advanced/advanced-jobs.md) for how to wire them via `[FromWorld]`.

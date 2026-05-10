@@ -66,7 +66,7 @@ highlighted.Remove(entityIndex);
 
     Everything else is safe: mutating a different set, mutating the same set in a different group, or using the deferred API (`Set<T>().Defer`) on the iterated set (it applies at the next submission).
 
-    To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `List<EntityIndex>` and apply them after the loop.
+    To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `NativeList<EntityIndex>` and apply them after the loop.
 
 ## Querying by set
 
@@ -87,7 +87,7 @@ int highlighted = World.Query().InSet<HighlightedParticle>().Count();
 
 ## Per-frame staging
 
-A common pattern: use a set as a **per-frame scratch list**. One system clears and populates it; downstream systems iterate only the members. This avoids recomputing the same predicate in every consumer (rendering, physics sync, audio cues, etc.).
+A common pattern: use a set as a **per-frame scratch list**. One system clears and populates it; downstream systems iterate only the members. This avoids recomputing the same predicate against many entities in every consumer (rendering, physics sync, audio cues, etc.).
 
 To make this work *within a single frame*, use the **immediate** APIs. Deferred set ops only land at the next submission, so a downstream system in the same frame would see last frame's contents.
 

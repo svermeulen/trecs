@@ -4,7 +4,7 @@ Trecs tracks which jobs read and write which data and inserts the right `JobHand
 
 ## Why this exists
 
-Unity's job system makes dependency wiring your problem: every job needs the right input handle. Get it wrong and you end up with race conditions, or — just as bad — jobs accidentally running in sequence when they could have run in parallel. Trecs reads your access pattern (parameter `in`/`ref` modifiers, the native field types listed in [Jobs & Burst](jobs-and-burst.md#thread-safety-cheat-sheet)) and emits the wiring at schedule time.
+Unity's job system makes dependency wiring your problem: every job needs the right input handle. Get it wrong and you end up with race conditions, or jobs accidentally running in sequence when they could have run in parallel. Trecs reads your access pattern (parameter `in`/`ref` modifiers, the native field types listed in [Jobs & Burst](jobs-and-burst.md#thread-safety-cheat-sheet)) and emits the wiring at schedule time.
 
 ## The reader/writer model
 
