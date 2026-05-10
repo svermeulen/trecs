@@ -55,11 +55,11 @@ nav:
       - Jobs & Burst: performance/jobs-and-burst.md
       - Dependency Tracking: performance/dependency-tracking.md
   - Recipes:
+      - Trecs vs Unity ECS: recipes/trecs-vs-unity-ecs.md
+      - Design Rules: recipes/design-rules.md
       - OOP Integration: recipes/oop-integration.md
       - Entity Subset Patterns: recipes/entity-subset-patterns.md
-      - Design Rules: recipes/design-rules.md
       - Debugging & Troubleshooting: recipes/debugging.md
-      - Trecs vs Unity ECS: recipes/trecs-vs-unity-ecs.md
   - Advanced:
       - Accessor Roles: advanced/accessor-roles.md
       - Aspect Interfaces: advanced/aspect-interfaces.md
