@@ -7,14 +7,7 @@ Entities are lightweight identifiers that group components together.
 Trecs has two ways of referring to entities:
 
 - **`EntityHandle`** — a stable reference that survives [structural changes](../entity-management/structural-changes.md). Use it whenever you need to store a long-lived pointer to another entity (e.g. on a component or on a managed object).
-- **`EntityIndex`** — a fast, transient reference that points directly into the underlying buffers. It's invalidated by any structural change, so it's only safe within a single system tick.
-
-| | EntityHandle | EntityIndex |
-|---|---|---|
-| **Stability** | Stable across structural changes | Invalidated by structural changes |
-| **Use case** | Long-lived references | Immediate access within a tick |
-| **Fields** | `UniqueId`, `Version` | `Index`, `GroupIndex` |
-| **Performance** | Requires a lookup | Direct buffer access |
+- **`EntityIndex`** — a fast, transient reference that points directly into the underlying buffers. It's invalidated by any structural change, so it's only safe within the current frame.
 
 Convert between them:
 
