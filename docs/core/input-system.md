@@ -33,6 +33,8 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 
 `Retain` is right when an input represents a sustained intent (e.g. "currently holding a movement direction"). `Reset` fits one-shot signals (e.g. "fire button pressed this frame").
 
+The choice also affects recording storage size. `Retain` lets the recorder prune successive frames with the same queued value (since `Retain` would reproduce that value anyway), so a sustained input compresses to one stored entry plus changes. With `Reset`, every frame of a sustained intent needs its own queued value or the component drops back to default — an analog-axis input recorded under `Reset` is bytes-per-frame.
+
 ## Queuing input
 
 `World.AddInput<T>(...)` is only callable from an `[ExecuteIn(SystemPhase.Input)]` system. Like every other system, the input system's `Execute()` runs once per fixed step (zero or more times per Unity `Update`, depending on catch-up).
