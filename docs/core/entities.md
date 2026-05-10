@@ -82,10 +82,9 @@ if (entity.TryGet<Velocity>(out var velAccessor))
     // ...
 }
 
-// Structural / set / input ops on the bound entity
+// Structural / input ops on the bound entity
 entity.Remove();
 entity.MoveTo<BallTags.Ball, BallTags.Resting>();
-entity.AddToSet(World.Set<HighlightedParticle>().Write);
 
 // Resolve the stable handle when you need to store it
 EntityHandle handle = entity.Handle;

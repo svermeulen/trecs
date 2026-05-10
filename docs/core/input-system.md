@@ -33,7 +33,7 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 
 `Retain` is right when an input represents a sustained intent (e.g. "currently holding a movement direction"). `Reset` fits one-shot signals (e.g. "fire button pressed this frame").
 
-The choice also affects recording storage size. `Retain` lets the recorder prune successive frames with the same queued value (since `Retain` would reproduce that value anyway), and similarly for `Retain` if default value is enqueued.
+The choice also affects recording storage size. `Retain` lets the recorder prune successive frames with the same queued value (since `Retain` would reproduce that value anyway), and similarly for `Reset` if default value is enqueued.
 
 ## Queuing input
 

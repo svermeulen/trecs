@@ -101,29 +101,6 @@ namespace Trecs
             where T3 : struct, ITag
             where T4 : struct, ITag => _world.MoveTo<T1, T2, T3, T4>(_entityIndex);
 
-        // ── Set operations ────────────────────────────────────────────
-
-        /// <summary>
-        /// Adds this entity to the given set immediately.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddToSet<TSet>(SetWrite<TSet> set)
-            where TSet : struct, IEntitySet => set.Add(_entityIndex);
-
-        /// <summary>
-        /// Removes this entity from the given set immediately.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveFromSet<TSet>(SetWrite<TSet> set)
-            where TSet : struct, IEntitySet => set.Remove(_entityIndex);
-
-        /// <summary>
-        /// Returns true if this entity is a member of the given set.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool ExistsInSet<TSet>(SetRead<TSet> set)
-            where TSet : struct, IEntitySet => set.Exists(_entityIndex);
-
         // ── Input ─────────────────────────────────────────────────────
 
         /// <summary>
