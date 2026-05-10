@@ -1720,16 +1720,15 @@ namespace Trecs.SourceGen
                 sb.AppendLine($"{ind}private {bufferType} {BufferFieldName(i)};");
             }
 
-            if (info.NeedsGroupField)
-                sb.AppendLine($"{ind}private GroupIndex {FromWorldEmitter.GenPrefix}GroupIndex;");
-
-            if (info.NeedsGlobalIndexOffset)
-                sb.AppendLine($"{ind}private int {FromWorldEmitter.GenPrefix}GlobalIndexOffset;");
-
-            if (info.NeedsEntityHandleBuffer)
-                sb.AppendLine(
-                    $"{ind}private NativeEntityHandleBuffer {FromWorldEmitter.GenPrefix}EntityHandles;"
-                );
+            PerGroupHiddenFieldEmitter.EmitDeclarations(
+                sb,
+                ind,
+                visibility: "private",
+                needsGroupField: info.NeedsGroupField,
+                needsGlobalIndexOffset: info.NeedsGlobalIndexOffset,
+                hasNativeWorldAccessor: false,
+                needsEntityHandleBuffer: info.NeedsEntityHandleBuffer
+            );
         }
 
         static void EmitExecuteShim(StringBuilder sb, JobInfo info, string ind)
@@ -2030,20 +2029,14 @@ namespace Trecs.SourceGen
                     $"{body}{FromWorldEmitter.GenPrefix}job.{BufferFieldName(i)} = {FromWorldEmitter.GenPrefix}buf{i}_value;"
                 );
 
-            if (info.NeedsGroupField)
-                sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}GroupIndex = {FromWorldEmitter.GenPrefix}group;"
-                );
-
-            if (info.NeedsGlobalIndexOffset)
-                sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}GlobalIndexOffset = {FromWorldEmitter.GenPrefix}queryIndexOffset;"
-                );
-
-            if (info.NeedsEntityHandleBuffer)
-                sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}EntityHandles = {FromWorldEmitter.GenPrefix}world.GetEntityHandleBufferForJob({FromWorldEmitter.GenPrefix}group);"
-                );
+            PerGroupHiddenFieldEmitter.EmitAssignments(
+                sb,
+                body,
+                needsGroupField: info.NeedsGroupField,
+                needsGlobalIndexOffset: info.NeedsGlobalIndexOffset,
+                hasNativeWorldAccessor: false,
+                needsEntityHandleBuffer: info.NeedsEntityHandleBuffer
+            );
 
             // Assign [FromWorld] field values.
             FromWorldEmitter.EmitFromWorldFieldAssignments(sb, body, orderedEmits);
@@ -2203,20 +2196,14 @@ namespace Trecs.SourceGen
                     $"{body}{FromWorldEmitter.GenPrefix}job.{BufferFieldName(i)} = {FromWorldEmitter.GenPrefix}buf{i}_value;"
                 );
 
-            if (info.NeedsGroupField)
-                sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}GroupIndex = {FromWorldEmitter.GenPrefix}group;"
-                );
-
-            if (info.NeedsGlobalIndexOffset)
-                sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}GlobalIndexOffset = {FromWorldEmitter.GenPrefix}queryIndexOffset;"
-                );
-
-            if (info.NeedsEntityHandleBuffer)
-                sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}EntityHandles = {FromWorldEmitter.GenPrefix}world.GetEntityHandleBufferForJob({FromWorldEmitter.GenPrefix}group);"
-                );
+            PerGroupHiddenFieldEmitter.EmitAssignments(
+                sb,
+                body,
+                needsGroupField: info.NeedsGroupField,
+                needsGlobalIndexOffset: info.NeedsGlobalIndexOffset,
+                hasNativeWorldAccessor: false,
+                needsEntityHandleBuffer: info.NeedsEntityHandleBuffer
+            );
 
             // Assign [FromWorld] field values.
             FromWorldEmitter.EmitFromWorldFieldAssignments(sb, body, orderedEmits);

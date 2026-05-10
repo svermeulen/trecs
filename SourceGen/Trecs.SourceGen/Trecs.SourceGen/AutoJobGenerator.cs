@@ -30,7 +30,8 @@ namespace Trecs.SourceGen
     [Generator]
     public class AutoJobGenerator : IIncrementalGenerator
     {
-        const string GenPrefix = "_trecs_";
+        // Forwards to the single source of truth so a future prefix change happens once.
+        const string GenPrefix = FromWorldEmitter.GenPrefix;
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
@@ -1263,27 +1264,15 @@ namespace Trecs.SourceGen
                 sb.AppendLine($"{fieldInd}internal {bufferType} {BufferFieldName(i)};");
             }
 
-            // GroupIndex field — always needed for aspect (for EntityIndex ctor), or for
-            // components when an EntityIndex parameter is present.
-            if (info.NeedsGroupField)
-                sb.AppendLine($"{fieldInd}internal GroupIndex {GenPrefix}GroupIndex;");
-
-            // GlobalIndexOffset field — the per-call offset assigned per group by the
-            // schedule overload; the Execute shim adds it to `i` before forwarding.
-            if (info.NeedsGlobalIndexOffset)
-                sb.AppendLine($"{fieldInd}internal int {GenPrefix}GlobalIndexOffset;");
-
-            // NativeWorldAccessor field.
-            if (info.HasNativeWorldAccessor)
-                sb.AppendLine($"{fieldInd}public NativeWorldAccessor {GenPrefix}nwa;");
-
-            // NativeEntityHandleBuffer field — populated per-group at schedule time
-            // so the Execute shim can materialize the user's EntityHandle parameter
-            // as `_trecs_EntityHandles[i]` (no dictionary lookup, just an indexed read).
-            if (info.NeedsEntityHandleBuffer)
-                sb.AppendLine(
-                    $"{fieldInd}internal NativeEntityHandleBuffer {GenPrefix}EntityHandles;"
-                );
+            PerGroupHiddenFieldEmitter.EmitDeclarations(
+                sb,
+                fieldInd,
+                visibility: "internal",
+                needsGroupField: info.NeedsGroupField,
+                needsGlobalIndexOffset: info.NeedsGlobalIndexOffset,
+                hasNativeWorldAccessor: info.HasNativeWorldAccessor,
+                needsEntityHandleBuffer: info.NeedsEntityHandleBuffer
+            );
 
             // PassThrough fields.
             foreach (var p in info.Params)
@@ -1664,25 +1653,14 @@ namespace Trecs.SourceGen
                     $"{innerBody}{GenPrefix}job.{BufferFieldName(i)} = {GenPrefix}buf{i}_value;"
                 );
 
-            if (info.NeedsGroupField)
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}job.{GenPrefix}GroupIndex = {GenPrefix}group;"
-                );
-
-            if (info.NeedsGlobalIndexOffset)
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}job.{GenPrefix}GlobalIndexOffset = {GenPrefix}queryIndexOffset;"
-                );
-
-            if (info.HasNativeWorldAccessor)
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}job.{GenPrefix}nwa = {GenPrefix}world.ToNative();"
-                );
-
-            if (info.NeedsEntityHandleBuffer)
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}job.{GenPrefix}EntityHandles = {GenPrefix}world.GetEntityHandleBufferForJob({GenPrefix}group);"
-                );
+            PerGroupHiddenFieldEmitter.EmitAssignments(
+                sb,
+                innerBody,
+                needsGroupField: info.NeedsGroupField,
+                needsGlobalIndexOffset: info.NeedsGlobalIndexOffset,
+                hasNativeWorldAccessor: info.HasNativeWorldAccessor,
+                needsEntityHandleBuffer: info.NeedsEntityHandleBuffer
+            );
 
             // Assign passthrough fields.
             foreach (var p in ptParams)
@@ -1870,25 +1848,14 @@ namespace Trecs.SourceGen
                     $"{innerBody}{GenPrefix}job.{BufferFieldName(i)} = {GenPrefix}buf{i}_value;"
                 );
 
-            if (info.NeedsGroupField)
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}job.{GenPrefix}GroupIndex = {GenPrefix}group;"
-                );
-
-            if (info.NeedsGlobalIndexOffset)
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}job.{GenPrefix}GlobalIndexOffset = {GenPrefix}queryIndexOffset;"
-                );
-
-            if (info.HasNativeWorldAccessor)
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}job.{GenPrefix}nwa = {GenPrefix}world.ToNative();"
-                );
-
-            if (info.NeedsEntityHandleBuffer)
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}job.{GenPrefix}EntityHandles = {GenPrefix}world.GetEntityHandleBufferForJob({GenPrefix}group);"
-                );
+            PerGroupHiddenFieldEmitter.EmitAssignments(
+                sb,
+                innerBody,
+                needsGroupField: info.NeedsGroupField,
+                needsGlobalIndexOffset: info.NeedsGlobalIndexOffset,
+                hasNativeWorldAccessor: info.HasNativeWorldAccessor,
+                needsEntityHandleBuffer: info.NeedsEntityHandleBuffer
+            );
 
             // Assign passthrough fields.
             foreach (var p in ptParams)
