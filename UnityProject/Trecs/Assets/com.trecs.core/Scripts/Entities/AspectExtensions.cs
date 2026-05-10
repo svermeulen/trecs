@@ -27,7 +27,10 @@ namespace Trecs
         /// from inside a Burst-compiled job using a <see cref="NativeWorldAccessor"/>.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static EntityHandle Handle<TAspect>(this TAspect aspect, in NativeWorldAccessor world)
+        public static EntityHandle Handle<TAspect>(
+            this TAspect aspect,
+            in NativeWorldAccessor world
+        )
             where TAspect : struct, IAspect => world.GetEntityHandle(aspect.EntityIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -1,7 +1,7 @@
 using System;
 using NUnit.Framework;
-using NAssert = NUnit.Framework.Assert;
 using Trecs.Internal;
+using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {

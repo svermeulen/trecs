@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using NUnit.Framework;
+using Trecs.Internal;
 using Unity.Collections;
 using Debug = UnityEngine.Debug;
 using NAssert = NUnit.Framework.Assert;
-using Trecs.Internal;
 
 namespace Trecs.Tests
 {

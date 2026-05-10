@@ -84,10 +84,7 @@ namespace Trecs.Samples.AspectInterfaces
                 // distinct random stream without any persistent RNG
                 // state on the system (Trecs systems avoid mutable
                 // member state).
-                uint seed =
-                    1u
-                    + (uint)World.Frame * 0x9E3779B9u
-                    + (uint)handle.Id * 0x85EBCA6Bu;
+                uint seed = 1u + (uint)World.Frame * 0x9E3779B9u + (uint)handle.Id * 0x85EBCA6Bu;
                 var rng = new Random(seed);
                 float duration = rng.NextFloat(
                     _settings.MinFleeDuration,

@@ -12,8 +12,10 @@ namespace Trecs.Internal
     public static class NativeWorldAccessorInternalExtensions
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RemoveEntity(this in NativeWorldAccessor world, EntityIndex entityIndex) =>
-            world.RemoveEntity(entityIndex);
+        public static void RemoveEntity(
+            this in NativeWorldAccessor world,
+            EntityIndex entityIndex
+        ) => world.RemoveEntity(entityIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void MoveTo(

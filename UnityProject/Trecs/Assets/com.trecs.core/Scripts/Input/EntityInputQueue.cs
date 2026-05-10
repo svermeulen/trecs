@@ -61,10 +61,7 @@ namespace Trecs.Internal
                 {
                     if (componentDec.IsInput)
                     {
-                        if (
-                            componentDec.MissingInputBehavior.Value
-                            == MissingInputBehavior.Reset
-                        )
+                        if (componentDec.MissingInputBehavior.Value == MissingInputBehavior.Reset)
                         {
                             _resetGroups.Add(
                                 new ResetGroupInfo
