@@ -59,7 +59,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                 World.RemoveEntity(fish.TargetMeal);
 
                 fish.TargetMeal = EntityHandle.Null;
-                fish.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(World);
+                fish.SetTag<FrenzyTags.NotEating>(World);
             }
         }
 
@@ -78,7 +78,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                 World.RemoveEntity(fishMeal.Value);
 
                 fishMeal.Value = EntityHandle.Null;
-                World.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(entityIndex);
+                World.SetTag<FrenzyTags.NotEating>(entityIndex);
             }
         }
 
@@ -93,7 +93,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     World.RemoveEntity(fish.TargetMeal);
 
                     fish.TargetMeal = EntityHandle.Null;
-                    fish.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(World);
+                    fish.SetTag<FrenzyTags.NotEating>(World);
                 }
             }
         }
@@ -120,7 +120,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                         World.RemoveEntity(meals[i].Value.ToIndex(World));
 
                         meals[i].Value = EntityHandle.Null;
-                        World.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(
+                        World.SetTag<FrenzyTags.NotEating>(
                             new EntityIndex(i, slice.GroupIndex)
                         );
                     }
@@ -172,7 +172,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                 world.RemoveEntity(mealIndex);
                 fish.TargetMeal = EntityHandle.Null;
-                world.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(entityIndex);
+                world.SetTag<FrenzyTags.NotEating>(entityIndex);
             }
         }
 
@@ -197,7 +197,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                 world.RemoveEntity(mealIndex);
                 fishMeal.Value = EntityHandle.Null;
-                world.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(entityIndex);
+                world.SetTag<FrenzyTags.NotEating>(entityIndex);
             }
         }
 
@@ -221,7 +221,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                     World.RemoveEntity(mealIndex);
                     fish.TargetMeal = EntityHandle.Null;
-                    World.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(entityIndex);
+                    World.SetTag<FrenzyTags.NotEating>(entityIndex);
                 }
             }
         }
@@ -251,7 +251,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                     World.RemoveEntity(mealIndex);
                     fishMeal.Value = EntityHandle.Null;
-                    World.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(entityIndex);
+                    World.SetTag<FrenzyTags.NotEating>(entityIndex);
                 }
             }
         }
@@ -288,7 +288,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                     World.RemoveEntity(mealIndex);
                     Meals[i] = new TargetMeal { Value = EntityHandle.Null };
-                    World.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(
+                    World.SetTag<FrenzyTags.NotEating>(
                         new EntityIndex(i, FishGroup)
                     );
                 }

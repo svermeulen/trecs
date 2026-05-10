@@ -94,8 +94,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
             meal.ApproachingFish = fish.Handle(World);
 
-            fish.MoveTo<FrenzyTags.Fish, FrenzyTags.Eating>(World);
-            meal.MoveTo<FrenzyTags.Meal, FrenzyTags.Eating>(World);
+            fish.SetTag<FrenzyTags.Eating>(World);
+            meal.SetTag<FrenzyTags.Eating>(World);
         }
 
         void RunQueryGroupSlices()
@@ -161,8 +161,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     rotations[fi].Value = quaternion.LookRotationSafe(dir, math.up());
                     velocities[fi].Value = dir * speeds[fi].Value;
 
-                    World.MoveTo<FrenzyTags.Fish, FrenzyTags.Eating>(fishEntityIndex);
-                    World.MoveTo<FrenzyTags.Meal, FrenzyTags.Eating>(mealEntityIndex);
+                    World.SetTag<FrenzyTags.Eating>(fishEntityIndex);
+                    World.SetTag<FrenzyTags.Eating>(mealEntityIndex);
 
                     mi++;
                 }
@@ -237,8 +237,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                 var mealEntityIndex = new EntityIndex(i, MealGroup);
                 var fishEntityIndex = new EntityIndex(i, FishGroup);
-                World.MoveTo<FrenzyTags.Fish, FrenzyTags.Eating>(fishEntityIndex);
-                World.MoveTo<FrenzyTags.Meal, FrenzyTags.Eating>(mealEntityIndex);
+                World.SetTag<FrenzyTags.Eating>(fishEntityIndex);
+                World.SetTag<FrenzyTags.Eating>(mealEntityIndex);
             }
         }
 

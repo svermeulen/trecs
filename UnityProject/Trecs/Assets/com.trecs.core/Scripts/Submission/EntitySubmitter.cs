@@ -1413,6 +1413,52 @@ namespace Trecs.Internal
             }
         }
 
+        // Move-queue variant: also handles the SetTag sentinel (-2), which encodes
+        // a partial tag change that needs the source group's dimension metadata to
+        // resolve. AddEntity-side queues never emit -2 because there's no source
+        // group, so they keep using the simpler DequeueTagSet.
+        TagSet DequeueMoveTagSet(ref NativeBag buffer, GroupIndex from)
+        {
+            var sentinel = buffer.Dequeue<int>();
+
+            if (sentinel == -1)
+                return new TagSet(buffer.Dequeue<int>());
+
+            if (sentinel == -2)
+            {
+                var tag = new Tag(buffer.Dequeue<int>());
+                return _worldInfo.ResolveSetTagDestination(from, tag);
+            }
+
+            switch (sentinel)
+            {
+                case 1:
+                    return TagSet.FromTags(new Tag(buffer.Dequeue<int>()));
+                case 2:
+                    return TagSet.FromTags(
+                        new Tag(buffer.Dequeue<int>()),
+                        new Tag(buffer.Dequeue<int>())
+                    );
+                case 3:
+                    return TagSet.FromTags(
+                        new Tag(buffer.Dequeue<int>()),
+                        new Tag(buffer.Dequeue<int>()),
+                        new Tag(buffer.Dequeue<int>())
+                    );
+                case 4:
+                    return TagSet.FromTags(
+                        new Tag(buffer.Dequeue<int>()),
+                        new Tag(buffer.Dequeue<int>()),
+                        new Tag(buffer.Dequeue<int>()),
+                        new Tag(buffer.Dequeue<int>())
+                    );
+                default:
+                    throw new TrecsException(
+                        $"Unexpected sentinel {sentinel} in native move queue"
+                    );
+            }
+        }
+
         bool HasPendingNativeOperations()
         {
             return HasAnyNonEmpty(_nativeRemoveOperationQueue)
@@ -1517,7 +1563,7 @@ namespace Trecs.Internal
                         {
                             var accessorId = buffer.Dequeue<int>();
                             var from = buffer.Dequeue<EntityIndex>();
-                            var toTagSet = DequeueTagSet(ref buffer);
+                            var toTagSet = DequeueMoveTagSet(ref buffer, from.GroupIndex);
                             var toGroup = _worldInfo.GetSingleGroupWithTags(toTagSet);
 
                             _log.Trace(

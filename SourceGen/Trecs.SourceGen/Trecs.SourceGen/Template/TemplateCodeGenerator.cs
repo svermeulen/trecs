@@ -117,6 +117,25 @@ namespace Trecs.SourceGen.Template
                 sb.AppendLine(argIndent, "partitions: Array.Empty<TagSet>(),");
             }
 
+            // dimensions — one TagSet per dimension listing its variant tags
+            if (data.Dimensions.Length > 0)
+            {
+                sb.AppendLine(argIndent, "dimensions: new TagSet[]");
+                sb.AppendLine(argIndent, "{");
+                for (int i = 0; i < data.Dimensions.Length; i++)
+                {
+                    var variants = data.Dimensions[i].VariantTagTypeNames;
+                    var tagArgs = string.Join(", ", variants);
+                    var comma = i < data.Dimensions.Length - 1 ? "," : "";
+                    sb.AppendLine(argIndent + 1, $"TagSet<{tagArgs}>.Value{comma}");
+                }
+                sb.AppendLine(argIndent, "},");
+            }
+            else
+            {
+                sb.AppendLine(argIndent, "dimensions: Array.Empty<TagSet>(),");
+            }
+
             // localComponentDeclarations
             if (data.Components.Length > 0)
             {

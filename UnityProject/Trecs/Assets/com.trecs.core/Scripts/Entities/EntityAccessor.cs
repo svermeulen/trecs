@@ -101,6 +101,16 @@ namespace Trecs
             where T3 : struct, ITag
             where T4 : struct, ITag => _world.MoveTo<T1, T2, T3, T4>(_entityIndex);
 
+        /// <summary>
+        /// Schedules a tag change: moves this entity to the partition where the
+        /// dimension containing <typeparamref name="T"/> now has
+        /// <typeparamref name="T"/> as its active variant. Other dimensions are
+        /// preserved.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetTag<T>()
+            where T : struct, ITag => _world.SetTag<T>(_entityIndex);
+
         // ── Input ─────────────────────────────────────────────────────
 
         /// <summary>

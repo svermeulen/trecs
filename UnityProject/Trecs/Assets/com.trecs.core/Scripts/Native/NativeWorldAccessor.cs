@@ -406,6 +406,28 @@ namespace Trecs
             where T3 : struct, ITag
             where T4 : struct, ITag => MoveTo<T1, T2, T3, T4>(GetEntityIndex(entityHandle));
 
+        /// <summary>
+        /// Burst-side equivalent of <see cref="WorldAccessor.SetTag{T}(EntityIndex)"/>.
+        /// Enqueues a tag change with sentinel <c>-2</c>; the submitter resolves the
+        /// destination partition (using the source group's template dimensions) on the
+        /// main thread.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal readonly void SetTag<T>(EntityIndex entityIndex)
+            where T : struct, ITag
+        {
+            AssertStructuralChangesAllowed();
+            var bag = _moveQueue.GetBag(_threadIndex);
+            bag.Enqueue(_accessorId);
+            bag.Enqueue(entityIndex);
+            bag.Enqueue((int)-2); // sentinel: SetTag — single tag GUID follows, dim-resolved at submit time
+            bag.Enqueue(Tag<T>.NativeGuid);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly void SetTag<T>(EntityHandle entityHandle)
+            where T : struct, ITag => SetTag<T>(GetEntityIndex(entityHandle));
+
         // ── Entity Reference Resolution ─────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

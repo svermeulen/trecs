@@ -512,6 +512,26 @@ namespace Trecs
             where T4 : struct, ITag => MoveTo<T1, T2, T3, T4>(entityHandle.ToIndex(_world));
 
         /// <summary>
+        /// Schedules a tag change: moves the entity to the partition where the dimension
+        /// containing <typeparamref name="T"/> now has <typeparamref name="T"/> as its
+        /// active variant. All other dimensions and tags are preserved. Throws if
+        /// <typeparamref name="T"/> is not declared as a partition variant on the entity's
+        /// template (via <see cref="IPartitionedBy{T1, T2}"/>).
+        /// </summary>
+        internal void SetTag<T>(EntityIndex entityIndex)
+            where T : struct, ITag
+        {
+            var newTagSet = _worldInfo.ResolveSetTagDestination(
+                entityIndex.GroupIndex,
+                Tag<T>.Value
+            );
+            MoveTo(entityIndex, newTagSet);
+        }
+
+        public void SetTag<T>(EntityHandle entityHandle)
+            where T : struct, ITag => SetTag<T>(entityHandle.ToIndex(_world));
+
+        /// <summary>
         /// Schedules removal of an entity. The removal is deferred until the next entity submission.
         /// </summary>
         internal void RemoveEntity(EntityIndex entityIndex)

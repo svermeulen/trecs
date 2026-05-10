@@ -34,7 +34,7 @@ namespace Trecs.Samples.Partitions
                 ball.Velocity = vel;
             }
 
-            // MoveTo transitions the entity to a different partition — this moves
+            // SetTag transitions the entity to a different partition — this moves
             // component data to a new contiguous array so iteration stays cache-friendly
             if (
                 math.lengthsq(ball.Velocity) < RestThreshold * RestThreshold
@@ -44,7 +44,7 @@ namespace Trecs.Samples.Partitions
                 ball.Velocity = float3.zero;
                 ball.RestTimer = 2f + World.Rng.Next() * 3f; // rest 2-5 seconds
 
-                ball.MoveTo<BallTags.Ball, BallTags.Resting>(World);
+                ball.SetTag<BallTags.Resting>(World);
             }
         }
 

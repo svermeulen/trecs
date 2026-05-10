@@ -34,7 +34,7 @@ namespace Trecs.Samples.FeedingFrenzy101
 
             meal.Remove(world);
             fish.TargetMeal = EntityHandle.Null;
-            fish.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(world);
+            fish.SetTag<FrenzyTags.NotEating>(world);
         }
 
         partial struct ConsumingFish

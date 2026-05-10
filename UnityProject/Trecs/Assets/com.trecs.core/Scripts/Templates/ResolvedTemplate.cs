@@ -17,6 +17,7 @@ namespace Trecs
             IReadOnlyList<TagSet> groupTagSets,
             IReadOnlyList<Template> allBaseTemplates,
             IReadOnlyList<TagSet> partitions,
+            IReadOnlyList<TagSet> dimensions,
             IReadOnlyList<IResolvedComponentDeclaration> componentDeclarations,
             ReadOnlyDenseDictionary<Type, IResolvedComponentDeclaration> componentDeclarationMap,
             IComponentBuilder[] componentBuilders,
@@ -30,6 +31,7 @@ namespace Trecs
             ComponentDeclarationMap = componentDeclarationMap;
             ComponentBuilders = componentBuilders;
             Partitions = partitions;
+            Dimensions = dimensions;
             AllTags = tagset;
             AllBaseTemplates = allBaseTemplates;
             VariableUpdateOnly = variableUpdateOnly;
@@ -121,6 +123,13 @@ namespace Trecs
         /// Valid partition tag combinations (inherited from the unresolved template).
         /// </summary>
         public IReadOnlyList<TagSet> Partitions { get; }
+
+        /// <summary>
+        /// Partition dimensions (variants per dim) — inherited transitively from base
+        /// templates. Used by tag-change operations (SetTag) to resolve which dim a
+        /// tag belongs to and what its sibling variants are.
+        /// </summary>
+        public IReadOnlyList<TagSet> Dimensions { get; }
 
         /// <summary>
         /// All resolved component declarations (local and inherited).

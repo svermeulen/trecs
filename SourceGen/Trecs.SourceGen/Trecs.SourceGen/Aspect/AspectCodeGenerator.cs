@@ -500,6 +500,17 @@ namespace Trecs.SourceGen.Aspect
                     );
                     sb.AppendLine();
                 }
+
+                // SetTag<T> — partial tag change that preserves other dimensions
+                sb.AppendLine(
+                    indentLevel,
+                    "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
+                );
+                sb.AppendLine(
+                    indentLevel,
+                    $"public readonly void SetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => world.SetTag<T>(_entityIndex);"
+                );
+                sb.AppendLine();
             }
         }
 

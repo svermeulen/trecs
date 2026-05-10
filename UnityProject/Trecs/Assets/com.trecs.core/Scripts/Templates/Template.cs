@@ -16,7 +16,8 @@ namespace Trecs
             IReadOnlyList<TagSet> partitions,
             IReadOnlyList<IComponentDeclaration> localComponentDeclarations,
             IReadOnlyList<Tag> localTags,
-            bool localVariableUpdateOnly = false
+            bool localVariableUpdateOnly = false,
+            IReadOnlyList<TagSet> dimensions = null
         )
         {
             DebugName = debugName;
@@ -24,6 +25,7 @@ namespace Trecs
             LocalComponentDeclarations = localComponentDeclarations;
             LocalTags = localTags;
             Partitions = partitions;
+            Dimensions = dimensions ?? System.Array.Empty<TagSet>();
             LocalVariableUpdateOnly = localVariableUpdateOnly;
         }
 
@@ -46,6 +48,13 @@ namespace Trecs
         /// An empty list means the template has a single implicit partition.
         /// </summary>
         public IReadOnlyList<TagSet> Partitions { get; }
+
+        /// <summary>
+        /// Partition dimensions declared on this template. Each entry is a TagSet of
+        /// mutually exclusive variant tags for one dimension (e.g. {Alive, Dead}).
+        /// <see cref="Partitions"/> is the cross product across all dimensions.
+        /// </summary>
+        public IReadOnlyList<TagSet> Dimensions { get; }
 
         /// <summary>
         /// Tags declared directly on this template (not inherited from base templates).

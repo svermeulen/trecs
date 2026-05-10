@@ -557,6 +557,7 @@ internal static class TrecsStubs
                 public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
                 public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
                 public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
+                public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
 
                 // Set gateway: Set<T>() returns SetAccessor<T> with .Defer / .Read / .Write properties.
                 public SetAccessor<TSet> Set<TSet>() where TSet : struct, IEntitySet => default;
@@ -643,6 +644,7 @@ internal static class TrecsStubs
                 public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
                 public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
                 public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
+                public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
                 public void SetAdd<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
                 public void SetRemove<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
             }
@@ -679,7 +681,8 @@ internal static class TrecsStubs
                     TagSet[] partitions,
                     IComponentDeclaration[] localComponentDeclarations,
                     Tag[] localTags,
-                    bool localVariableUpdateOnly = false
+                    bool localVariableUpdateOnly = false,
+                    TagSet[] dimensions = null
                 ) { }
             }
 
