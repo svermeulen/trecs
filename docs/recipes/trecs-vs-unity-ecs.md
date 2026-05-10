@@ -6,95 +6,95 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 
 ## Architecture
 
-| | Trecs | Unity ECS |
+| | Unity ECS | Trecs |
 |---|---|---|
-| **Storage** | Group-based (entities grouped by tag combination) | Archetype-based (entities grouped by component set) |
-| **Memory layout** | Structure-of-arrays: one contiguous buffer per component per group, indexed by the entity's position in the group | Fixed-size 16 KB chunks per archetype; entities split across many chunks |
-| **Entity identity** | `EntityHandle` (stable, wraps index + version) | `Entity` (stable, wraps index + version) |
-| **Definition** | [Templates](../core/templates.md) (`ITemplate` + `ITagged`) | No explicit templates (archetype emerges from components) |
-| **Structural changes** | Deferred, applied automatically at [submission](../entity-management/structural-changes.md). Manually via `World.SubmitEntities()` | Sync via `EntityManager`, or deferred via `EntityCommandBuffer` (played back automatically at command-buffer systems, or manually) |
-| **Multi-world** | Multiple `World` instances; no built-in roles or cross-world bridging | Multiple `World` instances; default world auto-created. NetCode for Entities (separate package) adds explicit Client / Server / ThinClient world roles on top. |
+| **Storage** | Archetype-based (entities grouped by component set) | Group-based (entities grouped by tag combination) |
+| **Memory layout** | Fixed-size 16 KB chunks per archetype; entities split across many chunks | Structure-of-arrays: one contiguous buffer per component per group, indexed by the entity's position in the group |
+| **Entity identity** | `Entity` (stable, wraps index + version) | `EntityHandle` (stable, wraps index + version) |
+| **Definition** | No explicit templates (archetype emerges from components) | [Templates](../core/templates.md) (`ITemplate` + `ITagged`) |
+| **Structural changes** | Sync via `EntityManager`, or deferred via `EntityCommandBuffer` (played back automatically at command-buffer systems, or manually) | Deferred, applied automatically at [submission](../entity-management/structural-changes.md). Manually via `World.SubmitEntities()` |
+| **Multi-world** | Multiple `World` instances; default world auto-created. NetCode for Entities (separate package) adds explicit Client / Server / ThinClient world roles on top. | Multiple `World` instances; no built-in roles or cross-world bridging |
 
 ## Key differences
 
 ### Components
 
-| Trecs | Unity ECS |
+| Unity ECS | Trecs |
 |---|---|
-| `IEntityComponent` (unmanaged struct) | `IComponentData` (unmanaged struct) |
-| No managed components | `class IComponentData` (managed) |
-| [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline) | `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) |
-| Tags via `ITag` (separate from components) | Zero-field `IComponentData` acts as tag |
-| `[Unwrap]` for single-field components | No equivalent |
-| Global state via `World.GlobalComponent<T>()` on a `Globals` template | Singletons via `SystemAPI.GetSingleton<T>()` |
+| `IComponentData` (unmanaged struct) | `IEntityComponent` (unmanaged struct) |
+| `class IComponentData` (managed) | No managed components |
+| `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) | [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline) |
+| Zero-field `IComponentData` acts as tag | Tags via `ITag` (separate from components) |
+| No equivalent | `[Unwrap]` for single-field components |
+| Singletons via `SystemAPI.GetSingleton<T>()` | Global state via `World.GlobalComponent<T>()` on a `Globals` template |
 
 ### Systems
 
-| Trecs | Unity ECS |
+| Unity ECS | Trecs |
 |---|---|
-| `ISystem` with `Execute()` | `ISystem` with `OnUpdate()` |
-| `[ForEachEntity]` source generation | `SystemAPI.Query<T>()` |
-| `[ExecuteAfter]` / `[ExecuteBefore]` | `[UpdateAfter]` / `[UpdateBefore]` |
-| Five phases (EarlyPresentation, Input, Fixed, Presentation, LatePresentation) | System groups (`InitializationSystemGroup`, etc.) |
-| User instantiates systems explicitly (`new FooSystem(dep1, dep2)`) and registers them | Framework discovers and instantiates systems via reflection |
-| Systems are managed classes; Burst is opt-in per job via `[WrapAsJob]` | Struct `ISystem` can be Burst-compiled wholesale |
+| `ISystem` with `OnUpdate()` | `ISystem` with `Execute()` |
+| `SystemAPI.Query<T>()` | `[ForEachEntity]` source generation |
+| `[UpdateAfter]` / `[UpdateBefore]` | `[ExecuteAfter]` / `[ExecuteBefore]` |
+| System groups (`InitializationSystemGroup`, etc.) | Five phases (EarlyPresentation, Input, Fixed, Presentation, LatePresentation) |
+| Framework discovers and instantiates systems via reflection | User instantiates systems explicitly (`new FooSystem(dep1, dep2)`) and registers them |
+| Struct `ISystem` can be Burst-compiled wholesale | Systems are managed classes; Burst is opt-in per job via `[WrapAsJob]` |
 
 ### Queries
 
-| Trecs | Unity ECS |
+| Unity ECS | Trecs |
 |---|---|
-| `World.Query().WithTags<T>()` | `EntityQuery` via `GetEntityQuery()` |
-| Aspects (`IAspect` + `IRead`/`IWrite`) | Aspects (`IAspect` + `RefRO`/`RefRW`) |
-| `[ForEachEntity]` with tag/component scope | `IJobEntity` with query attributes |
-| [Sets](../entity-management/sets.md) for sparse filtering | Enableable components |
-| [Reactive lifecycle](../entity-management/entity-events.md) via `World.Events.EntitiesWithTags<T>().OnAdded` / `OnRemoved` | No first-class equivalent |
+| `EntityQuery` via `GetEntityQuery()` | `World.Query().WithTags<T>()` |
+| Aspects (`IAspect` + `RefRO`/`RefRW`) | Aspects (`IAspect` + `IRead`/`IWrite`) |
+| `IJobEntity` with query attributes | `[ForEachEntity]` with tag/component scope |
+| Enableable components | [Sets](../entity-management/sets.md) for sparse filtering |
+| No first-class equivalent | [Reactive lifecycle](../entity-management/entity-events.md) via `World.Events.EntitiesWithTags<T>().OnAdded` / `OnRemoved` |
 
 ### Jobs
 
-| Trecs | Unity ECS |
+| Unity ECS | Trecs |
 |---|---|
-| `[WrapAsJob]` + `[ForEachEntity]` | `IJobEntity` |
-| `[FromWorld]` auto-wiring | Manual `GetComponentLookup` |
-| `NativeWorldAccessor` for structural ops | `EntityCommandBuffer.ParallelWriter` |
-| Sort keys for deterministic ordering | `sortKey` on `EntityCommandBuffer` |
+| `IJobEntity` | `[WrapAsJob]` + `[ForEachEntity]` |
+| Manual `GetComponentLookup` | `[FromWorld]` auto-wiring |
+| `EntityCommandBuffer.ParallelWriter` | `NativeWorldAccessor` for structural ops |
+| `sortKey` on `EntityCommandBuffer` | Sort keys for deterministic ordering |
 
 ### Determinism & networking
 
-| Trecs | Unity ECS |
+| Unity ECS | Trecs |
 |---|---|
-| Core design goal | Nice-to-have |
-| Built-in [recording / playback](../advanced/recording-and-playback.md) with desync detection | No built-in equivalent |
-| Deterministic RNG ([`World.Rng`](../advanced/time-and-rng.md)) | No built-in equivalent |
-| [Input system](../core/input-system.md) with frame isolation for perfect replay | NetCode for Entities (separate package) |
+| Nice-to-have | Core design goal |
+| No built-in equivalent | Built-in [recording / playback](../advanced/recording-and-playback.md) with desync detection |
+| No built-in equivalent | Deterministic RNG ([`World.Rng`](../advanced/time-and-rng.md)) |
+| NetCode for Entities (separate package) | [Input system](../core/input-system.md) with frame isolation for perfect replay |
 
 ### Serialization
 
-| Trecs | Unity ECS |
+| Unity ECS | Trecs |
 |---|---|
-| Full world state [serialization](../advanced/serialization.md) (runtime save/load, snapshots, replays) | Subscene baking (edit-time); limited runtime serialization |
-| Stable type IDs (auto-generated from type name) | `TypeIndex` (auto-generated) |
-| Delta serialization support | No built-in equivalent |
-| Per-save versioning via `Reader.Version` / `Writer.Version` for evolving custom serializers | No canonical equivalent — handled outside the engine |
+| Subscene baking (edit-time); limited runtime serialization | Full world state [serialization](../advanced/serialization.md) (runtime save/load, snapshots, replays) |
+| `TypeIndex` (auto-generated) | Stable type IDs (auto-generated from type name) |
+| No built-in equivalent | Delta serialization support |
+| No canonical equivalent — handled outside the engine | Per-save versioning via `Reader.Version` / `Writer.Version` for evolving custom serializers |
 
 ### Editor tooling
 
-| Trecs | Unity ECS |
+| Unity ECS | Trecs |
 |---|---|
-| [Hierarchy inspector](../editor-windows/hierarchy.md) + [transport / scrub / record window](../editor-windows/player.md) | Entity Debugger, Hierarchy window |
+| Entity Debugger, Hierarchy window | [Hierarchy inspector](../editor-windows/hierarchy.md) + [transport / scrub / record window](../editor-windows/player.md) |
 
 ### Authoring
 
-| Trecs | Unity ECS |
+| Unity ECS | Trecs |
 |---|---|
-| Programmatic — a composition root constructs the world, registers templates and systems, and spawns entities in code | Subscene + `Baker` — designers author with `MonoBehaviour`s, baked into entities at edit/build time |
+| Subscene + `Baker` — designers author with `MonoBehaviour`s, baked into entities at edit/build time | Programmatic — a composition root constructs the world, registers templates and systems, and spawns entities in code |
 
 ### Physics & rendering
 
-| Trecs | Unity ECS |
+| Unity ECS | Trecs |
 |---|---|
-| External (via OOP bridge) | Unity Physics (built-in) |
-| Rendering is user-owned — bring your own approach | Entities Graphics package |
-| No built-in transform hierarchy — define your own components | Built-in `LocalTransform` + `Parent` / `Child` system |
+| Unity Physics (built-in) | External (via OOP bridge) |
+| Entities Graphics package | Rendering is user-owned — bring your own approach |
+| Built-in `LocalTransform` + `Parent` / `Child` system | No built-in transform hierarchy — define your own components |
 
 ## Tag-based identity
 
