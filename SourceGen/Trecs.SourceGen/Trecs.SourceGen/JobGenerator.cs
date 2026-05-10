@@ -1993,33 +1993,14 @@ namespace Trecs.SourceGen
                 $"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;"
             );
 
-            // Iteration buffer deps.
             var buffers = GetIterationBuffers(info);
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var rid =
-                    $"ResourceId.Component(ComponentTypeId<{PerformanceCache.GetDisplayString(type)}>.Value)";
-                var method = readOnly ? "IncludeReadDep" : "IncludeWriteDep";
-                sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}scheduler.{method}({FromWorldEmitter.GenPrefix}deps, {rid}, {FromWorldEmitter.GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitDepRegistration(sb, body, buffers);
 
             // [FromWorld] dep registration.
             FromWorldEmitter.EmitFromWorldDepRegistration(sb, body, orderedEmits);
             EmitSingleEntityFieldsDepRegistration(sb, body, info.SingleEntityFields);
 
-            // Materialise iteration buffers.
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var typeName = PerformanceCache.GetDisplayString(type);
-                var ext = readOnly ? "GetBufferReadForJob" : "GetBufferWriteForJob";
-                sb.AppendLine(
-                    $"{body}var ({FromWorldEmitter.GenPrefix}buf{i}_value, _) = {FromWorldEmitter.GenPrefix}world.{ext}<{typeName}>({FromWorldEmitter.GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitMaterialization(sb, body, buffers);
 
             sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}job = this;");
 
@@ -2047,17 +2028,7 @@ namespace Trecs.SourceGen
                 $"{body}var {FromWorldEmitter.GenPrefix}handle = {FromWorldEmitter.GenPrefix}job.ScheduleParallel({FromWorldEmitter.GenPrefix}count, JobsUtil.ChooseBatchSize({FromWorldEmitter.GenPrefix}count), {FromWorldEmitter.GenPrefix}deps);"
             );
 
-            // Track outputs.
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var rid =
-                    $"ResourceId.Component(ComponentTypeId<{PerformanceCache.GetDisplayString(type)}>.Value)";
-                var method = readOnly ? "TrackJobRead" : "TrackJobWrite";
-                sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}scheduler.{method}({FromWorldEmitter.GenPrefix}handle, {rid}, {FromWorldEmitter.GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitOutputTracking(sb, body, buffers);
             FromWorldEmitter.EmitFromWorldTracking(sb, body, orderedEmits);
             EmitSingleEntityFieldsTracking(sb, body, info.SingleEntityFields);
 
@@ -2160,33 +2131,14 @@ namespace Trecs.SourceGen
                 $"{body}var {FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}extraDeps;"
             );
 
-            // Iteration buffer deps.
             var buffers = GetIterationBuffers(info);
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var rid =
-                    $"ResourceId.Component(ComponentTypeId<{PerformanceCache.GetDisplayString(type)}>.Value)";
-                var method = readOnly ? "IncludeReadDep" : "IncludeWriteDep";
-                sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}deps = {FromWorldEmitter.GenPrefix}scheduler.{method}({FromWorldEmitter.GenPrefix}deps, {rid}, {FromWorldEmitter.GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitDepRegistration(sb, body, buffers);
 
             // [FromWorld] dep registration.
             FromWorldEmitter.EmitFromWorldDepRegistration(sb, body, orderedEmits);
             EmitSingleEntityFieldsDepRegistration(sb, body, info.SingleEntityFields);
 
-            // Materialise iteration buffers.
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var typeName = PerformanceCache.GetDisplayString(type);
-                var ext = readOnly ? "GetBufferReadForJob" : "GetBufferWriteForJob";
-                sb.AppendLine(
-                    $"{body}var ({FromWorldEmitter.GenPrefix}buf{i}_value, _) = {FromWorldEmitter.GenPrefix}world.{ext}<{typeName}>({FromWorldEmitter.GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitMaterialization(sb, body, buffers);
 
             sb.AppendLine($"{body}var {FromWorldEmitter.GenPrefix}job = this;");
 
@@ -2219,17 +2171,7 @@ namespace Trecs.SourceGen
                 $"{body}var {FromWorldEmitter.GenPrefix}handle = {FromWorldEmitter.GenPrefix}shim.ScheduleParallel({FromWorldEmitter.GenPrefix}count, JobsUtil.ChooseBatchSize({FromWorldEmitter.GenPrefix}count), {FromWorldEmitter.GenPrefix}deps);"
             );
 
-            // Track outputs against the user job's resource accesses.
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var rid =
-                    $"ResourceId.Component(ComponentTypeId<{PerformanceCache.GetDisplayString(type)}>.Value)";
-                var method = readOnly ? "TrackJobRead" : "TrackJobWrite";
-                sb.AppendLine(
-                    $"{body}{FromWorldEmitter.GenPrefix}scheduler.{method}({FromWorldEmitter.GenPrefix}handle, {rid}, {FromWorldEmitter.GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitOutputTracking(sb, body, buffers);
             FromWorldEmitter.EmitFromWorldTracking(sb, body, orderedEmits);
             EmitSingleEntityFieldsTracking(sb, body, info.SingleEntityFields);
 

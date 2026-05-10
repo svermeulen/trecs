@@ -1603,16 +1603,7 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{innerBody}var {GenPrefix}deps = {GenPrefix}extraDeps;");
 
             var buffers = GetIterationBuffers(info);
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var rid =
-                    $"ResourceId.Component(ComponentTypeId<{PerformanceCache.GetDisplayString(type)}>.Value)";
-                var method = readOnly ? "IncludeReadDep" : "IncludeWriteDep";
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}deps = {GenPrefix}scheduler.{method}({GenPrefix}deps, {rid}, {GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitDepRegistration(sb, innerBody, buffers);
 
             // NativeSet dependency includes.
             foreach (var p in info.Params)
@@ -1632,16 +1623,7 @@ namespace Trecs.SourceGen
                 FromWorldEmitter.EmitFromWorldDepRegistration(sb, innerBody, fwEmits);
             EmitSingleEntityDepRegistration(sb, innerBody, info);
 
-            // Materialise iteration buffers.
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var typeName = PerformanceCache.GetDisplayString(type);
-                var ext = readOnly ? "GetBufferReadForJob" : "GetBufferWriteForJob";
-                sb.AppendLine(
-                    $"{innerBody}var ({GenPrefix}buf{i}_value, _) = {GenPrefix}world.{ext}<{typeName}>({GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitMaterialization(sb, innerBody, buffers);
 
             // Construct the job.
             var jobStructName = $"_{info.MethodName}_AutoJob";
@@ -1689,17 +1671,7 @@ namespace Trecs.SourceGen
                 $"{innerBody}var {GenPrefix}handle = {GenPrefix}job.ScheduleParallel({GenPrefix}count, JobsUtil.ChooseBatchSize({GenPrefix}count), {GenPrefix}deps);"
             );
 
-            // Track outputs.
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var rid =
-                    $"ResourceId.Component(ComponentTypeId<{PerformanceCache.GetDisplayString(type)}>.Value)";
-                var method = readOnly ? "TrackJobRead" : "TrackJobWrite";
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitOutputTracking(sb, innerBody, buffers);
 
             // Track NativeSet deps.
             foreach (var p in info.Params)
@@ -1798,16 +1770,7 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{innerBody}var {GenPrefix}deps = {GenPrefix}extraDeps;");
 
             var buffers = GetIterationBuffers(info);
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var rid =
-                    $"ResourceId.Component(ComponentTypeId<{PerformanceCache.GetDisplayString(type)}>.Value)";
-                var method = readOnly ? "IncludeReadDep" : "IncludeWriteDep";
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}deps = {GenPrefix}scheduler.{method}({GenPrefix}deps, {rid}, {GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitDepRegistration(sb, innerBody, buffers);
 
             // NativeSet dependency includes.
             foreach (var p in info.Params)
@@ -1827,16 +1790,7 @@ namespace Trecs.SourceGen
                 FromWorldEmitter.EmitFromWorldDepRegistration(sb, innerBody, fwEmits);
             EmitSingleEntityDepRegistration(sb, innerBody, info);
 
-            // Materialise iteration buffers.
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var typeName = PerformanceCache.GetDisplayString(type);
-                var ext = readOnly ? "GetBufferReadForJob" : "GetBufferWriteForJob";
-                sb.AppendLine(
-                    $"{innerBody}var ({GenPrefix}buf{i}_value, _) = {GenPrefix}world.{ext}<{typeName}>({GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitMaterialization(sb, innerBody, buffers);
 
             // Construct the job.
             var jobStructName = $"_{info.MethodName}_AutoJob";
@@ -1888,17 +1842,7 @@ namespace Trecs.SourceGen
                 $"{innerBody}var {GenPrefix}handle = {GenPrefix}shim.ScheduleParallel({GenPrefix}count, JobsUtil.ChooseBatchSize({GenPrefix}count), {GenPrefix}deps);"
             );
 
-            // Track outputs.
-            for (int i = 0; i < buffers.Count; i++)
-            {
-                var (type, readOnly) = buffers[i];
-                var rid =
-                    $"ResourceId.Component(ComponentTypeId<{PerformanceCache.GetDisplayString(type)}>.Value)";
-                var method = readOnly ? "TrackJobRead" : "TrackJobWrite";
-                sb.AppendLine(
-                    $"{innerBody}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {GenPrefix}group);"
-                );
-            }
+            IterationBufferEmitter.EmitOutputTracking(sb, innerBody, buffers);
 
             // Track NativeSet deps.
             foreach (var p in info.Params)
