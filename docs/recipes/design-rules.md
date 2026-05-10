@@ -17,7 +17,11 @@ Opinionated rules for building with Trecs. Each one points at a longer reference
 ## Entities & Templates
 
 - **Templates should describe design concepts.** `Bullet`, `Player`, `Enemy` — not `EntityWithHealthAndPosition`.
-- **No runtime composition changes.** A template's component set is fixed at compile time; entities don't gain or lose components at runtime. The escape hatches are [partitions](../core/templates.md#partitions), boolean flag/enum fields, [sets](../entity-management/sets.md), or child entities of different types
+- **No runtime composition changes.** A template's component set is fixed at compile time. The escape hatches:
+    - **[Partitions](../core/templates.md#partitions)** — declared moves between tag combinations of the same template; component data is preserved across the move.
+    - **Boolean / enum fields on a component** — the simplest option for "in state X, ignore field Y", but the unused fields still take memory in every state.
+    - **[Sets](../entity-management/sets.md)** — sparse membership flags, independent of component storage.
+    - **Child entity** — when the conditional shape needs *different* components, spawn a separate entity (possibly one of several templates) and reference it via an `EntityHandle` on a component of the parent.
 
 ## Structural changes & heap
 
