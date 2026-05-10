@@ -1,10 +1,10 @@
 # Entity Events
 
-Entity events let a service react to structural changes — when entities are added to, removed from, or moved between groups. Observer callbacks fire during [submission](structural-changes.md#when-submission-happens), after the queued change has been applied.
+Entity events let a service react to structural changes — that is, whenever entities are added, removed, or moved between groups. Observer callbacks fire during [submission](structural-changes.md#when-submission-happens), after the queued change has been applied.
 
 ## Subscribing
 
-The recommended pattern is to mark your handler with `[ForEachEntity]` so the source generator emits the per-entity iteration with the right component access:
+The recommended pattern is to mark your event handler with `[ForEachEntity]` so the source generator emits the per-entity iteration with the right component access:
 
 ```csharp
 public partial class RemoveCleanupHandler : IDisposable
@@ -34,7 +34,7 @@ public partial class RemoveCleanupHandler : IDisposable
 }
 ```
 
-Components read inside `OnRemoved` are still valid — removed entities are parked at the end of the backing array (past the active count) until submission finishes, so the buffers haven't been cleared yet. The removed components are also contiguous in memory, which is cache-friendly for cleanup.
+Components read inside `OnRemoved` are still valid, even though the callback is triggered _after_ removal.  This is possible because removed entities are parked at the end of the backing array (past the active count), so the buffers haven't been cleared yet. This also means that the removed components are contiguous in memory and therefore cache-friendly for any cleanup.
 
 ## Event types
 
@@ -83,7 +83,7 @@ public partial class CleanupHandlers : IDisposable
 
 ## Disposing subscriptions
 
-The chain returned by `EntitiesWithTags` / `EntitiesWithComponents` / `InGroup` / `AllEntities` is an `EntityEventsSubscription` (which implements `IDisposable`). Disposing it unregisters every observer on the chain:
+Subscriptions returned by `EntitiesWithTags` / `EntitiesWithComponents` / `InGroup` / `AllEntities` all implement `IDisposable`. Dispose the subscription to unregister the handler.
 
 ```csharp
 var sub = World.Events
