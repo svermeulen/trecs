@@ -15,8 +15,7 @@ namespace Trecs.Tests
     public partial class FMTestEntity
         : ITemplate,
             ITagged<FMTag>,
-            IHasPartition<FMPartitionA>,
-            IHasPartition<FMPartitionB>
+            IPartitionedBy<FMPartitionA, FMPartitionB>
     {
         TestInt TestInt;
         TestFloat TestFloat;

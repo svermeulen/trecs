@@ -81,25 +81,24 @@ namespace Trecs
         where T4 : struct, ITag { }
 
     /// <summary>
-    /// Declares a valid partition on a template. Each IHasPartition implementation
-    /// represents one valid partition. Type args are tag types that form the partition's TagSet.
+    /// Declares a partition dimension on a template. Each type argument is one variant tag —
+    /// an entity in this template carries exactly one of these tags at any time. Multiple
+    /// IPartitionedBy declarations on the same template define independent dimensions; the
+    /// source generator emits the cross product as concrete partitions
+    /// (e.g. two binary dimensions ⇒ 4 partitions).
     /// </summary>
-    public interface IHasPartition<T1>
-        where T1 : struct, ITag { }
-
-    /// <inheritdoc cref="IHasPartition{T1}"/>
-    public interface IHasPartition<T1, T2>
+    public interface IPartitionedBy<T1, T2>
         where T1 : struct, ITag
         where T2 : struct, ITag { }
 
-    /// <inheritdoc cref="IHasPartition{T1}"/>
-    public interface IHasPartition<T1, T2, T3>
+    /// <inheritdoc cref="IPartitionedBy{T1, T2}"/>
+    public interface IPartitionedBy<T1, T2, T3>
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag { }
 
-    /// <inheritdoc cref="IHasPartition{T1}"/>
-    public interface IHasPartition<T1, T2, T3, T4>
+    /// <inheritdoc cref="IPartitionedBy{T1, T2}"/>
+    public interface IPartitionedBy<T1, T2, T3, T4>
         where T1 : struct, ITag
         where T2 : struct, ITag
         where T3 : struct, ITag

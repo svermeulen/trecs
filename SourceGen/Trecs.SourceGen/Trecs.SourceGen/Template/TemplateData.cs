@@ -39,15 +39,16 @@ namespace Trecs.SourceGen.Template
     }
 
     /// <summary>
-    /// Parsed data for a single IHasPartition interface on a template struct
+    /// Parsed data for a single IPartitionedBy interface on a template — one partition
+    /// dimension whose variant tags are mutually exclusive.
     /// </summary>
-    internal class TemplatePartitionData
+    internal class TemplateDimensionData
     {
-        public ImmutableArray<string> TagTypeNames { get; }
+        public ImmutableArray<string> VariantTagTypeNames { get; }
 
-        public TemplatePartitionData(ImmutableArray<string> tagTypeNames)
+        public TemplateDimensionData(ImmutableArray<string> variantTagTypeNames)
         {
-            TagTypeNames = tagTypeNames;
+            VariantTagTypeNames = variantTagTypeNames;
         }
     }
 
@@ -66,7 +67,7 @@ namespace Trecs.SourceGen.Template
         public ImmutableArray<string> TagTypeNames { get; }
         public ImmutableArray<string> BaseTemplateTypeNames { get; }
         public ImmutableArray<TemplateComponentData> Components { get; }
-        public ImmutableArray<TemplatePartitionData> Partitions { get; }
+        public ImmutableArray<TemplateDimensionData> Dimensions { get; }
 
         public TemplateDefinitionData(
             string typeName,
@@ -79,7 +80,7 @@ namespace Trecs.SourceGen.Template
             ImmutableArray<string> tagTypeNames,
             ImmutableArray<string> baseTemplateTypeNames,
             ImmutableArray<TemplateComponentData> components,
-            ImmutableArray<TemplatePartitionData> partitions
+            ImmutableArray<TemplateDimensionData> dimensions
         )
         {
             TypeName = typeName;
@@ -92,7 +93,7 @@ namespace Trecs.SourceGen.Template
             TagTypeNames = tagTypeNames;
             BaseTemplateTypeNames = baseTemplateTypeNames;
             Components = components;
-            Partitions = partitions;
+            Dimensions = dimensions;
         }
     }
 }

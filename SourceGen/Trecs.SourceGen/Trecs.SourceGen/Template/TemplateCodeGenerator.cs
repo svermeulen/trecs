@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Trecs.SourceGen.Shared;
 
@@ -96,16 +98,16 @@ namespace Trecs.SourceGen.Template
                 sb.AppendLine(argIndent, "localBaseTemplates: Array.Empty<Template>(),");
             }
 
-            // partitions
-            if (data.Partitions.Length > 0)
+            // partitions — cross product of declared dimensions
+            var partitionTagSets = ComputeCrossProduct(data.Dimensions);
+            if (partitionTagSets.Count > 0)
             {
                 sb.AppendLine(argIndent, "partitions: new TagSet[]");
                 sb.AppendLine(argIndent, "{");
-                for (int i = 0; i < data.Partitions.Length; i++)
+                for (int i = 0; i < partitionTagSets.Count; i++)
                 {
-                    var partition = data.Partitions[i];
-                    var tagArgs = string.Join(", ", partition.TagTypeNames);
-                    var comma = i < data.Partitions.Length - 1 ? "," : "";
+                    var tagArgs = string.Join(", ", partitionTagSets[i]);
+                    var comma = i < partitionTagSets.Count - 1 ? "," : "";
                     sb.AppendLine(argIndent + 1, $"TagSet<{tagArgs}>.Value{comma}");
                 }
                 sb.AppendLine(argIndent, "},");
@@ -225,6 +227,46 @@ namespace Trecs.SourceGen.Template
         private static string NullableBool(bool value)
         {
             return value ? "true" : "null";
+        }
+
+        /// <summary>
+        /// Computes the cross product across a template's partition dimensions. Each result
+        /// is one concrete partition (a tuple of variant tag type names, one per dimension).
+        /// Empty input yields an empty result.
+        /// </summary>
+        private static IReadOnlyList<IReadOnlyList<string>> ComputeCrossProduct(
+            ImmutableArray<TemplateDimensionData> dimensions
+        )
+        {
+            if (dimensions.Length == 0)
+            {
+                return System.Array.Empty<IReadOnlyList<string>>();
+            }
+
+            var result = new List<IReadOnlyList<string>>();
+            var current = new string[dimensions.Length];
+            BuildCrossProduct(dimensions, 0, current, result);
+            return result;
+        }
+
+        private static void BuildCrossProduct(
+            ImmutableArray<TemplateDimensionData> dimensions,
+            int dimIndex,
+            string[] current,
+            List<IReadOnlyList<string>> result
+        )
+        {
+            if (dimIndex == dimensions.Length)
+            {
+                result.Add(current.ToArray());
+                return;
+            }
+
+            foreach (var variant in dimensions[dimIndex].VariantTagTypeNames)
+            {
+                current[dimIndex] = variant;
+                BuildCrossProduct(dimensions, dimIndex + 1, current, result);
+            }
         }
     }
 }

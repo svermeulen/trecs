@@ -14,8 +14,7 @@ namespace Trecs.Tests
     public partial class SPTestEntity
         : ITemplate,
             ITagged<SPTag>,
-            IHasPartition<SPPartitionA>,
-            IHasPartition<SPPartitionB>
+            IPartitionedBy<SPPartitionA, SPPartitionB>
     {
         TestInt TestInt;
         TestVec TestVec;

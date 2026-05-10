@@ -5,7 +5,7 @@ namespace Trecs.Samples.Partitions
     /// <summary>
     /// Applies gravity, velocity integration, and floor bounce to Active balls.
     ///
-    /// Because Active balls live in their own group (via IHasPartition), this loop
+    /// Because Active balls live in their own group (via IPartitionedBy), this loop
     /// iterates contiguous memory — no branches to skip resting balls.
     /// </summary>
     public partial class PhysicsSystem : ISystem

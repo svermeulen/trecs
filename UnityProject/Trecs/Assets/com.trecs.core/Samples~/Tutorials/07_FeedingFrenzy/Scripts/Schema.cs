@@ -107,8 +107,7 @@ namespace Trecs.Samples.FeedingFrenzy101
             : ITemplate,
                 IExtends<CommonTemplates.Renderable>,
                 ITagged<FrenzyTags.Fish>,
-                IHasPartition<FrenzyTags.NotEating>,
-                IHasPartition<FrenzyTags.Eating>
+                IPartitionedBy<FrenzyTags.NotEating, FrenzyTags.Eating>
         {
             // Position/Rotation are render-only — VisualSmoothingSystem chases
             // SimPosition/SimRotation each variable frame. Marking them
@@ -136,8 +135,7 @@ namespace Trecs.Samples.FeedingFrenzy101
             : ITemplate,
                 IExtends<CommonTemplates.Renderable>,
                 ITagged<FrenzyTags.Meal>,
-                IHasPartition<FrenzyTags.NotEating>,
-                IHasPartition<FrenzyTags.Eating>
+                IPartitionedBy<FrenzyTags.NotEating, FrenzyTags.Eating>
         {
             Rotation Rotation = new(quaternion.identity);
             MealNutrition Nutrition;

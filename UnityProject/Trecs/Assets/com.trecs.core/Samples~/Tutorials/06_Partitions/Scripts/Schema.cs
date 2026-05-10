@@ -33,8 +33,7 @@ namespace Trecs.Samples.Partitions
         public partial class BallEntity
             : ITemplate,
                 ITagged<BallTags.Ball>,
-                IHasPartition<BallTags.Active>,
-                IHasPartition<BallTags.Resting>
+                IPartitionedBy<BallTags.Active, BallTags.Resting>
         {
             Position Position;
             Velocity Velocity;

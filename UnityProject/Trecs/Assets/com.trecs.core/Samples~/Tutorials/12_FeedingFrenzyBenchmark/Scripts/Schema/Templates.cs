@@ -45,8 +45,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         public partial class PartitionsFishEntity
             : ITemplate,
                 IExtends<FishEntity>,
-                IHasPartition<FrenzyTags.NotEating>,
-                IHasPartition<FrenzyTags.Eating> { }
+                IPartitionedBy<FrenzyTags.NotEating, FrenzyTags.Eating> { }
 
         // Base meal entity (no eating partition tracking)
         public partial class MealEntity
@@ -63,7 +62,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         public partial class PartitionsMealEntity
             : ITemplate,
                 IExtends<MealEntity>,
-                IHasPartition<FrenzyTags.NotEating>,
-                IHasPartition<FrenzyTags.Eating> { }
+                IPartitionedBy<FrenzyTags.NotEating, FrenzyTags.Eating> { }
     }
 }

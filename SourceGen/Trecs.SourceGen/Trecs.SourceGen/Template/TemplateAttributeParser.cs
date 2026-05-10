@@ -37,7 +37,7 @@ namespace Trecs.SourceGen.Template
                 symbol.GetAttributes(),
                 "VariableUpdateOnlyAttribute"
             );
-            var partitions = ExtractPartitions(symbol);
+            var dimensions = ExtractDimensions(symbol);
             var defaultInitializedFields = GetDefaultInitializedFields(syntax);
             var components = ExtractComponents(symbol, defaultInitializedFields);
 
@@ -52,7 +52,7 @@ namespace Trecs.SourceGen.Template
                 tagTypeNames,
                 baseTemplateTypeNames,
                 components,
-                partitions
+                dimensions
             );
         }
 
@@ -99,26 +99,28 @@ namespace Trecs.SourceGen.Template
         }
 
         /// <summary>
-        /// Extracts partition combinations from IHasPartition&lt;T1, T2, ...&gt; interfaces
+        /// Extracts partition dimensions from IPartitionedBy&lt;T1, T2, ...&gt; interfaces.
+        /// Each interface declares one dimension whose type arguments are mutually exclusive
+        /// variant tags.
         /// </summary>
-        private static ImmutableArray<TemplatePartitionData> ExtractPartitions(
+        private static ImmutableArray<TemplateDimensionData> ExtractDimensions(
             INamedTypeSymbol symbol
         )
         {
-            var partitions = new List<TemplatePartitionData>();
+            var dimensions = new List<TemplateDimensionData>();
 
             foreach (var iface in symbol.Interfaces)
             {
-                if (IsIHasPartitionInterface(iface))
+                if (IsIPartitionedByInterface(iface))
                 {
-                    var tagNames = iface
+                    var variantTagNames = iface
                         .TypeArguments.Select(t => PerformanceCache.GetDisplayString(t))
                         .ToImmutableArray();
-                    partitions.Add(new TemplatePartitionData(tagNames));
+                    dimensions.Add(new TemplateDimensionData(variantTagNames));
                 }
             }
 
-            return partitions.ToImmutableArray();
+            return dimensions.ToImmutableArray();
         }
 
         /// <summary>
@@ -274,10 +276,10 @@ namespace Trecs.SourceGen.Template
                 && IsInTrecsNamespace(iface);
         }
 
-        private static bool IsIHasPartitionInterface(INamedTypeSymbol iface)
+        private static bool IsIPartitionedByInterface(INamedTypeSymbol iface)
         {
             return iface.IsGenericType
-                && iface.OriginalDefinition.Name == "IHasPartition"
+                && iface.OriginalDefinition.Name == "IPartitionedBy"
                 && IsInTrecsNamespace(iface);
         }
 
