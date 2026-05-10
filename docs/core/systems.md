@@ -191,7 +191,7 @@ Explicit constraints (`[ExecuteAfter]` / `[ExecuteBefore]`) always win over prio
 
 ## OnReady hook
 
-Declare `partial void OnReady()` on a system to run one-time setup once the world is fully built — including the global entity — but before the first tick. The two most common uses are **subscribing to entity lifecycle events** (registering at `OnReady` time means no spawns are missed from frame zero onward — see [Entity Events](../entity-management/entity-events.md)) and **initializing global components** (the global entity exists by the time `OnReady` runs, so writes through `World.GlobalComponent<T>().Write` apply directly).
+Declare `partial void OnReady()` on a system to run one-time setup once the world is fully built but before the first tick. The two most common uses are **subscribing to entity lifecycle events** (registering at `OnReady` time means no spawns are missed from frame zero onward — see [Entity Events](../entity-management/entity-events.md)) and **initializing global components** (the global entity exists by the time `OnReady` runs, so writes through `World.GlobalComponent<T>().Write` can be done).
 
 ```csharp
 public partial class EnemyTracker : ISystem
@@ -217,8 +217,6 @@ public partial class ScoreSystem : ISystem
     }
 }
 ```
-
-Note that the global entity is submitted before any `OnReady` hook runs, so an `OnAdded` subscription registered in `OnReady` will not fire for the global entity itself — read its components directly via `World.GlobalComponent<T>()` instead.
 
 `OnReady` is wired by source generation — declare it as a `partial void` and leave the implementation in the system's main partial. Don't declare it if you don't need it.
 
@@ -279,7 +277,7 @@ void Execute([SingleEntity(typeof(GlobalTag))] ref Score score)
 }
 ```
 
-Tags are required and must be specified inline — `[SingleEntity]` has no runtime override or `Optional` mode. For dynamic tag lookup, call `World.Query().WithTags(...).Single()` directly.
+Tags must be hardcoded in the attribute (e.g. `[SingleEntity(typeof(MyTag))]`) — there's no way to supply them at runtime, and no `Optional` mode. If you need a dynamic tag or want a no-throw form, call `World.Query().WithTags(...).Single()` (or `TrySingle`) directly.
 
 `[SingleEntity]` works in four contexts:
 
