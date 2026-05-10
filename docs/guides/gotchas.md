@@ -72,6 +72,14 @@ A template's component set is fixed at compile time. There is no `AddComponent<T
 
 ## Heap & disposal
 
+### Raw native collections in components don't round-trip through save/load
+
+Component serialization copies the raw struct bytes (the blit fast-path). A `NativeList<T>` / `NativeHashMap<K,V>` value is essentially a pointer to externally-allocated storage plus a length. Round-tripping such a component through a snapshot copies the bytes verbatim — the pointer that comes back on load is the previous session's memory address, no longer mapped, freed, or reassigned. Reading the deserialized collection crashes or returns garbage.
+
+Wrapping the collection in a `NativeUniquePtr<NativeList<T>>` avoids the trap: the unique ptr is a heap-key, not a raw memory pointer, and Trecs's serializer walks the inner collection's contents through the heap rather than blitting the struct.
+
+**Fix.** Wrap any native collection that needs to survive serialization in a `NativeUniquePtr` (or `NativeSharedPtr`). See [Wrapping native collections](../advanced/heap.md#wrapping-native-collections).
+
 ### `NativeUniquePtr<NativeList<T>>` — inner storage must be disposed first
 
 The wrapped collection's storage is allocated in Unity's allocator, not Trecs's heap. Disposing the `NativeUniquePtr` only frees the heap slot holding the `NativeList` header — the underlying allocation leaks.

@@ -13,7 +13,6 @@ Recommended practices for building with Trecs.  We assume here that determinism 
 - **Data only, no logic.** Components are unmanaged structs with fields. Put logic in systems.
 - **Keep components small and focused.** Prefer `Health { Current, Max }` over a 20-field `CharacterStats`. Many components hold a single field — use [`[Unwrap]`](../core/components.md#the-unwrap-shorthand) so call sites read like the data, not the struct.
 - **Unmanaged only.** No classes, strings, arrays, or reference types. Use [heap pointers](../advanced/heap.md) for managed/dynamically-sized data and [`FixedList<N>`](../advanced/fixed-collections.md) for inline lists.
-- **Wrap native collections in a `NativeUniquePtr` for serialization.** A raw `NativeList<T>` / `NativeHashMap<K,V>` allocated outside Trecs's heap won't be captured by save/load or recording. See [Wrapping native collections](../advanced/heap.md#wrapping-native-collections) for the pattern and the disposal caveat.
 
 ## Entities & Templates
 
@@ -27,7 +26,7 @@ Recommended practices for building with Trecs.  We assume here that determinism 
 ## General
 
 - **Prefer `World.Rng`, not `UnityEngine.Random`.** External RNG breaks replay. `FixedRng` and `VariableRng` are independent streams.
-- **Prefer `World.DeltaTime` / `World.ElapsedTime`, not `UnityEngine.Time.deltaTime`, `UnityEngine.Time.time` or `DateTime` / `Stopwatch` **
+- **Prefer `World.DeltaTime` / `World.ElapsedTime`,** not `UnityEngine.Time.deltaTime`, `UnityEngine.Time.time` or `DateTime` / `Stopwatch`
 - **Enable [`RequireDeterministicSubmission`](../entity-management/structural-changes.md#deterministic-submission)** for any project that records, replays, or networks state.
 
 ## See also
