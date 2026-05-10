@@ -88,6 +88,7 @@ This release covers a large redesign pass on accessor permissions, source-gen at
 
 - `com.trecs.tools` package (see Changed for migration).
 - `[FixedUpdateOnly]` attribute.
+- `warnOnMissing` parameter on `[Input(...)]` — the DEBUG-only warning misfired during playback (the recording's redundancy elimination prunes inputs whose value matches the mode's fallback, so every pruned frame logged a spurious "no frame data" warning during a Debug-build replay). Migration: drop the second argument from any `[Input(MissingInputBehavior.X, warnOnMissing: true)]` usage; if you want the signal back, an explicit `Assert.That(World.HasInput<T>(handle))` in your input or fixed-update system covers it without the playback false-positive.
 - `[AspectInterface]` attribute and `AspectValidator.ValidateUsagePatterns`.
 - `AccessorRole.Bypass` (renamed to `AccessorRole.Unrestricted` — was briefly named `None` mid-cycle) and `AccessorRole.Input` (input permissions are auto-derived from `[ExecuteIn(Input)]` and not separately selectable).
 - `World.CreateAccessor(string)` overload — use `World.CreateAccessor(AccessorRole, string)` instead. (Previously listed as deprecated; the obsolete shim was not actually retained.)

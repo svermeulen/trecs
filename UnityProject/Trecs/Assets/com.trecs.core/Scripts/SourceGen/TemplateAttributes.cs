@@ -205,12 +205,10 @@ namespace Trecs
     public sealed class InputAttribute : Attribute
     {
         public MissingInputBehavior OnMissing { get; }
-        public bool WarnOnMissing { get; }
 
-        public InputAttribute(MissingInputBehavior onMissing, bool warnOnMissing = false)
+        public InputAttribute(MissingInputBehavior onMissing)
         {
             OnMissing = onMissing;
-            WarnOnMissing = warnOnMissing;
         }
     }
 }

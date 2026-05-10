@@ -194,18 +194,16 @@ internal static class TrecsStubs
             [System.AttributeUsage(System.AttributeTargets.Field, AllowMultiple = false)]
             public sealed class ConstantAttribute : System.Attribute { }
 
-            // InputAttribute mirrors the runtime ctor: (MissingInputBehavior, bool warnOnMissing = false).
+            // InputAttribute mirrors the runtime ctor: (MissingInputBehavior).
             // The parser reads the enum arg via ConstructorArguments[0]; signature has to match.
             [System.AttributeUsage(System.AttributeTargets.Field, AllowMultiple = false)]
             public sealed class InputAttribute : System.Attribute
             {
                 public MissingInputBehavior OnMissing { get; }
-                public bool WarnOnMissing { get; }
 
-                public InputAttribute(MissingInputBehavior onMissing, bool warnOnMissing = false)
+                public InputAttribute(MissingInputBehavior onMissing)
                 {
                     OnMissing = onMissing;
-                    WarnOnMissing = warnOnMissing;
                 }
             }
 
@@ -668,7 +666,6 @@ internal static class TrecsStubs
                     bool? variableUpdateOnly,
                     bool? isInput,
                     object? inputFrameBehaviour,
-                    bool? warnOnMissingInput,
                     bool? isConstant,
                     bool? isInterpolated,
                     object? defaultValue

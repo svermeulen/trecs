@@ -195,15 +195,10 @@ namespace Trecs.SourceGen.Template
             {
                 var frameBehaviour = component.OnMissing ?? "MissingInputBehavior.Reset";
                 sb.AppendLine(paramIndent, $"inputFrameBehaviour: {frameBehaviour},");
-                sb.AppendLine(
-                    paramIndent,
-                    $"warnOnMissingInput: {(component.InputWarnOnMissing ? "true" : "false")},"
-                );
             }
             else
             {
                 sb.AppendLine(paramIndent, "inputFrameBehaviour: null,");
-                sb.AppendLine(paramIndent, "warnOnMissingInput: null,");
             }
 
             sb.AppendLine(paramIndent, $"isConstant: {NullableBool(component.IsConstant)},");

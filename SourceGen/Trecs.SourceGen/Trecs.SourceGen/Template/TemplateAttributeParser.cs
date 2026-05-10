@@ -145,7 +145,6 @@ namespace Trecs.SourceGen.Template
 
                     bool isInput = false;
                     string? inputFrameBehaviour = null;
-                    bool inputWarnOnMissing = false;
 
                     var inputAttr = attrs.FirstOrDefault(a =>
                         a.AttributeClass?.Name == "InputAttribute"
@@ -176,13 +175,6 @@ namespace Trecs.SourceGen.Template
                                 }
                             }
                         }
-                        if (
-                            inputAttr.ConstructorArguments.Length >= 2
-                            && inputAttr.ConstructorArguments[1].Value is bool warn
-                        )
-                        {
-                            inputWarnOnMissing = warn;
-                        }
                     }
 
                     components.Add(
@@ -194,7 +186,6 @@ namespace Trecs.SourceGen.Template
                             isConstant: isConstant,
                             isInput: isInput,
                             inputFrameBehaviour: inputFrameBehaviour ?? string.Empty,
-                            inputWarnOnMissing: inputWarnOnMissing,
                             hasExplicitDefault: hasExplicitDefault
                         )
                     );

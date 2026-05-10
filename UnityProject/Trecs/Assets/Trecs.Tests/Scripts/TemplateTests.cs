@@ -175,7 +175,6 @@ namespace Trecs.Tests
                         variableUpdateOnly: null,
                         isInput: null,
                         inputFrameBehaviour: null,
-                        warnOnMissingInput: null,
                         isConstant: null,
                         isInterpolated: null,
                         defaultValue: new TestInt { Value = 42 }
@@ -205,7 +204,6 @@ namespace Trecs.Tests
                         variableUpdateOnly: null,
                         isInput: null,
                         inputFrameBehaviour: null,
-                        warnOnMissingInput: null,
                         isConstant: null,
                         isInterpolated: true,
                         defaultValue: null
@@ -233,7 +231,6 @@ namespace Trecs.Tests
                         variableUpdateOnly: null,
                         isInput: true,
                         inputFrameBehaviour: MissingInputBehavior.Reset,
-                        warnOnMissingInput: false,
                         isConstant: null,
                         isInterpolated: null,
                         defaultValue: null
@@ -246,7 +243,6 @@ namespace Trecs.Tests
             var decl = t.LocalComponentDeclarations[0];
             NAssert.AreEqual(true, decl.IsInput, "IsInput flag should be true");
             NAssert.AreEqual(MissingInputBehavior.Reset, decl.MissingInputBehavior);
-            NAssert.AreEqual(false, decl.WarnOnMissingInput);
         }
 
         #endregion

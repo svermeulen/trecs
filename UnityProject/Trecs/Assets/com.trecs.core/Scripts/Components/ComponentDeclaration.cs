@@ -11,7 +11,6 @@ namespace Trecs
         bool? VariableUpdateOnly { get; }
         bool? IsInput { get; }
         MissingInputBehavior? MissingInputBehavior { get; }
-        bool? WarnOnMissingInput { get; }
         bool? IsConstant { get; }
         bool HasDefault { get; }
 
@@ -34,7 +33,6 @@ namespace Trecs.Internal
             bool? variableUpdateOnly,
             bool? isInput,
             MissingInputBehavior? inputFrameBehaviour,
-            bool? warnOnMissingInput,
             bool? isConstant,
             bool? isInterpolated,
             T? defaultValue
@@ -43,7 +41,6 @@ namespace Trecs.Internal
             VariableUpdateOnly = variableUpdateOnly;
             IsInput = isInput;
             MissingInputBehavior = inputFrameBehaviour;
-            WarnOnMissingInput = warnOnMissingInput;
             IsConstant = isConstant;
             IsInterpolated = isInterpolated;
             Default = defaultValue;
@@ -53,7 +50,6 @@ namespace Trecs.Internal
         public bool? IsInput { get; }
         public T? Default { get; }
         public MissingInputBehavior? MissingInputBehavior { get; }
-        public bool? WarnOnMissingInput { get; }
         public bool? IsConstant { get; }
         public bool? IsInterpolated { get; }
         public Type ComponentType => _componentType;
@@ -75,7 +71,6 @@ namespace Trecs.Internal
             bool? isConstant = null;
             bool? isInterpolated = null;
             MissingInputBehavior? inputFrameBehaviour = null;
-            bool? warnOnMissingInput = null;
             T? defaultValue = null;
 
             foreach (var baseDec in declarations)
@@ -167,23 +162,6 @@ namespace Trecs.Internal
                     }
                 }
 
-                if (dec.WarnOnMissingInput.HasValue)
-                {
-                    if (warnOnMissingInput.HasValue)
-                    {
-                        Assert.That(
-                            warnOnMissingInput.Value == dec.WarnOnMissingInput.Value,
-                            "Found conflicting WarnOnMissingInput declarations for component type {} while processing template {}",
-                            _componentType,
-                            templateContext
-                        );
-                    }
-                    else
-                    {
-                        warnOnMissingInput = dec.WarnOnMissingInput;
-                    }
-                }
-
                 if (dec.HasDefault)
                 {
                     if (defaultValue.HasValue)
@@ -206,7 +184,6 @@ namespace Trecs.Internal
             bool isInputChoice = isInput ?? false;
             bool isConstantChoice = isConstant ?? false;
             bool isInterpolatedChoice = isInterpolated ?? false;
-            bool warnOnMissingInputChoice = warnOnMissingInput ?? false;
 
             Assert.That(
                 !isInterpolatedChoice || !isConstantChoice,
@@ -246,7 +223,6 @@ namespace Trecs.Internal
                     variableUpdateOnly: variableUpdateOnlyChoice,
                     isInput: isInputChoice,
                     inputFrameBehaviour: inputFrameBehaviour,
-                    warnOnMissingInput: warnOnMissingInputChoice,
                     isConstant: isConstantChoice,
                     defaultValue: defaultValue,
                     isInterpolated: isInterpolatedChoice
@@ -267,7 +243,6 @@ namespace Trecs.Internal
                         variableUpdateOnly: true,
                         isInput: false,
                         inputFrameBehaviour: null,
-                        warnOnMissingInput: false,
                         isConstant: false,
                         defaultValue: new(),
                         isInterpolated: false
@@ -279,7 +254,6 @@ namespace Trecs.Internal
                         variableUpdateOnly: false,
                         isInput: false,
                         inputFrameBehaviour: null,
-                        warnOnMissingInput: false,
                         isConstant: false,
                         defaultValue: defaultValue.HasValue ? new(defaultValue.Value) : null,
                         isInterpolated: false

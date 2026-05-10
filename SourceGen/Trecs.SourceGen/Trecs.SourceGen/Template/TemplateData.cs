@@ -14,7 +14,6 @@ namespace Trecs.SourceGen.Template
         public bool IsConstant { get; }
         public bool IsInput { get; }
         public string OnMissing { get; }
-        public bool InputWarnOnMissing { get; }
         public bool HasExplicitDefault { get; }
 
         public TemplateComponentData(
@@ -25,7 +24,6 @@ namespace Trecs.SourceGen.Template
             bool isConstant,
             bool isInput,
             string inputFrameBehaviour,
-            bool inputWarnOnMissing,
             bool hasExplicitDefault
         )
         {
@@ -36,7 +34,6 @@ namespace Trecs.SourceGen.Template
             IsConstant = isConstant;
             IsInput = isInput;
             OnMissing = inputFrameBehaviour;
-            InputWarnOnMissing = inputWarnOnMissing;
             HasExplicitDefault = hasExplicitDefault;
         }
     }

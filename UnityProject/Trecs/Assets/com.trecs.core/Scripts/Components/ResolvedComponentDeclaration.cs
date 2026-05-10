@@ -11,7 +11,6 @@ namespace Trecs
         bool VariableUpdateOnly { get; }
         bool IsInput { get; }
         MissingInputBehavior? MissingInputBehavior { get; }
-        bool WarnOnMissingInput { get; }
         bool IsConstant { get; }
         bool IsInterpolated { get; }
         bool HasDefault { get; }
@@ -34,7 +33,6 @@ namespace Trecs.Internal
             bool variableUpdateOnly,
             bool isInput,
             MissingInputBehavior? inputFrameBehaviour,
-            bool warnOnMissingInput,
             bool isConstant,
             T? defaultValue,
             bool isInterpolated
@@ -43,7 +41,6 @@ namespace Trecs.Internal
             VariableUpdateOnly = variableUpdateOnly;
             IsInput = isInput;
             MissingInputBehavior = inputFrameBehaviour;
-            WarnOnMissingInput = warnOnMissingInput;
             IsConstant = isConstant;
             IsInterpolated = isInterpolated;
             Default = defaultValue;
@@ -54,7 +51,6 @@ namespace Trecs.Internal
         public bool IsInput { get; }
         public T? Default { get; }
         public MissingInputBehavior? MissingInputBehavior { get; }
-        public bool WarnOnMissingInput { get; }
         public bool IsConstant { get; }
         public bool IsInterpolated { get; }
         public IComponentBuilder Builder { get; }

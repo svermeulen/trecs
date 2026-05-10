@@ -24,11 +24,6 @@ namespace Trecs.Internal
         readonly List<int> _frameTempRemoveBuffer = new();
         readonly List<EntityHandle> _removeQueueBuffer = new();
 
-#if DEBUG
-        readonly List<GroupComponentTypePair> _warnOnMissingInfos;
-        readonly HashSet<GroupComponentTypePair> _warnOnMissingTempBuffer = new();
-#endif
-
         SimpleSubject _systemRegistryInputsAppliedEvent;
         WorldAccessor _accessor;
         int _maxClearFrame = -1;
@@ -49,10 +44,6 @@ namespace Trecs.Internal
             _resetGroups = new();
             _systemRunner = systemRunner;
 
-#if DEBUG
-            _warnOnMissingInfos = new();
-#endif
-
             foreach (var group in worldDef.AllGroups)
             {
                 var template = worldDef.GetResolvedTemplateForGroup(group);
@@ -71,19 +62,6 @@ namespace Trecs.Internal
                                 }
                             );
                         }
-
-#if DEBUG
-                        if (componentDec.WarnOnMissingInput)
-                        {
-                            _warnOnMissingInfos.Add(
-                                new GroupComponentTypePair
-                                {
-                                    GroupIndex = group,
-                                    ComponentType = componentDec.ComponentType,
-                                }
-                            );
-                        }
-#endif
                     }
                 }
             }
@@ -507,16 +485,6 @@ namespace Trecs.Internal
                     continue;
                 }
 
-#if DEBUG
-                _warnOnMissingTempBuffer.Remove(
-                    new GroupComponentTypePair()
-                    {
-                        GroupIndex = entityIndex.GroupIndex,
-                        ComponentType = typeof(T),
-                    }
-                );
-#endif
-
                 ref var value = ref component.Write;
 
                 if (UnmanagedUtil.BlittableEquals(value, desiredValue))
@@ -585,15 +553,6 @@ namespace Trecs.Internal
                 }
             }
 
-#if DEBUG
-            _warnOnMissingTempBuffer.Clear();
-
-            foreach (var info in _warnOnMissingInfos)
-            {
-                _warnOnMissingTempBuffer.Add(info);
-            }
-#endif
-
             var frame = _systemRunner.FixedFrame;
 
 #if TRECS_IS_PROFILING
@@ -614,21 +573,6 @@ namespace Trecs.Internal
                     }
                 }
             }
-
-#if DEBUG
-            foreach (var info in _warnOnMissingTempBuffer)
-            {
-                if (_accessor.CountEntitiesInGroup(info.GroupIndex) > 0)
-                {
-                    _log.Warning(
-                        "No frame data found for input component {} on frame {}",
-                        info.ComponentType,
-                        frame
-                    );
-                }
-            }
-            _warnOnMissingTempBuffer.Clear();
-#endif
 
 #if TRECS_IS_PROFILING
             using (TrecsProfiling.Start("Clearing old input"))
@@ -699,45 +643,6 @@ namespace Trecs.Internal
         {
             public GroupIndex GroupIndex;
             public IComponentBuilder ComponentBuilder;
-        }
-
-        struct GroupComponentTypePair : IEquatable<GroupComponentTypePair>
-        {
-            public GroupIndex GroupIndex;
-            public Type ComponentType;
-
-            public readonly bool Equals(GroupComponentTypePair other)
-            {
-                return GroupIndex == other.GroupIndex && ComponentType == other.ComponentType;
-            }
-
-            public override readonly bool Equals(object obj)
-            {
-                return obj is GroupComponentTypePair other && Equals(other);
-            }
-
-            public override readonly int GetHashCode()
-            {
-                return unchecked(
-                    (int)math.hash(new int2(GroupIndex.GetHashCode(), ComponentType.GetHashCode()))
-                );
-            }
-
-            public static bool operator ==(
-                GroupComponentTypePair left,
-                GroupComponentTypePair right
-            )
-            {
-                return left.Equals(right);
-            }
-
-            public static bool operator !=(
-                GroupComponentTypePair left,
-                GroupComponentTypePair right
-            )
-            {
-                return !(left == right);
-            }
         }
 
         internal interface IComponentTypeHelper : IDisposable
