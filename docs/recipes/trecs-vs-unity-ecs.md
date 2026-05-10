@@ -59,18 +59,16 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 
 | Unity ECS | Trecs |
 |---|---|
-| Nice-to-have | Core design goal |
+| Nice-to-have, not enforced | Core design goal, enforced via api |
 | No built-in equivalent | Built-in [recording / playback](../advanced/recording-and-playback.md) with desync detection |
-| No built-in equivalent | Deterministic RNG ([`World.Rng`](../advanced/time-and-rng.md)) |
-| NetCode for Entities (separate package) | [Input system](../core/input-system.md) with frame isolation for perfect replay |
+| NetCode for Entities (separate package) | No direct equivalent |
 
 ### Serialization
 
 | Unity ECS | Trecs |
 |---|---|
-| Subscene baking (edit-time); limited runtime serialization | Full world state [serialization](../advanced/serialization.md) (runtime save/load, snapshots, replays) |
-| `TypeIndex` (auto-generated) | Stable type IDs (auto-generated from type name) |
-| No built-in equivalent | Delta serialization support |
+| Subscene baking (edit-time) | No direct equivalent (yet) |
+| Limited runtime serialization | Full world state [serialization](../advanced/serialization.md) (runtime save/load, snapshots, replays) |
 | No canonical equivalent — handled outside the engine | Per-save versioning via `Reader.Version` / `Writer.Version` for evolving custom serializers |
 
 ### Editor tooling
@@ -148,7 +146,7 @@ Neither layout is universally better — chunks shine when you have many small a
 - **[`[Unwrap]` shorthand](../core/components.md#the-unwrap-shorthand)** — single-field components expose their inner value through aspect properties (e.g. `boid.Position` is a `float3`, not a `Position` wrapper)
 - **[Heap system](../advanced/heap.md)** — managed/native pointer types for non-component data
 - **Reactive entity lifecycle events** — first-class `OnAdded` / `OnRemoved` subscriptions
-- **Versioned save format support** — `Reader.Version` / `Writer.Version` for evolving custom serializers
+- **Built-in [serialization framework](../advanced/serialization.md)** — full world state save/load, with delta encoding for compact snapshots and per-save versioning (`Reader.Version` / `Writer.Version`) for evolving custom serializers across save format revisions
 
 ## What Unity ECS has that Trecs doesn't
 
