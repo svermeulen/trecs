@@ -62,9 +62,9 @@ highlighted.Remove(entityIndex);
 ```
 
 !!! warning "Don't mutate a set while iterating it"
-    The one unsafe combination is using an immediate `Add` / `Remove` / `Clear` on the **same set in the same group** you're currently iterating — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
+    Using an immediate `Add` / `Remove` / `Clear` on the **same set in the same group** you're currently iterating throws in DEBUG builds. In release builds (where the assertion is compiled out) iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
 
-    Everything else is safe: mutating a different set, mutating the same set in a different group, or using the deferred API (`Set<T>().Defer`) on the iterated set (it applies at the next submission). DEBUG builds throw at the point of misuse; release builds corrupt silently.
+    Everything else is safe: mutating a different set, mutating the same set in a different group, or using the deferred API (`Set<T>().Defer`) on the iterated set (it applies at the next submission).
 
     To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `List<EntityIndex>` and apply them after the loop.
 
