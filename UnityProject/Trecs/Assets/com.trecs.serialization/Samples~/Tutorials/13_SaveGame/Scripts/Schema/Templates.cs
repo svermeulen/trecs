@@ -4,11 +4,11 @@ namespace Trecs.Serialization.Samples.SaveGame
     {
         public partial class SaveGameGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
         {
-            // ResetToDefault: a tap produces exactly one move on the next
+            // Reset: a tap produces exactly one move on the next
             // fixed tick. If the queued input has already been consumed and
             // no new key is pressed, MoveInput reverts to zero instead of
             // causing auto-repeat.
-            [Input(MissingInputBehavior.ResetToDefault)]
+            [Input(MissingInputBehavior.Reset)]
             MoveInput MoveInput = default;
         }
 

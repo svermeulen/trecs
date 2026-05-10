@@ -90,7 +90,7 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
 
                 public partial class PlayerTemplate : Trecs.ITemplate
                 {
-                    [Trecs.Input(Trecs.MissingInputBehavior.ResetToDefault)]
+                    [Trecs.Input(Trecs.MissingInputBehavior.Reset)]
                     [Trecs.VariableUpdateOnly]
                     CCmd Command;
                 }

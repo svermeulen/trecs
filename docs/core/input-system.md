@@ -9,7 +9,7 @@ Mark template fields with `[Input]`:
 ```csharp
 public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
-    [Input(MissingInputBehavior.RetainCurrent)]
+    [Input(MissingInputBehavior.Retain)]
     MoveInput MoveInput;
 }
 ```
@@ -18,10 +18,10 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 
 | Value | Effect |
 |-------|--------|
-| `RetainCurrent` | Keep the previous frame's value |
-| `ResetToDefault` | Reset to the component's default value |
+| `Retain` | Keep the previous frame's value |
+| `Reset` | Reset to the component's default value |
 
-`RetainCurrent` is right when an input represents a sustained intent (e.g. "currently holding a movement direction"). `ResetToDefault` fits one-shot signals (e.g. "fire button pressed this frame").
+`Retain` is right when an input represents a sustained intent (e.g. "currently holding a movement direction"). `Reset` fits one-shot signals (e.g. "fire button pressed this frame").
 
 ## Queuing input
 
@@ -66,7 +66,7 @@ public partial class ProcessInputSystem : ISystem
     void Execute([SingleEntity(typeof(TrecsTags.Globals))] in MoveInput input)
     {
         // input.RequestedDirection is the value AddInput supplied this frame,
-        // or the prior frame's value (RetainCurrent) / default (ResetToDefault)
+        // or the prior frame's value (Retain) / default (Reset)
         // if no input was queued.
     }
 }

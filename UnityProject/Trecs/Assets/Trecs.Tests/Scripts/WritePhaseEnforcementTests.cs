@@ -569,7 +569,7 @@ namespace Trecs.Tests
                     new ComponentDeclaration<WritePhaseInputComp>(
                         null,
                         isInput: true,
-                        inputFrameBehaviour: MissingInputBehavior.RetainCurrent,
+                        inputFrameBehaviour: MissingInputBehavior.Retain,
                         null,
                         null,
                         null,

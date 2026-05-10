@@ -694,7 +694,7 @@ internal static class TrecsStubs
                 public static TagSet Value { get; }
             }
 
-            public enum MissingInputBehavior { ResetToDefault, KeepLast }
+            public enum MissingInputBehavior { Reset, Retain }
 
             // ----- InterpolatorInstaller surface -----
             // InterpolatorInstallerGenerator emits a WorldBuilder extension method

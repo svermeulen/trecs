@@ -78,12 +78,12 @@ namespace Trecs
         /// <summary>
         /// Resets the component to its <c>default</c> value when no input arrives.
         /// </summary>
-        ResetToDefault,
+        Reset,
 
         /// <summary>
         /// Keeps the component's value from the previous frame when no input arrives.
         /// </summary>
-        RetainCurrent,
+        Retain,
     }
 
     /// <summary>

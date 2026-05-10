@@ -10,10 +10,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
     {
         public partial class Globals : ITemplate, IExtends<TrecsTemplates.Globals>
         {
-            [Input(MissingInputBehavior.RetainCurrent)]
+            [Input(MissingInputBehavior.Retain)]
             DesiredPreset DesiredPreset = default;
 
-            [Input(MissingInputBehavior.RetainCurrent)]
+            [Input(MissingInputBehavior.Retain)]
             DesiredIterationStyle DesiredIterationStyle = default;
 
             DesiredFishCount DesiredFishCount = default;

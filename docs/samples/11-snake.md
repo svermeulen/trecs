@@ -44,7 +44,7 @@ public struct SnakeFood : ITag { }
 ```csharp
 public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
-    [Input(MissingInputBehavior.RetainCurrent)]
+    [Input(MissingInputBehavior.Retain)]
     MoveInput MoveInput;
     SnakeLength SnakeLength = new(4);
     Score Score;
@@ -52,7 +52,7 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 }
 ```
 
-The `[Input(RetainCurrent)]` attribute ensures the last input persists until a new one is received — critical for a game where the snake keeps moving in its current direction.
+The `[Input(Retain)]` attribute ensures the last input persists until a new one is received — critical for a game where the snake keeps moving in its current direction.
 
 ## Systems (execution order)
 
@@ -166,7 +166,7 @@ See [Serialization](../advanced/serialization.md) for custom-serializer authorin
 
 ## Concepts introduced
 
-- **`[Input(RetainCurrent)]`** on a template field — input persists across frames until replaced
+- **`[Input(Retain)]`** on a template field — input persists across frames until replaced
 - **`[ExecuteIn(SystemPhase.Input)]`** — system runs in the input phase, before fixed update
 - **`World.AddInput`** — queues input from outside the ECS tick
 - **`[SingleEntity(typeof(Tag))]`** parameter — bind the one tagged entity directly into the `Execute` signature

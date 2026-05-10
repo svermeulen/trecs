@@ -75,7 +75,7 @@ public partial class PlayerEntity : ITemplate, ITagged<PlayerTag>
     [Constant]
     PlayerId PlayerId;                          // Immutable after creation
 
-    [Input(MissingInputBehavior.RetainCurrent)]
+    [Input(MissingInputBehavior.Retain)]
     MoveInput MoveInput;                        // Player input
 }
 ```

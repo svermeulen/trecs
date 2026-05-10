@@ -232,7 +232,7 @@ namespace Trecs.Tests
                     new ComponentDeclaration<TestInt>(
                         variableUpdateOnly: null,
                         isInput: true,
-                        inputFrameBehaviour: MissingInputBehavior.ResetToDefault,
+                        inputFrameBehaviour: MissingInputBehavior.Reset,
                         warnOnMissingInput: false,
                         isConstant: null,
                         isInterpolated: null,
@@ -245,7 +245,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, t.LocalComponentDeclarations.Count);
             var decl = t.LocalComponentDeclarations[0];
             NAssert.AreEqual(true, decl.IsInput, "IsInput flag should be true");
-            NAssert.AreEqual(MissingInputBehavior.ResetToDefault, decl.MissingInputBehavior);
+            NAssert.AreEqual(MissingInputBehavior.Reset, decl.MissingInputBehavior);
             NAssert.AreEqual(false, decl.WarnOnMissingInput);
         }
 

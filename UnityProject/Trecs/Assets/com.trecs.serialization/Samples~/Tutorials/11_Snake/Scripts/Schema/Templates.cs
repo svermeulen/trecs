@@ -12,11 +12,11 @@ namespace Trecs.Serialization.Samples.Snake
 
         public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
         {
-            // RetainCurrent: the snake only moves once every N fixed
+            // Retain: the snake only moves once every N fixed
             // frames, so an input the player makes between move ticks must
-            // persist until the next tick to be processed. RetainCurrent
+            // persist until the next tick to be processed. Retain
             // keeps the last requested direction in place across frames.
-            [Input(MissingInputBehavior.RetainCurrent)]
+            [Input(MissingInputBehavior.Retain)]
             MoveInput MoveInput = default;
 
             SnakeLength SnakeLength = new(4);

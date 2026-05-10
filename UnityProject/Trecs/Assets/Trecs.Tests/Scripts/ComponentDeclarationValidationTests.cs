@@ -56,7 +56,7 @@ namespace Trecs.Tests
             var dec1 = new ComponentDeclaration<ConflictTestComp>(
                 null,
                 isInput: true,
-                MissingInputBehavior.ResetToDefault,
+                MissingInputBehavior.Reset,
                 null,
                 null,
                 null,
@@ -161,7 +161,7 @@ namespace Trecs.Tests
             var dec1 = new ComponentDeclaration<ConflictTestComp>(
                 null,
                 isInput: true,
-                MissingInputBehavior.ResetToDefault,
+                MissingInputBehavior.Reset,
                 null,
                 null,
                 null,

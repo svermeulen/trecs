@@ -178,7 +178,7 @@ public partial class MyGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
     Score Score = default;
     DesiredFishCount DesiredFishCount = new() { Value = 100 };
 
-    [Input(MissingInputBehavior.RetainCurrent)]
+    [Input(MissingInputBehavior.Retain)]
     MoveInput MoveInput = default;
 }
 ```

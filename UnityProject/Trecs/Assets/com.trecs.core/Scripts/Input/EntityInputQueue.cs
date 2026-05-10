@@ -12,7 +12,7 @@ namespace Trecs.Internal
     {
         static readonly TrecsLog _log = new(nameof(EntityInputQueue));
 
-        readonly List<ResetToDefaultGroupInfo> _resetToDefaultGroups;
+        readonly List<ResetGroupInfo> _resetGroups;
         readonly SystemRunner _systemRunner;
         readonly DisposeGroup _subscriptions = new();
         readonly List<IInputHistoryLocker> _historyLockers = new();
@@ -46,7 +46,7 @@ namespace Trecs.Internal
             _nativeFrameScopedSharedHeap = nativeFrameScopedSharedHeap;
             _frameScopedUniqueHeap = frameScopedUniqueHeap;
             _frameScopedNativeUniqueHeap = frameScopedNativeUniqueHeap;
-            _resetToDefaultGroups = new();
+            _resetGroups = new();
             _systemRunner = systemRunner;
 
 #if DEBUG
@@ -63,11 +63,11 @@ namespace Trecs.Internal
                     {
                         if (
                             componentDec.MissingInputBehavior.Value
-                            == MissingInputBehavior.ResetToDefault
+                            == MissingInputBehavior.Reset
                         )
                         {
-                            _resetToDefaultGroups.Add(
-                                new ResetToDefaultGroupInfo
+                            _resetGroups.Add(
+                                new ResetGroupInfo
                                 {
                                     GroupIndex = group,
                                     ComponentBuilder = componentDec.Builder,
@@ -345,7 +345,7 @@ namespace Trecs.Internal
         // Note: these Serialize/Deserialize methods are used by the recording system
         // for deterministic replay, not by snapshot serialization. Snapshots don't need
         // input queue state because the component values themselves (which include the
-        // last-applied input for RetainCurrent components) are already captured in the
+        // last-applied input for Retain components) are already captured in the
         // WorldStateSerializer snapshot.
         public void Serialize(ITrecsSerializationWriter writer)
         {
@@ -582,7 +582,7 @@ namespace Trecs.Internal
         {
             using (TrecsProfiling.Start("Resetting Input Values"))
             {
-                foreach (var info in _resetToDefaultGroups)
+                foreach (var info in _resetGroups)
                 {
                     info.ComponentBuilder.ResetInputs(this, info.GroupIndex);
                 }
@@ -698,7 +698,7 @@ namespace Trecs.Internal
             }
         }
 
-        class ResetToDefaultGroupInfo
+        class ResetGroupInfo
         {
             public GroupIndex GroupIndex;
             public IComponentBuilder ComponentBuilder;
