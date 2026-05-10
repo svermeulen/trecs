@@ -32,7 +32,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | Unity ECS | Trecs |
 |---|---|
 | `ISystem` with `OnUpdate()` | `ISystem` with `Execute()` |
-| `SystemAPI.Query<T>()` | `[ForEachEntity]` source generation |
+| `SystemAPI.Query<T>()` | `[ForEachEntity]` source generation, or `World.Query()` / `Aspect.Query(World)` for hand-rolled iteration |
 | `[UpdateAfter]` / `[UpdateBefore]` | `[ExecuteAfter]` / `[ExecuteBefore]` |
 | System groups (`InitializationSystemGroup`, etc.) | Five phases (EarlyPresentation, Input, Fixed, Presentation, LatePresentation) |
 | Framework discovers and instantiates systems via reflection | User instantiates systems explicitly (`new FooSystem(dep1, dep2)`) and registers them |
