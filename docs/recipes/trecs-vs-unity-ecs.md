@@ -21,7 +21,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 |---|---|---|
 | **Plain unmanaged data** | `IComponentData` (unmanaged struct) | `IEntityComponent` (unmanaged struct) |
 | **Managed data on an entity** | `class IComponentData` (managed component) | No managed components — use a [heap pointer](../advanced/heap.md) (`UniquePtr<T>` / `SharedPtr<T>`) referenced from a component |
-| **Per-entity collections** | `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) | [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline) for bounded cases, or a [heap pointer](../advanced/heap.md) (`UniquePtr<List<T>>` / `NativeUniquePtr<NativeList<T>>`) for unbounded |
+| **Per-entity dynamic collections** | `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) | [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline) for bounded cases, or a [heap pointer](../advanced/heap.md) (`UniquePtr<List<T>>` / `NativeUniquePtr<NativeList<T>>`) for unbounded |
 | **Tags / markers** | Zero-field `IComponentData` acts as a tag | Dedicated [`ITag`](../core/tags.md) marker structs (separate from components) |
 | **Singletons / global state** | `SystemAPI.GetSingleton<T>()` | `World.GlobalComponent<T>()` on a [`Globals` template](../core/templates.md#global-entity-template) |
 | **Single-field component shorthand** | None | [`[Unwrap]`](../core/components.md#the-unwrap-shorthand) — exposes the inner value through aspect properties (e.g. `boid.Position` is a `float3`, not a `Position` wrapper) |
@@ -33,9 +33,12 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | | Unity ECS | Trecs |
 |---|---|---|
 | **System base type** | `ISystem` with `OnUpdate()` | [`ISystem`](../core/systems.md) with `Execute()` |
+| **Per-role access enforcement** | None — any system can call `EntityManager` for any operation | [Accessor roles](../advanced/accessor-roles.md) (`Fixed` / `Variable` / `Unrestricted`) — phase-derived permissions for component reads / writes, structural changes, RNG streams, and heap allocation |
 | **System ordering** | `[UpdateAfter]` / `[UpdateBefore]` | [`[ExecuteAfter]` / `[ExecuteBefore]`](../core/systems.md#system-ordering) |
 | **Phase / group structure** | System groups (`InitializationSystemGroup`, etc.) | [Five fixed phases](../core/systems.md#update-phases) — EarlyPresentation, Input, Fixed, Presentation, LatePresentation |
+| **Phase-aware time / frame counters** | Separate `Time.deltaTime` / `Time.fixedDeltaTime` properties; you pick the right one | `World.DeltaTime`, `World.Frame`, etc. resolve automatically to fixed or variable values based on the current phase |
 | **Construction** | Framework discovers and instantiates systems via reflection | User instantiates systems explicitly and registers them |
+| **System pause / disable** | Ad-hoc; no built-in mechanism | [`SetSystemPaused`](../advanced/system-control.md) (deterministic, replay-stable) and `SetSystemEnabled(channel, ...)` (non-deterministic, multi-source) |
 | **Burst on the system itself** | Struct `ISystem` can be Burst-compiled wholesale | Systems are managed classes; Burst is opt-in per job via [`[WrapAsJob]`](../performance/jobs-and-burst.md) |
 | **Fixed → variable timestep smoothing** | Not built-in | Built-in [interpolation](../advanced/interpolation.md) framework |
 
@@ -56,6 +59,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 |---|---|---|
 | **Entity-iterating job** | `IJobEntity` | [`[WrapAsJob]`](../performance/jobs-and-burst.md) + `[ForEachEntity]` |
 | **Component lookup wiring** | Manual `GetComponentLookup` | [`[FromWorld]`](../advanced/advanced-jobs.md#fromworld--auto-wiring-job-fields) auto-wiring |
+| **`JobHandle` dependency wiring** | Manual `JobHandle.CombineDependencies`; you thread input handles between schedules | Auto-wired from declared component access — the [dependency tracker](../performance/dependency-tracking.md) infers the right input handle at each `ScheduleParallel` |
 | **Structural ops from a job** | `EntityCommandBuffer.ParallelWriter` | [`NativeWorldAccessor`](../performance/jobs-and-burst.md#nativeworldaccessor) for structural ops |
 | **Deterministic ordering of parallel ops** | `sortKey` on `EntityCommandBuffer` | [Sort keys](../entity-management/structural-changes.md#deterministic-submission) for deterministic ordering |
 
