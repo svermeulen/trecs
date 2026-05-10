@@ -1,6 +1,6 @@
 # Best Practices
 
-Recommended practices for building with Trecs.
+Recommended practices for building with Trecs.  We assume here that determinism is required property which may not apply to all games.
 
 ## Systems
 
@@ -31,7 +31,7 @@ Recommended practices for building with Trecs.
 
 ## Determinism
 
-The items in this section apply if you need replay-deterministic execution — recording / playback, save scrubbing, or lockstep networking. Non-deterministic games are valid Trecs projects too; you can skip the section if none of those apply.
+Skip this section if your game doesn't need replay determinism (see intro).
 
 - **Use `World.Rng`, never `UnityEngine.Random`.** External RNG breaks replay. `FixedRng` and `VariableRng` are independent streams.
 - **Use `world.FixedDeltaTime` in fixed-update systems.** `UnityEngine.Time.deltaTime` varies per render frame and breaks replay.
