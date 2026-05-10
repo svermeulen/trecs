@@ -388,6 +388,59 @@ namespace Trecs.Tests
         }
 
         [Test]
+        public void Filter_DeferredClear_FromNativeAccessor_SupersedesNativeAdd()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 3; i++)
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt())
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+            var nativeEcs = a.ToNative();
+
+            // Both NativeWorldAccessor.SetAdd and SetClear hit the same per-set
+            // deferred queues / clear flag. Clear should win regardless of order.
+            nativeEcs.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            nativeEcs.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
+            nativeEcs.SetClear<FiltOpTestSet>();
+            nativeEcs.SetAdd<FiltOpTestSet>(new EntityIndex(2, group));
+            a.SubmitEntities();
+
+            NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
+        }
+
+        [Test]
+        public void Filter_DeferredClear_FromNativeAccessor_SupersedesMainThreadDeferAdd()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 2; i++)
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt())
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+
+            // Main-thread Defer enqueues into the same per-set queues that the native
+            // accessor uses. Clear from the native accessor must wipe both.
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(1, group));
+
+            a.ToNative().SetClear<FiltOpTestSet>();
+            a.SubmitEntities();
+
+            NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
+        }
+
+        [Test]
         public void Filter_DeferredClear_FromNativeAccessor_AppliedAtSubmission()
         {
             using var env = CreateEnv();
@@ -689,6 +742,279 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(3, values.Count, "Set should have 3 entries after entity removal");
             NAssert.IsFalse(values.Contains(200), "Removed entity's value should not appear");
+        }
+
+        #endregion
+
+        #region TryGetGroupEntry
+
+        [Test]
+        public void TryGetGroupEntry_ValidGroupOfRegisteredSet_ReturnsTrueWithEntry()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            a.AddEntity(Tag<QId1>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+            var read = a.Set<FiltOpTestSet>().Read;
+
+            NAssert.IsTrue(read.TryGetGroupEntry(group, out var entry));
+            NAssert.IsTrue(entry.IsValid);
+        }
+
+        [Test]
+        public void TryGetGroupEntry_NullGroup_ReturnsFalse()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var read = a.Set<FiltOpTestSet>().Read;
+            NAssert.IsFalse(read.TryGetGroupEntry(GroupIndex.Null, out _));
+        }
+
+        [Test]
+        public void TryGetGroupEntry_GroupNotInSetTemplate_ReturnsFalse()
+        {
+            // FiltOpTestSet is scoped to QId1 (via IEntitySet<QId1>); a QId2 group
+            // exists in this world but isn't covered by the set's template.
+            using var env = EcsTestHelper.CreateEnvironment(
+                b =>
+                {
+                    b.AddSet<FiltOpTestSet>();
+                },
+                QTestEntityA.Template,
+                QTestEntityAB.Template
+            );
+            var a = env.Accessor;
+
+            a.AddEntity(Tag<QId1>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+            a.AddEntity(Tag<QId2>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+            a.SubmitEntities();
+
+            var qId2Group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId2>.Value);
+            var read = a.Set<FiltOpTestSet>().Read;
+
+            NAssert.IsFalse(
+                read.TryGetGroupEntry(qId2Group, out _),
+                "QId2 group is not in FiltOpTestSet's template — entry should be invalid"
+            );
+        }
+
+        #endregion
+
+        #region SetWrite group-validity safety net
+
+        [Test]
+        public void SetWrite_AddFromGroupOutsideTemplate_Throws()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(
+                b =>
+                {
+                    b.AddSet<FiltOpTestSet>();
+                },
+                QTestEntityA.Template,
+                QTestEntityAB.Template
+            );
+            var a = env.Accessor;
+
+            a.AddEntity(Tag<QId2>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
+            a.SubmitEntities();
+
+            var qId2Group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId2>.Value);
+
+            // FiltOpTestSet's template is QId1; writing to a QId2 group must surface
+            // the AssertValidGroup safety net (DEBUG-only). SetWrite is a ref struct
+            // so we re-acquire it inside the lambda — ref locals can't be captured.
+            NAssert.Catch<System.Exception>(() =>
+                a.Set<FiltOpTestSet>().Write.Add(new EntityIndex(0, qId2Group))
+            );
+        }
+
+        #endregion
+
+        #region Untyped Set(SetId) gateway
+
+        [Test]
+        public void SetById_Read_Count_MatchesTypedRead()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 3; i++)
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+            var typedSet = a.Set<FiltOpTestSet>();
+            typedSet.Write.Add(new EntityIndex(0, group));
+            typedSet.Write.Add(new EntityIndex(2, group));
+
+            var setId = EntitySet<FiltOpTestSet>.Value.Id;
+            NAssert.AreEqual(2, a.Set(setId).Read.Count);
+            NAssert.AreEqual(typedSet.Read.Count, a.Set(setId).Read.Count);
+        }
+
+        [Test]
+        public void SetById_Read_Exists_AgreesWithTypedRead()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 3; i++)
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+            var typedSet = a.Set<FiltOpTestSet>();
+            typedSet.Write.Add(new EntityIndex(1, group));
+
+            var setId = EntitySet<FiltOpTestSet>.Value.Id;
+            var untypedRead = a.Set(setId).Read;
+            NAssert.IsTrue(untypedRead.Exists(new EntityIndex(1, group)));
+            NAssert.IsFalse(untypedRead.Exists(new EntityIndex(0, group)));
+            NAssert.IsFalse(untypedRead.Exists(new EntityIndex(2, group)));
+        }
+
+        [Test]
+        public void SetById_Read_Exists_NullGroupReturnsFalse()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var setId = EntitySet<FiltOpTestSet>.Value.Id;
+            var read = a.Set(setId).Read;
+            NAssert.IsFalse(read.Exists(EntityIndex.Null));
+        }
+
+        [Test]
+        public void SetById_Read_EmptySetCountIsZero()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var setId = EntitySet<FiltOpTestSet>.Value.Id;
+            NAssert.AreEqual(0, a.Set(setId).Read.Count);
+        }
+
+        #endregion
+
+        #region EntityHandle overloads
+
+        [Test]
+        public void Filter_Defer_AddByHandle_AppearsInSet()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var handle = a.AddEntity(Tag<QId1>.Value)
+                .Set(new TestInt { Value = 7 })
+                .Set(new TestFloat())
+                .AssertComplete()
+                .Handle;
+            a.SubmitEntities();
+
+            a.Set<FiltOpTestSet>().Defer.Add(handle);
+            a.SubmitEntities();
+
+            NAssert.IsTrue(a.Set<FiltOpTestSet>().Read.Exists(handle));
+        }
+
+        [Test]
+        public void Filter_Defer_RemoveByHandle_RemovedFromSet()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var handle = a.AddEntity(Tag<QId1>.Value)
+                .Set(new TestInt { Value = 7 })
+                .Set(new TestFloat())
+                .AssertComplete()
+                .Handle;
+            a.SubmitEntities();
+
+            var set = a.Set<FiltOpTestSet>();
+            set.Defer.Add(handle);
+            a.SubmitEntities();
+            NAssert.IsTrue(set.Read.Exists(handle));
+
+            set.Defer.Remove(handle);
+            a.SubmitEntities();
+            NAssert.IsFalse(set.Read.Exists(handle));
+        }
+
+        [Test]
+        public void Filter_Write_AddByHandle_AppearsInSet()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var handle = a.AddEntity(Tag<QId1>.Value)
+                .Set(new TestInt())
+                .Set(new TestFloat())
+                .AssertComplete()
+                .Handle;
+            a.SubmitEntities();
+
+            var set = a.Set<FiltOpTestSet>();
+            set.Write.Add(handle);
+
+            NAssert.IsTrue(set.Read.Exists(handle));
+        }
+
+        [Test]
+        public void Filter_Write_RemoveByHandle_RemovedFromSet()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var handle = a.AddEntity(Tag<QId1>.Value)
+                .Set(new TestInt())
+                .Set(new TestFloat())
+                .AssertComplete()
+                .Handle;
+            a.SubmitEntities();
+
+            var set = a.Set<FiltOpTestSet>();
+            set.Write.Add(handle);
+            NAssert.IsTrue(set.Read.Exists(handle));
+
+            set.Write.Remove(handle);
+            NAssert.IsFalse(set.Read.Exists(handle));
+        }
+
+        [Test]
+        public void Filter_Read_ExistsByHandle_MatchesEntityIndexResult()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var handleA = a.AddEntity(Tag<QId1>.Value)
+                .Set(new TestInt { Value = 1 })
+                .Set(new TestFloat())
+                .AssertComplete()
+                .Handle;
+            var handleB = a.AddEntity(Tag<QId1>.Value)
+                .Set(new TestInt { Value = 2 })
+                .Set(new TestFloat())
+                .AssertComplete()
+                .Handle;
+            a.SubmitEntities();
+
+            var set = a.Set<FiltOpTestSet>();
+            set.Write.Add(handleA);
+
+            // Each Read access syncs and returns a fresh view; check both handles
+            // resolve to the right answers.
+            NAssert.IsTrue(set.Read.Exists(handleA));
+            NAssert.IsFalse(set.Read.Exists(handleB));
         }
 
         #endregion

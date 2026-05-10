@@ -83,6 +83,58 @@ namespace Trecs.Tests
             }
         }
 
+        // Add via the EntityHandle+NativeWorldAccessor overload.
+        partial struct AddByHandleJob
+        {
+            [FromWorld]
+            public NativeSetCommandBuffer<TFJTestTransientSet> Writer;
+
+            [FromWorld]
+            public NativeWorldAccessor World;
+
+            [ForEachEntity(Tag = typeof(QId1))]
+            void Execute(in TestInt value, EntityIndex entityIndex)
+            {
+                var handle = entityIndex.ToHandle(World);
+                Writer.Add(handle, World);
+            }
+        }
+
+        // Remove via the EntityHandle+NativeWorldAccessor overload — entities pre-populated
+        // before the job runs; this strips them out.
+        partial struct RemoveByHandleJob
+        {
+            [FromWorld]
+            public NativeSetCommandBuffer<TFJTestTransientSet> Writer;
+
+            [FromWorld]
+            public NativeWorldAccessor World;
+
+            [ForEachEntity(Tag = typeof(QId1))]
+            void Execute(in TestInt value, EntityIndex entityIndex)
+            {
+                var handle = entityIndex.ToHandle(World);
+                Writer.Remove(handle, World);
+            }
+        }
+
+        // Remove a specific subset by EntityIndex (every other entity), to cover
+        // the EntityIndex Remove path from a job.
+        partial struct RemoveEvenJob
+        {
+            [FromWorld]
+            public NativeSetCommandBuffer<TFJTestTransientSet> Writer;
+
+            [ForEachEntity(Tag = typeof(QId1))]
+            void Execute(in TestInt value, EntityIndex entityIndex)
+            {
+                if (entityIndex.Index % 2 == 0)
+                {
+                    Writer.Remove(entityIndex);
+                }
+            }
+        }
+
         [Test]
         public void JobWrite_EntitiesAppearAfterMainThreadRead()
         {
@@ -484,6 +536,92 @@ namespace Trecs.Tests
             NAssert.IsTrue(set.Read.Exists(new EntityIndex(2, group)));
             NAssert.IsTrue(set.Read.Exists(new EntityIndex(4, group)));
             NAssert.IsFalse(set.Read.Exists(new EntityIndex(1, group)));
+        }
+
+        [Test]
+        public void JobWrite_AddByHandle_AppearsInSet()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 4; i++)
+            {
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            }
+            a.SubmitEntities();
+
+            new AddByHandleJob().ScheduleParallel(a);
+
+            var set = a.Set<TFJTestTransientSet>();
+            NAssert.AreEqual(
+                4,
+                set.Read.Count,
+                "All four entities should be added via Handle overload"
+            );
+        }
+
+        [Test]
+        public void JobWrite_RemoveByHandle_RemovesFromSet()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 4; i++)
+            {
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            }
+            a.SubmitEntities();
+
+            // Pre-populate via main thread
+            var set = a.Set<TFJTestTransientSet>();
+            new FlagAllEntitiesJob().ScheduleParallel(a);
+            NAssert.AreEqual(4, set.Read.Count);
+
+            // Remove all via handle overload
+            new RemoveByHandleJob().ScheduleParallel(a);
+            NAssert.AreEqual(
+                0,
+                set.Read.Count,
+                "All entities should be removed via Handle overload"
+            );
+        }
+
+        [Test]
+        public void JobWrite_RemoveByEntityIndex_RemovesFromSet()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 6; i++)
+            {
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            }
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+            var set = a.Set<TFJTestTransientSet>();
+
+            // Pre-populate everyone
+            new FlagAllEntitiesJob().ScheduleParallel(a);
+            NAssert.AreEqual(6, set.Read.Count);
+
+            // Job removes evens (0, 2, 4)
+            new RemoveEvenJob().ScheduleParallel(a);
+
+            NAssert.AreEqual(3, set.Read.Count, "Three odd-indexed entities should remain");
+            NAssert.IsFalse(set.Read.Exists(new EntityIndex(0, group)));
+            NAssert.IsTrue(set.Read.Exists(new EntityIndex(1, group)));
+            NAssert.IsFalse(set.Read.Exists(new EntityIndex(2, group)));
+            NAssert.IsTrue(set.Read.Exists(new EntityIndex(3, group)));
         }
     }
 }
