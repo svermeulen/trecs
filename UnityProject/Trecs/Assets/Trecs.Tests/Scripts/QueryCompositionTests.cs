@@ -69,7 +69,7 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
             var setA = a.Set<QTestSetA>();
-            setA.Write.AddImmediate(new EntityIndex(0, group));
+            setA.Write.Add(new EntityIndex(0, group));
             a.SubmitEntities(); // Flush deferred set ops
 
             var results = new List<int>();
@@ -102,7 +102,7 @@ namespace Trecs.Tests
 
             var setA = a.Set<QTestSetA>();
             // Only entity 1 is in the set
-            setA.Write.AddImmediate(new EntityIndex(1, group));
+            setA.Write.Add(new EntityIndex(1, group));
             a.SubmitEntities(); // Flush deferred set ops
 
             var results = new List<int>();
@@ -292,7 +292,7 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
             var setA = a.Set<QTestSetA>();
-            setA.Write.AddImmediate(new EntityIndex(0, group));
+            setA.Write.Add(new EntityIndex(0, group));
             a.SubmitEntities(); // Flush deferred set ops
 
             _forEachFilterResults.Clear();
@@ -363,7 +363,7 @@ namespace Trecs.Tests
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var setA = a.Set<QTestSetA>();
-            setA.Write.AddImmediate(new EntityIndex(0, group));
+            setA.Write.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             _dynamicResults.Clear();
@@ -618,7 +618,7 @@ namespace Trecs.Tests
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var setA = a.Set<QTestSetA>();
-            setA.Write.AddImmediate(new EntityIndex(0, group));
+            setA.Write.Add(new EntityIndex(0, group));
             a.SubmitEntities(); // Flush deferred set ops
 
             var results = new List<int>();
@@ -649,7 +649,7 @@ namespace Trecs.Tests
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var setA = a.Set<QTestSetA>();
-            setA.Write.AddImmediate(new EntityIndex(1, group));
+            setA.Write.Add(new EntityIndex(1, group));
             a.SubmitEntities(); // Flush deferred set ops
 
             var results = new List<int>();

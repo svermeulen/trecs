@@ -33,7 +33,7 @@ public struct WaveX : IEntitySet { }
 public struct WaveZ : IEntitySet { }
 ```
 
-Sets define sparse subsets of entities. Membership is managed at runtime via `SetAdd`/`SetRemove`.
+Sets define sparse subsets of entities. Membership is managed at runtime via `Set<T>().Defer.Add` / `Defer.Remove`.
 
 ### Registration
 
@@ -69,14 +69,14 @@ public void Execute()
         float distZ = math.abs(particle.Position.z - waveCenterZ);
 
         if (distX < _settings.WaveBandWidth)
-            World.SetAdd<SampleSets.WaveX>(particle.EntityIndex);
+            World.Set<SampleSets.WaveX>().Defer.Add(particle.EntityIndex);
         else
-            World.SetRemove<SampleSets.WaveX>(particle.EntityIndex);
+            World.Set<SampleSets.WaveX>().Defer.Remove(particle.EntityIndex);
 
         if (distZ < _settings.WaveBandWidth)
-            World.SetAdd<SampleSets.WaveZ>(particle.EntityIndex);
+            World.Set<SampleSets.WaveZ>().Defer.Add(particle.EntityIndex);
         else
-            World.SetRemove<SampleSets.WaveZ>(particle.EntityIndex);
+            World.Set<SampleSets.WaveZ>().Defer.Remove(particle.EntityIndex);
     }
 }
 ```
@@ -115,7 +115,7 @@ The drawback is that sets are sparse and may have slower iteration than partitio
 ## Concepts introduced
 
 - **`IEntitySet`** — defines a sparse entity subset. See [Sets](../entity-management/sets.md).
-- **`SetAdd` / `SetRemove`** — deferred membership changes. See [Structural Changes](../entity-management/structural-changes.md).
+- **`Set<T>().Defer.Add` / `Defer.Remove`** — deferred membership changes. See [Structural Changes](../entity-management/structural-changes.md).
 - **`[ForEachEntity(Set = typeof(...))]`** — iterate only set members. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 - **Overlapping membership** — entities can be in multiple sets simultaneously.
 - **Sets vs Partitions trade-off** — see [Partitions](06-partitions.md) for the mutually-exclusive alternative, and [Entity Subset Patterns](../recipes/entity-subset-patterns.md) for how to choose.

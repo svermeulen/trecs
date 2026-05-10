@@ -38,7 +38,7 @@ namespace Trecs.Tests
             var set = a.Set<FiltStructSet>();
 
             // Add entity 0 to set
-            set.Write.AddImmediate(new EntityIndex(0, group));
+            set.Write.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             var read = set.Read;
@@ -80,7 +80,7 @@ namespace Trecs.Tests
             var set = a.Set<FiltStructSet>();
 
             // Add entity 0 to set
-            set.Write.AddImmediate(new EntityIndex(0, group));
+            set.Write.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             // Remove entity 2 (not in set)
@@ -118,8 +118,8 @@ namespace Trecs.Tests
 
             // Add entities 0 and 2 to set
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, group));
-            write.AddImmediate(new EntityIndex(2, group));
+            write.Add(new EntityIndex(0, group));
+            write.Add(new EntityIndex(2, group));
             a.SubmitEntities();
 
             NAssert.AreEqual(2, set.Read.Count);
@@ -158,7 +158,7 @@ namespace Trecs.Tests
             var set = a.Set<FiltStructSet>();
 
             // Add entity 3 (last) to set
-            set.Write.AddImmediate(new EntityIndex(3, group));
+            set.Write.Add(new EntityIndex(3, group));
             a.SubmitEntities();
             NAssert.AreEqual(1, set.Read.Count);
 
@@ -203,8 +203,8 @@ namespace Trecs.Tests
 
             // Add entities 1, 3 to set
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(1, group));
-            write.AddImmediate(new EntityIndex(3, group));
+            write.Add(new EntityIndex(1, group));
+            write.Add(new EntityIndex(3, group));
             a.SubmitEntities();
             NAssert.AreEqual(2, set.Read.Count);
 
@@ -236,9 +236,9 @@ namespace Trecs.Tests
             var set = a.Set<FiltStructSet>();
 
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, group));
-            write.AddImmediate(new EntityIndex(1, group));
-            write.AddImmediate(new EntityIndex(2, group));
+            write.Add(new EntityIndex(0, group));
+            write.Add(new EntityIndex(1, group));
+            write.Add(new EntityIndex(2, group));
             a.SubmitEntities();
 
             // Remove all entities using tag-based removal
@@ -268,7 +268,7 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltStructSet>();
 
-            set.Write.AddImmediate(new EntityIndex(0, group));
+            set.Write.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             // Remove filtered entity
@@ -316,7 +316,7 @@ namespace Trecs.Tests
             // Add every other entity to set
             for (int i = 0; i < 10; i += 2)
             {
-                set.Write.AddImmediate(new EntityIndex(i, group));
+                set.Write.Add(new EntityIndex(i, group));
             }
             a.SubmitEntities();
 
@@ -350,7 +350,7 @@ namespace Trecs.Tests
             // Add entities 0-4 to set
             for (int i = 0; i < 5; i++)
             {
-                set.Write.AddImmediate(new EntityIndex(i, group));
+                set.Write.Add(new EntityIndex(i, group));
             }
             a.SubmitEntities();
 
@@ -393,7 +393,7 @@ namespace Trecs.Tests
             // Add every 3rd entity to set
             for (int i = 0; i < total; i += 3)
             {
-                set.Write.AddImmediate(new EntityIndex(i, group));
+                set.Write.Add(new EntityIndex(i, group));
             }
             a.SubmitEntities();
 
@@ -438,7 +438,7 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltStructSet>();
 
-            a.SetAdd<FiltStructSet>(new EntityIndex(0, group));
+            a.Set<FiltStructSet>().Defer.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             // Expected behavior: entity should be in set after one submit
@@ -451,7 +451,7 @@ namespace Trecs.Tests
         }
 
         // NativeSetAdd_RequiresExtraSubmit_Bug — removed: bug was fixed by using
-        // AddImmediate/RemoveImmediate in FlushNativeSetQueue
+        // Add/Remove in FlushNativeSetQueue
 
         [Test]
         public void NativeSetRemove_EntityRemovedFromSet()
@@ -468,11 +468,11 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltStructSet>();
 
-            set.Write.AddImmediate(new EntityIndex(0, group));
+            set.Write.Add(new EntityIndex(0, group));
             a.SubmitEntities();
             NAssert.AreEqual(1, set.Read.Count);
 
-            a.SetRemove<FiltStructSet>(new EntityIndex(0, group));
+            a.Set<FiltStructSet>().Defer.Remove(new EntityIndex(0, group));
             a.SubmitEntities();
 
             // Expected behavior: entity should be removed after one submit
@@ -485,7 +485,7 @@ namespace Trecs.Tests
         }
 
         // NativeSetRemove_RequiresExtraSubmit_Bug — removed: bug was fixed by using
-        // AddImmediate/RemoveImmediate in FlushNativeSetQueue
+        // Add/Remove in FlushNativeSetQueue
 
         #endregion
 
@@ -519,14 +519,14 @@ namespace Trecs.Tests
 
             // Put all 3 entities in set
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, group));
-            write.AddImmediate(new EntityIndex(1, group));
-            write.AddImmediate(new EntityIndex(2, group));
+            write.Add(new EntityIndex(0, group));
+            write.Add(new EntityIndex(1, group));
+            write.Add(new EntityIndex(2, group));
             a.SubmitEntities();
             NAssert.AreEqual(3, set.Read.Count);
 
             // Now: deferred remove entity 0 from set AND structural remove entity 0
-            set.Write.RemoveImmediate(new EntityIndex(0, group));
+            set.Write.Remove(new EntityIndex(0, group));
             a.RemoveEntity(refs[0]);
             a.SubmitEntities();
 
@@ -564,7 +564,7 @@ namespace Trecs.Tests
             var set = a.Set<FiltStructSet>();
 
             // Deferred add entity 1 to set, AND remove entity 0 structurally
-            set.Write.AddImmediate(new EntityIndex(1, group));
+            set.Write.Add(new EntityIndex(1, group));
             a.RemoveEntity(refs[0]);
             a.SubmitEntities();
 
@@ -606,7 +606,7 @@ namespace Trecs.Tests
             var set = a.Set<FiltStructSet>();
 
             // Deferred add entity 0 to set, AND remove entity 0 structurally
-            set.Write.AddImmediate(new EntityIndex(0, group));
+            set.Write.Add(new EntityIndex(0, group));
             a.RemoveEntity(refs[0]);
             a.SubmitEntities();
 
@@ -642,14 +642,14 @@ namespace Trecs.Tests
             var set = a.Set<FiltStructSet>();
 
             // Add entity to set first
-            set.Write.AddImmediate(new EntityIndex(0, group));
+            set.Write.Add(new EntityIndex(0, group));
             a.SubmitEntities();
             NAssert.IsTrue(set.Read.Exists(new EntityIndex(0, group)));
 
             // Remove then re-add in same frame
             var write = set.Write;
-            write.RemoveImmediate(new EntityIndex(0, group));
-            write.AddImmediate(new EntityIndex(0, group));
+            write.Remove(new EntityIndex(0, group));
+            write.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             NAssert.IsTrue(

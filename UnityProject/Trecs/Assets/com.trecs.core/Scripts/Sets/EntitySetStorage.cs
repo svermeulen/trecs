@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Trecs.Collections;
 using Unity.Collections;
@@ -10,9 +9,10 @@ namespace Trecs.Internal
     /// A collection of entity indices organized by group, representing a subset of entities
     /// that match some user-defined criteria.
     ///
-    /// Supports immediate mutations via <see cref="AddImmediate"/>/<see cref="RemoveImmediate"/>
-    /// (main thread only). Deferred mutations are handled externally via
-    /// <see cref="WorldAccessor.SetAdd{T}"/> / <see cref="NativeWorldAccessor.SetAdd{TSet}"/>.
+    /// Supports immediate structural mutations via <see cref="AddUnchecked"/>/<see cref="RemoveUnchecked"/>
+    /// (main thread only, used during submission). User-facing immediate mutations go through
+    /// <see cref="SetWrite{T}"/>; deferred mutations are handled externally via
+    /// <see cref="SetAccessor{T}.Defer"/> / <see cref="NativeWorldAccessor.SetAdd{TSet}"/>.
     ///
     /// Storage layout: <see cref="_entriesPerGroup"/> is a full-size array indexed
     /// directly by <see cref="GroupIndex.Index"/>. Slots for groups that don't
@@ -62,38 +62,21 @@ namespace Trecs.Internal
 
         public EntitySetIterator GetEnumerator() => new(this);
 
-        // ── Immediate operations (main thread only) ────────────────────
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddImmediate(EntityIndex entityIndex)
-        {
-            AssertValidGroup(entityIndex.GroupIndex);
-            _entriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveImmediate(EntityIndex entityIndex)
-        {
-            AssertValidGroup(entityIndex.GroupIndex);
-            _entriesPerGroup[entityIndex.GroupIndex.Index].Remove(entityIndex.Index);
-        }
-
         // ── Internal immediate operations (structural updates) ─────────
         //
-        // *Unchecked paths skip the AssertValidGroup check that the public
-        // immediate paths enforce. Both still assert that the group is non-null
-        // so callers can't silently drop ops on a stale or default EntityIndex —
-        // null-group entries in the deferred queues are caller bugs to surface.
+        // Both assert that the group is non-null so callers can't silently
+        // drop ops on a stale or default EntityIndex — null-group entries in
+        // the deferred queues are caller bugs to surface.
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void AddImmediateUnchecked(EntityIndex entityIndex)
+        internal void AddUnchecked(EntityIndex entityIndex)
         {
             Assert.That(!entityIndex.GroupIndex.IsNull);
             _entriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void RemoveImmediateUnchecked(EntityIndex entityIndex)
+        internal void RemoveUnchecked(EntityIndex entityIndex)
         {
             Assert.That(!entityIndex.GroupIndex.IsNull);
             var entry = _entriesPerGroup[entityIndex.GroupIndex.Index];
@@ -246,20 +229,6 @@ namespace Trecs.Internal
             _registeredGroups.Dispose();
             _jobAddQueue.Dispose();
             _jobRemoveQueue.Dispose();
-        }
-
-        // ── Validation ─────────────────────────────────────────────────
-
-        [Conditional("DEBUG")]
-        void AssertValidGroup(GroupIndex group)
-        {
-#if DEBUG
-            Assert.That(
-                !group.IsNull && _entriesPerGroup[group.Index].IsValid,
-                "GroupIndex {} does not belong to this set's template",
-                group
-            );
-#endif
         }
     }
 }

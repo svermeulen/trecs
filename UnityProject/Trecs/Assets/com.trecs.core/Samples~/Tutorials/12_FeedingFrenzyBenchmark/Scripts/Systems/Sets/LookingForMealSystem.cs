@@ -68,11 +68,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
 
                 meal.ApproachingFish = fish.EntityIndex.ToHandle(World);
 
-                World.SetRemove<FrenzySets.NotEating>(fish.EntityIndex);
-                World.SetAdd<FrenzySets.Eating>(fish.EntityIndex);
+                World.Set<FrenzySets.NotEating>().Defer.Remove(fish.EntityIndex);
+                World.Set<FrenzySets.Eating>().Defer.Add(fish.EntityIndex);
 
-                World.SetRemove<FrenzySets.NotEating>(meal.EntityIndex);
-                World.SetAdd<FrenzySets.Eating>(meal.EntityIndex);
+                World.Set<FrenzySets.NotEating>().Defer.Remove(meal.EntityIndex);
+                World.Set<FrenzySets.Eating>().Defer.Add(meal.EntityIndex);
             }
         }
 
@@ -146,11 +146,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                     rotations[fi].Value = quaternion.LookRotationSafe(dir, math.up());
                     velocities[fi].Value = dir * speeds[fi].Value;
 
-                    World.SetRemove<FrenzySets.NotEating>(fishEntityIndex);
-                    World.SetAdd<FrenzySets.Eating>(fishEntityIndex);
+                    World.Set<FrenzySets.NotEating>().Defer.Remove(fishEntityIndex);
+                    World.Set<FrenzySets.Eating>().Defer.Add(fishEntityIndex);
 
-                    World.SetRemove<FrenzySets.NotEating>(mealEntityIndex);
-                    World.SetAdd<FrenzySets.Eating>(mealEntityIndex);
+                    World.Set<FrenzySets.NotEating>().Defer.Remove(mealEntityIndex);
+                    World.Set<FrenzySets.Eating>().Defer.Add(mealEntityIndex);
                 }
             }
         }

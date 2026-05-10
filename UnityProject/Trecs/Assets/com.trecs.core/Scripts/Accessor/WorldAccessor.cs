@@ -654,12 +654,6 @@ namespace Trecs
             return _entitiesDb.CountEntitiesInGroup(group);
         }
 
-        public int CountEntitiesInSet(SetId setId)
-        {
-            SyncSetForRead(setId);
-            return _structuralOps.GetSet(setId).ComputeFinalCount();
-        }
-
         public int CountAllEntities()
         {
             int total = 0;
@@ -781,10 +775,15 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Returns a lazy-sync accessor for any entity set registered on the
-        /// WorldBuilder via AddSet&lt;T&gt;(). No sync occurs at creation time —
-        /// each operation triggers the appropriate sync (read or write) on demand.
-        /// Safe to cache as a member field.
+        /// Returns a lazy-sync gateway for an entity set registered on the
+        /// WorldBuilder via AddSet&lt;T&gt;(). The returned <see cref="SetAccessor{T}"/>
+        /// selects the timing mode via its properties:
+        /// <list type="bullet">
+        ///   <item><description><c>.Defer</c> — queue Add / Remove / Clear for next submission (no sync).</description></item>
+        ///   <item><description><c>.Read</c> — synchronous read view (syncs writers once at acquisition).</description></item>
+        ///   <item><description><c>.Write</c> — synchronous read+write view (syncs all jobs once at acquisition).</description></item>
+        /// </list>
+        /// Cache the inner view (<c>.Read</c> / <c>.Write</c>) for repeated access in tight loops.
         /// </summary>
         public SetAccessor<T> Set<T>()
             where T : struct, IEntitySet
@@ -792,56 +791,21 @@ namespace Trecs
             return new SetAccessor<T>(this);
         }
 
-        // ── Deferred set operations (no sync needed) ──────────────────
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetAdd<T>(EntityIndex entityIndex)
-            where T : struct, IEntitySet
-        {
-            AssertCanMakeStructuralChanges();
-            ref var queues = ref _structuralOps.GetDeferredQueues(EntitySet<T>.Value.Id);
-            queues.AddQueue.GetBag(0).Enqueue(entityIndex);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetAdd<T>(EntityHandle entityHandle)
-            where T : struct, IEntitySet
-        {
-            SetAdd<T>(entityHandle.ToIndex(this));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetRemove<T>(EntityIndex entityIndex)
-            where T : struct, IEntitySet
-        {
-            AssertCanMakeStructuralChanges();
-            ref var queues = ref _structuralOps.GetDeferredQueues(EntitySet<T>.Value.Id);
-            queues.RemoveQueue.GetBag(0).Enqueue(entityIndex);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetRemove<T>(EntityHandle entityHandle)
-            where T : struct, IEntitySet
-        {
-            SetRemove<T>(entityHandle.ToIndex(this));
-        }
-
         /// <summary>
-        /// Defer a clear of an entity set until the next submission.
-        /// At submission time, the clear supersedes any pending
-        /// <see cref="SetAdd{T}"/> / <see cref="SetRemove{T}"/> for the same
-        /// set queued during this frame, regardless of call order — analogous
-        /// to how a queued remove supersedes a queued move on an entity. Use
-        /// <see cref="SetWrite{T}.ClearImmediate"/> if you need the clear to
-        /// take effect within the current frame.
+        /// Returns an untyped gateway for a set referenced by runtime <see cref="SetId"/>.
+        /// Use the typed <see cref="Set{T}"/> overload when the set type is known at compile time —
+        /// this overload is intended for tooling and editor code that handles sets generically.
         /// </summary>
+        public SetByIdAccessor Set(SetId setId)
+        {
+            return new SetByIdAccessor(this, setId);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetClear<T>()
-            where T : struct, IEntitySet
+        internal ref NativeSetDeferredQueues GetSetDeferredQueues(SetId setId)
         {
             AssertCanMakeStructuralChanges();
-            ref var queues = ref _structuralOps.GetDeferredQueues(EntitySet<T>.Value.Id);
-            queues.RequestClear();
+            return ref _structuralOps.GetDeferredQueues(setId);
         }
 
         internal void ClearSet(SetId setId)

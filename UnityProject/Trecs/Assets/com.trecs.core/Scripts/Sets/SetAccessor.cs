@@ -1,15 +1,17 @@
 using System.Runtime.CompilerServices;
+using Trecs.Internal;
 
 namespace Trecs
 {
     /// <summary>
-    /// Lightweight set handle returned by <see cref="WorldAccessor.Set{T}"/>.
-    ///
-    /// Use <see cref="Read"/> or <see cref="Write"/> to get a synced view for
-    /// batch operations in tight loops (sync + lookup happen once, not per-call).
-    ///
-    /// For deferred mutations use <see cref="WorldAccessor.SetAdd{T}"/>
-    /// and <see cref="WorldAccessor.SetRemove{T}"/> directly.
+    /// Lightweight set gateway returned by <see cref="WorldAccessor.Set{T}"/>.
+    /// Selects the set's timing mode:
+    /// <list type="bullet">
+    ///   <item><description><see cref="Defer"/> — queue Add / Remove / Clear for next submission. No sync, no per-call cost beyond an enqueue.</description></item>
+    ///   <item><description><see cref="Read"/> — synchronous read view. Syncs outstanding writer jobs once at acquisition.</description></item>
+    ///   <item><description><see cref="Write"/> — synchronous read+write view. Syncs outstanding readers and writers once at acquisition.</description></item>
+    /// </list>
+    /// Cache the returned view for repeated access in tight loops.
     /// </summary>
     public readonly ref struct SetAccessor<T>
         where T : struct, IEntitySet
@@ -24,7 +26,18 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Returns a read-only view after syncing outstanding writer jobs.
+        /// Returns a deferred-mutation view. Add / Remove / Clear are queued and
+        /// applied at the next submission. A queued Clear supersedes any queued
+        /// Add / Remove for the same set regardless of call order.
+        /// </summary>
+        public SetDefer<T> Defer
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return new SetDefer<T>(_world, _world.GetSetDeferredQueues(_setId)); }
+        }
+
+        /// <summary>
+        /// Returns a synchronous read-only view after syncing outstanding writer jobs.
         /// Cache the result for repeated access in a tight loop.
         /// </summary>
         public SetRead<T> Read
@@ -38,7 +51,7 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Returns a read+write view after syncing all outstanding jobs.
+        /// Returns a synchronous read+write view after syncing all outstanding jobs.
         /// Cache the result for repeated access in a tight loop.
         /// </summary>
         public SetWrite<T> Write

@@ -328,8 +328,8 @@ internal static class TrecsStubs
             // ----- Aspect / ForEach / RunOnce surface -----
             // Aspects emit substantial machinery that touches a wide slice of the runtime:
             // component buffer indexing, the full QueryBuilder DSL, dense + sparse slice
-            // iteration, NativeFactory for cross-entity Burst lookup, and MoveTo / SetAdd /
-            // SetRemove surface routed through both WorldAccessor and NativeWorldAccessor.
+            // iteration, NativeFactory for cross-entity Burst lookup, and MoveTo / Set
+            // surface routed through both WorldAccessor and NativeWorldAccessor.
             // The stubs below are body-empty / default-returning; they exist to satisfy
             // C# name and shape resolution, not to actually run.
 
@@ -417,9 +417,20 @@ internal static class TrecsStubs
             public readonly struct NativeSetWrite<T> where T : struct, IEntitySet { }
 
             // Main-thread set accessors. ParameterClassifier recognizes these in
-            // [WrapAsJob] methods and emits TRECS098. SetAccessor is iterated; SetRead
-            // is read-only. Real types live in com.trecs.core/Scripts/Sets/.
-            public readonly struct SetAccessor<T> where T : struct, IEntitySet { }
+            // [WrapAsJob] methods and emits TRECS098. SetAccessor is the gateway
+            // exposing .Defer / .Read / .Write. Real types live in com.trecs.core/Scripts/Sets/.
+            public readonly struct SetAccessor<T> where T : struct, IEntitySet
+            {
+                public SetDefer<T> Defer => default;
+                public SetRead<T> Read => default;
+                public SetWrite<T> Write => default;
+            }
+            public readonly struct SetDefer<T> where T : struct, IEntitySet
+            {
+                public void Add(EntityIndex entityIndex) { }
+                public void Remove(EntityIndex entityIndex) { }
+                public void Clear() { }
+            }
             public readonly struct SetRead<T> where T : struct, IEntitySet { }
             public readonly struct SetWrite<T> where T : struct, IEntitySet { }
 
@@ -547,8 +558,9 @@ internal static class TrecsStubs
                 public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
                 public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
                 public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
-                public void SetAdd<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
-                public void SetRemove<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
+
+                // Set gateway: Set<T>() returns SetAccessor<T> with .Defer / .Read / .Write properties.
+                public SetAccessor<TSet> Set<TSet>() where TSet : struct, IEntitySet => default;
 
                 // Job-scheduling surface (real impls live in com.trecs.core/Scripts/Jobs).
                 public Trecs.Internal.JobScheduler GetJobSchedulerForJob() => default!;

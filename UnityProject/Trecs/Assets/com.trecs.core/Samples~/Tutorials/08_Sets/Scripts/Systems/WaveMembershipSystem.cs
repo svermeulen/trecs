@@ -37,14 +37,14 @@ namespace Trecs.Samples.Sets
                 float distZ = math.abs(particle.Position.z - waveCenterZ);
 
                 if (distX < _settings.WaveBandWidth)
-                    World.SetAdd<SampleSets.WaveX>(particle.EntityIndex);
+                    World.Set<SampleSets.WaveX>().Defer.Add(particle.EntityIndex);
                 else
-                    World.SetRemove<SampleSets.WaveX>(particle.EntityIndex);
+                    World.Set<SampleSets.WaveX>().Defer.Remove(particle.EntityIndex);
 
                 if (distZ < _settings.WaveBandWidth)
-                    World.SetAdd<SampleSets.WaveZ>(particle.EntityIndex);
+                    World.Set<SampleSets.WaveZ>().Defer.Add(particle.EntityIndex);
                 else
-                    World.SetRemove<SampleSets.WaveZ>(particle.EntityIndex);
+                    World.Set<SampleSets.WaveZ>().Defer.Remove(particle.EntityIndex);
             }
         }
 

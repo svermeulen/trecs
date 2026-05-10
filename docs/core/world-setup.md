@@ -130,7 +130,7 @@ The `AccessorRole` controls which operations the accessor is allowed to perform 
 - **[Entity operations](../entity-management/structural-changes.md)** — `AddEntity`, `RemoveEntity`, `MoveTo`
 - **[Component access](components.md)** — `Component<T>`, `GlobalComponent<T>`, `ComponentBuffer<T>`
 - **[Queries](../data-access/queries-and-iteration.md)** — `Query()`, `CountEntitiesWithTags<T>()`
-- **[Sets](../entity-management/sets.md)** — `SetAdd`, `SetRemove`, `SetClear`
+- **[Sets](../entity-management/sets.md)** — `Set<T>()` gateway with `Defer` / `Read` / `Write` views
 - **[Events](../entity-management/entity-events.md)** — `Events` builder for entity lifecycle subscriptions
 - **[Time](../advanced/time-and-rng.md)** — `DeltaTime`, `ElapsedTime`, `Frame` (phase-aware)
 - **[RNG](../advanced/time-and-rng.md)** — `Rng`, `FixedRng`, `VariableRng`

@@ -38,7 +38,7 @@ namespace Trecs.Tests
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltOpTestSet>();
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
             a.SubmitEntities(); // flush deferred ops
 
             NAssert.IsTrue(set.Read.Exists(new EntityIndex(0, group)));
@@ -60,7 +60,7 @@ namespace Trecs.Tests
             var ei = new EntityIndex(0, group);
 
             var set = a.Set<FiltOpTestSet>();
-            a.SetAdd<FiltOpTestSet>(ei);
+            a.Set<FiltOpTestSet>().Defer.Add(ei);
             a.SubmitEntities();
 
             NAssert.IsTrue(set.Read.Exists(ei));
@@ -104,9 +104,9 @@ namespace Trecs.Tests
             var set = a.Set<FiltOpTestSet>();
 
             // Add entities 0, 2, 4 to set
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(2, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(4, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(2, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(4, group));
             a.SubmitEntities();
 
             var read = set.Read;
@@ -136,11 +136,11 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltOpTestSet>();
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
             a.SubmitEntities();
             NAssert.IsTrue(set.Read.Exists(new EntityIndex(0, group)));
 
-            a.SetRemove<FiltOpTestSet>(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Remove(new EntityIndex(0, group));
             a.SubmitEntities();
             NAssert.IsFalse(set.Read.Exists(new EntityIndex(0, group)));
         }
@@ -161,10 +161,10 @@ namespace Trecs.Tests
             var ei = new EntityIndex(0, group);
 
             var set = a.Set<FiltOpTestSet>();
-            a.SetAdd<FiltOpTestSet>(ei);
+            a.Set<FiltOpTestSet>().Defer.Add(ei);
             a.SubmitEntities();
 
-            a.SetRemove<FiltOpTestSet>(ei);
+            a.Set<FiltOpTestSet>().Defer.Remove(ei);
             a.SubmitEntities();
 
             NAssert.IsFalse(set.Read.Exists(ei));
@@ -185,12 +185,12 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltOpTestSet>();
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             // Remove and re-add in the same frame
-            a.SetRemove<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Remove(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             NAssert.IsTrue(set.Read.Exists(new EntityIndex(0, group)));
@@ -218,12 +218,12 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltOpTestSet>();
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(2, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(2, group));
             a.SubmitEntities();
 
-            set.Write.ClearImmediate();
+            set.Write.Clear();
 
             var read = set.Read;
             NAssert.IsFalse(read.Exists(new EntityIndex(0, group)));
@@ -249,12 +249,12 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltOpTestSet>();
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(1, group));
             a.SubmitEntities();
             NAssert.AreEqual(2, set.Read.Count);
 
-            a.SetClear<FiltOpTestSet>();
+            a.Set<FiltOpTestSet>().Defer.Clear();
             // Still populated until submission lands.
             NAssert.AreEqual(2, set.Read.Count);
 
@@ -276,9 +276,9 @@ namespace Trecs.Tests
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
-            a.SetClear<FiltOpTestSet>();
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Clear();
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
@@ -288,7 +288,7 @@ namespace Trecs.Tests
         public void Filter_DeferredClear_SupersedesPendingAddRegardlessOfOrder()
         {
             // Adds queued *after* Clear are also dropped — Clear wins by rule,
-            // not by call order. Use ClearImmediate if you want sequential
+            // not by call order. Use Clear if you want sequential
             // semantics within a single system.
             using var env = CreateEnv();
             var a = env.Accessor;
@@ -299,9 +299,9 @@ namespace Trecs.Tests
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
-            a.SetClear<FiltOpTestSet>();
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Clear();
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(1, group));
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
@@ -325,14 +325,14 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
             // Pre-populate
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(2, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(2, group));
             a.SubmitEntities();
             NAssert.AreEqual(3, a.Set<FiltOpTestSet>().Read.Count);
 
-            a.SetRemove<FiltOpTestSet>(new EntityIndex(1, group));
-            a.SetClear<FiltOpTestSet>();
+            a.Set<FiltOpTestSet>().Defer.Remove(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Clear();
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
@@ -353,12 +353,12 @@ namespace Trecs.Tests
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet2>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet2>(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet2>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet2>().Defer.Add(new EntityIndex(1, group));
             a.SubmitEntities();
 
-            a.SetClear<FiltOpTestSet>();
+            a.Set<FiltOpTestSet>().Defer.Clear();
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.Set<FiltOpTestSet>().Read.Count);
@@ -378,10 +378,10 @@ namespace Trecs.Tests
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
-            a.SetClear<FiltOpTestSet>();
+            a.Set<FiltOpTestSet>().Defer.Clear();
             a.SubmitEntities();
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             NAssert.AreEqual(1, a.Set<FiltOpTestSet>().Read.Count);
@@ -401,8 +401,8 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(1, group));
             a.SubmitEntities();
             NAssert.AreEqual(2, a.Set<FiltOpTestSet>().Read.Count);
 
@@ -435,9 +435,9 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltOpTestSet>();
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(2, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(4, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(2, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(4, group));
             a.SubmitEntities();
 
             NAssert.AreEqual(3, set.Read.Count);
@@ -478,14 +478,14 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltOpTestSet>();
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(2, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(2, group));
             a.SubmitEntities();
 
             NAssert.AreEqual(3, set.Read.Count);
 
-            a.SetRemove<FiltOpTestSet>(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Remove(new EntityIndex(1, group));
             a.SubmitEntities();
 
             NAssert.AreEqual(2, set.Read.Count);
@@ -515,10 +515,10 @@ namespace Trecs.Tests
             var set2 = a.Set<FiltOpTestSet2>();
 
             // Entity 0 in filter1 only, entity 1 in filter2 only, entity 2 in both
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(2, group));
-            a.SetAdd<FiltOpTestSet2>(new EntityIndex(1, group));
-            a.SetAdd<FiltOpTestSet2>(new EntityIndex(2, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(2, group));
+            a.Set<FiltOpTestSet2>().Defer.Add(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet2>().Defer.Add(new EntityIndex(2, group));
             a.SubmitEntities();
 
             var read1 = set1.Read;
@@ -560,8 +560,8 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltOpTestSet>();
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(1, group));
             a.SubmitEntities();
 
             NAssert.AreEqual(2, set.Read.Count);
@@ -600,8 +600,8 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltOpTestSet>();
 
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             var read = set.Read;
@@ -631,8 +631,8 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
             // Add entities 1 and 3 to set (values 10 and 30)
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(1, group));
-            a.SetAdd<FiltOpTestSet>(new EntityIndex(3, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(1, group));
+            a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(3, group));
             a.SubmitEntities();
 
             var values = new List<int>();
@@ -670,7 +670,7 @@ namespace Trecs.Tests
             // Add all to set
             for (int i = 0; i < 4; i++)
             {
-                a.SetAdd<FiltOpTestSet>(new EntityIndex(i, group));
+                a.Set<FiltOpTestSet>().Defer.Add(new EntityIndex(i, group));
             }
             a.SubmitEntities();
 

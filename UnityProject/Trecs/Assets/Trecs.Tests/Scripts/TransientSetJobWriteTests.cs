@@ -106,7 +106,7 @@ namespace Trecs.Tests
             NAssert.Greater(set.Read.Count, 0, "Set should have entries after job flush");
 
             // Manual clear
-            set.Write.ClearImmediate();
+            set.Write.Clear();
             NAssert.AreEqual(0, set.Read.Count, "Set should be empty after manual clear");
         }
 
@@ -130,9 +130,9 @@ namespace Trecs.Tests
             // Add entities 1, 3, 5 to the transient set directly
             var set = a.Set<TFJTestTransientSet>();
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(1, group));
-            write.AddImmediate(new EntityIndex(3, group));
-            write.AddImmediate(new EntityIndex(5, group));
+            write.Add(new EntityIndex(1, group));
+            write.Add(new EntityIndex(3, group));
+            write.Add(new EntityIndex(5, group));
 
             // Query using InSet<TFJTestTransientSet> via QueryBuilder
             var result = new List<int>();
@@ -168,9 +168,9 @@ namespace Trecs.Tests
             // Add entities 0, 2, 4 to the transient set
             var set = a.Set<TFJTestTransientSet>();
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, group));
-            write.AddImmediate(new EntityIndex(2, group));
-            write.AddImmediate(new EntityIndex(4, group));
+            write.Add(new EntityIndex(0, group));
+            write.Add(new EntityIndex(2, group));
+            write.Add(new EntityIndex(4, group));
 
             // Query using GroupSlices path
             int count = 0;
@@ -207,8 +207,8 @@ namespace Trecs.Tests
             // Add to transient set
             var set = a.Set<TFJTestTransientSet>();
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, group));
-            write.AddImmediate(new EntityIndex(2, group));
+            write.Add(new EntityIndex(0, group));
+            write.Add(new EntityIndex(2, group));
 
             // Verify via SetAccessor
             var read = set.Read;
@@ -236,8 +236,8 @@ namespace Trecs.Tests
 
             var set = a.Set<TFJTestTransientSet>();
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, group));
-            write.AddImmediate(new EntityIndex(3, group));
+            write.Add(new EntityIndex(0, group));
+            write.Add(new EntityIndex(3, group));
 
             var read = set.Read;
             NAssert.AreEqual(2, read.Count);
@@ -265,13 +265,13 @@ namespace Trecs.Tests
 
             var set = a.Set<TFJTestTransientSet>();
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, group));
-            write.AddImmediate(new EntityIndex(2, group));
+            write.Add(new EntityIndex(0, group));
+            write.Add(new EntityIndex(2, group));
 
             NAssert.AreEqual(2, set.Read.Count);
 
             // Manual clear
-            set.Write.ClearImmediate();
+            set.Write.Clear();
 
             var setAfter = a.Set<TFJTestTransientSet>();
             NAssert.AreEqual(0, setAfter.Read.Count, "Set should be empty after manual clear");
@@ -293,8 +293,8 @@ namespace Trecs.Tests
 
             var set = a.Set<TFJTestTransientSet>();
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, group));
-            write.AddImmediate(new EntityIndex(0, group));
+            write.Add(new EntityIndex(0, group));
+            write.Add(new EntityIndex(0, group));
 
             NAssert.AreEqual(
                 1,

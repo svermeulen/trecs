@@ -1600,7 +1600,7 @@ namespace Trecs
                             }
                             break;
                         case RowKind.SetItem:
-                            var newCount = accessor.CountEntitiesInSet(data.EntitySet.Id);
+                            var newCount = accessor.Set(data.EntitySet.Id).Read.Count;
                             if (newCount != data.Count)
                             {
                                 data.Count = newCount;
@@ -2478,7 +2478,7 @@ namespace Trecs
                 {
                     try
                     {
-                        count = _selectedAccessor.CountEntitiesInSet(sref.LiveSet.Id);
+                        count = _selectedAccessor.Set(sref.LiveSet.Id).Read.Count;
                         showCount = true;
                     }
                     catch

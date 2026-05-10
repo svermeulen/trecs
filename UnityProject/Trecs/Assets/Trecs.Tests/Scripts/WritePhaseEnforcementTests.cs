@@ -230,7 +230,7 @@ namespace Trecs.Tests
         {
             foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
             {
-                World.SetAdd<WritePhaseTestSet>(idx);
+                World.Set<WritePhaseTestSet>().Defer.Add(idx);
             }
         }
     }
@@ -242,7 +242,7 @@ namespace Trecs.Tests
         {
             foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
             {
-                World.SetRemove<WritePhaseTestSet>(idx);
+                World.Set<WritePhaseTestSet>().Defer.Remove(idx);
             }
         }
     }
@@ -253,7 +253,7 @@ namespace Trecs.Tests
         public void Execute()
         {
             // Forces SyncSetForWrite via the immediate SetAccessor.Write path
-            // (a different entry point than SetAdd / SetRemove).
+            // (a different entry point than Defer.Add / Defer.Remove).
             var _ = World.Set<WritePhaseTestSet>().Write;
         }
     }
@@ -480,7 +480,7 @@ namespace Trecs.Tests
         {
             foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
             {
-                World.SetAdd<WritePhaseTestSet>(idx);
+                World.Set<WritePhaseTestSet>().Defer.Add(idx);
                 return;
             }
         }

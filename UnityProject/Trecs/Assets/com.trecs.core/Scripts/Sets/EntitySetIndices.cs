@@ -19,8 +19,8 @@ namespace Trecs
         readonly int _count;
 
         // Captured reference to the source dict's live count, used in DEBUG to
-        // detect AddImmediate / RemoveImmediate / Clear of the same group while
-        // iterating. The dict struct shares native memory with the source, so
+        // detect Add / Remove / Clear of the same group while iterating. The
+        // dict struct shares native memory with the source, so
         // reading Count off this copy reflects mutations on the original.
         [NativeDisableContainerSafetyRestriction]
         readonly NativeDenseDictionary<int, int> _sourceDict;
@@ -63,9 +63,9 @@ namespace Trecs
         {
             Assert.That(
                 _sourceDict.Count == _count,
-                "Set entry mutated during iteration. AddImmediate / RemoveImmediate / "
+                "Set entry mutated during iteration. Add / Remove / "
                     + "Clear on the same set + same group is not allowed while iterating that "
-                    + "group. Use deferred SetAdd / SetRemove instead, or stage the mutations "
+                    + "group. Use the deferred Set&lt;T&gt;().Defer path instead, or stage the mutations "
                     + "in a separate buffer and apply them after the iteration completes."
             );
         }
@@ -114,9 +114,9 @@ namespace Trecs
             {
                 Assert.That(
                     _sourceDict.Count == _count,
-                    "Set entry mutated during iteration. AddImmediate / RemoveImmediate / "
+                    "Set entry mutated during iteration. Add / Remove / "
                         + "Clear on the same set + same group is not allowed while iterating "
-                        + "that group. Use deferred SetAdd / SetRemove instead, or stage the "
+                        + "that group. Use the deferred Set&lt;T&gt;().Defer path instead, or stage the "
                         + "mutations in a separate buffer and apply them after the iteration "
                         + "completes."
                 );

@@ -25,27 +25,36 @@ new WorldBuilder()
 
 ## Adding, removing, and clearing
 
+All set mutations go through the gateway `World.Set<T>()`, which exposes three timing modes via its properties:
+
+| Property | Timing | When applied |
+|---|---|---|
+| `.Defer` | Submission-deferred | Next call to `SubmitEntities()` |
+| `.Write` | Synchronous | Immediately (main thread, syncs outstanding jobs) |
+| `.Read`  | Synchronous read | Immediately (main thread, syncs outstanding writers) |
+
 ### Deferred (default)
 
 Queued during system execution; applied at the next submission. Safe during iteration:
 
 ```csharp
-World.SetAdd<HighlightedParticle>(particle.EntityIndex);
-World.SetRemove<HighlightedParticle>(particle.EntityIndex);
-World.SetClear<HighlightedParticle>();
+World.Set<HighlightedParticle>().Defer.Add(particle.EntityIndex);
+World.Set<HighlightedParticle>().Defer.Remove(particle.EntityIndex);
+World.Set<HighlightedParticle>().Defer.Clear();
 ```
 
-A queued `SetClear<T>` **supersedes** any `SetAdd<T>` / `SetRemove<T>` queued for the same set in the same submission, regardless of call order.  If you want sequential semantics within a single frame ("clear, then add these"), use the immediate APIs below.
+A queued `Defer.Clear()` **supersedes** any `Defer.Add` / `Defer.Remove` queued for the same set in the same submission, regardless of call order.  If you want sequential semantics within a single frame ("clear, then add these"), use the immediate APIs below.
 
 ### Immediate
 
-`AddImmediate` / `RemoveImmediate` / `ClearImmediate` take effect right away. `AddImmediate` and `RemoveImmediate` are thread-safe — usable from the main thread or a job. `ClearImmediate` is main-thread only.
+`Set<T>().Write` returns a synced view; its `Add` / `Remove` / `Clear` take effect right away. The sync runs once at acquisition, so cache the view for tight loops.
 
 ```csharp
 // Main thread
-World.Set<HighlightedParticle>().Write.AddImmediate(entityIndex);
-World.Set<HighlightedParticle>().Write.RemoveImmediate(entityIndex);
-World.Set<HighlightedParticle>().Write.ClearImmediate();
+var highlighted = World.Set<HighlightedParticle>().Write;
+highlighted.Add(entityIndex);
+highlighted.Remove(entityIndex);
+highlighted.Clear();
 
 // In a Burst job, via a NativeSetWrite captured as a job field
 highlighted.AddImmediate(entityIndex);
@@ -53,12 +62,12 @@ highlighted.RemoveImmediate(entityIndex);
 ```
 
 !!! warning "Don't mutate a set while iterating it"
-    `AddImmediate`, `RemoveImmediate`, and `ClearImmediate` modify the set's storage in place. Calling them on the same set + same group you're currently iterating corrupts iteration — entries get skipped, revisited, or (when an `Add` grows the underlying buffer) read from freed memory.
+    Immediate `Add`, `Remove`, and `Clear` modify the set's storage in place. Calling them on the same set + same group you're currently iterating corrupts iteration — entries get skipped, revisited, or (when an `Add` grows the underlying buffer) read from freed memory.
 
     | Op during iteration of set `S`, group `G` | Same set + same group | Same set, different group | Different set |
     |---|---|---|---|
-    | `AddImmediate` / `RemoveImmediate` / `ClearImmediate` | **Unsafe** | Safe | Safe |
-    | Deferred `SetAdd` / `SetRemove` / `SetClear` | Safe (applied at next submission) | Safe | Safe |
+    | Immediate `Add` / `Remove` / `Clear` (`Set<T>().Write`) | **Unsafe** | Safe | Safe |
+    | Deferred `Add` / `Remove` / `Clear` (`Set<T>().Defer`) | Safe (applied at next submission) | Safe | Safe |
 
     DEBUG builds throw at the point of misuse. Release builds corrupt silently.
 
@@ -95,12 +104,12 @@ public partial class CullingSystem : ISystem
         // Cache the writer once — Set<T>().Write does a sync up front.
         var visible = World.Set<VisibleThisFrame>().Write;
 
-        visible.ClearImmediate();
+        visible.Clear();
 
         foreach (var r in Renderable.Query(World).WithTags<GameTags.Renderable>())
         {
             if (Frustum.Intersects(r.Bounds))
-                visible.AddImmediate(r.EntityIndex);
+                visible.Add(r.EntityIndex);
         }
     }
 
@@ -119,7 +128,7 @@ Notes:
 
 - Sets are **not auto-cleared** between frames. Clear them yourself in the producer system if that's the contract you want.
 - Cache the `SetWrite<T>` returned by `Set<T>().Write` outside the loop. Each `.Write` access syncs outstanding job writes; caching syncs once and then writes hit the buffer directly.
-- From a Burst job, capture a `NativeSetWrite<T>` as a field for thread-safe `AddImmediate` / `RemoveImmediate`. Clearing from inside a job isn't supported — call `World.SetClear<T>()` (deferred) before the job dispatches, or `ClearImmediate` on the main thread.
+- From a Burst job, capture a `NativeSetWrite<T>` as a field for thread-safe `AddImmediate` / `RemoveImmediate`. Clearing from inside a job isn't supported — call `World.Set<T>().Defer.Clear()` (deferred) before the job dispatches, or `Set<T>().Write.Clear()` on the main thread.
 
 ## Sets vs tags
 

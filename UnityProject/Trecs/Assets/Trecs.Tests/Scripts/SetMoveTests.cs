@@ -57,7 +57,7 @@ namespace Trecs.Tests
             var groupA = a.WorldInfo.GetSingleGroupWithTags(FMPartitionASet);
             var set = a.Set<FMSet>();
 
-            set.Write.AddImmediate(new EntityIndex(0, groupA));
+            set.Write.Add(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             NAssert.AreEqual(1, set.Read.Count);
@@ -90,7 +90,7 @@ namespace Trecs.Tests
             var groupA = a.WorldInfo.GetSingleGroupWithTags(FMPartitionASet);
             var set = a.Set<FMSet>();
 
-            set.Write.AddImmediate(new EntityIndex(0, groupA));
+            set.Write.Add(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             // Move to PartitionB
@@ -131,7 +131,7 @@ namespace Trecs.Tests
             var groupA = a.WorldInfo.GetSingleGroupWithTags(FMPartitionASet);
             var set = a.Set<FMSet>();
 
-            set.Write.AddImmediate(new EntityIndex(0, groupA));
+            set.Write.Add(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             // Move entity 1 (NOT in set) to PartitionB
@@ -165,9 +165,9 @@ namespace Trecs.Tests
 
             // Add entities 0, 2, 4 to set
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, groupA));
-            write.AddImmediate(new EntityIndex(2, groupA));
-            write.AddImmediate(new EntityIndex(4, groupA));
+            write.Add(new EntityIndex(0, groupA));
+            write.Add(new EntityIndex(2, groupA));
+            write.Add(new EntityIndex(4, groupA));
             a.SubmitEntities();
             NAssert.AreEqual(3, set.Read.Count);
 
@@ -219,9 +219,9 @@ namespace Trecs.Tests
 
             // Add all 3 to set
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, groupA));
-            write.AddImmediate(new EntityIndex(1, groupA));
-            write.AddImmediate(new EntityIndex(2, groupA));
+            write.Add(new EntityIndex(0, groupA));
+            write.Add(new EntityIndex(1, groupA));
+            write.Add(new EntityIndex(2, groupA));
             a.SubmitEntities();
             NAssert.AreEqual(3, set.Read.Count);
 
@@ -259,8 +259,8 @@ namespace Trecs.Tests
 
             // Only entity 0 and 2 in set
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, groupA));
-            write.AddImmediate(new EntityIndex(2, groupA));
+            write.Add(new EntityIndex(0, groupA));
+            write.Add(new EntityIndex(2, groupA));
             a.SubmitEntities();
 
             // Remove entity 0 (in set), move entity 1 (NOT in set) to PartitionB
@@ -294,7 +294,7 @@ namespace Trecs.Tests
             var groupA = a.WorldInfo.GetSingleGroupWithTags(FMPartitionASet);
             var set = a.Set<FMSet>();
 
-            set.Write.AddImmediate(new EntityIndex(0, groupA));
+            set.Write.Add(new EntityIndex(0, groupA));
             a.SubmitEntities();
             NAssert.AreEqual(1, set.Read.Count);
 

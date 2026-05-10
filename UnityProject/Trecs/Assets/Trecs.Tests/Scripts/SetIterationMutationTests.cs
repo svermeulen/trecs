@@ -47,20 +47,20 @@ namespace Trecs.Tests
         // ── Safe boundaries: these scenarios must continue to work ─────────────
 
         [Test]
-        public void Iterate_AddImmediateToDifferentSet_VisitsAllOriginalEntries()
+        public void Iterate_AddToDifferentSet_VisitsAllOriginalEntries()
         {
             using var env = CreateSingleGroupEnv();
             var a = env.Accessor;
             var group = SpawnA(a, 4);
 
             for (int i = 0; i < 4; i++)
-                a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(i, group));
+                a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
 
             var visited = new List<int>();
             foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
             {
                 visited.Add(ei.Index);
-                a.Set<ItMutSetB>().Write.AddImmediate(new EntityIndex(ei.Index, group));
+                a.Set<ItMutSetB>().Write.Add(new EntityIndex(ei.Index, group));
             }
 
             visited.Sort();
@@ -69,7 +69,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Iterate_RemoveImmediateFromDifferentSet_VisitsAllOriginalEntries()
+        public void Iterate_RemoveFromDifferentSet_VisitsAllOriginalEntries()
         {
             using var env = CreateSingleGroupEnv();
             var a = env.Accessor;
@@ -77,15 +77,15 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 4; i++)
             {
-                a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(i, group));
-                a.Set<ItMutSetB>().Write.AddImmediate(new EntityIndex(i, group));
+                a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
+                a.Set<ItMutSetB>().Write.Add(new EntityIndex(i, group));
             }
 
             var visited = new List<int>();
             foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
             {
                 visited.Add(ei.Index);
-                a.Set<ItMutSetB>().Write.RemoveImmediate(new EntityIndex(ei.Index, group));
+                a.Set<ItMutSetB>().Write.Remove(new EntityIndex(ei.Index, group));
             }
 
             visited.Sort();
@@ -102,8 +102,8 @@ namespace Trecs.Tests
 
             for (int i = 0; i < 4; i++)
             {
-                a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(i, group));
-                a.Set<ItMutSetB>().Write.AddImmediate(new EntityIndex(i, group));
+                a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
+                a.Set<ItMutSetB>().Write.Add(new EntityIndex(i, group));
             }
 
             var visited = new List<int>();
@@ -113,7 +113,7 @@ namespace Trecs.Tests
                 visited.Add(ei.Index);
                 if (!cleared)
                 {
-                    a.Set<ItMutSetB>().Write.ClearImmediate();
+                    a.Set<ItMutSetB>().Write.Clear();
                     cleared = true;
                 }
             }
@@ -124,7 +124,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Iterate_AddImmediateToSameSetDifferentGroup_VisitsAllOriginalEntries()
+        public void Iterate_AddToSameSetDifferentGroup_VisitsAllOriginalEntries()
         {
             using var env = CreateMultiGroupEnv();
             var a = env.Accessor;
@@ -142,7 +142,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             for (int i = 0; i < 3; i++)
-                a.Set<ItMutSetMulti>().Write.AddImmediate(new EntityIndex(i, groupA));
+                a.Set<ItMutSetMulti>().Write.Add(new EntityIndex(i, groupA));
 
             // Filter the query to QId1 so iteration walks only groupA's slice.
             // Mutating a *different* group's entry within the same set is safe —
@@ -152,7 +152,7 @@ namespace Trecs.Tests
             {
                 NAssert.AreEqual(groupA.Index, ei.GroupIndex.Index);
                 visitedA++;
-                a.Set<ItMutSetMulti>().Write.AddImmediate(new EntityIndex(0, groupB));
+                a.Set<ItMutSetMulti>().Write.Add(new EntityIndex(0, groupB));
             }
 
             NAssert.AreEqual(3, visitedA);
@@ -160,7 +160,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Iterate_RemoveImmediateFromSameSetDifferentGroup_VisitsAllOriginalEntries()
+        public void Iterate_RemoveFromSameSetDifferentGroup_VisitsAllOriginalEntries()
         {
             using var env = CreateMultiGroupEnv();
             var a = env.Accessor;
@@ -178,8 +178,8 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             for (int i = 0; i < 3; i++)
-                a.Set<ItMutSetMulti>().Write.AddImmediate(new EntityIndex(i, groupA));
-            a.Set<ItMutSetMulti>().Write.AddImmediate(new EntityIndex(0, groupB));
+                a.Set<ItMutSetMulti>().Write.Add(new EntityIndex(i, groupA));
+            a.Set<ItMutSetMulti>().Write.Add(new EntityIndex(0, groupB));
 
             // Filter the query to QCatA so it only iterates groupA — leaves groupB alone.
             var visited = 0;
@@ -188,7 +188,7 @@ namespace Trecs.Tests
                 if (ei.GroupIndex.Index != groupA.Index)
                     continue;
                 visited++;
-                a.Set<ItMutSetMulti>().Write.RemoveImmediate(new EntityIndex(0, groupB));
+                a.Set<ItMutSetMulti>().Write.Remove(new EntityIndex(0, groupB));
             }
 
             NAssert.AreEqual(3, visited);
@@ -202,15 +202,15 @@ namespace Trecs.Tests
             var a = env.Accessor;
             var group = SpawnA(a, 3);
 
-            a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(0, group));
-            a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(1, group));
+            a.Set<ItMutSetA>().Write.Add(new EntityIndex(0, group));
+            a.Set<ItMutSetA>().Write.Add(new EntityIndex(1, group));
 
             var visited = new List<int>();
             foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
             {
                 visited.Add(ei.Index);
                 // Deferred — must not change what's iterated.
-                a.SetAdd<ItMutSetA>(new EntityIndex(2, group));
+                a.Set<ItMutSetA>().Defer.Add(new EntityIndex(2, group));
             }
             visited.Sort();
             NAssert.AreEqual(
@@ -232,13 +232,13 @@ namespace Trecs.Tests
             var group = SpawnA(a, 3);
 
             for (int i = 0; i < 3; i++)
-                a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(i, group));
+                a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
 
             var visited = new List<int>();
             foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
             {
                 visited.Add(ei.Index);
-                a.SetRemove<ItMutSetA>(ei);
+                a.Set<ItMutSetA>().Defer.Remove(ei);
             }
             visited.Sort();
             NAssert.AreEqual(
@@ -260,7 +260,7 @@ namespace Trecs.Tests
             var group = SpawnA(a, 3);
 
             for (int i = 0; i < 3; i++)
-                a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(i, group));
+                a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
 
             int pairs = 0;
             foreach (var outerEi in a.Query().InSet<ItMutSetA>().EntityIndices())
@@ -277,39 +277,39 @@ namespace Trecs.Tests
         // ── Iteration guard: mutating the same set + same group must throw ────
 
         [Test]
-        public void Iterate_AddImmediateToSameSetSameGroup_Throws()
+        public void Iterate_AddToSameSetSameGroup_Throws()
         {
             using var env = CreateSingleGroupEnv();
             var a = env.Accessor;
             var group = SpawnA(a, 4);
 
             for (int i = 0; i < 2; i++)
-                a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(i, group));
+                a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
 
             NAssert.Catch<Exception>(() =>
             {
                 foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
                 {
-                    a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(2, group));
+                    a.Set<ItMutSetA>().Write.Add(new EntityIndex(2, group));
                 }
             });
         }
 
         [Test]
-        public void Iterate_RemoveImmediateFromSameSetSameGroup_Throws()
+        public void Iterate_RemoveFromSameSetSameGroup_Throws()
         {
             using var env = CreateSingleGroupEnv();
             var a = env.Accessor;
             var group = SpawnA(a, 4);
 
             for (int i = 0; i < 4; i++)
-                a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(i, group));
+                a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
 
             NAssert.Catch<Exception>(() =>
             {
                 foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
                 {
-                    a.Set<ItMutSetA>().Write.RemoveImmediate(ei);
+                    a.Set<ItMutSetA>().Write.Remove(ei);
                 }
             });
         }
@@ -322,19 +322,19 @@ namespace Trecs.Tests
             var group = SpawnA(a, 3);
 
             for (int i = 0; i < 3; i++)
-                a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(i, group));
+                a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
 
             NAssert.Catch<Exception>(() =>
             {
                 foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
                 {
-                    a.Set<ItMutSetA>().Write.ClearImmediate();
+                    a.Set<ItMutSetA>().Write.Clear();
                 }
             });
         }
 
         [Test]
-        public void Iterate_DirectSetReadEnumerator_AddImmediate_Throws()
+        public void Iterate_DirectSetReadEnumerator_Add_Throws()
         {
             // Same scenario but iterating Set<T>().Read directly rather than via Query.
             using var env = CreateSingleGroupEnv();
@@ -342,7 +342,7 @@ namespace Trecs.Tests
             var group = SpawnA(a, 4);
 
             for (int i = 0; i < 2; i++)
-                a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(i, group));
+                a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
 
             NAssert.Catch<Exception>(() =>
             {
@@ -350,7 +350,7 @@ namespace Trecs.Tests
                 {
                     foreach (var idx in indices)
                     {
-                        a.Set<ItMutSetA>().Write.AddImmediate(new EntityIndex(2, g));
+                        a.Set<ItMutSetA>().Write.Add(new EntityIndex(2, g));
                     }
                 }
             });

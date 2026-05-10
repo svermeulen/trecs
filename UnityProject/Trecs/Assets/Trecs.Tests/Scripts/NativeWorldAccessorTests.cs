@@ -233,7 +233,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
-            a.SetAdd<NWATestSet>(new EntityIndex(0, group));
+            a.Set<NWATestSet>().Defer.Add(new EntityIndex(0, group));
             a.SubmitEntities();
 
             var set = a.Set<NWATestSet>();
@@ -258,11 +258,11 @@ namespace Trecs.Tests
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<NWATestSet>();
-            set.Write.AddImmediate(new EntityIndex(0, group));
+            set.Write.Add(new EntityIndex(0, group));
             a.SubmitEntities();
             NAssert.AreEqual(1, set.Read.Count);
 
-            a.SetRemove<NWATestSet>(new EntityIndex(0, group));
+            a.Set<NWATestSet>().Defer.Remove(new EntityIndex(0, group));
             a.SubmitEntities();
 
             NAssert.AreEqual(0, set.Read.Count);

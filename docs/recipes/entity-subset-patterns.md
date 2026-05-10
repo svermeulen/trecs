@@ -57,7 +57,7 @@ Use sets for dynamic, sparse membership. Sets must be registered with the world 
 public struct DeadEnemies : IEntitySet { }
 
 // Add to set
-World.SetAdd<DeadEnemies>(entity.EntityIndex);
+World.Set<DeadEnemies>().Defer.Add(entity.EntityIndex);
 
 // Iterate set members
 [ForEachEntity(Set = typeof(DeadEnemies))]
@@ -81,7 +81,7 @@ void Execute(in DeadEnemy enemy) { ... }
 
 - **Per-iteration filtering, membership not needed elsewhere** → Component value check. No registration, no transitions.
 - **The subset is a named concept systems want to query, iterate, or count** → Sets. "Visible enemies", "selected units", "poisoned entities" are natural fits.
-- **One system flags a subset for several downstream systems in the same frame** → Sets as per-frame scratch storage. Clear at the top of the producer, fill with `AddImmediate`, and let consumers iterate the set. See [Per-Frame Staging](../entity-management/sets.md#per-frame-staging).
+- **One system flags a subset for several downstream systems in the same frame** → Sets as per-frame scratch storage. Clear at the top of the producer, fill via `Set<T>().Write.Add`, and let consumers iterate the set. See [Per-Frame Staging](../entity-management/sets.md#per-frame-staging).
 - **3+ dimensions, or many categories** → Sets. Avoids combinatorial group explosion.
 - **Very large populations where a hot iteration shows up in the profiler** → Template partitions. The dense-array layout buys you cache-friendly iteration at the cost of data movement on transitions and extra groups per dimension. The partition boundary should reflect a real hot path, not just a conceptual state split.
 

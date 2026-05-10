@@ -171,14 +171,14 @@ namespace Trecs.Internal
             {
                 ref var bag = ref queues.RemoveQueue.GetBag(i);
                 while (!bag.IsEmpty)
-                    set.RemoveImmediateUnchecked(bag.Dequeue<EntityIndex>());
+                    set.RemoveUnchecked(bag.Dequeue<EntityIndex>());
             }
 
             for (int i = 0; i < queues.AddQueue.ThreadSlotCount; i++)
             {
                 ref var bag = ref queues.AddQueue.GetBag(i);
                 while (!bag.IsEmpty)
-                    set.AddImmediateUnchecked(bag.Dequeue<EntityIndex>());
+                    set.AddUnchecked(bag.Dequeue<EntityIndex>());
             }
         }
 
@@ -196,7 +196,7 @@ namespace Trecs.Internal
             }
             allRemoves.Sort();
             for (int i = 0; i < allRemoves.Length; i++)
-                set.RemoveImmediateUnchecked(allRemoves[i]);
+                set.RemoveUnchecked(allRemoves[i]);
             allRemoves.Dispose();
 
             var allAdds = new NativeList<EntityIndex>(64, Allocator.Temp);
@@ -208,7 +208,7 @@ namespace Trecs.Internal
             }
             allAdds.Sort();
             for (int i = 0; i < allAdds.Length; i++)
-                set.AddImmediateUnchecked(allAdds[i]);
+                set.AddUnchecked(allAdds[i]);
             allAdds.Dispose();
         }
 

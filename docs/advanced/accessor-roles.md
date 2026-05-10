@@ -28,7 +28,7 @@ The framework asserts every rule below at the call site. Crossing a role boundar
 | Persistent heap alloc (`AllocShared`, `AllocUnique`, native variants) | ✅ | ❌ | ✅ |
 | Structural change (`AddEntity` / `RemoveEntity` / `MoveTo`) on a non-VUO template | ✅ | ❌ | ✅ |
 | Structural change on a `[VariableUpdateOnly]` template [^vuo-template] | ❌ | ✅ | ✅ |
-| Set ops (`SetAdd` / `SetRemove` / `SetClear`, `Set<T>().Write`) | ✅ | ❌ | ✅ |
+| Set ops (`Set<T>().Defer`, `Set<T>().Write`) | ✅ | ❌ | ✅ |
 | `SetSystemPaused` | ✅ | ❌ | ✅ |
 | `FixedRng` | ✅ | ❌ | ✅ |
 | `VariableRng` | ❌ | ✅ | ✅ |

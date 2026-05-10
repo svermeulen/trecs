@@ -75,9 +75,9 @@ namespace Trecs.Tests
 
             // Add entities 0, 1, 2 to set
             var write = set.Write;
-            write.AddImmediate(new EntityIndex(0, groupA));
-            write.AddImmediate(new EntityIndex(1, groupA));
-            write.AddImmediate(new EntityIndex(2, groupA));
+            write.Add(new EntityIndex(0, groupA));
+            write.Add(new EntityIndex(1, groupA));
+            write.Add(new EntityIndex(2, groupA));
             a.SubmitEntities();
             NAssert.AreEqual(3, set.Read.Count);
 
@@ -115,8 +115,8 @@ namespace Trecs.Tests
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var set = a.Set<SPSet>();
 
-            set.Write.AddImmediate(new EntityIndex(0, groupA));
-            set.Write.AddImmediate(new EntityIndex(1, groupA));
+            set.Write.Add(new EntityIndex(0, groupA));
+            set.Write.Add(new EntityIndex(1, groupA));
             a.SubmitEntities();
 
             // Move entity 0, then remove it (reverts the move)
@@ -155,7 +155,7 @@ namespace Trecs.Tests
             var set = a.Set<SPSet>();
 
             // Deferred add entity 1 to set, native-remove entity 0
-            a.SetAdd<SPSet>(new EntityIndex(1, groupA));
+            a.Set<SPSet>().Defer.Add(new EntityIndex(1, groupA));
             nativeEcs.RemoveEntity(handles[0].ToIndex(a));
             a.SubmitEntities();
 
@@ -189,7 +189,7 @@ namespace Trecs.Tests
             var set = a.Set<SPSet>();
 
             // Add entity 0 to set, then native-remove entity 0
-            a.SetAdd<SPSet>(new EntityIndex(0, groupA));
+            a.Set<SPSet>().Defer.Add(new EntityIndex(0, groupA));
             nativeEcs.RemoveEntity(handles[0].ToIndex(a));
             a.SubmitEntities();
 
@@ -223,9 +223,9 @@ namespace Trecs.Tests
             var set2 = a.Set<SPSet2>();
 
             // Entity 0 in both sets, entity 1 in set1 only
-            set1.Write.AddImmediate(new EntityIndex(0, groupA));
-            set1.Write.AddImmediate(new EntityIndex(1, groupA));
-            set2.Write.AddImmediate(new EntityIndex(0, groupA));
+            set1.Write.Add(new EntityIndex(0, groupA));
+            set1.Write.Add(new EntityIndex(1, groupA));
+            set2.Write.Add(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             NAssert.AreEqual(2, set1.Read.Count);
@@ -256,8 +256,8 @@ namespace Trecs.Tests
             var set1 = a.Set<SPSet>();
             var set2 = a.Set<SPSet2>();
 
-            set1.Write.AddImmediate(new EntityIndex(0, groupA));
-            set2.Write.AddImmediate(new EntityIndex(0, groupA));
+            set1.Write.Add(new EntityIndex(0, groupA));
+            set2.Write.Add(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             // Move entity to PartitionB
@@ -295,11 +295,11 @@ namespace Trecs.Tests
 
             // Set1: entities 0, 2, 4
             // Set2: entities 1, 3
-            set1.Write.AddImmediate(new EntityIndex(0, groupA));
-            set1.Write.AddImmediate(new EntityIndex(2, groupA));
-            set1.Write.AddImmediate(new EntityIndex(4, groupA));
-            set2.Write.AddImmediate(new EntityIndex(1, groupA));
-            set2.Write.AddImmediate(new EntityIndex(3, groupA));
+            set1.Write.Add(new EntityIndex(0, groupA));
+            set1.Write.Add(new EntityIndex(2, groupA));
+            set1.Write.Add(new EntityIndex(4, groupA));
+            set2.Write.Add(new EntityIndex(1, groupA));
+            set2.Write.Add(new EntityIndex(3, groupA));
             a.SubmitEntities();
 
             // Move entity 0 (set1), remove entity 1 (set2)
@@ -339,7 +339,7 @@ namespace Trecs.Tests
             // Add every other entity to set (0, 2, 4, ..., 48)
             var write = set.Write;
             for (int i = 0; i < total; i += 2)
-                write.AddImmediate(new EntityIndex(i, groupA));
+                write.Add(new EntityIndex(i, groupA));
             a.SubmitEntities();
 
             NAssert.AreEqual(25, set.Read.Count);
@@ -393,7 +393,7 @@ namespace Trecs.Tests
             // Add first 30 to set
             var write = set.Write;
             for (int i = 0; i < 30; i++)
-                write.AddImmediate(new EntityIndex(i, groupA));
+                write.Add(new EntityIndex(i, groupA));
             a.SubmitEntities();
 
             NAssert.AreEqual(30, set.Read.Count);
@@ -443,8 +443,8 @@ namespace Trecs.Tests
             var set = a.Set<SPSet>();
 
             // Add entities 0, 2 to set
-            set.Write.AddImmediate(new EntityIndex(0, groupA));
-            set.Write.AddImmediate(new EntityIndex(2, groupA));
+            set.Write.Add(new EntityIndex(0, groupA));
+            set.Write.Add(new EntityIndex(2, groupA));
             a.SubmitEntities();
 
             // In one submission:
@@ -452,7 +452,7 @@ namespace Trecs.Tests
             // - Move entity 0 to PartitionB (in set)
             // - Remove entity 1 (not in set, but causes swap-back)
             // - Add new entity
-            a.SetAdd<SPSet>(new EntityIndex(3, groupA));
+            a.Set<SPSet>().Defer.Add(new EntityIndex(3, groupA));
             a.MoveTo(handles[0].ToIndex(a), PartitionB);
             a.RemoveEntity(handles[1]);
             var newHandle = a.AddEntity(PartitionA)
@@ -507,7 +507,7 @@ namespace Trecs.Tests
                         if (a.EntityExists(handles[3]))
                         {
                             var idx = handles[3].ToIndex(a);
-                            a.Set<SPSet>().Write.AddImmediate(idx);
+                            a.Set<SPSet>().Write.Add(idx);
                         }
                     }
                 );
@@ -547,8 +547,8 @@ namespace Trecs.Tests
             var set = a.Set<SPSet>();
 
             // Entities 1 and 2 in set
-            set.Write.AddImmediate(new EntityIndex(1, groupA));
-            set.Write.AddImmediate(new EntityIndex(2, groupA));
+            set.Write.Add(new EntityIndex(1, groupA));
+            set.Write.Add(new EntityIndex(2, groupA));
             a.SubmitEntities();
 
             // Callback: on remove, also remove entity 2
@@ -600,9 +600,9 @@ namespace Trecs.Tests
             var set = a.Set<SPSet>();
 
             // Frame 1: Add entities 0, 2, 4 to set
-            set.Write.AddImmediate(new EntityIndex(0, groupA));
-            set.Write.AddImmediate(new EntityIndex(2, groupA));
-            set.Write.AddImmediate(new EntityIndex(4, groupA));
+            set.Write.Add(new EntityIndex(0, groupA));
+            set.Write.Add(new EntityIndex(2, groupA));
+            set.Write.Add(new EntityIndex(4, groupA));
             a.SubmitEntities();
             NAssert.AreEqual(3, set.Read.Count);
 

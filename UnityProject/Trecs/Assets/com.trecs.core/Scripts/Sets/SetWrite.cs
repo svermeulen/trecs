@@ -33,33 +33,33 @@ namespace Trecs
         // ── Write operations ─────────────────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddImmediate(EntityIndex entityIndex)
+        public void Add(EntityIndex entityIndex)
         {
             AssertValidGroup(entityIndex.GroupIndex);
             _entriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveImmediate(EntityIndex entityIndex)
+        public void Remove(EntityIndex entityIndex)
         {
             AssertValidGroup(entityIndex.GroupIndex);
             _entriesPerGroup[entityIndex.GroupIndex.Index].Remove(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddImmediate(EntityHandle entityHandle)
+        public void Add(EntityHandle entityHandle)
         {
-            AddImmediate(entityHandle.ToIndex(_world));
+            Add(entityHandle.ToIndex(_world));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveImmediate(EntityHandle entityHandle)
+        public void Remove(EntityHandle entityHandle)
         {
-            RemoveImmediate(entityHandle.ToIndex(_world));
+            Remove(entityHandle.ToIndex(_world));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void ClearImmediate()
+        public void Clear()
         {
             _world.ClearSet(_setId);
         }

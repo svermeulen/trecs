@@ -59,8 +59,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                 World.RemoveEntity(fish.TargetMeal.ToIndex(World));
                 fish.TargetMeal = EntityHandle.Null;
 
-                World.SetRemove<FrenzySets.Eating>(entityIndex);
-                World.SetAdd<FrenzySets.NotEating>(entityIndex);
+                World.Set<FrenzySets.Eating>().Defer.Remove(entityIndex);
+                World.Set<FrenzySets.NotEating>().Defer.Add(entityIndex);
             }
         }
 
@@ -79,8 +79,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                 World.RemoveEntity(fishMeal.Value.ToIndex(World));
                 fishMeal.Value = EntityHandle.Null;
 
-                World.SetRemove<FrenzySets.Eating>(entityIndex);
-                World.SetAdd<FrenzySets.NotEating>(entityIndex);
+                World.Set<FrenzySets.Eating>().Defer.Remove(entityIndex);
+                World.Set<FrenzySets.NotEating>().Defer.Add(entityIndex);
             }
         }
 
@@ -137,8 +137,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                     World.RemoveEntity(fish.TargetMeal.ToIndex(World));
                     fish.TargetMeal = EntityHandle.Null;
 
-                    World.SetRemove<FrenzySets.Eating>(fish.EntityIndex);
-                    World.SetAdd<FrenzySets.NotEating>(fish.EntityIndex);
+                    World.Set<FrenzySets.Eating>().Defer.Remove(fish.EntityIndex);
+                    World.Set<FrenzySets.NotEating>().Defer.Add(fish.EntityIndex);
                 }
             }
         }
@@ -178,8 +178,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
 
             foreach (var entityIndex in toMoveToNotEating)
             {
-                eatingSet.Write.RemoveImmediate(entityIndex);
-                notEatingSet.Write.AddImmediate(entityIndex);
+                eatingSet.Write.Remove(entityIndex);
+                notEatingSet.Write.Add(entityIndex);
             }
         }
 

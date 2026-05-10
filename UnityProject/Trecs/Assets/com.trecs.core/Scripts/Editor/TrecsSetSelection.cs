@@ -226,7 +226,7 @@ namespace Trecs
                     );
                     _accessorWorld = world;
                 }
-                _entitiesValue.text = _accessor.CountEntitiesInSet(entitySet.Id).ToString();
+                _entitiesValue.text = _accessor.Set(entitySet.Id).Read.Count.ToString();
             }
             catch
             {

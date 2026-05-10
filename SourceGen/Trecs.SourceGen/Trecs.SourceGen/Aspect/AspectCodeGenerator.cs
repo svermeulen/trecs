@@ -496,17 +496,28 @@ namespace Trecs.SourceGen.Aspect
 
                 // AddToSet / RemoveFromSet
                 // (Can't be extension methods due to C# partial type inference limitation)
+                // WorldAccessor exposes deferred ops via the Set<T>().Defer gateway;
+                // NativeWorldAccessor still uses flat SetAdd / SetRemove verbs.
+                var addBody =
+                    accessorType == "WorldAccessor"
+                        ? "world.Set<TSet>().Defer.Add(_entityIndex)"
+                        : "world.SetAdd<TSet>(_entityIndex)";
+                var removeBody =
+                    accessorType == "WorldAccessor"
+                        ? "world.Set<TSet>().Defer.Remove(_entityIndex)"
+                        : "world.SetRemove<TSet>(_entityIndex)";
+
                 sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
                 sb.AppendLine(
                     indentLevel,
-                    $"public readonly void AddToSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => world.SetAdd<TSet>(_entityIndex);"
+                    $"public readonly void AddToSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => {addBody};"
                 );
                 sb.AppendLine();
 
                 sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
                 sb.AppendLine(
                     indentLevel,
-                    $"public readonly void RemoveFromSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => world.SetRemove<TSet>(_entityIndex);"
+                    $"public readonly void RemoveFromSet<TSet>({paramPrefix}{accessorType} world) where TSet : struct, IEntitySet => {removeBody};"
                 );
                 sb.AppendLine();
             }
