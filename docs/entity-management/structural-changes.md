@@ -37,7 +37,7 @@ World.RemoveEntitiesWithTags<GameTags.Bullet>();
 World.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
 ```
 
-The type parameters are the **destination** tag set, not the from/to pair. The entity's group changes; its component data is copied across.
+The type parameters spell out the **destination** tag set — where the entity ends up — not a from/to pair. Behind the scenes, the entity is relocated to the destination group's memory block and all its component values are copied across unchanged.
 
 ## Conflict resolution
 
