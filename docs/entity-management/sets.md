@@ -133,7 +133,7 @@ Notes:
 | **Iteration** | All entities with that tag are contiguous in memory | Sparse — only set members are visited |
 | **Best for** | Core identity, maximum cache locality | Dynamic membership, temporary flags, filtering |
 
-Both tags (via [partitions](../core/templates.md#partitions)) and sets can represent state, but the trade-offs differ. Tag changes move entity data in memory, giving you dense iteration. Set changes are cheap but iteration is sparse. See [Entity Subset Patterns](../recipes/entity-subset-patterns.md) for a deeper comparison.
+Both tags (via [partitions](../core/templates.md#partitions)) and sets can represent state, but the trade-offs differ. Tag changes move entity data in memory, giving you dense iteration. Set changes are cheap but iteration is sparse. See [Entity Subset Patterns](../guides/entity-subset-patterns.md) for a deeper comparison.
 
 ## See also
 

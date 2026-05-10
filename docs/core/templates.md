@@ -156,7 +156,7 @@ void UpdateActive(in ActiveBall ball) { /* ... */ }
 void UpdateResting(in RestingBall ball) { /* ... */ }
 ```
 
-Partitions are an optimization — see [Entity Subset Patterns](../recipes/entity-subset-patterns.md) for when to reach for partitions vs. sets vs. component-value branching.
+Partitions are an optimization — see [Entity Subset Patterns](../guides/entity-subset-patterns.md) for when to reach for partitions vs. sets vs. component-value branching.
 
 ## Entity creation
 

@@ -56,4 +56,4 @@ void OnDestroy() => world.Dispose();
 - **[Core: World Setup](core/world-setup.md)** — the deeper reference for `WorldBuilder`, lifecycle, and `WorldAccessor`.
 - **[Glossary](glossary.md)** — the terms (Group, Partition, Set, Tag, Aspect, Accessor, …) and how they relate.
 - **[Samples](samples/index.md)** — a progressive tutorial series plus full sample games.
-- **[FAQ](faq.md)** and **[Trecs vs Unity ECS](recipes/trecs-vs-unity-ecs.md)** if you're sizing up the framework.
+- **[FAQ](faq.md)** and **[Trecs vs Unity ECS](guides/trecs-vs-unity-ecs.md)** if you're sizing up the framework.

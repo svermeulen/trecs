@@ -120,4 +120,4 @@ The drawback is that sets are sparse and may have slower iteration than partitio
 - **`Set<T>().Defer.Add` / `Defer.Remove`** — deferred membership changes. See [Structural Changes](../entity-management/structural-changes.md).
 - **`[ForEachEntity(Set = typeof(...))]`** — iterate only set members. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 - **Overlapping membership** — entities can be in multiple sets simultaneously.
-- **Sets vs Partitions trade-off** — see [Partitions](06-partitions.md) for the mutually-exclusive alternative, and [Entity Subset Patterns](../recipes/entity-subset-patterns.md) for how to choose.
+- **Sets vs Partitions trade-off** — see [Partitions](06-partitions.md) for the mutually-exclusive alternative, and [Entity Subset Patterns](../guides/entity-subset-patterns.md) for how to choose.
