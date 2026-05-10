@@ -191,7 +191,7 @@ Explicit constraints (`[ExecuteAfter]` / `[ExecuteBefore]`) always win over prio
 
 ## OnReady hook
 
-Declare `partial void OnReady()` on a system to run one-time setup once the world is fully built but before the first tick. The most common use is **subscribing to entity lifecycle events** — registering at `OnReady` time means no spawns are missed from frame zero onward. See [Entity Events](../entity-management/entity-events.md).
+Declare `partial void OnReady()` on a system to run one-time setup once the world is fully built — including the global entity — but before the first tick. The two most common uses are **subscribing to entity lifecycle events** (registering at `OnReady` time means no spawns are missed from frame zero onward — see [Entity Events](../entity-management/entity-events.md)) and **initializing global components** (the global entity exists by the time `OnReady` runs, so writes through `World.GlobalComponent<T>().Write` apply directly).
 
 ```csharp
 public partial class EnemyTracker : ISystem
@@ -204,7 +204,21 @@ public partial class EnemyTracker : ISystem
     [ForEachEntity]
     void OnEnemyAdded(in Health hp) { /* ... */ }
 }
+
+public partial class ScoreSystem : ISystem
+{
+    readonly int _startingLives;
+
+    public ScoreSystem(int startingLives) => _startingLives = startingLives;
+
+    partial void OnReady()
+    {
+        World.GlobalComponent<Score>().Write = new Score { Lives = _startingLives };
+    }
+}
 ```
+
+Note that the global entity is submitted before any `OnReady` hook runs, so an `OnAdded` subscription registered in `OnReady` will not fire for the global entity itself — read its components directly via `World.GlobalComponent<T>()` instead.
 
 `OnReady` is wired by source generation — declare it as a `partial void` and leave the implementation in the system's main partial. Don't declare it if you don't need it.
 

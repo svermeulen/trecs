@@ -695,8 +695,6 @@ namespace Trecs
 
             var loadInfo = _systemLoader.LoadSystems(this, _systems);
 
-            CallSystemReadyHooks(loadInfo);
-
             _systemEnableState.Initialize(loadInfo.Systems.Count);
 
             using (TrecsProfiling.Start("SystemRunner.Initialize"))
@@ -720,6 +718,8 @@ namespace Trecs
             {
                 _entitySubmitter.SubmitEntities();
             }
+
+            CallSystemReadyHooks(loadInfo);
 
             _initializeCompleted = true;
 

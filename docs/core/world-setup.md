@@ -95,7 +95,8 @@ var world = new WorldBuilder()
 // 2. (Optional) Add systems
 world.AddSystem(new FooSystem());
 
-// 3. Initialize — allocates groups, locks system list, runs OnReady hooks
+// 3. Initialize — allocates groups, locks system list, builds the global
+//    entity, then runs OnReady hooks
 world.Initialize();
 
 // 4. (Optional) Standalone WorldAccessor for non-system code
