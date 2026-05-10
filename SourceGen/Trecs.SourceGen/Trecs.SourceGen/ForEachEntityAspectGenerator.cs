@@ -526,6 +526,12 @@ namespace Trecs.SourceGen
                     case ParamSlotKind.LoopEntityIndex:
                         args.Add(entityIndexVar);
                         break;
+                    case ParamSlotKind.LoopEntityHandle:
+                        args.Add("__entityHandle");
+                        break;
+                    case ParamSlotKind.LoopEntityAccessor:
+                        args.Add("__entityAccessor");
+                        break;
                     case ParamSlotKind.LoopWorldAccessor:
                         args.Add(worldVar);
                         break;
@@ -603,11 +609,13 @@ namespace Trecs.SourceGen
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(indentLevel + 2, "__view.SetIndex(__i);");
 
-            if (info.HasEntityIndexParameter)
-                sb.AppendLine(
-                    indentLevel + 2,
-                    "var __entityIndex = new EntityIndex(__i, __slice.GroupIndex);"
-                );
+            EmitEntityRefDeclarations(
+                sb,
+                info,
+                indentLevel + 2,
+                indexExpr: "new EntityIndex(__i, __slice.GroupIndex)",
+                worldVar: worldName
+            );
 
             EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
 
@@ -657,11 +665,13 @@ namespace Trecs.SourceGen
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(indentLevel + 2, "__view.SetIndex(__idx);");
 
-            if (info.HasEntityIndexParameter)
-                sb.AppendLine(
-                    indentLevel + 2,
-                    "var __entityIndex = new EntityIndex(__idx, __slice.GroupIndex);"
-                );
+            EmitEntityRefDeclarations(
+                sb,
+                info,
+                indentLevel + 2,
+                indexExpr: "new EntityIndex(__idx, __slice.GroupIndex)",
+                worldVar: worldName
+            );
 
             EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
 
@@ -679,6 +689,39 @@ namespace Trecs.SourceGen
         {
             var callArgs = BuildUserMethodCallArgs(info, "__view", worldName, "__entityIndex");
             sb.AppendLine(indentLevel, $"{methodName}({callArgs});");
+        }
+
+        /// <summary>
+        /// Emits the per-iteration declarations for entity-shaped parameters
+        /// (<c>EntityIndex</c>, <c>EntityHandle</c>, <c>EntityAccessor</c>).
+        /// Each declaration is only emitted when the user took that parameter
+        /// type. <c>__entityIndex</c> is also emitted whenever a handle or accessor
+        /// is requested, because both derive from it.
+        /// </summary>
+        private static void EmitEntityRefDeclarations(
+            OptimizedStringBuilder sb,
+            ValidatedMethodInfo info,
+            int indentLevel,
+            string indexExpr,
+            string worldVar
+        )
+        {
+            bool needsIndex =
+                info.HasEntityIndexParameter
+                || info.HasEntityHandleParameter
+                || info.HasEntityAccessorParameter;
+            if (needsIndex)
+                sb.AppendLine(indentLevel, $"var __entityIndex = {indexExpr};");
+            if (info.HasEntityHandleParameter)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var __entityHandle = {worldVar}.GetEntityHandle(__entityIndex);"
+                );
+            if (info.HasEntityAccessorParameter)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var __entityAccessor = {worldVar}.Entity(__entityIndex);"
+                );
         }
 
         private static void EmitPerGroupBufferFetch(
@@ -752,8 +795,13 @@ namespace Trecs.SourceGen
             sb.AppendLine(3, "{");
             sb.AppendLine(4, "__view.SetIndex(__i);");
 
-            if (info.HasEntityIndexParameter)
-                sb.AppendLine(4, "var __entityIndex = new EntityIndex(__i, __group);");
+            EmitEntityRefDeclarations(
+                sb,
+                info,
+                indentLevel: 4,
+                indexExpr: "new EntityIndex(__i, __group)",
+                worldVar: "__world"
+            );
 
             EmitUserBodyOrCall(sb, indentLevel: 4, methodName, info, "__world");
 
@@ -960,6 +1008,8 @@ namespace Trecs.SourceGen
             var setWriteParameters = classified.SetWriteParameters;
             var paramSlots = classified.ParameterSlots;
             bool hasEntityIndexParameter = classified.HasEntityIndex;
+            bool hasEntityHandleParameter = classified.HasEntityHandle;
+            bool hasEntityAccessorParameter = classified.HasEntityAccessor;
 
             if (componentTypes.Count == 0)
             {
@@ -989,6 +1039,8 @@ namespace Trecs.SourceGen
                     ParameterSlots = paramSlots,
                     AttributeTagTypes = attributeTagTypes,
                     HasEntityIndexParameter = hasEntityIndexParameter,
+                    HasEntityHandleParameter = hasEntityHandleParameter,
+                    HasEntityAccessorParameter = hasEntityAccessorParameter,
                     SetTypes = effectiveSetTypes,
                     MatchByComponents = attributeMatchByComponents,
                     SetAccessorParameters = setAccessorParameters,

@@ -122,6 +122,11 @@ internal static class TrecsStubs
                 public EntityIndex ToIndex(NativeWorldAccessor world) => default;
             }
 
+            // EntityAccessor — main-thread live entity reference. The real type is a
+            // ref struct bound to a WorldAccessor. Stubbed as a plain readonly struct
+            // because the generator only ever passes it through to the user method.
+            public readonly struct EntityAccessor { }
+
             public readonly struct Tag { }
             public readonly struct TagSet
             {
@@ -590,6 +595,14 @@ internal static class TrecsStubs
                 // AutoJobGenerator's ScheduleParallel shim calls this when forwarding into
                 // a Burst job that takes `in NativeWorldAccessor`.
                 public NativeWorldAccessor ToNative() => default;
+
+                // Per-entity helpers used by source-gen-emitted iteration code when the
+                // user takes `EntityHandle` / `EntityAccessor` parameters. The real
+                // versions live in WorldAccessorInternalExtensions (Trecs.Internal) but
+                // generators emit `world.GetEntityHandle(...)` / `world.Entity(...)`
+                // and the C# compiler resolves them either way.
+                public EntityHandle GetEntityHandle(EntityIndex entityIndex) => default;
+                public EntityAccessor Entity(EntityIndex entityIndex) => default;
             }
 
             public class WorldInfo

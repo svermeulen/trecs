@@ -473,6 +473,12 @@ namespace Trecs.SourceGen
                     case ParamSlotKind.LoopEntityIndex:
                         args.Add(entityIndexVar);
                         break;
+                    case ParamSlotKind.LoopEntityHandle:
+                        args.Add("__entityHandle");
+                        break;
+                    case ParamSlotKind.LoopEntityAccessor:
+                        args.Add("__entityAccessor");
+                        break;
                     case ParamSlotKind.LoopWorldAccessor:
                         args.Add(worldVar);
                         break;
@@ -552,11 +558,13 @@ namespace Trecs.SourceGen
                 );
             }
 
-            if (info.HasEntityIndexParameter)
-                sb.AppendLine(
-                    indentLevel + 2,
-                    "var __entityIndex = new EntityIndex(__i, __slice.GroupIndex);"
-                );
+            EmitEntityRefDeclarations(
+                sb,
+                info,
+                indentLevel + 2,
+                indexExpr: "new EntityIndex(__i, __slice.GroupIndex)",
+                worldVar: worldName
+            );
 
             EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
 
@@ -611,11 +619,13 @@ namespace Trecs.SourceGen
                 );
             }
 
-            if (info.HasEntityIndexParameter)
-                sb.AppendLine(
-                    indentLevel + 2,
-                    "var __entityIndex = new EntityIndex(__i, __slice.GroupIndex);"
-                );
+            EmitEntityRefDeclarations(
+                sb,
+                info,
+                indentLevel + 2,
+                indexExpr: "new EntityIndex(__i, __slice.GroupIndex)",
+                worldVar: worldName
+            );
 
             EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
 
@@ -689,16 +699,49 @@ namespace Trecs.SourceGen
                 );
             }
 
-            if (validatedParamsInfo.HasEntityIndexParameter)
-            {
-                sb.AppendLine(
-                    indentLevel + 1,
-                    "var __entityIndex = new EntityIndex(__i, __group);"
-                );
-            }
+            EmitEntityRefDeclarations(
+                sb,
+                validatedParamsInfo,
+                indentLevel + 1,
+                indexExpr: "new EntityIndex(__i, __group)",
+                worldVar: "__world"
+            );
 
             EmitUserBodyOrCall(sb, indentLevel + 1, methodName, validatedParamsInfo, "__world");
             sb.AppendLine(indentLevel, "}");
+        }
+
+        /// <summary>
+        /// Emits the per-iteration declarations for entity-shaped parameters
+        /// (<c>EntityIndex</c>, <c>EntityHandle</c>, <c>EntityAccessor</c>).
+        /// Each declaration is only emitted when the user took that parameter
+        /// type. <c>__entityIndex</c> is also emitted whenever a handle or accessor
+        /// is requested, because both derive from it.
+        /// </summary>
+        private static void EmitEntityRefDeclarations(
+            OptimizedStringBuilder sb,
+            ValidatedMethodInfo info,
+            int indentLevel,
+            string indexExpr,
+            string worldVar
+        )
+        {
+            bool needsIndex =
+                info.HasEntityIndexParameter
+                || info.HasEntityHandleParameter
+                || info.HasEntityAccessorParameter;
+            if (needsIndex)
+                sb.AppendLine(indentLevel, $"var __entityIndex = {indexExpr};");
+            if (info.HasEntityHandleParameter)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var __entityHandle = {worldVar}.GetEntityHandle(__entityIndex);"
+                );
+            if (info.HasEntityAccessorParameter)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var __entityAccessor = {worldVar}.Entity(__entityIndex);"
+                );
         }
 
         // Validation and parameter info classes (reused from original ForEachGenerator)
@@ -765,7 +808,10 @@ namespace Trecs.SourceGen
                 isValid: ref isValid
             );
             bool hasAnyIterationParameter =
-                classified.ComponentParameters.Count > 0 || classified.HasEntityIndex;
+                classified.ComponentParameters.Count > 0
+                || classified.HasEntityIndex
+                || classified.HasEntityHandle
+                || classified.HasEntityAccessor;
 
             if (!hasAnyIterationParameter)
             {
@@ -802,6 +848,8 @@ namespace Trecs.SourceGen
                     ComponentParameters = classified.ComponentParameters.ToList(),
                     CustomParameters = classified.CustomParameters.ToList(),
                     HasEntityIndexParameter = classified.HasEntityIndex,
+                    HasEntityHandleParameter = classified.HasEntityHandle,
+                    HasEntityAccessorParameter = classified.HasEntityAccessor,
                     ParameterSlots = classified.ParameterSlots.ToList(),
                     AttributeTagTypes = attributeTagTypes,
                     SetTypes = setTypes,

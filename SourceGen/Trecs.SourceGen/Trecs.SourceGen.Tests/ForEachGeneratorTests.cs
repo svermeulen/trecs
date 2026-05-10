@@ -207,6 +207,104 @@ public class ForEachGeneratorTests
     }
 
     [Test]
+    public void ForEachWithEntityHandleParameter_CompilesCleanly()
+    {
+        // EntityHandle is the public stable identifier — generator must resolve
+        // it per-iteration via __world.GetEntityHandle(__entityIndex).
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem
+                {
+                    [Trecs.ForEachEntity(typeof(PlayerTag))]
+                    void Process(in CPos pos, Trecs.EntityHandle handle) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
+    public void ForEachWithEntityAccessorParameter_CompilesCleanly()
+    {
+        // EntityAccessor is the live no-arg API entry point — generator constructs
+        // it via __world.Entity(__entityIndex).
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem
+                {
+                    [Trecs.ForEachEntity(typeof(PlayerTag))]
+                    void Process(in CPos pos, Trecs.EntityAccessor entity) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
+    public void ForEachWithAllThreeEntityParamTypes_CompilesCleanly()
+    {
+        // Mixing EntityIndex + EntityHandle + EntityAccessor in one method must
+        // produce a single shared __entityIndex declaration plus the two derived ones.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem
+                {
+                    [Trecs.ForEachEntity(typeof(PlayerTag))]
+                    void Process(
+                        in CPos pos,
+                        Trecs.Internal.EntityIndex idx,
+                        Trecs.EntityHandle handle,
+                        Trecs.EntityAccessor entity
+                    ) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new ForEachGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
     public void ForEachGenericAttribute_CompilesCleanly()
     {
         // [ForEachEntity<Tag>] — C# 11 generic-attribute shorthand. Exercises the

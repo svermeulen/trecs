@@ -220,4 +220,72 @@ public class ForEachEntityAspectGeneratorTests
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
         Assert.That(run.GenErrors, Is.Empty, run.Format());
     }
+
+    [Test]
+    public void ForEachEntity_AspectMode_WithEntityHandle_CompilesCleanly()
+    {
+        // Aspect-mode iteration with an extra EntityHandle parameter — generator
+        // resolves the handle once per iteration alongside the aspect view.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public partial struct PlayerView : Trecs.IAspect, Trecs.IRead<CPos> { }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem
+                {
+                    [Trecs.ForEachEntity(typeof(PlayerTag))]
+                    void Process(in PlayerView player, Trecs.EntityHandle handle) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new ForEachEntityAspectGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+        Assert.That(run.GenErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
+    public void ForEachEntity_AspectMode_WithEntityAccessor_CompilesCleanly()
+    {
+        // Aspect-mode iteration with an extra EntityAccessor parameter — generator
+        // emits __world.Entity(__entityIndex) once per iteration.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public partial struct PlayerView : Trecs.IAspect, Trecs.IRead<CPos> { }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem
+                {
+                    [Trecs.ForEachEntity(typeof(PlayerTag))]
+                    void Process(in PlayerView player, Trecs.EntityAccessor entity) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new ForEachEntityAspectGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+        Assert.That(run.GenErrors, Is.Empty, run.Format());
+    }
 }

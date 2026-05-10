@@ -22,6 +22,12 @@ namespace Trecs.SourceGen.Shared
         /// <summary>The loop's entity index (Trecs.EntityIndex, no modifiers, no [PassThroughArgument]).</summary>
         LoopEntityIndex,
 
+        /// <summary>The loop's stable entity handle (Trecs.EntityHandle, no modifiers, no [PassThroughArgument]).</summary>
+        LoopEntityHandle,
+
+        /// <summary>The loop's live entity accessor (Trecs.EntityAccessor, no modifiers, no [PassThroughArgument]). Main-thread only.</summary>
+        LoopEntityAccessor,
+
         /// <summary>The loop's world accessor (Trecs.WorldAccessor, no modifiers, no [PassThroughArgument]).</summary>
         LoopWorldAccessor,
 
@@ -161,6 +167,12 @@ namespace Trecs.SourceGen.Shared
         public List<ITypeSymbol> AttributeTagTypes { get; set; } = new();
         public bool HasAttributeTags => AttributeTagTypes.Count > 0;
         public bool HasEntityIndexParameter { get; set; }
+
+        /// <summary>True if the user took a <c>EntityHandle</c> parameter on the iteration method.</summary>
+        public bool HasEntityHandleParameter { get; set; }
+
+        /// <summary>True if the user took a <c>EntityAccessor</c> parameter on the iteration method.</summary>
+        public bool HasEntityAccessorParameter { get; set; }
 
         /// <summary>
         /// Parameter slots in declaration order. Used by the code generator to emit

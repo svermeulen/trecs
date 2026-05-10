@@ -40,6 +40,12 @@ namespace Trecs.SourceGen.Shared
         /// <summary>Whether an EntityIndex parameter was found.</summary>
         public bool HasEntityIndex { get; set; }
 
+        /// <summary>Whether an EntityHandle parameter was found.</summary>
+        public bool HasEntityHandle { get; set; }
+
+        /// <summary>Whether an EntityAccessor parameter was found.</summary>
+        public bool HasEntityAccessor { get; set; }
+
         /// <summary>Whether a WorldAccessor parameter was found.</summary>
         public bool HasWorldAccessor { get; set; }
 
@@ -357,6 +363,16 @@ namespace Trecs.SourceGen.Shared
                     "EntityIndex",
                     TrecsNamespaces.TrecsInternal
                 );
+                bool isEntityHandle = SymbolAnalyzer.IsExactType(
+                    paramType,
+                    "EntityHandle",
+                    TrecsNamespaces.Trecs
+                );
+                bool isEntityAccessor = SymbolAnalyzer.IsExactType(
+                    paramType,
+                    "EntityAccessor",
+                    TrecsNamespaces.Trecs
+                );
                 bool isWorldAccessor = SymbolAnalyzer.IsExactType(
                     paramType,
                     "WorldAccessor",
@@ -409,6 +425,74 @@ namespace Trecs.SourceGen.Shared
 
                     result.HasEntityIndex = true;
                     result.ParameterSlots.Add(new ParamSlot(ParamSlotKind.LoopEntityIndex, 0));
+                    continue;
+                }
+
+                if (!isPassThrough && isEntityHandle)
+                {
+                    if (isRef || isIn)
+                    {
+                        reportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.ParameterMustBeByValue,
+                                param.GetLocation(),
+                                param.Identifier.Text
+                            )
+                        );
+                        isValid = false;
+                        continue;
+                    }
+
+                    if (result.HasEntityHandle)
+                    {
+                        reportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.DuplicateLoopParameter,
+                                param.GetLocation(),
+                                param.Identifier.Text,
+                                "EntityHandle"
+                            )
+                        );
+                        isValid = false;
+                        continue;
+                    }
+
+                    result.HasEntityHandle = true;
+                    result.ParameterSlots.Add(new ParamSlot(ParamSlotKind.LoopEntityHandle, 0));
+                    continue;
+                }
+
+                if (!isPassThrough && isEntityAccessor)
+                {
+                    if (isRef || isIn)
+                    {
+                        reportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.ParameterMustBeByValue,
+                                param.GetLocation(),
+                                param.Identifier.Text
+                            )
+                        );
+                        isValid = false;
+                        continue;
+                    }
+
+                    if (result.HasEntityAccessor)
+                    {
+                        reportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.DuplicateLoopParameter,
+                                param.GetLocation(),
+                                param.Identifier.Text,
+                                "EntityAccessor"
+                            )
+                        );
+                        isValid = false;
+                        continue;
+                    }
+
+                    result.HasEntityAccessor = true;
+                    result.ParameterSlots.Add(new ParamSlot(ParamSlotKind.LoopEntityAccessor, 0));
                     continue;
                 }
 
