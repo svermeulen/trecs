@@ -23,7 +23,7 @@ EntityIndex index = handle.ToIndex(World);
 
 ## Creating entities
 
-Entities are created via `WorldAccessor.AddEntity()`, which returns an `EntityInitializer` for setting component values:
+Entities are created via `WorldAccessor.AddEntity()`, which provides a fluent api for setting component values:
 
 ```csharp
 World.AddEntity<SampleTags.Spinner>()
@@ -33,15 +33,16 @@ World.AddEntity<SampleTags.Spinner>()
 
 The tag selects which template to spawn — Trecs looks up the template registered with that identity tag.
 
-`EntityInitializer` is a `ref struct`. Use it immediately; don't store it across method boundaries. The stable handle is available before the next [submission](../entity-management/structural-changes.md):
+The stable handle for the new entity is available before the next [submission](../entity-management/structural-changes.md):
 
 ```csharp
-var init = World.AddEntity<MyTag>();
-EntityHandle handle = init.Handle;
-init.Set(new Position(float3.zero));
+EntityHandle handle = World.AddEntity<MyTag>();
+  .Set(new Position(float3.zero))
+  .AssertComplete()
+  .Handle;
 ```
 
-Calling `init.AssertComplete()` verifies that every non-optional field on the template has been set. The same check runs automatically during submission; an explicit call just surfaces the error earlier, at the call site.
+You may optionally call `.AssertComplete()` to verify that every non-optional field on the template has been set. The same check runs automatically during submission; an explicit call just surfaces the error earlier, at the call site.
 
 ## Removing entities
 
