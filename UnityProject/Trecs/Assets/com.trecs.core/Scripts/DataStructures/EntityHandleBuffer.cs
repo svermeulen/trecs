@@ -15,22 +15,22 @@ namespace Trecs
     /// </summary>
     public readonly struct NativeEntityHandleBuffer
     {
-        readonly NativeBuffer<int> _uniqueIds;
+        readonly NativeBuffer<int> _ids;
         readonly NativeBuffer<EntityHandleMapElement> _forwardMap;
 
         internal NativeEntityHandleBuffer(
-            NativeBuffer<int> uniqueIds,
+            NativeBuffer<int> ids,
             NativeBuffer<EntityHandleMapElement> forwardMap
         )
         {
-            _uniqueIds = uniqueIds;
+            _ids = ids;
             _forwardMap = forwardMap;
         }
 
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _uniqueIds.Length;
+            get => _ids.Length;
         }
 
         public EntityHandle this[int index]
@@ -38,9 +38,9 @@ namespace Trecs
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                int uniqueId = _uniqueIds.IndexAsReadOnly(index);
-                ref readonly var element = ref _forwardMap.IndexAsReadOnly(uniqueId - 1);
-                return new EntityHandle(uniqueId, element.Version);
+                int id = _ids.IndexAsReadOnly(index);
+                ref readonly var element = ref _forwardMap.IndexAsReadOnly(id - 1);
+                return new EntityHandle(id, element.Version);
             }
         }
     }

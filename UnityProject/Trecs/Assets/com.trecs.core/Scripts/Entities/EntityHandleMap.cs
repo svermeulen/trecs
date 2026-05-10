@@ -22,7 +22,7 @@ namespace Trecs
         // Reverse map: per-group list of forward-map unique IDs (1-based),
         // indexed by GroupIndex.Index. Allocated once at world init with length
         // equal to the number of groups.
-        // We intentionally store just the UniqueId (4 bytes) instead of a full EntityHandle
+        // We intentionally store just the Id (4 bytes) instead of a full EntityHandle
         // (8 bytes). The Version is authoritative in the forward map, so any consumer that
         // needs a full handle (e.g. GetEntityHandle, NativeEntityHandleBuffer indexing)
         // fetches Version from there.
@@ -173,23 +173,23 @@ namespace Trecs
 
             ref var groupList = ref GetGroupList(entityIndex.GroupIndex);
             EnsureGroupListSize(ref groupList, entityIndex.Index + 1);
-            groupList[entityIndex.Index] = reference.UniqueId;
+            groupList[entityIndex.Index] = reference.Id;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void UpdateEntityHandle(EntityIndex from, EntityIndex to)
         {
             ref var fromGroupList = ref _entityIndexToReferenceMap.ElementAt(from.GroupIndex.Index);
-            var uniqueId = fromGroupList[from.Index];
+            var id = fromGroupList[from.Index];
             fromGroupList[from.Index] = 0;
 
-            ref var element = ref _entityHandleMap.ElementAt(uniqueId - 1);
+            ref var element = ref _entityHandleMap.ElementAt(id - 1);
             element.Index = to.Index;
             element.GroupIndex = to.GroupIndex;
 
             ref var toGroupList = ref GetGroupList(to.GroupIndex);
             EnsureGroupListSize(ref toGroupList, to.Index + 1);
-            toGroupList[to.Index] = uniqueId;
+            toGroupList[to.Index] = id;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -197,21 +197,21 @@ namespace Trecs
         {
             ref var groupList = ref _entityIndexToReferenceMap.ElementAt(group.Index);
 
-            var uniqueId = groupList[oldIndex];
+            var id = groupList[oldIndex];
 
             // The entity at oldIndex may have been moved/removed already
             // (e.g., it was itself a moved entity whose reference was already handled).
             // In that case, skip the update.
-            if (uniqueId == 0)
+            if (id == 0)
             {
                 return;
             }
 
             groupList[oldIndex] = 0;
             EnsureGroupListSize(ref groupList, newIndex + 1);
-            groupList[newIndex] = uniqueId;
+            groupList[newIndex] = id;
 
-            ref var element = ref _entityHandleMap.ElementAt(uniqueId - 1);
+            ref var element = ref _entityHandleMap.ElementAt(id - 1);
             element.Index = newIndex;
             element.GroupIndex = group;
         }
@@ -222,17 +222,17 @@ namespace Trecs
             ref var groupList = ref _entityIndexToReferenceMap.ElementAt(
                 entityIndex.GroupIndex.Index
             );
-            var uniqueId = groupList[entityIndex.Index];
+            var id = groupList[entityIndex.Index];
             groupList[entityIndex.Index] = 0;
 
             // Invalidate the entity locator element by bumping its version and setting the entityIndex to point to a not existing element.
-            ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(uniqueId - 1);
+            ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(id - 1);
             entityHandleMapElement.Index = _nextFreeIndex; //keep the free linked list updated
             entityHandleMapElement.GroupIndex = default;
             entityHandleMapElement.BumpVersion();
 
             // Mark the element as the last element used.
-            _nextFreeIndex.Set(uniqueId - 1);
+            _nextFreeIndex.Set(id - 1);
         }
 
         // OPTIMIZATION OPPORTUNITY: The three Batch* methods below are candidates for Burst compilation.
@@ -279,10 +279,10 @@ namespace Trecs
                 var fromIndex = keys[i].key;
                 var toIndex = values[i].ToIndex;
 
-                var uniqueId = fromGroupList[fromIndex];
+                var id = fromGroupList[fromIndex];
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 Assert.That(
-                    uniqueId != 0,
+                    id != 0,
                     "BatchUpdateEntityHandles: null EntityHandle at fromIndex {} in group {}",
                     fromIndex,
                     fromGroup
@@ -290,11 +290,11 @@ namespace Trecs
 #endif
                 fromGroupList[fromIndex] = 0;
 
-                ref var element = ref _entityHandleMap.ElementAt(uniqueId - 1);
+                ref var element = ref _entityHandleMap.ElementAt(id - 1);
                 element.Index = toIndex;
                 element.GroupIndex = toGroup;
 
-                toGroupList[toIndex] = uniqueId;
+                toGroupList[toIndex] = id;
             }
         }
 
@@ -313,9 +313,9 @@ namespace Trecs
             {
                 var entityArrayIndex = entityHandlesToRemove[i];
 
-                var uniqueId = groupList[entityArrayIndex];
+                var id = groupList[entityArrayIndex];
                 Assert.That(
-                    uniqueId != 0,
+                    id != 0,
                     "BatchRemoveEntityHandles: null EntityHandle at index {} in group {}",
                     entityArrayIndex,
                     fromGroup
@@ -323,11 +323,11 @@ namespace Trecs
 
                 groupList[entityArrayIndex] = 0;
 
-                ref var element = ref _entityHandleMap.ElementAt(uniqueId - 1);
+                ref var element = ref _entityHandleMap.ElementAt(id - 1);
                 element.Index = _nextFreeIndex;
                 element.GroupIndex = default;
                 element.BumpVersion();
-                _nextFreeIndex.Set(uniqueId - 1);
+                _nextFreeIndex.Set(id - 1);
             }
         }
 
@@ -344,17 +344,17 @@ namespace Trecs
 
             foreach (var entry in swapBackMapping)
             {
-                var uniqueId = groupList[entry.Key];
+                var id = groupList[entry.Key];
 
-                if (uniqueId == 0)
+                if (id == 0)
                 {
                     continue;
                 }
 
                 groupList[entry.Key] = 0;
-                groupList[entry.Value] = uniqueId;
+                groupList[entry.Value] = id;
 
-                ref var element = ref _entityHandleMap.ElementAt(uniqueId - 1);
+                ref var element = ref _entityHandleMap.ElementAt(id - 1);
                 element.Index = entry.Value;
                 element.GroupIndex = group;
             }
@@ -373,16 +373,16 @@ namespace Trecs
 
             for (int i = 0; i < entityCount; i++)
             {
-                var uniqueId = groupList[i];
+                var id = groupList[i];
                 Assert.That(
-                    uniqueId != 0,
+                    id != 0,
                     "ValidateGroupConsistency: null handle at index {} in group {} (entityCount={})",
                     i,
                     group,
                     entityCount
                 );
 
-                ref var element = ref _entityHandleMap.ElementAt(uniqueId - 1);
+                ref var element = ref _entityHandleMap.ElementAt(id - 1);
                 Assert.That(
                     element.GroupIndex == group,
                     "ValidateGroupConsistency: group mismatch at index {} in group {}: element points to group {}",
@@ -408,18 +408,18 @@ namespace Trecs
 
             for (int i = 0; i < groupList.Length; i++)
             {
-                var uniqueId = groupList[i];
-                if (uniqueId == 0)
+                var id = groupList[i];
+                if (id == 0)
                 {
                     continue;
                 }
 
-                ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(uniqueId - 1);
+                ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(id - 1);
                 entityHandleMapElement.Index = _nextFreeIndex;
                 entityHandleMapElement.GroupIndex = default;
                 entityHandleMapElement.BumpVersion();
 
-                _nextFreeIndex.Set(uniqueId - 1);
+                _nextFreeIndex.Set(id - 1);
             }
 
             groupList.Clear();
@@ -435,17 +435,17 @@ namespace Trecs
 
             for (int i = 0; i < fromGroupList.Length; i++)
             {
-                var uniqueId = fromGroupList[i];
-                if (uniqueId == 0)
+                var id = fromGroupList[i];
+                if (id == 0)
                 {
                     continue;
                 }
 
-                ref var element = ref _entityHandleMap.ElementAt(uniqueId - 1);
+                ref var element = ref _entityHandleMap.ElementAt(id - 1);
                 element.Index = i;
                 element.GroupIndex = toGroupId;
 
-                toGroupList[i] = uniqueId;
+                toGroupList[i] = id;
             }
 
             fromGroupList.Clear();
@@ -460,11 +460,11 @@ namespace Trecs
 
             if (entityIndex.Index < groupList.Length)
             {
-                var uniqueId = groupList[entityIndex.Index];
-                if (uniqueId != 0)
+                var id = groupList[entityIndex.Index];
+                if (id != 0)
                 {
-                    ref var element = ref _entityHandleMap.ElementAt(uniqueId - 1);
-                    return new EntityHandle(uniqueId, element.Version);
+                    ref var element = ref _entityHandleMap.ElementAt(id - 1);
+                    return new EntityHandle(id, element.Version);
                 }
             }
 

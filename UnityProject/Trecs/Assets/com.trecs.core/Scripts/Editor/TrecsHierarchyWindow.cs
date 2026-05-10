@@ -2269,12 +2269,12 @@ namespace Trecs
                     continue;
                 }
                 var displayName = string.IsNullOrEmpty(templateDisplay)
-                    ? $"#{handle.UniqueId}"
-                    : $"{templateDisplay} #{handle.UniqueId}";
+                    ? $"#{handle.Id}"
+                    : $"{templateDisplay} #{handle.Id}";
 
                 if (SearchActive)
                 {
-                    var hay = $"{displayName} id:{handle.UniqueId}";
+                    var hay = $"{displayName} id:{handle.Id}";
                     var ctx = new PredicateData { Template = parentTref };
                     if (!MatchesSearch(SearchScope.Entities, hay, in ctx))
                     {
@@ -2905,9 +2905,7 @@ namespace Trecs
                     evt.menu.AppendSeparator();
                     evt.menu.AppendAction(
                         "Copy Entity Id",
-                        _ =>
-                            EditorGUIUtility.systemCopyBuffer =
-                                data.EntityHandle.UniqueId.ToString()
+                        _ => EditorGUIUtility.systemCopyBuffer = data.EntityHandle.Id.ToString()
                     );
                     break;
 
@@ -3597,7 +3595,7 @@ namespace Trecs
                 case Template t:
                     return TrecsRowIdentity.TemplatePrefix + (t.DebugName ?? "");
                 case EntityHandle eh:
-                    return TrecsRowIdentity.EntityPrefix + eh.UniqueId + ":" + eh.Version;
+                    return TrecsRowIdentity.EntityPrefix + eh.Id + ":" + eh.Version;
                 case ValueTuple<Template, GroupIndex> tg:
                     return "group:"
                         + (tg.Item1?.DebugName ?? "")
@@ -3639,15 +3637,15 @@ namespace Trecs
                     return data.StableKey;
                 case RowKind.Entity:
                     // Entity selection across world transitions is
-                    // best-effort: UniqueId+Version are stable within a
+                    // best-effort: Id+Version are stable within a
                     // world but not across instances. The match will
                     // typically miss after play-mode entry, which is the
                     // honest answer (the editor-mode entity isn't in the
                     // play-mode world).
-                    if (data.EntityHandle.UniqueId != 0)
+                    if (data.EntityHandle.Id != 0)
                     {
                         return TrecsRowIdentity.EntityPrefix
-                            + data.EntityHandle.UniqueId
+                            + data.EntityHandle.Id
                             + ":"
                             + data.EntityHandle.Version;
                     }
@@ -3745,8 +3743,7 @@ namespace Trecs
             return sel switch
             {
                 TrecsTemplateSelection ts => !string.IsNullOrEmpty(ts.Identity),
-                TrecsEntitySelection es => es.GetWorld() == _selectedWorld
-                    && es.Handle.UniqueId != 0,
+                TrecsEntitySelection es => es.GetWorld() == _selectedWorld && es.Handle.Id != 0,
                 TrecsAccessorSelection acs => !string.IsNullOrEmpty(acs.Identity),
                 TrecsComponentTypeSelection cs => !string.IsNullOrEmpty(cs.Identity),
                 TrecsSetSelection ss => !string.IsNullOrEmpty(ss.Identity),

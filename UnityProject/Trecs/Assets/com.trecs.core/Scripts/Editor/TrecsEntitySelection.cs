@@ -22,7 +22,7 @@ namespace Trecs
         {
             SetWorld(world);
             Handle = handle;
-            name = $"Entity id:{handle.UniqueId} v:{handle.Version}";
+            name = $"Entity id:{handle.Id} v:{handle.Version}";
         }
     }
 }

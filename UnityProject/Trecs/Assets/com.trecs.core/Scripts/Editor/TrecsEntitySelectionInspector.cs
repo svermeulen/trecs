@@ -170,7 +170,7 @@ namespace Trecs
             if (!selection.Handle.TryToIndex(world, out var entityIndex))
             {
                 ShowStatus(
-                    $"Entity id:{selection.Handle.UniqueId} v:{selection.Handle.Version} no longer exists."
+                    $"Entity id:{selection.Handle.Id} v:{selection.Handle.Version} no longer exists."
                 );
                 return;
             }
@@ -221,8 +221,7 @@ namespace Trecs
             GroupIndex group
         )
         {
-            _headerLabel.text =
-                $"Entity id:{selection.Handle.UniqueId} v:{selection.Handle.Version}";
+            _headerLabel.text = $"Entity id:{selection.Handle.Id} v:{selection.Handle.Version}";
             _templateLabel.text = $"Template: {rt.DebugName}";
             _worldLabel.text = $"World: {world.DebugName ?? "(unnamed)"}";
 

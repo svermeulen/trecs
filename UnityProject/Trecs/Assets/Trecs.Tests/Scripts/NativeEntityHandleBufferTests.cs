@@ -44,7 +44,7 @@ namespace Trecs.Tests
 
             // Buffer iteration order is group-storage order. For each slot,
             // the handle must match what GetEntityHandle(EntityIndex) reports.
-            // This exercises the two-load reconstruction path: reverse map -> uniqueId,
+            // This exercises the two-load reconstruction path: reverse map -> id,
             // then forward map -> Version.
             for (int i = 0; i < buffer.Length; i++)
             {
@@ -82,8 +82,8 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             NAssert.AreEqual(
-                originalHandle.UniqueId,
-                newHandle.UniqueId,
+                originalHandle.Id,
+                newHandle.Id,
                 "Freed forward-map slot should be reused"
             );
             NAssert.AreNotEqual(
@@ -125,7 +125,7 @@ namespace Trecs.Tests
             var handle3 = init3.Handle;
 
             // Removing the middle entity triggers swap-back of #3 into index 1.
-            // The reverse map's int at index 1 gets rewritten with #3's UniqueId.
+            // The reverse map's int at index 1 gets rewritten with #3's Id.
             a.RemoveEntity(init2.Handle);
             a.SubmitEntities();
 

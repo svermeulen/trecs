@@ -13,27 +13,29 @@ namespace Trecs
     public readonly struct EntityHandle : IEquatable<EntityHandle>, IStableHashProvider
     {
         /// <summary>
-        /// The unique numeric identifier for this entity, assigned at creation time.
+        /// The slot identifier for this entity within the world. Combined with <see cref="Version"/>
+        /// to form a stable handle that survives slot reuse. Not globally unique: slot ids are
+        /// recycled when entities are destroyed, with <see cref="Version"/> distinguishing reuses.
         /// </summary>
-        public readonly int UniqueId;
+        public readonly int Id;
 
         /// <summary>
         /// The version counter used to detect stale references after entity destruction and reuse.
         /// </summary>
         public readonly int Version;
 
-        internal int index => UniqueId - 1;
+        internal int index => Id - 1;
 
         /// <inheritdoc/>
         public static bool operator ==(EntityHandle obj1, EntityHandle obj2)
         {
-            return obj1.UniqueId == obj2.UniqueId && obj1.Version == obj2.Version;
+            return obj1.Id == obj2.Id && obj1.Version == obj2.Version;
         }
 
         /// <inheritdoc/>
         public static bool operator !=(EntityHandle obj1, EntityHandle obj2)
         {
-            return obj1.UniqueId != obj2.UniqueId || obj1.Version != obj2.Version;
+            return obj1.Id != obj2.Id || obj1.Version != obj2.Version;
         }
 
         /// <inheritdoc/>
@@ -49,13 +51,13 @@ namespace Trecs
         {
             // we don't want to use HashCode.Combine or GetHashCode because
             // it's not deterministic across restarts
-            return unchecked((int)math.hash(new uint2((uint)UniqueId, (uint)Version)));
+            return unchecked((int)math.hash(new uint2((uint)Id, (uint)Version)));
         }
 
-        public EntityHandle(int uniqueId, int version)
+        public EntityHandle(int id, int version)
             : this()
         {
-            this.UniqueId = uniqueId;
+            this.Id = id;
             this.Version = version;
         }
 
@@ -68,13 +70,13 @@ namespace Trecs
         /// <inheritdoc/>
         public bool Equals(EntityHandle other)
         {
-            return other.UniqueId == UniqueId && other.Version == Version;
+            return other.Id == Id && other.Version == Version;
         }
 
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"id:{UniqueId} version:{Version}";
+            return $"id:{Id} version:{Version}";
         }
 
         /// <summary>

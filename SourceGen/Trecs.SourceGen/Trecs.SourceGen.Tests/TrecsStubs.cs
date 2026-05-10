@@ -124,7 +124,7 @@ internal static class TrecsStubs
 
             public readonly struct EntityHandle
             {
-                public readonly int UniqueId;
+                public readonly int Id;
                 public readonly int Version;
                 public static EntityHandle Null => default;
                 public bool IsNull => false;
