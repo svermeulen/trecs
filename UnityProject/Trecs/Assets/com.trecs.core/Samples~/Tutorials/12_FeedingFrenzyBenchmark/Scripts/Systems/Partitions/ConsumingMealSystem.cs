@@ -56,10 +56,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
             if (distanceSqr < EatDistanceSqr)
             {
-                World.RemoveEntity(fish.TargetMeal.ToIndex(World));
+                World.RemoveEntity(fish.TargetMeal);
 
                 fish.TargetMeal = EntityHandle.Null;
-                World.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(fish.EntityIndex);
+                fish.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(World);
             }
         }
 
@@ -75,7 +75,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
             if (distanceSqr < EatDistanceSqr)
             {
-                World.RemoveEntity(fishMeal.Value.ToIndex(World));
+                World.RemoveEntity(fishMeal.Value);
 
                 fishMeal.Value = EntityHandle.Null;
                 World.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(entityIndex);
@@ -90,10 +90,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                 if (distanceSqr < EatDistanceSqr)
                 {
-                    World.RemoveEntity(fish.TargetMeal.ToIndex(World));
+                    World.RemoveEntity(fish.TargetMeal);
 
                     fish.TargetMeal = EntityHandle.Null;
-                    World.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(fish.EntityIndex);
+                    fish.MoveTo<FrenzyTags.Fish, FrenzyTags.NotEating>(World);
                 }
             }
         }

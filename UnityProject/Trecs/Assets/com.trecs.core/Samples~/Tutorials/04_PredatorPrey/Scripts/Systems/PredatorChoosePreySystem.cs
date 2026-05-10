@@ -1,5 +1,4 @@
 using Unity.Mathematics;
-using Trecs.Internal;
 
 namespace Trecs.Samples.PredatorPrey
 {
@@ -42,8 +41,8 @@ namespace Trecs.Samples.PredatorPrey
 
                 if (found)
                 {
-                    chosenPrey.ApproachingPredator = predator.EntityIndex.ToHandle(World);
-                    predator.ChosenPrey = chosenPrey.EntityIndex.ToHandle(World);
+                    chosenPrey.ApproachingPredator = predator.Handle(World);
+                    predator.ChosenPrey = chosenPrey.Handle(World);
                 }
             }
         }

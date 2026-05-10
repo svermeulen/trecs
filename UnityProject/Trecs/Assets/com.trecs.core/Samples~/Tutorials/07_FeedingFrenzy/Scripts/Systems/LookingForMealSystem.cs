@@ -1,5 +1,4 @@
 using Unity.Mathematics;
-using Trecs.Internal;
 
 namespace Trecs.Samples.FeedingFrenzy101
 {
@@ -37,8 +36,8 @@ namespace Trecs.Samples.FeedingFrenzy101
         void PairFishWithMeal(in Fish fish, in Meal meal)
         {
             // Store a stable handle to the meal (survives group moves)
-            fish.TargetMeal = meal.EntityIndex.ToHandle(World);
-            meal.ApproachingFish = fish.EntityIndex.ToHandle(World);
+            fish.TargetMeal = meal.Handle(World);
+            meal.ApproachingFish = fish.Handle(World);
 
             // Set destination at the meal's position, keeping the fish's Y
             var destPos = meal.Position;

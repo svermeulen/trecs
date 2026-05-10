@@ -83,7 +83,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
         void PairFishWithMeal(in Fish fish, in Meal meal)
         {
-            fish.TargetMeal = meal.EntityIndex.ToHandle(World);
+            fish.TargetMeal = meal.Handle(World);
             fish.DestinationPosition = meal.Position;
             fish.DestinationPosition.y = fish.Position.y;
 
@@ -92,10 +92,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             fish.Rotation = quaternion.LookRotationSafe(destinationDir, math.up());
             fish.Velocity = destinationDir * fish.Speed;
 
-            meal.ApproachingFish = fish.EntityIndex.ToHandle(World);
+            meal.ApproachingFish = fish.Handle(World);
 
-            World.MoveTo<FrenzyTags.Fish, FrenzyTags.Eating>(fish.EntityIndex);
-            World.MoveTo<FrenzyTags.Meal, FrenzyTags.Eating>(meal.EntityIndex);
+            fish.MoveTo<FrenzyTags.Fish, FrenzyTags.Eating>(World);
+            meal.MoveTo<FrenzyTags.Meal, FrenzyTags.Eating>(World);
         }
 
         void RunQueryGroupSlices()

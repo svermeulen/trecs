@@ -58,7 +58,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
 
                 var meal = mealIter.Current;
 
-                fish.TargetMeal = meal.EntityIndex.ToHandle(World);
+                var fishHandle = fish.Handle(World);
+                var mealHandle = meal.Handle(World);
+
+                fish.TargetMeal = mealHandle;
                 fish.DestinationPosition = meal.Position;
                 fish.DestinationPosition.y = fish.Position.y;
 
@@ -67,13 +70,13 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                 fish.Rotation = quaternion.LookRotationSafe(destinationDir, math.up());
                 fish.Velocity = destinationDir * fish.Speed;
 
-                meal.ApproachingFish = fish.EntityIndex.ToHandle(World);
+                meal.ApproachingFish = fishHandle;
 
-                World.Set<FrenzySets.NotEating>().Defer.Remove(fish.EntityIndex);
-                World.Set<FrenzySets.Eating>().Defer.Add(fish.EntityIndex);
+                World.Set<FrenzySets.NotEating>().Defer.Remove(fishHandle);
+                World.Set<FrenzySets.Eating>().Defer.Add(fishHandle);
 
-                World.Set<FrenzySets.NotEating>().Defer.Remove(meal.EntityIndex);
-                World.Set<FrenzySets.Eating>().Defer.Add(meal.EntityIndex);
+                World.Set<FrenzySets.NotEating>().Defer.Remove(mealHandle);
+                World.Set<FrenzySets.Eating>().Defer.Add(mealHandle);
             }
         }
 

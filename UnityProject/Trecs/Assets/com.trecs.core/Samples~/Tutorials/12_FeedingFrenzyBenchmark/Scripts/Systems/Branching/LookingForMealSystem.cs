@@ -68,7 +68,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
 
         void PairFishWithMeal(in Fish fish, in Meal meal)
         {
-            fish.TargetMeal = meal.EntityIndex.ToHandle(World);
+            fish.TargetMeal = meal.Handle(World);
             fish.DestinationPosition = meal.Position;
             fish.DestinationPosition.y = fish.Position.y;
 
@@ -77,7 +77,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             fish.Rotation = quaternion.LookRotationSafe(destinationDir, math.up());
             fish.Velocity = destinationDir * fish.Speed;
 
-            meal.ApproachingFish = fish.EntityIndex.ToHandle(World);
+            meal.ApproachingFish = fish.Handle(World);
         }
 
         void RunQueryGroupSlices()

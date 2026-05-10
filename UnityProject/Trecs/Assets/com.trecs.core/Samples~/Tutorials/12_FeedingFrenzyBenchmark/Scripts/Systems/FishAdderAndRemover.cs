@@ -175,14 +175,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             int removed = 0;
 
             foreach (
-                var entityIndex in World
+                var entity in World
                     .Query()
                     .WithTags<FrenzyTags.Fish>()
                     .InSet<FrenzySets.NotEating>()
-                    .EntityIndices()
+                    .Entities()
             )
             {
-                World.RemoveEntity(entityIndex);
+                entity.Remove();
                 removed++;
 
                 if (removed >= count)
@@ -195,7 +195,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 var fish in Fish.Query(World).WithTags<FrenzyTags.Fish>().InSet<FrenzySets.Eating>()
             )
             {
-                World.RemoveEntity(fish.EntityIndex);
+                fish.Remove(World);
                 World.RemoveEntity(fish.TargetMeal);
 
                 removed++;
@@ -220,7 +220,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     continue;
                 }
 
-                World.RemoveEntity(fish.EntityIndex);
+                fish.Remove(World);
                 removed++;
 
                 if (removed >= count)
@@ -236,7 +236,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     continue;
                 }
 
-                World.RemoveEntity(fish.EntityIndex);
+                fish.Remove(World);
                 World.RemoveEntity(fish.TargetMeal);
 
                 removed++;
@@ -255,13 +255,13 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             int removed = 0;
 
             foreach (
-                var entityIndex in World
+                var entity in World
                     .Query()
                     .WithTags<FrenzyTags.Fish, FrenzyTags.NotEating>()
-                    .EntityIndices()
+                    .Entities()
             )
             {
-                World.RemoveEntity(entityIndex);
+                entity.Remove();
                 removed++;
 
                 if (removed >= count)
@@ -272,7 +272,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             foreach (var fish in Fish.Query(World).WithTags<FrenzyTags.Fish, FrenzyTags.Eating>())
             {
-                World.RemoveEntity(fish.EntityIndex);
+                fish.Remove(World);
                 removed++;
 
                 if (removed >= count)

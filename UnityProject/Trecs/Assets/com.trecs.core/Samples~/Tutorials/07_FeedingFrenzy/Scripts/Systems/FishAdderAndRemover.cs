@@ -73,13 +73,13 @@ namespace Trecs.Samples.FeedingFrenzy101
 
             // Prefer removing idle fish first
             foreach (
-                var entityIndex in World
+                var entity in World
                     .Query()
                     .WithTags<FrenzyTags.Fish, FrenzyTags.NotEating>()
-                    .EntityIndices()
+                    .Entities()
             )
             {
-                World.RemoveEntity(entityIndex);
+                entity.Remove();
                 removed++;
                 if (removed >= count)
                     return;
@@ -87,13 +87,13 @@ namespace Trecs.Samples.FeedingFrenzy101
 
             // Then remove eating fish
             foreach (
-                var entityIndex in World
+                var entity in World
                     .Query()
                     .WithTags<FrenzyTags.Fish, FrenzyTags.Eating>()
-                    .EntityIndices()
+                    .Entities()
             )
             {
-                World.RemoveEntity(entityIndex);
+                entity.Remove();
                 removed++;
                 if (removed >= count)
                     return;
