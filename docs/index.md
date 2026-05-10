@@ -4,10 +4,10 @@ A high-performance Entity Component System framework for Unity, designed for **d
 
 ## Why Trecs
 
-- **Designed for determinism.** Fixed-timestep simulation, deterministic RNG, isolated input, and built-in snapshot / record / replay with desync detection.
-- **Burst & Jobs out of the box.** A source generator emits the job structs and chains the right `JobHandle` dependencies based on the components you read and write — no manual wiring.
 - **Cache-friendly storage.** Components live in contiguous structure-of-arrays buffers grouped by tag set.
 - **Small surface, lots of leverage.** Aspects bundle component access; sets give you sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; pointers (`SharedPtr` / `UniquePtr`) let components reference data on the heap.
+- **Burst & Jobs out of the box.** A source generator emits the job structs and chains the right `JobHandle` dependencies based on the components you read and write — no manual wiring.
+- **Designed for determinism.** Fixed-timestep simulation, deterministic RNG, isolated input, and built-in snapshot / record / replay with desync detection.
 - **Editor tooling.** A live entity inspector and a record / scrub / fork timeline window for diagnosing transient bugs.
 
 ## A taste
