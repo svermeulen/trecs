@@ -63,6 +63,31 @@ ref readonly CMeshReference meshRef = ref World.Component<CMeshReference>(entity
 Mesh mesh = meshRef.Mesh.Get(World);
 ```
 
+## Wrapping native collections
+
+Native collection types (`NativeList<T>`, `NativeHashMap<K,V>`, `NativeQueue<T>`, etc.) hold an internal pointer to externally-allocated storage, so they can't sit directly inside a component as-is. Wrapping them in a `NativeUniquePtr` is the standard pattern when you want one of these collections to be part of world state:
+
+```csharp
+public partial struct CCollisionPairBuffer : IEntityComponent
+{
+    public NativeUniquePtr<NativeList<CollisionPair>> Value;
+}
+```
+
+The component now holds an unmanaged pointer (legal as a component field), the `NativeList` lives behind it, and Trecs's [serialization](serialization.md) walks the inner list's raw data — so snapshots and recordings capture the collection contents for free.
+
+**Disposal caveat.** The inner collection's storage is allocated in Unity's allocator (whichever one you passed to `new NativeList<T>(allocator)`), not in Trecs's heap. Disposing the `NativeUniquePtr` only frees the heap slot holding the `NativeList` header — the underlying storage leaks unless you dispose the inner collection first:
+
+```csharp
+ref var list = ref buffer.Value.Get(world);
+list.Dispose();              // free the NativeList's storage
+buffer.Value.Dispose(world); // then free the heap slot
+```
+
+For entity-scoped buffers, do this in an `OnRemoved` handler. For world / scene globals (like `CCollisionPairBuffer`), do it in scene teardown before world disposal.
+
+For fixed-size cases where serialization isn't a concern, [`FixedList<N>`](fixed-collections.md) sits directly in a component without any wrapping.
+
 ## Shared pointers and reference counting
 
 `SharedPtr<T>` and `NativeSharedPtr<T>` use reference counting. Multiple components can reference the same data:
