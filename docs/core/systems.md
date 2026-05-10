@@ -177,7 +177,7 @@ new WorldBuilder()
     // ...
 ```
 
-For tie-breaking when no explicit constraint applies, use `[ExecutePriority(int)]` (default `0`; higher = later within the same phase):
+As an alternative to per-pair constraints, `[ExecutePriority(int)]` lets a system position itself broadly within its phase (default `0`; higher = later). Useful when you want a system to run before *everything* (or after everything) without naming each peer:
 
 ```csharp
 [ExecutePriority(-10)]  // Runs before systems with default priority
@@ -187,7 +187,7 @@ public partial class EarlySystem : ISystem { }
 public partial class LateSystem : ISystem { }
 ```
 
-Explicit constraints (`[ExecuteAfter]` / `[ExecuteBefore]`) always win over priority — priority only breaks ties among systems with no ordering constraint between them.
+Explicit constraints (`[ExecuteAfter]` / `[ExecuteBefore]`) always win over priority — priority only orders systems with no constraint between them.
 
 ## OnReady hook
 
