@@ -1,7 +1,6 @@
 using System;
 using Unity.Mathematics;
 using UnityEngine;
-using Trecs.Internal;
 
 namespace Trecs.Samples.FeedingFrenzy101
 {
@@ -28,7 +27,7 @@ namespace Trecs.Samples.FeedingFrenzy101
         static void ExecuteImpl(
             ref UniformScale scale,
             ref ColorComponent color,
-            EntityIndex entityIndex,
+            EntityHandle handle,
             in NativeWorldAccessor world,
             [PassThroughArgument] Settings settings
         )
@@ -37,7 +36,7 @@ namespace Trecs.Samples.FeedingFrenzy101
 
             if (scale.Value <= settings.MinScale)
             {
-                world.RemoveEntity(entityIndex);
+                world.RemoveEntity(handle);
                 return;
             }
 

@@ -233,6 +233,7 @@ namespace Trecs.SourceGen
             int bufferIndex = 0;
             bool hasAspect = false;
             bool hasEntityIndex = false;
+            bool hasEntityHandle = false;
             bool hasGlobalIndex = false;
             bool hasNwa = false;
             AspectIterationData? aspectData = null;
@@ -512,27 +513,56 @@ namespace Trecs.SourceGen
                     continue;
                 }
 
-                // Targeted diagnostic for EntityHandle / EntityAccessor — both are
-                // accepted in main-thread [ForEachEntity] callbacks but not in jobs.
+                // EntityHandle: per-iteration handle materialized from a hidden
+                // NativeEntityHandleBuffer field at no extra cost (single buffered read,
+                // no dictionary lookup).
                 if (
                     !paramHasSingleEntity
-                    && (
-                        SymbolAnalyzer.IsExactType(paramType, "EntityHandle", TrecsNamespaces.Trecs)
-                        || SymbolAnalyzer.IsExactType(
-                            paramType,
-                            "EntityAccessor",
-                            TrecsNamespaces.Trecs
-                        )
-                    )
+                    && SymbolAnalyzer.IsExactType(paramType, "EntityHandle", TrecsNamespaces.Trecs)
                 )
                 {
-                    var typeName = paramType.Name;
+                    if (param.RefKind != RefKind.None)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.ParameterMustBeByValue,
+                                param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
+                                paramName
+                            )
+                        );
+                        return null;
+                    }
+                    if (hasEntityHandle)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.DuplicateLoopParameter,
+                                param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
+                                paramName,
+                                "EntityHandle"
+                            )
+                        );
+                        return null;
+                    }
+                    hasEntityHandle = true;
+                    paramSlots.Add(AutoJobParam.EntityHandle(paramName));
+                    continue;
+                }
+
+                // EntityAccessor is a ref struct bound to a managed WorldAccessor —
+                // it can't cross into a job. Targeted diagnostic to point users at
+                // EntityHandle (the value-type equivalent) instead.
+                if (
+                    !paramHasSingleEntity
+                    && SymbolAnalyzer.IsExactType(paramType, "EntityAccessor", TrecsNamespaces.Trecs)
+                )
+                {
                     context.ReportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.InvalidParameterList,
                             param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
-                            $"Parameter '{paramName}' is {typeName}, which is supported in main-thread [ForEachEntity] callbacks but not in jobs. "
-                                + "Use EntityIndex (with `using Trecs.Internal;`) and convert to a handle via `ei.ToHandle(world)` if needed."
+                            $"Parameter '{paramName}' is EntityAccessor, which is supported in main-thread [ForEachEntity] callbacks but not in jobs (it carries a managed WorldAccessor reference). "
+                                + "Use EntityHandle instead — it's a plain value type and is materialized per-iteration from a NativeEntityHandleBuffer at no extra cost."
                         )
                     );
                     return null;
@@ -963,8 +993,8 @@ namespace Trecs.SourceGen
                         DiagnosticDescriptors.InvalidParameterList,
                         param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                         $"Parameter '{paramName}' of type '{PerformanceCache.GetDisplayString(paramType)}' is not recognized. "
-                            + "Expected: IAspect (in), IEntityComponent (in/ref), EntityIndex, NativeWorldAccessor, NativeSetRead<T>, NativeSetCommandBuffer<T>, [PassThroughArgument], or [FromWorld]. "
-                            + "Note: EntityHandle / EntityAccessor are accepted in main-thread [ForEachEntity] callbacks but not in jobs — use EntityIndex (with `using Trecs.Internal;`) and convert to a handle via `ei.ToHandle(world)` if needed."
+                            + "Expected: IAspect (in), IEntityComponent (in/ref), EntityHandle, EntityIndex, NativeWorldAccessor, NativeSetRead<T>, NativeSetCommandBuffer<T>, [PassThroughArgument], or [FromWorld]. "
+                            + "Note: EntityAccessor is accepted in main-thread [ForEachEntity] callbacks but not in jobs (it carries a managed WorldAccessor reference) — use EntityHandle in jobs."
                     )
                 );
                 return null;
@@ -1243,6 +1273,14 @@ namespace Trecs.SourceGen
             if (info.HasNativeWorldAccessor)
                 sb.AppendLine($"{fieldInd}public NativeWorldAccessor {GenPrefix}nwa;");
 
+            // NativeEntityHandleBuffer field — populated per-group at schedule time
+            // so the Execute shim can materialize the user's EntityHandle parameter
+            // as `_trecs_EntityHandles[i]` (no dictionary lookup, just an indexed read).
+            if (info.NeedsEntityHandleBuffer)
+                sb.AppendLine(
+                    $"{fieldInd}internal NativeEntityHandleBuffer {GenPrefix}EntityHandles;"
+                );
+
             // PassThrough fields.
             foreach (var p in info.Params)
             {
@@ -1411,6 +1449,9 @@ namespace Trecs.SourceGen
                         break;
                     case AutoJobParamRole.EntityIndex:
                         callArgs.Add($"{GenPrefix}ei");
+                        break;
+                    case AutoJobParamRole.EntityHandle:
+                        callArgs.Add($"{GenPrefix}EntityHandles[i]");
                         break;
                     case AutoJobParamRole.GlobalIndex:
                         callArgs.Add($"{GenPrefix}GlobalIndexOffset + i");
@@ -1634,6 +1675,11 @@ namespace Trecs.SourceGen
                     $"{innerBody}{GenPrefix}job.{GenPrefix}nwa = {GenPrefix}world.ToNative();"
                 );
 
+            if (info.NeedsEntityHandleBuffer)
+                sb.AppendLine(
+                    $"{innerBody}{GenPrefix}job.{GenPrefix}EntityHandles = {GenPrefix}world.GetEntityHandleBufferForJob({GenPrefix}group);"
+                );
+
             // Assign passthrough fields.
             foreach (var p in ptParams)
                 sb.AppendLine($"{innerBody}{GenPrefix}job.{GenPrefix}pt_{p.Name} = {p.Name};");
@@ -1833,6 +1879,11 @@ namespace Trecs.SourceGen
             if (info.HasNativeWorldAccessor)
                 sb.AppendLine(
                     $"{innerBody}{GenPrefix}job.{GenPrefix}nwa = {GenPrefix}world.ToNative();"
+                );
+
+            if (info.NeedsEntityHandleBuffer)
+                sb.AppendLine(
+                    $"{innerBody}{GenPrefix}job.{GenPrefix}EntityHandles = {GenPrefix}world.GetEntityHandleBufferForJob({GenPrefix}group);"
                 );
 
             // Assign passthrough fields.
@@ -2080,6 +2131,13 @@ namespace Trecs.SourceGen
             EntityIndex,
 
             /// <summary>
+            /// <c>EntityHandle</c> parameter — materialized per iteration from a hidden
+            /// <c>NativeEntityHandleBuffer</c> field populated per-group at schedule time.
+            /// Forwarded as <c>_trecs_EntityHandles[i]</c> at the call site.
+            /// </summary>
+            EntityHandle,
+
+            /// <summary>
             /// <c>int</c> parameter marked <c>[GlobalIndex]</c>. The Execute shim forwards
             /// <c>_trecs_GlobalIndexOffset + i</c> at the call site; the schedule overload
             /// accumulates the offset across the per-group loop. Mirrors JobGenerator's
@@ -2197,6 +2255,9 @@ namespace Trecs.SourceGen
 
             public static AutoJobParam EntityIndex(string name) =>
                 new(AutoJobParamRole.EntityIndex, null, name, "EntityIndex");
+
+            public static AutoJobParam EntityHandle(string name) =>
+                new(AutoJobParamRole.EntityHandle, null, name, "EntityHandle");
 
             public static AutoJobParam GlobalIndex(string name) =>
                 new(AutoJobParamRole.GlobalIndex, null, name, "int");
@@ -2368,9 +2429,17 @@ namespace Trecs.SourceGen
             public IterationCriteria Criteria { get; }
 
             public bool HasEntityIndex => Params.Any(p => p.Role == AutoJobParamRole.EntityIndex);
+            public bool HasEntityHandle => Params.Any(p => p.Role == AutoJobParamRole.EntityHandle);
             public bool HasGlobalIndex => Params.Any(p => p.Role == AutoJobParamRole.GlobalIndex);
             public bool HasNativeWorldAccessor =>
                 Params.Any(p => p.Role == AutoJobParamRole.NativeWorldAccessor);
+
+            /// <summary>
+            /// True if the generated job needs a <c>_trecs_EntityHandles</c>
+            /// <c>NativeEntityHandleBuffer</c> field, populated per-group at schedule time
+            /// and dereferenced as <c>_trecs_EntityHandles[i]</c> in the Execute shim.
+            /// </summary>
+            public bool NeedsEntityHandleBuffer => HasEntityHandle;
 
             /// <summary>
             /// True if the generated job needs a <c>_trecs_Group</c> field. Aspect always

@@ -201,6 +201,114 @@ public class JobGeneratorTests
     }
 
     [Test]
+    public void IterationJob_ComponentsModeWithEntityHandle_CompilesCleanly()
+    {
+        // Components-mode method takes an EntityHandle. JobGenerator should plumb
+        // a hidden `_trecs_EntityHandles` NativeEntityHandleBuffer field through
+        // the Execute shim and the per-group ScheduleParallel body.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial struct UpdateJob : Unity.Jobs.IJobFor
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    public void Execute(in CPos pos, Trecs.EntityHandle handle) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new JobGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+        Assert.That(run.GenErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
+    public void IterationJob_AspectModeWithEntityHandle_CompilesCleanly()
+    {
+        // Aspect-mode method takes (in AspectType, EntityHandle). The aspect
+        // ExtraParamOrder list should record the EntityHandle and the Execute
+        // call args should append `_trecs_EntityHandles[i]` after the aspect.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public partial struct PlayerView : Trecs.IAspect, Trecs.IRead<CPos> { }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial struct UpdateJob : Unity.Jobs.IJobFor
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    public void Execute(in PlayerView player, Trecs.EntityHandle handle) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new JobGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+        Assert.That(run.GenErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
+    public void IterationJob_AspectModeWithEntityIndexAndEntityHandle_CompilesCleanly()
+    {
+        // Both EntityIndex and EntityHandle on the same aspect-mode method —
+        // they're independent; ExtraParamOrder preserves declaration order so
+        // the call args land in the right slots.
+        const string source = """
+            using Trecs.Internal;
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public partial struct PlayerView : Trecs.IAspect, Trecs.IRead<CPos> { }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial struct UpdateJob : Unity.Jobs.IJobFor
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    public void Execute(
+                        in PlayerView player,
+                        EntityIndex ei,
+                        Trecs.EntityHandle handle
+                    ) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new JobGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+        Assert.That(run.GenErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
     public void IterationJob_FromWorldGenericAttribute_CompilesCleanly()
     {
         // [FromWorld<Tag>] — C# 11 generic-attribute shorthand on the FromWorld field.

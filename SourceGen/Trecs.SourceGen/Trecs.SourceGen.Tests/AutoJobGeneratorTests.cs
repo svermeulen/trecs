@@ -90,6 +90,80 @@ public class AutoJobGeneratorTests
     }
 
     [Test]
+    public void AutoJob_ComponentsModeWithEntityHandle_CompilesCleanly()
+    {
+        // Components-mode [WrapAsJob] takes an EntityHandle. AutoJobGenerator should
+        // emit a hidden `_trecs_EntityHandles` NativeEntityHandleBuffer field on the
+        // generated job struct, populated per-group at schedule time.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem : Trecs.ISystem
+                {
+                    public void Execute() { }
+
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    [Trecs.WrapAsJob]
+                    static void Process(in CPos pos, Trecs.EntityHandle handle) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new AutoJobGenerator(),
+                new AutoSystemGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+        Assert.That(run.GenErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
+    public void AutoJob_AspectModeWithEntityHandle_CompilesCleanly()
+    {
+        // Aspect-mode [WrapAsJob] taking (in AspectType, EntityHandle).
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public partial struct PlayerView : Trecs.IAspect, Trecs.IRead<CPos> { }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem : Trecs.ISystem
+                {
+                    public void Execute() { }
+
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    [Trecs.WrapAsJob]
+                    static void Process(in PlayerView player, Trecs.EntityHandle handle) { }
+                }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new AutoJobGenerator(),
+                new AutoSystemGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+        Assert.That(run.GenErrors, Is.Empty, run.Format());
+    }
+
+    [Test]
     public void AutoJob_WithFromWorldFactory_CompilesCleanly()
     {
         // [FromWorld] aspect-factory parameter — the canonical FeedingFrenzy pattern. The

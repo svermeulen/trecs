@@ -110,6 +110,27 @@ namespace Trecs.Tests
     }
 
     /// <summary>
+    /// Exercises the EntityHandle injection in a <c>[WrapAsJob]</c> method.
+    /// AutoJobGenerator should emit a hidden NativeEntityHandleBuffer field on
+    /// the generated job, populated per-group at schedule time, and dereference
+    /// `__EntityHandles[i]` into the user method's EntityHandle parameter.
+    /// </summary>
+    partial class WrapAsJobEntityHandleSystem : ISystem
+    {
+        [ForEachEntity(Tag = typeof(QId1))]
+        [WrapAsJob]
+        static void Tag(ref TestInt value, EntityHandle handle)
+        {
+            value.Value = handle.Id;
+        }
+
+        public void Execute()
+        {
+            Tag();
+        }
+    }
+
+    /// <summary>
     /// Covers the invariants that make the Trecs job scheduling layer safe to
     /// use: functional parity between main-thread and <c>[WrapAsJob]</c>
     /// variants, sequential write dependency tracking, and the read/read
@@ -213,6 +234,49 @@ namespace Trecs.Tests
                     beforeValues[i],
                     afterValues[i],
                     $"Entity {i}: readers mutated state from {beforeValues[i]} to {afterValues[i]}."
+                );
+            }
+        }
+
+        [Test]
+        public void WrapAsJob_WithEntityHandleParameter_MaterializesPerEntityHandle()
+        {
+            // Each entity's TestInt.Value gets overwritten with its own EntityHandle.Id.
+            // If the source-gen-emitted NativeEntityHandleBuffer plumbing is wrong,
+            // we'd see all entities collapse to the same Id (single buffer slot reused),
+            // a wrong index in the buffer, or zero/garbage Ids (uninitialized buffer).
+            using var env = EcsTestHelper.CreateEnvironment(
+                b => b.AddSystem(new WrapAsJobEntityHandleSystem()),
+                QTestEntityA.Template
+            );
+
+            var handles = new EntityHandle[EntityCount];
+            var a = env.Accessor;
+            for (int i = 0; i < EntityCount; i++)
+            {
+                handles[i] = a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = -1 })
+                    .Set(new TestFloat())
+                    .AssertComplete()
+                    .Handle;
+            }
+            a.SubmitEntities();
+
+            env.StepFixedFrames(1);
+
+            // After the job runs, each entity's TestInt.Value must equal its handle.Id.
+            // We pull the value back via the handle (not via buffer index) so the
+            // assertion stays robust if storage is reordered between submit and read.
+            for (int i = 0; i < EntityCount; i++)
+            {
+                var entity = a.Entity(handles[i]);
+                int actual = entity.Get<TestInt>().Read.Value;
+                NAssert.AreEqual(
+                    handles[i].Id,
+                    actual,
+                    $"Entity {i} (handle.Id={handles[i].Id}): job wrote {actual}. "
+                        + "If actual is 0 the EntityHandles buffer wasn't populated; "
+                        + "if it equals another entity's Id the per-iteration index is wrong."
                 );
             }
         }

@@ -603,6 +603,23 @@ internal static class TrecsStubs
                 // and the C# compiler resolves them either way.
                 public EntityHandle GetEntityHandle(EntityIndex entityIndex) => default;
                 public EntityAccessor Entity(EntityIndex entityIndex) => default;
+
+                // Job-side per-group EntityHandle buffer. Source-gen-emitted job code
+                // calls `__world.GetEntityHandleBufferForJob(group)` once per group at
+                // schedule time and stashes the result in a hidden field; the inner
+                // Execute(int i) shim then dereferences `__EntityHandles[i]` to pass the
+                // handle into a user method that took an EntityHandle parameter.
+                public NativeEntityHandleBuffer GetEntityHandleBufferForJob(GroupIndex group) =>
+                    default;
+            }
+
+            // NativeEntityHandleBuffer — read-only per-group view. Source-gen-emitted
+            // job structs hold one as a hidden field, indexed per-iteration to materialize
+            // the user's EntityHandle parameter.
+            public readonly struct NativeEntityHandleBuffer
+            {
+                public EntityHandle this[int index] => default;
+                public int Length => 0;
             }
 
             public class WorldInfo

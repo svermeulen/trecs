@@ -273,6 +273,95 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
         );
     }
 
+    [Test]
+    public void TRECS008_TwoEntityHandleParametersOnComponentJob()
+    {
+        // Mirrors the existing two-EntityIndex test — one EntityHandle is fine but
+        // two trips the duplicate-loop-parameter check.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial struct BadJob : Unity.Jobs.IJobFor
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    public void Execute(in CPos a, Trecs.EntityHandle one, Trecs.EntityHandle two) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS008",
+            new IIncrementalGenerator[] { new JobGenerator(), new EntityComponentGenerator() }
+        );
+    }
+
+    [Test]
+    public void TRECS008_EntityAccessorOnComponentJobIsRejected()
+    {
+        // EntityAccessor is a managed-bound ref struct — even though EntityHandle is
+        // now plumbed through jobs, EntityAccessor stays main-thread-only. JobGenerator
+        // emits a targeted message pointing the user at EntityHandle.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial struct BadJob : Unity.Jobs.IJobFor
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    public void Execute(in CPos a, Trecs.EntityAccessor entity) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS008",
+            new IIncrementalGenerator[] { new JobGenerator(), new EntityComponentGenerator() }
+        );
+    }
+
+    [Test]
+    public void TRECS008_TwoEntityHandleParametersOnAspectJob()
+    {
+        // Aspect-mode method allows EntityIndex AND EntityHandle each up to once;
+        // two of either trips the duplicate-loop-parameter check.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public partial struct PlayerView : Trecs.IAspect, Trecs.IRead<CPos> { }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial struct BadJob : Unity.Jobs.IJobFor
+                {
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    public void Execute(
+                        in PlayerView player,
+                        Trecs.EntityHandle one,
+                        Trecs.EntityHandle two
+                    ) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS008",
+            new IIncrementalGenerator[]
+            {
+                new JobGenerator(),
+                new AspectGenerator(),
+                new EntityComponentGenerator(),
+            }
+        );
+    }
+
     static void AssertDiagnostic(
         string source,
         string expectedId,

@@ -1,6 +1,5 @@
 using Unity.Mathematics;
 using Random = Unity.Mathematics.Random;
-using Trecs.Internal;
 
 namespace Trecs.Samples.AspectInterfaces
 {
@@ -32,12 +31,12 @@ namespace Trecs.Samples.AspectInterfaces
         }
 
         [ForEachEntity(typeof(SampleTags.Enemy))]
-        void DanceImpl(in EnemyView enemy)
+        void DanceImpl(in EnemyView enemy, EntityHandle handle)
         {
-            // Per-entity phase from EntityIndex so each enemy bobs out
+            // Per-entity phase from EntityHandle so each enemy bobs out
             // of sync — half the flock on the way up while the other
             // half is on the way down.
-            float phase = enemy.EntityIndex.Index * 1.7f;
+            float phase = handle.Id * 1.7f;
             float t = World.ElapsedTime * _settings.DanceFrequency + phase;
             // abs(sin) so the bob bottoms out at the spawn height
             // instead of dipping below the ground plane.
@@ -47,7 +46,11 @@ namespace Trecs.Samples.AspectInterfaces
         }
 
         [ForEachEntity(typeof(SampleTags.Enemy))]
-        void ExecuteImpl(in EnemyView enemy, [PassThroughArgument] in BossView boss)
+        void ExecuteImpl(
+            in EnemyView enemy,
+            EntityHandle handle,
+            [PassThroughArgument] in BossView boss
+        )
         {
             // Passive heal. Tuned so an enemy that just took a hit needs
             // a few seconds of fleeing before it's topped up and ready
@@ -77,14 +80,14 @@ namespace Trecs.Samples.AspectInterfaces
             {
                 enemy.Mood = EnemyMood.Fleeing;
 
-                // Seed from frame + entity index so each hit gets a
+                // Seed from frame + entity handle so each hit gets a
                 // distinct random stream without any persistent RNG
                 // state on the system (Trecs systems avoid mutable
                 // member state).
                 uint seed =
                     1u
                     + (uint)World.Frame * 0x9E3779B9u
-                    + (uint)enemy.EntityIndex.Index * 0x85EBCA6Bu;
+                    + (uint)handle.Id * 0x85EBCA6Bu;
                 var rng = new Random(seed);
                 float duration = rng.NextFloat(
                     _settings.MinFleeDuration,

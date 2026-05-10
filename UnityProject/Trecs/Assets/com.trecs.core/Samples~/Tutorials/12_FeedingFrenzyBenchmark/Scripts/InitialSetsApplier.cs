@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 
 namespace Trecs.Samples.FeedingFrenzyBenchmark
 {
@@ -30,15 +29,15 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         WorldAccessor World { get; }
 
         [ForEachEntity]
-        void OnFishAdded(EntityIndex entityIndex)
+        void OnFishAdded(EntityHandle handle)
         {
-            World.Set<FrenzySets.NotEating>().Defer.Add(entityIndex);
+            World.Set<FrenzySets.NotEating>().Defer.Add(handle);
         }
 
         [ForEachEntity]
-        void OnMealAdded(EntityIndex entityIndex)
+        void OnMealAdded(EntityHandle handle)
         {
-            World.Set<FrenzySets.NotEating>().Defer.Add(entityIndex);
+            World.Set<FrenzySets.NotEating>().Defer.Add(handle);
         }
 
         public void Dispose()

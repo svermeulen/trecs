@@ -1,12 +1,11 @@
 using Unity.Mathematics;
-using Trecs.Internal;
 
 namespace Trecs.Samples.FeedingFrenzy101
 {
     /// <summary>
     /// Bobs idle (NotEating) fish up and down with a sinusoidal wave.
     ///
-    /// Demonstrates: [WrapAsJob] with EntityIndex for per-entity variation.
+    /// Demonstrates: [WrapAsJob] with EntityHandle for per-entity variation.
     /// Each fish gets a unique phase offset via the golden ratio so they
     /// bob at different times for visual appeal.
     ///
@@ -18,9 +17,9 @@ namespace Trecs.Samples.FeedingFrenzy101
 
         [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
         [WrapAsJob]
-        static void Execute(in Fish fish, EntityIndex entityIndex, in NativeWorldAccessor world)
+        static void Execute(in Fish fish, EntityHandle handle, in NativeWorldAccessor world)
         {
-            float phaseOffset = entityIndex.Index * GoldenRatio;
+            float phaseOffset = handle.Id * GoldenRatio;
             float y = 0.3f * fish.UniformScale * math.sin(3f * world.ElapsedTime + phaseOffset);
             var pos = fish.SimPosition;
             pos.y = y;

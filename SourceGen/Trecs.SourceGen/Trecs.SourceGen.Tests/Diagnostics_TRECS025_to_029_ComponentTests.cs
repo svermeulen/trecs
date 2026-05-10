@@ -265,6 +265,108 @@ public class Diagnostics_TRECS025_to_029_ComponentTests
         );
     }
 
+    [Test]
+    public void TRECS025_DuplicateEntityHandleParameterOnAutoJob()
+    {
+        // [WrapAsJob] static method may declare at most one EntityHandle parameter —
+        // a second trips DuplicateLoopParameter (the "EntityHandle" flavor).
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem : Trecs.ISystem
+                {
+                    public void Execute() { }
+
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    [Trecs.WrapAsJob]
+                    static void Process(in CPos a, Trecs.EntityHandle one, Trecs.EntityHandle two) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS025",
+            new IIncrementalGenerator[]
+            {
+                new AutoJobGenerator(),
+                new AutoSystemGenerator(),
+                new EntityComponentGenerator(),
+            }
+        );
+    }
+
+    [Test]
+    public void TRECS028_EntityHandleParameterUsesRefModifierOnAutoJob()
+    {
+        // EntityHandle on a [WrapAsJob] method must be passed by value — `ref` is rejected.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem : Trecs.ISystem
+                {
+                    public void Execute() { }
+
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    [Trecs.WrapAsJob]
+                    static void Process(in CPos a, ref Trecs.EntityHandle handle) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS028",
+            new IIncrementalGenerator[]
+            {
+                new AutoJobGenerator(),
+                new AutoSystemGenerator(),
+                new EntityComponentGenerator(),
+            }
+        );
+    }
+
+    [Test]
+    public void TRECS005_EntityAccessorOnAutoJobIsRejected()
+    {
+        // EntityAccessor is a managed-bound ref struct — it's main-thread-only even
+        // though EntityHandle now works in jobs. AutoJobGenerator emits a targeted
+        // InvalidParameterList (TRECS005) message pointing the user at EntityHandle.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct PlayerTag : Trecs.ITag { }
+
+                public partial class MySystem : Trecs.ISystem
+                {
+                    public void Execute() { }
+
+                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
+                    [Trecs.WrapAsJob]
+                    static void Process(in CPos a, Trecs.EntityAccessor entity) { }
+                }
+            }
+            """;
+
+        AssertDiagnostic(
+            source,
+            "TRECS005",
+            new IIncrementalGenerator[]
+            {
+                new AutoJobGenerator(),
+                new AutoSystemGenerator(),
+                new EntityComponentGenerator(),
+            }
+        );
+    }
+
     static void AssertDiagnostic(
         string source,
         string expectedId,

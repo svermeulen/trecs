@@ -491,54 +491,99 @@ namespace Trecs.SourceGen
             componentTypes.AddRange(aspectData.WriteTypes);
             componentTypes = PerformanceCache.GetDistinctTypes(componentTypes).ToList();
 
-            // Optional EntityIndex second parameter.
+            // Optional EntityIndex / EntityHandle parameters following the aspect.
+            // Either, both, or neither — order is preserved so the Execute call args
+            // line up with the user's parameter order. Anything else after the aspect
+            // is rejected.
             bool hasEntityIndex = false;
-            if (parameters.Count >= 2)
+            bool hasEntityHandle = false;
+            var extraParamOrder = new List<AspectExtraParamKind>();
+            ParameterSyntax? offendingExtraParam = null;
+            ITypeSymbol? offendingExtraType = null;
+            bool offendingIsComponent = false;
+            for (int i = 1; i < parameters.Count; i++)
             {
-                if (parameters[1].Type?.ToString() == "EntityIndex")
-                    hasEntityIndex = true;
-            }
-            if (parameters.Count > (hasEntityIndex ? 2 : 1))
-            {
-                // Detect the "mixed signature" case where an aspect parameter is followed
-                // by a direct component parameter — this is intentionally not supported.
-                // Aspects are the canonical way to declare a method's component requirements
-                // in Trecs; if you need an additional component, add it to the aspect's
-                // IRead<T> / IWrite<T> interface list. Aspects are typically defined per
-                // method, so this is usually a one-line addition.
-                int extraStart = hasEntityIndex ? 2 : 1;
-                ParameterSyntax? offendingComponentParam = null;
-                ITypeSymbol? offendingComponentType = null;
-                for (int i = extraStart; i < parameters.Count; i++)
+                var paramType =
+                    parameters[i].Type != null
+                        ? semanticModel.GetTypeInfo(parameters[i].Type!).Type
+                        : null;
+                if (paramType == null)
                 {
-                    var paramType =
-                        parameters[i].Type != null
-                            ? semanticModel.GetTypeInfo(parameters[i].Type!).Type
-                            : null;
-                    if (
-                        paramType != null
-                        && SymbolAnalyzer.ImplementsInterface(
-                            paramType,
-                            "IEntityComponent",
-                            TrecsNamespaces.Trecs
-                        )
-                    )
-                    {
-                        offendingComponentParam = parameters[i];
-                        offendingComponentType = paramType;
-                        break;
-                    }
+                    offendingExtraParam = parameters[i];
+                    break;
                 }
 
-                if (offendingComponentParam != null)
+                bool isEntityIndex =
+                    paramType.Name == "EntityIndex"
+                    && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
+                        == TrecsNamespaces.TrecsInternal;
+                bool isEntityHandleParam =
+                    paramType.Name == "EntityHandle"
+                    && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
+                        == TrecsNamespaces.Trecs;
+
+                if (isEntityIndex)
                 {
+                    if (hasEntityIndex)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.InvalidJobParameterList,
+                                parameters[i].GetLocation(),
+                                $"Method '{method.Identifier.Text}' has more than one EntityIndex parameter — only one is allowed."
+                            )
+                        );
+                        return null;
+                    }
+                    hasEntityIndex = true;
+                    extraParamOrder.Add(AspectExtraParamKind.EntityIndex);
+                    continue;
+                }
+
+                if (isEntityHandleParam)
+                {
+                    if (hasEntityHandle)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.InvalidJobParameterList,
+                                parameters[i].GetLocation(),
+                                $"Method '{method.Identifier.Text}' has more than one EntityHandle parameter — only one is allowed."
+                            )
+                        );
+                        return null;
+                    }
+                    hasEntityHandle = true;
+                    extraParamOrder.Add(AspectExtraParamKind.EntityHandle);
+                    continue;
+                }
+
+                offendingExtraParam = parameters[i];
+                offendingExtraType = paramType;
+                offendingIsComponent = SymbolAnalyzer.ImplementsInterface(
+                    paramType,
+                    "IEntityComponent",
+                    TrecsNamespaces.Trecs
+                );
+                break;
+            }
+
+            if (offendingExtraParam != null)
+            {
+                if (offendingIsComponent)
+                {
+                    // The "mixed signature" case where an aspect parameter is followed
+                    // by a direct component parameter — intentionally not supported.
+                    // Aspects are the canonical way to declare a method's component
+                    // requirements in Trecs; add the component to the aspect's IRead<T>
+                    // / IWrite<T> interface list instead.
                     context.ReportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.MixedAspectAndComponentParams,
-                            offendingComponentParam.GetLocation(),
+                            offendingExtraParam.GetLocation(),
                             method.Identifier.Text,
-                            offendingComponentParam.Identifier.Text,
-                            PerformanceCache.GetDisplayString(offendingComponentType!)
+                            offendingExtraParam.Identifier.Text,
+                            PerformanceCache.GetDisplayString(offendingExtraType!)
                         )
                     );
                 }
@@ -548,7 +593,7 @@ namespace Trecs.SourceGen
                         Diagnostic.Create(
                             DiagnosticDescriptors.InvalidJobParameterList,
                             method.GetLocation(),
-                            "[ForEachEntity] iteration method on a job takes (in AspectType, EntityIndex?). Extra parameters are not supported."
+                            "[ForEachEntity] iteration method on a job takes (in AspectType, EntityIndex?, EntityHandle?). Extra parameters are not supported."
                         )
                     );
                 }
@@ -575,6 +620,8 @@ namespace Trecs.SourceGen
                 readComponentTypes: aspectData.ReadTypes.ToList(),
                 writeComponentTypes: aspectData.WriteTypes.ToList(),
                 hasEntityIndexParameter: hasEntityIndex,
+                hasEntityHandleParameter: hasEntityHandle,
+                extraParamOrder: extraParamOrder,
                 criteria: criteria
             );
         }
@@ -603,6 +650,7 @@ namespace Trecs.SourceGen
             var paramSlots = new List<ComponentsParam>();
             int bufferIndex = 0;
             bool hasEntityIndex = false;
+            bool hasEntityHandle = false;
             bool hasGlobalIndex = false;
             foreach (var p in parameters)
             {
@@ -680,25 +728,43 @@ namespace Trecs.SourceGen
                     continue;
                 }
 
-                // Targeted diagnostic for EntityHandle / EntityAccessor — both are
-                // accepted in main-thread [ForEachEntity] callbacks but not in jobs.
                 bool isEntityHandle =
                     paramType.Name == "EntityHandle"
                     && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
                         == TrecsNamespaces.Trecs;
+                if (isEntityHandle)
+                {
+                    if (hasEntityHandle)
+                    {
+                        context.ReportDiagnostic(
+                            Diagnostic.Create(
+                                DiagnosticDescriptors.InvalidJobParameterList,
+                                p.GetLocation(),
+                                $"Method '{method.Identifier.Text}' has more than one EntityHandle parameter — only one is allowed."
+                            )
+                        );
+                        return null;
+                    }
+                    hasEntityHandle = true;
+                    paramSlots.Add(ComponentsParam.EntityHandleParam(p.Identifier.Text));
+                    continue;
+                }
+
+                // EntityAccessor is a ref struct bound to a managed WorldAccessor —
+                // it can't cross into a job. Targeted diagnostic to point users at
+                // EntityHandle (the value-type equivalent) instead.
                 bool isEntityAccessor =
                     paramType.Name == "EntityAccessor"
                     && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
                         == TrecsNamespaces.Trecs;
-                if (isEntityHandle || isEntityAccessor)
+                if (isEntityAccessor)
                 {
-                    var typeName = isEntityHandle ? "EntityHandle" : "EntityAccessor";
                     context.ReportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.InvalidJobParameterList,
                             p.GetLocation(),
-                            $"Parameter '{p.Identifier.Text}' is {typeName}, which is supported in main-thread [ForEachEntity] callbacks but not in jobs. "
-                                + "Use EntityIndex (with `using Trecs.Internal;`) and convert to a handle via `ei.ToHandle(world)` if needed."
+                            $"Parameter '{p.Identifier.Text}' is EntityAccessor, which is supported in main-thread [ForEachEntity] callbacks but not in jobs (it carries a managed WorldAccessor reference). "
+                                + "Use EntityHandle instead — it's a plain value type and is materialized per-iteration from a NativeEntityHandleBuffer at no extra cost."
                         )
                     );
                     return null;
@@ -726,7 +792,7 @@ namespace Trecs.SourceGen
                         Diagnostic.Create(
                             DiagnosticDescriptors.InvalidParameterList,
                             p.GetLocation(),
-                            $"Parameter '{p.Identifier.Text}' must implement IEntityComponent (or be EntityIndex / [GlobalIndex] int) — Trecs jobs do not support custom pass-through arguments."
+                            $"Parameter '{p.Identifier.Text}' must implement IEntityComponent (or be EntityHandle / EntityIndex / [GlobalIndex] int) — Trecs jobs do not support custom pass-through arguments."
                         )
                     );
                     return null;
@@ -1659,6 +1725,11 @@ namespace Trecs.SourceGen
 
             if (info.NeedsGlobalIndexOffset)
                 sb.AppendLine($"{ind}private int {FromWorldEmitter.GenPrefix}GlobalIndexOffset;");
+
+            if (info.NeedsEntityHandleBuffer)
+                sb.AppendLine(
+                    $"{ind}private NativeEntityHandleBuffer {FromWorldEmitter.GenPrefix}EntityHandles;"
+                );
         }
 
         static void EmitExecuteShim(StringBuilder sb, JobInfo info, string ind)
@@ -1681,8 +1752,18 @@ namespace Trecs.SourceGen
                     $"{body}var {FromWorldEmitter.GenPrefix}view = new {ai.AspectTypeName}({FromWorldEmitter.GenPrefix}ei, {ctorArgs});"
                 );
                 sb.Append($"{body}Execute(in {FromWorldEmitter.GenPrefix}view");
-                if (ai.HasEntityIndexParameter)
-                    sb.Append($", {FromWorldEmitter.GenPrefix}ei");
+                foreach (var kind in ai.ExtraParamOrder)
+                {
+                    switch (kind)
+                    {
+                        case AspectExtraParamKind.EntityIndex:
+                            sb.Append($", {FromWorldEmitter.GenPrefix}ei");
+                            break;
+                        case AspectExtraParamKind.EntityHandle:
+                            sb.Append($", {FromWorldEmitter.GenPrefix}EntityHandles[i]");
+                            break;
+                    }
+                }
                 sb.AppendLine(");");
             }
             else
@@ -1704,7 +1785,7 @@ namespace Trecs.SourceGen
                     );
 
                 // Build call args in original parameter order so the user can mix
-                // components / EntityIndex / [GlobalIndex] freely.
+                // components / EntityIndex / EntityHandle / [GlobalIndex] freely.
                 var callArgs = new List<string>(ci.Parameters.Count);
                 foreach (var p in ci.Parameters)
                 {
@@ -1718,6 +1799,9 @@ namespace Trecs.SourceGen
                         }
                         case ComponentsParamRole.EntityIndex:
                             callArgs.Add($"{FromWorldEmitter.GenPrefix}ei");
+                            break;
+                        case ComponentsParamRole.EntityHandle:
+                            callArgs.Add($"{FromWorldEmitter.GenPrefix}EntityHandles[i]");
                             break;
                         case ComponentsParamRole.GlobalIndex:
                             callArgs.Add($"{FromWorldEmitter.GenPrefix}GlobalIndexOffset + i");
@@ -1956,6 +2040,11 @@ namespace Trecs.SourceGen
                     $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}GlobalIndexOffset = {FromWorldEmitter.GenPrefix}queryIndexOffset;"
                 );
 
+            if (info.NeedsEntityHandleBuffer)
+                sb.AppendLine(
+                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}EntityHandles = {FromWorldEmitter.GenPrefix}world.GetEntityHandleBufferForJob({FromWorldEmitter.GenPrefix}group);"
+                );
+
             // Assign [FromWorld] field values.
             FromWorldEmitter.EmitFromWorldFieldAssignments(sb, body, orderedEmits);
             EmitSingleEntityFieldsAssignment(sb, body, info.SingleEntityFields);
@@ -2122,6 +2211,11 @@ namespace Trecs.SourceGen
             if (info.NeedsGlobalIndexOffset)
                 sb.AppendLine(
                     $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}GlobalIndexOffset = {FromWorldEmitter.GenPrefix}queryIndexOffset;"
+                );
+
+            if (info.NeedsEntityHandleBuffer)
+                sb.AppendLine(
+                    $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.GenPrefix}EntityHandles = {FromWorldEmitter.GenPrefix}world.GetEntityHandleBufferForJob({FromWorldEmitter.GenPrefix}group);"
                 );
 
             // Assign [FromWorld] field values.
@@ -2397,6 +2491,14 @@ namespace Trecs.SourceGen
             public bool NeedsGlobalIndexOffset =>
                 Kind == JobKind.Components && Components!.HasGlobalIndexParameter;
 
+            // True if the generated job needs a `_trecs_EntityHandles` NativeEntityHandleBuffer
+            // field. Set when the user took an EntityHandle iteration parameter (in either
+            // aspect or components mode); the field is populated per-group at schedule time
+            // and dereferenced as `__EntityHandles[i]` in the Execute shim.
+            public bool NeedsEntityHandleBuffer =>
+                (Kind == JobKind.Aspect && Aspect!.HasEntityHandleParameter)
+                || (Kind == JobKind.Components && Components!.HasEntityHandleParameter);
+
             public JobInfo(
                 INamedTypeSymbol symbol,
                 StructDeclarationSyntax structDecl,
@@ -2480,6 +2582,12 @@ namespace Trecs.SourceGen
             public List<ITypeSymbol> ReadComponentTypes { get; }
             public List<ITypeSymbol> WriteComponentTypes { get; }
             public bool HasEntityIndexParameter { get; }
+            public bool HasEntityHandleParameter { get; }
+
+            // For aspect-mode with extra params, we need to know the original
+            // declaration order so the Execute call args land in the same slots
+            // the user wrote.
+            public List<AspectExtraParamKind> ExtraParamOrder { get; }
             public IterationCriteria Criteria { get; }
 
             public AspectIterationInfo(
@@ -2489,6 +2597,8 @@ namespace Trecs.SourceGen
                 List<ITypeSymbol> readComponentTypes,
                 List<ITypeSymbol> writeComponentTypes,
                 bool hasEntityIndexParameter,
+                bool hasEntityHandleParameter,
+                List<AspectExtraParamKind> extraParamOrder,
                 IterationCriteria criteria
             )
             {
@@ -2498,6 +2608,8 @@ namespace Trecs.SourceGen
                 ReadComponentTypes = readComponentTypes;
                 WriteComponentTypes = writeComponentTypes;
                 HasEntityIndexParameter = hasEntityIndexParameter;
+                HasEntityHandleParameter = hasEntityHandleParameter;
+                ExtraParamOrder = extraParamOrder;
                 Criteria = criteria;
             }
 
@@ -2531,6 +2643,8 @@ namespace Trecs.SourceGen
 
             public bool HasEntityIndexParameter =>
                 Parameters.Any(p => p.Role == ComponentsParamRole.EntityIndex);
+            public bool HasEntityHandleParameter =>
+                Parameters.Any(p => p.Role == ComponentsParamRole.EntityHandle);
             public bool HasGlobalIndexParameter =>
                 Parameters.Any(p => p.Role == ComponentsParamRole.GlobalIndex);
             public IEnumerable<ComponentsParam> Components =>
@@ -2541,7 +2655,18 @@ namespace Trecs.SourceGen
         {
             Component,
             EntityIndex,
+            EntityHandle,
             GlobalIndex,
+        }
+
+        /// <summary>
+        /// Order-tracking for the optional entity-shaped parameters following
+        /// the aspect param in an aspect-mode <c>[ForEachEntity]</c> job method.
+        /// </summary>
+        internal enum AspectExtraParamKind
+        {
+            EntityIndex,
+            EntityHandle,
         }
 
         internal class ComponentsParam
@@ -2580,6 +2705,9 @@ namespace Trecs.SourceGen
 
             public static ComponentsParam EntityIndexParam(string name) =>
                 new(ComponentsParamRole.EntityIndex, null, false, false, name, -1);
+
+            public static ComponentsParam EntityHandleParam(string name) =>
+                new(ComponentsParamRole.EntityHandle, null, false, false, name, -1);
 
             public static ComponentsParam GlobalIndexParam(string name) =>
                 new(ComponentsParamRole.GlobalIndex, null, false, false, name, -1);
