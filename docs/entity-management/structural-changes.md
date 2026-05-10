@@ -52,7 +52,7 @@ To react to submission boundaries, see [Entity Events — Frame Events](entity-e
 
 ## Deterministic submission
 
-For replay and networking, enable deterministic ordering:
+Any workflow that needs the simulation to evolve identically across runs — recording / replay, networked rollback, snapshot-load consistency, reproducible tests, debug-replay tooling — wants deterministic submission ordering:
 
 ```csharp
 var settings = new WorldSettings
@@ -61,7 +61,7 @@ var settings = new WorldSettings
 };
 ```
 
-This sorts structural operations queued from Burst jobs (via [`NativeWorldAccessor`](../performance/jobs-and-burst.md)) before applying them, making submission order independent of job-thread interleaving. Operations queued from the main thread are already deterministic — they apply in the order user code queued them — so this setting only affects the native path. The cost is a single sort per submission, cheap enough to enable by default if you may ever record, replay, or network the simulation.
+This sorts structural operations queued from Burst jobs (via [`NativeWorldAccessor`](../performance/jobs-and-burst.md)) before applying them, so submission order doesn't depend on job-thread interleaving. Operations queued from the main thread are already deterministic — they apply in the order user code queued them — so the setting only affects the native path. The cost is a single sort per submission, cheap enough to leave on by default if you may ever need a reproducible run.
 
 When you queue structural changes from a Burst job through `NativeWorldAccessor`, pass a `sortKey` to control the deterministic order:
 
