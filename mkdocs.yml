@@ -55,10 +55,10 @@ nav:
       - Jobs & Burst: performance/jobs-and-burst.md
       - Dependency Tracking: performance/dependency-tracking.md
   - Guides:
+      - OOP Integration: guides/oop-integration.md
       - Trecs vs Unity ECS: guides/trecs-vs-unity-ecs.md
       - Best Practices: guides/best-practices.md
       - Gotchas: guides/gotchas.md
-      - OOP Integration: guides/oop-integration.md
       - Entity Subset Patterns: guides/entity-subset-patterns.md
       - Debugging & Troubleshooting: guides/debugging.md
   - Advanced:
