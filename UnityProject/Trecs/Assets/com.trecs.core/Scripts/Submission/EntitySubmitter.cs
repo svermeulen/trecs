@@ -1240,7 +1240,7 @@ namespace Trecs.Internal
 
         // Drives the cascade loop in SubmitEntitiesImpl: returns true while
         // there's still entity-level work to apply. Deferred set ops
-        // (Set&lt;T&gt;().Defer.Add / .Remove / .Clear) are intentionally excluded here.
+        // (Set<T>().Defer.Add / .Remove / .Clear) are intentionally excluded here.
         // They get drained by FlushAllDeferredOps at the end of each loop
         // iteration, so a set op queued by an observer in iteration N is
         // applied at the boundary between N and N+1. The hidden invariant

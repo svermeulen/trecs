@@ -110,9 +110,11 @@ NativeSetCommandBuffer<HighlightedParticle> highlightedWrite;
 // Check membership
 bool isHighlighted = highlightedRead.Exists(entityIndex);
 
-// Modify (thread-safe, immediate within job)
+// Modify (queued, applied after the writer's SetFlushJob — same frame, before any
+// reader job that depends on the set)
 highlightedWrite.Add(entityIndex);
 highlightedWrite.Remove(entityIndex);
+highlightedWrite.Clear();   // Order-insensitive: wins over any Add/Remove in this writer cycle.
 ```
 
 ## External job tracking

@@ -65,7 +65,7 @@ namespace Trecs
                 _sourceDict.Count == _count,
                 "Set entry mutated during iteration. Add / Remove / "
                     + "Clear on the same set + same group is not allowed while iterating that "
-                    + "group. Use the deferred Set&lt;T&gt;().Defer path instead, or stage the mutations "
+                    + "group. Use the deferred Set<T>().Defer path instead, or stage the mutations "
                     + "in a separate buffer and apply them after the iteration completes."
             );
         }
@@ -116,7 +116,7 @@ namespace Trecs
                     _sourceDict.Count == _count,
                     "Set entry mutated during iteration. Add / Remove / "
                         + "Clear on the same set + same group is not allowed while iterating "
-                        + "that group. Use the deferred Set&lt;T&gt;().Defer path instead, or stage the "
+                        + "that group. Use the deferred Set<T>().Defer path instead, or stage the "
                         + "mutations in a separate buffer and apply them after the iteration "
                         + "completes."
                 );
