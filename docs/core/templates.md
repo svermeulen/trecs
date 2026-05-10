@@ -117,13 +117,16 @@ public partial class Player : ITemplate,
 
 ## Partitions
 
-Partitions are mutually exclusive tag combinations a template can move between at runtime. Entities in different partitions are stored in separate contiguous arrays — useful when a hot iteration over one state (`Active`) needs to be cache-friendly:
+Partitions are mutually exclusive tag combinations a template can move between at runtime. Entities in different partitions are stored in separate contiguous arrays — useful when a hot iteration over one state needs to be cache-friendly. Declare them with `IPartitionedBy<...>`.
+
+### Presence/absence (binary)
+
+Single-tag form: the tag is either present or absent. Two partitions are emitted automatically.
 
 ```csharp
 public partial class BallEntity : ITemplate,
     ITagged<BallTags.Ball>,
-    IHasPartition<BallTags.Active>,
-    IHasPartition<BallTags.Resting>
+    IPartitionedBy<BallTags.Active>
 {
     Position Position;
     Velocity Velocity;
@@ -132,29 +135,59 @@ public partial class BallEntity : ITemplate,
 }
 ```
 
-Each `IHasPartition` declares a valid partition. The entity always carries the base tag (`BallTags.Ball`) plus one of the partition tag sets.
-
-### Transitions
-
-Move an entity between partitions with `MoveTo`:
-
-```csharp
-// Hits the ground → Resting
-World.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
-
-// Or via an aspect
-ball.MoveTo<BallTags.Ball, BallTags.Active>(World);
-```
-
-Systems target specific partitions like any other tag combination:
+There is no companion `Inactive` / `Resting` tag — the absent partition has no name. Query it with `Without =`:
 
 ```csharp
 [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
 void UpdateActive(in ActiveBall ball) { /* ... */ }
 
-[ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
+[ForEachEntity(typeof(BallTags.Ball), Without = typeof(BallTags.Active))]
 void UpdateResting(in RestingBall ball) { /* ... */ }
 ```
+
+### Multi-variant
+
+For dimensions with three or more mutually exclusive states, list every variant:
+
+```csharp
+public partial class Enemy : ITemplate,
+    ITagged<GameTags.Enemy>,
+    IPartitionedBy<MoveState.Walking, MoveState.Running, MoveState.Idle>
+{ /* ... */ }
+```
+
+The source generator emits one partition per variant.
+
+### Multiple dimensions (cross product)
+
+Each `IPartitionedBy<...>` is one independent dimension. Stack them and the source generator emits the cross product as concrete partitions automatically — authors write **O(N·k)** declarations and get **O(k^N)** partitions.
+
+```csharp
+public partial class Enemy : ITemplate,
+    ITagged<GameTags.Enemy>,
+    IPartitionedBy<HealthState.Alive, HealthState.Dead>,    // 2 variants
+    IPartitionedBy<Visibility.Visible, Visibility.Hidden>,  // 2 variants
+    IPartitionedBy<GameTags.Poisoned>                       // presence/absence
+{ /* ... */ }
+// → 8 partitions: every (Alive|Dead) × (Visible|Hidden) × (Poisoned-present|absent) combination.
+```
+
+### Transitions
+
+Tag-change verbs handle moves between partitions; the runtime resolves the destination from the entity's current group plus the tag delta.
+
+```csharp
+// Presence/absence dim:
+ball.AddTag<BallTags.Active>(World);    // start simulating
+ball.RemoveTag<BallTags.Active>(World); // ground → idle
+
+// Multi-variant dim (also valid for presence/absence):
+enemy.SetTag<MoveState.Running>(World); // switch the active variant in MoveState's dim
+```
+
+`SetTag<T>` and `AddTag<T>` are aliases — `SetTag` reads more naturally for variant dims (a "switch"), `AddTag` for presence/absence (a "turn on"). `RemoveTag<T>` is only valid for presence/absence dims; for multi-variant dims there is no defined "absent" partition, so use `SetTag`/`AddTag` to switch instead.
+
+For a fully-specified destination, the runtime form `World.MoveTo(entityIndex, tagSet)` still works.
 
 Partitions are an optimization — see [Entity Subset Patterns](../guides/entity-subset-patterns.md) for when to reach for partitions vs. sets vs. component-value branching.
 

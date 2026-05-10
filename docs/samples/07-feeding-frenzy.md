@@ -29,8 +29,7 @@ Plus `Position`, `Rotation`, `Velocity`, `Speed`, `UniformScale`, `ColorComponen
 public partial class FishEntity : ITemplate,
     IExtends<CommonTemplates.Renderable>,
     ITagged<FrenzyTags.Fish>,
-    IHasPartition<FrenzyTags.NotEating>,
-    IHasPartition<FrenzyTags.Eating>
+    IPartitionedBy<FrenzyTags.NotEating, FrenzyTags.Eating>
 {
     Velocity Velocity;
     Speed Speed;

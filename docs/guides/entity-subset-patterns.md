@@ -41,24 +41,27 @@ void Execute(in DeadEnemy enemy) { ... }
 
 ## Approach C: template [partitions](../core/templates.md#partitions)
 
-Use `IHasPartition` to define mutually exclusive states that entities can transition between:
+Use `IPartitionedBy<...>` to define mutually exclusive states that entities can transition between. Arity 1 = presence/absence; arity ≥ 2 = explicit variants.
 
 ```csharp
-// Template with partitions
+// Presence/absence: one tag, two partitions (alive vs. not)
 public partial class EnemyEntity : ITemplate,
     ITagged<GameTags.Enemy>,
-    IHasPartition<GameTags.Alive>,
-    IHasPartition<GameTags.Dead>
+    IPartitionedBy<GameTags.Alive>
 {
     Health Health;
     Position Position;
 }
 
 // Transition (from inside an Execute)
-entity.MoveTo<GameTags.Enemy, GameTags.Dead>();
+entity.RemoveTag<GameTags.Alive>(World);   // → dead
+
+// Iterate only living enemies
+[ForEachEntity(typeof(GameTags.Enemy), typeof(GameTags.Alive))]
+void Execute(in LivingEnemy enemy) { ... }
 
 // Iterate only dead enemies
-[ForEachEntity(typeof(GameTags.Enemy), typeof(GameTags.Dead))]
+[ForEachEntity(typeof(GameTags.Enemy), Without = typeof(GameTags.Alive))]
 void Execute(in DeadEnemy enemy) { ... }
 ```
 
@@ -94,14 +97,13 @@ At 3+ dimensions, prefer sets — they don't create additional groups.
 
 ## Mixing approaches
 
-Nothing forces you to pick one approach per template. A typical mix is to use **partitions** when a lifecycle split (e.g. `Alive` / `Dead`) is hot enough that splitting the storage is worth it, and **sets** for everything else — dynamic categorizations, designer-meaningful subsets, multi-dimensional filters. Component-value branching covers the rest.
+Nothing forces you to pick one approach per template. A typical mix is to use **partitions** when a lifecycle split (e.g. `Alive` / dead) is hot enough that splitting the storage is worth it, and **sets** for everything else — dynamic categorizations, designer-meaningful subsets, multi-dimensional filters. Component-value branching covers the rest.
 
 ```csharp
-// Partitions: only because Alive/Dead iteration is a measured hot path.
+// Partitions: only because the alive/dead split is a measured hot path.
 public partial class Enemy : ITemplate,
     ITagged<GameTags.Enemy>,
-    IHasPartition<GameTags.Alive>,
-    IHasPartition<GameTags.Dead>
+    IPartitionedBy<GameTags.Alive>
 { ... }
 
 // Sets: design-level subsets that systems want to query directly.

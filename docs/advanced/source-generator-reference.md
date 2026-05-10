@@ -66,7 +66,7 @@ The generator produces partial-type scaffolding for types that implement these i
 | `IJobSystem` | System that schedules jobs | [Jobs & Burst](../performance/jobs-and-burst.md) |
 | `ITemplate` | Entity blueprint | [Templates](../core/templates.md) |
 | `ITagged<…>` | Declares identity tags on a template | [Templates](../core/templates.md), [Tags](../core/tags.md) |
-| `IHasPartition<…>` | Declares a valid partition on a template | [Templates — Partitions](../core/templates.md#partitions) |
+| `IPartitionedBy<…>` | Declares a partition dimension (arity 1 = presence/absence; arity ≥ 2 = explicit variants). Multiple declarations cross-product. | [Templates — Partitions](../core/templates.md#partitions) |
 | `IExtends<…>` | Template inheritance | [Templates — Inheritance](../core/templates.md#template-inheritance) |
 | `IEntityComponent` | Unmanaged component | [Components](../core/components.md) |
 | `ITag` | Zero-cost marker | [Tags](../core/tags.md) |

@@ -26,7 +26,7 @@ public partial class SpinnerEntity : ITemplate, ITagged<SampleTags.Spinner>
 }
 ```
 
-See [Templates](templates.md) for partitions (`IHasPartition`) and template inheritance.
+See [Templates](templates.md) for partitions (`IPartitionedBy`) and template inheritance.
 
 ## Tags in systems
 

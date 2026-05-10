@@ -15,7 +15,6 @@ Balls bounce under gravity. When a ball's energy drops below a threshold, it tra
 ```csharp
 public struct Ball : ITag { }
 public struct Active : ITag { }
-public struct Resting : ITag { }
 ```
 
 ### Template with partitions
@@ -23,8 +22,7 @@ public struct Resting : ITag { }
 ```csharp
 public partial class BallEntity : ITemplate,
     ITagged<BallTags.Ball>,
-    IHasPartition<BallTags.Active>,
-    IHasPartition<BallTags.Resting>
+    IPartitionedBy<BallTags.Active>
 {
     Position Position;
     Velocity Velocity;
@@ -33,7 +31,7 @@ public partial class BallEntity : ITemplate,
 }
 ```
 
-Each `IHasPartition` declares a valid partition. The entity always has the `Ball` tag plus exactly one partition tag — creating two separate groups in memory.
+`IPartitionedBy<T>` declares a presence/absence partition dimension. Two partitions are emitted: balls with the `Active` tag, and balls without it. The "absent" case has no companion tag — query it with `Without =`.
 
 ## Systems
 
@@ -50,7 +48,7 @@ void Execute(in ActiveBall ball)
     ball.Position += vel * World.DeltaTime;
     ball.Velocity = vel;
 
-    // Transition to Resting only when energy is low AND on the floor
+    // Transition to the absent (idle) partition when energy is low AND on the floor
     if (
         math.lengthsq(ball.Velocity) < RestThreshold * RestThreshold
         && ball.Position.y <= FloorY + 0.01f
@@ -58,7 +56,7 @@ void Execute(in ActiveBall ball)
     {
         ball.Velocity = float3.zero;
         ball.RestTimer = 2f + World.Rng.Next() * 3f; // rest 2-5 seconds
-        ball.MoveTo<BallTags.Ball, BallTags.Resting>(World);
+        ball.RemoveTag<BallTags.Active>(World);
     }
 }
 
@@ -71,7 +69,7 @@ partial struct ActiveBall : IAspect, IWrite<Position, Velocity, RestTimer> { }
 [ExecuteAfter(typeof(PhysicsSystem))]
 public partial class WakeUpSystem : ISystem
 {
-    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
+    [ForEachEntity(typeof(BallTags.Ball), Without = typeof(BallTags.Active))]
     void Execute(in RestingBall ball)
     {
         ball.RestTimer -= World.DeltaTime;
@@ -80,7 +78,7 @@ public partial class WakeUpSystem : ISystem
         {
             float angle = World.Rng.Next() * 2f * math.PI;
             ball.Velocity = new float3(math.cos(angle) * 2f, LaunchSpeed, math.sin(angle) * 2f);
-            ball.MoveTo<BallTags.Ball, BallTags.Active>(World);
+            ball.AddTag<BallTags.Active>(World);
         }
     }
 
@@ -102,7 +100,7 @@ public partial class BallRendererSystem : ISystem
         // Yellow/red color
     }
 
-    [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
+    [ForEachEntity(typeof(BallTags.Ball), Without = typeof(BallTags.Active))]
     void RenderResting(in RestingBallView ball)
     {
         // Gray color
@@ -118,8 +116,9 @@ public partial class BallRendererSystem : ISystem
 
 ## Concepts introduced
 
-- **`IHasPartition`** declares valid partitions on a template. See [Templates](../core/templates.md) and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).
-- **`MoveTo<Tag1, Tag2>()`** transitions entities between partitions. See [Structural Changes](../entity-management/structural-changes.md).
+- **`IPartitionedBy<T>`** declares a presence/absence partition dimension on a template. See [Templates](../core/templates.md) and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).
+- **`AddTag<T>()` / `RemoveTag<T>()`** transition entities between partitions by toggling the tag. See [Structural Changes](../entity-management/structural-changes.md).
+- **`Without = typeof(T)`** queries the absent partition. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 - **Partition-filtered iteration** — systems iterate only entities in a specific partition. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 - **Group separation** — Active and Resting balls live in separate contiguous arrays for cache-friendly iteration.
 - **Multiple `[ForEachEntity]` methods** — different queries in the same system, called from an explicit `Execute()`. See [Systems](../core/systems.md).

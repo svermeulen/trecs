@@ -41,7 +41,7 @@ void IdleBob(in Fish fish) { ... }
 
 ### Partitions
 
-Uses `IHasPartition` for group separation:
+Uses `IPartitionedBy` for group separation:
 
 ```csharp
 [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
