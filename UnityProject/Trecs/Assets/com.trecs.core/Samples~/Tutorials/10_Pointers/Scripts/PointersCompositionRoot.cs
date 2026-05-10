@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using Trecs.Internal;
 
 namespace Trecs.Samples.Pointers
 {
@@ -24,8 +23,6 @@ namespace Trecs.Samples.Pointers
     {
         public int EntitiesPerRoute = 3;
 
-        DisposeCollection _eventDisposables;
-
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -34,7 +31,6 @@ namespace Trecs.Samples.Pointers
         )
         {
             var gameObjectRegistry = new GameObjectRegistry();
-            _eventDisposables = new DisposeCollection();
 
             // SharedPtr/UniquePtr require a writable blob store. The in-memory
             // store is sufficient for samples — no on-disk persistence needed.
@@ -59,7 +55,7 @@ namespace Trecs.Samples.Pointers
 
             // Register cleanup handler BEFORE spawning, so it catches
             // all future removals (including world disposal).
-            RegisterPointerCleanup(world);
+            var followerCleanup = new PatrolFollowerCleanup(world);
 
             var sceneInitializer = new SceneInitializer(
                 world,
@@ -71,39 +67,7 @@ namespace Trecs.Samples.Pointers
 
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { _eventDisposables.Dispose, world.Dispose };
-        }
-
-        /// <summary>
-        /// Pointers stored in components MUST be disposed manually when
-        /// entities are removed. Subscribe to OnRemoved to handle this.
-        /// Without cleanup, disposed pointers leak and generate warnings.
-        /// </summary>
-        void RegisterPointerCleanup(World world)
-        {
-            var cleanupAccessor = world.CreateAccessor(AccessorRole.Fixed);
-
-            cleanupAccessor
-                .Events.EntitiesWithTags<PatrolTags.Follower>()
-                .OnRemoved(
-                    (GroupIndex group, EntityRange indices) =>
-                    {
-                        for (int i = indices.Start; i < indices.End; i++)
-                        {
-                            var entityIndex = new EntityIndex(i, group);
-
-                            // Dispose SharedPtr: decrements refcount.
-                            // Object is freed when last clone is disposed.
-                            var route = cleanupAccessor.Component<Route>(entityIndex).Read;
-                            route.Value.Dispose(cleanupAccessor);
-
-                            // Dispose UniquePtr: returns object to pool.
-                            var trail = cleanupAccessor.Component<Trail>(entityIndex).Read;
-                            trail.Value.Dispose(cleanupAccessor);
-                        }
-                    }
-                )
-                .AddTo(_eventDisposables);
+            disposables = new() { followerCleanup.Dispose, world.Dispose };
         }
     }
 }

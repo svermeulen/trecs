@@ -114,7 +114,7 @@ namespace Trecs.Samples
             foreach (var group in World.WorldInfo.GetGroupsWithTags<CommonTags.Renderable>())
             {
                 var wasRemoved = groupsProcessed.Remove(group);
-                Assert.That(wasRemoved, "No renderable registered for group {}", group);
+                Assert.That(wasRemoved, $"No renderable registered for group {group}");
             }
         }
 
