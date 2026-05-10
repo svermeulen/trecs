@@ -58,6 +58,22 @@ public partial class ParticleJobSystem : ISystem
 
 `[ForEachEntity]` is **not** required, though. You can write an entirely hand-rolled `IJobFor` / `IJobParallelFor` / etc. and still pass in Trecs data into it. See [Advanced Job Features](../advanced/advanced-jobs.md) for details.
 
+## Per-iteration `EntityHandle`
+
+A `[ForEachEntity]` callback running inside a job can take an `EntityHandle` parameter alongside its components — works in both `[WrapAsJob]` and manual job structs:
+
+```csharp
+[ForEachEntity(typeof(SampleTags.Particle))]
+[WrapAsJob]
+static void Cull(ref Lifetime lifetime, EntityHandle handle, in NativeWorldAccessor world)
+{
+    if (lifetime.Remaining <= 0)
+        world.RemoveEntity(handle);
+}
+```
+
+The handle is materialized per iteration from a per-group buffer the source generator wires up automatically — no dictionary lookup, just one indexed read. `EntityAccessor` is **not** supported in jobs (it carries a managed `WorldAccessor` reference); use `EntityHandle` plus `NativeWorldAccessor` for any per-entity ops.
+
 ## `NativeWorldAccessor`
 
 `NativeWorldAccessor` is the Burst-compatible counterpart to `WorldAccessor`. Get one with `world.ToNative()` (or take it as an `in NativeWorldAccessor` parameter — `[WrapAsJob]` auto-injects it):

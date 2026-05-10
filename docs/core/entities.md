@@ -24,10 +24,6 @@ foreach (EntityHandle h in World.Query().WithTags<GameTags.Enemy>().EntityHandle
 }
 ```
 
-`World` is the system's source-generated `WorldAccessor` property — see [Systems](systems.md).
-
-> Internally, the runtime also uses an `EntityIndex` — a transient pointer into the underlying buffers — that's invalidated by any structural change. It powers fast iteration but isn't part of the public API; reach for `EntityHandle` (or [`EntityAccessor`](#accessing-entity-data)) instead.
-
 ## Creating entities
 
 Entities are created via `WorldAccessor.AddEntity()`, which provides a fluent api for setting component values:
@@ -68,7 +64,7 @@ Removal is **deferred** — the entity disappears at the next [submission](../en
 
 ## Accessing entity data
 
-`EntityAccessor` is a live single-entity view, bound to a `WorldAccessor`. It exposes component access plus no-arg structural / input ops on the bound entity. (Set membership goes through `World.Set<T>()` so you can pick deferred or immediate.)
+`EntityAccessor` is a live single-entity view, bound to a `WorldAccessor`. It exposes component access plus remove/move operations on the bound entity
 
 ```csharp
 EntityAccessor entity = World.Entity(handle);

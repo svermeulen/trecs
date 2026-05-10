@@ -53,7 +53,7 @@ public partial class PlayerInputSystem : ISystem
 }
 ```
 
-For **one-shot** inputs (key-down events), Unity only reports the event on the variable frame the key was pressed. If a fixed step doesn't run on that exact frame, an `Execute()` poll would miss it. The established pattern is to capture the event at variable cadence in a helper method that *you* call from your composition root's `Update`, and forward the latest value in `Execute()`:
+For **one-shot** inputs (key-down events), Unity only reports the event on the variable frame the key was pressed. If a fixed step doesn't run on that exact frame, an `Execute()` poll would miss it. The established pattern is to capture the event at variable cadence and forward the latest value in `Execute()`:
 
 ```csharp
 [ExecuteIn(SystemPhase.Input)]
@@ -61,7 +61,7 @@ public partial class SnakeInputSystem : ISystem
 {
     int2 _pendingDirection;
 
-    // Called every frame
+    // Called every rendered frame
     // for eg. from the game's MonoBehaviour Update, or an early presentation system
     public void CaptureInput()
     {
@@ -84,9 +84,7 @@ public partial class SnakeInputSystem : ISystem
 }
 ```
 
-`CaptureInput()` is plain user code — there's no Trecs framework hook for variable-cadence callbacks. Wire it from wherever you already drive `world.Tick()` (typically a MonoBehaviour's `Update`).
-
-Use `World.AddInput<T>(EntityHandle, in T)` to target a specific entity, or `entity.AddInput(value)` from inside an `[ForEachEntity]` callback that takes an `EntityAccessor`. Both forms route to the same playback-aware queue, so recordings restore inputs against the same entity on replay.
+Use `World.AddInput<T>(EntityHandle, in T)` to target a specific entity, or `entity.AddInput(value)` from inside an `[ForEachEntity]` callback that takes an `EntityAccessor`.
 
 ## Reading input
 
@@ -104,7 +102,7 @@ public partial class ProcessInputSystem : ISystem
 }
 ```
 
-`[Input]` components are read-only outside the Input apply step. Writing to one directly from a fixed-update (or any other) system throws in DEBUG builds — values must enter through `World.AddInput<T>(...)` so recording and playback can replay them. If you need a sim-state field that fixed-update systems can mutate, use a regular (non-`[Input]`) component.
+Note however that `[Input]` components are read-only outside the Input systems. Writing to one directly from a fixed-update (or any other) system throws in DEBUG builds — values must enter through `World.AddInput<T>(...)` so recording and playback can replay them. If you need a sim-state field that fixed-update systems can mutate, use a regular (non-`[Input]`) component.
 
 ## See also
 
