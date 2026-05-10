@@ -32,7 +32,6 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | Unity ECS | Trecs |
 |---|---|
 | `ISystem` with `OnUpdate()` | `ISystem` with `Execute()` |
-| `SystemAPI.Query<T>()` | `[ForEachEntity]` source generation |
 | `[UpdateAfter]` / `[UpdateBefore]` | `[ExecuteAfter]` / `[ExecuteBefore]` |
 | System groups (`InitializationSystemGroup`, etc.) | Five phases (EarlyPresentation, Input, Fixed, Presentation, LatePresentation) |
 | Framework discovers and instantiates systems via reflection | User instantiates systems themselves and registers them |
@@ -42,7 +41,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 
 | Unity ECS | Trecs |
 |---|---|
-| `EntityQuery` via `GetEntityQuery()` | `World.Query()` builder (chain `WithTags<T>` / `WithComponents<T>` / `InSet<T>`), or `MyAspect.Query(World)` for typed aspect iteration |
+| `SystemAPI.Query<T>()`, `EntityQuery` via `GetEntityQuery()` | `World.Query()` builder (chain `WithTags<T>` / `WithComponents<T>` / `InSet<T>`), or `MyAspect.Query(World)` for typed aspect iteration, or `[ForEachEntity]` method |
 | Aspects (`IAspect` + `RefRO`/`RefRW`) | Aspects (`IAspect` + `IRead`/`IWrite`) |
 | `IJobEntity` with query attributes | `[ForEachEntity]` with tag/component scope |
 | Enableable components | [Sets](../entity-management/sets.md) for sparse filtering |
