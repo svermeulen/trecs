@@ -25,7 +25,6 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | `class IComponentData` (managed) | No managed components |
 | `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) | [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline) for bounded cases, or a [heap pointer](../advanced/heap.md) (`UniquePtr<List<T>>` / `NativeUniquePtr<NativeList<T>>`) for unbounded |
 | Zero-field `IComponentData` acts as tag | Tags via `ITag` (separate from components) |
-| No equivalent | `[Unwrap]` for single-field components |
 | Singletons via `SystemAPI.GetSingleton<T>()` | Global state via `World.GlobalComponent<T>()` on a `Globals` template |
 
 ### Systems
@@ -148,6 +147,7 @@ Neither layout is universally better — chunks shine when you have many small a
 - **Input system** — frame-isolated input queuing for replay
 - **[Interpolation](../advanced/interpolation.md)** — built-in fixed-to-variable timestep smoothing
 - **Sets** — sparse entity subsets without group changes
+- **[`[Unwrap]` shorthand](../core/components.md#the-unwrap-shorthand)** — single-field components expose their inner value through aspect properties (e.g. `boid.Position` is a `float3`, not a `Position` wrapper)
 - **[Heap system](../advanced/heap.md)** — managed/native pointer types for non-component data
 - **Reactive entity lifecycle events** — first-class `OnAdded` / `OnRemoved` subscriptions
 - **Versioned save format support** — `Reader.Version` / `Writer.Version` for evolving custom serializers
