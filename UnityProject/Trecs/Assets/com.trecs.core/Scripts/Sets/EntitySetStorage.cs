@@ -20,7 +20,7 @@ namespace Trecs.Internal
     /// <see cref="_registeredGroups"/> is a compact list of the subset of groups
     /// this set covers — used for iteration paths (dep-tracking, flush, dispose).
     /// </summary>
-    internal readonly struct EntitySetStorage
+    internal readonly unsafe struct EntitySetStorage
     {
         [NativeDisableContainerSafetyRestriction]
         internal readonly NativeList<SetGroupEntry> _entriesPerGroup;
@@ -29,6 +29,15 @@ namespace Trecs.Internal
 
         internal readonly AtomicNativeBags _jobAddQueue;
         internal readonly AtomicNativeBags _jobRemoveQueue;
+
+        // Set by NativeSetCommandBuffer.Clear() (race-write of 1 — idempotent across
+        // threads), consumed and reset by SetFlushJob. Lives on the storage rather
+        // than per-writer because writer jobs of the same set are serialized via
+        // the scheduler — exactly one writer-job-cycle is in flight at a time, so
+        // a single flag is sufficient.
+        [NativeDisableUnsafePtrRestriction]
+        internal readonly int* _jobClearRequested;
+
         readonly SetId _setId;
 
         internal EntitySetStorage(
@@ -46,6 +55,9 @@ namespace Trecs.Internal
 
             _jobAddQueue = AtomicNativeBags.Create(Allocator.Persistent);
             _jobRemoveQueue = AtomicNativeBags.Create(Allocator.Persistent);
+
+            _jobClearRequested = (int*)UnsafeUtility.Malloc(sizeof(int), 4, Allocator.Persistent);
+            *_jobClearRequested = 0;
 
             // Populate only the slots whose groups match this set's template.
             // Unmatched slots remain default(SetGroupEntry) — IsValid == false.
@@ -122,7 +134,8 @@ namespace Trecs.Internal
         // ── Job write support ──────────────────────────────────────────
 
         internal NativeSetCommandBuffer<TSet> CreateWriter<TSet>()
-            where TSet : struct, IEntitySet => new(_jobAddQueue, _jobRemoveQueue);
+            where TSet : struct, IEntitySet =>
+            new(_jobAddQueue, _jobRemoveQueue, _jobClearRequested);
 
         /// <summary>
         /// Drain all pending job writes into the actual group entries.
@@ -176,6 +189,7 @@ namespace Trecs.Internal
         {
             DrainEntityIndexBags(_jobAddQueue);
             DrainEntityIndexBags(_jobRemoveQueue);
+            *_jobClearRequested = 0;
             ClearEntriesOnly();
         }
 
@@ -229,6 +243,7 @@ namespace Trecs.Internal
             _registeredGroups.Dispose();
             _jobAddQueue.Dispose();
             _jobRemoveQueue.Dispose();
+            UnsafeUtility.Free(_jobClearRequested, Allocator.Persistent);
         }
     }
 }

@@ -171,7 +171,7 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static void TrackNativeSetCommandBufferDepsForJob<TSet>(
+        public static unsafe void TrackNativeSetCommandBufferDepsForJob<TSet>(
             this WorldAccessor world,
             JobHandle handle
         )
@@ -186,6 +186,8 @@ namespace Trecs.Internal
                 AddQueue = collection._jobAddQueue,
                 RemoveQueue = collection._jobRemoveQueue,
                 EntriesPerGroup = collection._entriesPerGroup,
+                RegisteredGroups = collection._registeredGroups,
+                ClearRequested = collection._jobClearRequested,
                 RequireDeterministic = world.RequireDeterministicSubmission,
             };
             var flushHandle = flushJob.Schedule(handle);

@@ -44,6 +44,45 @@ namespace Trecs.Tests
             }
         }
 
+        partial struct ClearSetJob
+        {
+            [FromWorld]
+            public NativeSetCommandBuffer<TFJTestTransientSet> Writer;
+
+            [ForEachEntity(Tag = typeof(QId1))]
+            void Execute(in TestInt value, EntityIndex entityIndex)
+            {
+                // Every thread requesting Clear is idempotent (race-write of 1).
+                Writer.Clear();
+            }
+        }
+
+        partial struct AddThenClearJob
+        {
+            [FromWorld]
+            public NativeSetCommandBuffer<TFJTestTransientSet> Writer;
+
+            [ForEachEntity(Tag = typeof(QId1))]
+            void Execute(in TestInt value, EntityIndex entityIndex)
+            {
+                Writer.Add(entityIndex);
+                Writer.Clear();
+            }
+        }
+
+        partial struct ClearThenAddJob
+        {
+            [FromWorld]
+            public NativeSetCommandBuffer<TFJTestTransientSet> Writer;
+
+            [ForEachEntity(Tag = typeof(QId1))]
+            void Execute(in TestInt value, EntityIndex entityIndex)
+            {
+                Writer.Clear();
+                Writer.Add(entityIndex);
+            }
+        }
+
         [Test]
         public void JobWrite_EntitiesAppearAfterMainThreadRead()
         {
@@ -332,6 +371,119 @@ namespace Trecs.Tests
 
             // All entities should be flagged (proves the write job completed before read)
             NAssert.AreEqual(4, set.Read.Count, "All entities should be in set after sync");
+        }
+
+        [Test]
+        public void JobClear_PreviouslyAddedEntities_AreRemoved()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 6; i++)
+            {
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            }
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+            var set = a.Set<TFJTestTransientSet>();
+
+            // Pre-populate via main thread
+            var write = set.Write;
+            write.Add(new EntityIndex(0, group));
+            write.Add(new EntityIndex(2, group));
+            write.Add(new EntityIndex(4, group));
+            NAssert.AreEqual(3, set.Read.Count);
+
+            // A job that clears should wipe everything
+            new ClearSetJob().ScheduleParallel(a);
+
+            NAssert.AreEqual(0, set.Read.Count, "Job-side Clear should wipe all entries");
+        }
+
+        [Test]
+        public void JobClear_AddThenClearInSameJob_ResultIsEmpty()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 6; i++)
+            {
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            }
+            a.SubmitEntities();
+
+            // Job calls Add then Clear on each entity. Clear supersedes regardless of order.
+            new AddThenClearJob().ScheduleParallel(a);
+
+            var set = a.Set<TFJTestTransientSet>();
+            NAssert.AreEqual(0, set.Read.Count, "Clear in the same writer cycle wipes queued adds");
+        }
+
+        [Test]
+        public void JobClear_ClearThenAddInSameJob_ResultIsEmpty()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 6; i++)
+            {
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            }
+            a.SubmitEntities();
+
+            // Even when Clear is called BEFORE Add on each thread, semantics are
+            // order-insensitive (matching deferred-clear semantics): Clear wins,
+            // queued Adds in the same writer-cycle are discarded.
+            new ClearThenAddJob().ScheduleParallel(a);
+
+            var set = a.Set<TFJTestTransientSet>();
+            NAssert.AreEqual(0, set.Read.Count, "Clear is order-insensitive within a writer cycle");
+        }
+
+        [Test]
+        public void JobClear_FollowedByAnotherWriterJob_OnlyLatterAddsRemain()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            for (int i = 0; i < 6; i++)
+            {
+                a.AddEntity(Tag<QId1>.Value)
+                    .Set(new TestInt { Value = i })
+                    .Set(new TestFloat())
+                    .AssertComplete();
+            }
+            a.SubmitEntities();
+
+            var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
+            var set = a.Set<TFJTestTransientSet>();
+            set.Write.Add(new EntityIndex(0, group));
+            set.Write.Add(new EntityIndex(1, group));
+
+            // First writer-job clears.
+            new ClearSetJob().ScheduleParallel(a);
+
+            // Second writer-job adds entries (every other one). The earlier clear
+            // must NOT affect this second cycle — its flag was consumed by its
+            // own SetFlushJob.
+            new FlagEntitiesJob().ScheduleParallel(a);
+
+            // Every other entity (0, 2, 4) flagged by the second job.
+            NAssert.AreEqual(3, set.Read.Count);
+            NAssert.IsTrue(set.Read.Exists(new EntityIndex(0, group)));
+            NAssert.IsTrue(set.Read.Exists(new EntityIndex(2, group)));
+            NAssert.IsTrue(set.Read.Exists(new EntityIndex(4, group)));
+            NAssert.IsFalse(set.Read.Exists(new EntityIndex(1, group)));
         }
     }
 }

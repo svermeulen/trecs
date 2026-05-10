@@ -15,12 +15,16 @@ namespace Trecs
     /// <see cref="JobGenSchedulingExtensions.TrackNativeSetCommandBufferDepsForJob{TSet}"/>,
     /// and tracked as the new writer so readers naturally depend on it.
     ///
+    /// If the writer queued a <see cref="NativeSetCommandBuffer{TSet}.Clear"/>, all
+    /// pre-existing set contents are cleared and the queued add/remove bags are drained
+    /// without applying — analogous to deferred-clear semantics at submission time.
+    ///
     /// When <see cref="RequireDeterministic"/> is true, entries are collected, sorted by
     /// (GroupIndex, Index), then applied — ensuring deterministic iteration order regardless
     /// of thread scheduling. Removes are always processed before adds.
     /// </summary>
     [BurstCompile]
-    struct SetFlushJob : IJob
+    unsafe struct SetFlushJob : IJob
     {
         public AtomicNativeBags AddQueue;
         public AtomicNativeBags RemoveQueue;
@@ -28,10 +32,23 @@ namespace Trecs
         [NativeDisableContainerSafetyRestriction]
         public NativeList<SetGroupEntry> EntriesPerGroup;
 
+        [NativeDisableContainerSafetyRestriction]
+        public NativeList<GroupIndex> RegisteredGroups;
+
+        [NoAlias]
+        [NativeDisableUnsafePtrRestriction]
+        public int* ClearRequested;
+
         public bool RequireDeterministic;
 
         public void Execute()
         {
+            if (*ClearRequested != 0)
+            {
+                FlushClear();
+                return;
+            }
+
             if (RequireDeterministic)
             {
                 FlushDeterministic();
@@ -39,6 +56,27 @@ namespace Trecs
             else
             {
                 FlushNonDeterministic();
+            }
+        }
+
+        void FlushClear()
+        {
+            *ClearRequested = 0;
+            for (int i = 0; i < RegisteredGroups.Length; i++)
+            {
+                EntriesPerGroup[RegisteredGroups[i].Index].Clear();
+            }
+            DrainBag(RemoveQueue);
+            DrainBag(AddQueue);
+        }
+
+        static void DrainBag(AtomicNativeBags bags)
+        {
+            for (int i = 0; i < bags.ThreadSlotCount; i++)
+            {
+                ref var bag = ref bags.GetBag(i);
+                while (!bag.IsEmpty)
+                    bag.Dequeue<EntityIndex>();
             }
         }
 
