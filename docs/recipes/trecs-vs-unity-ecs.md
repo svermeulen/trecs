@@ -43,7 +43,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 |---|---|
 | `SystemAPI.Query<T>()`, `EntityQuery` via `GetEntityQuery()` | [`World.Query()`](../data-access/queries-and-iteration.md) builder (chain `WithTags<T>` / `WithComponents<T>` / `InSet<T>`), or `MyAspect.Query(World)` for typed aspect iteration, or [`[ForEachEntity]`](../core/systems.md#foreachentity) method |
 | Aspects (`IAspect` + `RefRO`/`RefRW`) | [Aspects](../data-access/aspects.md) (`IAspect` + `IRead`/`IWrite`), **[`[Unwrap]` shorthand](../core/components.md#the-unwrap-shorthand)** |
-| `IJobEntity` with query attributes | `[ForEachEntity]` method on `IJobFor`, or [`[WrapAsJob]`](../performance/jobs-and-burst.md) |
+| `IJobEntity` filtered by `Execute` parameter types and `[WithAll]` / `[WithAny]` / `[WithNone]` attributes | `[ForEachEntity]` method on `IJobFor`, or [`[WrapAsJob]`](../performance/jobs-and-burst.md) |
 | Enableable components | [Sets](../entity-management/sets.md) for sparse filtering |
 
 ### Jobs
