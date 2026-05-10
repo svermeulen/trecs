@@ -109,7 +109,7 @@ while (running)
     world.LateTick();   // LatePresentation
 }
 
-// 6. Cleanup
+// 6. Cleanup — runs OnShutdown hooks (reverse of OnReady), then tears down state
 world.Dispose();
 ```
 

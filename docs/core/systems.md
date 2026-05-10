@@ -225,6 +225,33 @@ public partial class ScoreSystem : ISystem
 
 `OnReady` runs in the same order systems will execute: by phase first (`EarlyPresentation` → `Input` → `Fixed` → `Presentation` → `LatePresentation`), then within each phase by `[ExecuteAfter]` / `[ExecuteBefore]` edges, then by `[ExecutePriority]`, and finally by the order systems were passed to `AddSystem` / `AddSystems` as a tie-breaker. If you need one system's `OnReady` to run after another's, prefer `[ExecuteAfter]` over relying on registration order — the same constraint controls runtime order.
 
+## OnShutdown hook
+
+Declare `partial void OnShutdown()` on a system to run one-time teardown when the world is disposed. The hook fires from `World.Dispose()` while the world is still fully functional — queries, events, and component reads all still work — so it's the right place to release native resources, unsubscribe from external events, or flush any final state.
+
+```csharp
+public partial class RendererSystem : ISystem
+{
+    GraphicsBuffer _instanceBuffer;
+
+    partial void OnReady()
+    {
+        _instanceBuffer = new GraphicsBuffer(/* ... */);
+    }
+
+    partial void OnShutdown()
+    {
+        _instanceBuffer?.Release();
+    }
+}
+```
+
+`OnShutdown` is wired by source generation — declare it as a `partial void` and leave the implementation in the system's main partial. Don't declare it if you don't need it.
+
+`OnShutdown` runs in the **reverse** of `OnReady` order: phases reversed (`LatePresentation` → `Presentation` → `EarlyPresentation` → `Fixed` → `Input`), and within each phase, sorted systems traversed in reverse. This mirrors the standard last-in-first-out teardown pattern, so a system that depends on another at `OnReady` time can rely on its dependency still being alive at `OnShutdown` time.
+
+`OnShutdown` is **not** called if `World.Initialize()` was never reached or did not complete — there's nothing to tear down in that case.
+
 ## Registering systems
 
 Systems are registered with the world builder:

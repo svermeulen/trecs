@@ -36,7 +36,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | | Unity ECS | Trecs |
 |---|---|---|
 | **System base type** | `ISystem` (struct, Burst-friendly) with `OnUpdate()`, or `SystemBase` (managed class, with `Entities.ForEach` lambda support) | [`ISystem`](../core/systems.md) (managed class) with `Execute()` |
-| **One-time setup / teardown** | `OnCreate(ref SystemState)` / `OnDestroy(ref SystemState)` | [`partial void OnReady()`](../core/systems.md#onready-hook); implement `IDisposable` on the system for teardown |
+| **One-time setup / teardown** | `OnCreate(ref SystemState)` / `OnDestroy(ref SystemState)` | [`partial void OnReady()`](../core/systems.md#onready-hook) / [`partial void OnShutdown()`](../core/systems.md#onshutdown-hook) — both source-generated `partial` hooks; `OnShutdown` runs in reverse of `OnReady` order |
 | **Per-role access enforcement** | None — any system can call `EntityManager` for any operation | [Accessor roles](../advanced/accessor-roles.md) (`Fixed` / `Variable` / `Unrestricted`) — phase-derived permissions for component reads / writes, structural changes, RNG streams, and heap allocation |
 | **System ordering** | `[UpdateAfter]` / `[UpdateBefore]` | [`[ExecuteAfter]` / `[ExecuteBefore]`](../core/systems.md#system-ordering) |
 | **Phase / group structure** | System groups (`InitializationSystemGroup`, etc.) | [Five fixed phases](../core/systems.md#update-phases) — EarlyPresentation, Input, Fixed, Presentation, LatePresentation |
@@ -51,20 +51,20 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | | Unity ECS | Trecs |
 |---|---|---|
 | **Building a query** | `SystemAPI.Query<T>()`, `EntityQuery` via `GetEntityQuery()` | [`World.Query()`](../data-access/queries-and-iteration.md) builder (chain `WithTags<T>` / `WithComponents<T>` / `InSet<T>`), `MyAspect.Query(World)` for typed aspect iteration, or [`[ForEachEntity]`](../core/systems.md#foreachentity) method |
-| **Bundled component access** | Aspects (`IAspect` + `RefRO`/`RefRW`) — *deprecated in Entities 1.x; Unity plans to remove them in a future major release in favour of using `IComponentData` and `EntityQuery` directly* | [Aspects](../data-access/aspects.md) (`IAspect` + `IRead`/`IWrite`) |
+| **Bundled component access** | Aspects (`IAspect` + `RefRO`/`RefRW`) — *deprecated in Entities 1.x* | [Aspects](../data-access/aspects.md) (`IAspect` + `IRead`/`IWrite`) |
 | **Iterating in a job** | `IJobEntity` filtered by `Execute` parameter types and `[WithAll]` / `[WithAny]` / `[WithNone]` attributes | `[ForEachEntity]` method on `IJobFor`, or [`[WrapAsJob]`](../performance/jobs-and-burst.md) |
 | **Sparse / dynamic membership** | Enableable components (toggle without structural change) | [Sets](../entity-management/sets.md) — independent membership index, doesn't touch component storage |
 | **Reactive lifecycle** | Change filters or `EntityCommandBuffer` patterns | First-class [`OnAdded` / `OnRemoved` / `OnMoved`](../entity-management/entity-events.md) subscriptions |
 | **Detect component modifications** | Built-in change filters | None built-in |
-| **Polymorphic aspect helpers** | Generic methods over `IAspect` work but no declared contract (and `IAspect` itself is deprecated — see above) | [Aspect interfaces](../advanced/aspect-interfaces.md) — `partial interface : IAspect` declares a contract that multiple aspects with matching component shapes can satisfy, enabling generic helpers without boxing or virtual dispatch |
+| **Polymorphic aspect helpers** | None built-in | [Aspect interfaces](../advanced/aspect-interfaces.md) — `partial interface : IAspect` declares a contract that multiple aspects with matching component shapes can satisfy, enabling generic helpers without boxing or virtual dispatch |
 
 ## Jobs
 
 | | Unity ECS | Trecs |
 |---|---|---|
-| **Entity-iterating job** | `IJobEntity` | [`[WrapAsJob]`](../performance/jobs-and-burst.md) + `[ForEachEntity]` |
+| **Entity-iterating job** | `IJobEntity` | [`[WrapAsJob]`](../performance/jobs-and-burst.md) / `IJobFor` + `[ForEachEntity]` |
 | **Component lookup wiring** | Manual `GetComponentLookup` | [`[FromWorld]`](../advanced/advanced-jobs.md#fromworld--auto-wiring-job-fields) auto-wiring |
-| **`JobHandle` dependency wiring** | Manual `JobHandle.CombineDependencies`; you thread input handles between schedules | Auto-wired from declared component access — the [dependency tracker](../performance/dependency-tracking.md) infers the right input handle at each `ScheduleParallel` |
+| **`JobHandle` dependency wiring** | Auto-tracked per-system via `state.Dependency` (framework threads input/output based on declared component access). Within a single system, multiple schedules are still hand-threaded through `state.Dependency`, and fan-in across handles uses `JobHandle.CombineDependencies`. Granularity is per component type globally. | Auto-wired per-job from declared component access — the [dependency tracker](../performance/dependency-tracking.md) infers the right input handle at every `ScheduleParallel`, including across multiple schedules in one system. Granularity is per `(component, group)`, so jobs touching the same component on different groups run in parallel. |
 | **Structural ops from a job** | `EntityCommandBuffer.ParallelWriter` | [`NativeWorldAccessor`](../performance/jobs-and-burst.md#nativeworldaccessor) for structural ops |
 | **Deterministic ordering of parallel ops** | `sortKey` on `EntityCommandBuffer` | [Sort keys](../entity-management/structural-changes.md#deterministic-submission) for deterministic ordering |
 
@@ -73,7 +73,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | | Unity ECS | Trecs |
 |---|---|---|
 | **Stance toward determinism** | Nice-to-have, not enforced | Core design goal, enforced via API |
-| **Recording / playback with desync detection** | Not built-in | Built-in [recording / playback](../advanced/recording-and-playback.md) |
+| **Recording / playback with desync detection** | Not built-in | Built-in [recording / playback](../advanced/recording-and-playback.md) with desync detection |
 | **Deterministic RNG** | None built-in | Framework-level [`World.Rng`](../advanced/time-and-rng.md) with fork support |
 | **Frame-isolated input for replay** | Not built-in (NetCode for Entities provides one) | [Input system](../core/input-system.md) with frame isolation |
 | **Networking** | NetCode for Entities (separate package) — Client / Server / ThinClient world roles | No direct equivalent |
@@ -83,9 +83,8 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | | Unity ECS | Trecs |
 |---|---|---|
 | **Edit-time authoring → entities** | Subscene baking — designers author with `MonoBehaviour`s, baked at edit/build time | No direct equivalent (yet) |
-| **Runtime save/load of full world state** | Limited runtime serialization | Built-in [serialization](../advanced/serialization.md) (snapshots, save/load, replays) |
+| **Runtime save/load of full world state** | Limited runtime serialization | Built-in full game state [serialization](../advanced/serialization.md) (snapshots, save/load, replays) |
 | **Incremental scene streaming** | Subscenes load incrementally (open-world / large-scale streaming) | None built-in — full snapshots only |
-| **Delta-encoded snapshots** | None built-in | Delta encoding for compact snapshots |
 | **Per-save versioning** | Handled outside the engine | `Reader.Version` / `Writer.Version` for evolving custom serializers across save format revisions |
 
 ## Editor tooling
