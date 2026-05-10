@@ -12,7 +12,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | **Memory layout** | Fixed-size 16 KB chunks per archetype; entities split across many chunks | Structure-of-arrays: one contiguous buffer per component per group, indexed by the entity's position in the group |
 | **Entity identity** | `Entity` (stable, wraps index + version) | `EntityHandle` (stable, wraps index + version) |
 | **Definition** | No explicit templates (archetype emerges from components) | [Templates](../core/templates.md) (`ITemplate` + `ITagged`) |
-| **Structural changes** | Sync via `EntityManager`, or deferred via `EntityCommandBuffer` (played back automatically at command-buffer systems, or manually) | Deferred, applied automatically at [submission](../entity-management/structural-changes.md). Manually via `World.SubmitEntities()` |
+| **Structural changes** | `EntityManager` calls are synchronous (a sync point). For deferral, opt into an `EntityCommandBuffer`; ECBs play back automatically at built-in command-buffer systems (e.g. `EndSimulationEntityCommandBufferSystem`), or manually via `Playback()`. | All structural changes are deferred — [submission](../entity-management/structural-changes.md) runs automatically at the end of every fixed step, or manually via `World.SubmitEntities()`. No synchronous path. |
 | **Multi-world** | Multiple `World` instances; default world auto-created. NetCode for Entities (separate package) adds explicit Client / Server / ThinClient world roles on top. | Multiple `World` instances; no built-in roles or cross-world bridging |
 
 ## Key differences
