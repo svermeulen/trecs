@@ -96,8 +96,8 @@ foreach (var predator in Predator.Query(World).WithTags<SampleTags.Predator>())
     if (found)
     {
         // Link predator ↔ prey via aspects
-        chosenPrey.ApproachingPredator = predator.EntityIndex.ToHandle(World);
-        predator.ChosenPrey = chosenPrey.EntityIndex.ToHandle(World);
+        chosenPrey.ApproachingPredator = predator.Handle(World);
+        predator.ChosenPrey = chosenPrey.Handle(World);
     }
 }
 

@@ -34,28 +34,28 @@ Inside an aspect that reads `Position`, `aspect.Position` returns a `float3` rat
 
 ## Reading and writing components
 
-The most common access happens through [aspects](../data-access/aspects.md) and `[ForEachEntity]` parameters — those are the patterns you'll use day-to-day. For ad-hoc access by `EntityIndex`:
+The most common access happens through [aspects](../data-access/aspects.md) and `[ForEachEntity]` parameters — those are the patterns you'll use day-to-day. For ad-hoc access by `EntityHandle`:
 
 ```csharp
-ref readonly Health hp = ref World.Component<Health>(entityIndex).Read;
+ref readonly Health hp = ref World.Component<Health>(handle).Read;
 
-ref Health hpW = ref World.Component<Health>(entityIndex).Write;
+ref Health hpW = ref World.Component<Health>(handle).Write;
 hpW.Current -= damage;
 ```
 
 The `.Read` / `.Write` split lets Trecs lazily complete any in-flight jobs with conflicting access before handing back the reference. See [Dependency Tracking](../performance/dependency-tracking.md).
 
-When the entity may not have the component, use the safe `TryComponent` form:
+For a single-entity view bundling several component lookups (and `TryGet` for optional components), see [`EntityAccessor`](entities.md#accessing-entity-data):
 
 ```csharp
-if (World.TryComponent<Health>(entityIndex, out var healthAccessor))
+var entity = World.Entity(handle);
+ref Health hp = ref entity.Get<Health>().Write;
+
+if (entity.TryGet<Velocity>(out var velAccessor))
 {
-    ref readonly Health hp = ref healthAccessor.Read;
-    // ...
+    ref readonly Velocity vel = ref velAccessor.Read;
 }
 ```
-
-For a single-entity view bundling several components, see [`EntityAccessor`](entities.md#accessing-entity-data).
 
 ## Component field attributes
 

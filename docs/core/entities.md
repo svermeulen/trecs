@@ -2,24 +2,31 @@
 
 Entities are lightweight identifiers that group components together.
 
-## EntityHandle vs EntityIndex
+## EntityHandle
 
-Trecs has two ways of referring to entities:
+`EntityHandle` is the public, stable reference to an entity. It survives [structural changes](../entity-management/structural-changes.md), so it is what you use whenever you need to store a long-lived reference to another entity (for example on a component, on a managed object, or across frames).
 
-- **`EntityHandle`** — a stable reference that survives [structural changes](../entity-management/structural-changes.md). Use it whenever you need to store a long-lived pointer to another entity (e.g. on a component or on a managed object).
-- **`EntityIndex`** — a fast, transient reference that points directly into the underlying buffers. It's invalidated by any structural change, so it's only safe within the current frame.
-
-Convert between them:
+You typically obtain a handle from one of these entry points:
 
 ```csharp
-// EntityIndex → EntityHandle (stable)
-EntityHandle handle = index.ToHandle(World);
+// At creation time
+EntityHandle handle = World.AddEntity<MyTag>()
+    .Set(new Position(float3.zero))
+    .Handle;
 
-// EntityHandle → EntityIndex (transient)
-EntityIndex index = handle.ToIndex(World);
+// From inside an aspect query (extension method)
+EntityHandle preyHandle = prey.Handle(World);
+
+// From a query iterator
+foreach (EntityHandle h in World.Query().WithTags<GameTags.Enemy>().EntityHandles())
+{
+    // ...
+}
 ```
 
 `World` is the system's source-generated `WorldAccessor` property — see [Systems](systems.md).
+
+> Internally, the runtime also uses an `EntityIndex` — a transient pointer into the underlying buffers — that's invalidated by any structural change. It powers fast iteration but isn't part of the public API; reach for `EntityHandle` (or [`EntityAccessor`](#accessing-entity-data)) instead.
 
 ## Creating entities
 
@@ -36,10 +43,10 @@ The tag selects which template to spawn — Trecs looks up the template register
 The stable handle for the new entity is available before the next [submission](../entity-management/structural-changes.md):
 
 ```csharp
-EntityHandle handle = World.AddEntity<MyTag>();
-  .Set(new Position(float3.zero))
-  .AssertComplete()
-  .Handle;
+EntityHandle handle = World.AddEntity<MyTag>()
+    .Set(new Position(float3.zero))
+    .AssertComplete()
+    .Handle;
 ```
 
 You may optionally call `.AssertComplete()` to verify that every non-optional field on the template has been set. The same check runs automatically during submission; an explicit call just surfaces the error earlier, at the call site.
@@ -47,8 +54,10 @@ You may optionally call `.AssertComplete()` to verify that every non-optional fi
 ## Removing entities
 
 ```csharp
-World.RemoveEntity(entityIndex);
 World.RemoveEntity(entityHandle);
+
+// Inside an iteration callback, the bound entity removes itself:
+entity.Remove();
 
 // Remove every entity matching a tag combination
 World.RemoveEntitiesWithTags<SampleTags.Sphere>();
@@ -59,24 +68,48 @@ Removal is **deferred** — the entity disappears at the next [submission](../en
 
 ## Accessing entity data
 
-`EntityAccessor` is a convenient single-entity component view:
+`EntityAccessor` is a live single-entity view, bound to a `WorldAccessor`. It exposes component access plus no-arg structural / set / input ops on the bound entity:
 
 ```csharp
-var entity = index.ToEntity(World);
-ref Position pos = ref entity.Get<Position>().Write;
+EntityAccessor entity = World.Entity(handle);
 
-// Or from a handle
-var entity2 = handle.ToEntity(World);
-ref readonly Velocity vel = ref entity2.Get<Velocity>().Read;
+ref Position pos = ref entity.Get<Position>().Write;
+ref readonly Velocity vel = ref entity.Get<Velocity>().Read;
 
 // Safe access
 if (entity.TryGet<Velocity>(out var velAccessor))
 {
     // ...
 }
+
+// Structural / set / input ops on the bound entity
+entity.Remove();
+entity.MoveTo<BallTags.Ball, BallTags.Resting>();
+entity.AddToSet(World.Set<HighlightedParticle>().Write);
+
+// Resolve the stable handle when you need to store it
+EntityHandle handle = entity.Handle;
 ```
 
-For most cases prefer [aspects](../data-access/aspects.md) — they bundle related components into a single typed view with auto-generated read/write properties.
+`EntityAccessor` is a `ref struct` — it lives on the stack for the duration of a frame and isn't suitable for storage. For long-lived references, store an `EntityHandle` instead.
+
+You can also receive an `EntityAccessor` directly as a `[ForEachEntity]` parameter, or from a query terminator:
+
+```csharp
+[ForEachEntity(typeof(GameTags.Enemy))]
+void Execute(in EnemyView enemy, EntityAccessor entity)
+{
+    if (enemy.Health <= 0) entity.Remove();
+}
+
+// Single-entity terminator returns an EntityAccessor
+EntityAccessor player = World.Query().WithTags<GameTags.Player>().Single();
+
+// Multi-entity terminator yields one per match
+foreach (var e in World.Query().WithTags<GameTags.Enemy>().Entities()) { /* ... */ }
+```
+
+For most multi-component access prefer [aspects](../data-access/aspects.md) — they bundle related components into a single typed view with auto-generated read/write properties.
 
 ## Counting entities
 

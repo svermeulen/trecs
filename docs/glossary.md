@@ -7,9 +7,8 @@ Trecs uses several similar-sounding terms with distinct meanings. This page is a
 | Term | What it is |
 |---|---|
 | **[Entity](core/entities.md)** | An identifier that groups components together. Has no data of its own. |
-| **[`EntityHandle`](core/entities.md#entityhandle-vs-entityindex)** | A *stable* reference to an entity that survives structural changes. Use for long-lived references. |
-| **[`EntityIndex`](core/entities.md#entityhandle-vs-entityindex)** | A *transient* reference that points directly into the underlying buffers. Faster than `EntityHandle` but invalidated by any structural change. |
-| **[`EntityAccessor`](core/entities.md#accessing-entity-data)** | A single-entity convenience view exposing `Get<T>()` for component access. |
+| **[`EntityHandle`](core/entities.md#entityhandle)** | The *stable* reference to an entity that survives structural changes. Use whenever you need to store a reference to another entity. |
+| **[`EntityAccessor`](core/entities.md#accessing-entity-data)** | A live single-entity view bound to a `WorldAccessor`. Exposes `Get<T>()` for component access plus no-arg `Remove()` / `MoveTo<…>()` / set / input ops on the bound entity. |
 
 ## Classifying entities
 

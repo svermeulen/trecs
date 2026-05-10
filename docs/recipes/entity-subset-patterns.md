@@ -38,8 +38,8 @@ public partial class EnemyEntity : ITemplate,
     Position Position;
 }
 
-// Transition
-World.MoveTo<GameTags.Enemy, GameTags.Dead>(entity.EntityIndex);
+// Transition (from inside an iteration callback)
+entity.MoveTo<GameTags.Enemy, GameTags.Dead>();
 
 // Iterate only dead enemies
 [ForEachEntity(typeof(GameTags.Enemy), typeof(GameTags.Dead))]
@@ -57,7 +57,7 @@ Use sets for dynamic, sparse membership. Sets must be registered with the world 
 public struct DeadEnemies : IEntitySet { }
 
 // Add to set
-World.Set<DeadEnemies>().Defer.Add(entity.EntityIndex);
+World.Set<DeadEnemies>().Defer.Add(entity.Handle);
 
 // Iterate set members
 [ForEachEntity(Set = typeof(DeadEnemies))]

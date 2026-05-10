@@ -65,7 +65,7 @@ public partial class LifetimeSystem : ISystem
     }
 
     [ForEachEntity(typeof(SampleTags.Sphere))]
-    void Execute(in GameObjectId gameObjectId, ref Lifetime lifetime, EntityIndex entityIndex)
+    void Execute(in GameObjectId gameObjectId, ref Lifetime lifetime, EntityAccessor entity)
     {
         lifetime.Value -= World.DeltaTime;
 
@@ -74,7 +74,7 @@ public partial class LifetimeSystem : ISystem
             var go = _gameObjectRegistry.Resolve(gameObjectId);
             Object.Destroy(go);
             _gameObjectRegistry.Unregister(gameObjectId);
-            World.RemoveEntity(entityIndex);
+            entity.Remove();
         }
     }
 }

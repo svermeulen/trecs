@@ -81,20 +81,22 @@ ref Velocity vel = ref velocities[i];
 
 ### Lookups — Cross-Group
 
-For accessing components on arbitrary entities across groups:
+For accessing components on arbitrary entities across groups. Lookups are an advanced job-side primitive — indexing is by transient entity index (resolved from an `EntityHandle` you've stored elsewhere via `handle.ToIndex(world)`):
 
 ```csharp
 NativeComponentLookupRead<Health> healthLookup;
 NativeComponentLookupWrite<Damage> damageLookup;
 
-// Access by EntityIndex
+var entityIndex = targetHandle.ToIndex(world);
+
 ref readonly Health hp = ref healthLookup[entityIndex];
 ref Damage dmg = ref damageLookup[entityIndex];
 
-// Check existence
 if (healthLookup.Exists(entityIndex)) { ... }
 if (healthLookup.TryGet(entityIndex, out Health hp)) { ... }
 ```
+
+For most cross-group reads inside a job, prefer the higher-level `<Aspect>.NativeFactory` pattern (see [Aspects](../data-access/aspects.md)) — it hides the lookup plumbing.
 
 ## Native set operations
 
@@ -107,14 +109,13 @@ NativeSetRead<HighlightedParticle> highlightedRead;
 [FromWorld]
 NativeSetCommandBuffer<HighlightedParticle> highlightedWrite;
 
-// Check membership
-bool isHighlighted = highlightedRead.Exists(entityIndex);
-
 // Modify (queued, applied after the writer's SetFlushJob — same frame, before any
 // reader job that depends on the set)
-highlightedWrite.Add(entityIndex);
-highlightedWrite.Remove(entityIndex);
+highlightedWrite.Add(handle, world);
+highlightedWrite.Remove(handle, world);
 highlightedWrite.Clear();   // Order-insensitive: wins over any Add/Remove in this writer cycle.
+
+// Read-side iteration is via TryGetGroupEntry on a per-group basis.
 ```
 
 ## External job tracking

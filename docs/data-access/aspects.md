@@ -13,7 +13,8 @@ This generates:
 - `ref readonly float3 Velocity` (read-only, unwrapped)
 - `ref readonly float Speed` (read-only, unwrapped)
 - `ref float3 Position` (read-write, unwrapped)
-- `EntityIndex EntityIndex`
+
+Aspects also pick up extension methods from `AspectExtensions`: `aspect.Handle(World)` to resolve the iterated entity to a stable `EntityHandle`, `aspect.Entity(World)` for an `EntityAccessor`, and `aspect.Remove(World)` / `aspect.MoveTo<…>(World)` for structural ops. The handle / native variants also work inside Burst jobs by passing a `NativeWorldAccessor`.
 
 A component marked `[Unwrap]` (single-field struct) exposes its inner value through the property. Without `[Unwrap]`, the property returns the wrapping struct (`ref Position` instead of `ref float3`).
 

@@ -85,7 +85,7 @@ public partial class SnakeInputSystem : ISystem
 
 `CaptureInput()` is plain user code — there's no Trecs framework hook for variable-cadence callbacks. Wire it from wherever you already drive `world.Tick()` (typically a MonoBehaviour's `Update`).
 
-`World.AddInput<T>(EntityHandle, in T)` and `World.AddInput<T>(EntityIndex, in T)` are both available; the handle form is what playback restores against, so prefer it for global / persistent entities.
+Use `World.AddInput<T>(EntityHandle, in T)` to target a specific entity, or `entity.AddInput(value)` from inside an `[ForEachEntity]` callback that takes an `EntityAccessor`. Both forms route to the same playback-aware queue, so recordings restore inputs against the same entity on replay.
 
 ## Reading input
 

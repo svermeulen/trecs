@@ -63,12 +63,15 @@ See [Sets](../entity-management/sets.md) for set-scoped iteration.
 
 **Optional extras:**
 
-- **`EntityIndex`** — the current entity's transient index.
+- **`EntityAccessor`** — a live single-entity view bound to the world; offers `Get<T>()`, `Remove()`, `MoveTo<…>()`, set / input ops, and a `Handle` property. The default choice when you need to act on the iterated entity.
+- **`EntityHandle`** — the stable handle for the iterated entity, when you only need to store it (e.g. on another component).
 - **`WorldAccessor`** — the system's accessor (main-thread only).
 - **`NativeWorldAccessor`** — job-safe world access (`[WrapAsJob]` only).
 - **`[GlobalIndex] int`** — see [Cross-group index](#cross-group-index).
 - **`[PassThroughArgument]`** — a value the caller forwards in. See [PassThroughArgument](#passthroughargument).
 - **`[SingleEntity]`** — a singleton entity hoisted out of the loop. See [SingleEntity](#singleentity).
+
+> An internal `EntityIndex` parameter is also accepted for advanced cases — it's a transient pointer into the underlying buffers that skips the per-call handle lookup. Prefer `EntityAccessor` / `EntityHandle` unless you have a specific perf reason.
 
 ### The Execute method
 
@@ -87,11 +90,11 @@ public partial class DamageSystem : ISystem
         foreach (var enemy in EnemyView.Query(World).WithTags<GameTags.Enemy>())
         {
             if (enemy.Health <= 0)
-                World.RemoveEntity(enemy.EntityIndex);
+                enemy.Remove(World);
         }
     }
 
-    partial struct EnemyView : IAspect, IRead<Health>, IAspectEntityIndex { }
+    partial struct EnemyView : IAspect, IRead<Health> { }
 }
 ```
 
@@ -307,7 +310,7 @@ partial struct BuildInstanceData
 }
 ```
 
-Useful when filling a contiguous output buffer across groups — for example, packed data for instanced rendering. `EntityIndex` resets per group; `[GlobalIndex]` doesn't.
+Useful when filling a contiguous output buffer across groups — for example, packed data for instanced rendering. The per-group iteration index resets per group; `[GlobalIndex]` doesn't.
 
 ### Entity operations from inside a system
 
@@ -318,8 +321,8 @@ World.AddEntity<SampleTags.Sphere>()
     .Set(new Position(float3.zero))
     .Set(new Lifetime(5f));
 
-World.RemoveEntity(entityIndex);
-World.MoveTo<BallTags.Ball, BallTags.Resting>(ball.EntityIndex);
+World.RemoveEntity(handle);
+ball.MoveTo<BallTags.Ball, BallTags.Resting>(World);
 
 float dt = World.DeltaTime;
 float random = World.Rng.Next();

@@ -87,7 +87,7 @@ foreach (var slice in accessor.Query().InSet<HighlightedParticles>().GroupSlices
 ```
 
 !!! tip
-    For most use cases, prefer `[ForEachEntity]`, aspect queries, or `EntityIndices()` iteration. GroupSlices are mainly useful when you need maximum throughput and are comfortable working at the group level. See [Queries & Iteration](../data-access/queries-and-iteration.md) for the higher-level alternatives.
+    For most use cases, prefer `[ForEachEntity]`, aspect queries, or `.Entities()` / `.EntityHandles()` iteration. GroupSlices are mainly useful when you need maximum throughput and are comfortable working at the group level. See [Queries & Iteration](../data-access/queries-and-iteration.md) for the higher-level alternatives.
 
 ## TagSet
 
@@ -125,15 +125,7 @@ int count = accessor.CountEntitiesInGroup(playerGroup);
 
 `GroupIndex` values are assigned sequentially during `WorldBuilder.Build()` and are stable for the lifetime of a `World`. They are **not** stable across runs — don't store them on disk. Persist the `TagSet` instead and resolve back to a `GroupIndex` after load.
 
-`EntityIndex` carries a `GroupIndex` directly:
-
-```csharp
-EntityIndex idx = handle.ToIndex(accessor);
-GroupIndex group = idx.GroupIndex;
-int indexInGroup = idx.Index;
-```
-
-Event callbacks also receive `GroupIndex`:
+Event callbacks receive `GroupIndex` directly when iterating ranges:
 
 ```csharp
 accessor.Events.EntitiesWithTags<GameTags.Enemy>()

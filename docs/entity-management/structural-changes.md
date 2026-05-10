@@ -20,21 +20,35 @@ World.AddEntity<GameTags.Bullet>()
     .Set(new Velocity(vel));
 ```
 
-The entity is buffered and joins its group on the next submission. The `EntityIndex` is not assigned until then.
+The entity is buffered and joins its group on the next submission. Its storage location isn't assigned until then.
 
 ### Remove
 
 ```csharp
-World.RemoveEntity(entityIndex);
+// By stable handle (the public removal entry point)
 World.RemoveEntity(entityHandle);
+
+// From inside an iteration callback that takes an EntityAccessor
+entity.Remove();
+
+// From inside a system loop that has an aspect in hand
+enemy.Remove(World);
+
+// Bulk by tag
 World.RemoveEntitiesWithTags<GameTags.Bullet>();
 ```
 
 ### Move (partition transition)
 
 ```csharp
-// Move to the group with these destination tags. Component data is preserved.
-World.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
+// By stable handle
+World.MoveTo<BallTags.Ball, BallTags.Resting>(handle);
+
+// From inside an iteration callback that takes an EntityAccessor
+entity.MoveTo<BallTags.Ball, BallTags.Resting>();
+
+// From an aspect
+ball.MoveTo<BallTags.Ball, BallTags.Resting>(World);
 ```
 
 The type parameters spell out the **destination** tag set — where the entity ends up — not a from/to pair. Behind the scenes, the entity is relocated to the destination group's memory block and all its component values are copied across unchanged.

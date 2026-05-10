@@ -68,15 +68,17 @@ public void Execute()
         float distX = math.abs(particle.Position.x - waveCenterX);
         float distZ = math.abs(particle.Position.z - waveCenterZ);
 
+        var handle = particle.Handle(World);
+
         if (distX < _settings.WaveBandWidth)
-            World.Set<SampleSets.WaveX>().Defer.Add(particle.EntityIndex);
+            World.Set<SampleSets.WaveX>().Defer.Add(handle);
         else
-            World.Set<SampleSets.WaveX>().Defer.Remove(particle.EntityIndex);
+            World.Set<SampleSets.WaveX>().Defer.Remove(handle);
 
         if (distZ < _settings.WaveBandWidth)
-            World.Set<SampleSets.WaveZ>().Defer.Add(particle.EntityIndex);
+            World.Set<SampleSets.WaveZ>().Defer.Add(handle);
         else
-            World.Set<SampleSets.WaveZ>().Defer.Remove(particle.EntityIndex);
+            World.Set<SampleSets.WaveZ>().Defer.Remove(handle);
     }
 }
 ```

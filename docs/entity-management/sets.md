@@ -38,8 +38,8 @@ All set mutations go through the gateway `World.Set<T>()`, which exposes three t
 Queued during system execution; applied at the next submission. Safe during iteration:
 
 ```csharp
-World.Set<HighlightedParticle>().Defer.Add(particle.EntityIndex);
-World.Set<HighlightedParticle>().Defer.Remove(particle.EntityIndex);
+World.Set<HighlightedParticle>().Defer.Add(particle.Handle(World));
+World.Set<HighlightedParticle>().Defer.Remove(particle.Handle(World));
 World.Set<HighlightedParticle>().Defer.Clear();
 ```
 
@@ -52,13 +52,13 @@ A queued `Defer.Clear()` **supersedes** any `Defer.Add` / `Defer.Remove` queued 
 ```csharp
 // Main thread
 var highlighted = World.Set<HighlightedParticle>().Write;
-highlighted.Add(entityIndex);
-highlighted.Remove(entityIndex);
+highlighted.Add(handle);
+highlighted.Remove(handle);
 highlighted.Clear();
 
 // In a Burst job, via a NativeSetCommandBuffer captured as a job field
-highlighted.Add(entityIndex);
-highlighted.Remove(entityIndex);
+highlighted.Add(handle, world);
+highlighted.Remove(handle, world);
 ```
 
 !!! warning "Don't mutate a set while iterating it"
@@ -66,7 +66,7 @@ highlighted.Remove(entityIndex);
 
     Everything else is safe: mutating a different set, mutating the same set in a different group, or using the deferred API (`Set<T>().Defer`) on the iterated set (it applies at the next submission).
 
-    To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `NativeList<EntityIndex>` and apply them after the loop.
+    To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `NativeList<EntityHandle>` and apply them after the loop.
 
 ## Querying by set
 
@@ -104,7 +104,7 @@ public partial class CullingSystem : ISystem
         foreach (var r in Renderable.Query(World).WithTags<GameTags.Renderable>())
         {
             if (Frustum.Intersects(r.Bounds))
-                visible.Add(r.EntityIndex);
+                visible.Add(r.Handle(World));
         }
     }
 

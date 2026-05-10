@@ -60,17 +60,23 @@ A query must have at least one filter — terminators assert otherwise.
 ### Terminators
 
 ```csharp
-// Iterate entity-by-entity
-foreach (EntityIndex idx in World.Query().WithTags<GameTags.Player>().EntityIndices())
+// Iterate entity-by-entity, yielding a live EntityAccessor per match
+foreach (var entity in World.Query().WithTags<GameTags.Player>().Entities())
 {
-    ref Position pos = ref World.Component<Position>(idx).Write;
+    ref Position pos = ref entity.Get<Position>().Write;
     pos.Value.y += 1f;
+}
+
+// Iterate stable handles only — useful when you just want to store / pass them
+foreach (EntityHandle handle in World.Query().WithTags<GameTags.Enemy>().EntityHandles())
+{
+    _enemies.Add(handle);
 }
 
 // Count
 int total = World.Query().WithTags<GameTags.Enemy>().Count();
 
-// Single entity (asserts exactly one match)
+// Single entity (asserts exactly one match) — returns an EntityAccessor
 EntityAccessor player = World.Query().WithTags<GameTags.Player>().Single();
 ref Health hp = ref player.Get<Health>().Write;
 
@@ -88,10 +94,10 @@ Other counting helpers on `WorldAccessor`: `CountAllEntities()`, `CountEntitiesW
 `InSet<T>()` filters to members of the given [set](../entity-management/sets.md). The query builder is limited to one set filter.  To match additional sets, test for membership inside the loop body.
 
 ```csharp
-foreach (var idx in World.Query()
+foreach (var entity in World.Query()
     .WithTags<GameTags.Particle>()
     .InSet<HighlightedParticles>()
-    .EntityIndices())
+    .Entities())
 {
     // ...
 }

@@ -113,9 +113,11 @@ void Execute(ref Position position, in Route route, in Trail trail)
 
 ## Cleanup
 
-Pointers must be disposed when entities are removed:
+Pointers must be disposed when entities are removed. Range-based `OnRemoved` hands back a `GroupIndex` and the index range within that group; reconstructing the per-entity index lets us read each component before storage is freed:
 
 ```csharp
+using Trecs.Internal; // EntityIndex lives here — used at this layer only.
+
 world.Events.EntitiesWithTags<PatrolTags.Follower>()
     .OnRemoved((GroupIndex group, EntityRange indices) =>
     {
