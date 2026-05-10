@@ -31,7 +31,7 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 | `Retain` | Keep the previous frame's value |
 | `Reset` | Reset to the component's default value |
 
-`Retain` is right when an input represents a sustained intent (e.g. "currently holding a movement direction"). `Reset` fits one-shot signals (e.g. "fire button pressed this frame"). Both are replay-stable: the same frame produces the same component value whether or not an input was actually queued at record time.
+`Retain` is right when an input represents a sustained intent (e.g. "currently holding a movement direction"). `Reset` fits one-shot signals (e.g. "fire button pressed this frame"). Both rules apply during playback exactly as they did during recording, so a frame with no queued input still produces a deterministic component value.
 
 ## Queuing input
 
