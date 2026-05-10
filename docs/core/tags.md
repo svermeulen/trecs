@@ -40,7 +40,7 @@ void Execute(ref Rotation rotation) { /* ... */ }
 void Execute(in ActiveBall ball) { /* ... */ }
 ```
 
-Tags also drive `World.Query()` for manual iteration:
+Tags also drive manual iteration. Aspect queries (and `World.Query()`) both accept tag filters:
 
 ```csharp
 foreach (var player in PlayerView.Query(World).WithTags<GameTags.Player>())
@@ -51,7 +51,7 @@ foreach (var player in PlayerView.Query(World).WithTags<GameTags.Player>())
 var boss = BossView.Query(World).WithTags<GameTags.Boss>().Single();
 ```
 
-See [Queries & Iteration](../data-access/queries-and-iteration.md).
+See [Queries & Iteration](../data-access/queries-and-iteration.md) for the `World.Query()` form and the full filter / terminator API.
 
 ## Tags in queries
 
