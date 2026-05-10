@@ -24,25 +24,25 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | `IComponentData` (unmanaged struct) | `IEntityComponent` (unmanaged struct) |
 | `class IComponentData` (managed) | No managed components |
 | `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) | [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline) for bounded cases, or a [heap pointer](../advanced/heap.md) (`UniquePtr<List<T>>` / `NativeUniquePtr<NativeList<T>>`) for unbounded |
-| Zero-field `IComponentData` acts as tag | Tags via `ITag` (separate from components) |
-| Singletons via `SystemAPI.GetSingleton<T>()` | Global state via `World.GlobalComponent<T>()` on a `Globals` template |
+| Zero-field `IComponentData` acts as tag | [Tags](../core/tags.md) via `ITag` (separate from components) |
+| Singletons via `SystemAPI.GetSingleton<T>()` | Global state via `World.GlobalComponent<T>()` on a [`Globals` template](../core/templates.md#global-entity-template) |
 
 ### Systems
 
 | Unity ECS | Trecs |
 |---|---|
-| `ISystem` with `OnUpdate()` | `ISystem` with `Execute()` |
-| `[UpdateAfter]` / `[UpdateBefore]` | `[ExecuteAfter]` / `[ExecuteBefore]` |
-| System groups (`InitializationSystemGroup`, etc.) | Five phases (EarlyPresentation, Input, Fixed, Presentation, LatePresentation) |
+| `ISystem` with `OnUpdate()` | [`ISystem`](../core/systems.md) with `Execute()` |
+| `[UpdateAfter]` / `[UpdateBefore]` | [`[ExecuteAfter]` / `[ExecuteBefore]`](../core/systems.md#system-ordering) |
+| System groups (`InitializationSystemGroup`, etc.) | [Five phases](../core/systems.md#update-phases) (EarlyPresentation, Input, Fixed, Presentation, LatePresentation) |
 | Framework discovers and instantiates systems via reflection | User instantiates systems themselves and registers them |
-| Struct `ISystem` can be Burst-compiled wholesale | Systems are managed classes; Burst is opt-in per job via `[WrapAsJob]` |
+| Struct `ISystem` can be Burst-compiled wholesale | Systems are managed classes; Burst is opt-in per job via [`[WrapAsJob]`](../performance/jobs-and-burst.md) |
 
 ### Queries
 
 | Unity ECS | Trecs |
 |---|---|
-| `SystemAPI.Query<T>()`, `EntityQuery` via `GetEntityQuery()` | `World.Query()` builder (chain `WithTags<T>` / `WithComponents<T>` / `InSet<T>`), or `MyAspect.Query(World)` for typed aspect iteration, or `[ForEachEntity]` method |
-| Aspects (`IAspect` + `RefRO`/`RefRW`) | Aspects (`IAspect` + `IRead`/`IWrite`) |
+| `SystemAPI.Query<T>()`, `EntityQuery` via `GetEntityQuery()` | [`World.Query()`](../data-access/queries-and-iteration.md) builder (chain `WithTags<T>` / `WithComponents<T>` / `InSet<T>`), or `MyAspect.Query(World)` for typed aspect iteration, or [`[ForEachEntity]`](../core/systems.md#foreachentity) method |
+| Aspects (`IAspect` + `RefRO`/`RefRW`) | [Aspects](../data-access/aspects.md) (`IAspect` + `IRead`/`IWrite`) |
 | `IJobEntity` with query attributes | `[ForEachEntity]` with tag/component scope |
 | Enableable components | [Sets](../entity-management/sets.md) for sparse filtering |
 | No first-class equivalent | [Reactive lifecycle](../entity-management/entity-events.md) via `World.Events.EntitiesWithTags<T>().OnAdded` / `OnRemoved` |
@@ -51,10 +51,10 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 
 | Unity ECS | Trecs |
 |---|---|
-| `IJobEntity` | `[WrapAsJob]` + `[ForEachEntity]` |
-| Manual `GetComponentLookup` | `[FromWorld]` auto-wiring |
-| `EntityCommandBuffer.ParallelWriter` | `NativeWorldAccessor` for structural ops |
-| `sortKey` on `EntityCommandBuffer` | Sort keys for deterministic ordering |
+| `IJobEntity` | [`[WrapAsJob]`](../performance/jobs-and-burst.md) + `[ForEachEntity]` |
+| Manual `GetComponentLookup` | [`[FromWorld]`](../advanced/advanced-jobs.md#fromworld--auto-wiring-job-fields) auto-wiring |
+| `EntityCommandBuffer.ParallelWriter` | [`NativeWorldAccessor`](../performance/jobs-and-burst.md#nativeworldaccessor) for structural ops |
+| `sortKey` on `EntityCommandBuffer` | [Sort keys](../entity-management/structural-changes.md#deterministic-submission) for deterministic ordering |
 
 ### Determinism & networking
 
