@@ -57,6 +57,7 @@ nav:
   - Recipes:
       - Trecs vs Unity ECS: recipes/trecs-vs-unity-ecs.md
       - Best Practices: recipes/best-practices.md
+      - Gotchas: recipes/gotchas.md
       - OOP Integration: recipes/oop-integration.md
       - Entity Subset Patterns: recipes/entity-subset-patterns.md
       - Debugging & Troubleshooting: recipes/debugging.md

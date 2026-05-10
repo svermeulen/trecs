@@ -39,12 +39,6 @@ Skip this section if your game doesn't need replay determinism (see intro).
 - **Provide sort keys in parallel structural-change jobs.** `NativeWorldAccessor` ops (`AddEntity` / `RemoveEntity` / `MoveTo` from a job) need a deterministic sort key for replay determinism.
 - **Enable [`RequireDeterministicSubmission`](../entity-management/structural-changes.md#deterministic-submission)** for any project that records, replays, or networks state.
 
-## Common anti-patterns
+## See also
 
-| Anti-Pattern | Problem | Solution |
-|---|---|---|
-| Logic in components | Breaks data/logic separation | Move to systems or util classes |
-| Mutable fixed-system fields | Not serialized, diverges between record/replay | Store dynamic state in components |
-| `UnityEngine.Random` / `Time.deltaTime` in fixed update | Breaks determinism | `World.Rng`, `world.FixedDeltaTime` |
-| Tight coupling between systems | Fragile ordering, hidden dependencies | Explicit `[ExecuteAfter]` / `[ExecuteBefore]` |
-| Allocating heap from `Variable` / `Presentation` | Fails the role's heap-allocation rule | Allocate in `Fixed` (or `Input` for frame-scoped) |
+- [Gotchas](gotchas.md) — common mistakes, edge cases, and surprises with the symptom / cause / fix for each.
