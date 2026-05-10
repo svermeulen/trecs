@@ -1,6 +1,6 @@
 # Input System
 
-The input system is a deterministic pipeline for player input. Inputs are queued by `[ExecuteIn(SystemPhase.Input)]` systems and applied at the start of the next fixed update — so inputs are captured at variable cadence but consumed at fixed cadence, which is what makes [recording and playback](../advanced/recording-and-playback.md) deterministic.
+The input system is a deterministic pipeline for player input. `[ExecuteIn(SystemPhase.Input)]` systems run just before each fixed step — in lockstep with the simulation — and queue inputs via `World.AddInput<T>(...)`. The queued inputs are applied to the global entity at the start of the fixed step that follows, so the simulation reads them deterministically: record the input stream, replay it, get the same world state. See [recording and playback](../advanced/recording-and-playback.md).
 
 ## Marking input fields
 
@@ -25,7 +25,23 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 
 ## Queuing input
 
-`World.AddInput<T>(...)` is only callable from an `[ExecuteIn(SystemPhase.Input)]` system. The Input phase runs once per fixed step, just before that step. Capture raw key/mouse state at variable cadence in the system's `Tick()`, then forward the latest value in `Execute()`:
+`World.AddInput<T>(...)` is only callable from an `[ExecuteIn(SystemPhase.Input)]` system. Like every other system, the input system's `Execute()` runs once per fixed step (zero or more times per Unity `Update`, depending on catch-up).
+
+For **sustained** inputs (held keys, analog axes), read directly in `Execute()`:
+
+```csharp
+[ExecuteIn(SystemPhase.Input)]
+public partial class PlayerInputSystem : ISystem
+{
+    public void Execute()
+    {
+        var dir = new float2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
+        World.AddInput(World.GlobalEntityHandle, new MoveInput { Direction = dir });
+    }
+}
+```
+
+For **one-shot** inputs (key-down events), Unity only reports the event on the variable frame the key was pressed. If a fixed step doesn't run on that exact frame, an `Execute()` poll would miss it. The established pattern is to capture the event at variable cadence in a helper method that *you* call from your composition root's `Update`, and forward the latest value in `Execute()`:
 
 ```csharp
 [ExecuteIn(SystemPhase.Input)]
@@ -33,7 +49,8 @@ public partial class SnakeInputSystem : ISystem
 {
     int2 _pendingDirection;
 
-    public void Tick()  // runs every Unity Update — variable cadence
+    // Called from the game's MonoBehaviour Update, every Unity frame.
+    public void CaptureInput()
     {
         if (Input.GetKeyDown(KeyCode.W)) _pendingDirection = new int2(0, 1);
         else if (Input.GetKeyDown(KeyCode.S)) _pendingDirection = new int2(0, -1);
@@ -41,7 +58,7 @@ public partial class SnakeInputSystem : ISystem
         else if (Input.GetKeyDown(KeyCode.D)) _pendingDirection = new int2(1, 0);
     }
 
-    public void Execute()  // runs once per fixed step
+    public void Execute()  // runs just before each fixed step
     {
         if (_pendingDirection.x != 0 || _pendingDirection.y != 0)
         {
@@ -53,6 +70,8 @@ public partial class SnakeInputSystem : ISystem
     }
 }
 ```
+
+`CaptureInput()` is plain user code — there's no Trecs framework hook for variable-cadence callbacks. Wire it from wherever you already drive `world.Tick()` (typically a MonoBehaviour's `Update`).
 
 `World.AddInput<T>(EntityHandle, in T)` and `World.AddInput<T>(EntityIndex, in T)` are both available; the handle form is what playback restores against, so prefer it for global / persistent entities.
 
@@ -74,7 +93,7 @@ public partial class ProcessInputSystem : ISystem
 
 ## Determinism notes
 
-- Inputs are stamped with the next fixed-frame number and applied at fixed-update boundaries — the Input phase itself runs at variable cadence, but only its `AddInput` calls cross into fixed state.
+- Inputs are stamped with the next fixed-frame number when `AddInput` is called and applied at the boundary of that fixed step. Because the Input phase itself runs at fixed cadence, the input → simulation handoff is fully deterministic.
 - During [recording](../advanced/recording-and-playback.md), inputs are captured into the `RecordingBundle`'s `InputQueue` alongside per-frame checksums.
 - During playback, `BundlePlayer.Start` disables every Input-phase system via `EnableChannel.Playback`; recorded inputs are replayed instead, and live keystrokes are ignored.
 - `MissingInputBehavior` is replay-stable: the same frame produces the same component value whether or not an input was actually queued at record time.
