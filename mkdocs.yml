@@ -56,7 +56,7 @@ nav:
       - Dependency Tracking: performance/dependency-tracking.md
   - Recipes:
       - Trecs vs Unity ECS: recipes/trecs-vs-unity-ecs.md
-      - Design Rules: recipes/design-rules.md
+      - Best Practices: recipes/best-practices.md
       - OOP Integration: recipes/oop-integration.md
       - Entity Subset Patterns: recipes/entity-subset-patterns.md
       - Debugging & Troubleshooting: recipes/debugging.md

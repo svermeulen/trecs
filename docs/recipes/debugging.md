@@ -68,7 +68,7 @@ Common causes:
 - **Mutable state on a fixed-update system.** Systems are not serialized — state kept on a system field diverges between recording and playback.
 - **`UnityEngine.Random` anywhere in the fixed-update path.** Replace with `World.Rng`.
 
-When checksums diverge, the [Determinism](./design-rules.md#determinism) checklist is the first stop.
+When checksums diverge, the [Determinism](./best-practices.md#determinism) checklist is the first stop.
 
 ## Post-deserialization checksum mismatch
 

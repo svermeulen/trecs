@@ -1,6 +1,6 @@
-# Design Rules
+# Best Practices
 
-Opinionated rules for building with Trecs. Each one points at a longer reference page if you want the full story.
+Recommended practices for building with Trecs.
 
 ## Systems
 
@@ -30,6 +30,8 @@ Opinionated rules for building with Trecs. Each one points at a longer reference
 - **Allocate the heap from the right role.** Persistent heap (`SharedPtr` / `NativeSharedPtr`) is `Fixed`-only; frame-scoped heap is `Input`-only. See [Heap Allocation Rules](../advanced/heap-allocation-rules.md).
 
 ## Determinism
+
+The items in this section apply if you need replay-deterministic execution — recording / playback, save scrubbing, or lockstep networking. Non-deterministic games are valid Trecs projects too; you can skip the section if none of those apply.
 
 - **Use `World.Rng`, never `UnityEngine.Random`.** External RNG breaks replay. `FixedRng` and `VariableRng` are independent streams.
 - **Use `world.FixedDeltaTime` in fixed-update systems.** `UnityEngine.Time.deltaTime` varies per render frame and breaks replay.
