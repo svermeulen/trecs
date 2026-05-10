@@ -32,7 +32,8 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 
 | | Unity ECS | Trecs |
 |---|---|---|
-| **System base type** | `ISystem` with `OnUpdate()` | [`ISystem`](../core/systems.md) with `Execute()` |
+| **System base type** | `ISystem` (struct, Burst-friendly) with `OnUpdate()`, or `SystemBase` (managed class, with `Entities.ForEach` lambda support) | [`ISystem`](../core/systems.md) (managed class) with `Execute()` |
+| **One-time setup / teardown** | `OnCreate(ref SystemState)` / `OnDestroy(ref SystemState)` | [`partial void OnReady()`](../core/systems.md#onready-hook); implement `IDisposable` on the system for teardown |
 | **Per-role access enforcement** | None — any system can call `EntityManager` for any operation | [Accessor roles](../advanced/accessor-roles.md) (`Fixed` / `Variable` / `Unrestricted`) — phase-derived permissions for component reads / writes, structural changes, RNG streams, and heap allocation |
 | **System ordering** | `[UpdateAfter]` / `[UpdateBefore]` | [`[ExecuteAfter]` / `[ExecuteBefore]`](../core/systems.md#system-ordering) |
 | **Phase / group structure** | System groups (`InitializationSystemGroup`, etc.) | [Five fixed phases](../core/systems.md#update-phases) — EarlyPresentation, Input, Fixed, Presentation, LatePresentation |
