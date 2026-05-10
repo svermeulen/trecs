@@ -191,31 +191,18 @@ Explicit constraints (`[ExecuteAfter]` / `[ExecuteBefore]`) always win over prio
 
 ## OnReady hook
 
-Declare `partial void OnReady()` on a system to run one-time setup once the world is fully built but before the first tick. Common uses:
-
-- **Subscribe to entity lifecycle events** (`OnAdded` / `OnRemoved` / `OnMoved`) so the system observes every spawn / despawn from frame zero. See [Entity Events](../entity-management/entity-events.md).
-- **Cache `GroupIndex` / per-group buffer references** that don't change after init.
-- **Validate registered templates** — assert that every tag combination the system intends to query has a corresponding group, that referenced sets are registered, etc. Better to fail loudly here than to silently iterate nothing later.
-- **Precompute data sized to the registered groups**, like a `NativeArray<T>` indexed by `GroupIndex`.
+Declare `partial void OnReady()` on a system to run one-time setup once the world is fully built but before the first tick. The most common use is **subscribing to entity lifecycle events** — registering at `OnReady` time means no spawns are missed from frame zero onward. See [Entity Events](../entity-management/entity-events.md).
 
 ```csharp
-public partial class EnemyStatsSystem : ISystem
+public partial class EnemyTracker : ISystem
 {
-    GroupIndex _enemyGroup;
-
     partial void OnReady()
     {
-        // Cache once — GroupIndex assignment is stable for the world's lifetime.
-        _enemyGroup = World.WorldInfo.GetSingleGroupWithTags(TagSet<GameTags.Enemy>.Value);
-
-        // Subscribe up front so we don't miss any spawns from later init code.
         World.Events.EntitiesWithTags<GameTags.Enemy>().OnAdded(OnEnemyAdded);
     }
 
     [ForEachEntity]
     void OnEnemyAdded(in Health hp) { /* ... */ }
-
-    public void Execute() { /* uses _enemyGroup ... */ }
 }
 ```
 
