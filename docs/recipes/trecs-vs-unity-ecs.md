@@ -12,7 +12,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | **Memory layout** | Structure-of-arrays: one contiguous buffer per component per group, indexed by the entity's position in the group | Fixed-size 16 KB chunks per archetype; entities split across many chunks |
 | **Entity identity** | `EntityHandle` (stable, wraps index + version) | `Entity` (stable, wraps index + version) |
 | **Definition** | [Templates](../core/templates.md) (`ITemplate` + `ITagged`) | No explicit templates (archetype emerges from components) |
-| **Structural changes** | Deferred, applied automatically at [submission](../entity-management/structural-changes.md) | Deferred via `EntityCommandBuffer` |
+| **Structural changes** | Deferred, applied automatically at [submission](../entity-management/structural-changes.md) | Sync via `EntityManager`, or deferred via `EntityCommandBuffer` (played back automatically at command-buffer systems, or manually) |
 | **Multi-world** | Multiple `World` instances; no built-in roles or cross-world bridging | Explicit Client / Server / ThinClient worlds wired into NetCode for Entities |
 
 ## Key differences
