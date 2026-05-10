@@ -1,6 +1,6 @@
 # Input System
 
-The input system is a deterministic pipeline for player input. Inputs are queued by `[ExecuteIn(SystemPhase.Input)]` systems and applied at the start of the next fixed update — so inputs are captured at variable cadence but consumed at fixed cadence, which is what makes [recording and playback](recording-and-playback.md) deterministic.
+The input system is a deterministic pipeline for player input. Inputs are queued by `[ExecuteIn(SystemPhase.Input)]` systems and applied at the start of the next fixed update — so inputs are captured at variable cadence but consumed at fixed cadence, which is what makes [recording and playback](../advanced/recording-and-playback.md) deterministic.
 
 ## Marking input fields
 
@@ -75,11 +75,11 @@ public partial class ProcessInputSystem : ISystem
 ## Determinism notes
 
 - Inputs are stamped with the next fixed-frame number and applied at fixed-update boundaries — the Input phase itself runs at variable cadence, but only its `AddInput` calls cross into fixed state.
-- During [recording](recording-and-playback.md), inputs are captured into the `RecordingBundle`'s `InputQueue` alongside per-frame checksums.
+- During [recording](../advanced/recording-and-playback.md), inputs are captured into the `RecordingBundle`'s `InputQueue` alongside per-frame checksums.
 - During playback, `BundlePlayer.Start` disables every Input-phase system via `EnableChannel.Playback`; recorded inputs are replayed instead, and live keystrokes are ignored.
 - `MissingInputBehavior` is replay-stable: the same frame produces the same component value whether or not an input was actually queued at record time.
 
 ## See also
 
 - [Sample 11 — Snake](../samples/11-snake.md) — full keyboard-driven input wired to a recordable global entity.
-- [Recording & Playback](recording-and-playback.md) — how the `InputQueue` is captured and replayed.
+- [Recording & Playback](../advanced/recording-and-playback.md) — how the `InputQueue` is captured and replayed.

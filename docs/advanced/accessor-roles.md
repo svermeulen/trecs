@@ -12,7 +12,7 @@ The framework asserts every rule below at the call site. Crossing a role boundar
 ## The three roles
 
 - **`Fixed`** — owns the deterministic simulation. Reads and writes simulation state, mutates entity structure, and allocates persistent heap. Render-only state (anything marked `[VariableUpdateOnly]`) is off-limits. Default for `[ExecuteIn(SystemPhase.Fixed)]` systems, which is the implicit default for any `ISystem`.
-- **`Variable`** — drives presentation. Reads simulation state to render it, and reads/writes the render-only `[VariableUpdateOnly]` state that goes with it. Doesn't touch deterministic state. Default for the three presentation phases and for input systems (input systems get a few extra permissions on top — see [Input System](input-system.md)).
+- **`Variable`** — drives presentation. Reads simulation state to render it, and reads/writes the render-only `[VariableUpdateOnly]` state that goes with it. Doesn't touch deterministic state. Default for the three presentation phases and for input systems (input systems get a few extra permissions on top — see [Input System](../core/input-system.md)).
 - **`Unrestricted`** — escape hatch for non-system code (lifecycle hooks, event callbacks, networking, debug tooling, scripting bridges). Bypasses the per-role rules.
 
 ## Capability matrix
@@ -109,6 +109,6 @@ class PaletteService
 ## Related
 
 - [Heap Allocation Rules](heap-allocation-rules.md) — the heap-specific subset of these rules, plus deterministic ID minting, the seeder pattern, and the `OnRemoved` cleanup convention.
-- [Input System](input-system.md) — how `[Input]` components and `AddInput<T>` work with input systems.
+- [Input System](../core/input-system.md) — how `[Input]` components and `AddInput<T>` work with input systems.
 - [Time & RNG](time-and-rng.md) — `FixedRng` vs `VariableRng` deterministic streams.
 - [Disabling & Pausing Systems](system-control.md) — when to use `SetSystemPaused` vs `EnableChannel`.

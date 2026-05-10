@@ -236,7 +236,7 @@ deterministic:
    new WorldSettings { RandomSeed = 42 }
    ```
    Always use `World.Rng` / `World.FixedRng` — never `UnityEngine.Random` or `System.Random`.
-3. **Isolate inputs.** Use the [Input System](input-system.md) to queue player inputs. During playback, recorded inputs are replayed instead of live input — `BundlePlayer.Start` disables every input-phase system via `EnableChannel.Playback`.
+3. **Isolate inputs.** Use the [Input System](../core/input-system.md) to queue player inputs. During playback, recorded inputs are replayed instead of live input — `BundlePlayer.Start` disables every input-phase system via `EnableChannel.Playback`.
 4. **Use sort keys in jobs.** When using `NativeWorldAccessor` in parallel jobs, provide deterministic sort keys:
    ```csharp
    nativeWorld.AddEntity<MyTag>(sortKey: (uint)entityId);

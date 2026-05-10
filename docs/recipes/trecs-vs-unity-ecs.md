@@ -65,7 +65,7 @@ Trecs has a deliberately small API surface — a handful of core concepts, with 
 | Core design goal | Nice-to-have |
 | Built-in recording / playback with desync detection | No built-in equivalent |
 | Deterministic RNG (`World.Rng`) | No built-in equivalent |
-| [Input system](../advanced/input-system.md) with frame isolation for perfect replay | NetCode for Entities (separate package) |
+| [Input system](../core/input-system.md) with frame isolation for perfect replay | NetCode for Entities (separate package) |
 
 ### Serialization
 

@@ -44,7 +44,7 @@ public partial class PlayerInputSystem : ISystem
 }
 ```
 
-`Input`-phase systems are the only place [`AddInput`](../advanced/input-system.md) is allowed; they run just-in-time before each fixed step so the simulation reads a stable input snapshot.
+`Input`-phase systems are the only place [`AddInput`](../core/input-system.md) is allowed; they run just-in-time before each fixed step so the simulation reads a stable input snapshot.
 
 ## Layer 2: pure ECS
 

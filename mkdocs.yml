@@ -38,11 +38,12 @@ nav:
   - Glossary: glossary.md
   - Core:
       - World Setup: core/world-setup.md
-      - Entities: core/entities.md
       - Components: core/components.md
-      - Templates: core/templates.md
       - Tags: core/tags.md
+      - Templates: core/templates.md
+      - Entities: core/entities.md
       - Systems: core/systems.md
+      - Input System: core/input-system.md
   - Data Access:
       - Queries & Iteration: data-access/queries-and-iteration.md
       - Aspects: data-access/aspects.md
@@ -73,7 +74,6 @@ nav:
       - Serialization: advanced/serialization.md
       - Recording & Playback: advanced/recording-and-playback.md
       - Binary Format: advanced/binary-format.md
-      - Input System: advanced/input-system.md
       - Time & RNG: advanced/time-and-rng.md
   - Editor Windows:
       - Overview: editor-windows/index.md

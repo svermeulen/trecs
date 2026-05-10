@@ -25,7 +25,7 @@ This page is a **cross-reference index**, not a tutorial. Each row links to the 
 | `[ExecutePriority(int)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
 | `[ExecuteIn(SystemPhase.Presentation)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
 | `[ExecuteIn(SystemPhase.LatePresentation)]` | `ISystem` / `IJobSystem` class | [Systems](../core/systems.md) |
-| `[ExecuteIn(SystemPhase.Input)]` | `ISystem` class | [Input System](input-system.md) |
+| `[ExecuteIn(SystemPhase.Input)]` | `ISystem` class | [Input System](../core/input-system.md) |
 
 ### Components and templates
 
@@ -35,7 +35,7 @@ This page is a **cross-reference index**, not a tutorial. Each row links to the 
 | `[VariableUpdateOnly]` | component field **or** template class | [Components](../core/components.md) |
 | `[Constant]` | component field | [Components](../core/components.md) |
 | `[Interpolated]` | template field | [Interpolation](interpolation.md) |
-| `[Input(MissingInputBehavior.…)]` | template field on an input component | [Input System](input-system.md) |
+| `[Input(MissingInputBehavior.…)]` | template field on an input component | [Input System](../core/input-system.md) |
 
 ### Interpolation
 

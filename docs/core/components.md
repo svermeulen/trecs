@@ -85,7 +85,7 @@ public partial class PlayerEntity : ITemplate, ITagged<PlayerTag>
 | `[Interpolated]` | Generates interpolation companion components for smooth rendering. See [Interpolation](../advanced/interpolation.md). |
 | `[VariableUpdateOnly]` | Only variable-cadence phases (Input / Presentation) may read or write it. Asserted at the access site — see [Accessor Roles](../advanced/accessor-roles.md#capability-matrix). |
 | `[Constant]` | Immutable after entity creation. Asserted at the write site. |
-| `[Input(...)]` | Marks the component as input data. See [Input System](../advanced/input-system.md). |
+| `[Input(...)]` | Marks the component as input data. See [Input System](input-system.md). |
 
 A component without an attribute is **simulation state**: any phase may read it, but only `Fixed` systems may write it.
 
