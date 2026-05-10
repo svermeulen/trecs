@@ -11,7 +11,7 @@ namespace Trecs.Samples.Partitions
     {
         const float LaunchSpeed = 8f;
 
-        [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
+        [ForEachEntity(typeof(BallTags.Ball), Without = typeof(BallTags.Active))]
         void Execute(in RestingBall ball)
         {
             ball.RestTimer -= World.DeltaTime;
@@ -21,7 +21,7 @@ namespace Trecs.Samples.Partitions
                 float angle = World.Rng.Next() * 2f * math.PI;
                 ball.Velocity = new float3(math.cos(angle) * 2f, LaunchSpeed, math.sin(angle) * 2f);
 
-                ball.SetTag<BallTags.Active>(World);
+                ball.AddTag<BallTags.Active>(World);
             }
         }
 

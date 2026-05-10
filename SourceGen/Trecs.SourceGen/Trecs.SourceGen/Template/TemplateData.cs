@@ -40,11 +40,20 @@ namespace Trecs.SourceGen.Template
 
     /// <summary>
     /// Parsed data for a single IPartitionedBy interface on a template — one partition
-    /// dimension whose variant tags are mutually exclusive.
+    /// dimension whose variant tags are mutually exclusive. Arity 1 = presence/absence
+    /// (the dim has the tag or doesn't); arity ≥ 2 = explicit-variants (one tag is
+    /// active per dim).
     /// </summary>
     internal class TemplateDimensionData
     {
         public ImmutableArray<string> VariantTagTypeNames { get; }
+
+        /// <summary>
+        /// True for arity-1 dimensions (<c>IPartitionedBy&lt;T&gt;</c>), where the tag
+        /// is either present or absent on the entity. False for explicit-variants
+        /// dimensions (<c>IPartitionedBy&lt;T1, T2, ...&gt;</c>).
+        /// </summary>
+        public bool IsPresenceAbsence => VariantTagTypeNames.Length == 1;
 
         public TemplateDimensionData(ImmutableArray<string> variantTagTypeNames)
         {

@@ -43,6 +43,21 @@ namespace Trecs
         public Type Set { get; set; }
 
         /// <summary>
+        /// Tag type to exclude from the query — entities tagged with this will not
+        /// be iterated. Use to query the "absent" partition of a presence/absence
+        /// dimension declared via <c>IPartitionedBy&lt;T&gt;</c>. For multiple
+        /// excluded tags, use <see cref="Withouts"/>.
+        /// </summary>
+        public Type Without { get; set; }
+
+        /// <summary>
+        /// Tag types to exclude from the query — entities tagged with any of these
+        /// will not be iterated. Use for multiple exclusions; use
+        /// <see cref="Without"/> for a single exclusion.
+        /// </summary>
+        public Type[] Withouts { get; set; }
+
+        /// <summary>
         /// When true, matches groups by which components they declare rather than by
         /// requiring tag membership.
         /// </summary>

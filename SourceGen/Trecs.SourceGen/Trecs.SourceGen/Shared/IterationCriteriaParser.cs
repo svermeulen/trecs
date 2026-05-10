@@ -12,17 +12,20 @@ namespace Trecs.SourceGen.Shared
     {
         public List<ITypeSymbol> TagTypes { get; }
         public List<ITypeSymbol> SetTypes { get; }
+        public List<ITypeSymbol> WithoutTagTypes { get; }
         public bool MatchByComponents { get; }
 
         public IterationCriteria(
             List<ITypeSymbol> tagTypes,
             List<ITypeSymbol> setTypes,
-            bool matchByComponents
+            bool matchByComponents,
+            List<ITypeSymbol>? withoutTagTypes = null
         )
         {
             TagTypes = tagTypes;
             SetTypes = setTypes;
             MatchByComponents = matchByComponents;
+            WithoutTagTypes = withoutTagTypes ?? new List<ITypeSymbol>();
         }
     }
 
@@ -61,6 +64,7 @@ namespace Trecs.SourceGen.Shared
         )
         {
             var setTypes = new List<ITypeSymbol>();
+            var withoutTagTypes = new List<ITypeSymbol>();
             bool matchByComponents = false;
             AttributeData? matched = null;
 
@@ -81,6 +85,22 @@ namespace Trecs.SourceGen.Shared
                         case "MatchByComponents" when named.Value.Value is bool b:
                             matchByComponents = b;
                             break;
+                        case "Without"
+                            when named.Value.Kind == TypedConstantKind.Type
+                                && named.Value.Value is ITypeSymbol w1:
+                            withoutTagTypes.Add(w1);
+                            break;
+                        case "Withouts"
+                            when named.Value.Kind == TypedConstantKind.Array:
+                            foreach (var elem in named.Value.Values)
+                            {
+                                if (
+                                    elem.Kind == TypedConstantKind.Type
+                                    && elem.Value is ITypeSymbol ws
+                                )
+                                    withoutTagTypes.Add(ws);
+                            }
+                            break;
                     }
                 }
                 break;
@@ -90,7 +110,12 @@ namespace Trecs.SourceGen.Shared
             var shortName = TagSourceParser.StripAttributeSuffix(attributeName);
 
             if (matched == null)
-                return new IterationCriteria(new List<ITypeSymbol>(), setTypes, matchByComponents);
+                return new IterationCriteria(
+                    new List<ITypeSymbol>(),
+                    setTypes,
+                    matchByComponents,
+                    withoutTagTypes
+                );
 
             var result = TagSourceParser.Parse(
                 matched,
@@ -102,7 +127,12 @@ namespace Trecs.SourceGen.Shared
             if (!result.Ok)
                 return null;
 
-            return new IterationCriteria(result.TagTypes!, setTypes, matchByComponents);
+            return new IterationCriteria(
+                result.TagTypes!,
+                setTypes,
+                matchByComponents,
+                withoutTagTypes
+            );
         }
     }
 }

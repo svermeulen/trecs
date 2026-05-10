@@ -1427,7 +1427,13 @@ namespace Trecs.Internal
             if (sentinel == -2)
             {
                 var tag = new Tag(buffer.Dequeue<int>());
-                return _worldInfo.ResolveSetTagDestination(from, tag);
+                return _worldInfo.ResolveAddTagDestination(from, tag);
+            }
+
+            if (sentinel == -3)
+            {
+                var tag = new Tag(buffer.Dequeue<int>());
+                return _worldInfo.ResolveRemoveTagDestination(from, tag);
             }
 
             switch (sentinel)
@@ -1565,6 +1571,12 @@ namespace Trecs.Internal
                             var from = buffer.Dequeue<EntityIndex>();
                             var toTagSet = DequeueMoveTagSet(ref buffer, from.GroupIndex);
                             var toGroup = _worldInfo.GetSingleGroupWithTags(toTagSet);
+
+                            // Skip no-op moves (AddTag/RemoveTag where the entity is
+                            // already in the destination partition) — applying them
+                            // would re-add the entity at a new slot.
+                            if (toGroup == from.GroupIndex)
+                                continue;
 
                             _log.Trace(
                                 "Swapping entity {} from group {} to {} (from native operation)",

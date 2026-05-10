@@ -407,26 +407,54 @@ namespace Trecs
             where T4 : struct, ITag => MoveTo<T1, T2, T3, T4>(GetEntityIndex(entityHandle));
 
         /// <summary>
-        /// Burst-side equivalent of <see cref="WorldAccessor.SetTag{T}(EntityIndex)"/>.
-        /// Enqueues a tag change with sentinel <c>-2</c>; the submitter resolves the
+        /// Burst-side equivalent of <see cref="WorldAccessor.AddTag{T}(EntityIndex)"/>.
+        /// Enqueues a tag-add with sentinel <c>-2</c>; the submitter resolves the
         /// destination partition (using the source group's template dimensions) on the
         /// main thread.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal readonly void SetTag<T>(EntityIndex entityIndex)
+        internal readonly void AddTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertStructuralChangesAllowed();
             var bag = _moveQueue.GetBag(_threadIndex);
             bag.Enqueue(_accessorId);
             bag.Enqueue(entityIndex);
-            bag.Enqueue((int)-2); // sentinel: SetTag — single tag GUID follows, dim-resolved at submit time
+            bag.Enqueue((int)-2); // sentinel: AddTag — single tag GUID follows, dim-resolved at submit time
             bag.Enqueue(Tag<T>.NativeGuid);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly void AddTag<T>(EntityHandle entityHandle)
+            where T : struct, ITag => AddTag<T>(GetEntityIndex(entityHandle));
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal readonly void SetTag<T>(EntityIndex entityIndex)
+            where T : struct, ITag => AddTag<T>(entityIndex);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly void SetTag<T>(EntityHandle entityHandle)
-            where T : struct, ITag => SetTag<T>(GetEntityIndex(entityHandle));
+            where T : struct, ITag => AddTag<T>(GetEntityIndex(entityHandle));
+
+        /// <summary>
+        /// Burst-side equivalent of <see cref="WorldAccessor.RemoveTag{T}(EntityIndex)"/>.
+        /// Sentinel <c>-3</c>; resolved at submit time.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal readonly void RemoveTag<T>(EntityIndex entityIndex)
+            where T : struct, ITag
+        {
+            AssertStructuralChangesAllowed();
+            var bag = _moveQueue.GetBag(_threadIndex);
+            bag.Enqueue(_accessorId);
+            bag.Enqueue(entityIndex);
+            bag.Enqueue((int)-3);
+            bag.Enqueue(Tag<T>.NativeGuid);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly void RemoveTag<T>(EntityHandle entityHandle)
+            where T : struct, ITag => RemoveTag<T>(GetEntityIndex(entityHandle));
 
         // ── Entity Reference Resolution ─────────────────────────────
 

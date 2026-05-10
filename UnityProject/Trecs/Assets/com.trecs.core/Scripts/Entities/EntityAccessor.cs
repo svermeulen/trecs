@@ -102,14 +102,30 @@ namespace Trecs
             where T4 : struct, ITag => _world.MoveTo<T1, T2, T3, T4>(_entityIndex);
 
         /// <summary>
-        /// Schedules a tag change: moves this entity to the partition where the
+        /// Schedules a tag-add: moves this entity to the partition where the
         /// dimension containing <typeparamref name="T"/> now has
         /// <typeparamref name="T"/> as its active variant. Other dimensions are
         /// preserved.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddTag<T>()
+            where T : struct, ITag => _world.AddTag<T>(_entityIndex);
+
+        /// <summary>
+        /// Alias for <see cref="AddTag{T}"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetTag<T>()
             where T : struct, ITag => _world.SetTag<T>(_entityIndex);
+
+        /// <summary>
+        /// Schedules a tag-remove: moves this entity to the partition where
+        /// <typeparamref name="T"/> is absent. Only valid for presence/absence
+        /// dimensions.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveTag<T>()
+            where T : struct, ITag => _world.RemoveTag<T>(_entityIndex);
 
         // ── Input ─────────────────────────────────────────────────────
 

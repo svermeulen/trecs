@@ -248,13 +248,29 @@ namespace Trecs
         {
             var groups = GetGroupsWithTags(tagset);
             Assert.That(groups.Count > 0, "No groups found for tags {}", tagset);
-            Assert.That(
-                groups.Count == 1,
+
+            if (groups.Count == 1)
+            {
+                return groups[0];
+            }
+
+            // Multiple groups contain this tag set as a subset. Prefer the group
+            // whose tags exactly equal the requested set — this lets users target
+            // the "absent" partition of a presence/absence dim by specifying just
+            // the ITagged tags (without ambiguity from the present partition,
+            // which would also match by subset).
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (_worldInfo.ToTagSet(groups[i]) == tagset)
+                {
+                    return groups[i];
+                }
+            }
+
+            throw Assert.CreateException(
                 "Ambiguous groups found for tags {}.  Must be unique when creating.",
                 tagset
             );
-
-            return groups[0];
         }
 
         public GroupIndex GetSingleGroupWithTags<T1>()

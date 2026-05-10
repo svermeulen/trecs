@@ -166,6 +166,13 @@ namespace Trecs.SourceGen.Shared
         public List<ParameterInfo> CustomParameters { get; set; } = new();
         public List<ITypeSymbol> AttributeTagTypes { get; set; } = new();
         public bool HasAttributeTags => AttributeTagTypes.Count > 0;
+
+        /// <summary>
+        /// Tag types from <c>Without =</c> / <c>Withouts =</c> on the iteration
+        /// attribute. Source-generator emits a chained <c>.WithoutTags&lt;T&gt;()</c>
+        /// for each entry so matching groups are excluded from the query result.
+        /// </summary>
+        public List<ITypeSymbol> AttributeWithoutTagTypes { get; set; } = new();
         public bool HasEntityIndexParameter { get; set; }
 
         /// <summary>True if the user took a <c>EntityHandle</c> parameter on the iteration method.</summary>

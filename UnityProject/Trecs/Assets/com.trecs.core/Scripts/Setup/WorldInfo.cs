@@ -527,15 +527,17 @@ namespace Trecs
             _queryEngine.GetResolvedTemplateForTags(tags);
 
         /// <summary>
-        /// Resolves the destination <see cref="TagSet"/> for a tag-change operation
-        /// (<c>SetTag&lt;T&gt;</c>): finds which partition dimension contains
-        /// <paramref name="newTag"/> on the source group's template and returns the
-        /// source group's tags with that dimension's current variant replaced by
-        /// <paramref name="newTag"/>.
+        /// Resolves the destination <see cref="TagSet"/> for a tag-add operation
+        /// (<c>AddTag&lt;T&gt;</c> / <c>SetTag&lt;T&gt;</c>): finds the partition
+        /// dimension containing <paramref name="newTag"/> on the source group's
+        /// template and returns the source group's tags with that dimension's
+        /// current variant replaced by <paramref name="newTag"/>. For
+        /// presence/absence dimensions this is "set tag present"; for
+        /// multi-variant dimensions it's "switch to this variant".
         /// </summary>
-        public TagSet ResolveSetTagDestination(GroupIndex from, Tag newTag)
+        public TagSet ResolveAddTagDestination(GroupIndex from, Tag newTag)
         {
-            Assert.That(!from.IsNull, "Cannot resolve SetTag from null group");
+            Assert.That(!from.IsNull, "Cannot resolve AddTag from null group");
             var template = GetResolvedTemplateForGroup(from);
             var currentTags = ToTagSet(from);
 
@@ -543,13 +545,51 @@ namespace Trecs
             {
                 if (TagSetContainsTag(dim, newTag))
                 {
-                    return BuildSetTagDestination(currentTags, dim, newTag);
+                    return BuildTagSetReplacing(currentTags, dim, addTag: newTag);
                 }
             }
 
             throw Assert.CreateException(
                 "Tag {} is not part of any partition dimension on template {}",
                 newTag,
+                template.DebugName
+            );
+        }
+
+        /// <summary>
+        /// Resolves the destination <see cref="TagSet"/> for a tag-remove operation
+        /// (<c>RemoveTag&lt;T&gt;</c>): finds the presence/absence dimension whose
+        /// only variant is <paramref name="tagToRemove"/> and returns the source
+        /// group's tags with that variant stripped. Throws if
+        /// <paramref name="tagToRemove"/> is in a multi-variant dimension — there
+        /// is no defined "absent" partition there; use <c>AddTag</c>/<c>SetTag</c>
+        /// to switch variants instead.
+        /// </summary>
+        public TagSet ResolveRemoveTagDestination(GroupIndex from, Tag tagToRemove)
+        {
+            Assert.That(!from.IsNull, "Cannot resolve RemoveTag from null group");
+            var template = GetResolvedTemplateForGroup(from);
+            var currentTags = ToTagSet(from);
+
+            foreach (var dim in template.Dimensions)
+            {
+                if (TagSetContainsTag(dim, tagToRemove))
+                {
+                    if (dim.Tags.Count != 1)
+                    {
+                        throw Assert.CreateException(
+                            "Cannot RemoveTag<{}>: it is a variant in a multi-variant dimension on template {}. Use AddTag/SetTag to switch variants.",
+                            tagToRemove,
+                            template.DebugName
+                        );
+                    }
+                    return BuildTagSetReplacing(currentTags, dim, addTag: default);
+                }
+            }
+
+            throw Assert.CreateException(
+                "Tag {} is not part of any partition dimension on template {}",
+                tagToRemove,
                 template.DebugName
             );
         }
@@ -564,7 +604,10 @@ namespace Trecs
             return false;
         }
 
-        static TagSet BuildSetTagDestination(TagSet current, TagSet dim, Tag newTag)
+        // Builds a TagSet equal to <paramref name="current"/> with every tag from
+        // <paramref name="dim"/> stripped, then with <paramref name="addTag"/>
+        // appended (skipped if it's the default Tag — i.e. a remove).
+        static TagSet BuildTagSetReplacing(TagSet current, TagSet dim, Tag addTag)
         {
             var resultTags = new List<Tag>();
             foreach (var t in current.Tags)
@@ -572,7 +615,8 @@ namespace Trecs
                 if (!TagSetContainsTag(dim, t))
                     resultTags.Add(t);
             }
-            resultTags.Add(newTag);
+            if (addTag.Guid != 0)
+                resultTags.Add(addTag);
             return TagSet.FromTags(resultTags);
         }
 

@@ -512,24 +512,66 @@ namespace Trecs
             where T4 : struct, ITag => MoveTo<T1, T2, T3, T4>(entityHandle.ToIndex(_world));
 
         /// <summary>
-        /// Schedules a tag change: moves the entity to the partition where the dimension
+        /// Schedules a tag-add: moves the entity to the partition where the dimension
         /// containing <typeparamref name="T"/> now has <typeparamref name="T"/> as its
-        /// active variant. All other dimensions and tags are preserved. Throws if
-        /// <typeparamref name="T"/> is not declared as a partition variant on the entity's
-        /// template (via <see cref="IPartitionedBy{T1, T2}"/>).
+        /// active variant. All other dimensions and tags are preserved. For
+        /// presence/absence dimensions this sets the tag present; for multi-variant
+        /// dimensions it switches the active variant. Throws if
+        /// <typeparamref name="T"/> is not declared as a partition variant on the
+        /// entity's template (via <see cref="IPartitionedBy{T1}"/> /
+        /// <see cref="IPartitionedBy{T1, T2}"/>).
         /// </summary>
-        internal void SetTag<T>(EntityIndex entityIndex)
+        internal void AddTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
-            var newTagSet = _worldInfo.ResolveSetTagDestination(
+            var newTagSet = _worldInfo.ResolveAddTagDestination(
                 entityIndex.GroupIndex,
                 Tag<T>.Value
             );
+            // Skip the move when the entity is already in the destination — MoveTo
+            // does not de-dupe a same-group move and would re-add the entity at
+            // a new slot.
+            if (newTagSet == _worldInfo.ToTagSet(entityIndex.GroupIndex))
+                return;
             MoveTo(entityIndex, newTagSet);
         }
 
+        public void AddTag<T>(EntityHandle entityHandle)
+            where T : struct, ITag => AddTag<T>(entityHandle.ToIndex(_world));
+
+        /// <summary>
+        /// Alias for <see cref="AddTag{T}(EntityIndex)"/>. Reads more naturally for
+        /// multi-variant dimensions (where the operation is a "switch" rather than
+        /// a "set present").
+        /// </summary>
+        internal void SetTag<T>(EntityIndex entityIndex)
+            where T : struct, ITag => AddTag<T>(entityIndex);
+
         public void SetTag<T>(EntityHandle entityHandle)
-            where T : struct, ITag => SetTag<T>(entityHandle.ToIndex(_world));
+            where T : struct, ITag => AddTag<T>(entityHandle.ToIndex(_world));
+
+        /// <summary>
+        /// Schedules a tag-remove: moves the entity to the partition where
+        /// <typeparamref name="T"/> is absent. Only valid when
+        /// <typeparamref name="T"/> is in a presence/absence partition dimension
+        /// (declared via <see cref="IPartitionedBy{T1}"/>). For multi-variant
+        /// dimensions there is no "absent" partition — use
+        /// <see cref="AddTag{T}(EntityIndex)"/> to switch variants instead.
+        /// </summary>
+        internal void RemoveTag<T>(EntityIndex entityIndex)
+            where T : struct, ITag
+        {
+            var newTagSet = _worldInfo.ResolveRemoveTagDestination(
+                entityIndex.GroupIndex,
+                Tag<T>.Value
+            );
+            if (newTagSet == _worldInfo.ToTagSet(entityIndex.GroupIndex))
+                return;
+            MoveTo(entityIndex, newTagSet);
+        }
+
+        public void RemoveTag<T>(EntityHandle entityHandle)
+            where T : struct, ITag => RemoveTag<T>(entityHandle.ToIndex(_world));
 
         /// <summary>
         /// Schedules removal of an entity. The removal is deferred until the next entity submission.

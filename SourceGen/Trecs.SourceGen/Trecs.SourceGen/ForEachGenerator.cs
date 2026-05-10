@@ -395,7 +395,8 @@ namespace Trecs.SourceGen
             var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
                 info.AttributeTagTypes,
                 info.MatchByComponents,
-                info.ComponentParameters.Select(p => p.TypeSymbol)
+                info.ComponentParameters.Select(p => p.TypeSymbol),
+                info.AttributeWithoutTagTypes
             );
             if (chain.Length > 0)
                 sb.AppendLine(3, $"__builder = __builder{chain};");
@@ -431,7 +432,8 @@ namespace Trecs.SourceGen
             var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
                 info.AttributeTagTypes,
                 info.MatchByComponents,
-                info.ComponentParameters.Select(p => p.TypeSymbol)
+                info.ComponentParameters.Select(p => p.TypeSymbol),
+                info.AttributeWithoutTagTypes
             );
             if (chain.Length > 0)
                 sb.AppendLine(3, $"__builder = __builder{chain};");
@@ -804,6 +806,7 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
             var attributeTagTypes = criteria?.TagTypes ?? new List<ITypeSymbol>();
+            var attributeWithoutTagTypes = criteria?.WithoutTagTypes ?? new List<ITypeSymbol>();
             var setTypes = criteria?.SetTypes ?? new List<ITypeSymbol>();
             bool attributeMatchByComponents = criteria?.MatchByComponents ?? false;
 
@@ -818,6 +821,7 @@ namespace Trecs.SourceGen
                     HasEntityAccessorParameter = classified.HasEntityAccessor,
                     ParameterSlots = classified.ParameterSlots.ToList(),
                     AttributeTagTypes = attributeTagTypes,
+                    AttributeWithoutTagTypes = attributeWithoutTagTypes,
                     SetTypes = setTypes,
                     MatchByComponents = attributeMatchByComponents,
                     SetAccessorParameters = classified.SetAccessorParameters.ToList(),

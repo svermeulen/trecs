@@ -32,14 +32,15 @@ namespace Trecs.SourceGen.Shared
         }
 
         /// <summary>
-        /// Builds a chained string of <c>.WithTags&lt;…&gt;().WithComponents&lt;…&gt;()</c>
-        /// calls from the supplied tag and component type lists. Returns an empty string
-        /// when there are no criteria to emit.
+        /// Builds a chained string of <c>.WithTags&lt;…&gt;().WithoutTags&lt;…&gt;()
+        /// .WithComponents&lt;…&gt;()</c> calls from the supplied type lists. Returns
+        /// an empty string when there are no criteria to emit.
         /// </summary>
         public static string BuildAttributeCriteriaChain(
             IEnumerable<ITypeSymbol> tagTypes,
             bool matchByComponents,
-            IEnumerable<ITypeSymbol> componentTypes
+            IEnumerable<ITypeSymbol> componentTypes,
+            IEnumerable<ITypeSymbol>? withoutTagTypes = null
         )
         {
             var chain = new StringBuilder();
@@ -48,6 +49,15 @@ namespace Trecs.SourceGen.Shared
             if (tagList.Count > 0)
             {
                 AppendWithTagsChain(chain, tagList);
+            }
+
+            if (withoutTagTypes != null)
+            {
+                var withoutList = withoutTagTypes.ToList();
+                if (withoutList.Count > 0)
+                {
+                    AppendWithoutTagsChain(chain, withoutList);
+                }
             }
 
             if (matchByComponents)
@@ -59,6 +69,28 @@ namespace Trecs.SourceGen.Shared
             }
 
             return chain.ToString();
+        }
+
+        /// <summary>
+        /// Appends chained <c>.WithoutTags&lt;…&gt;()</c> calls. Same chunking rule
+        /// as <see cref="AppendWithTagsChain"/>.
+        /// </summary>
+        public static void AppendWithoutTagsChain(
+            StringBuilder sb,
+            IEnumerable<ITypeSymbol> tagTypes
+        )
+        {
+            const int max = TrecsCodeGenConstants.MaxTagsPerCall;
+            var list = tagTypes.ToList();
+
+            for (int i = 0; i < list.Count; i += max)
+            {
+                var count = Math.Min(max, list.Count - i);
+                var names = list.Skip(i)
+                    .Take(count)
+                    .Select(t => PerformanceCache.GetDisplayString(t));
+                sb.Append($".WithoutTags<{string.Join(", ", names)}>()");
+            }
         }
     }
 }

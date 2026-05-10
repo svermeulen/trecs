@@ -439,7 +439,8 @@ namespace Trecs.SourceGen
             var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
                 info.AttributeTagTypes,
                 info.MatchByComponents,
-                info.ComponentTypes
+                info.ComponentTypes,
+                info.AttributeWithoutTagTypes
             );
             if (chain.Length > 0)
                 sb.AppendLine(3, $"__builder = __builder{chain};");
@@ -484,7 +485,8 @@ namespace Trecs.SourceGen
             var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
                 info.AttributeTagTypes,
                 info.MatchByComponents,
-                info.ComponentTypes
+                info.ComponentTypes,
+                info.AttributeWithoutTagTypes
             );
             if (chain.Length > 0)
                 sb.AppendLine(3, $"__builder = __builder{chain};");
@@ -955,6 +957,7 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
             var attributeTagTypes = criteria?.TagTypes ?? new List<ITypeSymbol>();
+            var attributeWithoutTagTypes = criteria?.WithoutTagTypes ?? new List<ITypeSymbol>();
             var setTypes = criteria?.SetTypes ?? new List<ITypeSymbol>();
             bool attributeMatchByComponents = criteria?.MatchByComponents ?? false;
 
@@ -1004,6 +1007,7 @@ namespace Trecs.SourceGen
                     CustomParameters = customParameters,
                     ParameterSlots = paramSlots,
                     AttributeTagTypes = attributeTagTypes,
+                    AttributeWithoutTagTypes = attributeWithoutTagTypes,
                     HasEntityIndexParameter = hasEntityIndexParameter,
                     HasEntityHandleParameter = hasEntityHandleParameter,
                     HasEntityAccessorParameter = hasEntityAccessorParameter,

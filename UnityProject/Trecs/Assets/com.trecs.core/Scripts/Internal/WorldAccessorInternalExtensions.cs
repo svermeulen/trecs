@@ -40,8 +40,16 @@ namespace Trecs.Internal
             where T4 : struct, ITag => world.MoveTo<T1, T2, T3, T4>(entityIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void AddTag<T>(this WorldAccessor world, EntityIndex entityIndex)
+            where T : struct, ITag => world.AddTag<T>(entityIndex);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SetTag<T>(this WorldAccessor world, EntityIndex entityIndex)
             where T : struct, ITag => world.SetTag<T>(entityIndex);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void RemoveTag<T>(this WorldAccessor world, EntityIndex entityIndex)
+            where T : struct, ITag => world.RemoveTag<T>(entityIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void RemoveEntity(this WorldAccessor world, EntityIndex entityIndex) =>

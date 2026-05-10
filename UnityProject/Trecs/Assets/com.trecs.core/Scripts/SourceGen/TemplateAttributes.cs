@@ -81,6 +81,15 @@ namespace Trecs
         where T4 : struct, ITag { }
 
     /// <summary>
+    /// Declares a presence/absence partition dimension: the entity is either tagged with
+    /// <typeparamref name="T1"/> or not, with the two cases stored in separate partitions.
+    /// Use <c>AddTag&lt;T1&gt;</c> / <c>RemoveTag&lt;T1&gt;</c> to switch. Query the absent
+    /// partition with <c>[ForEachEntity(..., Without = typeof(T1))]</c>.
+    /// </summary>
+    public interface IPartitionedBy<T1>
+        where T1 : struct, ITag { }
+
+    /// <summary>
     /// Declares a partition dimension on a template. Each type argument is one variant tag —
     /// an entity in this template carries exactly one of these tags at any time. Multiple
     /// IPartitionedBy declarations on the same template define independent dimensions; the

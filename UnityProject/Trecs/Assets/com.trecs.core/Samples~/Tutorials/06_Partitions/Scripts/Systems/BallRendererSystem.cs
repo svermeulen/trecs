@@ -26,7 +26,7 @@ namespace Trecs.Samples.Partitions
             go.GetComponent<Renderer>().material.color = Color.Lerp(Color.yellow, Color.red, 0.5f);
         }
 
-        [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Resting))]
+        [ForEachEntity(typeof(BallTags.Ball), Without = typeof(BallTags.Active))]
         void RenderResting(in RestingBallView ball)
         {
             var go = _registry.Resolve(ball.GameObjectId);

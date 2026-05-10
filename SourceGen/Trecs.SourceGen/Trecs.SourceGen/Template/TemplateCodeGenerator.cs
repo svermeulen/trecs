@@ -98,7 +98,10 @@ namespace Trecs.SourceGen.Template
                 sb.AppendLine(argIndent, "localBaseTemplates: Array.Empty<Template>(),");
             }
 
-            // partitions — cross product of declared dimensions
+            // partitions — cross product of declared dimensions. Presence/absence dims
+            // (arity 1) expand to two cases: the tag present, and an "absent" entry
+            // (no tag added). The cross product walker filters out the empty all-absent
+            // partition when no dim is active.
             var partitionTagSets = ComputeCrossProduct(data.Dimensions);
             if (partitionTagSets.Count > 0)
             {
@@ -106,9 +109,21 @@ namespace Trecs.SourceGen.Template
                 sb.AppendLine(argIndent, "{");
                 for (int i = 0; i < partitionTagSets.Count; i++)
                 {
-                    var tagArgs = string.Join(", ", partitionTagSets[i]);
+                    var tags = partitionTagSets[i];
+                    string entry;
+                    if (tags.Count == 0)
+                    {
+                        // All dims are presence/absence and all "absent" in this row —
+                        // the partition's identifying tag set is empty.
+                        entry = "TagSet.Null";
+                    }
+                    else
+                    {
+                        var tagArgs = string.Join(", ", tags);
+                        entry = $"TagSet<{tagArgs}>.Value";
+                    }
                     var comma = i < partitionTagSets.Count - 1 ? "," : "";
-                    sb.AppendLine(argIndent + 1, $"TagSet<{tagArgs}>.Value{comma}");
+                    sb.AppendLine(argIndent + 1, $"{entry}{comma}");
                 }
                 sb.AppendLine(argIndent, "},");
             }
@@ -250,8 +265,9 @@ namespace Trecs.SourceGen.Template
 
         /// <summary>
         /// Computes the cross product across a template's partition dimensions. Each result
-        /// is one concrete partition (a tuple of variant tag type names, one per dimension).
-        /// Empty input yields an empty result.
+        /// is one concrete partition: a list of variant tag type names (one per active
+        /// dimension; presence/absence dimensions in the "absent" state contribute no
+        /// entry). Empty input yields an empty result.
         /// </summary>
         private static IReadOnlyList<IReadOnlyList<string>> ComputeCrossProduct(
             ImmutableArray<TemplateDimensionData> dimensions
@@ -263,15 +279,20 @@ namespace Trecs.SourceGen.Template
             }
 
             var result = new List<IReadOnlyList<string>>();
-            var current = new string[dimensions.Length];
+            var current = new List<string>();
             BuildCrossProduct(dimensions, 0, current, result);
             return result;
         }
 
+        // Sentinel marking the "absent" branch of a presence/absence dimension. The walker
+        // skips it instead of recording a tag, so the resulting partition has one fewer
+        // entry than there are active dimensions.
+        const string AbsentVariant = "<absent>";
+
         private static void BuildCrossProduct(
             ImmutableArray<TemplateDimensionData> dimensions,
             int dimIndex,
-            string[] current,
+            List<string> current,
             List<IReadOnlyList<string>> result
         )
         {
@@ -281,10 +302,24 @@ namespace Trecs.SourceGen.Template
                 return;
             }
 
-            foreach (var variant in dimensions[dimIndex].VariantTagTypeNames)
+            var dim = dimensions[dimIndex];
+            if (dim.IsPresenceAbsence)
             {
-                current[dimIndex] = variant;
+                // "Absent" branch — skip adding a tag.
                 BuildCrossProduct(dimensions, dimIndex + 1, current, result);
+                // "Present" branch — add the tag.
+                current.Add(dim.VariantTagTypeNames[0]);
+                BuildCrossProduct(dimensions, dimIndex + 1, current, result);
+                current.RemoveAt(current.Count - 1);
+            }
+            else
+            {
+                foreach (var variant in dim.VariantTagTypeNames)
+                {
+                    current.Add(variant);
+                    BuildCrossProduct(dimensions, dimIndex + 1, current, result);
+                    current.RemoveAt(current.Count - 1);
+                }
             }
         }
     }
