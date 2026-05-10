@@ -682,7 +682,10 @@ namespace Trecs
             return new ComponentAccessor<T>(this, entityHandle.ToIndex(_entitiesDb));
         }
 
-        internal bool TryComponent<T>(EntityIndex entityIndex, out ComponentAccessor<T> componentRef)
+        internal bool TryComponent<T>(
+            EntityIndex entityIndex,
+            out ComponentAccessor<T> componentRef
+        )
             where T : unmanaged, IEntityComponent
         {
             SyncAndRecordRead<T>(entityIndex.GroupIndex);
@@ -693,6 +696,15 @@ namespace Trecs
             }
             componentRef = default;
             return false;
+        }
+
+        public bool TryComponent<T>(
+            EntityHandle entityHandle,
+            out ComponentAccessor<T> componentRef
+        )
+            where T : unmanaged, IEntityComponent
+        {
+            return TryComponent<T>(entityHandle.ToIndex(_entitiesDb), out componentRef);
         }
 
         /// <summary>

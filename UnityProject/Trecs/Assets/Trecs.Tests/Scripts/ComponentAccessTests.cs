@@ -1,7 +1,7 @@
 using NUnit.Framework;
+using Trecs.Internal;
 using Unity.Collections;
 using NAssert = NUnit.Framework.Assert;
-using Trecs.Internal;
 
 namespace Trecs.Tests
 {
@@ -93,6 +93,37 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var found = a.TryComponent<TestInt>(new EntityIndex(0, group), out _);
+
+            NAssert.IsFalse(found);
+        }
+
+        [Test]
+        public void Component_TryGet_ByHandle_Existing_ReturnsTrue()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            var init = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 77 }).AssertComplete();
+            var handle = init.Handle;
+            a.SubmitEntities();
+
+            var found = a.TryComponent<TestInt>(handle, out var comp);
+
+            NAssert.IsTrue(found);
+            NAssert.AreEqual(77, comp.Read.Value);
+        }
+
+        [Test]
+        public void Component_TryGet_ByHandle_MissingComponent_ReturnsFalse()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            var init = a.AddEntity(TestTags.Alpha).AssertComplete();
+            var handle = init.Handle;
+            a.SubmitEntities();
+
+            var found = a.TryComponent<TestFloat>(handle, out _);
 
             NAssert.IsFalse(found);
         }
