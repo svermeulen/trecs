@@ -200,6 +200,28 @@ namespace Trecs.Tests
     }
 
     /// <summary>
+    /// Fixed-phase <c>[WrapAsJob]</c> system that tries to schedule a write
+    /// job over an <c>[Input]</c> component. The job-scheduling path goes
+    /// through <c>GetBufferWriteForJobScheduling</c>, which calls the same
+    /// <c>AssertCanWriteComponent</c> as the main-thread path, so the IsInput
+    /// guard must fire here too — at scheduling time, before the job runs.
+    /// </summary>
+    partial class FixedWrapAsJobInputCompWriter : ISystem
+    {
+        [ForEachEntity(Tag = typeof(WritePhaseSetTag))]
+        [WrapAsJob]
+        static void WriteInput(ref WritePhaseInputComp value)
+        {
+            value.Value = 1;
+        }
+
+        public void Execute()
+        {
+            WriteInput();
+        }
+    }
+
+    /// <summary>
     /// Fixed-phase <c>[WrapAsJob]</c> system that tries to schedule a read
     /// job over a <c>[VariableUpdateOnly]</c> component. Routes through
     /// <c>GetBufferReadForJobScheduling</c> →
@@ -1031,6 +1053,17 @@ namespace Trecs.Tests
             // .Write to an [Input] component is still rejected — the rule is
             // "only Unrestricted writes," not "Input-or-Unrestricted writes."
             using var env = CreateEnvWithSystem(new InputInputCompWriter());
+            NAssert.Throws<TrecsException>(() => env.World.Tick());
+        }
+
+        [Test]
+        public void WrapAsJob_Write_FromFixed_ToInputComponent_Throws()
+        {
+            // [WrapAsJob] routes through GetBufferWriteForJobScheduling,
+            // which calls AssertCanWriteComponent — same guard as the
+            // main-thread path. The IsInput rejection must therefore fire
+            // at scheduling time, before the job dispatches to Burst.
+            using var env = CreateEnvWithSystem(new FixedWrapAsJobInputCompWriter());
             NAssert.Throws<TrecsException>(() => env.World.Tick());
         }
 
