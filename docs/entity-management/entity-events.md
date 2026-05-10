@@ -33,7 +33,7 @@ A scope picks which groups the subscription watches. One of:
 
 ### Handlers
 
-The recommended pattern is to mark the handler with `[ForEachEntity]` so the source generator emits the per-entity iteration with the right component access:
+The recommended pattern is to use a `[ForEachEntity]` method as the event handler:
 
 ```csharp
 public partial class RemoveCleanupHandler : IDisposable
@@ -63,11 +63,7 @@ public partial class RemoveCleanupHandler : IDisposable
 }
 ```
 
-Components read inside `OnRemoved` are still valid, even though the callback fires *after* removal — removed entities are parked at the end of the backing array (past the active count), so the buffers haven't been cleared yet. The removed components are also contiguous in memory, which is cache-friendly for cleanup.
-
-## Aspects in event callbacks
-
-Aspects work in event handlers the same way they do in systems — declare a `partial struct` with `IRead` / `IWrite` and use it as the handler parameter:
+All `[ForEachEntity]` features are supported on event handlers, so for example you can use aspects as well:
 
 ```csharp
 public partial class CleanupHandlers : IDisposable
@@ -102,6 +98,8 @@ public partial class CleanupHandlers : IDisposable
 }
 ```
 
+Note that components read inside `OnRemoved` are still valid, even though the callback fires *after* removal — removed entities are parked at the end of the backing array (past the active count), so the buffers haven't been cleared yet. The removed components are also contiguous in memory, which is cache-friendly for cleanup.
+
 ## Priorities
 
 Call `WithPriority(int)` before `OnAdded` / `OnRemoved` / `OnMoved` to control firing order across observers on the same group (higher = later; default `0`):
@@ -115,7 +113,7 @@ World.Events
 
 ## Disposing subscriptions
 
-Subscriptions returned by `EntitiesWithTags` / `EntitiesWithComponents` / `InGroup` / `AllEntities` all implement `IDisposable`. Dispose the subscription to unregister the handler.
+The returned subscription objects all implement `IDisposable`. Dispose the subscription to unregister the handler.
 
 ```csharp
 var sub = World.Events
@@ -125,30 +123,31 @@ var sub = World.Events
 sub.Dispose();
 ```
 
-Trecs doesn't ship a `DisposeCollection` type. The samples define a small helper, but a `List<IDisposable>` walked in `Dispose()` works fine too.
+Trecs doesn't ship a `DisposeCollection` type to aggregate subscription disposables together. The samples define a small helper, but a `List<IDisposable>` walked during your object cleanup works fine too.
 
 ## Cascading structural changes from callbacks
 
-A callback can itself queue structural changes — e.g. an `OnRemoved` handler that removes a follower, or an `OnAdded` handler that spawns a child. Trecs cascades **iteratively, not recursively**:
-
-- Each submission iteration snapshots the queued ops, applies them, and fires the matching observers. New ops queued from callbacks are picked up in the *next* iteration of the same `SubmitEntities()` call.
-- The cascade continues until the queues drain, bounded by `WorldSettings.MaxSubmissionIterations` (default 10). Hitting the cap throws `"possible circular submission detected"` in `DEBUG` builds — usually a sign that an observer is feeding itself.
-- Order is deterministic across iterations. Native (Burst-queued) ops are sorted at the boundary when [`RequireDeterministicSubmission`](structural-changes.md#deterministic-submission) is enabled.
-- **Don't call `world.SubmitEntities()` from inside a callback** — the re-entrancy guard asserts. Just queue the change and let the running submission pick it up.
-
-The [strict-accessor-during-Fixed-execute rule](../advanced/accessor-roles.md#strict-accessor-during-fixed-execute-rule) does **not** apply inside observer callbacks: submission runs *between* system executes, so a service can use its own `AccessorRole.Fixed` accessor from the callback. The [pointer cleanup sample](../samples/10-pointers.md) relies on this.
+A callback can itself queue structural changes — e.g. an `OnRemoved` handler that removes a follower, or an `OnAdded` handler that spawns a child.  Trecs keeps processing the queue until empty or a maximum number of iterations is reached - configurable via `WorldSettings.MaxSubmissionIterations` (default 10). Hitting the cap throws `"possible circular submission detected"` in `DEBUG` builds — usually a sign that an observer is feeding itself.
 
 ## Frame events
 
-Separate from entity events, `World.Events` also exposes lifecycle hooks for the simulation loop:
+Separate from the per-entity events above, `World.Events` exposes lifecycle hooks for the simulation loop and for snapshot / recording loads:
+
+| Event | Fires when |
+|---|---|
+| `OnVariableUpdateStarted` | At the start of every `World.Tick()`. |
+| `OnFixedUpdateStarted` | At the start of each fixed-update step (zero or more times per `Tick()`, depending on catch-up). |
+| `OnPostApplyInputs` | Inside each fixed step, after inputs have been applied to the global entity. |
+| `OnSubmissionStarted` | Submission is about to run (end of each fixed step). |
+| `OnSubmission` | Submission finished — all queued structural changes applied. |
+| `OnFixedUpdateCompleted` | At the end of each fixed-update step. |
+| `OnDeserializeStarted` | A snapshot or recording is about to load into the world. |
+| `OnDeserializeCompleted` | A snapshot or recording has finished loading. |
+
+Each takes an `Action` (or `Action, int priority` for ordering) and returns `IDisposable`. Dispose to unsubscribe.
 
 ```csharp
-World.Events.OnFixedUpdateStarted(() => { /* fixed phase begins */ });
-World.Events.OnPostApplyInputs(() =>     { /* inputs applied — inside the fixed step, before systems */ });
-World.Events.OnSubmissionStarted(() =>   { /* submission about to run */ });
-World.Events.OnSubmission(() =>          { /* submission finished — all changes applied */ });
-World.Events.OnFixedUpdateCompleted(() => { /* all fixed steps complete */ });
-World.Events.OnVariableUpdateStarted(() => { /* variable phase begins */ });
+var sub = World.Events.OnSubmission(() => Debug.Log("Submission complete"));
+// ...
+sub.Dispose();
 ```
-
-Each returns `IDisposable`; call `.Dispose()` to unsubscribe. Each method also has a `(Action, int priority)` overload for ordering. `OnDeserializeCompleted` is also available for reacting to a snapshot / recording load.
