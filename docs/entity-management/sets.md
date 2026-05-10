@@ -133,4 +133,4 @@ Both tags (via [partitions](../core/templates.md#partitions)) and sets can repre
 
 ## See also
 
-- [Sample 08 — Sets](../samples/08-sets.md): a worked example of producer/consumer set membership across systems.
+- [Sample 08 — Sets](../samples/08-sets.md): a complete example of producer/consumer set membership across systems.

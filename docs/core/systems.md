@@ -286,7 +286,7 @@ Tags must be hardcoded in the attribute (e.g. `[SingleEntity(typeof(MyTag))]`) �
 - **`[WrapAsJob]` static methods** — singletons become job-struct fields wired up at schedule time.
 - **Hand-written job-struct fields** — `[SingleEntity]` directly on a field of an `IJobFor` makes the generator populate it (the same way `[FromWorld]` works for other field kinds).
 
-For a worked example using `[SingleEntity]` to track a single head entity, see [Sample 11 — Snake](../samples/11-snake.md).
+For a complete `[SingleEntity]` example tracking a single head entity, see [Sample 11 — Snake](../samples/11-snake.md).
 
 ### Cross-group index
 
