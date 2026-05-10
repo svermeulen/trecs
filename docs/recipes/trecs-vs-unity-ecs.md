@@ -27,6 +27,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | **Single-field component shorthand** | None | [`[Unwrap]`](../core/components.md#the-unwrap-shorthand) — exposes the inner value through aspect properties (e.g. `boid.Position` is a `float3`, not a `Position` wrapper) |
 | **Runtime add / remove of components** | Yes (`AddComponent` / `RemoveComponent`; causes archetype move) | No — a template's component set is fixed at compile time. Use [partitions](../core/templates.md#partitions), boolean / enum fields, [sets](../entity-management/sets.md), or child entities for the equivalents |
 | **Components shared across many entities** | `ISharedComponentData` | No equivalent; share by reference via a heap pointer |
+| **Cleanup-after-destroy components** | `ICleanupComponentData` — persists past entity destruction so a system can finalize and explicitly remove them | None — use [`OnRemoved`](../entity-management/entity-events.md) observer events for finalization |
 
 ## Systems
 
@@ -80,6 +81,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 |---|---|---|
 | **Edit-time authoring → entities** | Subscene baking — designers author with `MonoBehaviour`s, baked at edit/build time | No direct equivalent (yet) |
 | **Runtime save/load of full world state** | Limited runtime serialization | Built-in [serialization](../advanced/serialization.md) (snapshots, save/load, replays) |
+| **Incremental scene streaming** | Subscenes load incrementally (open-world / large-scale streaming) | None built-in — full snapshots only |
 | **Delta-encoded snapshots** | None built-in | Delta encoding for compact snapshots |
 | **Per-save versioning** | Handled outside the engine | `Reader.Version` / `Writer.Version` for evolving custom serializers across save format revisions |
 
@@ -88,6 +90,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | | Unity ECS | Trecs |
 |---|---|---|
 | **Entity inspector** | Entity Debugger, Hierarchy window | [Hierarchy inspector](../editor-windows/hierarchy.md) |
+| **Live editing of running entities** | Live baking — edits to subscene `MonoBehaviour` authoring sources are re-baked and flowed into the running entity world | [Hierarchy window](../editor-windows/hierarchy.md) — per-entity JSON-editable component inspector mutates running entities directly |
 | **Record / scrub / fork timeline** | None built-in | [Player window](../editor-windows/player.md) — record a session, scrub back through earlier frames, fork the timeline |
 
 ## Physics & rendering
@@ -97,6 +100,7 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 | **Physics** | Unity Physics (built-in) | External (via OOP bridge) |
 | **Rendering** | Entities Graphics package | User-owned — bring your own approach |
 | **Transform hierarchy** | Built-in `LocalTransform` + `Parent` / `Child` system maintaining `LocalToWorld` | None built-in — define your own components |
+| **GameObject ↔ Entity hybrid** | Companion Components — an entity can carry a managed Unity `GameObject` "shadow" maintained by the framework | Manual bridging via a `GameObjectId` component plus a user-side registry (the samples ship a `GameObjectRegistry` helper) |
 
 ## Tag-based identity
 
