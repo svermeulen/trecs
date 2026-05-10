@@ -312,7 +312,7 @@ namespace Trecs
 
         public EntityHandle GlobalEntityHandle => _world.GlobalEntityHandle;
 
-        public EntityIndex GlobalEntityIndex => _worldInfo.GlobalEntityIndex;
+        internal EntityIndex GlobalEntityIndex => _worldInfo.GlobalEntityIndex;
 
         public float VariableElapsedTime
         {
@@ -456,7 +456,7 @@ namespace Trecs
         /// deferred until the next entity submission. The entity's component data is preserved
         /// for components shared between the source and destination groups.
         /// </summary>
-        public void MoveTo(EntityIndex entityIndex, TagSet tags)
+        internal void MoveTo(EntityIndex entityIndex, TagSet tags)
         {
             // MoveTo touches both source and destination groups; both must
             // be allowed for the role. The dest's role-allowance dictates
@@ -472,19 +472,19 @@ namespace Trecs
             AccessRecorder?.OnEntityMoved(_debugName, entityIndex.GroupIndex, toGroup);
         }
 
-        public void MoveTo<T1>(EntityIndex entityIndex)
+        internal void MoveTo<T1>(EntityIndex entityIndex)
             where T1 : struct, ITag => MoveTo(entityIndex, TagSet<T1>.Value);
 
-        public void MoveTo<T1, T2>(EntityIndex entityIndex)
+        internal void MoveTo<T1, T2>(EntityIndex entityIndex)
             where T1 : struct, ITag
             where T2 : struct, ITag => MoveTo(entityIndex, TagSet<T1, T2>.Value);
 
-        public void MoveTo<T1, T2, T3>(EntityIndex entityIndex)
+        internal void MoveTo<T1, T2, T3>(EntityIndex entityIndex)
             where T1 : struct, ITag
             where T2 : struct, ITag
             where T3 : struct, ITag => MoveTo(entityIndex, TagSet<T1, T2, T3>.Value);
 
-        public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex)
+        internal void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex)
             where T1 : struct, ITag
             where T2 : struct, ITag
             where T3 : struct, ITag
@@ -514,7 +514,7 @@ namespace Trecs
         /// <summary>
         /// Schedules removal of an entity. The removal is deferred until the next entity submission.
         /// </summary>
-        public void RemoveEntity(EntityIndex entityIndex)
+        internal void RemoveEntity(EntityIndex entityIndex)
         {
             AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
 
@@ -670,7 +670,7 @@ namespace Trecs
             return new ComponentBufferAccessor<T>(this, group);
         }
 
-        public ComponentAccessor<T> Component<T>(EntityIndex entityIndex)
+        internal ComponentAccessor<T> Component<T>(EntityIndex entityIndex)
             where T : unmanaged, IEntityComponent
         {
             return new ComponentAccessor<T>(this, entityIndex);
@@ -682,7 +682,7 @@ namespace Trecs
             return new ComponentAccessor<T>(this, entityHandle.ToIndex(_entitiesDb));
         }
 
-        public bool TryComponent<T>(EntityIndex entityIndex, out ComponentAccessor<T> componentRef)
+        internal bool TryComponent<T>(EntityIndex entityIndex, out ComponentAccessor<T> componentRef)
             where T : unmanaged, IEntityComponent
         {
             SyncAndRecordRead<T>(entityIndex.GroupIndex);
@@ -705,7 +705,7 @@ namespace Trecs
             return Component<T>(_worldInfo.GlobalEntityIndex);
         }
 
-        public EntityAccessor Entity(EntityIndex entityIndex)
+        internal EntityAccessor Entity(EntityIndex entityIndex)
         {
             return new EntityAccessor(this, entityIndex);
         }
@@ -829,17 +829,17 @@ namespace Trecs
             return entityHandle.Exists(_entitiesDb);
         }
 
-        public EntityHandle GetEntityHandle(EntityIndex entityIndex)
+        internal EntityHandle GetEntityHandle(EntityIndex entityIndex)
         {
             return entityIndex.ToHandle(_entitiesDb);
         }
 
-        public EntityIndex GetEntityIndex(EntityHandle entityHandle)
+        internal EntityIndex GetEntityIndex(EntityHandle entityHandle)
         {
             return entityHandle.ToIndex(_entitiesDb);
         }
 
-        public bool TryGetEntityIndex(EntityHandle entityHandle, out EntityIndex entityIndex)
+        internal bool TryGetEntityIndex(EntityHandle entityHandle, out EntityIndex entityIndex)
         {
             return entityHandle.TryToIndex(_entitiesDb, out entityIndex);
         }
@@ -857,7 +857,7 @@ namespace Trecs
             _entityInputQueue.AddInput(_systemRunner.FixedFrame, entityHandle, value);
         }
 
-        public void AddInput<T>(EntityIndex entityIndex, in T value)
+        internal void AddInput<T>(EntityIndex entityIndex, in T value)
             where T : unmanaged, IEntityComponent
         {
             AssertCanAddInputsSystem();

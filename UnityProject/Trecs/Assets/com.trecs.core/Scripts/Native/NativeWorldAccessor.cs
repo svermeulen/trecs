@@ -287,7 +287,7 @@ namespace Trecs
         // ── Entity Remove ───────────────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void RemoveEntity(EntityIndex entityIndex)
+        internal readonly void RemoveEntity(EntityIndex entityIndex)
         {
             AssertStructuralChangesAllowed();
             Assert.That(entityIndex != EntityIndex.Null);
@@ -308,7 +308,7 @@ namespace Trecs
         /// <summary>
         /// Schedule a tag change with a pre-built TagSet.
         /// </summary>
-        public readonly void MoveTo(EntityIndex entityIndex, TagSet tags)
+        internal readonly void MoveTo(EntityIndex entityIndex, TagSet tags)
         {
             AssertStructuralChangesAllowed();
             var bag = _moveQueue.GetBag(_threadIndex);
@@ -319,7 +319,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void MoveTo<T1>(EntityIndex entityIndex)
+        internal readonly void MoveTo<T1>(EntityIndex entityIndex)
             where T1 : struct, ITag
         {
             AssertStructuralChangesAllowed();
@@ -331,7 +331,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void MoveTo<T1, T2>(EntityIndex entityIndex)
+        internal readonly void MoveTo<T1, T2>(EntityIndex entityIndex)
             where T1 : struct, ITag
             where T2 : struct, ITag
         {
@@ -345,7 +345,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void MoveTo<T1, T2, T3>(EntityIndex entityIndex)
+        internal readonly void MoveTo<T1, T2, T3>(EntityIndex entityIndex)
             where T1 : struct, ITag
             where T2 : struct, ITag
             where T3 : struct, ITag
@@ -361,7 +361,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex)
+        internal readonly void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex)
             where T1 : struct, ITag
             where T2 : struct, ITag
             where T3 : struct, ITag
@@ -409,17 +409,17 @@ namespace Trecs
         // ── Entity Reference Resolution ─────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool TryGetEntityIndex(
+        internal readonly bool TryGetEntityIndex(
             EntityHandle entityHandle,
             out EntityIndex entityIndex
         ) => _entityIds.TryGetEntityIndex(entityHandle, out entityIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly EntityIndex GetEntityIndex(EntityHandle entityHandle) =>
+        internal readonly EntityIndex GetEntityIndex(EntityHandle entityHandle) =>
             _entityIds.GetEntityIndex(entityHandle);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly EntityHandle GetEntityHandle(EntityIndex entityIndex) =>
+        internal readonly EntityHandle GetEntityHandle(EntityIndex entityIndex) =>
             _entityIds.GetEntityHandle(entityIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -429,7 +429,7 @@ namespace Trecs
         // ── Deferred Set Operations ─────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetAdd<TSet>(EntityIndex entityIndex)
+        internal void SetAdd<TSet>(EntityIndex entityIndex)
             where TSet : struct, IEntitySet
         {
             AssertStructuralChangesAllowed();
@@ -447,7 +447,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetRemove<TSet>(EntityIndex entityIndex)
+        internal void SetRemove<TSet>(EntityIndex entityIndex)
             where TSet : struct, IEntitySet
         {
             AssertStructuralChangesAllowed();

@@ -28,7 +28,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(EntityIndex entityIndex)
+        internal void Add(EntityIndex entityIndex)
         {
             _queues.AddQueue.GetBag(0).Enqueue(entityIndex);
         }
@@ -40,7 +40,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(EntityIndex entityIndex)
+        internal void Remove(EntityIndex entityIndex)
         {
             _queues.RemoveQueue.GetBag(0).Enqueue(entityIndex);
         }

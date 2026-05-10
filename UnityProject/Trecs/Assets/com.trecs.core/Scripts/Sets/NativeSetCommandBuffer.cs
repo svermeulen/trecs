@@ -55,7 +55,7 @@ namespace Trecs
         /// Writes are flushed immediately after the writer job completes.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(EntityIndex entityIndex)
+        internal void Add(EntityIndex entityIndex)
         {
             var bag = _addQueue.GetBag(_threadIndex);
             bag.Enqueue(entityIndex);
@@ -78,7 +78,7 @@ namespace Trecs
         /// Writes are flushed immediately after the writer job completes.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(EntityIndex entityIndex)
+        internal void Remove(EntityIndex entityIndex)
         {
             var bag = _removeQueue.GetBag(_threadIndex);
             bag.Enqueue(entityIndex);

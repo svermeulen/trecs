@@ -49,10 +49,7 @@ namespace Trecs
             return _world.TryComponent(_entityIndex, out componentRef);
         }
 
-        /// <summary>
-        /// The transient buffer index for this entity.
-        /// </summary>
-        public EntityIndex EntityIndex => _entityIndex;
+        internal EntityIndex EntityIndex => _entityIndex;
 
         /// <summary>
         /// The stable entity identifier. Performs a reverse lookup.

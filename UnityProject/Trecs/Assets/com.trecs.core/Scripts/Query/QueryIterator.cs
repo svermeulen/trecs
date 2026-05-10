@@ -12,7 +12,7 @@ namespace Trecs
     /// Self-enumerable — use directly in foreach:
     /// <code>foreach (var ei in queryBuilder.EntityIndices()) { ... }</code>
     /// </remarks>
-    public ref struct QueryIterator
+    internal ref struct QueryIterator
     {
         bool _done;
         GroupIndex _currentGroup;

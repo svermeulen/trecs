@@ -248,7 +248,7 @@ namespace Trecs
             );
         }
 
-        public readonly QueryIterator EntityIndices()
+        internal readonly QueryIterator EntityIndices()
         {
             AssertHasAnyCriteria();
             return CreateIterator();
@@ -314,7 +314,7 @@ namespace Trecs
             return true;
         }
 
-        public readonly EntityIndex SingleEntityIndex()
+        internal readonly EntityIndex SingleEntityIndex()
         {
             AssertHasAnyCriteria();
             var iter = CreateIterator();
@@ -328,7 +328,7 @@ namespace Trecs
             return result;
         }
 
-        public readonly bool TrySingleEntityIndex(out EntityIndex entityIndex)
+        internal readonly bool TrySingleEntityIndex(out EntityIndex entityIndex)
         {
             AssertHasAnyCriteria();
             var iter = CreateIterator();
@@ -375,7 +375,7 @@ namespace Trecs
             return groups;
         }
 
-        public readonly QueryIterator CreateIterator()
+        internal readonly QueryIterator CreateIterator()
         {
             var groups = ResolveGroups();
             return new QueryIterator(_world, groups);

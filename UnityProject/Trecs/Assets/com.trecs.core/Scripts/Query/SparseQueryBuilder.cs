@@ -232,7 +232,7 @@ namespace Trecs
             return true;
         }
 
-        public readonly EntityIndex SingleEntityIndex()
+        internal readonly EntityIndex SingleEntityIndex()
         {
             var iter = CreateIterator();
 
@@ -245,7 +245,7 @@ namespace Trecs
             return result;
         }
 
-        public readonly bool TrySingleEntityIndex(out EntityIndex entityIndex)
+        internal readonly bool TrySingleEntityIndex(out EntityIndex entityIndex)
         {
             var iter = CreateIterator();
 
@@ -267,7 +267,7 @@ namespace Trecs
             return true;
         }
 
-        public readonly QueryIterator EntityIndices()
+        internal readonly QueryIterator EntityIndices()
         {
             return CreateIterator();
         }
@@ -289,7 +289,7 @@ namespace Trecs
             return new EntitiesQueryIterator(CreateIterator(), _world);
         }
 
-        public readonly QueryIterator CreateIterator()
+        internal readonly QueryIterator CreateIterator()
         {
             var groups = ResolveGroups();
             return new QueryIterator(_world, groups, _set);
