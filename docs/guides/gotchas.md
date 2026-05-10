@@ -6,47 +6,29 @@ Common mistakes, edge cases, and surprises when building with Trecs. Each entry 
 
 ### `UnityEngine.Random` or `Time.deltaTime` in fixed update
 
-Both vary across runs and break replay. The simulation desyncs from a recording the moment one of these executes during a fixed step.
+Both vary across runs and break replay. The simulation desyncs from a recording the moment one of these are used during a fixed step.
 
-**Fix.** Use `World.Rng` (with the `FixedRng` / `VariableRng` streams) and `world.FixedDeltaTime` / `world.DeltaTime` (phase-aware). See [Time & RNG](../advanced/time-and-rng.md).
+**Fix.** Use `World.Rng` and `World.DeltaTime` (phase-aware). See [Time & RNG](../advanced/time-and-rng.md).
 
 ### Mutable state stored on a fixed-update system
 
-System fields are not serialized. Anything mutable kept on a system silently diverges between record and replay — the recording captures component state up to disk, and on replay the system field starts at its constructor default while the recording assumes the accumulated value.
+System fields are not serialized. Anything mutable kept on a system silently diverges between record and replay.
 
-**Fix.** Store dynamic state in components. Constructor parameters for immutable configuration are fine.
+**Fix.** Store dynamic state in components. Constructor parameters for immutable configuration are fine, or to cache some data to members in OnReady.
 
 ### Reading continuous time in fixed update with float-sensitive code
 
 `DeltaTime` / `ElapsedTime` accumulate floating-point error that drifts across machines. For lockstep-deterministic workloads (RTS netcode etc.) this causes desync even when everything else is deterministic.
 
-**Fix.** Set `WorldSettings.AssertNoTimeInFixedPhase = true` (throws on access during fixed phase) and use `World.FixedFrame` (a discrete tick counter) as your time source. See [`AssertNoTimeInFixedPhase`](../advanced/serialization.md#worldsettingsassertnotimeinfixedphase).
-
-### Missing sort keys in parallel structural-change jobs
-
-`NativeWorldAccessor` ops (`AddEntity` / `RemoveEntity` / `MoveTo` from a job) without a deterministic sort key produce non-deterministic ordering across runs.
-
-**Fix.** Pass a stable sort key to every parallel structural op. See [Deterministic submission](../entity-management/structural-changes.md#deterministic-submission).
+**Fix.** Set `WorldSettings.AssertNoTimeInFixedPhase = true` (throws on access during fixed phase) and use `World.FixedFrame` (a discrete tick counter) as your time source. See [`AssertNoTimeInFixedPhase`](../advanced/serialization.md#worldsettingsassertnotimeinfixedphase).  Only applicable for multiplayer games that require cross machine sync.
 
 ## Lifecycle & init
-
-### Reading globals from `OnReady`
-
-The global entity isn't yet initialized when `OnReady` runs. `World.GlobalComponent<T>()` from there is unsafe.
-
-**Fix.** Use `OnReady` for one-time setup that doesn't touch globals — typically subscribing to events. Initialize global state from a one-shot fixed-phase system that runs at frame 0, or from world setup before any system's first execute. See [OnReady hook](../core/systems.md#onready-hook).
 
 ### Service-class accessor used during a Fixed system's `Execute`
 
 Strict-accessor rule: during a `Fixed` system's `Execute`, only that system's own accessor may touch ECS state. A service holding a separately-created accessor — even a `Fixed`-role one — throws.
 
 **Fix.** Pass the calling system's `WorldAccessor` into the service rather than holding a separate one. Variable-cadence phases and observer callbacks don't enforce this rule. See [Strict-accessor rule](../advanced/accessor-roles.md#strict-accessor-during-fixed-execute-rule).
-
-### Cascading structural changes from event callbacks
-
-`OnAdded` / `OnRemoved` / `OnMoved` callbacks fire from inside `SubmitEntities`. Structural changes from inside a callback queue further callbacks, which run before submission completes — so a poorly-bounded cascade loops.
-
-**Fix.** Cap recursion depth or use deferred patterns. See [Cascading structural changes from callbacks](../entity-management/entity-events.md#cascading-structural-changes-from-callbacks).
 
 ## Structural changes
 
@@ -60,7 +42,7 @@ Strict-accessor rule: during a `Fixed` system's `Execute`, only that system's ow
 
 Submission runs at end of fixed step (and end of `Tick()`), so an entity spawned in a Fixed system *does* exist in time for Presentation in the same Tick. But it's been through **zero** fixed-update cycles — Presentation sees its spawn-time initial values, not whatever a fixed tick of physics / AI / logic would have produced.
 
-If presentation logic implicitly assumes "at least one fixed tick has run on this entity" — interpolation between fixed-step snapshots, derived per-tick state, transform-sync that depends on a value integrated in Fixed, a GameObject created in `OnAdded` whose pose is driven from `[VariableUpdateOnly]` fields populated by a fixed system — the entity will render at its initial state for one frame and then jump to the correct state on the next tick. Visible as a brief stutter or wrong-position pop on spawn.
+If presentation logic implicitly assumes "at least one fixed tick has run on this entity" — interpolation between fixed-step snapshots, derived per-tick state, transform-sync that depends on a value integrated in Fixed — the entity will render at its initial state for one frame and then jump to the correct state on the next tick. Visible as a brief stutter or wrong-position pop on spawn.
 
 **Fix.** Initialize *everything Presentation reads* at spawn time, including interpolation snapshots and any derived state that fixed-update would normally produce. If that's impractical, mark new entities with a "Spawning" tag/set/flag that Presentation skips for one tick, and clear the marker on the entity's first Fixed pass.
 
