@@ -55,6 +55,16 @@ ref readonly var pos = ref World.Component<Position>(parent.ChildRef).Read;  // 
 
 **Fix.** Check `World.EntityExists(handle)` before dereferencing and skip if it returns false — the handle becomes dereferenceable on the next step, once submission has run.
 
+## Native heap allocations aren't visible to jobs in the same step
+
+Allocations into the native heaps (`NativeUniquePtr` / `NativeSharedPtr`) queue into a pending collection rather than the resolver's look up table that Burst jobs read from. The queue drains at submission time (end of fixed step). A Burst job scheduled in the same step that calls `.Get(NativeWorldAccessor)` on a freshly-allocated native ptr won't find it.
+
+Main-thread `.Get(WorldAccessor)` / `.Set(WorldAccessor, ...)` calls **do** work on freshly-allocated native ptrs — the main-thread API path checks the pending queue first before the resolver. Managed pointers (`UniquePtr<T>` / `SharedPtr<T>`) aren't deferred either; they have no resolver layer and are main-thread-only by design.
+
+The deferral exists because Burst jobs hold a snapshot of the resolver's allocation table; mutating it mid-job would corrupt in-flight reads.
+
+**Fix.** Wait 1 frame, or if the work doesn't have to be Burst, do it from the main thread instead.
+
 ## Just-spawned entities haven't been fixed-updated when Presentation sees them
 
 An entity spawned in a Fixed system is submitted in time for the same Tick's Presentation, but no fixed-update cycle has run on it yet — Presentation sees the spawn-time initial values, not the post-tick values. Therefore the entity will render at its initial state for one frame and then jump to the correct state on the next tick. Visible as a brief stutter or wrong-position pop on spawn.

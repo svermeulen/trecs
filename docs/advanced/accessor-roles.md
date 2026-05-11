@@ -1,11 +1,8 @@
 # Accessor Roles
 
-!!! note "When you need this page"
-    System code gets the right accessor role for free — most users only need to know that `Fixed`-phase systems can mutate simulation state, presentation systems can read it, and that's it. Read this page if you're **writing service classes** that hold their own accessor, **calling Trecs from non-system code** (init, lifecycle hooks, editor tooling), or **debugging a `TrecsException` from a role mismatch**.
-
 Every `WorldAccessor` is tagged with an `AccessorRole` that controls what the accessor is allowed to do — which components it can read and write, whether it can make structural changes, whether it can allocate from the heap, and which RNG stream it can pull from. The role is set at accessor-creation time and never changes.
 
-System-owned accessors get their role automatically from their `SystemPhase` (see [System-owned accessors](#system-owned-accessors-vs-standalone-accessors) below).  Service classes can also create accessors via `world.CreateAccessor(AccessorRole, ...)` and pick the role explicitly.
+System-owned accessors get their role automatically from their `SystemPhase` (see [System-owned accessors](#system-owned-accessors-vs-standalone-accessors) below).  Non system classes can also create accessors via `world.CreateAccessor(AccessorRole, ...)` and pick the role explicitly.
 
 The framework asserts every rule below at the call site. Crossing a role boundary throws an immediate, clear `TrecsException` rather than producing silent desync later.
 
