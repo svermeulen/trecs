@@ -172,6 +172,23 @@ public partial class Enemy : ITemplate,
 // → 8 partitions: every (Alive|Dead) × (Visible|Hidden) × (Poisoned-present|absent) combination.
 ```
 
+!!! warning "Mind the explosion"
+    Each declared dimension multiplies the partition count. The cost compounds — every partition is a distinct group with its own contiguous component buffer per component:
+
+    | Dimensions  | Partitions |
+    |-------------|------------|
+    | 1 × binary  | 2          |
+    | 2 × binary  | 4          |
+    | 3 × binary  | 8          |
+    | 4 × binary  | 16         |
+    | 5 × binary  | 32         |
+    | 6 × binary  | 64         |
+    | 4-way + 3 × binary | 32  |
+
+    **Rule of thumb: past 8 partitions, prefer [sets](../entity-management/sets.md).** Sets are presence/absence too but don't multiply — five "poisoned / stunned / burning / selected / targeted" sets are five sparse data structures, not 32 groups. The source generator emits a `TRECS038` warning when a template crosses the 8-partition threshold.
+
+    The cross product is worth it when the dimensions are *intrinsic to the entity's storage shape* — e.g. an `Active` partition you iterate every frame in a hot system, where cache locality matters. It's the wrong tool for "states the design wants to name but the simulation rarely iterates by," which are almost always cheaper as sets.
+
 ### Transitions
 
 Tag-change verbs handle moves between partitions; the runtime resolves the destination from the entity's current group plus the tag delta.

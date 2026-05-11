@@ -223,6 +223,15 @@ internal static class TrecsStubs
             public interface ITagged<T1, T2, T3, T4>
                 where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
 
+            // Partition-dimension declarations. The source generator inspects these on
+            // template classes to compute cross-product partitions and dim metadata.
+            public interface IPartitionedBy<T1> where T1 : struct, ITag { }
+            public interface IPartitionedBy<T1, T2> where T1 : struct, ITag where T2 : struct, ITag { }
+            public interface IPartitionedBy<T1, T2, T3>
+                where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
+            public interface IPartitionedBy<T1, T2, T3, T4>
+                where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
+
             // Iteration / job attributes consumed by ForEach / Job / RunOnce generators.
             // Properties match the real declarations in Packages/com.trecs.core/Scripts/SourceGen/.
 

@@ -201,7 +201,7 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // Template diagnostics (TRECS030-037; 038/039 unused)
+        // Template diagnostics (TRECS030-038; 039 unused)
 
         public static readonly DiagnosticDescriptor TemplateMustBePartial = new(
             id: "TRECS030",
@@ -270,6 +270,15 @@ namespace Trecs.SourceGen
             id: "TRECS035",
             title: "[VariableUpdateOnly] applied to a non-template class",
             messageFormat: "[VariableUpdateOnly] on type '{0}' is silently ignored — the attribute is only meaningful on a class implementing ITemplate or on a template's component field. Remove it or apply it to one of those targets.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor TemplatePartitionCountHigh = new(
+            id: "TRECS038",
+            title: "Template generates many partitions",
+            messageFormat: "Template '{0}' generates {1} partitions across {2} dimensions ({3}). Each partition pre-allocates a contiguous component buffer. Past ~8 partitions consider sets — they don't multiply. See docs/guides/entity-subset-patterns.md.",
             category: TrecsCategory,
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true

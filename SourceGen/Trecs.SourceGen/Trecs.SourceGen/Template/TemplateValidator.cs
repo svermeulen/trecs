@@ -157,7 +157,62 @@ namespace Trecs.SourceGen.Template
                 }
             }
 
+            // Warn when a template's cross-product partition count crosses the
+            // threshold where sets are usually the better tool. Each emitted
+            // partition pre-allocates a contiguous component buffer, so the
+            // memory and startup cost compounds quickly with dimensions.
+            CheckPartitionCount(data, declaration, reportDiagnostic);
+
             return isValid;
+        }
+
+        // Threshold above which we emit TRECS038. Chosen so that a 1-D or 2-D
+        // partitioning (up to 4 groups) is silent, 3-D (up to 8) is silent, and
+        // anything beyond starts warning. Aligns with the "prefer sets past 8"
+        // rule in docs/guides/entity-subset-patterns.md.
+        const int PartitionWarningThreshold = 8;
+
+        private static void CheckPartitionCount(
+            TemplateDefinitionData data,
+            TypeDeclarationSyntax declaration,
+            Action<Diagnostic> reportDiagnostic
+        )
+        {
+            if (data.Dimensions.Length == 0)
+                return;
+
+            // Cross-product size: arity-1 dims contribute 2 (present + absent);
+            // multi-variant dims contribute the variant count. Multiply across
+            // dims using long arithmetic — even pathological inputs stay well
+            // below long.MaxValue (and if they don't, the user has bigger
+            // problems than this warning).
+            long count = 1;
+            foreach (var dim in data.Dimensions)
+            {
+                int dimSize = dim.IsPresenceAbsence ? 2 : dim.VariantTagTypeNames.Length;
+                count *= dimSize;
+            }
+
+            if (count <= PartitionWarningThreshold)
+                return;
+
+            var dimShape = string.Join(
+                " × ",
+                data.Dimensions.Select(d =>
+                    d.IsPresenceAbsence ? "2 (presence/absence)" : d.VariantTagTypeNames.Length.ToString()
+                )
+            );
+
+            reportDiagnostic(
+                Diagnostic.Create(
+                    DiagnosticDescriptors.TemplatePartitionCountHigh,
+                    declaration.GetLocation(),
+                    data.TypeName,
+                    count,
+                    data.Dimensions.Length,
+                    dimShape
+                )
+            );
         }
 
         private static bool ValidateComponentAttributes(

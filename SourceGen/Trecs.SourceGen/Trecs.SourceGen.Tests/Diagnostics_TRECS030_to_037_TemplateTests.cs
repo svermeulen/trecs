@@ -237,6 +237,74 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
         AssertNoDiagnostic(source, "TRECS037");
     }
 
+    [Test]
+    public void TRECS038_TooManyPartitions_Fires()
+    {
+        // Four binary dimensions cross-product to 16 partitions — above the
+        // PartitionWarningThreshold of 8.
+        const string source = """
+            namespace Sample
+            {
+                public struct TBase : Trecs.ITag { }
+                public struct TA : Trecs.ITag { }
+                public struct TB : Trecs.ITag { }
+                public struct TC : Trecs.ITag { }
+                public struct TD : Trecs.ITag { }
+
+                public partial class TPlayer : Trecs.ITemplate,
+                    Trecs.ITagged<TBase>,
+                    Trecs.IPartitionedBy<TA>,
+                    Trecs.IPartitionedBy<TB>,
+                    Trecs.IPartitionedBy<TC>,
+                    Trecs.IPartitionedBy<TD>
+                { }
+            }
+            """;
+
+        AssertDiagnostic(source, "TRECS038");
+    }
+
+    [Test]
+    public void TRECS038_AtThreshold_DoesNotFire()
+    {
+        // Three binary dims = 8 partitions, right at the threshold. Should not
+        // warn — the threshold is "above 8", not "8 or above".
+        const string source = """
+            namespace Sample
+            {
+                public struct TBase : Trecs.ITag { }
+                public struct TA : Trecs.ITag { }
+                public struct TB : Trecs.ITag { }
+                public struct TC : Trecs.ITag { }
+
+                public partial class TPlayer : Trecs.ITemplate,
+                    Trecs.ITagged<TBase>,
+                    Trecs.IPartitionedBy<TA>,
+                    Trecs.IPartitionedBy<TB>,
+                    Trecs.IPartitionedBy<TC>
+                { }
+            }
+            """;
+
+        AssertNoDiagnostic(source, "TRECS038");
+    }
+
+    [Test]
+    public void TRECS038_NoPartitions_DoesNotFire()
+    {
+        // Sanity: a template with no IPartitionedBy declarations never warns.
+        const string source = """
+            namespace Sample
+            {
+                public struct TBase : Trecs.ITag { }
+
+                public partial class TPlain : Trecs.ITemplate, Trecs.ITagged<TBase> { }
+            }
+            """;
+
+        AssertNoDiagnostic(source, "TRECS038");
+    }
+
     static void AssertDiagnostic(string source, string expectedId)
     {
         var run = GeneratorTestHarness.Run(
