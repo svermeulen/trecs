@@ -1,22 +1,23 @@
 # Aspect Interfaces
 
-For helper methods that work across several aspects sharing the same component shape — same access surface, different concrete struct per callsite.
+An aspect interface lets a helper method work across several aspects that share the same component access shape — same read/write surface, but a different concrete struct at each call site.
 
 An aspect interface is a `partial interface` that extends `IAspect` and lists `IRead<>` / `IWrite<>` like a concrete aspect:
 
 ```csharp
-public partial interface IPositionedBoid : IAspect, IWrite<Position> { }
+public partial interface IBoid : IAspect, IWrite<Position>, IRead<Velocity> { }
 
-// Two aspects that satisfy the contract, each adding its own components.
-partial struct MovementAspect : IPositionedBoid, IRead<Velocity, Speed> { }
-partial struct WrapAspect     : IPositionedBoid { }
+// Two aspects that satisfy the contract, each adding its own extras.
+partial struct MovementAspect : IBoid, IWrite<Acceleration> { }
+partial struct WrapAspect     : IBoid { }
 
 // Generic helper — no boxing, no virtual dispatch.
-public static class BoidBounds
+public static class BoidIntegration
 {
-    public static void WrapPosition<T>(in T boid, float halfSize) where T : IPositionedBoid
+    public static void StepAndWrap<T>(in T boid, float halfSize, float dt) where T : IBoid
     {
         ref var p = ref boid.Position;
+        p += boid.Velocity * dt;
         if (p.x >  halfSize) p.x -= halfSize * 2;
         if (p.x < -halfSize) p.x += halfSize * 2;
         if (p.z >  halfSize) p.z -= halfSize * 2;
