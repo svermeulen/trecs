@@ -1,0 +1,57 @@
+[data-md-color-primary="teal"] {
+  --md-primary-fg-color: #1e362c;
+  --md-primary-fg-color--light: #2d4a3e;
+  --md-primary-fg-color--dark: #142119;
+}
+
+[data-md-color-accent="deep-orange"] {
+  --md-accent-fg-color: #b94a3a;
+  --md-accent-fg-color--transparent: rgba(185, 74, 58, 0.1);
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  margin-top: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.hero-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hero-text h1 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 2.6rem;
+  line-height: 1.1;
+}
+
+.hero-text p {
+  margin-bottom: 0;
+  font-size: 1.05rem;
+  color: var(--md-default-fg-color--light);
+}
+
+.hero img {
+  flex: 0 0 auto;
+  width: 480px;
+  height: auto;
+}
+
+@media screen and (max-width: 60em) {
+  .hero {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 1.25rem;
+  }
+  .hero img {
+    width: 180px;
+    align-self: center;
+  }
+  .hero-text h1 {
+    font-size: 2.2rem;
+  }
+}

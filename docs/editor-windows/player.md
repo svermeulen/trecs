@@ -4,15 +4,10 @@ The **Trecs Player** is the editor's transport for a running world: record a ses
 
 **To open it:** `Window > Trecs > Player`. Worlds appear in the dropdown automatically. Most settings (auto-record, anchor cadence, scrub-cache caps) are EditorPrefs-backed — tune them outside Play mode and they apply the next time a world starts.
 
-!!! warning "Screenshot pending: `images/player-overview.png`"
-    Whole window mid-recording: world dropdown, recording header row with `(unsaved)` name and the `REC` badge, transport row with the slider showing a few anchor ticks and a snapshot marker. FeedingFrenzy or Snake sample, light theme.
-
-<!-- When captured, delete the admonition above and uncomment this block:
 <figure markdown>
-  ![The Trecs Player window mid-recording with markers visible on the timeline](images/player-overview.png){ width="720" }
+  ![The Trecs Player window mid-recording with markers visible on the timeline](../images/player-overview.png){ width="500" }
   <figcaption>The Trecs Player against a live world, capturing a recording.</figcaption>
 </figure>
--->
 
 ## Layout
 
@@ -39,16 +34,6 @@ A capacity banner appears under the slider when the recorder is paused against i
 REC switches to PLAY when you scrub back or load a saved recording. To return from PLAY to REC, press **Record** to fork (see below).
 
 ## Transport row
-
-!!! warning "Screenshot pending: `images/player-transport-row.png`"
-    Close-up of the transport row mid-PLAY with the play button shown green (paused), Loop button on, and a snapshot marker visible above the slider.
-
-<!-- When captured, delete the admonition above and uncomment this block:
-<figure markdown>
-  ![Transport row close-up with paused state and an active loop](images/player-transport-row.png){ width="640" }
-  <figcaption>The transport row drives playback; Record is context-sensitive across LIVE/REC/PLAY.</figcaption>
-</figure>
--->
 
 | Button | Shortcut | Behaviour |
 |---|---|---|
@@ -85,16 +70,6 @@ See [Recording & Playback](../advanced/recording-and-playback.md) for the underl
 
 ## Actions ▾ menu
 
-!!! warning "Screenshot pending: `images/player-actions-menu.png`"
-    The ▾ menu open with both groups visible: New / Save / Save As / Load / Delete Recording, then Save / Load Snapshot, Trim, Settings, Help. Ideally with one Load Recording sub-cascade expanded so the saved-name list is visible.
-
-<!-- When captured, delete the admonition above and uncomment this block:
-<figure markdown>
-  ![The Actions menu open showing all groups](images/player-actions-menu.png){ width="520" }
-  <figcaption>The ▾ menu owns less-frequent file operations and Trim; the primary controls live in the transport row.</figcaption>
-</figure>
--->
-
 The ▾ button opens a menu with everything that doesn't fit on the transport row. Entries grey out when they don't apply (e.g. **Save Recording** is disabled until there's a buffer to save).
 
 | Group | Entry | Notes |
@@ -114,16 +89,6 @@ The ▾ button opens a menu with everything that doesn't fit on the transport ro
 The full library — rename, multi-select, reveal-in-Finder — lives in the [Saves window](saves.md).
 
 ## Settings
-
-!!! warning "Screenshot pending: `images/player-settings.png`"
-    The modal Settings popup with all five fields visible (Auto-Record, anchor interval, scrub-cache interval, max anchor count, max scrub-cache MB), and the Reset / Cancel / Save buttons along the bottom.
-
-<!-- When captured, delete the admonition above and uncomment this block:
-<figure markdown>
-  ![The modal Settings popup](images/player-settings.png){ width="380" }
-  <figcaption>Settings persist via EditorPrefs and apply to all live recorders on Save.</figcaption>
-</figure>
--->
 
 **Actions ▾ → Settings…** opens a modal popup with the recorder's tuning knobs. Values persist via `EditorPrefs` and are reachable outside Play mode.
 

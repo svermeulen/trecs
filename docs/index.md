@@ -1,6 +1,16 @@
+<div class="hero" markdown>
+
+<div class="hero-text" markdown>
+
 # Trecs
 
 A high-performance Entity Component System for Unity, built for **deterministic simulation, recording/playback, and Burst/Jobs**.
+
+</div>
+
+![Trecs](assets/logo.png)
+
+</div>
 
 ## Why Trecs
 
@@ -52,8 +62,42 @@ void OnDestroy() => world.Dispose();
 
 ## Where to go next
 
-- **[Getting Started](getting-started.md)** — install Trecs and run your first entity in a Unity scene.
-- **[Core: World Setup](core/world-setup.md)** — reference for `WorldBuilder`, lifecycle, and `WorldAccessor`.
-- **[Glossary](glossary.md)** — the terms (Group, Partition, Set, Tag, Aspect, Accessor, …) and how they relate.
-- **[Samples](samples/index.md)** — a progressive tutorial series plus full sample games.
-- **[FAQ](faq.md)** and **[Trecs vs Unity ECS](guides/trecs-vs-unity-ecs.md)** if you're sizing up the framework.
+<div class="grid cards" markdown>
+
+-   :material-rocket-launch:{ .lg .middle } **[Getting Started](getting-started.md)**
+
+    ---
+
+    Install Trecs and run your first entity in a Unity scene.
+
+-   :material-cube-outline:{ .lg .middle } **[Core: World Setup](core/world-setup.md)**
+
+    ---
+
+    Reference for `WorldBuilder`, lifecycle, and `WorldAccessor`.
+
+-   :material-book-open-variant:{ .lg .middle } **[Glossary](glossary.md)**
+
+    ---
+
+    The terms — Group, Partition, Set, Tag, Aspect, Accessor — and how they relate.
+
+-   :material-puzzle-outline:{ .lg .middle } **[Samples](samples/index.md)**
+
+    ---
+
+    A progressive tutorial series plus full sample games.
+
+-   :material-help-circle-outline:{ .lg .middle } **[FAQ](faq.md)**
+
+    ---
+
+    Quick answers to common questions about scope, limits, and design choices.
+
+-   :material-compare:{ .lg .middle } **[Trecs vs Unity ECS](guides/trecs-vs-unity-ecs.md)**
+
+    ---
+
+    Side-by-side comparison if you're sizing up the framework.
+
+</div>

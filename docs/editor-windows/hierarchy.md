@@ -4,15 +4,10 @@ The **Trecs Hierarchy** window is the editor's main inspector for a running worl
 
 **To open it:** `Window > Trecs > Hierarchy`
 
-!!! warning "Screenshot pending: `images/hierarchy-overview.png`"
-    Whole window with all five sections expanded; entity rows visible under a couple of templates. FeedingFrenzy sample, light theme.
-
-<!-- When captured, delete the admonition above and uncomment this block:
 <figure markdown>
-  ![The Trecs Hierarchy window with all five sections expanded](images/hierarchy-overview.png){ width="720" }
-  <figcaption>The Trecs Hierarchy window in live mode against the FeedingFrenzy sample.</figcaption>
+  ![The Trecs Hierarchy window with all five sections expanded](../images/hierarchy-overview.png){ width="720" }
+  <figcaption>The Trecs Hierarchy window in live mode</figcaption>
 </figure>
--->
 
 ## Overview
 
@@ -35,12 +30,9 @@ The toolbar hosts:
 
 ## World dropdown
 
-!!! warning "Screenshot pending: `images/hierarchy-world-dropdown.png`"
-    Toolbar with the world dropdown clicked open, ideally showing both a live world and at least one `(cached)` entry so the suffix is visible.
-
 <!-- When captured, delete the admonition above and uncomment this block:
 <figure markdown>
-  ![Toolbar with the world dropdown open showing live and cached entries](images/hierarchy-world-dropdown.png){ width="480" }
+  ![Toolbar with the world dropdown open showing live and cached entries](../images/hierarchy-world-dropdown.png){ width="480" }
   <figcaption>Live worlds appear by name; cached snapshots are suffixed with <code>(cached)</code>.</figcaption>
 </figure>
 -->
@@ -53,15 +45,9 @@ Selecting a live world while a cached snapshot is showing switches into live mod
 
 ## Search syntax
 
-!!! warning "Screenshot pending: `images/hierarchy-search-help.png`"
-    Whole window with the `?` button toggled on so the inline help panel is visible above the tree. Bonus: type `t:e tag:enemy` in the search field so a filtered tree shows underneath.
-
-<!-- When captured, delete the admonition above and uncomment this block:
 <figure markdown>
-  ![Hierarchy window with the inline search-help panel toggled open](images/hierarchy-search-help.png){ width="720" }
-  <figcaption>The <code>?</code> button toggles an inline reference panel that mirrors this section.</figcaption>
+  ![Hierarchy window with the inline search-help panel toggled open](../images/hierarchy-search-help.png){ width="360" }
 </figure>
--->
 
 The search field accepts whitespace-separated **tokens**. Every token must match (logical AND) for a row to appear. Tokens come in three shapes:
 
@@ -157,15 +143,9 @@ Every committed search is recorded (capped at 20 entries, persisted via `EditorP
 
 ## Row context menu
 
-!!! warning "Screenshot pending: `images/hierarchy-row-context-menu.png`"
-    Right-click a Component row (e.g. `CHealth`) so the full Component menu is visible — its six entries cover the most variety. Tree expanded behind it for context.
-
-<!-- When captured, delete the admonition above and uncomment this block:
 <figure markdown>
-  ![Row context menu opened on a component, showing the scoped Find variants](images/hierarchy-row-context-menu.png){ width="520" }
-  <figcaption>Each "Find…" entry pre-fills the search field with the right predicate and kind selector.</figcaption>
+  ![Row context menu opened on a component, showing the scoped Find variants](../images/hierarchy-row-context-menu.png){ width="300" }
 </figure>
--->
 
 Right-clicking a row offers actions tailored to its kind:
 
@@ -183,16 +163,6 @@ Each "Find…" entry pre-fills the search field with the right predicate and kin
 
 ## Cog menu
 
-!!! warning "Screenshot pending: `images/hierarchy-cog-menu.png`"
-    Window with the kebab (`⋮`) menu open in the top-right, showing all four entries (`Show Empty Templates`, `Show Abstract Templates`, `Help…`, `Clear Search History`).
-
-<!-- When captured, delete the admonition above and uncomment this block:
-<figure markdown>
-  ![The cog menu open showing the visibility toggles, help, and clear-search-history entries](images/hierarchy-cog-menu.png){ width="480" }
-  <figcaption>The kebab menu hosts visibility toggles and search-history maintenance.</figcaption>
-</figure>
--->
-
 The kebab (`⋮`) at the top-right holds:
 
 - **Show Empty Templates** — toggle templates with no live entities.
@@ -203,16 +173,6 @@ The kebab (`⋮`) at the top-right holds:
 Both visibility toggles persist via `EditorPrefs`.
 
 ## Inspector cross-links and hover preview
-
-!!! warning "Screenshot pending: `images/hierarchy-inspector-links.png`"
-    Hierarchy on the left, Unity Inspector on the right showing a template's component list with the cross-link buttons visible. Ideally with a `Shift+hover` preview highlight visible on a row in the tree.
-
-<!-- When captured, delete the admonition above and uncomment this block:
-<figure markdown>
-  ![Hierarchy alongside Unity's Inspector showing cross-link buttons on a template view](images/hierarchy-inspector-links.png){ width="900" }
-  <figcaption>Inspector cross-links navigate the hierarchy by stable identity, so selection survives world transitions and domain reloads.</figcaption>
-</figure>
--->
 
 Selecting a row drives Unity's standard inspector to a Trecs-aware view of the entity / template / component / set / tag. Component fields appear as a per-entity component inspector with JSON edit support, and most inspector views include navigation links back to the hierarchy:
 

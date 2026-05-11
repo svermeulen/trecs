@@ -4,15 +4,10 @@ The **Trecs Saves** window is the library view for everything saved to disk: **r
 
 **To open it:** `Window > Trecs > Saves`. Worlds appear in the dropdown once they call `WorldBuilder.Build()`.
 
-!!! warning "Screenshot pending: `images/saves-overview.png`"
-    Whole window with the world dropdown, search field, and both sections (Recordings, Snapshots) populated. At least one recording row should have the "loaded in Player" highlight (bold name + left accent stripe). FeedingFrenzy or Snake sample, light theme.
-
-<!-- When captured, delete the admonition above and uncomment this block:
 <figure markdown>
-  ![The Trecs Saves window with both sections populated](images/saves-overview.png){ width="640" }
+  ![The Trecs Saves window with both sections populated](../images/saves-overview.png){ width="400" }
   <figcaption>The Saves window manages all on-disk recordings and snapshots side by side.</figcaption>
 </figure>
--->
 
 ## Layout
 
@@ -57,16 +52,6 @@ A snapshot is a single frame, so there's no duration:
 The search field filters both sections by case-insensitive substring match against the name. Empty query shows everything.
 
 ## Selection and bulk actions
-
-!!! warning "Screenshot pending: `images/saves-selection-toolbar.png`"
-    Three rows selected (mix of recordings and snapshots), with the selection toolbar visible above showing "3 selected" and the Delete / Clear buttons.
-
-<!-- When captured, delete the admonition above and uncomment this block:
-<figure markdown>
-  ![Multi-row selection with the bulk toolbar visible](images/saves-selection-toolbar.png){ width="540" }
-  <figcaption>Shift / Ctrl click for range / additive selection; the bulk toolbar handles batch delete.</figcaption>
-</figure>
--->
 
 Click a row to select it. Selection state is independent of the Player's loaded-recording highlight.
 
