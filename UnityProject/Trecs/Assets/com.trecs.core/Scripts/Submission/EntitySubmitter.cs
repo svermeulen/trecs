@@ -80,11 +80,23 @@ namespace Trecs.Internal
         // stores all per-entity state inline.
         readonly DenseDictionary<EntityIndex, PendingEntityChanges> _pendingChanges = new();
 
-        // Side list for IAccessRecorder-only attribution of additional
-        // contributors. Populated only when _accessRecorder != null AND an op
-        // arrives from a different accessor than the one that created the
-        // pending entry. Cleared between submissions.
-        readonly FastList<(EntityIndex entity, int accessorId)> _pendingExtraContributors = new();
+        // Per-entity attribution of additional contributors, used only when
+        // _accessRecorder != null. Keyed by EntityIndex so the swap-emit loop
+        // looks up extras in O(1) rather than scanning a flat side list. The
+        // inner FastLists are pooled across submissions via _extraContribListPool.
+        readonly DenseDictionary<
+            EntityIndex,
+            FastList<int>
+        > _pendingExtraContributors = new();
+        readonly Stack<FastList<int>> _extraContribListPool = new();
+
+        // Persistent NativeLists used per submit for the dequeue→queue handoff
+        // in FlushNativeOperations. Cleared between uses rather than constructed
+        // fresh — each NativeList construction registers an AtomicSafetyHandle
+        // and allocates list metadata that adds up over high-frequency submits.
+        // Allocator.Persistent because their lifetime is the EntitySubmitter's.
+        NativeList<(EntityIndex, int)> _removalsScratch;
+        NativeList<(EntityIndex, GroupIndex, int)> _swapsScratch;
 
         // Per-set deferred bags are now on EntitySetStorage; no centralized set queues needed.
         readonly WorldInfo _worldInfo;
@@ -143,6 +155,8 @@ namespace Trecs.Internal
             _cachedRangeOfSubmittedIndices = new FastList<EntityRange>();
             _transientEntityIDsAffectedByRemoveAtSwapBack = new DenseDictionary<int, int>();
             _cachedSortedDescendingRemoveIndices = new NativeList<int>(16, Allocator.Persistent);
+            _removalsScratch = new NativeList<(EntityIndex, int)>(16, Allocator.Persistent);
+            _swapsScratch = new NativeList<(EntityIndex, GroupIndex, int)>(16, Allocator.Persistent);
             _cachedSrcArrays = new FastList<IComponentArray>();
             _cachedDstArrays = new FastList<IComponentArray>();
             _worldInfo = worldInfo;
@@ -310,6 +324,10 @@ namespace Trecs.Internal
 
                 if (_cachedSortedDescendingRemoveIndices.IsCreated)
                     _cachedSortedDescendingRemoveIndices.Dispose();
+                if (_removalsScratch.IsCreated)
+                    _removalsScratch.Dispose();
+                if (_swapsScratch.IsCreated)
+                    _swapsScratch.Dispose();
 
                 Assert.That(_submitCompleteEvent.NumObservers == 0);
                 Assert.That(_submitStartedEvent.NumObservers == 0);
@@ -1485,14 +1503,23 @@ namespace Trecs.Internal
             }
             else if (_accessRecorder != null && p.PrimaryAccessorId != accessorId)
             {
-                // Dev-tooling-only path. Dedup is skipped — duplicate OnEntityMoved
-                // events are not catastrophic for recording, and avoiding a Contains
-                // scan keeps hot-path simplicity even when recording is on.
-                _pendingExtraContributors.Add((from, accessorId));
+                // Dev-tooling-only path. Keyed by entity so the swap-emit loop
+                // reads extras in O(1). Inner list is pooled across submissions.
+                // Dedup against existing entries in the list is still skipped —
+                // duplicate OnEntityMoved events are acceptable for recording
+                // and avoiding a Contains scan keeps hot-path simplicity.
+                if (!_pendingExtraContributors.TryGetValue(from, out var extras))
+                {
+                    extras =
+                        _extraContribListPool.Count > 0
+                            ? _extraContribListPool.Pop()
+                            : new FastList<int>();
+                    _pendingExtraContributors.TryAdd(from, extras, out _);
+                }
+                extras.Add(accessorId);
             }
 
-            var (dimIdx, dim) = WorldInfo.FindDimContainingTag(p.Template, tag);
-            if (dimIdx < 0)
+            if (!p.Template.TryGetDimForTag(tag, out var dimIdx, out var dim))
                 throw Assert.CreateException(
                     "Tag {} is not part of any partition dimension on template {}",
                     tag,
@@ -1516,9 +1543,11 @@ namespace Trecs.Internal
                 );
             p.TouchedDimsMask |= bit;
 
+            var activeVariant = p.Template.GetActiveVariantInGroup(p.FinalTagSet, dimIdx);
+
             if (isSet)
             {
-                p.FinalTagSet = WorldInfo.ReplaceDimensionTags(p.FinalTagSet, dim, tag);
+                p.FinalTagSet = WorldInfo.ReplaceDimensionTags(p.FinalTagSet, activeVariant, tag);
             }
             else
             {
@@ -1528,7 +1557,7 @@ namespace Trecs.Internal
                         tag,
                         p.Template.DebugName
                     );
-                p.FinalTagSet = WorldInfo.RemoveDimensionTags(p.FinalTagSet, dim);
+                p.FinalTagSet = WorldInfo.RemoveDimensionTags(p.FinalTagSet, activeVariant);
             }
         }
 
@@ -1559,7 +1588,8 @@ namespace Trecs.Internal
             {
                 var removeBuffersCount = _nativeRemoveOperationQueue.ThreadSlotCount;
 
-                var removals = new NativeList<(EntityIndex, int)>(Allocator.TempJob);
+                var removals = _removalsScratch;
+                removals.Clear();
 
                 using (TrecsProfiling.Start("NatRemove Dequeue"))
                 {
@@ -1617,8 +1647,6 @@ namespace Trecs.Internal
 #endif
                     _entitiesOperations.QueueNativeRemoveOperations(removals, _worldInfo);
                 }
-
-                removals.Dispose();
             }
 
             using (TrecsProfiling.Start("Native Swap Operations"))
@@ -1655,7 +1683,8 @@ namespace Trecs.Internal
                     _managedTagOps.Clear();
                 }
 
-                var swaps = new NativeList<(EntityIndex, GroupIndex, int)>(Allocator.TempJob);
+                var swaps = _swapsScratch;
+                swaps.Clear();
 
                 foreach (var kvp in _pendingChanges)
                 {
@@ -1688,15 +1717,12 @@ namespace Trecs.Internal
                             from.GroupIndex,
                             toGroup
                         );
-                        int extrasCount = _pendingExtraContributors.Count;
-                        for (int i = 0; i < extrasCount; i++)
+                        if (_pendingExtraContributors.TryGetValue(from, out var extras))
                         {
-                            var extra = _pendingExtraContributors[i];
-                            if (extra.entity == from)
+                            int extrasCount = extras.Count;
+                            for (int i = 0; i < extrasCount; i++)
                             {
-                                var accessor = _accessorRegistry.GetAccessorById(
-                                    extra.accessorId
-                                );
+                                var accessor = _accessorRegistry.GetAccessorById(extras[i]);
                                 _accessRecorder.OnEntityMoved(
                                     accessor.DebugName,
                                     from.GroupIndex,
@@ -1708,7 +1734,15 @@ namespace Trecs.Internal
                 }
 
                 _pendingChanges.Recycle();
-                _pendingExtraContributors.Clear();
+                // Return each per-entity FastList to the pool, then recycle the
+                // outer dict. Empty in the typical case (no recorder, or recorder
+                // with single-accessor entities).
+                foreach (var kvp in _pendingExtraContributors)
+                {
+                    kvp.Value.Clear();
+                    _extraContribListPool.Push(kvp.Value);
+                }
+                _pendingExtraContributors.Recycle();
 
                 if (_trecsSettings.RequireDeterministicSubmission)
                 {
@@ -1740,8 +1774,6 @@ namespace Trecs.Internal
 #endif
                     _entitiesOperations.QueueNativeMoveOperations(swaps, _worldInfo);
                 }
-
-                swaps.Dispose();
             }
 
             //todo: it feels weird that these builds in the transient entities database while it could build directly to the final one

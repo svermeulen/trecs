@@ -603,7 +603,7 @@ namespace Trecs.Tests
             // any one-time allocations (lazy registry warmup, pool growth,
             // jit) happen here rather than under the measurement.
             // EntityHandle (not EntityIndex) is stable across partition moves.
-            for (int i = 0; i < 8; i++)
+            for (int i = 0; i < 32; i++)
             {
                 a.SetTag<McPoisoned>(handle);
                 a.SubmitEntities();

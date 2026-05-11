@@ -35,6 +35,83 @@ namespace Trecs
             AllTags = tagset;
             AllBaseTemplates = allBaseTemplates;
             VariableUpdateOnly = variableUpdateOnly;
+
+            BuildDimensionCaches();
+        }
+
+        // Tag.Guid → (dim index in Dimensions, the dim's TagSet). Used by the
+        // submission coalescer to resolve "which dim does this tag belong to"
+        // in O(1) instead of an O(numDims × dimSize) scan. Built once at
+        // construction; immutable thereafter.
+        Dictionary<int, (int Index, TagSet Dim)> _tagToDim;
+
+        // GroupTagSet.Id → array indexed by dim index → active variant Tag for
+        // that dim in this group (default(Tag) means the dim has no active
+        // variant in this group, i.e. presence/absence dim with the tag absent).
+        // Lets the dim-replacement math avoid scanning the current TagSet for
+        // the active variant. Keyed by id (not TagSet) because that's what the
+        // submission coalescer carries; the entries are scoped to this
+        // template's GroupTagSets so id collisions across templates don't matter.
+        Dictionary<int, Tag[]> _activeVariantsByGroupTagSetId;
+
+        void BuildDimensionCaches()
+        {
+            _tagToDim = new Dictionary<int, (int, TagSet)>();
+            for (int d = 0; d < Dimensions.Count; d++)
+            {
+                var dim = Dimensions[d];
+                var dimTags = dim.Tags;
+                for (int i = 0; i < dimTags.Count; i++)
+                {
+                    _tagToDim[dimTags[i].Guid] = (d, dim);
+                }
+            }
+
+            _activeVariantsByGroupTagSetId = new Dictionary<int, Tag[]>(GroupTagSets.Count);
+            for (int g = 0; g < GroupTagSets.Count; g++)
+            {
+                var groupTagSet = GroupTagSets[g];
+                var groupTags = groupTagSet.Tags;
+                var active = new Tag[Dimensions.Count];
+                for (int i = 0; i < groupTags.Count; i++)
+                {
+                    var t = groupTags[i];
+                    if (_tagToDim.TryGetValue(t.Guid, out var info))
+                    {
+                        active[info.Index] = t;
+                    }
+                }
+                _activeVariantsByGroupTagSetId[groupTagSet.Id] = active;
+            }
+        }
+
+        // Resolves which partition dimension <paramref name="tag"/> is a variant
+        // of on this template. Returns false if the tag isn't part of any dim
+        // (e.g. it's a base/component tag rather than a partition variant). O(1).
+        internal bool TryGetDimForTag(Tag tag, out int dimIdx, out TagSet dim)
+        {
+            if (_tagToDim.TryGetValue(tag.Guid, out var info))
+            {
+                dimIdx = info.Index;
+                dim = info.Dim;
+                return true;
+            }
+            dimIdx = -1;
+            dim = default;
+            return false;
+        }
+
+        // Returns the variant of <paramref name="dimIdx"/> that is currently
+        // active in the group identified by <paramref name="groupTagSet"/>.
+        // Returns default(Tag) if no variant of that dim is active in this
+        // group (only possible for presence/absence dims when the tag is
+        // absent). Throws KeyNotFoundException if <paramref name="groupTagSet"/>
+        // is not one of this template's GroupTagSets — that would be a bug in
+        // the caller (the coalescer always operates on TagSets within the
+        // current template).
+        internal Tag GetActiveVariantInGroup(TagSet groupTagSet, int dimIdx)
+        {
+            return _activeVariantsByGroupTagSetId[groupTagSet.Id][dimIdx];
         }
 
         /// <summary>

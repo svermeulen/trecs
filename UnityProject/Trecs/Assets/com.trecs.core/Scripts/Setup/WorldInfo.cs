@@ -526,85 +526,35 @@ namespace Trecs
         public ResolvedTemplate GetResolvedTemplateForTags(TagSet tags) =>
             _queryEngine.GetResolvedTemplateForTags(tags);
 
-        // Allocation-free indexed scan. Callers pass `set.Tags` directly so the
-        // caller can hoist the registry lookup out of inner loops. foreach over
-        // IReadOnlyList<Tag> would box the enumerator.
-        static bool TagSetContainsTag(IReadOnlyList<Tag> tags, Tag tag)
-        {
-            int count = tags.Count;
-            for (int i = 0; i < count; i++)
-            {
-                if (tags[i] == tag)
-                    return true;
-            }
-            return false;
-        }
-
-        // Returns the index of the partition dimension on <paramref name="template"/>
-        // that contains <paramref name="tag"/>, along with the dim's TagSet, or
-        // (-1, default) if the tag is not a partition variant on the template.
-        // Used by the submission coalescing path to detect same-dim conflicts and
-        // apply per-dim replacements.
-        internal static (int index, TagSet dim) FindDimContainingTag(
-            ResolvedTemplate template,
-            Tag tag
+        // Returns a TagSet equal to <paramref name="current"/> with the dim
+        // identified by <paramref name="activeVariant"/> replaced by
+        // <paramref name="replacement"/>. <paramref name="activeVariant"/> is
+        // the dim's currently-active variant in <paramref name="current"/>, or
+        // default(Tag) if the dim has no active variant (presence/absence dim
+        // with tag absent). Computes the new id by XOR — caller is responsible
+        // for resolving the active variant via
+        // <see cref="ResolvedTemplate.GetActiveVariantInGroup"/>. Mirrors
+        // TagSetRegistry's id==0→1 normalization.
+        internal static TagSet ReplaceDimensionTags(
+            TagSet current,
+            Tag activeVariant,
+            Tag replacement
         )
         {
-            for (int i = 0; i < template.Dimensions.Count; i++)
-            {
-                var d = template.Dimensions[i];
-                if (TagSetContainsTag(d.Tags, tag))
-                    return (i, d);
-            }
-            return (-1, default);
-        }
-
-        // Returns a TagSet equal to <paramref name="current"/> with the dim's
-        // currently-active variant (if any) replaced by <paramref name="replacement"/>.
-        // Computes the new id directly via XOR — no intermediate Tag list. Safe
-        // because every destination is a pre-registered partition cross-product
-        // variant. Mirrors TagSetRegistry's id==0→1 normalization so a non-empty
-        // result that XOR-collapses to 0 maps to the registered id.
-        internal static TagSet ReplaceDimensionTags(TagSet current, TagSet dim, Tag replacement)
-        {
-            var currentTags = current.Tags;
-            var dimTags = dim.Tags;
-            int newId = current.Id;
-            int dimCount = dimTags.Count;
-            // At most one variant of any given dim is active in `current`.
-            for (int i = 0; i < dimCount; i++)
-            {
-                var t = dimTags[i];
-                if (TagSetContainsTag(currentTags, t))
-                {
-                    newId ^= t.Guid;
-                    break;
-                }
-            }
-            newId ^= replacement.Guid;
+            // XOR by 0 is identity, so default(Tag).Guid==0 handles the
+            // "no active variant" case without a branch.
+            int newId = current.Id ^ activeVariant.Guid ^ replacement.Guid;
             if (newId == 0)
                 newId = 1;
             return new TagSet(newId);
         }
 
         // Returns a TagSet equal to <paramref name="current"/> with the dim's
-        // currently-active variant (if any) stripped. XOR-direct — see
-        // ReplaceDimensionTags for the contract.
-        internal static TagSet RemoveDimensionTags(TagSet current, TagSet dim)
+        // currently-active variant stripped (no-op if no active variant).
+        // XOR-direct — see ReplaceDimensionTags for the contract.
+        internal static TagSet RemoveDimensionTags(TagSet current, Tag activeVariant)
         {
-            var currentTags = current.Tags;
-            var dimTags = dim.Tags;
-            int newId = current.Id;
-            int dimCount = dimTags.Count;
-            for (int i = 0; i < dimCount; i++)
-            {
-                var t = dimTags[i];
-                if (TagSetContainsTag(currentTags, t))
-                {
-                    newId ^= t.Guid;
-                    break;
-                }
-            }
+            int newId = current.Id ^ activeVariant.Guid;
             if (newId == 0)
                 newId = 1;
             return new TagSet(newId);
