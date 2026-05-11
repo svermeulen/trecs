@@ -1,4 +1,4 @@
-# Disabling and Pausing Systems
+# Pausing and Disabling Systems
 
 Trecs provides two independent mechanisms for skipping a system's `Execute()` on a tick. They have different determinism guarantees, are exposed on different surfaces, and are intended for different problems.
 

@@ -64,7 +64,7 @@ nav:
       - Accessor Roles: advanced/accessor-roles.md
       - Time & RNG: advanced/time-and-rng.md
       - Interpolation: advanced/interpolation.md
-      - System Control: advanced/system-control.md
+      - Pausing & Disabling Systems: advanced/pausing-and-disabling-systems.md
       - Heap: advanced/heap.md
       - Heap Allocation Rules: advanced/heap-allocation-rules.md
       - Aspect Interfaces: advanced/aspect-interfaces.md
