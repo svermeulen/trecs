@@ -120,11 +120,11 @@ namespace Trecs.Tests
     // other.
     public struct McBase : ITag { }
 
-    public struct McPoisoned : ITag { }  // presence/absence dim
+    public struct McPoisoned : ITag { } // presence/absence dim
 
-    public struct McAlive : ITag { }    // variant dim
+    public struct McAlive : ITag { } // variant dim
 
-    public struct McDead : ITag { }     // variant dim
+    public struct McDead : ITag { } // variant dim
 
     public partial class McTestEntity
         : ITemplate,
@@ -165,7 +165,10 @@ namespace Trecs.Tests
             a.UnsetTag<McPoisoned>(init.Handle.ToIndex(a));
             a.SubmitEntities();
 
-            NAssert.AreEqual(1, a.Query().WithTags<McBase, McAlive>().WithoutTags<McPoisoned>().Count());
+            NAssert.AreEqual(
+                1,
+                a.Query().WithTags<McBase, McAlive>().WithoutTags<McPoisoned>().Count()
+            );
             NAssert.AreEqual(0, a.Query().WithTags<McBase, McAlive, McPoisoned>().Count());
         }
 

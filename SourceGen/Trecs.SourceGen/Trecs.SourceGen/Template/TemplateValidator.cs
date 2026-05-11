@@ -199,7 +199,9 @@ namespace Trecs.SourceGen.Template
             var dimShape = string.Join(
                 " × ",
                 data.Dimensions.Select(d =>
-                    d.IsPresenceAbsence ? "2 (presence/absence)" : d.VariantTagTypeNames.Length.ToString()
+                    d.IsPresenceAbsence
+                        ? "2 (presence/absence)"
+                        : d.VariantTagTypeNames.Length.ToString()
                 )
             );
 

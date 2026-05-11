@@ -481,20 +481,14 @@ namespace Trecs.SourceGen.Aspect
                 // SetTag works for both presence/absence (turns the tag on) and
                 // multi-variant (switches the active variant); UnsetTag is the inverse,
                 // valid only on presence/absence dims.
-                sb.AppendLine(
-                    indentLevel,
-                    "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
-                );
+                sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
                 sb.AppendLine(
                     indentLevel,
                     $"public readonly void SetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => world.SetTag<T>(_entityIndex);"
                 );
                 sb.AppendLine();
 
-                sb.AppendLine(
-                    indentLevel,
-                    "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
-                );
+                sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
                 sb.AppendLine(
                     indentLevel,
                     $"public readonly void UnsetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => world.UnsetTag<T>(_entityIndex);"

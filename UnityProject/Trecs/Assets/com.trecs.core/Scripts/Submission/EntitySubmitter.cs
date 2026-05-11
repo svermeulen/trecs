@@ -84,10 +84,7 @@ namespace Trecs.Internal
         // _accessRecorder != null. Keyed by EntityIndex so the swap-emit loop
         // looks up extras in O(1) rather than scanning a flat side list. The
         // inner FastLists are pooled across submissions via _extraContribListPool.
-        readonly DenseDictionary<
-            EntityIndex,
-            FastList<int>
-        > _pendingExtraContributors = new();
+        readonly DenseDictionary<EntityIndex, FastList<int>> _pendingExtraContributors = new();
         readonly Stack<FastList<int>> _extraContribListPool = new();
 
         // Persistent NativeLists used per submit for the dequeue→queue handoff
@@ -156,7 +153,10 @@ namespace Trecs.Internal
             _transientEntityIDsAffectedByRemoveAtSwapBack = new DenseDictionary<int, int>();
             _cachedSortedDescendingRemoveIndices = new NativeList<int>(16, Allocator.Persistent);
             _removalsScratch = new NativeList<(EntityIndex, int)>(16, Allocator.Persistent);
-            _swapsScratch = new NativeList<(EntityIndex, GroupIndex, int)>(16, Allocator.Persistent);
+            _swapsScratch = new NativeList<(EntityIndex, GroupIndex, int)>(
+                16,
+                Allocator.Persistent
+            );
             _cachedSrcArrays = new FastList<IComponentArray>();
             _cachedDstArrays = new FastList<IComponentArray>();
             _worldInfo = worldInfo;
@@ -1726,11 +1726,7 @@ namespace Trecs.Internal
                         // the recorder was active. Each accessor that contributed
                         // to the final coalesced move gets one OnEntityMoved event.
                         var primary = _accessorRegistry.GetAccessorById(p.PrimaryAccessorId);
-                        _accessRecorder.OnEntityMoved(
-                            primary.DebugName,
-                            from.GroupIndex,
-                            toGroup
-                        );
+                        _accessRecorder.OnEntityMoved(primary.DebugName, from.GroupIndex, toGroup);
                         if (_pendingExtraContributors.TryGetValue(from, out var extras))
                         {
                             int extrasCount = extras.Count;

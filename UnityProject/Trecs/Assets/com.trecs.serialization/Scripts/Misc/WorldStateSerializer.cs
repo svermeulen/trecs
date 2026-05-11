@@ -612,11 +612,7 @@ namespace Trecs.Serialization
                 if (numComponents > 0 && subMap.Count == 0)
                 {
                     var template = _worldDef.GetResolvedTemplateForGroup(group);
-                    _world.ComponentStore.PreallocateDBGroup(
-                        group,
-                        0,
-                        template.ComponentBuilders
-                    );
+                    _world.ComponentStore.PreallocateDBGroup(group, 0, template.ComponentBuilders);
                 }
 
                 Assert.That(

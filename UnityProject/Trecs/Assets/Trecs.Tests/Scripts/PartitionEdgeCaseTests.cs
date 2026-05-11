@@ -412,10 +412,7 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(
                 1,
-                a.Query()
-                    .WithTags<PeBase>()
-                    .WithoutTags<PeAlive, PePoisoned, PeOnFire>()
-                    .Count()
+                a.Query().WithTags<PeBase>().WithoutTags<PeAlive, PePoisoned, PeOnFire>().Count()
             );
             NAssert.AreEqual(1234, a.Component<TestInt>(init.Handle).Read.Value);
         }
@@ -521,9 +518,7 @@ namespace Trecs.Tests
             NAssert.IsFalse(a.EntityExists(init.Handle), "Entity should be removed");
             NAssert.AreEqual(
                 0,
-                a.Query()
-                    .WithTags<PeBase, PeAlive, PePoisoned, PeOnFire>()
-                    .Count(),
+                a.Query().WithTags<PeBase, PeAlive, PePoisoned, PeOnFire>().Count(),
                 "Coalesced move must not race the remove and land the entity in the destination group."
             );
             NAssert.AreEqual(
@@ -548,13 +543,11 @@ namespace Trecs.Tests
             // iteration.
             // EntityInitializer is a ref struct, so we lift .Handle (a regular
             // struct) into locals before capturing in the OnMoved lambda.
-            var observedHandle = a
-                .AddEntity<McBase, McAlive>()
+            var observedHandle = a.AddEntity<McBase, McAlive>()
                 .Set(new TestInt { Value = 1 })
                 .AssertComplete()
                 .Handle;
-            var triggeredHandle = a
-                .AddEntity<McBase, McAlive>()
+            var triggeredHandle = a.AddEntity<McBase, McAlive>()
                 .Set(new TestInt { Value = 2 })
                 .AssertComplete()
                 .Handle;
@@ -594,7 +587,9 @@ namespace Trecs.Tests
             // TRECS_INTERNAL_CHECKS adds diagnostic Assert.That calls with
             // boxed-arg formatting on the coalescing hot path. Those allocs
             // are the whole point of the symbol — skip the zero-GC guarantee.
-            NAssert.Ignore("Zero-GC guarantee is release-mode only, not TRECS_INTERNAL_CHECKS-mode");
+            NAssert.Ignore(
+                "Zero-GC guarantee is release-mode only, not TRECS_INTERNAL_CHECKS-mode"
+            );
 #endif
             using var env = CreateMcEnv();
             var a = env.Accessor;
@@ -734,10 +729,7 @@ namespace Trecs.Tests
                 a.Query().WithTags<McBase, McDead, McPoisoned>().Count(),
                 "All entities should have both dims set; cross-thread-bag ops on the same entity must coalesce."
             );
-            NAssert.AreEqual(
-                0,
-                a.Query().WithTags<McBase, McAlive>().Count()
-            );
+            NAssert.AreEqual(0, a.Query().WithTags<McBase, McAlive>().Count());
         }
     }
 }

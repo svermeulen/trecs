@@ -40,6 +40,5 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Remove<TAspect>(this TAspect aspect, in NativeWorldAccessor world)
             where TAspect : struct, IAspect => world.RemoveEntity(aspect.EntityIndex);
-
     }
 }

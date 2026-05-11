@@ -90,8 +90,7 @@ namespace Trecs.SourceGen.Shared
                                 && named.Value.Value is ITypeSymbol w1:
                             withoutTagTypes.Add(w1);
                             break;
-                        case "Withouts"
-                            when named.Value.Kind == TypedConstantKind.Array:
+                        case "Withouts" when named.Value.Kind == TypedConstantKind.Array:
                             foreach (var elem in named.Value.Values)
                             {
                                 if (

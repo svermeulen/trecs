@@ -120,9 +120,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                         World.RemoveEntity(meals[i].Value.ToIndex(World));
 
                         meals[i].Value = EntityHandle.Null;
-                        World.SetTag<FrenzyTags.NotEating>(
-                            new EntityIndex(i, slice.GroupIndex)
-                        );
+                        World.SetTag<FrenzyTags.NotEating>(new EntityIndex(i, slice.GroupIndex));
                     }
                 }
             }
@@ -288,9 +286,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                     World.RemoveEntity(mealIndex);
                     Meals[i] = new TargetMeal { Value = EntityHandle.Null };
-                    World.SetTag<FrenzyTags.NotEating>(
-                        new EntityIndex(i, FishGroup)
-                    );
+                    World.SetTag<FrenzyTags.NotEating>(new EntityIndex(i, FishGroup));
                 }
             }
         }
