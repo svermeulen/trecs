@@ -400,6 +400,24 @@ namespace Trecs.Tests
         }
 
         [Test]
+        public void Warmup_CrossTemplate_Throws()
+        {
+            // Warmup is the other primary single-group entry point — verify
+            // the resolver error surfaces there too.
+            using var env = EcsTestHelper.CreateEnvironment(
+                b => { },
+                ResolverPlayerEntity.Template,
+                ResolverEnemyEntity.Template
+            );
+            var a = env.Accessor;
+
+            NAssert.Throws<TrecsException>(() =>
+            {
+                a.Warmup<ResolverCharacter>(initialCapacity: 4);
+            });
+        }
+
+        [Test]
         public void WorldBuild_RegisteringBaseAndDerived_Throws()
         {
             // ResolverBallEntity declares IExtends<ResolverShapeBase>. If both

@@ -309,9 +309,12 @@ namespace Trecs
             }
 
             // Verify the smallest is actually a subset of every other match.
-            // Within a single template this can fail when matches differ on a
-            // mutex-variant dim — the unique-smallest check alone isn't
-            // sufficient.
+            // For cross-product partitions (source-gen IPartitionedBy), the
+            // unique-smallest check above already implies this. The check is
+            // here for templates whose partition shapes are declared manually
+            // via the Template constructor's `partitions: TagSet[]` parameter
+            // — those can produce matches of differing sizes that don't form
+            // a chain in the subset order.
             var smallestGroup = groups[smallestIdx];
             var smallestTags = _groupInfos[smallestGroup.Index].Tags;
             for (int i = 0; i < groups.Count; i++)
