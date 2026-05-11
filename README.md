@@ -1,11 +1,11 @@
-<img src="docs/assets/logo.png" alt="Trecs" width="300" align="right" />
-
 # Trecs
 
 [![Source Generator](https://github.com/svermeulen/trecs/actions/workflows/sourcegen.yml/badge.svg)](https://github.com/svermeulen/trecs/actions/workflows/sourcegen.yml)
 [![Unity](https://github.com/svermeulen/trecs/actions/workflows/unity.yml/badge.svg)](https://github.com/svermeulen/trecs/actions/workflows/unity.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![Unity 6000.3+](https://img.shields.io/badge/Unity-6000.3%2B-black)
+
+<img src="docs/assets/logo.png" alt="Trecs" width="200" align="right" />
 
 A high-performance Entity Component System framework for Unity, designed for **deterministic simulation, recording/playback, and Burst/Jobs**.
 
