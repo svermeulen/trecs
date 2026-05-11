@@ -17,7 +17,9 @@ These four terms are related but distinct — the docs and source are careful ab
 
 ## Groups
 
-Groups come from **templates** registered with the world at build time. Each template's tag combination defines one group; you never create groups directly through the runtime API.
+A **group** is Trecs' storage unit: a contiguous block of component arrays holding the entities that share one tag combination. Entities tagged `{Player, Active}` live in one group; entities tagged `{Enemy, Active}` live in another.
+
+Groups come from **templates** registered with the world at build time. Each unique tag combination across your registered templates defines exactly one group; the runtime API never creates new groups on the fly.
 
 ```csharp
 // Two templates registered with WorldBuilder:
@@ -27,9 +29,28 @@ Groups come from **templates** registered with the world at build time. Each tem
 // → Two groups exist: {Player, Active} and {Enemy, Active}.
 ```
 
-The tags passed to `AddEntity` are **not** the group's full tag set — they're a query that resolves to the unique group whose tags contain them as a subset. When several groups match the subset, the lookup prefers one whose tag set is exactly equal to the query (this is what lets you target the "empty" side of a presence/absence partition by omitting the partition tag). Otherwise it throws.
+Each group is named by two handles — a stable `TagSet` and a runtime `GroupIndex`. See [TagSet vs GroupIndex](#tagset-vs-groupindex) below.
+
+### Why groups matter
+
+Groups are the foundation of Trecs' performance model:
+
+- **Cache efficiency** — entities with the same tags are packed together, so iteration is fast.
+- **Targeted iteration** — systems iterate over specific groups by tag, skipping irrelevant entities.
+- **Partitions** — template [partitions](../core/templates.md#partitions) use groups to separate entities by state, so each partition iterates independently.
+
+## Resolving tags to a group
+
+Several APIs take a tag set and return the group it names: `AddEntity<...>()`, `CountEntitiesWithTags<...>()`, `worldInfo.GetSingleGroupWithTags(...)`, event subscriptions, and so on. The tags you pass aren't required to be the group's full tag set — they're a query, and the lookup rule is:
+
+1. Find every group whose tag set is a **superset** of the query.
+2. If exactly one matches, return it.
+3. If several match, prefer the one whose tag set **exactly equals** the query — this is what lets you target the "empty" side of a presence/absence partition by omitting the partition tag.
+4. Otherwise, throw `ambiguous`.
 
 ```csharp
+// Given the two templates above ({Player, Active} and {Enemy, Active}):
+
 accessor.AddEntity<GameTags.Player>();
 // → {Player, Active} — only one group contains Player
 
@@ -40,15 +61,7 @@ accessor.AddEntity<GameTags.Active>();
 // → throws: both groups contain Active (ambiguous)
 ```
 
-Entities in the same group share the same component layout and are stored contiguously.
-
-### Why groups matter
-
-Groups are the foundation of Trecs' performance model:
-
-- **Cache efficiency** — entities with the same tags are packed together, so iteration is fast
-- **Targeted iteration** — systems iterate over specific groups by tag, skipping irrelevant entities
-- **Partitions** — template [partitions](../core/templates.md#partitions) use groups to separate entities by state, so each partition iterates independently
+If you want a specific group unambiguously, pass its exact tag combination. If you want to iterate every group that contains some tags, use a tag query (`accessor.Query().WithTags<...>()`) instead — queries are intentionally many-to-many and won't throw on multiple matches.
 
 ## TagSet vs GroupIndex
 
