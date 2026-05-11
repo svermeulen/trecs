@@ -11,9 +11,12 @@ namespace Trecs.Internal
         static readonly TrecsLog _log = new(nameof(ComponentStore));
 
         // Per-group component arrays, indexed directly by GroupIndex.Index.
-        // Pre-allocated at construction — every slot holds a (possibly empty)
-        // DenseDictionary<ComponentId, IComponentArray>. A direct array index
-        // replaces the old Dict<GroupIndex, ...> hash lookup on the hot path.
+        // The outer array is sized at world build (one DenseDictionary per
+        // group); the inner per-component IComponentArray slots are populated
+        // lazily on first touch — usually the group's first AddEntity, or the
+        // serializer's eager pre-materialize for snapshot/recording reads. A
+        // direct array index replaces the old Dict<GroupIndex, ...> hash
+        // lookup on the hot path.
         readonly DenseDictionary<ComponentId, IComponentArray>[] _groupEntityComponentsDB;
 
         bool _configurationFrozen;
@@ -58,17 +61,16 @@ namespace Trecs.Internal
             IComponentArray fromDictionary
         )
         {
-            //be sure that the ComponentArray for the entity Type exists
+            // Per-group component-array slots are materialized lazily on first
+            // touch — both during world build (no eager warm-up) and during
+            // entity submission (a fresh group's slots show up when entities
+            // first land in it). The freeze flag is intentionally not checked
+            // here; it only signals "no more groups" upstream, not "no more
+            // slots on existing groups."
             if (
                 !groupPerComponentType.TryGetValue(typeId, out IComponentArray toEntitiesDictionary)
             )
             {
-                Assert.That(
-                    !_configurationFrozen,
-                    "Attempted to add a new component dictionary {} after the configuration has been frozen",
-                    typeId
-                );
-
                 toEntitiesDictionary = fromDictionary.Create();
                 groupPerComponentType.Add(typeId, toEntitiesDictionary);
             }
@@ -77,7 +79,10 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// Preallocate the DB-side storage for a group with a given set of component builders.
+        /// Eagerly materialize the per-group component-array slots for a given
+        /// template's builders. Component slots are normally lazy (created on
+        /// first entity), but serialization read paths need them populated up
+        /// front so the in-memory layout matches the on-wire shape.
         /// </summary>
         public void PreallocateDBGroup(
             GroupIndex groupId,
@@ -85,8 +90,6 @@ namespace Trecs.Internal
             IComponentBuilder[] entityComponentsToBuild
         )
         {
-            Assert.That(!_configurationFrozen);
-
             var numberOfEntityComponents = entityComponentsToBuild.Length;
             DenseDictionary<ComponentId, IComponentArray> group = GetDBGroup(groupId);
             group.EnsureCapacity(numberOfEntityComponents);

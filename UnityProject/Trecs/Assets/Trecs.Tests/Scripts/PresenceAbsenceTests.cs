@@ -188,5 +188,40 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, a.Query().WithTags<McBase, McDead, McPoisoned>().Count());
             NAssert.AreEqual(0, a.Query().WithTags<McBase, McAlive>().Count());
         }
+
+        [Test]
+        public void Warmup_DoesNotThrow_AndEntitiesCanStillBeAdded()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            // Warm a specific group, then verify the world still works
+            // normally for adds/queries into that group.
+            a.Warmup<McBase, McAlive>(initialCapacity: 16);
+
+            a.AddEntity<McBase, McAlive>().Set(new TestInt { Value = 1 }).AssertComplete();
+            a.AddEntity<McBase, McAlive>().Set(new TestInt { Value = 2 }).AssertComplete();
+            a.SubmitEntities();
+
+            NAssert.AreEqual(2, a.Query().WithTags<McBase, McAlive>().Count());
+        }
+
+        [Test]
+        public void WarmupAllGroups_DoesNotThrow()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            // Restoring the pre-0.x eager-allocation behavior must remain a
+            // one-call escape hatch and round-trip cleanly through to the
+            // submission pipeline.
+            a.WarmupAllGroups(initialCapacityPerGroup: 4);
+
+            // Sanity: adds into a previously-warmed group still work and
+            // queries return the right counts.
+            a.AddEntity<McBase, McAlive>().Set(new TestInt { Value = 10 }).AssertComplete();
+            a.SubmitEntities();
+            NAssert.AreEqual(1, a.Query().WithTags<McBase, McAlive>().Count());
+        }
     }
 }

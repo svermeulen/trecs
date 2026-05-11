@@ -33,6 +33,16 @@ namespace Trecs
             _isDisposed = true;
         }
 
+        internal void WarmupGroup(
+            GroupIndex group,
+            int initialCapacity,
+            Internal.IComponentBuilder[] componentBuilders
+        )
+        {
+            Assert.That(!_isDisposed);
+            _entitySubmitter.Preallocate(group, initialCapacity, componentBuilders);
+        }
+
         internal EntityInitializer AddEntity(
             GroupIndex group,
             string callerFile = "",

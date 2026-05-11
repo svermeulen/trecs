@@ -546,21 +546,16 @@ namespace Trecs
 
         void WarmupGroups()
         {
-            using (TrecsProfiling.Start("Preallocating Groups"))
-            {
-                foreach (var group in _worldInfo.AllGroups)
-                {
-                    var _ = _entitySubmitter.GetDBGroup(group);
-                    var template = _worldInfo.GetResolvedTemplateForGroup(group);
+            // Per-group component-array slots are now materialized lazily —
+            // the first entity into a group triggers the IComponentArray
+            // creation via ComponentStore.GetOrAddTypeSafeDictionary, the
+            // staging buffer slots via EntityFactory.AddEntity, and the
+            // reference list growth via the locator. Skipping the eager
+            // warmup avoids O(groups × components) startup allocations
+            // for templates with many partitions; the per-group startup
+            // cost is paid only for groups that actually get populated.
 
-                    using (TrecsProfiling.Start("EntitySubmitter.Preallocate (group {})", group))
-                    {
-                        _entitySubmitter.Preallocate(group, 1, template.ComponentBuilders);
-                    }
-                }
-            }
-
-            _log.Debug("Initialized {} groups", _worldInfo.AllGroups.Count);
+            _log.Debug("Registered {} groups (lazy buffer init)", _worldInfo.AllGroups.Count);
 
             using (TrecsProfiling.Start("EntitySubmitter.FreezeConfiguration"))
             {
@@ -760,9 +755,9 @@ namespace Trecs
 
             // Register only after Initialize completes so editor-tool listeners
             // (TrecsEntitiesWindow et al.) never see a partially-built world.
-            // CountEntitiesInGroup and similar queries assume per-group
-            // component dictionaries have been preallocated by WarmupGroups,
-            // which runs above.
+            // Per-group component dictionaries are materialized lazily on
+            // first entity creation, but CountEntitiesInGroup and similar
+            // queries already handle the empty-group case.
             WorldRegistry.Register(this);
         }
 

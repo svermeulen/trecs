@@ -523,7 +523,10 @@ namespace Trecs
 
         internal void PreallocateIdMaps(GroupIndex groupId, int size)
         {
-            Assert.That(!_configurationFrozen);
+            // Lazy by default; the per-group list starts at capacity 0 from
+            // InitEntityHandleMap and grows on first insert. This entry point
+            // exists for callers (e.g. WorldAccessor.Warmup) that want to
+            // pre-size buffers ahead of a burst of adds. Safe post-freeze.
 
             ref var groupList = ref GetGroupList(groupId);
             EnsureGroupListSize(ref groupList, size);

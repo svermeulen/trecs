@@ -363,7 +363,11 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// Preallocate memory to avoid the impact to resize arrays when many entities are submitted at once
+        /// Eagerly materialize buffers for a group — the DB-side component arrays,
+        /// the double-buffered staging dictionaries, and the per-group id-map list.
+        /// The default behavior is lazy (first AddEntity does the work); callers
+        /// that know a group is about to be heavily populated can call this to
+        /// avoid the first-add allocation latency. Safe post-freeze.
         /// </summary>
         internal void Preallocate(
             GroupIndex groupId,
@@ -371,8 +375,6 @@ namespace Trecs.Internal
             IComponentBuilder[] entityComponentsToBuild
         )
         {
-            Assert.That(!_componentStore.ConfigurationFrozen);
-
             using (TrecsProfiling.Start("PreallocateDBGroup"))
             {
                 _componentStore.PreallocateDBGroup(groupId, size, entityComponentsToBuild);

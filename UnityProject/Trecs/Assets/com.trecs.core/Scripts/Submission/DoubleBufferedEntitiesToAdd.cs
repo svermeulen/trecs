@@ -160,11 +160,10 @@ namespace Trecs.Internal
             IComponentBuilder[] entityComponentsToBuild
         )
         {
-            // We could relax this constraint, since this method could be useful
-            // at runtime if we know the number of entities we need
-            // If so - change to check _configurationFrozen below instead, in
-            // cases where new group/component dictionaries are added
-            Assert.That(!_configurationFrozen);
+            // Lazy by default; this entry point exists for callers that want to
+            // eagerly reserve buffers for a group ahead of a known burst of adds
+            // (see WorldAccessor.Warmup). Safe post-freeze — the underlying
+            // PreallocateDictionaries / GetOrAdd paths are idempotent.
 
             PreallocateDictionaries(
                 currentComponentsToAddPerGroup,

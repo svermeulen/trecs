@@ -604,6 +604,21 @@ namespace Trecs.Serialization
 
                 var numComponents = reader.Read<int>("numComponents");
 
+                // Per-group component slots are normally lazy (created on
+                // first entity). Snapshot/recording reads need them in place
+                // so the wire-format walk lines up with the in-memory map —
+                // materialize them eagerly here for the group we're about
+                // to populate.
+                if (numComponents > 0 && subMap.Count == 0)
+                {
+                    var template = _worldDef.GetResolvedTemplateForGroup(group);
+                    _world.ComponentStore.PreallocateDBGroup(
+                        group,
+                        0,
+                        template.ComponentBuilders
+                    );
+                }
+
                 Assert.That(
                     subMap.Count == numComponents,
                     "Unexpected number of components for group {}. Expected {}, got {}",

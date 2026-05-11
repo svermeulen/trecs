@@ -189,6 +189,8 @@ public partial class Enemy : ITemplate,
 
     The cross product is worth it when the dimensions are *intrinsic to the entity's storage shape* — e.g. an `Active` partition you iterate every frame in a hot system, where cache locality matters. It's the wrong tool for "states the design wants to name but the simulation rarely iterates by," which are almost always cheaper as sets.
 
+    **Lazy buffers.** Component arrays are allocated on first use per group, not at world-build time — so declaring partitions you rarely populate is cheap at startup. If you want the pre-0.x eager behavior (everything pre-allocated up front), call `World.WarmupAllGroups()` after initialization, or `World.Warmup<TTag1, TTag2>(initialCapacity: N)` for a specific group you know is about to be heavily populated.
+
 ### Transitions
 
 Tag-change verbs handle moves between partitions; the runtime resolves the destination from the entity's current group plus the tag delta.

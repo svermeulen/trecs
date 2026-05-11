@@ -734,6 +734,65 @@ namespace Trecs
             return total;
         }
 
+        // ── Warmup ────────────────────────────────────────────────────
+        // Per-group component-array slots are normally lazy: the first
+        // AddEntity into a group triggers the IComponentArray allocations,
+        // which keeps world startup cheap even when templates declare many
+        // partitions. The Warmup* methods let callers opt back into the
+        // eager behavior — either world-wide or for specific hot groups —
+        // when they'd rather pay the allocation cost up front than at
+        // first-add time.
+
+        /// <summary>
+        /// Eagerly materializes the component-array slots for <paramref name="group"/>
+        /// and grows each to hold at least <paramref name="initialCapacity"/> entities.
+        /// Safe to call multiple times; capacities only grow.
+        /// </summary>
+        public void Warmup(GroupIndex group, int initialCapacity = 1)
+        {
+            Assert.That(!group.IsNull, "Cannot warm up null group");
+            Assert.That(initialCapacity >= 0, "initialCapacity must be non-negative");
+            var template = _worldInfo.GetResolvedTemplateForGroup(group);
+            _structuralOps.WarmupGroup(group, initialCapacity, template.ComponentBuilders);
+        }
+
+        /// <summary>
+        /// Warms up the single group identified by <paramref name="tags"/>.
+        /// </summary>
+        public void Warmup(TagSet tags, int initialCapacity = 1) =>
+            Warmup(_worldInfo.GetSingleGroupWithTags(tags), initialCapacity);
+
+        public void Warmup<T1>(int initialCapacity = 1)
+            where T1 : struct, ITag => Warmup(TagSet<T1>.Value, initialCapacity);
+
+        public void Warmup<T1, T2>(int initialCapacity = 1)
+            where T1 : struct, ITag
+            where T2 : struct, ITag => Warmup(TagSet<T1, T2>.Value, initialCapacity);
+
+        public void Warmup<T1, T2, T3>(int initialCapacity = 1)
+            where T1 : struct, ITag
+            where T2 : struct, ITag
+            where T3 : struct, ITag => Warmup(TagSet<T1, T2, T3>.Value, initialCapacity);
+
+        public void Warmup<T1, T2, T3, T4>(int initialCapacity = 1)
+            where T1 : struct, ITag
+            where T2 : struct, ITag
+            where T3 : struct, ITag
+            where T4 : struct, ITag => Warmup(TagSet<T1, T2, T3, T4>.Value, initialCapacity);
+
+        /// <summary>
+        /// Warms up every group in the world — matches the pre-0.x eager-allocation
+        /// behavior. Call this from setup code if you'd rather pay the allocation
+        /// cost up front than at first-entity time.
+        /// </summary>
+        public void WarmupAllGroups(int initialCapacityPerGroup = 1)
+        {
+            foreach (var group in _worldInfo.AllGroups)
+            {
+                Warmup(group, initialCapacityPerGroup);
+            }
+        }
+
         public ComponentBufferAccessor<T> ComponentBuffer<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
