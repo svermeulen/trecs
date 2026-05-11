@@ -69,13 +69,29 @@ namespace Trecs.SourceGen.Template
             TemplateDefinitionData data
         )
         {
-            // For templates with explicit defaults, generate a static defaults instance
+            // For templates with explicit defaults, generate a static defaults instance.
+            // Abstract templates can't be `new`'d directly — emit a private concrete
+            // subclass so the field initializers still run and feed the Template ctor.
             if (data.Components.Any(c => c.HasExplicitDefault))
             {
-                sb.AppendLine(
-                    indentLevel,
-                    $"private static readonly {data.TypeName} _templateDefaults = new();"
-                );
+                if (data.IsAbstract)
+                {
+                    sb.AppendLine(
+                        indentLevel,
+                        $"private sealed class _DefaultsHolder : {data.TypeName} {{ }}"
+                    );
+                    sb.AppendLine(
+                        indentLevel,
+                        $"private static readonly {data.TypeName} _templateDefaults = new _DefaultsHolder();"
+                    );
+                }
+                else
+                {
+                    sb.AppendLine(
+                        indentLevel,
+                        $"private static readonly {data.TypeName} _templateDefaults = new();"
+                    );
+                }
                 sb.AppendLine();
             }
 

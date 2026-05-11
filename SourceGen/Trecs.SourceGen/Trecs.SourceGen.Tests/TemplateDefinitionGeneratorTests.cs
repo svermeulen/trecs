@@ -170,6 +170,46 @@ public class TemplateDefinitionGeneratorTests
     }
 
     [Test]
+    public void AbstractTemplate_WithExplicitDefault_CompilesCleanly()
+    {
+        // Abstract templates can carry explicit field defaults — the codegen emits a
+        // private nested concrete subclass to drive field initializers, since `new T()`
+        // doesn't compile against an abstract `T`.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CCount : Trecs.IEntityComponent { public int Value; }
+
+                public abstract partial class AbsWithDefault : Trecs.ITemplate
+                {
+                    CCount Count = new() { Value = 7 };
+                }
+
+                public partial class ConcreteChild : Trecs.ITemplate, Trecs.IExtends<AbsWithDefault> { }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(
+            new Microsoft.CodeAnalysis.IIncrementalGenerator[]
+            {
+                new TemplateDefinitionGenerator(),
+                new EntityComponentGenerator(),
+            },
+            source
+        );
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+
+        var tree = string.Join("\n", run.GeneratedTrees);
+        Assert.That(
+            tree,
+            Does.Contain("_DefaultsHolder"),
+            "Expected abstract template with explicit default to emit a private concrete subclass.\n"
+                + run.Format()
+        );
+    }
+
+    [Test]
     public void ConcreteTemplate_PassesIsAbstractFalse()
     {
         // Sanity check: a non-abstract template still emits isAbstract: false so
