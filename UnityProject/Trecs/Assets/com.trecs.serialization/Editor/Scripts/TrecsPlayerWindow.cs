@@ -1377,7 +1377,7 @@ namespace Trecs.Serialization
         {
             if (!controllerInstalled)
             {
-                _stateBadge.text = "NO RECORDER";
+                _stateBadge.text = "NOT INSTALLED";
                 _stateBadge.style.backgroundColor = new Color(0.5f, 0.35f, 0.05f);
                 _stateBadge.tooltip =
                     "This World has no TrecsGameStateController installed, so "
@@ -1388,8 +1388,8 @@ namespace Trecs.Serialization
                 return;
             }
             // Restore the default tooltip on every controller-installed call so
-            // a NO RECORDER → installed transition (e.g. user fixes wiring and
-            // re-enters Play) doesn't leave the diagnostic tooltip stuck.
+            // a NOT INSTALLED → installed transition (e.g. user fixes wiring
+            // and re-enters Play) doesn't leave the diagnostic tooltip stuck.
             _stateBadge.tooltip = DefaultBadgeTooltip;
             // Desync overrides the mode badge: the user really wants to see
             // this loud and immediate, not buried in a side banner. Mode is
