@@ -96,21 +96,36 @@ shared.Dispose(World);  // Decrements ref count; frees if zero
 
 ### Cleanup is manual for entity-owned pointers
 
-Pointers stored on components must be disposed when the entity is removed — Trecs does **not** auto-dispose. The standard pattern is an `OnRemoved` observer on the relevant tag:
+Pointers stored on components must be disposed when the entity is removed — Trecs does **not** auto-dispose. The standard pattern is an `OnRemoved` observer on the relevant tag, with a `[ForEachEntity]` handler that receives the component(s) to dispose:
 
 ```csharp
-accessor.Events.EntitiesWithTags<MyTag>()
-    .OnRemoved((group, indices, world) =>
+public partial class PaletteRefCleanup : IDisposable
+{
+    readonly DisposeCollection _disposables = new();
+
+    public PaletteRefCleanup(World world)
     {
-        var refs = world.ComponentBuffer<PaletteRef>(group).Read;
-        for (int i = indices.Start; i < indices.End; i++)
-        {
-            refs[i].Value.Dispose(world.Heap);
-        }
-    });
+        World = world.CreateAccessor(AccessorRole.Fixed);
+
+        World.Events
+            .EntitiesWithTags<MyTag>()
+            .OnRemoved(OnRemoved)
+            .AddTo(_disposables);
+    }
+
+    WorldAccessor World { get; }
+
+    [ForEachEntity]
+    void OnRemoved(in PaletteRef paletteRef)
+    {
+        paletteRef.Value.Dispose(World);
+    }
+
+    public void Dispose() => _disposables.Dispose();
+}
 ```
 
-See [Sample 10 — Pointers](../samples/10-pointers.md) for a reference implementation.
+See [Sample 10 — Pointers](../samples/10-pointers.md) for a reference implementation and [Entity Events](../entity-management/entity-events.md) for the full observer API.
 
 !!! warning
     Forgetting to dispose pointers causes memory leaks. Trecs detects leaks at world shutdown in debug builds.
