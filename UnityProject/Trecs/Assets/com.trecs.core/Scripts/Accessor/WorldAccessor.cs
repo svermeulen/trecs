@@ -1535,6 +1535,7 @@ namespace Trecs
         /// </summary>
         public void SetSystemEnabled(int systemIndex, EnableChannel channel, bool enabled)
         {
+            AssertCanAccessVariableData();
             _systemEnableState.SetSystemEnabled(systemIndex, channel, enabled);
         }
 
