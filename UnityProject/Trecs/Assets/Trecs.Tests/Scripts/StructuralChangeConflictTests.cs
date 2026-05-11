@@ -262,21 +262,6 @@ namespace Trecs.Tests
 
         #endregion
 
-        #region Duplicate Swap (error)
-
-        [Test]
-        public void ManagedDuplicateSwap_Throws()
-        {
-            // MIGRATION: this test relied on MoveTo throwing at the second
-            // call site (pre-resolution dedup). The new SetTag/UnsetTag
-            // verbs defer same-dim conflict detection to submission time,
-            // so the second SetTag call returns normally. Equivalent
-            // coverage exists in SubmissionPipelineEdgeCaseTests where the
-            // throw is asserted after SubmitEntities.
-        }
-
-        #endregion
-
         #region Multiple entities with mixed conflicts
 
         [Test]

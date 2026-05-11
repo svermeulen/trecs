@@ -213,30 +213,6 @@ namespace Trecs.Tests
 
         #endregion
 
-        #region Managed + native move dedup
-
-        [Test]
-        public void ManagedMoveAndNativeMove_SameEntity_FirstWins()
-        {
-            // MIGRATION: this test relied on MoveTo dedup ("first move
-            // wins") for two moves to the same destination. The new
-            // SetTag/UnsetTag verbs treat any two ops on the same dim
-            // as a same-dim conflict and throw at submission; there's
-            // no "first writer wins" path to assert. Cross-path dedup is
-            // still covered by the move+remove conflict tests, which
-            // exercise legitimately different ops on the same entity.
-        }
-
-        [Test]
-        public void NativeDuplicateMove_SameEntity_OnlyMovedOnce()
-        {
-            // MIGRATION: this test relied on MoveTo dedup. Two SetTag
-            // ops on the same partition dim in one submission now throw
-            // (same-dim conflict) rather than coalescing to one move.
-        }
-
-        #endregion
-
         #region Add + remove + move in same submission
 
         [Test]
