@@ -2,7 +2,7 @@
 
 The **Trecs Hierarchy** window is the editor's main inspector for a running world's schema and live state. It cross-references templates, entities, components, tags, sets, and accessors in a single tree, and stays useful between Play sessions via on-disk schema snapshots.
 
-**To open it:** `Window > Trecs > Hierarchy`. Worlds appear in the dropdown once they call `WorldBuilder.Build()` — set readable names with [`WorldBuilder.SetDebugName`](../core/world-setup.md) so they're easy to pick.
+**To open it:** `Window > Trecs > Hierarchy`
 
 !!! warning "Screenshot pending: `images/hierarchy-overview.png`"
     Whole window with all five sections expanded; entity rows visible under a couple of templates. FeedingFrenzy sample, light theme.
