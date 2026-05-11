@@ -62,7 +62,7 @@ System code never calls `world.CreateAccessor(AccessorRole.X)` — it gets the r
 
 ## Related
 
-- [Heap Allocation Rules](heap-allocation-rules.md) — the heap-specific subset of these rules, plus deterministic ID minting, the seeder pattern, and the `OnRemoved` cleanup convention.
+- [Shared Heap Data](shared-heap-data.md) — the heap-specific subset of these rules, plus deterministic ID minting and the seeder / provider patterns for shared blobs.
 - [Input System](../core/input-system.md) — how `[Input]` components and `AddInput<T>` work with input systems.
 - [Time & RNG](time-and-rng.md) — `FixedRng` vs `VariableRng` deterministic streams.
 - [Pausing & Disabling Systems](pausing-and-disabling-systems.md) — when to use `SetSystemPaused` vs `EnableChannel`.

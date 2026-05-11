@@ -66,7 +66,7 @@ nav:
       - Interpolation: advanced/interpolation.md
       - Pausing & Disabling Systems: advanced/pausing-and-disabling-systems.md
       - Heap: advanced/heap.md
-      - Heap Allocation Rules: advanced/heap-allocation-rules.md
+      - Shared Heap Data: advanced/shared-heap-data.md
       - Aspect Interfaces: advanced/aspect-interfaces.md
       - Advanced Job Features: advanced/advanced-jobs.md
       - Fixed Collections: advanced/fixed-collections.md

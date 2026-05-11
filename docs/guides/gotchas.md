@@ -24,7 +24,7 @@ Using an immediate `Add` / `Remove` / `Clear` on the same set in the group you'r
 
 Pointers must be manually disposed. DEBUG builds catch leaks at world shutdown and report them; release builds leak silently.
 
-**Fix.** Dispose entity-owned pointers in an `OnRemoved` handler. See [Cleanup is manual](../advanced/heap-allocation-rules.md#cleanup-is-manual).
+**Fix.** Dispose entity-owned pointers in an `OnRemoved` handler. See [Cleanup is manual for entity-owned pointers](../advanced/heap.md#cleanup-is-manual-for-entity-owned-pointers).
 
 ## Raw native collections in components don't round-trip through save/load
 

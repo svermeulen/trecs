@@ -933,7 +933,7 @@ namespace Trecs.Tests
 
             // Native resolve (NativeSharedPtrResolver) requires flush first
             heap.FlushPendingOperations();
-            ref int value = ref ptr.Get(heap.Resolver);
+            ref readonly int value = ref ptr.Get(heap.Resolver);
             NAssert.AreEqual(42, value);
 
             heap.Dispose();
@@ -969,7 +969,7 @@ namespace Trecs.Tests
             heap.DisposeHandle(ptr.Handle);
 
             heap.FlushPendingOperations();
-            ref int value = ref clone.Get(heap.Resolver);
+            ref readonly int value = ref clone.Get(heap.Resolver);
             NAssert.AreEqual(42, value);
 
             heap.Dispose();

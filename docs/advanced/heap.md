@@ -2,7 +2,7 @@
 
 Components are unmanaged structs, so they can't hold classes, arrays, or other managed references directly. The **heap** system provides pointer types that let components reference data stored outside the component buffer.
 
-This page covers pointer mechanics. For *which role can allocate which heap*, see [Heap Allocation Rules](heap-allocation-rules.md).
+This page covers pointer mechanics. For sharing patterns, stable identity, and which role can allocate which heap, see [Shared Heap Data](shared-heap-data.md).
 
 ## Pointer types
 
@@ -25,7 +25,7 @@ NativeUniquePtr<NativeData> nativeUnique = World.Heap.AllocNativeUnique(new Nati
 NativeSharedPtr<NativeData> nativeShared = World.Heap.AllocNativeShared(new NativeData());
 ```
 
-For shared allocations that need a stable identity across runs (so clones from disk resolve to the same heap entry), use the `BlobId` overloads — see [Stable BlobIds](heap-allocation-rules.md#stable-blobids-when-init-isnt-deterministic).
+For shared allocations that need a stable identity across runs (so clones from disk resolve to the same heap entry), use the `BlobId` overloads — see [Pattern B — look up by stable `BlobId`](shared-heap-data.md#pattern-b--look-up-by-stable-blobid).
 
 ## Reading
 
@@ -94,7 +94,23 @@ unique.Dispose(World);
 shared.Dispose(World);  // Decrements ref count; frees if zero
 ```
 
-Dispose entity-owned pointers from an `OnRemoved` reactive handler — see [Cleanup is manual](heap-allocation-rules.md#cleanup-is-manual).
+### Cleanup is manual for entity-owned pointers
+
+Pointers stored on components must be disposed when the entity is removed — Trecs does **not** auto-dispose. The standard pattern is an `OnRemoved` observer on the relevant tag:
+
+```csharp
+accessor.Events.EntitiesWithTags<MyTag>()
+    .OnRemoved((group, indices, world) =>
+    {
+        var refs = world.ComponentBuffer<PaletteRef>(group).Read;
+        for (int i = indices.Start; i < indices.End; i++)
+        {
+            refs[i].Value.Dispose(world.Heap);
+        }
+    });
+```
+
+See [Sample 10 — Pointers](../samples/10-pointers.md) for a reference implementation.
 
 !!! warning
     Forgetting to dispose pointers causes memory leaks. Trecs detects leaks at world shutdown in debug builds.

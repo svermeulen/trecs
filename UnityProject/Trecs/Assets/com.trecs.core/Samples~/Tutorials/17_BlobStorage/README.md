@@ -82,7 +82,7 @@ once spawned, so an `OnRemoved` cleanup observer isn't needed in the example
 code. If you adapt the pattern to entities that come and go, register one as
 shown in [Sample 10 — Pointers](../10_Pointers/README.md) or follow the
 template documented in
-[Heap Allocation Rules](../../../../docs/advanced/heap-allocation-rules.md).
+[Shared Heap Data](../../../../docs/advanced/shared-heap-data.md).
 
 ## Setup (manual)
 

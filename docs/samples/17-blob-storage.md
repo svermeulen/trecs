@@ -99,7 +99,7 @@ Because the blob lives once in the shared heap, all 36 entities pointing at the 
 
 Pointers on components must be disposed when the entity is removed — the framework does **not** auto-dispose, because it can't know whether you copied the handle elsewhere. This sample never removes entities, so no cleanup observer is needed.
 
-For entities that come and go, register an `OnRemoved` observer as in [Sample 10 — Pointers](10-pointers.md), or follow [Heap Allocation Rules](../advanced/heap-allocation-rules.md).
+For entities that come and go, register an `OnRemoved` observer as in [Sample 10 — Pointers](10-pointers.md). See also [Heap — cleanup is manual](../advanced/heap.md#cleanup-is-manual-for-entity-owned-pointers) and [Shared Heap Data](../advanced/shared-heap-data.md) for the sharing patterns this sample illustrates.
 
 ## When to reach for this
 

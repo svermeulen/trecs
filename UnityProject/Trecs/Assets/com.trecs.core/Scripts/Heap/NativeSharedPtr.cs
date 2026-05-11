@@ -10,8 +10,10 @@ namespace Trecs
     /// <summary>
     /// Reference-counted pointer to a shared native (unmanaged) heap allocation. Burst-compatible.
     /// Multiple entities can reference the same data via <see cref="BlobId"/>. Resolve to a
-    /// <c>ref T</c> via <see cref="Get(in NativeSharedPtrResolver)"/> in jobs or
-    /// <see cref="Get(HeapAccessor)"/> on the main thread.
+    /// <c>ref readonly T</c> via <see cref="Get(in NativeSharedPtrResolver)"/> in jobs or
+    /// <see cref="Get(HeapAccessor)"/> on the main thread. Shared native data is immutable by
+    /// design — any number of readers can resolve the same blob in parallel without coordination,
+    /// so the API only exposes read-only access.
     /// <para>
     /// Allocate via <see cref="HeapAccessor.AllocNativeShared{T}"/>. Cloning increments the
     /// reference count; disposing decrements it and frees when zero.
@@ -68,25 +70,25 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref T Get(in NativeSharedPtrResolver nativePtrResolver)
+        public readonly unsafe ref readonly T Get(in NativeSharedPtrResolver nativePtrResolver)
         {
             return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(nativePtrResolver));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref T Get(in NativeWorldAccessor accessor)
+        public readonly unsafe ref readonly T Get(in NativeWorldAccessor accessor)
         {
             return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(accessor.SharedPtrResolver));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref T Get(HeapAccessor heap)
+        public readonly unsafe ref readonly T Get(HeapAccessor heap)
         {
             return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(heap));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref T Get(WorldAccessor world)
+        public readonly unsafe ref readonly T Get(WorldAccessor world)
         {
             return ref Get(world.Heap);
         }

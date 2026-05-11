@@ -142,5 +142,5 @@ world.Events.EntitiesWithTags<PatrolTags.Follower>()
 - **`Clone()`** — increments the `SharedPtr` ref count.
 - **`Dispose()`** — decrements the ref count (shared) or returns to the pool (unique).
 - **`Get(world)`** — dereferences a pointer.
-- **Cleanup handlers** — dispose pointers on entity removal to prevent leaks. See [Heap Allocation Rules](../advanced/heap-allocation-rules.md) and [Entity Events](../entity-management/entity-events.md).
+- **Cleanup handlers** — dispose pointers on entity removal to prevent leaks. See [Heap — cleanup is manual](../advanced/heap.md#cleanup-is-manual-for-entity-owned-pointers) and [Entity Events](../entity-management/entity-events.md).
 - For Burst-compatible variants used inside jobs, see [Native Pointers](14-native-pointers.md).
