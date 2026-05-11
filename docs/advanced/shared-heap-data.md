@@ -28,7 +28,7 @@ public class PaletteSeeder
 }
 ```
 
-That's enough to keep the blobs alive. The next question is how entity spawners get their own handles to these blobs. There are two patterns, and the choice matters more than it might look.
+That's enough to keep the blobs alive. The next question is how entity spawners get their own handles to these blobs. There are two patterns:
 
 ## Pattern A — clone from a provider
 
@@ -89,7 +89,7 @@ world.AddEntity<MyTag>()
 
 This pattern is *necessary*, not merely preferable, in two cases:
 
-- **Content-pipeline assets** where IDs are assigned by an importer and baked into level data. A method-per-asset provider doesn't scale to thousands of meshes, textures, or clips loaded from disk; the asset's identity *is* its ID.
+- **Content-pipeline assets** where IDs are assigned by an importer and baked into level data. 
 - **Snapshot reload and desync recovery.** When a snapshot captures an entity's `SharedPtr<T>`, what gets serialized is the `BlobId`. On reload — possibly into a process that started up differently, or on a peer that diverged mid-game — the heap must contain a blob under that exact ID for the pointer to resolve. Stable, hand-authored IDs make this work even if init code was refactored, reordered, or skipped between save and load.
 
 For purely runtime-spawned entities in a single-process game with no save/load and no peer reconciliation, auto-minted IDs are deterministic enough — the framework mints them from a fixed RNG, so the same init sequence produces the same IDs across runs. Stable IDs are insurance against that determinism breaking.
