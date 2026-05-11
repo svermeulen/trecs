@@ -1,3 +1,5 @@
+<img src="docs/assets/logo.png" alt="Trecs" width="300" align="right" />
+
 # Trecs
 
 [![Source Generator](https://github.com/svermeulen/trecs/actions/workflows/sourcegen.yml/badge.svg)](https://github.com/svermeulen/trecs/actions/workflows/sourcegen.yml)
