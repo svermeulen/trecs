@@ -603,13 +603,12 @@ namespace Trecs.Tests
             // any one-time allocations (lazy registry warmup, pool growth,
             // jit) happen here rather than under the measurement.
             // EntityHandle (not EntityIndex) is stable across partition moves.
-            for (int i = 0; i < 32; i++)
-            {
-                a.SetTag<McPoisoned>(handle);
-                a.SubmitEntities();
-                a.UnsetTag<McPoisoned>(handle);
-                a.SubmitEntities();
-            }
+            // Diagnostics showed exactly one cycle is sufficient to settle
+            // every allocation path on the coalesced SetTag/UnsetTag hot path.
+            a.SetTag<McPoisoned>(handle);
+            a.SubmitEntities();
+            a.UnsetTag<McPoisoned>(handle);
+            a.SubmitEntities();
 
             NAssert.That(
                 () =>
