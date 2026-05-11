@@ -415,7 +415,7 @@ namespace Trecs
         // all fixed-update systems. This guarantees stable IDs across runs
         // as long as allocation order is itself deterministic — which is
         // the same discipline rule that already applies to fixed-update
-        // code (see docs/advanced/heap-allocation-rules.md).
+        // code (see docs/advanced/shared-heap-data.md).
         BlobId MintBlobId()
         {
             var value = _fixedRng.NextLong();

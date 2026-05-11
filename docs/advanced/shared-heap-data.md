@@ -96,18 +96,16 @@ For purely runtime-spawned entities in a single-process game with no save/load a
 
 ## Choosing `BlobId` values
 
-`BlobId` wraps a 64-bit `long`. Practical options, in rough order of preference:
+`BlobId` wraps a 64-bit `long`. Whichever value you pick goes behind a named constant, so call sites all read the same (`PaletteIds.Warm`). The question is what to put on the right-hand side:
 
-- **Hand-assigned small ints** in a single `static class` (`new(1001)`, `new(1002)`, …). Simplest; fine for a handful of named assets. The registry itself prevents collisions because it's the only place IDs are minted.
-- **Stable string hashes** — `new(StableHash64("warm-palette"))` — for medium-sized named sets. Self-documenting, no central counter, refactor-safe as long as you don't rename the key. Collision probability at 64 bits is negligible for any realistic asset count.
+```csharp
+public static readonly BlobId Warm = new(/* ??? */);
+```
+
+Practical options:
+
+- **Random 64-bit literals** — `new(0x7f3a9b21d4e6c5a8)`. Generate once at authoring time, paste in, never change. Effectively zero collision risk with anything else in the heap, including IDs minted by other modules, plugins, or the framework's auto-mint (which also draws random 64-bit longs). The downside is the literal itself isn't human-meaningful — but since you read it through the named constant, that rarely matters in practice. A reasonable default.
+- **Stable string hashes** — `new(StableHash64("warm-palette"))`. Same collision profile as random literals at 64 bits, with the bonus that the value is derivable from the name. Useful when IDs need to round-trip through text (config files, save formats) or when you want the source of truth to be the string rather than the literal.
 - **Asset-pipeline IDs** — GUIDs or content hashes the importer already produced, cast or hashed down to `long`. The right answer when the blob originates from a content pipeline; the `BlobId` design is built for this case.
+- **Hand-assigned small ints** — `new(1001)`, `new(1002)`, … Simplest for a single registry in a single codebase. The drawback is brittleness in multi-module setups: if two independent codebases both start their registries at `1001`, they collide on shared blob stores. Fine if you control all the code that mints stable IDs; reach for one of the wider-range options if you don't.
 
-Avoid random literals like `new(0x7f3a9b21d4e6c5a8)`. They give you neither the readability of a name nor the derivability of a hash, and you still need a central registry to track which are taken.
-
-## Cheat sheet
-
-- **Persistent allocation from init or `Fixed` systems** (and `Unrestricted` if you must). Input systems use `AllocXxxFrameScoped` for transient payloads; `Variable`-cadence systems can't allocate at all.
-- **Anchor seeded blobs** in a long-lived object so the refcount never drops to zero between seed and first reference.
-- **Prefer cloning from a typed provider** for fixed named asset sets; reach for `BlobId` lookup when you need durable identity or content-pipeline addressing.
-- **Auto-IDs are deterministic** when init and fixed code is deterministic — same rule as replay. Use explicit `BlobId`s when that determinism can't be relied on.
-- **Presentation systems read; they don't allocate heap, and they only spawn `[VariableUpdateOnly]` templates.** If a presentation system needs new sim-state, populate it from a `[VariableUpdateOnly]` component or a fixed system; if it needs render-only entities, declare the template `[VariableUpdateOnly]` and spawn from there.
