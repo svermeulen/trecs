@@ -1,9 +1,6 @@
 # Serialization
 
-!!! note "When you need this page"
-    Read this if you're implementing **save/load** or hooking into the **recording / replay** system. The types here live in the optional `com.trecs.serialization` package — `com.trecs.core` does not depend on them.
-
-Trecs ships an optional binary serialization framework for full ECS world state. It is the foundation for [Recording & Playback](recording-and-playback.md) and for save/load systems.
+Trecs ships an optional binary serialization framework (`com.trecs.serialization` package) for full ECS world state. It is the foundation for [Recording & Playback](recording-and-playback.md) and for save/load systems.
 
 ## Quick start
 
@@ -20,13 +17,13 @@ var worldStateSerializer = new WorldStateSerializer(world);
 var snapshots = new SnapshotSerializer(worldStateSerializer, registry, world);
 ```
 
-For a save-game flow stop here and use `SnapshotSerializer.SaveSnapshot` / `LoadSnapshot`. For deterministic record/replay also construct `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` (see [Recording & Playback](recording-and-playback.md)).  If you just want to use the record/replay for debugging in editor you can wrap around `UNITY_EDITOR` - see samples project for more details.
+For a save-game flow stop here and use `SnapshotSerializer.SaveSnapshot` / `LoadSnapshot`. For deterministic record/replay also construct `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` (see [Recording & Playback](recording-and-playback.md)).
 
-`SerializerRegistry` is independent of Trecs — it exposes generic `RegisterBlit<T>`, `RegisterEnum<T>`, `RegisterSerializer<TSerializer>` and can be used standalone in non-ECS code.
+`SerializerRegistry` is a generic serializer independent of Trecs — it exposes generic `RegisterBlit<T>`, `RegisterEnum<T>`, `RegisterSerializer<TSerializer>` and can be used standalone in non-ECS code.
 
 ## Authoring a custom serializer
 
-Most components are unmanaged structs and serialize automatically via the built-in blit serializer. You only need a custom `ISerializer<T>` for types that hold managed references (lists, dictionaries, strings) or where you want a non-default encoding.
+Components are unmanaged structs and serialize automatically via the built-in blit serializer. You only need a custom `ISerializer<T>` if you are storing custom types on the heap.
 
 ```csharp
 public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
