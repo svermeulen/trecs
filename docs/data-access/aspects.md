@@ -14,7 +14,7 @@ This generates:
 - `ref readonly float Speed` (read-only, unwrapped)
 - `ref float3 Position` (read-write, unwrapped)
 
-Aspects also pick up extension methods from `AspectExtensions`: `aspect.Handle(World)` resolves the iterated entity to a stable `EntityHandle`, `aspect.Entity(World)` returns an `EntityAccessor`, and `aspect.Remove(World)` / `aspect.MoveTo<…>(World)` perform structural ops. The handle / native variants also work inside Burst jobs by passing a `NativeWorldAccessor`.
+Aspects also pick up entity-level methods: `aspect.Handle(World)` resolves the iterated entity to a stable `EntityHandle`, `aspect.Entity(World)` returns an `EntityAccessor`, and `aspect.Remove(World)` / `aspect.SetTag<T>(World)` / `aspect.UnsetTag<T>(World)` perform structural ops. `Handle` / `Entity` / `Remove` come from `AspectExtensions`; `SetTag` / `UnsetTag` are source-generated per aspect, with overloads for both `WorldAccessor` and `NativeWorldAccessor`. The native overloads work inside Burst jobs.
 
 A component marked `[Unwrap]` (single-field struct) exposes its inner value through the property. Without `[Unwrap]`, the property returns the wrapping struct (`ref Position` instead of `ref float3`).
 

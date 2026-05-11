@@ -84,7 +84,8 @@ nativeWorld.AddEntity<GameTags.Bullet>(sortKey: (uint)index)
     .Set(new Position(pos));
 
 nativeWorld.RemoveEntity(entityIndex);
-nativeWorld.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
+nativeWorld.SetTag<BallTags.Resting>(entityHandle);     // partition transition (turn tag on / switch variant)
+nativeWorld.UnsetTag<BallTags.Active>(entityHandle);    // partition transition (presence/absence dim only)
 ```
 
 ## Thread-safety cheat sheet

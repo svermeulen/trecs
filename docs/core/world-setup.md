@@ -127,7 +127,7 @@ var accessor = world.CreateAccessor(AccessorRole.Unrestricted);
 
 `WorldAccessor` exposes:
 
-- **[Entity operations](../entity-management/structural-changes.md)** — `AddEntity`, `RemoveEntity`, `MoveTo`
+- **[Entity operations](../entity-management/structural-changes.md)** — `AddEntity`, `RemoveEntity`, `SetTag` / `UnsetTag` (partition transitions)
 - **[Component access](components.md)** — `Component<T>`, `GlobalComponent<T>`, `ComponentBuffer<T>`
 - **[Queries](../data-access/queries-and-iteration.md)** — `Query()`, `CountEntitiesWithTags<T>()`
 - **[Sets](../entity-management/sets.md)** — `Set<T>()` gateway with `Defer` / `Read` / `Write` views

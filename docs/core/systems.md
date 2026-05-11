@@ -61,7 +61,7 @@ See [Sets](../entity-management/sets.md) for set-scoped iteration.
 
 **Optional extras:**
 
-- **`EntityAccessor`** — a live single-entity view; offers `Get<T>()`, `Remove()`, `MoveTo<…>()`, set / input ops, and a `Handle` property. Default choice when you need to act on the iterated entity.
+- **`EntityAccessor`** — a live single-entity view; offers `Get<T>()`, `Remove()`, `SetTag<T>()` / `UnsetTag<T>()`, set / input ops, and a `Handle` property. Default choice when you need to act on the iterated entity.
 - **`EntityHandle`** — the stable handle for the iterated entity, when you only need to store it (e.g. on another component).
 - **`WorldAccessor`** — the system's accessor (main-thread only).
 - **`NativeWorldAccessor`** — job-safe world access (`[WrapAsJob]` only).
@@ -348,7 +348,7 @@ World.AddEntity<SampleTags.Sphere>()
     .Set(new Lifetime(5f));
 
 World.RemoveEntity(handle);
-ball.MoveTo<BallTags.Ball, BallTags.Resting>(World);
+ball.UnsetTag<BallTags.Active>(World);   // partition transition
 
 float dt = World.DeltaTime;
 float random = World.Rng.Next();

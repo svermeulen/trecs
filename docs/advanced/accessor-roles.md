@@ -21,7 +21,7 @@ Every rule below is asserted at the call site. Crossing a role boundary throws a
 | Read [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) component | ❌ | ✅ | ✅ |
 | Write [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) component | ❌ | ✅ | ✅ |
 | Persistent heap alloc (`AllocShared`, `AllocUnique`, native variants) | ✅ | ❌ | ✅ |
-| Structural change (`AddEntity` / `RemoveEntity` / `MoveTo`) on a non-VUO template | ✅ | ❌ | ✅ |
+| Structural change (`AddEntity` / `RemoveEntity` / `SetTag` / `UnsetTag`) on a non-VUO template | ✅ | ❌ | ✅ |
 | Structural change on a [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) template | ❌ | ✅ | ✅ |
 | Read set (`Set<T>().Read` — `Exists`, `Count`, iterate) | ✅ | ✅ | ✅ |
 | Mutate set (`Set<T>().Defer`, `Set<T>().Write`) | ✅ | ❌ | ✅ |
@@ -33,9 +33,9 @@ Every rule below is asserted at the call site. Crossing a role boundary throws a
 
 `[VariableUpdateOnly]` applies at two scopes that behave differently. The distinction matters for the structural-change rows above.
 
-- **`[VariableUpdateOnly]` on a component field** — the component is render-only state. `Fixed` cannot read or write it; `Variable` / input / `Unrestricted` can. **The structural-change rule is unaffected** — entities of the parent template are still simulation state, so `Fixed` and `Unrestricted` create / remove / move them.
+- **`[VariableUpdateOnly]` on a component field** — the component is render-only state. `Fixed` cannot read or write it; `Variable` / input / `Unrestricted` can. **The structural-change rule is unaffected** — entities of the parent template are still simulation state, so `Fixed` and `Unrestricted` create / remove / partition-transition them.
 
-- **`[VariableUpdateOnly]` on a template class** — the entire template is render-cadence state (cameras, view-only helpers). The structural-change rule **inverts**: `Fixed` is rejected; `Variable` / input / `Unrestricted` create / remove / move them. These groups are skipped from the determinism checksum.
+- **`[VariableUpdateOnly]` on a template class** — the entire template is render-cadence state (cameras, view-only helpers). The structural-change rule **inverts**: `Fixed` is rejected; `Variable` / input / `Unrestricted` create / remove / partition-transition them. These groups are skipped from the determinism checksum.
 
 See the [Components attribute reference](../core/components.md#component-field-attributes) for field-level usage and the [source-generator reference](source-generator-reference.md#components-and-templates) for both.
 

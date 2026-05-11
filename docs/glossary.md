@@ -8,7 +8,7 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 |---|---|
 | **[Entity](core/entities.md)** | An identifier that groups components. Has no data of its own. |
 | **[`EntityHandle`](core/entities.md#entityhandle)** | A *stable* reference to an entity that survives structural changes. Use whenever you store a reference to another entity. |
-| **[`EntityAccessor`](core/entities.md#accessing-entity-data)** | A live single-entity view bound to a `WorldAccessor`. Exposes `Get<T>()` plus no-arg `Remove()` / `MoveTo<…>()` / set / input ops on the bound entity. |
+| **[`EntityAccessor`](core/entities.md#accessing-entity-data)** | A live single-entity view bound to a `WorldAccessor`. Exposes `Get<T>()` plus no-arg `Remove()` / `SetTag<T>()` / `UnsetTag<T>()` / set / input ops on the bound entity. |
 
 ## Classifying entities
 
@@ -25,7 +25,7 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 |---|---|
 | **[Group](advanced/groups-and-tagsets.md#groups)** | A unique tag combination plus the contiguous memory block holding entities that carry it. Created implicitly. |
 | **[`GroupIndex`](advanced/groups-and-tagsets.md#groupindex)** | `ushort` runtime handle for a group, valid only for one `World`'s lifetime. |
-| **[Partition](core/templates.md#partitions)** | A group an entity *moves between* at runtime, for cache locality across entities sharing dynamic state. Partitions an entity moves between share the same template and component types. |
+| **[Partition](core/templates.md#partitions)** | A group an entity *moves between* at runtime via `SetTag<T>()` / `UnsetTag<T>()`, for cache locality across entities sharing dynamic state. Partitions an entity moves between share the same template and component types. |
 | **[Set](entity-management/sets.md)** | A dynamic membership flag on entities (`IEntitySet`), independent of tags and groups. Iteration visits only members — efficient sparse iteration across groups. |
 
 ## Bundling component access
@@ -59,7 +59,7 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 
 | Term | What it is |
 |---|---|
-| **[Submission](entity-management/structural-changes.md)** | The point in the frame where queued structural ops are applied. Add / remove / move are deferred until submission. |
+| **[Submission](entity-management/structural-changes.md)** | The point in the frame where queued structural ops are applied. Add / remove / partition transitions are deferred until submission. |
 | **[Heap](advanced/heap.md)** | Storage for managed or unmanaged data outside the component buffer, accessed via `SharedPtr` / `UniquePtr` / native variants. |
 | **[`BlobId`](advanced/shared-heap-data.md#pattern-b--look-up-by-stable-blobid)** | Stable identifier for a heap blob. Auto-minted from a deterministic RNG, or supplied explicitly when init isn't deterministic. |
 

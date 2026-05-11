@@ -11,7 +11,7 @@ These four terms are related but distinct — the docs and source are careful ab
 | Term | What it is | Example |
 |---|---|---|
 | **Group** | Storage bucket. One per unique tag combination; holds the contiguous component arrays for entities with that exact tag set. | `{Player, VIP}` is a different group from `{Player}`. |
-| **Partition** | A group that an entity *moves between* at runtime to represent state, via `MoveTo<FromTag, ToTag>()`. "Partition" is the **role** a group plays — the storage is still a group. | An `Active` ball moves to the `Resting` partition without losing its components. |
+| **Partition** | A group that an entity *moves between* at runtime to represent state, via `SetTag<T>()` / `UnsetTag<T>()` on a tag declared in `IPartitionedBy<…>`. "Partition" is the **role** a group plays — the storage is still a group. | An `Active` ball moves to the `Resting` partition via `ball.UnsetTag<Active>(World)`, without losing its components. |
 | **TagSet** | Stable identity for a tag combination — a 32-bit hash of the tag GUIDs. Portable across runs and serializable. | `TagSet<GameTags.Player>.Value` resolves to the same value every run. |
 | **Set** | Dynamic, per-frame entity subset — membership is toggled at runtime by code, independent of tags or groups. See [Sets](../entity-management/sets.md). | A `Highlighted` set holding entities currently under the cursor. |
 

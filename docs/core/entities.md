@@ -64,7 +64,7 @@ Removal is **deferred** — the entity disappears at the next [submission](../en
 
 ## Accessing entity data
 
-`EntityAccessor` is a live single-entity view bound to a `WorldAccessor`. It exposes component access plus remove/move operations on the bound entity.
+`EntityAccessor` is a live single-entity view bound to a `WorldAccessor`. It exposes component access plus remove and partition-transition operations on the bound entity.
 
 ```csharp
 EntityAccessor entity = World.Entity(handle);
@@ -80,7 +80,8 @@ if (entity.TryGet<Velocity>(out var velAccessor))
 
 // Structural / input ops on the bound entity
 entity.Remove();
-entity.MoveTo<BallTags.Ball, BallTags.Resting>();
+entity.SetTag<BallTags.Resting>();      // partition transition (turn tag on / switch variant)
+entity.UnsetTag<BallTags.Active>();     // partition transition (presence/absence dim only)
 
 // Resolve the stable handle when you need to store it
 EntityHandle handle = entity.Handle;
