@@ -956,7 +956,9 @@ namespace Trecs.Internal
         )
         {
             var numEntities = fromEntityToEntityIDs.Count;
+#if DEBUG && TRECS_INTERNAL_CHECKS
             Assert.That(numEntities > 0, "something went wrong, no entities to swap");
+#endif
 
             var toGroupDB = ecsRoot.GetDBGroup(toGroup);
             var hasFilters = ecsRoot._setStore.HasAnySets;
@@ -1514,6 +1516,13 @@ namespace Trecs.Internal
                         _extraContribListPool.Count > 0
                             ? _extraContribListPool.Pop()
                             : new FastList<int>();
+#if DEBUG && TRECS_INTERNAL_CHECKS
+                    Assert.That(
+                        extras.Count == 0,
+                        "Pooled FastList<int> popped with stale Count={} — recycle path failed to Clear()",
+                        extras.Count
+                    );
+#endif
                     _pendingExtraContributors.TryAdd(from, extras, out _);
                 }
                 extras.Add(accessorId);
@@ -1526,14 +1535,8 @@ namespace Trecs.Internal
                     p.Template.DebugName
                 );
 
-            // 64 dims is plenty — TRECS038 caps the partition count well below
-            // what this mask supports, and a template hitting >64 dims would
-            // mean 2^64+ partitions, which is nonsense.
-            Assert.That(
-                dimIdx < 64,
-                "Template {} has more than 64 partition dimensions — coalescing mask cannot represent this",
-                p.Template.DebugName
-            );
+            // dimIdx < 64 is enforced at template build time in
+            // ResolvedTemplate.BuildDimensionCaches — no runtime check needed.
             ulong bit = 1UL << dimIdx;
             if ((p.TouchedDimsMask & bit) != 0)
                 throw Assert.CreateException(
@@ -1559,6 +1562,17 @@ namespace Trecs.Internal
                     );
                 p.FinalTagSet = WorldInfo.RemoveDimensionTags(p.FinalTagSet, activeVariant);
             }
+
+#if DEBUG && TRECS_INTERNAL_CHECKS
+            // Catch XOR-math bugs and tag-guid collisions at the source rather
+            // than as a downstream miss in GetSingleGroupWithTags.
+            Assert.That(
+                p.Template.IsRegisteredGroupTagSet(p.FinalTagSet),
+                "Coalesced FinalTagSet {} is not a registered GroupTagSet of template {} — XOR-direct dim math produced an unregistered id",
+                p.FinalTagSet,
+                p.Template.DebugName
+            );
+#endif
         }
 
         bool HasPendingNativeOperations()
@@ -1734,6 +1748,15 @@ namespace Trecs.Internal
                 }
 
                 _pendingChanges.Recycle();
+#if DEBUG && TRECS_INTERNAL_CHECKS
+                // No-recorder path should never deposit extras; if it did, the
+                // dict would silently leak entries across submissions.
+                Assert.That(
+                    _accessRecorder != null || _pendingExtraContributors.Count == 0,
+                    "_pendingExtraContributors has {} entries but _accessRecorder is null — extras leaked into the no-recorder path",
+                    _pendingExtraContributors.Count
+                );
+#endif
                 // Return each per-entity FastList to the pool, then recycle the
                 // outer dict. Empty in the typical case (no recorder, or recorder
                 // with single-accessor entities).

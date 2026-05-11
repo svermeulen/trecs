@@ -541,6 +541,9 @@ namespace Trecs
             Tag replacement
         )
         {
+#if DEBUG && TRECS_INTERNAL_CHECKS
+            AssertActiveVariantIsActuallyActive(current, activeVariant);
+#endif
             // XOR by 0 is identity, so default(Tag).Guid==0 handles the
             // "no active variant" case without a branch.
             int newId = current.Id ^ activeVariant.Guid ^ replacement.Guid;
@@ -554,11 +557,34 @@ namespace Trecs
         // XOR-direct — see ReplaceDimensionTags for the contract.
         internal static TagSet RemoveDimensionTags(TagSet current, Tag activeVariant)
         {
+#if DEBUG && TRECS_INTERNAL_CHECKS
+            AssertActiveVariantIsActuallyActive(current, activeVariant);
+#endif
             int newId = current.Id ^ activeVariant.Guid;
             if (newId == 0)
                 newId = 1;
             return new TagSet(newId);
         }
+
+#if DEBUG && TRECS_INTERNAL_CHECKS
+        static void AssertActiveVariantIsActuallyActive(TagSet current, Tag activeVariant)
+        {
+            if (activeVariant.Guid == 0)
+                return;
+            var tags = current.Tags;
+            int count = tags.Count;
+            for (int i = 0; i < count; i++)
+            {
+                if (tags[i].Guid == activeVariant.Guid)
+                    return;
+            }
+            throw Assert.CreateException(
+                "ReplaceDimensionTags / RemoveDimensionTags called with activeVariant {} that is not in current TagSet {} — XOR math would produce an unregistered TagSet id",
+                activeVariant,
+                current
+            );
+        }
+#endif
 
         public bool IsResolvedTemplate(Template template)
         {

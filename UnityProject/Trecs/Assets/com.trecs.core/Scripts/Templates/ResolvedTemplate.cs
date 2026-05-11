@@ -56,6 +56,16 @@ namespace Trecs
 
         void BuildDimensionCaches()
         {
+            // Structural cap: coalescer's TouchedDimsMask is a ulong, so 64 dims
+            // is the hard upper bound. Always-on, once-at-build — replaces what
+            // used to be a runtime per-op assertion in EntitySubmitter.
+            Assert.That(
+                Dimensions.Count <= 64,
+                "Template {} has {} partition dimensions, exceeding the 64-dim cap (TouchedDimsMask is a ulong)",
+                DebugName,
+                Dimensions.Count
+            );
+
             _tagToDim = new Dictionary<int, (int, TagSet)>();
             for (int d = 0; d < Dimensions.Count; d++)
             {
@@ -63,7 +73,18 @@ namespace Trecs
                 var dimTags = dim.Tags;
                 for (int i = 0; i < dimTags.Count; i++)
                 {
-                    _tagToDim[dimTags[i].Guid] = (d, dim);
+                    var t = dimTags[i];
+#if DEBUG && TRECS_INTERNAL_CHECKS
+                    Assert.That(
+                        !_tagToDim.ContainsKey(t.Guid),
+                        "Tag {} appears in two partition dimensions of template {} (existing dim {}, new dim {}). Each tag must belong to at most one dim.",
+                        t,
+                        DebugName,
+                        _tagToDim.TryGetValue(t.Guid, out var existing) ? existing.Index : -1,
+                        d
+                    );
+#endif
+                    _tagToDim[t.Guid] = (d, dim);
                 }
             }
 
@@ -81,6 +102,14 @@ namespace Trecs
                         active[info.Index] = t;
                     }
                 }
+#if DEBUG && TRECS_INTERNAL_CHECKS
+                Assert.That(
+                    !_activeVariantsByGroupTagSetId.ContainsKey(groupTagSet.Id),
+                    "Two GroupTagSets of template {} resolve to id {} — TagSet content-hash collision broke partition-variant uniqueness",
+                    DebugName,
+                    groupTagSet.Id
+                );
+#endif
                 _activeVariantsByGroupTagSetId[groupTagSet.Id] = active;
             }
         }
@@ -101,17 +130,33 @@ namespace Trecs
             return false;
         }
 
+        // True iff <paramref name="tagSet"/> is one of this template's
+        // registered GroupTagSets. Used by submission-pipeline DEBUG checks
+        // to catch XOR-math producing unregistered ids.
+        internal bool IsRegisteredGroupTagSet(TagSet tagSet)
+        {
+            return _activeVariantsByGroupTagSetId.ContainsKey(tagSet.Id);
+        }
+
         // Returns the variant of <paramref name="dimIdx"/> that is currently
         // active in the group identified by <paramref name="groupTagSet"/>.
         // Returns default(Tag) if no variant of that dim is active in this
         // group (only possible for presence/absence dims when the tag is
-        // absent). Throws KeyNotFoundException if <paramref name="groupTagSet"/>
-        // is not one of this template's GroupTagSets — that would be a bug in
-        // the caller (the coalescer always operates on TagSets within the
-        // current template).
+        // absent). DEBUG_INTERNAL_CHECKS produces a named Trecs exception on
+        // miss; release falls through to the raw indexer (KeyNotFoundException).
         internal Tag GetActiveVariantInGroup(TagSet groupTagSet, int dimIdx)
         {
+#if DEBUG && TRECS_INTERNAL_CHECKS
+            if (!_activeVariantsByGroupTagSetId.TryGetValue(groupTagSet.Id, out var arr))
+                throw Assert.CreateException(
+                    "TagSet {} is not a registered group of template {} — coalescer invariant broken",
+                    groupTagSet,
+                    DebugName
+                );
+            return arr[dimIdx];
+#else
             return _activeVariantsByGroupTagSetId[groupTagSet.Id][dimIdx];
+#endif
         }
 
         /// <summary>
