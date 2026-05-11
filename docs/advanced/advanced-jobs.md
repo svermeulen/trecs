@@ -96,7 +96,7 @@ if (healthLookup.Exists(entityIndex)) { ... }
 if (healthLookup.TryGet(entityIndex, out Health hp)) { ... }
 ```
 
-For most cross-group reads in a job, prefer the higher-level `<Aspect>.NativeFactory` pattern (see [Aspects](../data-access/aspects.md)) — it hides the lookup plumbing.
+For more complex cross-group reads in a job, prefer the higher-level `<Aspect>.NativeFactory` pattern (see [Aspects](../data-access/aspects.md)) — it hides the lookup plumbing.
 
 ## Native set operations
 
@@ -135,6 +135,8 @@ To force-complete tracked jobs before main-thread access:
 ```csharp
 accessor.SyncMainThread<Position>(group);
 ```
+
+Note that this is very low level operation that shouldn't be necessary in most cases.
 
 ## See also
 

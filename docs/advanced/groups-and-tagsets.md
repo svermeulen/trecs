@@ -1,6 +1,8 @@
 # Groups, GroupIndex & TagSets
 
-This page covers the low-level storage model behind [tags](../core/tags.md). Most users interact with tags through templates and `[ForEachEntity]` attributes and don't need these APIs. They're useful for custom job scheduling, dynamic queries, or tooling.
+This page covers the low-level storage model behind [tags](../core/tags.md). Most users interact with tags through templates and `[ForEachEntity]` attributes and don't need these APIs. They're useful for high performance job scheduling, dynamic queries, or tooling.
+
+It can also be useful to understand conceptually since it's fundamental to how Trecs works.
 
 ## Terminology at a Glance
 
