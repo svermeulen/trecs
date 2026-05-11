@@ -13,6 +13,7 @@ A high-performance Entity Component System framework for Unity, designed for **d
 **Full docs: [svermeulen.github.io/trecs](https://svermeulen.github.io/trecs)** 
 
 [Getting Started](https://svermeulen.github.io/trecs/getting-started/) · [Glossary](https://svermeulen.github.io/trecs/glossary/) · [Samples](https://svermeulen.github.io/trecs/samples/) · [FAQ](https://svermeulen.github.io/trecs/faq/) · [Trecs vs Unity ECS](https://svermeulen.github.io/trecs/guides/trecs-vs-unity-ecs/)
+<br clear="all" />
 
 ## Features
 
