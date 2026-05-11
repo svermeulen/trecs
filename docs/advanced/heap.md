@@ -37,8 +37,8 @@ MyData data = unique.Get(World);
 MyData data2 = shared.Get(World);
 
 // Native (return refs)
-ref NativeData d1 = ref nativeUnique.Get(World);
-ref NativeData d2 = ref nativeShared.Get(World);
+ref readonly NativeData d1 = ref nativeUnique.Get(World);
+ref readonly NativeData d2 = ref nativeShared.Get(World);
 
 // Safe access
 if (shared.TryGet(World, out MyData data3)) { ... }
@@ -104,7 +104,7 @@ Dispose entity-owned pointers from an `OnRemoved` reactive handler — see [Clea
 Use native pointer types (`NativeUniquePtr<T>` / `NativeSharedPtr<T>`) in jobs and call `Get` with a `NativeWorldAccessor`:
 
 ```csharp
-ref NativeData data = ref nativeShared.Get(in nativeWorld);
+ref readonly NativeData data = ref nativeShared.Get(in nativeWorld);
 ```
 
 ## See also

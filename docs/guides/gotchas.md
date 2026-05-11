@@ -40,6 +40,25 @@ The wrapped collection's storage is allocated in Unity's allocator, not Trecs's 
 
 **Fix.** Dispose the inner collection, then the unique ptr. See [Wrapping native collections](../advanced/heap.md#wrapping-native-collections).
 
+## Mutating a `NativeUniquePtr<T>` needs write access to the owning component
+
+`GetMut` and `Set` on `NativeUniquePtr<T>` are defined as `ref this` extension methods, so the call site needs a writeable reference to the pointer struct itself — typically a `Write`-accessed component field. Calling them through a `ref readonly` (e.g. what `Component<T>(entity).Read` hands back) doesn't compile, because a `ref readonly` field isn't addressable as `ref`.
+
+```csharp
+// ❌ Won't compile: Read returns ref readonly, so the inner
+//    NativeUniquePtr field isn't addressable as `ref this`.
+ref readonly var buf = ref World.Component<CScratchBuffer>(entity).Read;
+buf.List.GetMut(World).Add(42);
+
+// ✅ Take write access on the component.
+ref var buf = ref World.Component<CScratchBuffer>(entity).Write;
+buf.List.GetMut(World).Add(42);
+```
+
+This is intentional: it lets mutations to the pointed-to native data piggy-back on the framework's existing component resource tracking. The scheduler already knows which systems read and write each component, so requiring write access on the component in order to mutate the native allocation behind the pointer means cross-system contention on that allocation is automatically serialized — no separate per-pointer bookkeeping is needed. Read-only access (`Get`) has no such requirement and works through a `ref readonly` component, which similarly composes with the read-side of component tracking.
+
+**Fix.** Get `.Write` on the owning component (or copy the pointer to a local) before calling `GetMut` / `Set`.
+
 ## Looking up a fresh `EntityHandle` in the same fixed step
 
 `World.AddEntity<T>()` returns immediately with an `EntityInitializer` whose `Handle` is valid as an identity (stable, will resolve later) — but the entity isn't placed in any group until submission at end of the fixed step. Another system later in the same step that reads components on the handle throws, because the entity doesn't exist anywhere yet.
