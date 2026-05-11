@@ -17,15 +17,30 @@ These four terms are related but distinct — the docs and source are careful ab
 
 ## Groups
 
-Groups are created **implicitly** from tag combinations. You never create them directly — they emerge from how you use tags in templates and `AddEntity` calls.
+Groups come from **templates** registered with the world at build time. Each template's tag combination defines one group; you never create groups directly through the runtime API.
 
 ```csharp
-// These two entities belong to different groups:
-accessor.AddEntity<GameTags.Player>();                // group: {Player}
-accessor.AddEntity<GameTags.Player, GameTags.VIP>();  // group: {Player, VIP}
+// Two templates registered with WorldBuilder:
+//   PlayerEntity : ITagged<Player>, ITagged<Active>
+//   EnemyEntity  : ITagged<Enemy>, ITagged<Active>
+//
+// → Two groups exist: {Player, Active} and {Enemy, Active}.
 ```
 
-Each unique tag combination maps to exactly one group. Entities in the same group share the same component layout and are stored contiguously.
+The tags passed to `AddEntity` are **not** the group's full tag set — they're a query that resolves to the unique group whose tags contain them as a subset. When several groups match the subset, the lookup prefers one whose tag set is exactly equal to the query (this is what lets you target the "empty" side of a presence/absence partition by omitting the partition tag). Otherwise it throws.
+
+```csharp
+accessor.AddEntity<GameTags.Player>();
+// → {Player, Active} — only one group contains Player
+
+accessor.AddEntity<GameTags.Enemy, GameTags.Active>();
+// → {Enemy, Active} — exact match
+
+accessor.AddEntity<GameTags.Active>();
+// → throws: both groups contain Active (ambiguous)
+```
+
+Entities in the same group share the same component layout and are stored contiguously.
 
 ### Why groups matter
 

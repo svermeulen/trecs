@@ -101,9 +101,8 @@ Unity's `Unity.Collections` ships `FixedList32Bytes<T>` through `FixedList4096By
 | | Trecs | Unity `FixedList*Bytes` |
 |---|---|---|
 | Sizing axis | Element count (`FixedList16<T>` = 16 slots, always) | Total bytes (`FixedList64Bytes<T>` = `~62 / sizeof(T)` slots) |
-| Indexer | Returns `ref readonly T`; writes via `.Mut(i)` | Returns `T` by value (copies per access); use `.ElementAt(i)` for `ref T` |
-| `in` parameter safety | Reads safe, writes compile-error | Indexer copies the whole struct per access |
+| Element read | `ref readonly T` — zero-copy, including through `in` parameters | `T` by value — copies the element on every read. `.ElementAt(i)` returns `ref T` but isn't callable through `in` |
+| Element write | `.Mut(i)` returns `ref T`; not callable through `in` (compile-error) | `list[i] = x` setter; not callable through `in` (compile-error) |
 | API surface | Minimal: `Add`, `Clear`, `RemoveAt`, `RemoveAtSwapBack`, `Mut` | Extensive: `IndexOf`, `Contains`, `Sort`, `IEnumerable<T>`, cross-size equality |
 | Count-less variant | `FixedArray<N>` | none |
 
-Either works as an inline component buffer. Trecs's types read more naturally at ECS call sites — the element-count axis matches how you think about the bound, and the readonly-indexer / `Mut`-write split keeps `in` parameters safe without defensive copies. If your codebase already uses Unity's types, mixing the two is fine.
