@@ -2355,7 +2355,8 @@ namespace Trecs.SourceGen
             return QueryBuilderHelper.BuildAttributeCriteriaChain(
                 c.TagTypes,
                 c.MatchByComponents,
-                componentTypes
+                componentTypes,
+                c.WithoutTagTypes
             );
         }
 

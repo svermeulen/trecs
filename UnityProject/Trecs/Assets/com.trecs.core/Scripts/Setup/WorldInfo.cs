@@ -545,7 +545,7 @@ namespace Trecs
             {
                 if (TagSetContainsTag(dim, newTag))
                 {
-                    return BuildTagSetReplacing(currentTags, dim, addTag: newTag);
+                    return ReplaceDimensionTags(currentTags, dim, replacement: newTag);
                 }
             }
 
@@ -583,7 +583,7 @@ namespace Trecs
                             template.DebugName
                         );
                     }
-                    return BuildTagSetReplacing(currentTags, dim, addTag: default);
+                    return RemoveDimensionTags(currentTags, dim);
                 }
             }
 
@@ -605,9 +605,10 @@ namespace Trecs
         }
 
         // Builds a TagSet equal to <paramref name="current"/> with every tag from
-        // <paramref name="dim"/> stripped, then with <paramref name="addTag"/>
-        // appended (skipped if it's the default Tag — i.e. a remove).
-        static TagSet BuildTagSetReplacing(TagSet current, TagSet dim, Tag addTag)
+        // <paramref name="dim"/> stripped, then with <paramref name="replacement"/>
+        // appended. Used by AddTag/SetTag to swap a dim's current variant for a new
+        // one.
+        static TagSet ReplaceDimensionTags(TagSet current, TagSet dim, Tag replacement)
         {
             var resultTags = new List<Tag>();
             foreach (var t in current.Tags)
@@ -615,8 +616,22 @@ namespace Trecs
                 if (!TagSetContainsTag(dim, t))
                     resultTags.Add(t);
             }
-            if (addTag.Guid != 0)
-                resultTags.Add(addTag);
+            resultTags.Add(replacement);
+            return TagSet.FromTags(resultTags);
+        }
+
+        // Builds a TagSet equal to <paramref name="current"/> with every tag from
+        // <paramref name="dim"/> stripped. Used by RemoveTag on presence/absence
+        // dims; for those, stripping the dim's only variant leaves the entity in
+        // the absent partition.
+        static TagSet RemoveDimensionTags(TagSet current, TagSet dim)
+        {
+            var resultTags = new List<Tag>();
+            foreach (var t in current.Tags)
+            {
+                if (!TagSetContainsTag(dim, t))
+                    resultTags.Add(t);
+            }
             return TagSet.FromTags(resultTags);
         }
 

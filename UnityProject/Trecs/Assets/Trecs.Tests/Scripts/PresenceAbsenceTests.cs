@@ -114,4 +114,79 @@ namespace Trecs.Tests
             NAssert.AreEqual(0, a.Query().WithTags<PaBase, PaPresent>().Count());
         }
     }
+
+    // Multi-dim cross-product test: one presence/absence dim + one binary-variant
+    // dim. Yields 4 partitions; AddTag/RemoveTag on either dim preserves the
+    // other.
+    public struct McBase : ITag { }
+
+    public struct McPoisoned : ITag { }  // presence/absence dim
+
+    public struct McAlive : ITag { }    // variant dim
+
+    public struct McDead : ITag { }     // variant dim
+
+    public partial class McTestEntity
+        : ITemplate,
+            ITagged<McBase>,
+            IPartitionedBy<McPoisoned>,
+            IPartitionedBy<McAlive, McDead>
+    {
+        TestInt TestInt;
+    }
+
+    [TestFixture]
+    public class MultiDimPartitionTests
+    {
+        TestEnvironment CreateEnv() =>
+            EcsTestHelper.CreateEnvironment(b => { }, McTestEntity.Template);
+
+        [Test]
+        public void CrossProduct_EmitsFourPartitions()
+        {
+            // 1 presence/absence dim (2 partitions) × 1 binary-variant dim (2 partitions) = 4.
+            NAssert.AreEqual(4, McTestEntity.Template.Partitions.Count);
+            NAssert.AreEqual(2, McTestEntity.Template.Dimensions.Count);
+        }
+
+        [Test]
+        public void RemoveTag_PreservesOtherDimension()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            // Start as poisoned + alive.
+            var init = a.AddEntity<McBase, McPoisoned, McAlive>()
+                .Set(new TestInt { Value = 1 })
+                .AssertComplete();
+            a.SubmitEntities();
+
+            // RemoveTag<Poisoned> should toggle just the poisoned dim, keeping McAlive.
+            a.RemoveTag<McPoisoned>(init.Handle.ToIndex(a));
+            a.SubmitEntities();
+
+            NAssert.AreEqual(1, a.Query().WithTags<McBase, McAlive>().WithoutTags<McPoisoned>().Count());
+            NAssert.AreEqual(0, a.Query().WithTags<McBase, McAlive, McPoisoned>().Count());
+        }
+
+        [Test]
+        public void SetTag_VariantDim_SwapsSiblingNotPoisoning()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            // Start as poisoned + alive.
+            var init = a.AddEntity<McBase, McPoisoned, McAlive>()
+                .Set(new TestInt { Value = 2 })
+                .AssertComplete();
+            a.SubmitEntities();
+
+            // SetTag<Dead> should swap the Alive/Dead variant; Poisoned stays.
+            a.SetTag<McDead>(init.Handle.ToIndex(a));
+            a.SubmitEntities();
+
+            NAssert.AreEqual(1, a.Query().WithTags<McBase, McDead, McPoisoned>().Count());
+            NAssert.AreEqual(0, a.Query().WithTags<McBase, McAlive>().Count());
+        }
+    }
 }

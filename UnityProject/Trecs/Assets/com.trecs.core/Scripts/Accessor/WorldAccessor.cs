@@ -467,6 +467,14 @@ namespace Trecs
 
             AssertCanMakeStructuralChangesToGroup(toGroup);
 
+            // Same-group moves would re-add the entity at a new slot rather
+            // than no-op — short-circuit them. Matters in particular for
+            // AddTag/RemoveTag where the destination can already equal the
+            // source partition (e.g. AddTag<T> on an entity already tagged
+            // with T).
+            if (toGroup == entityIndex.GroupIndex)
+                return;
+
             _structuralOps.MoveTo(entityIndex, toGroup);
 
             AccessRecorder?.OnEntityMoved(_debugName, entityIndex.GroupIndex, toGroup);
