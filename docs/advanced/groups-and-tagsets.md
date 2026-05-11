@@ -23,8 +23,8 @@ Groups come from **templates** registered with the world at build time. Each uni
 
 ```csharp
 // Two templates registered with WorldBuilder:
-//   PlayerEntity : ITagged<Player>, ITagged<Active>
-//   EnemyEntity  : ITagged<Enemy>, ITagged<Active>
+//   PlayerEntity : ITagged<Player, Active>
+//   EnemyEntity  : ITagged<Enemy, Active>
 //
 // → Two groups exist: {Player, Active} and {Enemy, Active}.
 ```
