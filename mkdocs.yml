@@ -60,7 +60,6 @@ nav:
       - Best Practices: guides/best-practices.md
       - Gotchas: guides/gotchas.md
       - Entity Subset Patterns: guides/entity-subset-patterns.md
-      - Debugging & Troubleshooting: guides/debugging.md
   - Advanced:
       - Accessor Roles: advanced/accessor-roles.md
       - Time & RNG: advanced/time-and-rng.md

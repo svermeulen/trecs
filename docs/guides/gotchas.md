@@ -1,6 +1,6 @@
 # Gotchas
 
-Common mistakes, edge cases, and surprises when building with Trecs. Each entry documents what goes wrong, why, and the fix. For the high-level rules, see [Best Practices](best-practices.md); for tooling-driven debugging, see [Debugging & Troubleshooting](debugging.md).
+Common mistakes, edge cases, and surprises when building with Trecs. Each entry documents what goes wrong, why, and the fix. For the high-level rules, see [Best Practices](best-practices.md).
 
 ## `UnityEngine.Random` or `Time.deltaTime` in fixed update
 

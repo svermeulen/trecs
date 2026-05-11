@@ -77,6 +77,12 @@ The generator produces partial-type scaffolding for types that implement these i
 
 The full list of field types `[FromWorld]` can auto-populate is documented at [Advanced Job Features — Supported Field Types](advanced-jobs.md#supported-field-types). At a glance: native component buffers, native component lookups, native set read/write, `NativeWorldAccessor`, and `GroupIndex`.
 
+## Inspecting generated output
+
+When the generator emits code, the output lands in your project's `obj/<Configuration>/<TargetFramework>/generated/` folder. Rider, Visual Studio, and VS Code all expose these files in the Solution Explorer under **Dependencies → Analyzers**. Open the generated file to see exactly what the generator produced for a given `ISystem` / `ITemplate` / aspect.
+
+To enable source-generator timing logs during local debugging, add `SOURCEGEN_TIMING` to the generator's `DefineConstants` in `SourceGen/Trecs.SourceGen/Trecs.SourceGen/Trecs.SourceGen.csproj`. The timings fire to `SourceGenLogger.Log`, which writes to the Unity console.
+
 ## Diagnostics
 
 The generator emits structured diagnostics in the `TRECS001`–`TRECS117` range, grouped by area: ForEach iteration, Aspect, Component, Template, AutoSystem, Iteration helper, Hook migration, Job scheduling, FromWorld, WrapAsJob / AutoJob, SingleEntity, GlobalIndex. Two analyzer-emitted codes — `TRECS110` and `TRECS111` — guard against `NativeUniquePtr` copies.
