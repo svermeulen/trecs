@@ -12,7 +12,7 @@ A high-performance Entity Component System for Unity, built for **deterministic 
 
 </div>
 
-## Why Trecs
+## Features
 
 - **Cache-friendly storage.** Components live in contiguous structure-of-arrays buffers grouped by tag set.
 - **Small surface, lots of leverage.** Aspects bundle component access; sets give sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; `SharedPtr` / `UniquePtr` let components reference heap data.
@@ -20,7 +20,7 @@ A high-performance Entity Component System for Unity, built for **deterministic 
 - **Designed for determinism.** Fixed-timestep simulation, deterministic RNG, isolated input, and built-in snapshot / record / replay with desync detection.
 - **Editor tooling.** A live entity inspector and a record / scrub / fork timeline window for diagnosing transient bugs.
 
-## A taste
+## Quick Start
 
 ```csharp
 // 1. Components — unmanaged structs holding per-entity data

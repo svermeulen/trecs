@@ -9,6 +9,12 @@
   --md-accent-fg-color--transparent: rgba(185, 74, 58, 0.1);
 }
 
+:root,
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --md-typeset-a-color: #2e8b66;
+}
+
 .hero {
   display: flex;
   align-items: center;
