@@ -138,4 +138,63 @@ public class TemplateDefinitionGeneratorTests
 
         Assert.That(run.CompileErrors, Is.Empty, run.Format());
     }
+
+    [Test]
+    public void AbstractTemplate_MirrorsModifierAndPassesIsAbstractTrue()
+    {
+        // C# requires every partial declaration to agree on `abstract`; the generator
+        // must mirror the modifier. Also verifies the runtime Template ctor gets
+        // isAbstract: true so WorldBuilder.AddTemplate can guard at runtime.
+        const string source = """
+            namespace Sample
+            {
+                public abstract partial class AbsBase : Trecs.ITemplate { }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(new TemplateDefinitionGenerator(), source);
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+
+        var tree = string.Join("\n", run.GeneratedTrees);
+        Assert.That(
+            tree,
+            Does.Contain("abstract partial class AbsBase"),
+            "Expected emitted partial to mirror the `abstract` modifier.\n" + run.Format()
+        );
+        Assert.That(
+            tree,
+            Does.Contain("isAbstract: true"),
+            "Expected emitted Template ctor to carry isAbstract: true.\n" + run.Format()
+        );
+    }
+
+    [Test]
+    public void ConcreteTemplate_PassesIsAbstractFalse()
+    {
+        // Sanity check: a non-abstract template still emits isAbstract: false so
+        // WorldBuilder.AddTemplate accepts it.
+        const string source = """
+            namespace Sample
+            {
+                public partial class Concrete : Trecs.ITemplate { }
+            }
+            """;
+
+        var run = GeneratorTestHarness.Run(new TemplateDefinitionGenerator(), source);
+
+        Assert.That(run.CompileErrors, Is.Empty, run.Format());
+
+        var tree = string.Join("\n", run.GeneratedTrees);
+        Assert.That(
+            tree,
+            Does.Contain("isAbstract: false"),
+            "Expected emitted Template ctor to carry isAbstract: false.\n" + run.Format()
+        );
+        Assert.That(
+            tree,
+            Does.Not.Contain("abstract partial class Concrete"),
+            "Non-abstract template should not emit `abstract` modifier.\n" + run.Format()
+        );
+    }
 }

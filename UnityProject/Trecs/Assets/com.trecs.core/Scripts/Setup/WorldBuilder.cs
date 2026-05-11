@@ -64,6 +64,11 @@ namespace Trecs
         public WorldBuilder AddTemplate(Template template)
         {
             Require.That(template != null, "template must not be null");
+            Require.That(
+                !template.IsAbstract,
+                "Template '{}' is marked abstract — abstract templates may only be used as IExtends<> bases. Remove the 'abstract' keyword or register a concrete derived template instead.",
+                template.DebugName
+            );
             _templates.Add(template);
             return this;
         }

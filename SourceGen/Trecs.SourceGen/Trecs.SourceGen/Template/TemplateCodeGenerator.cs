@@ -36,10 +36,12 @@ namespace Trecs.SourceGen.Template
                     var effectiveAccessibility =
                         data.Accessibility == "private" ? "internal" : data.Accessibility;
                     var typeKeyword = data.IsClass ? "class" : "struct";
+                    // C# requires every partial declaration to agree on `abstract` — mirror it here.
+                    var abstractModifier = data.IsAbstract ? "abstract " : "";
 
                     builder.AppendLine(
                         indentLevel,
-                        $"{effectiveAccessibility} partial {typeKeyword} {data.TypeName}"
+                        $"{effectiveAccessibility} {abstractModifier}partial {typeKeyword} {data.TypeName}"
                     );
                     builder.AppendLine(indentLevel, "{");
                     indentLevel++;
@@ -186,7 +188,15 @@ namespace Trecs.SourceGen.Template
             // Inheritance is resolved transitively in WorldInfo.ResolveTemplate.
             sb.AppendLine(
                 argIndent,
-                $"localVariableUpdateOnly: {(data.IsVariableUpdateOnly ? "true" : "false")}"
+                $"localVariableUpdateOnly: {(data.IsVariableUpdateOnly ? "true" : "false")},"
+            );
+
+            // isAbstract — set when the source template class is declared `abstract`.
+            // Such templates may be IExtends<> bases but cannot be passed to
+            // WorldBuilder.AddTemplate (analyzer TRECS039 + runtime guard).
+            sb.AppendLine(
+                argIndent,
+                $"isAbstract: {(data.IsAbstract ? "true" : "false")}"
             );
 
             sb.AppendLine(indentLevel, ");");

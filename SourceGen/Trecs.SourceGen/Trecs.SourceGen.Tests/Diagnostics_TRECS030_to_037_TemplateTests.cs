@@ -309,6 +309,45 @@ public class Diagnostics_TRECS030_to_037_TemplateTests
         AssertNoDiagnostic(source, "TRECS038");
     }
 
+    [Test]
+    public void AbstractTemplate_DoesNotFire_TRECS030_to_038()
+    {
+        // Orthogonality regression: an `abstract` template with the full feature
+        // surface (fields, ITagged, IExtends, IPartitionedBy, [VariableUpdateOnly])
+        // must not trip any of the template-shape diagnostics. TRECS039 fires only
+        // at the call site, not at the definition.
+        const string source = """
+            namespace Sample
+            {
+                public partial struct CPos : Trecs.IEntityComponent { public float X; }
+                public struct TBase : Trecs.ITag { }
+                public struct TIdle : Trecs.ITag { }
+                public struct THunt : Trecs.ITag { }
+
+                [Trecs.VariableUpdateOnly]
+                public abstract partial class AbsBase
+                    : Trecs.ITemplate,
+                      Trecs.ITagged<TBase>,
+                      Trecs.IPartitionedBy<TIdle, THunt>
+                {
+                    CPos Position;
+                }
+
+                public partial class ConcreteChild : Trecs.ITemplate, Trecs.IExtends<AbsBase> { }
+            }
+            """;
+
+        AssertNoDiagnostic(source, "TRECS030");
+        AssertNoDiagnostic(source, "TRECS031");
+        AssertNoDiagnostic(source, "TRECS032");
+        AssertNoDiagnostic(source, "TRECS033");
+        AssertNoDiagnostic(source, "TRECS034");
+        AssertNoDiagnostic(source, "TRECS035");
+        AssertNoDiagnostic(source, "TRECS036");
+        AssertNoDiagnostic(source, "TRECS037");
+        AssertNoDiagnostic(source, "TRECS038");
+    }
+
     static void AssertDiagnostic(string source, string expectedId)
     {
         var run = GeneratorTestHarness.Run(

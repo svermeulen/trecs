@@ -29,6 +29,7 @@ namespace Trecs.SourceGen.Template
             var accessibility = SymbolAnalyzer.GetAccessibilityModifier(symbol);
             var containingTypes = SymbolAnalyzer.GetContainingTypeChain(symbol).ToImmutableArray();
             var isClass = symbol.TypeKind == TypeKind.Class;
+            var isAbstract = symbol.IsAbstract;
 
             var tagTypeNames = ExtractTagTypeNames(symbol);
             var baseTemplateTypeNames = ExtractBaseTemplateTypeNames(symbol);
@@ -46,6 +47,7 @@ namespace Trecs.SourceGen.Template
                 namespaceName,
                 accessibility,
                 isClass,
+                isAbstract,
                 isGlobals,
                 isVariableUpdateOnly,
                 containingTypes,

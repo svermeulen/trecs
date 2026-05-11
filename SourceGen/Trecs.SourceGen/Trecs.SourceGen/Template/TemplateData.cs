@@ -70,6 +70,7 @@ namespace Trecs.SourceGen.Template
         public string NamespaceName { get; }
         public string Accessibility { get; }
         public bool IsClass { get; }
+        public bool IsAbstract { get; }
         public bool IsGlobals { get; }
         public bool IsVariableUpdateOnly { get; }
         public ImmutableArray<string> ContainingTypes { get; }
@@ -83,6 +84,7 @@ namespace Trecs.SourceGen.Template
             string namespaceName,
             string accessibility,
             bool isClass,
+            bool isAbstract,
             bool isGlobals,
             bool isVariableUpdateOnly,
             ImmutableArray<string> containingTypes,
@@ -96,6 +98,7 @@ namespace Trecs.SourceGen.Template
             NamespaceName = namespaceName;
             Accessibility = accessibility;
             IsClass = isClass;
+            IsAbstract = isAbstract;
             IsGlobals = isGlobals;
             IsVariableUpdateOnly = isVariableUpdateOnly;
             ContainingTypes = containingTypes;

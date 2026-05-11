@@ -18,7 +18,8 @@ namespace Trecs
             IReadOnlyList<IComponentDeclaration> localComponentDeclarations,
             IReadOnlyList<Tag> localTags,
             bool localVariableUpdateOnly = false,
-            IReadOnlyList<TagSet> dimensions = null
+            IReadOnlyList<TagSet> dimensions = null,
+            bool isAbstract = false
         )
         {
             DebugName = debugName;
@@ -28,6 +29,7 @@ namespace Trecs
             Partitions = partitions;
             Dimensions = dimensions ?? Array.Empty<TagSet>();
             LocalVariableUpdateOnly = localVariableUpdateOnly;
+            IsAbstract = isAbstract;
         }
 
         /// <summary>
@@ -73,5 +75,12 @@ namespace Trecs
         /// Component declarations defined directly on this template (not inherited).
         /// </summary>
         public IReadOnlyList<IComponentDeclaration> LocalComponentDeclarations { get; }
+
+        /// <summary>
+        /// True when the source template class is declared <c>abstract</c>. Abstract templates
+        /// may appear as <c>IExtends&lt;&gt;</c> bases of concrete templates, but they cannot be
+        /// passed to <see cref="WorldBuilder.AddTemplate"/> — that throws.
+        /// </summary>
+        public bool IsAbstract { get; }
     }
 }

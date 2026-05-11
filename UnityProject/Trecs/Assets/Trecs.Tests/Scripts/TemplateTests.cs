@@ -160,6 +160,82 @@ namespace Trecs.Tests
 
         #endregion
 
+        #region Abstract
+
+        [Test]
+        public void Template_DefaultsToNonAbstract()
+        {
+            var t = new Template(
+                debugName: "PlainTemplate",
+                localBaseTemplates: Array.Empty<Template>(),
+                partitions: Array.Empty<TagSet>(),
+                localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
+                localTags: new Tag[] { TestTags.Alpha }
+            );
+
+            NAssert.IsFalse(t.IsAbstract);
+        }
+
+        [Test]
+        public void Template_IsAbstract_SetsFlag()
+        {
+            var t = new Template(
+                debugName: "AbstractTemplate",
+                localBaseTemplates: Array.Empty<Template>(),
+                partitions: Array.Empty<TagSet>(),
+                localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
+                localTags: new Tag[] { TestTags.Alpha },
+                isAbstract: true
+            );
+
+            NAssert.IsTrue(t.IsAbstract);
+        }
+
+        [Test]
+        public void WorldBuilder_AddTemplate_AbstractTemplate_Throws()
+        {
+            var t = new Template(
+                debugName: "AbsT",
+                localBaseTemplates: Array.Empty<Template>(),
+                partitions: Array.Empty<TagSet>(),
+                localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
+                localTags: new Tag[] { TestTags.Alpha },
+                isAbstract: true
+            );
+
+            var wb = new WorldBuilder();
+
+            var ex = NAssert.Throws<TrecsException>(() => wb.AddTemplate(t));
+            NAssert.That(ex.Message, Does.Contain("AbsT"));
+            NAssert.That(ex.Message, Does.Contain("abstract"));
+        }
+
+        [Test]
+        public void WorldBuilder_AddTemplates_AbstractInList_Throws()
+        {
+            var abs = new Template(
+                debugName: "AbsT",
+                localBaseTemplates: Array.Empty<Template>(),
+                partitions: Array.Empty<TagSet>(),
+                localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
+                localTags: new Tag[] { TestTags.Alpha },
+                isAbstract: true
+            );
+            var con = new Template(
+                debugName: "ConT",
+                localBaseTemplates: Array.Empty<Template>(),
+                partitions: Array.Empty<TagSet>(),
+                localComponentDeclarations: Array.Empty<IComponentDeclaration>(),
+                localTags: new Tag[] { TestTags.Beta }
+            );
+
+            var wb = new WorldBuilder();
+
+            NAssert.Throws<TrecsException>(() => wb.AddTemplates(new[] { con, abs }));
+        }
+
+        #endregion
+
         #region Defaults
 
         [Test]

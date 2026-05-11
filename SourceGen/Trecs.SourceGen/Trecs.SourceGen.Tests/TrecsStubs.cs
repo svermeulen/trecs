@@ -687,7 +687,8 @@ internal static class TrecsStubs
                     IComponentDeclaration[] localComponentDeclarations,
                     Tag[] localTags,
                     bool localVariableUpdateOnly = false,
-                    TagSet[] dimensions = null
+                    TagSet[] dimensions = null,
+                    bool isAbstract = false
                 ) { }
             }
 
@@ -762,6 +763,8 @@ internal static class TrecsStubs
                 public WorldBuilder AddInterpolatedPreviousSaver<T>(InterpolatedPreviousSaver<T> saver)
                     where T : unmanaged, IEntityComponent => this;
                 public WorldBuilder AddSystem(ISystem system) => this;
+                public WorldBuilder AddTemplate(Template template) => this;
+                public WorldBuilder AddTemplates(System.Collections.Generic.IEnumerable<Template> templates) => this;
             }
         }
 

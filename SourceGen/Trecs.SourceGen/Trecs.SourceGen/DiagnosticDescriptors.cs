@@ -201,7 +201,7 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
-        // Template diagnostics (TRECS030-038; 039 unused)
+        // Template diagnostics (TRECS030-039)
 
         public static readonly DiagnosticDescriptor TemplateMustBePartial = new(
             id: "TRECS030",
@@ -281,6 +281,15 @@ namespace Trecs.SourceGen
             messageFormat: "Template '{0}' generates {1} partitions across {2} dimensions ({3}). Each partition is a distinct group with its own per-component buffer. Past ~16 partitions consider sets — they don't multiply. See docs/guides/entity-subset-patterns.md.",
             category: TrecsCategory,
             DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor AddAbstractTemplate = new(
+            id: "TRECS039",
+            title: "Cannot register an abstract template",
+            messageFormat: "Template '{0}' is declared abstract and cannot be passed to WorldBuilder.AddTemplate / AddTemplates. Abstract templates may only be used as IExtends<> bases. Remove the 'abstract' keyword from '{0}', or register a concrete derived template instead.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
             isEnabledByDefault: true
         );
 
