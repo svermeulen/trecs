@@ -429,11 +429,11 @@ namespace Trecs
             where T : struct, ITag => SetTag<T>(GetEntityIndex(entityHandle));
 
         /// <summary>
-        /// Burst-side equivalent of <see cref="WorldAccessor.RemoveTag{T}(EntityIndex)"/>.
+        /// Burst-side equivalent of <see cref="WorldAccessor.UnsetTag{T}(EntityIndex)"/>.
         /// Sentinel <c>-3</c>; resolved at submit time.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal readonly void RemoveTag<T>(EntityIndex entityIndex)
+        internal readonly void UnsetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertStructuralChangesAllowed();
@@ -445,8 +445,8 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void RemoveTag<T>(EntityHandle entityHandle)
-            where T : struct, ITag => RemoveTag<T>(GetEntityIndex(entityHandle));
+        public readonly void UnsetTag<T>(EntityHandle entityHandle)
+            where T : struct, ITag => UnsetTag<T>(GetEntityIndex(entityHandle));
 
         // ── Entity Reference Resolution ─────────────────────────────
 

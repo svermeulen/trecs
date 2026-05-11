@@ -469,7 +469,7 @@ namespace Trecs
 
             // Same-group moves would re-add the entity at a new slot rather
             // than no-op — short-circuit them. Matters in particular for
-            // SetTag/RemoveTag where the destination can already equal the
+            // SetTag/UnsetTag where the destination can already equal the
             // source partition (e.g. SetTag<T> on an entity already tagged
             // with T).
             if (toGroup == entityIndex.GroupIndex)
@@ -554,10 +554,10 @@ namespace Trecs
         /// dimensions there is no "absent" partition — use
         /// <see cref="SetTag{T}(EntityIndex)"/> to switch variants instead.
         /// </summary>
-        internal void RemoveTag<T>(EntityIndex entityIndex)
+        internal void UnsetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
-            var newTagSet = _worldInfo.ResolveRemoveTagDestination(
+            var newTagSet = _worldInfo.ResolveUnsetTagDestination(
                 entityIndex.GroupIndex,
                 Tag<T>.Value
             );
@@ -566,8 +566,8 @@ namespace Trecs
             MoveTo(entityIndex, newTagSet);
         }
 
-        public void RemoveTag<T>(EntityHandle entityHandle)
-            where T : struct, ITag => RemoveTag<T>(entityHandle.ToIndex(_world));
+        public void UnsetTag<T>(EntityHandle entityHandle)
+            where T : struct, ITag => UnsetTag<T>(entityHandle.ToIndex(_world));
 
         /// <summary>
         /// Schedules removal of an entity. The removal is deferred until the next entity submission.

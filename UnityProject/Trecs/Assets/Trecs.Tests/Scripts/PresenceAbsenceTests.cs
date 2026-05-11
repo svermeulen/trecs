@@ -80,7 +80,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void RemoveTag_MovesPresentEntityToAbsent()
+        public void UnsetTag_MovesPresentEntityToAbsent()
         {
             using var env = CreateEnv();
             var a = env.Accessor;
@@ -90,7 +90,7 @@ namespace Trecs.Tests
                 .AssertComplete();
             a.SubmitEntities();
 
-            a.RemoveTag<PaPresent>(init.Handle.ToIndex(a));
+            a.UnsetTag<PaPresent>(init.Handle.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.Query().WithTags<PaBase, PaPresent>().Count());
@@ -98,7 +98,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void RemoveTag_OnAlreadyAbsent_IsIdempotent()
+        public void UnsetTag_OnAlreadyAbsent_IsIdempotent()
         {
             using var env = CreateEnv();
             var a = env.Accessor;
@@ -106,8 +106,8 @@ namespace Trecs.Tests
             var init = a.AddEntity<PaBase>().Set(new TestInt { Value = 5 }).AssertComplete();
             a.SubmitEntities();
 
-            // RemoveTag when already absent should be a no-op move (same destination group).
-            a.RemoveTag<PaPresent>(init.Handle.ToIndex(a));
+            // UnsetTag when already absent should be a no-op move (same destination group).
+            a.UnsetTag<PaPresent>(init.Handle.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(1, a.Query().WithTags<PaBase>().WithoutTags<PaPresent>().Count());
@@ -116,7 +116,7 @@ namespace Trecs.Tests
     }
 
     // Multi-dim cross-product test: one presence/absence dim + one binary-variant
-    // dim. Yields 4 partitions; SetTag/RemoveTag on either dim preserves the
+    // dim. Yields 4 partitions; SetTag/UnsetTag on either dim preserves the
     // other.
     public struct McBase : ITag { }
 
@@ -150,7 +150,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void RemoveTag_PreservesOtherDimension()
+        public void UnsetTag_PreservesOtherDimension()
         {
             using var env = CreateEnv();
             var a = env.Accessor;
@@ -161,8 +161,8 @@ namespace Trecs.Tests
                 .AssertComplete();
             a.SubmitEntities();
 
-            // RemoveTag<Poisoned> should toggle just the poisoned dim, keeping McAlive.
-            a.RemoveTag<McPoisoned>(init.Handle.ToIndex(a));
+            // UnsetTag<Poisoned> should toggle just the poisoned dim, keeping McAlive.
+            a.UnsetTag<McPoisoned>(init.Handle.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(1, a.Query().WithTags<McBase, McAlive>().WithoutTags<McPoisoned>().Count());

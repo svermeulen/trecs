@@ -83,7 +83,7 @@ namespace Trecs
     /// <summary>
     /// Declares a presence/absence partition dimension: the entity is either tagged with
     /// <typeparamref name="T1"/> or not, with the two cases stored in separate partitions.
-    /// Use <c>SetTag&lt;T1&gt;</c> / <c>RemoveTag&lt;T1&gt;</c> to switch. Query the absent
+    /// Use <c>SetTag&lt;T1&gt;</c> / <c>UnsetTag&lt;T1&gt;</c> to switch. Query the absent
     /// partition with <c>[ForEachEntity(..., Without = typeof(T1))]</c>.
     /// </summary>
     public interface IPartitionedBy<T1>

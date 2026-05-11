@@ -54,7 +54,7 @@ public partial class EnemyEntity : ITemplate,
 }
 
 // Transition (from inside an Execute)
-entity.RemoveTag<GameTags.Alive>(World);   // → dead
+entity.UnsetTag<GameTags.Alive>(World);   // → dead
 
 // Iterate only living enemies
 [ForEachEntity(typeof(GameTags.Enemy), typeof(GameTags.Alive))]

@@ -44,7 +44,7 @@ namespace Trecs.Samples.Partitions
                 ball.Velocity = float3.zero;
                 ball.RestTimer = 2f + World.Rng.Next() * 3f; // rest 2-5 seconds
 
-                ball.RemoveTag<BallTags.Active>(World);
+                ball.UnsetTag<BallTags.Active>(World);
             }
         }
 

@@ -60,8 +60,8 @@ namespace Trecs.Internal
             where T : struct, ITag => world.SetTag<T>(entityIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RemoveTag<T>(this in NativeWorldAccessor world, EntityIndex entityIndex)
-            where T : struct, ITag => world.RemoveTag<T>(entityIndex);
+        public static void UnsetTag<T>(this in NativeWorldAccessor world, EntityIndex entityIndex)
+            where T : struct, ITag => world.UnsetTag<T>(entityIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TryGetEntityIndex(

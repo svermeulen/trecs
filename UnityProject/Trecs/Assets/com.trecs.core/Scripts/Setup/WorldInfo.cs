@@ -557,16 +557,16 @@ namespace Trecs
 
         /// <summary>
         /// Resolves the destination <see cref="TagSet"/> for a tag-remove operation
-        /// (<c>RemoveTag&lt;T&gt;</c>): finds the presence/absence dimension whose
+        /// (<c>UnsetTag&lt;T&gt;</c>): finds the presence/absence dimension whose
         /// only variant is <paramref name="tagToRemove"/> and returns the source
         /// group's tags with that variant stripped. Throws if
         /// <paramref name="tagToRemove"/> is in a multi-variant dimension — there
         /// is no defined "absent" partition there; use <c>SetTag</c> to switch
         /// variants instead.
         /// </summary>
-        public TagSet ResolveRemoveTagDestination(GroupIndex from, Tag tagToRemove)
+        public TagSet ResolveUnsetTagDestination(GroupIndex from, Tag tagToRemove)
         {
-            Assert.That(!from.IsNull, "Cannot resolve RemoveTag from null group");
+            Assert.That(!from.IsNull, "Cannot resolve UnsetTag from null group");
             var template = GetResolvedTemplateForGroup(from);
             var currentTags = ToTagSet(from);
 
@@ -577,7 +577,7 @@ namespace Trecs
                     if (dim.Tags.Count != 1)
                     {
                         throw Assert.CreateException(
-                            "Cannot RemoveTag<{}>: it is a variant in a multi-variant dimension on template {}. Use SetTag to switch variants.",
+                            "Cannot UnsetTag<{}>: it is a variant in a multi-variant dimension on template {}. Use SetTag to switch variants.",
                             tagToRemove,
                             template.DebugName
                         );
@@ -619,7 +619,7 @@ namespace Trecs
         }
 
         // Builds a TagSet equal to <paramref name="current"/> with every tag from
-        // <paramref name="dim"/> stripped. Used by RemoveTag on presence/absence
+        // <paramref name="dim"/> stripped. Used by UnsetTag on presence/absence
         // dims; for those, stripping the dim's only variant leaves the entity in
         // the absent partition.
         static TagSet RemoveDimensionTags(TagSet current, TagSet dim)

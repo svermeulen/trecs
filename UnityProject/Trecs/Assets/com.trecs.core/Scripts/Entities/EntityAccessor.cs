@@ -116,8 +116,8 @@ namespace Trecs
         /// dimensions.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveTag<T>()
-            where T : struct, ITag => _world.RemoveTag<T>(_entityIndex);
+        public void UnsetTag<T>()
+            where T : struct, ITag => _world.UnsetTag<T>(_entityIndex);
 
         // ── Input ─────────────────────────────────────────────────────
 

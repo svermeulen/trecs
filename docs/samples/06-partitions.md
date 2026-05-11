@@ -56,7 +56,7 @@ void Execute(in ActiveBall ball)
     {
         ball.Velocity = float3.zero;
         ball.RestTimer = 2f + World.Rng.Next() * 3f; // rest 2-5 seconds
-        ball.RemoveTag<BallTags.Active>(World);
+        ball.UnsetTag<BallTags.Active>(World);
     }
 }
 
@@ -117,7 +117,7 @@ public partial class BallRendererSystem : ISystem
 ## Concepts introduced
 
 - **`IPartitionedBy<T>`** declares a presence/absence partition dimension on a template. See [Templates](../core/templates.md) and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).
-- **`SetTag<T>()` / `RemoveTag<T>()`** transition entities between partitions by toggling the tag. See [Structural Changes](../entity-management/structural-changes.md).
+- **`SetTag<T>()` / `UnsetTag<T>()`** transition entities between partitions by toggling the tag. See [Structural Changes](../entity-management/structural-changes.md).
 - **`Without = typeof(T)`** queries the absent partition. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 - **Partition-filtered iteration** — systems iterate only entities in a specific partition. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 - **Group separation** — Active and Resting balls live in separate contiguous arrays for cache-friendly iteration.
