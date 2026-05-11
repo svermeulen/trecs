@@ -1,12 +1,12 @@
 # 10 — Pointers
 
-Using heap pointers to store managed data (classes, lists, arrays) that can't live in unmanaged components.
+Heap pointers for managed data (classes, lists, arrays) that can't live in unmanaged components.
 
 **Source:** `com.trecs.core/Samples~/Tutorials/10_Pointers/`
 
 ## What it does
 
-Entities follow shared patrol routes (displayed as waypoints). Each entity has its own trail history (displayed as a LineRenderer). Multiple entities share the same route data via `SharedPtr`, while each has a unique trail via `UniquePtr`.
+Entities follow shared patrol routes (waypoints). Each has its own trail history (a LineRenderer). Multiple entities share route data via `SharedPtr`; each has a unique trail via `UniquePtr`.
 
 ## Schema
 
@@ -27,7 +27,7 @@ public class TrailHistory
 }
 ```
 
-These contain `List<T>` — managed types that can't be stored directly in components.
+These hold `List<T>` — managed types that can't live directly in components.
 
 ### Components
 
@@ -46,7 +46,7 @@ public partial struct Trail : IEntityComponent
 
 ## Allocation
 
-`SharedPtr` and `UniquePtr` require a blob store. The sample uses the in-memory store, but a disk-backed store is also available — see [Heap](../advanced/heap.md):
+`SharedPtr` and `UniquePtr` need a blob store. The sample uses the in-memory store; a disk-backed store is also available — see [Heap](../advanced/heap.md):
 
 ```csharp
 .AddBlobStore(new BlobStoreInMemory(
@@ -55,7 +55,7 @@ public partial struct Trail : IEntityComponent
 
 ### SharedPtr — shared route data
 
-`AllocShared` returns a handle with refcount 1. `Clone` increments the count; each entity stores its own clone. Once spawning is done the original is disposed, leaving the entity clones to keep the underlying object alive:
+`AllocShared` returns a handle with refcount 1. `Clone` increments the count; each entity stores its own clone. After spawning, the original is disposed — the entity clones keep the object alive:
 
 ```csharp
 var routePtr = world.Heap.AllocShared(new PatrolRoute { /* ... */ });
@@ -77,13 +77,13 @@ routePtr.Dispose(world);
 var trailPtr = world.Heap.AllocUnique(new TrailHistory { MaxLength = 50 });
 ```
 
-Each entity gets its own `UniquePtr` — the data is not shared and is mutated freely by the owning entity.
+Each entity owns its `UniquePtr` — not shared, mutated freely by the owner.
 
 ## Systems
 
 ### PatrolMovementSystem
 
-Reads the shared route and unique trail:
+Reads the shared route and the unique trail:
 
 ```csharp
 [ForEachEntity(MatchByComponents = true)]
@@ -113,7 +113,7 @@ void Execute(ref Position position, in Route route, in Trail trail)
 
 ## Cleanup
 
-Pointers must be disposed when entities are removed. Range-based `OnRemoved` hands back a `GroupIndex` and the index range within that group; reconstructing the per-entity index lets us read each component before storage is freed:
+Pointers must be disposed when entities are removed. Range-based `OnRemoved` provides a `GroupIndex` and an index range; reconstructing the per-entity index reads each component before storage is freed:
 
 ```csharp
 using Trecs.Internal; // EntityIndex lives here — used at this layer only.
@@ -139,8 +139,8 @@ world.Events.EntitiesWithTags<PatrolTags.Follower>()
 
 - **`SharedPtr<T>`** — reference-counted pointer for shared managed data. See [Heap](../advanced/heap.md).
 - **`UniquePtr<T>`** — single-owner pointer for per-entity managed data.
-- **`Clone()`** — increments the ref count on a `SharedPtr`.
-- **`Dispose()`** — decrements ref count (shared) or returns to pool (unique).
-- **`Get(world)`** — dereferences a pointer to access the underlying object.
-- **Cleanup handlers** — dispose pointers when entities are removed to prevent leaks. See [Heap Allocation Rules](../advanced/heap-allocation-rules.md) and [Entity Events](../entity-management/entity-events.md).
+- **`Clone()`** — increments the `SharedPtr` ref count.
+- **`Dispose()`** — decrements the ref count (shared) or returns to the pool (unique).
+- **`Get(world)`** — dereferences a pointer.
+- **Cleanup handlers** — dispose pointers on entity removal to prevent leaks. See [Heap Allocation Rules](../advanced/heap-allocation-rules.md) and [Entity Events](../entity-management/entity-events.md).
 - For Burst-compatible variants used inside jobs, see [Native Pointers](14-native-pointers.md).

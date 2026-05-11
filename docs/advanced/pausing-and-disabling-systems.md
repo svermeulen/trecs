@@ -1,6 +1,6 @@
 # Pausing and Disabling Systems
 
-Trecs provides two independent mechanisms for skipping a system's `Execute()` on a tick. They have different determinism guarantees, are exposed on different surfaces, and are intended for different problems.
+Trecs provides two independent mechanisms for skipping a system's `Execute()` on a tick. They differ in determinism guarantees, surface, and intent.
 
 | | Channel disable | Paused |
 |---|---|---|
@@ -13,7 +13,7 @@ A system runs on a tick **iff** no channel has it disabled **and** it is not pau
 
 ## Channels — non-deterministic toggles
 
-Each system has an independent disable bit per `EnableChannel`. Different concerns own different channels and can never clobber each other:
+Each system has an independent disable bit per `EnableChannel`. Different concerns own different channels and can't clobber each other:
 
 ```csharp
 public enum EnableChannel
@@ -32,13 +32,13 @@ accessor.SetSystemEnabled(systemIndex, EnableChannel.User, true);   // re-enable
 bool enabled = accessor.IsSystemEnabled(systemIndex, EnableChannel.User);
 ```
 
-Channel state defaults to "all enabled" at world init and is **not part of snapshot/restore or recording state**. This is likely to cause desyncs.
+Channel state defaults to "all enabled" at world init and is **not part of snapshot/restore or recording state** — using it for simulation-affecting pauses will desync.
 
 ## SetSystemPaused — deterministic pause
 
-`SetSystemPaused` is a per-system flag that **is** part of serialized world state, so it survives snapshot/restore and round-trips through recording playback. Use it for any pause that affects the simulation and must replay identically (eg. pausing for UI menu popup).
+`SetSystemPaused` is a per-system flag that **is** part of serialized world state, so it survives snapshot/restore and round-trips through recording playback. Use it for any pause that affects the simulation and must replay identically (e.g. UI menu popup).
 
-Called from inside a system or from initialization code, via `WorldAccessor`:
+Called from a system or initialization code via `WorldAccessor`:
 
 ```csharp
 accessor.SetSystemPaused(systemIndex, true);
@@ -46,11 +46,11 @@ accessor.SetSystemPaused(systemIndex, false);
 bool paused = accessor.IsSystemPaused(systemIndex);
 ```
 
-Like other deterministic-state mutations, this must be called from a context that can mutate fixed state — i.e., from a fixed-update system, a reactive event handler, or initialization. Calling from a variable / input system asserts.
+Like other deterministic-state mutations, this requires a context that can mutate fixed state — a fixed-update system, a reactive event handler, or initialization. Calling from a variable / input system asserts.
 
 ## Combined query
 
-For debug UIs and tests, `IsSystemEffectivelyEnabled` answers "would this system run on the next tick" — `true` iff no channel disabled and not paused. Available on both `World` and `WorldAccessor`:
+`IsSystemEffectivelyEnabled` answers "would this system run on the next tick" — `true` iff no channel disabled and not paused. Available on both `World` and `WorldAccessor`:
 
 ```csharp
 bool willRun = world.IsSystemEffectivelyEnabled(systemIndex);
@@ -58,7 +58,7 @@ bool willRun = world.IsSystemEffectivelyEnabled(systemIndex);
 
 ## Building your own grouping
 
-Trecs deliberately doesn't have a built-in `[SystemGroup]` concept to do a bulk pause/unpause. Instead, the framework exposes the per-system metadata you need to build whatever grouping makes sense for your game (also available on both `World` and `WorldAccessor`):
+Trecs has no built-in `[SystemGroup]` for bulk pause/unpause. The framework exposes per-system metadata so you can build whatever grouping fits your game (on `World` and `WorldAccessor`):
 
 ```csharp
 int count = world.SystemCount;

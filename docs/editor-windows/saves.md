@@ -1,8 +1,8 @@
 # Trecs Saves Window
 
-The **Trecs Saves** window is the library view for everything you've saved to disk: both **recordings** (time-range scrubbable buffers) and **snapshots** (single-frame world states). The [Player](player.md) owns the active recording's transport and the in-flight Save/Load convenience entries; this window owns library management — browse, search, rename, reveal in Finder, multi-select delete, save-as-new.
+The **Trecs Saves** window is the library view for everything saved to disk: **recordings** (scrubbable time-range buffers) and **snapshots** (single-frame world states). The [Player](player.md) owns the active recording's transport and in-flight Save/Load entries; this window handles library management — browse, search, rename, reveal in Finder, multi-select delete, save-as-new.
 
-**To open it:** `Window > Trecs > Saves`. Worlds appear in the dropdown automatically once they call `WorldBuilder.Build()`.
+**To open it:** `Window > Trecs > Saves`. Worlds appear in the dropdown once they call `WorldBuilder.Build()`.
 
 !!! warning "Screenshot pending: `images/saves-overview.png`"
     Whole window with the world dropdown, search field, and both sections (Recordings, Snapshots) populated. At least one recording row should have the "loaded in Player" highlight (bold name + left accent stripe). FeedingFrenzy or Snake sample, light theme.
@@ -25,26 +25,24 @@ The **Trecs Saves** window is the library view for everything you've saved to di
 | **+ Save as new… row** | Trailing row in each section that prompts for a new name. |
 | **Status line** | Shows the result of the last action; auto-clears after a few seconds. |
 
-The recording **Size** column hides when the window gets narrow — Duration is the more useful measure for picking a recording to load, and the size remains in the row's tooltip.
+The recording **Size** column hides when the window gets narrow — Duration is more useful for picking a recording, and size remains in the row's tooltip.
 
 ## Recording rows
 
-A recording row shows everything you need to pick which session to replay:
-
 | Column | What it shows |
 |---|---|
-| Name | The saved-recording name. Bold when this recording is currently loaded in the [Player](player.md). |
+| Name | The saved-recording name. Bold when loaded in the [Player](player.md). |
 | Duration | Total simulated time. Tooltip: frame count and tick rate. |
 | Size | On-disk size. Hidden when the window is narrow. |
 | Saved | Relative time (e.g. `5m ago`, `3d ago`); tooltip shows the absolute timestamp. |
 | Load | Loads this recording into the Player for the selected world. Disabled when no world is active. |
 | ⋮ | Per-row menu (see [Per-row menu](#per-row-menu)). |
 
-The row currently loaded in the Player gets a **blue left accent stripe** and a bold name, so you can spot it at a glance. Selecting that row keeps the stripe; only the fill colour changes.
+The row loaded in the Player gets a **blue left accent stripe** and a bold name. Selecting that row keeps the stripe; only the fill colour changes.
 
 ## Snapshot rows
 
-Snapshot rows are a simpler shape — a snapshot is a single frame, so there's no duration:
+A snapshot is a single frame, so there's no duration:
 
 | Column | What it shows |
 |---|---|
@@ -56,7 +54,7 @@ Snapshot rows are a simpler shape — a snapshot is a single frame, so there's n
 
 ## Search
 
-The search field at the top filters both sections by case-insensitive substring match against the name. Empty query shows everything. Clearing the search restores the full list.
+The search field filters both sections by case-insensitive substring match against the name. Empty query shows everything.
 
 ## Selection and bulk actions
 
@@ -83,7 +81,7 @@ When at least one row is selected, a **selection toolbar** appears above the lis
 
 ## Per-row menu
 
-Each row has a kebab (⋮) button that opens a per-row menu. Right-clicking the row opens the same menu at the cursor.
+Each row's kebab (⋮) button opens a per-row menu. Right-clicking the row opens the same menu at the cursor.
 
 | Entry | Notes |
 |---|---|
@@ -95,15 +93,15 @@ Each row has a kebab (⋮) button that opens a per-row menu. Right-clicking the 
 
 ## Save as new
 
-The trailing **+ Save current recording as new…** row in the Recordings section prompts for a name and writes the live in-memory buffer to disk under that name. **+ Capture snapshot as new…** in the Snapshots section captures the current frame as a new snapshot. Both rows are disabled when no world is active or (for recordings) when the recorder has no buffer.
+The trailing **+ Save current recording as new…** row prompts for a name and writes the live in-memory buffer to disk. **+ Capture snapshot as new…** captures the current frame as a new snapshot. Both are disabled when no world is active or (for recordings) when the recorder has no buffer.
 
 ## On-disk locations
 
-Recordings and snapshots both live under the project's `Library/` folder, namespaced by Trecs. See [`TrecsPaths`](../advanced/binary-format.md) for the exact paths and the [Binary Format](../advanced/binary-format.md) page for the on-disk layout.
+Recordings and snapshots live under the project's `Library/` folder, namespaced by Trecs. See [`TrecsPaths`](../advanced/binary-format.md) for the exact paths and the [Binary Format](../advanced/binary-format.md) page for the on-disk layout.
 
 ## Multi-world
 
-In a multi-world scene the dropdown selects which world a Save / Capture / Load operates on. Save/Capture pulls state from that world; Load applies the file to that world's controller. Selection state in the list is independent of the world selector.
+The dropdown selects which world a Save / Capture / Load operates on. Save/Capture pulls state from that world; Load applies the file to that world's controller. List selection is independent of the world selector.
 
 ## See also
 

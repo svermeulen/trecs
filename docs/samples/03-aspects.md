@@ -1,12 +1,12 @@
 # 03 — Aspects
 
-Bundled component access via aspects. Instead of declaring individual component parameters, aspects group related read/write operations into a single reusable struct.
+Aspects group related read/write component operations into a single reusable struct, instead of listing individual component parameters.
 
 **Source:** `com.trecs.core/Samples~/Tutorials/03_Aspects/`
 
 ## What it does
 
-Boids (simple agents) move in straight lines and wrap around the edges of a bounded area. Their GameObjects are rotated to face the direction of movement.
+Boids move in straight lines and wrap around a bounded area, rotated to face their movement direction.
 
 ## Schema
 
@@ -32,7 +32,7 @@ public partial class BoidEntity : ITemplate, ITagged<SampleTags.Boid>
 
 ### BoidMovementSystem
 
-Defines an aspect and uses it for iteration:
+Defines an aspect and iterates over it:
 
 ```csharp
 public partial class BoidMovementSystem : ISystem
@@ -57,7 +57,7 @@ The `Boid` aspect provides:
 
 ### BoidWrapSystem
 
-Wraps boids that go out of bounds. Uses `[ExecuteAfter]` to run after movement:
+Wraps boids that go out of bounds. `[ExecuteAfter]` ensures it runs after movement:
 
 ```csharp
 [ExecuteAfter(typeof(BoidMovementSystem))]
@@ -87,7 +87,7 @@ public partial class BoidWrapSystem : ISystem
 
 ### BoidRendererSystem (variable update)
 
-Reads position and velocity to update the GameObject transform and face the movement direction.
+Reads position and velocity, then updates the GameObject transform to face the movement direction.
 
 ## Concepts introduced
 

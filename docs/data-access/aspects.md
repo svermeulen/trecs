@@ -1,6 +1,6 @@
 # Aspects
 
-An aspect is a `partial struct` that bundles related component access into one reusable view. You declare which components the aspect reads and writes; the source generator emits the per-component access properties.
+An aspect is a `partial struct` that bundles related component access into one reusable view. Declare which components it reads and writes; the source generator emits the access properties.
 
 ## Defining an aspect
 
@@ -14,7 +14,7 @@ This generates:
 - `ref readonly float Speed` (read-only, unwrapped)
 - `ref float3 Position` (read-write, unwrapped)
 
-Aspects also pick up extension methods from `AspectExtensions`: `aspect.Handle(World)` to resolve the iterated entity to a stable `EntityHandle`, `aspect.Entity(World)` for an `EntityAccessor`, and `aspect.Remove(World)` / `aspect.MoveTo<…>(World)` for structural ops. The handle / native variants also work inside Burst jobs by passing a `NativeWorldAccessor`.
+Aspects also pick up extension methods from `AspectExtensions`: `aspect.Handle(World)` resolves the iterated entity to a stable `EntityHandle`, `aspect.Entity(World)` returns an `EntityAccessor`, and `aspect.Remove(World)` / `aspect.MoveTo<…>(World)` perform structural ops. The handle / native variants also work inside Burst jobs by passing a `NativeWorldAccessor`.
 
 A component marked `[Unwrap]` (single-field struct) exposes its inner value through the property. Without `[Unwrap]`, the property returns the wrapping struct (`ref Position` instead of `ref float3`).
 
@@ -33,7 +33,7 @@ public partial class BoidMovementSystem : ISystem
 }
 ```
 
-The aspect is passed `in`. The struct itself is read-only, but `IWrite` properties still return mutable refs to the underlying components.
+The aspect is passed `in`. The struct is read-only, but `IWrite` properties still return mutable refs to the underlying components.
 
 ## Multiple `IRead` / `IWrite` interfaces
 
@@ -75,7 +75,7 @@ var player = PlayerView.Query(World).WithTags<GameTags.Player>().Single();
 
 ## Where to define aspects
 
-Aspects are just partial structs — they can live anywhere. The convention in samples is to nest them as private `partial struct`s inside the system that uses them, since most aspects pair one-to-one with one system:
+Aspects are partial structs and can live anywhere. Samples nest them as private `partial struct`s inside the system that uses them, since most aspects pair one-to-one with one system:
 
 ```csharp
 public partial class PhysicsSystem : ISystem

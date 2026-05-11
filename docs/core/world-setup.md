@@ -1,9 +1,9 @@
 # World Setup
 
-Every Trecs application starts by building a `World` — the container that owns all entities and components, and which drives the per-frame system update.
+Every Trecs application starts by building a `World` — the container that owns all entities and components and drives the per-frame system update.
 
 !!! tip "New to Trecs?"
-    Start with [Getting Started](../getting-started.md) for a five-minute end-to-end walkthrough; come back here for the deeper reference.
+    Start with [Getting Started](../getting-started.md) for a five-minute walkthrough; come back here for the reference.
 
 ## WorldBuilder
 
@@ -36,7 +36,7 @@ var world = new WorldBuilder()
 
 ### Adding systems
 
-Systems can be registered on the builder *or* on the world directly. The two are equivalent — pick whichever fits your composition:
+Systems can be registered on the builder *or* on the world directly — both are equivalent:
 
 ```csharp
 // On the builder
@@ -113,17 +113,17 @@ while (running)
 world.Dispose();
 ```
 
-`BuildAndInitialize()` combines steps 1 and 3 — use it when no systems need to be added post-`Build()`.
+`BuildAndInitialize()` combines steps 1 and 3. Use it when no systems need to be added post-`Build()`.
 
 ## WorldAccessor
 
-`WorldAccessor` is the primary API for interacting with the world at runtime. Systems get one for free via source generation. For non-system code (init, lifecycle hooks, debug tooling, event callbacks) create one manually:
+`WorldAccessor` is the primary runtime API. Systems get one via source generation. For non-system code (init, lifecycle hooks, debug tooling, event callbacks) create one manually:
 
 ```csharp
 var accessor = world.CreateAccessor(AccessorRole.Unrestricted);
 ```
 
-The `AccessorRole` controls which operations the accessor is allowed to perform — see [Accessor Roles](../advanced/accessor-roles.md) for the full matrix.
+`AccessorRole` controls which operations the accessor may perform — see [Accessor Roles](../advanced/accessor-roles.md) for the full matrix.
 
 `WorldAccessor` exposes:
 

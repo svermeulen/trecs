@@ -1,8 +1,8 @@
 # Trecs vs Unity ECS
 
-A comparison for developers familiar with Unity's built-in ECS (Entities package). Targets the current Entities 1.x line.
+For developers familiar with Unity's built-in ECS (Entities package). Targets the current Entities 1.x line.
 
-Trecs has a deliberately small API surface — a handful of core high level concepts, with source generation doing the heavy lifting for low level operations.
+Trecs has a deliberately small API surface — a handful of high-level concepts, with source generation handling the low-level work.
 
 ## Architecture
 
@@ -107,9 +107,9 @@ Trecs has a deliberately small API surface — a handful of core high level conc
 
 ## Tag-based identity
 
-The most consequential architectural difference is that Trecs gives entities an identity axis beyond "which components do they carry". In Unity ECS, identity is *emergent* — two entities with the same component set are indistinguishable in queries. In Trecs, entities also carry **tags** that queries can filter on.
+The biggest architectural difference: Trecs gives entities an identity axis beyond "which components do they carry". In Unity ECS, identity is *emergent* — two entities with the same component set are indistinguishable in queries. In Trecs, entities also carry **tags** that queries can filter on.
 
-A tag may map 1:1 to one template (`GameTags.Spinner` only on `SpinnerEntity`) or name an abstract role shared across many templates that inherit from a common base. **Templates** themselves are compile-time blueprints describing an entity's component layout and identity tags. Spawn sites name the *tag*, not the template (`AddEntity<GameTags.Enemy>()`), and the world looks up the template registered for it. Systems should also refer to entities by tag (or by component schema), never by template class — that's what keeps gameplay code decoupled from concrete entity definitions.
+A tag may map 1:1 to one template (`GameTags.Spinner` only on `SpinnerEntity`) or name an abstract role shared across many templates. **Templates** are compile-time blueprints describing an entity's component layout and identity tags. Spawn sites name the *tag*, not the template (`AddEntity<GameTags.Enemy>()`), and the world looks up the registered template. Systems should refer to entities by tag (or by component schema), never by template class — that decouples gameplay code from concrete entity definitions.
 
 Both styles are first-class:
 
@@ -123,28 +123,28 @@ void Execute(ref Health health, in Position pos) { ... }
 void Execute(ref Position pos, in Velocity vel) { ... }
 ```
 
-Tag scoping is useful when the subset is a design-level concept rather than a component-schema coincidence. `MatchByComponents` is right for cross-cutting systems (rendering, physics sync, debug overlays) that don't care *what* an entity is, only that it has certain components.
+Use tag scoping when the subset is a design-level concept. Use `MatchByComponents` for cross-cutting systems (rendering, physics sync, debug overlays) that don't care *what* an entity is, only that it has certain components.
 
-The extra identity axis buys you a few practical things:
+The extra identity axis buys you:
 
-- **Queries can read like the design.** `[ForEachEntity(typeof(GameTags.Enemy))]` says what it means. Component-set queries drift: "things with `Health` + `Position` + `AIState`" is a brittle stand-in for "enemies".
-- **Tag queries fail loudly when shapes are wrong.** A tag-scoped query whose matching template doesn't declare a requested component surfaces an error. Component-only matching silently skips the entity instead — a notoriously common source of "why isn't my system running on this entity?" bugs.
-- **Templates are a single source of truth.** The full layout, defaults, tags, and partitions for "an Enemy" live in one place. Spawn sites can't drift.
-- **Refactoring is safer.** Renaming a component is one template edit; the generator surfaces every spawn site that's affected.
-- **Tags carry meaning into tools.** Logs, recordings, and inspectors can name entities by what they are rather than by an opaque component-set fingerprint.
+- **Queries that read like the design.** `[ForEachEntity(typeof(GameTags.Enemy))]` says what it means. Component-set queries drift: "things with `Health` + `Position` + `AIState`" is a brittle stand-in for "enemies".
+- **Loud failures on shape mismatches.** A tag-scoped query whose matching template doesn't declare a requested component surfaces an error. Component-only matching silently skips the entity — a common source of "why isn't my system running on this entity?" bugs.
+- **A single source of truth.** The full layout, defaults, tags, and partitions for "an Enemy" live in one template. Spawn sites can't drift.
+- **Safer refactoring.** Renaming a component is one template edit; the generator surfaces every affected spawn site.
+- **Meaningful tags in tools.** Logs, recordings, and inspectors name entities by what they are, not by an opaque component-set fingerprint.
 
-The tradeoff: you have to define templates up front for the entities you want to spawn — there's no "just attach a component and see what happens" path. For deliberately-designed simulations that's usually a feature, and `MatchByComponents` is still there for systems that genuinely don't care about identity.
+The tradeoff: you must define templates up front — no "attach a component and see what happens" path. For deliberately-designed simulations that's usually a feature, and `MatchByComponents` is there for systems that don't care about identity.
 
 ## Memory layout: flat buffers vs chunks
 
 Unity ECS splits each archetype across many fixed-size 16 KB chunks; iteration walks chunks in order. Trecs uses structure-of-arrays: each group owns one flat contiguous buffer per component, and every entity occupies the same index across all of them.
 
-The practical consequences:
+Practical consequences:
 
-- **Iteration is a plain array walk.** `ForEachEntity` over a group is `for (int i = 0; i < count; i++)` against contiguous memory — no per-chunk bookkeeping, no chunk lookups.
-- **Memory is sized to actual use.** A 16 KB chunk is allocated even when it only holds a handful of entities, so rare archetypes can waste meaningful memory when they proliferate. Trecs grows each group's buffers as entities are added.
-- **Structural changes cost less, and there's less opportunity to do them accidentally.** In Unity ECS, adding/removing a component moves the entity to a different archetype; users coming from a tag-heavy mindset sometimes reach for "add a zero-sized tag component" as a cheap boolean, not realizing it's a full structural change. Unity's enableable components exist to fix that. In Trecs the foot-gun doesn't exist: a template's component set is fixed at compile time, so you can't add or remove components at runtime at all. The equivalents — partition transitions, boolean component fields, sets — are visibly what they are at the call site.
-- **Parallelism shape is different.** Both engines use Unity's job system. Unity ECS naturally parallelizes a chunk per worker; Trecs slices a query's matching entities across `IJobParallelFor` batches. Throughput is comparable for large workloads.
-- **Random-access lookup is one indirection less.** Both engines are O(1) for "given an entity handle, fetch component `T`" — Unity keeps an `Entity → (chunk pointer, index-in-chunk)` map and Trecs keeps an `EntityHandle → (group, index-in-group)` map. The chunk model then dereferences the chunk pointer to reach the component array; the flat layout indexes directly into the group's per-component buffer.
+- **Iteration is a plain array walk.** `ForEachEntity` over a group is `for (int i = 0; i < count; i++)` against contiguous memory — no per-chunk bookkeeping or lookups.
+- **Memory is sized to actual use.** A 16 KB chunk holding a handful of entities wastes memory when rare archetypes proliferate. Trecs grows each group's buffers as entities are added.
+- **Structural changes cost less, and you can't do them accidentally.** In Unity ECS, adding/removing a component moves the entity to a different archetype; users sometimes reach for "add a zero-sized tag component" as a cheap boolean, not realizing it's a full structural change. Unity's enableable components exist to fix that. In Trecs the foot-gun doesn't exist: a template's component set is fixed at compile time. The equivalents — partition transitions, boolean component fields, sets — are visibly what they are at the call site.
+- **Different parallelism shape.** Both engines use Unity's job system. Unity ECS parallelizes a chunk per worker; Trecs slices matching entities across `IJobParallelFor` batches. Throughput is comparable for large workloads.
+- **One fewer indirection on random-access lookup.** Both are O(1) for "given an entity handle, fetch component `T`". Unity keeps an `Entity → (chunk pointer, index-in-chunk)` map and dereferences the chunk pointer; Trecs keeps an `EntityHandle → (group, index-in-group)` map and indexes directly into the group's per-component buffer.
 
-The chunk model's distinct advantage is per-chunk metadata — change-filter version numbers and chunk components let a parallel job skip a whole chunk at once when nothing in it has changed. Flat buffers have no analog. Throughput on dense workloads is otherwise comparable.
+The chunk model's distinct advantage is per-chunk metadata — change-filter version numbers and chunk components let a parallel job skip a whole chunk when nothing in it changed. Flat buffers have no analog. Throughput on dense workloads is otherwise comparable.

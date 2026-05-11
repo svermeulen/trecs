@@ -4,7 +4,7 @@ Entities are lightweight identifiers that group components together.
 
 ## EntityHandle
 
-`EntityHandle` is the stable reference to an entity. It survives [structural changes](../entity-management/structural-changes.md), so it is what you use whenever you need to store a long-lived reference to another entity (for example on a component, on a managed object, or across frames).
+`EntityHandle` is the stable reference to an entity. It survives [structural changes](../entity-management/structural-changes.md), so use it whenever you need a long-lived reference (e.g. on a component, on a managed object, or across frames).
 
 You typically obtain a handle from one of these entry points:
 
@@ -26,7 +26,7 @@ foreach (EntityHandle h in World.Query().WithTags<GameTags.Enemy>().EntityHandle
 
 ## Creating entities
 
-Entities are created via `WorldAccessor.AddEntity()`, which provides a fluent api for setting component values:
+Entities are created via `WorldAccessor.AddEntity()`, which exposes a fluent API for setting component values:
 
 ```csharp
 World.AddEntity<SampleTags.Spinner>()
@@ -36,7 +36,7 @@ World.AddEntity<SampleTags.Spinner>()
 
 The tag selects which template to spawn — Trecs looks up the template registered with that identity tag.
 
-The stable handle for the new entity is available before the next [submission](../entity-management/structural-changes.md):
+The stable handle is available before the next [submission](../entity-management/structural-changes.md):
 
 ```csharp
 EntityHandle handle = World.AddEntity<MyTag>()
@@ -45,7 +45,7 @@ EntityHandle handle = World.AddEntity<MyTag>()
     .Handle;
 ```
 
-You may optionally call `.AssertComplete()` to verify that every non-optional field on the template has been set. The same check runs automatically during submission; an explicit call just surfaces the error earlier, at the call site.
+`.AssertComplete()` verifies that every non-optional template field has been set. The same check runs at submission; calling it explicitly surfaces the error earlier, at the call site.
 
 ## Removing entities
 
@@ -64,7 +64,7 @@ Removal is **deferred** — the entity disappears at the next [submission](../en
 
 ## Accessing entity data
 
-`EntityAccessor` is a live single-entity view, bound to a `WorldAccessor`. It exposes component access plus remove/move operations on the bound entity
+`EntityAccessor` is a live single-entity view bound to a `WorldAccessor`. It exposes component access plus remove/move operations on the bound entity.
 
 ```csharp
 EntityAccessor entity = World.Entity(handle);
@@ -86,7 +86,7 @@ entity.MoveTo<BallTags.Ball, BallTags.Resting>();
 EntityHandle handle = entity.Handle;
 ```
 
-`EntityAccessor` is a `ref struct` — it lives on the stack for the duration of a frame and isn't suitable for storage. For long-lived references, store an `EntityHandle` instead.
+`EntityAccessor` is a `ref struct` — it lives on the stack and isn't suitable for storage. For long-lived references, store an `EntityHandle` instead.
 
 You can also receive an `EntityAccessor` directly as a `[ForEachEntity]` parameter, or from a query terminator:
 
@@ -104,7 +104,7 @@ EntityAccessor player = World.Query().WithTags<GameTags.Player>().Single();
 foreach (var e in World.Query().WithTags<GameTags.Enemy>().Entities()) { /* ... */ }
 ```
 
-For most multi-component access prefer [aspects](../data-access/aspects.md) — they bundle related components into a single typed view with auto-generated read/write properties.
+For most multi-component access prefer [aspects](../data-access/aspects.md) — they bundle related components into a typed view with auto-generated read/write properties.
 
 ## Counting entities
 

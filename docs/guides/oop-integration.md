@@ -1,6 +1,6 @@
 # OOP Integration
 
-Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours, and other managed objects. This recipe describes a three-layer architecture for bridging ECS and non-ECS code cleanly.
+Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours, and other managed objects. A three-layer architecture bridges ECS and non-ECS code cleanly.
 
 ## The three layers
 
@@ -26,7 +26,7 @@ Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours,
 
 ## Layer 1: input bridge
 
-An input-phase ECS system reads player input and queues it into the world. Keeping the read on the deterministic side of the boundary means the same input data flows through both live play and replay:
+An input-phase ECS system reads player input and queues it into the world. Keeping the read on the deterministic side means the same input data flows through both live play and replay:
 
 ```csharp
 [ExecuteIn(SystemPhase.Input)]
@@ -48,7 +48,7 @@ public partial class PlayerInputSystem : ISystem
 
 ## Layer 2: pure ECS
 
-Simulation systems contain only ECS logic — no `GameObject`, no `MonoBehaviour`, no `UnityEngine` APIs:
+Simulation systems contain only ECS logic — no `GameObject`, `MonoBehaviour`, or `UnityEngine` APIs:
 
 ```csharp
 public partial class MovementSystem : ISystem
@@ -85,7 +85,7 @@ public partial class GameObjectSyncSystem : ISystem
 }
 ```
 
-Note here that GameObjectRegistry and GameObjectId are not part of Trecs.  See Sample projects for example implementations.
+`GameObjectRegistry` and `GameObjectId` are not part of Trecs. See Sample projects for example implementations.
 
 ### Spawning and despawning GameObjects
 
@@ -120,8 +120,6 @@ public partial class EnemyGameObjectManager : IDisposable
     public void Dispose() => _disposables.Dispose();
 }
 ```
-
-Note here that GameObjectRegistry and GameObjectId are not part of Trecs.  See Sample projects for example implementations.
 
 ## Why this separation matters
 

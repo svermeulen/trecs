@@ -1,6 +1,6 @@
 # Jobs & Burst
 
-Trecs integrates with [Unity's job system and Burst compiler](https://docs.unity3d.com/Packages/com.unity.burst@latest) for parallel, high-performance entity processing. You can write job structs by hand — Trecs's source generator just handles the scheduling boilerplate (`ScheduleParallel`, [dependency tracking](dependency-tracking.md), field auto-wiring) for you. And for the simplest cases, the generator emits the entire job struct from a single annotated method.
+Trecs integrates with [Unity's job system and Burst compiler](https://docs.unity3d.com/Packages/com.unity.burst@latest) for parallel, high-performance entity processing. You can write job structs by hand — Trecs's source generator handles the scheduling boilerplate (`ScheduleParallel`, [dependency tracking](dependency-tracking.md), field auto-wiring). For the simplest cases, the generator emits the entire job struct from a single annotated method.
 
 ## `[WrapAsJob]` — the simplest approach
 
@@ -23,16 +23,16 @@ public partial class ParticleMoveSystem : ISystem
 
 Two requirements:
 
-- **`static`** — the generated Burst job calls your method directly, with no system instance to call against, therefore it must be marked `static`.
-- **Use `NativeWorldAccessor`, not `WorldAccessor`**, for any world-level reads (`DeltaTime`, structural ops, set ops) inside the body.
+- **`static`** — the generated Burst job calls your method directly, with no system instance, so it must be `static`.
+- **Use `NativeWorldAccessor`, not `WorldAccessor`** for any world-level reads (`DeltaTime`, structural ops, set ops) inside the body.
 
-Then, instead of calling your system `Execute()` method directly, Trecs will schedule a job instead.
+Trecs schedules the job instead of calling your `Execute()` method directly.
 
-Note that [`[PassThroughArgument]`](../core/systems.md#passthroughargument) is supported in this case as well and will forward the data to the generated job.
+[`[PassThroughArgument]`](../core/systems.md#passthroughargument) is supported here too and forwards the data to the generated job.
 
 ## Manual job structs
 
-In some cases you might want to define a custom job struct instead of using `[WrapAsJob]`. The simplest way is to put `[ForEachEntity]` on the job's `Execute` method — Trecs generates a `ScheduleParallel` for it just like it does for `[WrapAsJob]`:
+To define a custom job struct instead of using `[WrapAsJob]`, put `[ForEachEntity]` on the job's `Execute` method — Trecs generates a `ScheduleParallel` for it the same way:
 
 ```csharp
 public partial class ParticleJobSystem : ISystem
@@ -56,11 +56,11 @@ public partial class ParticleJobSystem : ISystem
 }
 ```
 
-`[ForEachEntity]` is **not** required, though. You can write an entirely hand-rolled `IJobFor` / `IJobParallelFor` / etc. and still pass in Trecs data into it. See [Advanced Job Features](../advanced/advanced-jobs.md) for details.
+`[ForEachEntity]` is **not** required. You can write an entirely hand-rolled `IJobFor` / `IJobParallelFor` and still pass Trecs data into it. See [Advanced Job Features](../advanced/advanced-jobs.md).
 
 ## Per-iteration `EntityHandle`
 
-A `[ForEachEntity]` callback running inside a job can take an `EntityHandle` parameter alongside its components — works in both `[WrapAsJob]` and manual job structs:
+A `[ForEachEntity]` callback inside a job can take an `EntityHandle` parameter alongside its components — works in both `[WrapAsJob]` and manual job structs:
 
 ```csharp
 [ForEachEntity(typeof(SampleTags.Particle))]
@@ -72,7 +72,7 @@ static void Cull(ref Lifetime lifetime, EntityHandle handle, in NativeWorldAcces
 }
 ```
 
-The handle is materialized per iteration from a per-group buffer the source generator wires up automatically — no dictionary lookup, just one indexed read. `EntityAccessor` is **not** supported in jobs (it carries a managed `WorldAccessor` reference); use `EntityHandle` plus `NativeWorldAccessor` for any per-entity ops.
+The handle is materialized per iteration from a per-group buffer the source generator wires up automatically — no dictionary lookup, one indexed read. `EntityAccessor` is **not** supported in jobs (it carries a managed `WorldAccessor` reference); use `EntityHandle` plus `NativeWorldAccessor` for per-entity ops.
 
 ## `NativeWorldAccessor`
 
@@ -100,4 +100,4 @@ nativeWorld.MoveTo<BallTags.Ball, BallTags.Resting>(entityIndex);
 !!! warning
     `WorldAccessor` is **main-thread only**. Inside jobs always use `NativeWorldAccessor` and the native read/write types — see [Advanced Job Features](../advanced/advanced-jobs.md) for how to wire them via `[FromWorld]`.
 
-For deeper coverage — `[FromWorld]` auto-wiring, lookup types across groups, native set operations, `[GlobalIndex]`, external job-handle tracking — continue to [Advanced Job Features](../advanced/advanced-jobs.md). For the parallel iteration pattern itself, see [Queries & Iteration](../data-access/queries-and-iteration.md).
+For deeper coverage — `[FromWorld]` auto-wiring, cross-group lookup types, native set operations, `[GlobalIndex]`, external job-handle tracking — see [Advanced Job Features](../advanced/advanced-jobs.md). For the parallel iteration pattern itself, see [Queries & Iteration](../data-access/queries-and-iteration.md).

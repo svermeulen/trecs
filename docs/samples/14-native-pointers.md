@@ -8,7 +8,7 @@ Using Burst-compatible heap pointers to store unmanaged data that a parallel job
 
 Mirrors [Sample 10](10-pointers.md) — entities follow shared patrol routes and each draws a trail of recent positions — but the route and trail payloads are now **unmanaged structs**, allocated in native heap blobs via `NativeSharedPtr` / `NativeUniquePtr`, and the movement system runs as a Burst-compiled job that resolves the pointers inline.
 
-This is the shape you reach for whenever you want heap-allocated data in a Burst job. The managed `SharedPtr` / `UniquePtr` from Sample 10 cannot be used in jobs at all — that is the gap these native variants fill.
+Reach for this shape whenever you want heap-allocated data in a Burst job. The managed `SharedPtr` / `UniquePtr` from Sample 10 cannot be used in jobs at all — that's the gap these native variants fill.
 
 ## Schema
 
@@ -36,9 +36,9 @@ public struct TrailHistory
 }
 ```
 
-Both are unmanaged. `PatrolRoute` is a `readonly struct` because the route never mutates after construction — this matches the framework's own pointer types (`NativeSharedPtr`, `NativeUniquePtr`) and avoids the defensive copies the compiler would otherwise insert when the struct is accessed through an `in` reference. `TrailHistory` is mutable so the movement job can append to `Positions` each tick.
+Both are unmanaged. `PatrolRoute` is `readonly` because the route never mutates after construction — this matches the framework's own pointer types (`NativeSharedPtr`, `NativeUniquePtr`) and avoids the defensive copies the compiler would insert when accessed through an `in` reference. `TrailHistory` is mutable so the movement job can append to `Positions` each tick.
 
-The waypoints and positions use [`FixedList64<T>`](../advanced/fixed-collections.md) from `Trecs.Collections` — an inline, bounded list with 64 element slots. Unlike a managed `List<T>`, it's unmanaged and lives inside the blob directly.
+Waypoints and positions use [`FixedList64<T>`](../advanced/fixed-collections.md) from `Trecs.Collections` — an inline, bounded list with 64 slots. Unlike `List<T>`, it's unmanaged and lives inside the blob directly.
 
 ### Components
 
@@ -55,7 +55,7 @@ public partial struct Trail : IEntityComponent
 }
 ```
 
-The pointer handles are small value types (12 bytes and 4 bytes respectively) stored inline in the component.
+The pointer handles are small value types (12 and 4 bytes) stored inline in the component.
 
 ## Allocation
 
@@ -96,7 +96,7 @@ Each entity gets its own `NativeUniquePtr` — no sharing, no refcount.
 
 ### PatrolMovementSystem — Burst job
 
-This is the point of the sample: the pointer resolution happens inside a Burst-compiled job.
+The point of the sample: pointer resolution happens inside a Burst-compiled job.
 
 ```csharp
 public partial class PatrolMovementSystem : ISystem
@@ -134,9 +134,9 @@ public partial class PatrolMovementSystem : ISystem
 Key points:
 
 - **`[WrapAsJob]`** turns this static method into a Burst-compiled parallel job. The source generator wires up the `NativeWorldAccessor` automatically — no manual job struct needed.
-- **`route.Value.Get(world)`** resolves the `NativeSharedPtr` through `NativeWorldAccessor.SharedPtrResolver`. Returns `ref T` to the blob contents.
-- **`trail.Value.GetMut(world)`** is the **mutable** counterpart for `NativeUniquePtr`. It's an extension method with `ref this`, which forces the caller to hold a writable reference to the component — the framework uses this to track write dependencies without any extra bookkeeping.
-- The movement system uses `ref Trail trail` so that `trail.Value.GetMut(...)` is callable. `in Route route` is enough for the shared side because we only read.
+- **`route.Value.Get(world)`** resolves the `NativeSharedPtr` through `NativeWorldAccessor.SharedPtrResolver`, returning `ref T` to the blob contents.
+- **`trail.Value.GetMut(world)`** is the **mutable** counterpart for `NativeUniquePtr`. It's an extension method with `ref this`, forcing the caller to hold a writable reference to the component — the framework uses this to track write dependencies without extra bookkeeping.
+- The movement system uses `ref Trail trail` so `trail.Value.GetMut(...)` is callable. `in Route route` is enough for the shared side since we only read.
 
 ### PatrolRendererSystem — main thread
 
@@ -160,11 +160,11 @@ public partial class PatrolRendererSystem : ISystem
 }
 ```
 
-The same pointer resolves on the main thread via the `WorldAccessor` overload of `Get(...)`. No conversion is required.
+The same pointer resolves on the main thread via the `WorldAccessor` overload of `Get(...)`. No conversion needed.
 
 ## Cleanup
 
-Native pointers stored in components must be disposed when entities are removed, same as their managed counterparts — otherwise the blobs leak and a warning fires on world disposal.
+Native pointers stored in components must be disposed when entities are removed, like their managed counterparts — otherwise blobs leak and a warning fires on world disposal.
 
 ```csharp
 public partial class PointerCleanupHandler : IDisposable
@@ -193,14 +193,14 @@ public partial class PointerCleanupHandler : IDisposable
 }
 ```
 
-The cleanup handler is registered in the composition root *before* the scene initializer spawns entities, so it also catches removals that happen during world disposal.
+The cleanup handler is registered in the composition root *before* the scene initializer spawns entities, so it also catches removals during world disposal.
 
 ## Concepts introduced
 
 - **`NativeSharedPtr<T>`** — Burst-compatible reference-counted pointer to an unmanaged blob. Mirrors `SharedPtr<T>` from Sample 10.
 - **`NativeUniquePtr<T>`** — Burst-compatible single-owner pointer. Mirrors `UniquePtr<T>`.
 - **`AllocNativeShared` / `AllocNativeUnique`** on `HeapAccessor` — allocate unmanaged blobs on the native heap.
-- **`Get(NativeWorldAccessor)` / `GetMut(NativeWorldAccessor)`** — resolve a native pointer from inside a Burst job. The same pointers resolve from the main thread via the `WorldAccessor` overload.
+- **`Get(NativeWorldAccessor)` / `GetMut(NativeWorldAccessor)`** — resolve a native pointer inside a Burst job. The same pointers resolve from the main thread via the `WorldAccessor` overload.
 - **`[WrapAsJob]` + auto-injected `NativeWorldAccessor`** — generates a Burst job whose `Execute` has the native world accessor wired up automatically.
-- **`FixedList64<T>`** — inline bounded list, Burst-compatible, used here to store waypoints and trail positions inside unmanaged blobs.
+- **`FixedList64<T>`** — inline bounded list, Burst-compatible, used here for waypoints and trail positions inside unmanaged blobs.
 - **`readonly struct`** for shared blob payloads — avoids defensive copies when read through `in` references.

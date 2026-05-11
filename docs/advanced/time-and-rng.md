@@ -4,7 +4,7 @@ Trecs provides phase-aware time and deterministic random number generation.
 
 ## Time properties
 
-Access time values via the `World` accessor (available in systems as `World`):
+Access time values via the `World` accessor (available in systems):
 
 | Property | Description |
 |----------|-------------|
@@ -20,7 +20,7 @@ Access time values via the `World` accessor (available in systems as `World`):
 
 ### Phase-aware DeltaTime
 
-`DeltaTime` automatically returns the correct value for the phase your system runs in:
+`DeltaTime` returns the correct value for the system's phase:
 
 ```csharp
 // In a fixed update system: DeltaTime == FixedDeltaTime
@@ -49,7 +49,7 @@ Fixed-time values are also accessible from variable update via `World.FixedDelta
 
 ## Deterministic RNG
 
-Trecs provides a deterministic `Rng` type seeded from `WorldSettings.RandomSeed`.
+Trecs provides a deterministic `Rng` seeded from `WorldSettings.RandomSeed`.
 
 ```csharp
 // Phase-aware (recommended)
@@ -68,7 +68,7 @@ var forked = World.Rng.Fork();
 // forked produces independent values without advancing the main RNG
 ```
 
-Set the seed in world settings for reproducible results:
+Set the seed for reproducible results:
 
 ```csharp
 var settings = new WorldSettings { RandomSeed = 42 };

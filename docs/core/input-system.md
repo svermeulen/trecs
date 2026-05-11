@@ -1,8 +1,8 @@
 # Input System
 
-A Trecs simulation is designed to be **deterministic** — given the same starting state, every run produces the same world. But the values you feed *into* the simulation often aren't: keyboard / mouse / gamepad state, network packets, system clocks, asset-load timings. The input system is the controlled gateway through which those non-deterministic values enter the simulation, in a form that recording and playback can capture and replay losslessly.
+A Trecs simulation is **deterministic**: given the same starting state, every run produces the same world. But the values you feed *into* the simulation often aren't — keyboard / mouse / gamepad state, network packets, system clocks, asset-load timings. The input system is the controlled gateway for those non-deterministic values, in a form recording and playback can capture and replay losslessly.
 
-Despite the name, "input" here isn't limited to user input — it covers **any non-deterministic value entering the simulation**. A network message, a wall-clock reading, a response from an external service all qualify, and they all use the same pipeline.
+Despite the name, "input" isn't limited to user input — it covers **any non-deterministic value entering the simulation**. Network messages, wall-clock readings, and responses from external services all use the same pipeline.
 
 The mechanics:
 
@@ -10,7 +10,7 @@ The mechanics:
 - Inside an `[ExecuteIn(SystemPhase.Input)]` system, call `World.AddInput<T>(entity, value)`. Input systems run just before each fixed step, in lockstep with the simulation.
 - The queued value is applied to the target entity at the start of the upcoming fixed step.
 
-During [recording](../advanced/recording-and-playback.md), every `AddInput` call is captured into the recording bundle alongside the frame number it targets. During playback, every Input-phase system is disabled and the recorded inputs are replayed onto the exact same frames they originally targeted — so the simulation sees byte-identical input on every run, regardless of what the live keyboard / network / clock are doing.
+During [recording](../advanced/recording-and-playback.md), every `AddInput` call is captured into the recording bundle alongside its target frame. During playback, every Input-phase system is disabled and recorded inputs are replayed onto the exact frames they originally targeted, so the simulation sees byte-identical input on every run regardless of live keyboard / network / clock activity.
 
 ## Marking input fields
 
@@ -31,13 +31,13 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 | `Retain` | Keep the previous frame's value |
 | `Reset` | Reset to the component's default value |
 
-`Retain` is right when an input represents a sustained intent (e.g. "currently holding a movement direction"). `Reset` fits one-shot signals (e.g. "fire button pressed this frame").
+`Retain` fits sustained intent (e.g. "currently holding a movement direction"). `Reset` fits one-shot signals (e.g. "fire button pressed this frame").
 
-The choice also affects recording storage size. `Retain` lets the recorder prune successive frames with the same queued value (since `Retain` would reproduce that value anyway), and similarly for `Reset` if default value is enqueued.
+The choice also affects recording size. `Retain` lets the recorder prune successive frames with the same queued value (since `Retain` would reproduce it anyway); `Reset` does the same when the default value is enqueued.
 
 ## Queuing input
 
-`World.AddInput<T>(...)` is only callable from an `[ExecuteIn(SystemPhase.Input)]` system. Like every other system, the input system's `Execute()` runs once per fixed step (zero or more times per Unity `Update`, depending on catch-up).
+`World.AddInput<T>(...)` is only callable from an `[ExecuteIn(SystemPhase.Input)]` system. Its `Execute()` runs once per fixed step (zero or more times per Unity `Update`, depending on catch-up).
 
 For **sustained** inputs (held keys, analog axes), read directly in `Execute()`:
 
@@ -53,7 +53,7 @@ public partial class PlayerInputSystem : ISystem
 }
 ```
 
-For **one-shot** inputs (key-down events), Unity only reports the event on the variable frame the key was pressed. If a fixed step doesn't run on that exact frame, an `Execute()` poll would miss it. The established pattern is to capture the event at variable cadence and forward the latest value in `Execute()`:
+For **one-shot** inputs (key-down events), Unity only reports the event on the variable frame the key was pressed. If a fixed step doesn't run on that frame, an `Execute()` poll would miss it. Capture the event at variable cadence and forward the latest value in `Execute()`:
 
 ```csharp
 [ExecuteIn(SystemPhase.Input)]
@@ -96,13 +96,12 @@ public partial class ProcessInputSystem : ISystem
     void Execute([SingleEntity(typeof(TrecsTags.Globals))] in MoveInput input)
     {
         // input.RequestedDirection is the value AddInput supplied this frame,
-        // or the prior frame's value (Retain) / default (Reset)
-        // if no input was queued.
+        // or the prior frame's value (Retain) / default (Reset) if none was queued.
     }
 }
 ```
 
-Note however that `[Input]` components are read-only outside the Input systems. Writing to one directly from a fixed-update (or any other) system throws in DEBUG builds — values must enter through `World.AddInput<T>(...)` so recording and playback can replay them. If you need a sim-state field that fixed-update systems can mutate, use a regular (non-`[Input]`) component.
+`[Input]` components are read-only outside Input systems. Writing one from a fixed-update (or any other) system throws in DEBUG builds — values must enter through `World.AddInput<T>(...)` so recording and playback can replay them. If you need a sim-state field that fixed-update systems can mutate, use a regular (non-`[Input]`) component.
 
 ## See also
 

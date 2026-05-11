@@ -1,12 +1,12 @@
 # 11 — Snake
 
-A complete grid-based game with deterministic input handling, recording/playback, and structured entity lifecycle management.
+A grid-based game with deterministic input, recording/playback, and entity lifecycle management.
 
 **Source:** `Samples/11_Snake/`
 
 ## What it does
 
-Classic Snake — a head moves on a grid, eats food to grow, and leaves a trail of body segments. The game supports deterministic recording and playback via hotkeys:
+Classic Snake — a head moves on a grid, eats food to grow, and leaves body segments behind. Hotkeys drive deterministic recording and playback:
 
 | Key | Action |
 |---|---|
@@ -52,7 +52,7 @@ public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 }
 ```
 
-The `[Input(Retain)]` attribute ensures the last input persists until a new one is received — critical for a game where the snake keeps moving in its current direction.
+`[Input(Retain)]` keeps the last input until a new one arrives — needed because the snake keeps moving in its current direction.
 
 ## Systems (execution order)
 
@@ -95,7 +95,7 @@ Every N fixed frames (controlled by `MoveTickCounter`):
 3. Advances the head one cell in the current direction
 4. Wraps around grid edges
 
-The head is pulled in via `[SingleEntity]` — a per-parameter attribute that finds the one entity matching the given tag and binds it to the aspect parameter. Global state is read via `World.GlobalComponent<T>()`, and `World.Frame` stamps each segment with its creation frame:
+`[SingleEntity]` is a per-parameter attribute that finds the one entity matching the given tag and binds it to the aspect parameter. Global state is read via `World.GlobalComponent<T>()`, and `World.Frame` stamps each segment with its creation frame:
 
 ```csharp
 void Execute([SingleEntity(typeof(SnakeTags.SnakeHead))] in SnakeHead head)
@@ -132,11 +132,11 @@ partial struct SnakeHead : IAspect, IWrite<Direction, GridPos> { }
 
 ### 3. FoodConsumeSystem
 
-Checks if the head overlaps food. If so: removes the food entity, increments `SnakeLength` and `Score`.
+If the head overlaps food, removes the food entity and increments `SnakeLength` and `Score`.
 
 ### 4. SegmentTrimSystem
 
-If the segment count exceeds `SnakeLength - 1`, removes the oldest segment (by `SegmentAge`).
+When segment count exceeds `SnakeLength - 1`, removes the oldest segment (by `SegmentAge`).
 
 ### 5. FoodSpawnSystem
 
@@ -160,16 +160,16 @@ new WorldBuilder()
     // ...
 ```
 
-Serialization is wired in via the sample-side `SerializationFactory.CreateAll(world)` helper (in `Samples/Common/Scripts/`), which composes a registry + `WorldStateSerializer` + `SnapshotSerializer` + `BundleRecorder` + `BundlePlayer` + `RecordingBundleSerializer`. The `RecordAndPlaybackController` reads keyboard input and drives `SaveSnapshot(path)` / `LoadSnapshot(path)` to manage snapshot files, and `recorder.Start()` / `recorder.Stop()` + `bundleSerializer.Save(bundle, path)` / `bundleSerializer.Load(path)` + `player.Start(bundle)` to manage recording bundles, against file paths under `persistentDataPath`.
+Serialization is wired up via the sample-side `SerializationFactory.CreateAll(world)` helper (in `Samples/Common/Scripts/`), which composes a registry + `WorldStateSerializer` + `SnapshotSerializer` + `BundleRecorder` + `BundlePlayer` + `RecordingBundleSerializer`. The `RecordAndPlaybackController` reads keyboard input and drives `SaveSnapshot(path)` / `LoadSnapshot(path)` for snapshots, and `recorder.Start()` / `recorder.Stop()` + `bundleSerializer.Save(bundle, path)` / `bundleSerializer.Load(path)` + `player.Start(bundle)` for recording bundles, against file paths under `persistentDataPath`.
 
 See [Serialization](../advanced/serialization.md) for custom-serializer authoring and [Recording & Playback](../advanced/recording-and-playback.md) for the full bundle API.
 
 ## Concepts introduced
 
-- **`[Input(Retain)]`** on a template field — input persists across frames until replaced
-- **`[ExecuteIn(SystemPhase.Input)]`** — system runs in the input phase, before fixed update
+- **`[Input(Retain)]`** on a template field — input persists until replaced
+- **`[ExecuteIn(SystemPhase.Input)]`** — runs in the input phase, before fixed update
 - **`World.AddInput`** — queues input from outside the ECS tick
-- **`[SingleEntity(typeof(Tag))]`** parameter — bind the one tagged entity directly into the `Execute` signature
+- **`[SingleEntity(typeof(Tag))]`** parameter — binds the one tagged entity into the `Execute` signature
 - **Grid-based gameplay** — integer positions, discrete movement
 - **FIFO entity management** — `SegmentAge` tracks creation order for oldest-first removal
 - **Deterministic recording/playback** — seeded RNG + deterministic submission

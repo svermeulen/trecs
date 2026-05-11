@@ -1,14 +1,14 @@
 # Structural Changes
 
-Add, remove, and move (re-tag) operations are **deferred** — they're queued during system execution and applied later at a submission boundary. This keeps entity indices stable during iteration and is what makes safe parallel processing possible.
+Add, remove, and move (re-tag) operations are **deferred** — queued during system execution and applied later at a submission boundary. This keeps entity indices stable during iteration and enables safe parallel processing.
 
 In the examples below, `World` is the [`WorldAccessor`](../advanced/accessor-roles.md) injected into a system.
 
 ## When submission happens
 
-Submission drains the queues of entity operations. The system runner calls it for you automatically at the end of every fixed update and at the end of `World.Tick()`.
+Submission drains the queued operations. The system runner calls it automatically at the end of every fixed update and at the end of `World.Tick()`.
 
-You can also call it manually via `World.SubmitEntities()`.
+Call it manually via `World.SubmitEntities()`.
 
 ## Deferred operations
 
@@ -51,7 +51,7 @@ entity.MoveTo<BallTags.Ball, BallTags.Resting>();
 ball.MoveTo<BallTags.Ball, BallTags.Resting>(World);
 ```
 
-The type parameters spell out the **destination** tag set — where the entity ends up — not a from/to pair. Behind the scenes, the entity is relocated to the destination group's memory block and all its component values are copied across unchanged.
+The type parameters spell out the **destination** tag set, not a from/to pair. The entity is relocated to the destination group's memory block; component values are copied across unchanged.
 
 ## Conflict resolution
 
@@ -66,7 +66,7 @@ To react to submission boundaries, see [Entity Events — Frame Events](entity-e
 
 ## Deterministic submission
 
-Any workflow that needs the simulation to evolve identically across runs — recording / replay, networked rollback, snapshot-load consistency, reproducible tests, debug-replay tooling — needs deterministic submission ordering, so should include this flag:
+Any workflow that needs the simulation to evolve identically across runs — recording / replay, networked rollback, snapshot-load consistency, reproducible tests — needs deterministic submission ordering, so should include this flag:
 
 ```csharp
 var settings = new WorldSettings
@@ -75,9 +75,9 @@ var settings = new WorldSettings
 };
 ```
 
-This sorts structural operations queued from Burst jobs (via [`NativeWorldAccessor`](../performance/jobs-and-burst.md)) before applying them, so submission order doesn't depend on job-thread interleaving. Operations queued from the main thread are already deterministic — they apply in the order user code queued them — so the setting only affects the native path. The cost is a single sort per submission, cheap enough to leave on by default if you may ever need a reproducible run.
+This sorts structural operations queued from Burst jobs (via [`NativeWorldAccessor`](../performance/jobs-and-burst.md)) before applying them, so submission order doesn't depend on job-thread interleaving. Main-thread operations are already deterministic — they apply in queue order — so the setting only affects the native path. Cost is a single sort per submission; cheap enough to leave on by default if reproducibility may ever matter.
 
-This is also why, when you queue structural changes from a Burst job through `NativeWorldAccessor`, we require a `sortKey` (so we can maintain deterministic order):
+This is why queuing structural changes from a Burst job through `NativeWorldAccessor` requires a `sortKey`:
 
 ```csharp
 nativeAccessor.AddEntity<MyTag>(sortKey: (uint)i);  // i = the iteration index in the job

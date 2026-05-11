@@ -1,10 +1,10 @@
 # Advanced Job Features
 
-This page covers advanced job APIs for manual job scheduling and low-level component access. For the basics of running jobs with `[WrapAsJob]` and manual job structs, see [Jobs & Burst](../performance/jobs-and-burst.md).
+This page covers advanced job APIs for manual job scheduling and low-level component access. For basics of `[WrapAsJob]` and manual job structs, see [Jobs & Burst](../performance/jobs-and-burst.md).
 
 ## FromWorld — Auto-Wiring Job Fields
 
-The `[FromWorld]` attribute marks fields on a job struct to be automatically populated from the world before scheduling:
+`[FromWorld]` marks fields on a job struct to be auto-populated from the world before scheduling:
 
 ```csharp
 [BurstCompile]
@@ -41,10 +41,10 @@ partial struct MyJob : IJobFor
 
 ### Tag resolution
 
-Fields that require a tag scope (buffers, lookups, `GroupIndex`) can get their tags in two ways:
+Fields that require a tag scope (buffers, lookups, `GroupIndex`) can get their tags two ways:
 
-- **Inline** — specify `Tag` or `Tags` directly on the attribute: `[FromWorld(typeof(GameTags.Player))]`. The tag is baked into the generated code.
-- **At schedule time** — omit `Tag`/`Tags`, and the generated `ScheduleParallel` method will include a `TagSet` parameter that the caller must provide:
+- **Inline** — specify `Tag` or `Tags` on the attribute: `[FromWorld(typeof(GameTags.Player))]`. The tag is baked into the generated code.
+- **At schedule time** — omit `Tag`/`Tags`, and the generated `ScheduleParallel` includes a `TagSet` parameter the caller must provide:
 
 ```csharp
 [BurstCompile]
@@ -60,7 +60,7 @@ partial struct FlexibleJob : IJobFor
 new FlexibleJob().ScheduleParallel(accessor, TagSet<GameTags.Player>.Value);
 ```
 
-This is useful when if the tagset being operated on is not known until runtime, or if you want to reuse the same job struct for multiple tag scopes. The generated `ScheduleParallel` method will have a parameter for each `[FromWorld]` field that doesn't specify tags inline.
+Useful when the tagset isn't known until runtime, or when reusing the same job struct for multiple tag scopes. `ScheduleParallel` gets one parameter per `[FromWorld]` field without an inline tag.
 
 Fields that don't require tags (`NativeSetRead`, `NativeSetCommandBuffer`, `NativeWorldAccessor`) are populated automatically and never generate schedule parameters.
 
@@ -81,7 +81,7 @@ ref Velocity vel = ref velocities[i];
 
 ### Lookups — Cross-Group
 
-For accessing components on arbitrary entities across groups. Lookups are an advanced job-side primitive — indexing is by transient entity index (resolved from an `EntityHandle` you've stored elsewhere via `handle.ToIndex(world)`):
+For accessing components on arbitrary entities across groups. Lookups are an advanced job-side primitive — indexing is by transient entity index (resolved from a stored `EntityHandle` via `handle.ToIndex(world)`):
 
 ```csharp
 NativeComponentLookupRead<Health> healthLookup;
@@ -96,7 +96,7 @@ if (healthLookup.Exists(entityIndex)) { ... }
 if (healthLookup.TryGet(entityIndex, out Health hp)) { ... }
 ```
 
-For most cross-group reads inside a job, prefer the higher-level `<Aspect>.NativeFactory` pattern (see [Aspects](../data-access/aspects.md)) — it hides the lookup plumbing.
+For most cross-group reads in a job, prefer the higher-level `<Aspect>.NativeFactory` pattern (see [Aspects](../data-access/aspects.md)) — it hides the lookup plumbing.
 
 ## Native set operations
 
@@ -120,7 +120,7 @@ highlightedWrite.Clear();   // Order-insensitive: wins over any Add/Remove in th
 
 ## External job tracking
 
-In the rare case where a job is scheduled manually without using the Trecs source generator (e.g., a third-party job or a custom scheduling pattern), you can register it with the world so the [dependency tracker](../performance/dependency-tracking.md) knows about it, using `TrackExternalJob` on the system's `WorldAccessor`:
+When a job is scheduled manually without the Trecs source generator (e.g., a third-party job or custom scheduling pattern), register it with the world so the [dependency tracker](../performance/dependency-tracking.md) knows about it, via `TrackExternalJob` on the system's `WorldAccessor`:
 
 ```csharp
 JobHandle handle = myJob.Schedule(count, batchSize);

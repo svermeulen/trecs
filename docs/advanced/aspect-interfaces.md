@@ -1,6 +1,6 @@
 # Aspect Interfaces
 
-For the rare case where you want a helper method that works across several aspects with the same component shape — same access surface, different concrete struct at each callsite.
+For helper methods that work across several aspects sharing the same component shape — same access surface, different concrete struct per callsite.
 
 An aspect interface is a `partial interface` that extends `IAspect` and lists `IRead<>` / `IWrite<>` like a concrete aspect:
 
@@ -28,7 +28,7 @@ public static class BoidBounds
 Rules:
 
 - The interface must be `partial` and list `IAspect` in its base list.
-- Aspect interfaces compose: one aspect interface can extend another, and all `IRead<>` / `IWrite<>` types are merged into the concrete aspect.
-- Iteration entry points (`[ForEachEntity]`, `[SingleEntity]`) still require a concrete aspect struct. Aspect interfaces are for polymorphic helpers you call *from* iteration, not the iteration parameter itself.
+- Aspect interfaces compose: one can extend another, and all `IRead<>` / `IWrite<>` types merge into the concrete aspect.
+- Iteration entry points (`[ForEachEntity]`, `[SingleEntity]`) still require a concrete aspect struct. Aspect interfaces are for polymorphic helpers called *from* iteration, not the iteration parameter itself.
 
 See [sample 15 — Aspect Interfaces](../samples/15-aspect-interfaces.md) for a complete example.

@@ -1,12 +1,12 @@
 # 06 — Partitions
 
-Built-in partition transitions via template partitions. Entities in different partitions are stored in separate groups for cache-friendly, targeted iteration.
+Template partitions split entities into separate groups for cache-friendly, targeted iteration.
 
 **Source:** `com.trecs.core/Samples~/Tutorials/06_Partitions/`
 
 ## What it does
 
-Balls bounce under gravity. When a ball's energy drops below a threshold, it transitions to a "Resting" partition and turns gray. After a rest timer expires, it launches back into the air and returns to "Active".
+Balls bounce under gravity. When a ball's energy drops below a threshold, it moves to a "Resting" partition and turns gray. After a rest timer expires, it launches back into the air and returns to "Active".
 
 ## Schema
 
@@ -31,13 +31,13 @@ public partial class BallEntity : ITemplate,
 }
 ```
 
-`IPartitionedBy<T>` declares a presence/absence partition dimension. Two partitions are emitted: balls with the `Active` tag, and balls without it. The "absent" case has no companion tag — query it with `Without =`.
+`IPartitionedBy<T>` declares a presence/absence partition dimension. Two partitions are emitted: balls with the `Active` tag, and balls without. The absent case has no companion tag — query it with `Without =`.
 
 ## Systems
 
 ### PhysicsSystem — active balls only
 
-Only processes balls in the Active partition:
+Processes only balls in the Active partition:
 
 ```csharp
 [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
@@ -88,7 +88,7 @@ public partial class WakeUpSystem : ISystem
 
 ### BallRendererSystem — different rendering per partition
 
-Two `[ForEachEntity]` methods with different tag filters:
+Two `[ForEachEntity]` methods, different tag filters:
 
 ```csharp
 [ExecuteIn(SystemPhase.Presentation)]
@@ -116,10 +116,10 @@ public partial class BallRendererSystem : ISystem
 
 ## Concepts introduced
 
-- **`IPartitionedBy<T>`** declares a presence/absence partition dimension on a template. See [Templates](../core/templates.md) and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).
-- **`SetTag<T>()` / `UnsetTag<T>()`** transition entities between partitions by toggling the tag. See [Structural Changes](../entity-management/structural-changes.md).
-- **`Without = typeof(T)`** queries the absent partition. See [Queries & Iteration](../data-access/queries-and-iteration.md).
+- **`IPartitionedBy<T>`** — declares a presence/absence partition dimension on a template. See [Templates](../core/templates.md) and [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).
+- **`SetTag<T>()` / `UnsetTag<T>()`** — transition entities between partitions by toggling the tag. See [Structural Changes](../entity-management/structural-changes.md).
+- **`Without = typeof(T)`** — query the absent partition.
 - **Partition-filtered iteration** — systems iterate only entities in a specific partition. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 - **Group separation** — Active and Resting balls live in separate contiguous arrays for cache-friendly iteration.
-- **Multiple `[ForEachEntity]` methods** — different queries in the same system, called from an explicit `Execute()`. See [Systems](../core/systems.md).
-- For dynamic, overlapping membership where partitions don't fit, see [Sets](08-sets.md).
+- **Multiple `[ForEachEntity]` methods** — different queries in one system, called from an explicit `Execute()`. See [Systems](../core/systems.md).
+- For dynamic, overlapping membership, see [Sets](08-sets.md).

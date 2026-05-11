@@ -2,7 +2,7 @@
 
 The **Trecs Hierarchy** window is the editor's main inspector for a running world's schema and live state. It cross-references templates, entities, components, tags, sets, and accessors in a single tree, and stays useful between Play sessions via on-disk schema snapshots.
 
-**To open it:** `Window > Trecs > Hierarchy`. Worlds appear in the dropdown automatically once they call `WorldBuilder.Build()` — give them readable names with [`WorldBuilder.SetDebugName`](../core/world-setup.md) so they're easy to pick when you have more than one.
+**To open it:** `Window > Trecs > Hierarchy`. Worlds appear in the dropdown once they call `WorldBuilder.Build()` — set readable names with [`WorldBuilder.SetDebugName`](../core/world-setup.md) so they're easy to pick.
 
 !!! warning "Screenshot pending: `images/hierarchy-overview.png`"
     Whole window with all five sections expanded; entity rows visible under a couple of templates. FeedingFrenzy sample, light theme.
@@ -16,7 +16,7 @@ The **Trecs Hierarchy** window is the editor's main inspector for a running worl
 
 ## Overview
 
-The window shows a tree split into five top-level sections:
+The tree splits into five top-level sections:
 
 | Section | What it lists |
 |---|---|
@@ -26,7 +26,7 @@ The window shows a tree split into five top-level sections:
 | **Sets** | Every `EntitySet` with its current tag membership. |
 | **Tags** | Every `Tag` and which entities/templates carry it. |
 
-A toolbar across the top hosts:
+The toolbar hosts:
 
 - A **world dropdown** (multi-world projects — see below).
 - A **search field** with the predicate DSL described in [Search syntax](#search-syntax).
@@ -45,11 +45,11 @@ A toolbar across the top hosts:
 </figure>
 -->
 
-When at least one Trecs world is alive in the editor, the dropdown lists each world by name. Picking one binds the tree to that world.
+When at least one Trecs world is alive, the dropdown lists each by name. Picking one binds the tree to that world.
 
-When no live world exists, the dropdown falls back to **cached snapshots** loaded from `Library/`. Cached entries are suffixed with `(cached)` so you can tell them apart from live worlds. Cache mode is read-only — toggles like the system-enable switch are disabled, since there is no running world to mutate.
+With no live world, the dropdown falls back to **cached snapshots** from `Library/`. Cached entries are suffixed with `(cached)`. Cache mode is read-only — toggles like the system-enable switch are disabled, since there's no running world to mutate.
 
-Selecting a live world while a cached snapshot is showing automatically switches the window into live mode (and vice-versa when the live world stops).
+Selecting a live world while a cached snapshot is showing switches into live mode (and vice-versa when the live world stops).
 
 ## Search syntax
 
@@ -63,7 +63,7 @@ Selecting a live world while a cached snapshot is showing automatically switches
 </figure>
 -->
 
-The search field accepts whitespace-separated **tokens**. Every token must match (logical AND) for a row to appear. Tokens fall into three shapes:
+The search field accepts whitespace-separated **tokens**. Every token must match (logical AND) for a row to appear. Tokens come in three shapes:
 
 ### Bare substrings
 
@@ -73,7 +73,7 @@ A bare word is a substring match against the row's display name and altname:
 player        matches any row whose display name contains "player"
 ```
 
-Smart-case: a token with no uppercase characters matches case-insensitively; introducing any uppercase character flips that token to case-sensitive (ripgrep / vim / ag convention).
+Smart-case: tokens with no uppercase match case-insensitively; any uppercase character flips the token to case-sensitive (ripgrep / vim / ag convention).
 
 ```
 play COLL     "play" matches loosely, "COLL" only matches literal "COLL"
@@ -87,7 +87,7 @@ Quote a phrase to include spaces:
 
 ### Kind selector
 
-A single `t:KIND` token restricts which row kinds are visible. Only one selector is honored; later selectors overwrite earlier ones.
+A single `t:KIND` token restricts which row kinds are visible. Only one selector is honored; later ones overwrite earlier ones.
 
 | Token | Restricts to |
 |---|---|
@@ -100,7 +100,7 @@ A single `t:KIND` token restricts which row kinds are visible. Only one selector
 
 ### Predicates
 
-Predicates are `key:value` tokens with a recognized key. Each predicate is checked against whatever fields the row's kind exposes. A predicate that doesn't apply to a row's kind filters that row out, so combining predicates implicitly narrows which kinds appear.
+Predicates are `key:value` tokens with a recognized key, checked against fields the row's kind exposes. A predicate that doesn't apply to a kind filters that row out, so combining predicates implicitly narrows which kinds appear.
 
 | Predicate | Applies to | Matches when |
 |---|---|---|
@@ -139,10 +139,10 @@ base:Enemy                   templates whose base chain includes Enemy
 
 ## Search history
 
-Every committed search is recorded (capped at 20 entries, persisted across sessions via `EditorPrefs`):
+Every committed search is recorded (capped at 20 entries, persisted via `EditorPrefs`):
 
 - With focus in the search field, **Up** / **Down** cycle through prior queries.
-- The current draft is preserved on the first **Up** and restored when you walk back past it with **Down**.
+- The current draft is preserved on the first **Up** and restored when walking back past it with **Down**.
 - The cog menu has a **Clear Search History** entry.
 
 ## Keyboard shortcuts
@@ -167,7 +167,7 @@ Every committed search is recorded (capped at 20 entries, persisted across sessi
 </figure>
 -->
 
-Right-clicking a row offers actions tailored to the row's kind:
+Right-clicking a row offers actions tailored to its kind:
 
 | Row kind | Actions |
 |---|---|
@@ -193,14 +193,14 @@ Each "Find…" entry pre-fills the search field with the right predicate and kin
 </figure>
 -->
 
-The kebab (`⋮`) at the top-right of the window holds:
+The kebab (`⋮`) at the top-right holds:
 
-- **Show Empty Templates** — toggle whether templates with no live entities appear.
-- **Show Abstract Templates** — toggle whether abstract (non-instantiable) templates appear.
+- **Show Empty Templates** — toggle templates with no live entities.
+- **Show Abstract Templates** — toggle abstract (non-instantiable) templates.
 - **Help…** — opens the same inline help panel as the `?` button.
 - **Clear Search History** — wipes the saved query list.
 
-Both visibility toggles are persisted via `EditorPrefs`.
+Both visibility toggles persist via `EditorPrefs`.
 
 ## Inspector cross-links and hover preview
 
@@ -214,16 +214,16 @@ Both visibility toggles are persisted via `EditorPrefs`.
 </figure>
 -->
 
-Selecting a row drives Unity's standard inspector to a Trecs-aware view of the entity / template / component / set / tag. Component fields are shown as a per-entity component inspector with JSON edit support, and most inspector views include navigation links back to other rows in the hierarchy:
+Selecting a row drives Unity's standard inspector to a Trecs-aware view of the entity / template / component / set / tag. Component fields appear as a per-entity component inspector with JSON edit support, and most inspector views include navigation links back to the hierarchy:
 
-- Clicking a link selects the linked row in the hierarchy (and scrolls it into view).
-- Holding `Shift` while hovering a link previews the destination — the hierarchy scrolls but the selection doesn't change, so the inspector keeps showing your current row.
+- Clicking a link selects the linked row and scrolls it into view.
+- `Shift+hover` on a link previews the destination — the hierarchy scrolls but selection doesn't change, so the inspector keeps showing your current row.
 
-Selection and link navigation persist across domain reloads and across the live ↔ cache transition: rows are identified by stable string keys (e.g. `template:Foo`, `accessor:MoveSystem`), not by transient object references.
+Selection and link navigation persist across domain reloads and the live ↔ cache transition: rows are identified by stable string keys (e.g. `template:Foo`, `accessor:MoveSystem`), not transient object references.
 
 ## Live vs cache mode
 
-Trecs writes a schema snapshot to `Library/` whenever a world runs in the editor, so the hierarchy still has something to show after Play mode ends or between domain reloads.
+Trecs writes a schema snapshot to `Library/` whenever a world runs in the editor, so the hierarchy has something to show after Play mode ends or between domain reloads.
 
 | | Live mode | Cache mode |
 |---|---|---|
@@ -232,7 +232,7 @@ Trecs writes a schema snapshot to `Library/` whenever a world runs in the editor
 | System-enable toggle | Active | Disabled |
 | Entity counts on rows | Live counts | Hidden (cache holds no entity instances) |
 
-The window switches automatically: when a live world appears it takes over the dropdown; when the last live world stops, the most recent compatible snapshot loads in cache mode. The dropdown's `(cached)` suffix is the at-a-glance indicator.
+The window switches automatically: a new live world takes over the dropdown; when the last live world stops, the most recent compatible snapshot loads in cache mode. The `(cached)` suffix is the at-a-glance indicator.
 
 ## See also
 

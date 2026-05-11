@@ -1,6 +1,6 @@
 # Samples
 
-Trecs includes a progressive tutorial series and two full game samples. Each sample builds on concepts from previous ones.
+A progressive tutorial series plus full game samples. Each builds on the previous.
 
 ## Tutorial series (Trecs 101)
 
@@ -32,14 +32,14 @@ Trecs includes a progressive tutorial series and two full game samples. Each sam
 
 ## Running the samples
 
-Open `UnityProject/Trecs/Assets/Samples/Main.unity` in Unity 6000.3+ and press Play. The scene includes a `SampleCycler` that lets you switch between samples at runtime. Each sample has its own composition root that builds the world and initializes the scene.
+Open `UnityProject/Trecs/Assets/Samples/Main.unity` in Unity 6000.3+ and press Play. A `SampleCycler` lets you switch between samples at runtime. Each sample has its own composition root.
 
 ## Sample architecture: Bootstrap & CompositionRoot
 
-Each sample uses a simple two-class pattern to wire everything together:
+Each sample uses a two-class pattern:
 
-- **`Bootstrap`** — a MonoBehaviour that drives the Unity lifecycle. In `Awake()` it calls `CompositionRoot.Construct()` and runs the returned initializers; `Update()` and `LateUpdate()` invoke the tickables and late tickables; `OnDestroy()` runs the disposables.
-- **`CompositionRootBase`** — an abstract MonoBehaviour that each sample subclasses. `Construct()` builds the `WorldBuilder`, creates systems, and returns four `List<Action>` callbacks (init, tick, late tick, dispose).
+- **`Bootstrap`** — MonoBehaviour driving the Unity lifecycle. `Awake()` calls `CompositionRoot.Construct()` and runs the initializers; `Update()` / `LateUpdate()` invoke tickables and late tickables; `OnDestroy()` runs disposables.
+- **`CompositionRootBase`** — abstract MonoBehaviour each sample subclasses. `Construct()` builds the `WorldBuilder`, creates systems, and returns four `List<Action>` callbacks (init, tick, late tick, dispose).
 
 ```csharp
 // Simplified — each sample's composition root looks roughly like this:
@@ -66,17 +66,17 @@ public class MyCompositionRoot : CompositionRootBase
 ```
 
 !!! note
-    This pattern is just a lightweight convenience for the samples. Trecs is deliberately unopinionated about how you structure your application — it doesn't register MonoBehaviours, manage singletons, or hook into Unity's update loop automatically. Use whatever you prefer: a DI framework (Reflex, Zenject, VContainer), plain MonoBehaviours, ScriptableObjects, or anything else. All Trecs needs is for your code to call `world.Tick()`, `world.LateTick()`, and `world.Dispose()` at the appropriate times.
+    This pattern is a convenience for the samples. Trecs is unopinionated about application structure — it doesn't register MonoBehaviours, manage singletons, or hook into Unity's update loop. Use a DI framework (Reflex, Zenject, VContainer), plain MonoBehaviours, ScriptableObjects, or anything else. Trecs only requires that your code calls `world.Tick()`, `world.LateTick()`, and `world.Dispose()` at the right times.
 
 ## Shared utilities
 
-The `Common/` directory contains helpers shared across samples (these are sample code — not part of Trecs itself):
+`Common/` contains helpers shared across samples (sample code — not part of Trecs itself):
 
 - **`GameObjectRegistry`** — maps `GameObjectId` components to Unity GameObjects
 - **`RendererSystem`** — GPU-instanced indirect rendering for high entity counts
-- **`Bootstrap`** / **`CompositionRootBase`** — the lifecycle wiring described above
+- **`Bootstrap`** / **`CompositionRootBase`** — the lifecycle wiring above
 - **`SampleUtil`** — primitive/material helpers
-- **`DisposeCollection`** — small `IDisposable` aggregator
+- **`DisposeCollection`** — `IDisposable` aggregator
 - Common components and templates (`Position`, `Rotation`, `UniformScale`, `ColorComponent`, `CommonTemplates.Renderable`, etc.)
 
-If you copy code from a sample, be sure to also copy any dependencies from `Common/`.
+If you copy code from a sample, also copy its `Common/` dependencies.

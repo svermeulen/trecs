@@ -1,14 +1,14 @@
 # 09 — Interpolation
 
-Smooth rendering at variable frame rates despite a low fixed timestep. Side-by-side comparison of interpolated vs raw entity movement.
+Smooth rendering at variable frame rates despite a low fixed timestep. Side-by-side comparison of interpolated vs raw movement.
 
 **Source:** `com.trecs.core/Samples~/Tutorials/09_Interpolation/`
 
 ## What it does
 
-Two sets of entities orbit in circles. "Smooth" entities use interpolation and appear silky smooth. "Raw" entities read the fixed-update position directly and visibly stutter at high frame rates.
+Two sets of entities orbit in circles. "Smooth" entities use interpolation; "Raw" entities read the fixed-update position directly and visibly stutter at high frame rates.
 
-The fixed timestep is intentionally set low (10 Hz) to make the difference obvious. An alternative approach to see this effect would be to keep default timestep but adjust Unity Time.scale to slow down the simulation. In a real game the latter approach is more useful to debug this effect.
+The fixed timestep is set low (10 Hz) to make the difference obvious. An alternative is keeping the default timestep but lowering Unity's `Time.scale` — more useful for debugging in a real game.
 
 ## Schema
 
@@ -49,11 +49,11 @@ public partial class RawOrbitEntity : ITemplate, ITagged<OrbitTags.Raw>
 }
 ```
 
-The `[Interpolated]` attribute on `Position` and `Rotation` automatically generates `Interpolated<T>` and `InterpolatedPrevious<T>` wrapper components.
+`[Interpolated]` on `Position` and `Rotation` generates `Interpolated<T>` and `InterpolatedPrevious<T>` wrapper components.
 
 ## Interpolation functions
 
-Define static methods with `[GenerateInterpolatorSystem]` that specify how each component type should be blended. The source generator creates a Burst-compiled job system for each:
+Static methods marked `[GenerateInterpolatorSystem]` specify how each component type blends. The source generator emits a Burst-compiled job system for each:
 
 ```csharp
 public static class SampleInterpolators
@@ -80,11 +80,11 @@ public static class SampleInterpolators
 }
 ```
 
-The `GroupName` groups related interpolators so they can be registered with a single call.
+`GroupName` lets related interpolators be registered with a single call.
 
 ## Setup
 
-The generated extension method `AddInterpolationSampleInterpolators()` registers both the previous-frame savers and the blending systems:
+The generated `AddInterpolationSampleInterpolators()` extension registers both the previous-frame savers and the blending systems:
 
 ```csharp
 var world = new WorldBuilder()
@@ -99,18 +99,18 @@ var world = new WorldBuilder()
 
 ### Entity creation
 
-Smooth entities use `SetInterpolated`, which initializes the current, previous, and interpolated copies of the component in one call:
+`SetInterpolated` initializes the current, previous, and interpolated copies in one call:
 
 ```csharp
 entity.SetInterpolated(new Position(position));
 entity.SetInterpolated(new Rotation(quaternion.identity));
 ```
 
-Raw entities use plain `Set` — they only have the single fixed-update component.
+Raw entities use plain `Set` — they only have the fixed-update component.
 
 ## Rendering
 
-The renderer uses two aspects — one that reads the interpolated wrappers and one that reads the raw components — and dispatches per partition:
+Two aspects — one for the interpolated wrappers, one for the raw components — dispatched per partition:
 
 ```csharp
 [ExecuteIn(SystemPhase.Presentation)]
@@ -145,14 +145,14 @@ public partial class OrbitRendererSystem : ISystem
 }
 ```
 
-Because `Position` and `Rotation` are `[Unwrap]`, the aspect exposes `view.InterpolatedPosition` (`float3`) and `view.InterpolatedRotation` (`quaternion`) directly — no double-`.Value` indirection.
+Because `Position` and `Rotation` are `[Unwrap]`, the aspect exposes `view.InterpolatedPosition` (`float3`) and `view.InterpolatedRotation` (`quaternion`) directly — no double-`.Value`.
 
 ## Concepts introduced
 
-- **`[Interpolated]`** attribute on template fields generates the `Interpolated<T>` and `InterpolatedPrevious<T>` wrapper components.
-- **`[GenerateInterpolatorSystem]`** source-generates Burst-compiled blending systems from simple static methods.
-- **`GroupName`** groups related interpolators so a single generated extension method (`AddInterpolationSampleInterpolators()`) registers them all.
-- **`SetInterpolated()`** initializes all three component copies (current, interpolated, previous).
-- **Reading via an aspect** — `IRead<Interpolated<Position>>` together with `[Unwrap]` gives clean `view.InterpolatedPosition` access.
+- **`[Interpolated]`** on template fields generates `Interpolated<T>` and `InterpolatedPrevious<T>` wrapper components.
+- **`[GenerateInterpolatorSystem]`** — source-generates Burst-compiled blending systems from static methods.
+- **`GroupName`** — registers a group of interpolators via a single generated extension method.
+- **`SetInterpolated()`** — initializes all three component copies (current, interpolated, previous).
+- **Reading via an aspect** — `IRead<Interpolated<Position>>` plus `[Unwrap]` gives clean `view.InterpolatedPosition` access.
 
-See [Interpolation](../advanced/interpolation.md) for the full reference. For an alternative pattern using a manual `SimPosition` + lerp, see [Feeding Frenzy](07-feeding-frenzy.md).
+See [Interpolation](../advanced/interpolation.md) for the full reference. For a manual `SimPosition` + lerp alternative, see [Feeding Frenzy](07-feeding-frenzy.md).

@@ -1,6 +1,6 @@
 # Fixed Collections
 
-Components must be unmanaged structs, so a component field can't hold a `List<T>` or an array directly. When you need a small bounded collection inside a component — equipment slots on a character, active buffs on a unit, a small list of tracked targets — `Trecs.Collections` provides two size-specialized value types that store their elements inline.
+Components must be unmanaged structs, so a component field can't hold a `List<T>` or an array. For small bounded collections inside a component — equipment slots, active buffs, tracked targets — `Trecs.Collections` provides two size-specialized value types that store elements inline.
 
 | Type | Shape | Use when |
 |---|---|---|
@@ -11,7 +11,7 @@ Both require `T : unmanaged`. Available sizes: `2`, `4`, `8`, `16`, `32`, `64`, 
 
 ## Read / write split
 
-The indexer on both types returns `ref readonly T` — you read with `arr[i]`, but you can't write through it. Writes go through a separate `.Mut(i)` extension method that returns `ref T`:
+The indexer returns `ref readonly T` — read with `arr[i]`, but you can't write through it. Writes go through `.Mut(i)`, which returns `ref T`:
 
 ```csharp
 ref readonly var x = ref arr[i];  // readonly ref (no copy, works through `in` too)
@@ -20,7 +20,7 @@ ref var r = ref arr.Mut(i);        // mutable ref for in-place updates
 r += 1;
 ```
 
-This split makes `in FixedArray<N>` / `in FixedList<N>` parameters genuinely safe: readers can index them freely (no defensive copy, no hidden mutation), and writes fail to compile because `Mut` is a `this ref` extension that can't be called through a readonly reference.
+This makes `in FixedArray<N>` / `in FixedList<N>` parameters safe: readers can index freely (no defensive copy, no hidden mutation), and writes fail to compile because `Mut` is a `this ref` extension that can't be called through a readonly reference.
 
 ```csharp
 void Foo(in FixedArray16<int> arr)
@@ -32,7 +32,7 @@ void Foo(in FixedArray16<int> arr)
 
 ## `FixedArray<N>`
 
-A fixed-length array whose storage lives inline in its container. `default(FixedArray8<float3>)` gives you 8 zeroed slots; there's nothing to initialize.
+A fixed-length array stored inline. `default(FixedArray8<float3>)` gives 8 zeroed slots; nothing to initialize.
 
 ```csharp
 using Trecs.Collections;
@@ -54,7 +54,7 @@ m.x += 1.0f;
 
 ## `FixedList<N>`
 
-A `FixedList<N><T>` is a `FixedArray<N><T>` plus a `Count` that tracks how many slots are live. `Capacity` is fixed at `N`; `Count` starts at `0` and grows with `Add` up to `Capacity`.
+A `FixedList<N><T>` is a `FixedArray<N><T>` plus a `Count` of live slots. `Capacity` is fixed at `N`; `Count` starts at `0` and grows with `Add` up to `Capacity`.
 
 ```csharp
 public struct ContactPoints : IEntityComponent
@@ -84,19 +84,19 @@ for (int i = cp.Contacts.Count - 1; i >= 0; i--)
 | `RemoveAtSwapBack(i)` | O(1) (overwrites slot `i` with the last element) | No |
 | `Mut(i) = x` | O(1) | — |
 
-`==` compares `Count` and the live slots only — bytes past `Count` (leftover from prior `Clear` / `RemoveAt` calls, or uninitialized) are ignored.
+`==` compares `Count` and live slots only — bytes past `Count` (leftover from prior `Clear` / `RemoveAt` calls, or uninitialized) are ignored.
 
 ## Choosing a size
 
-Type names pick the footprint. A `FixedArray256<float4x4>` is **16 KB** — per entity, whether every slot is used or not. Pick the smallest variant that covers your worst case, and round up when the worst case doesn't hit a power of two. If you'd want a `FixedList<100>`, use `FixedList128` and accept the slack.  Memory is usually pretty cheap.
+The type name picks the footprint. A `FixedArray256<float4x4>` is **16 KB** per entity, used or not. Pick the smallest variant that covers your worst case, rounding up to the next power of two — for a `FixedList<100>`, use `FixedList128` and accept the slack. Memory is usually cheap.
 
 ## When to reach for something else
 
-- **The upper bound varies widely across entities, or is usually far below the cap.** A `FixedArray256<T>` that's typically empty wastes storage on every entity in the group. Use a [heap pointer](heap.md) to an external `NativeList<T>` or a managed `List<T>` instead.
+- **The upper bound varies widely across entities, or usually sits far below the cap.** A `FixedArray256<T>` that's typically empty wastes storage on every entity in the group. Use a [heap pointer](heap.md) to an external `NativeList<T>` or managed `List<T>` instead.
 
 ## Relation to Unity's `FixedList*Bytes`
 
-Unity's `Unity.Collections` package ships `FixedList32Bytes<T>` through `FixedList4096Bytes<T>` — the same idea on a different axis. The quick differences:
+Unity's `Unity.Collections` ships `FixedList32Bytes<T>` through `FixedList4096Bytes<T>` — same idea, different axis. Differences:
 
 | | Trecs | Unity `FixedList*Bytes` |
 |---|---|---|
@@ -106,4 +106,4 @@ Unity's `Unity.Collections` package ships `FixedList32Bytes<T>` through `FixedLi
 | API surface | Minimal: `Add`, `Clear`, `RemoveAt`, `RemoveAtSwapBack`, `Mut` | Extensive: `IndexOf`, `Contains`, `Sort`, `IEnumerable<T>`, cross-size equality |
 | Count-less variant | `FixedArray<N>` | none |
 
-Either works as an inline component buffer. Trecs's types read more naturally at ECS call sites — the element-count axis matches how you think about the bound, and the readonly-indexer / `Mut`-write split keeps `in` parameters safe without defensive copies. If your codebase is already using Unity's types, mixing the two is fine; they're independent.
+Either works as an inline component buffer. Trecs's types read more naturally at ECS call sites — the element-count axis matches how you think about the bound, and the readonly-indexer / `Mut`-write split keeps `in` parameters safe without defensive copies. If your codebase already uses Unity's types, mixing the two is fine.

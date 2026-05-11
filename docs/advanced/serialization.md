@@ -7,7 +7,7 @@ Trecs ships an optional binary serialization framework for full ECS world state.
 
 ## Overview
 
-Compose just the pieces you need:
+Compose the pieces you need:
 
 - **`SerializerRegistry`** — maps types to their serializers.
 - **`WorldStateSerializer`** — reads/writes the entire ECS world (components, sets, heaps, entity handles).
@@ -33,13 +33,13 @@ var snapshots = new SnapshotSerializer(worldStateSerializer, registry, world);
 
 For a save-game flow stop here and use `SnapshotSerializer.SaveSnapshot` / `LoadSnapshot`. For deterministic record/replay also construct `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` (see [Recording & Playback](recording-and-playback.md)).
 
-The samples ship a `SerializationFactory.CreateAll(world)` helper that wires up the full stack in one call — copy `Samples/Serialization/Common/Scripts/SerializationFactory.cs` into your project and trim the parts you don't need.
+The samples ship a `SerializationFactory.CreateAll(world)` helper that wires up the full stack in one call — copy `Samples/Serialization/Common/Scripts/SerializationFactory.cs` into your project and trim what you don't need.
 
-`SerializerRegistry` itself is independent of Trecs — it only exposes generic `RegisterBlit<T>`, `RegisterEnum<T>`, `RegisterSerializer<TSerializer>` and can be used standalone in non-ECS code.
+`SerializerRegistry` is independent of Trecs — it exposes generic `RegisterBlit<T>`, `RegisterEnum<T>`, `RegisterSerializer<TSerializer>` and can be used standalone in non-ECS code.
 
 ## Authoring a custom serializer
 
-Most components are unmanaged structs and serialize automatically via the built-in blit serializer — no extra code required. You only need a custom `ISerializer<T>` for types that hold managed references (lists, dictionaries, strings) or where you want a non-default encoding.
+Most components are unmanaged structs and serialize automatically via the built-in blit serializer. You only need a custom `ISerializer<T>` for types that hold managed references (lists, dictionaries, strings) or where you want a non-default encoding.
 
 ```csharp
 public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
@@ -75,7 +75,7 @@ registry.RegisterSerializer<HighScoreTableSerializer>();
 ```
 
 !!! note "Field names are discarded"
-    The `name` arguments passed to `writer.Write` / `reader.Read` are **not** persisted in the binary stream — they exist only for debug memory tracking (`GetMemoryReport`) and as self-documentation. The binary format is purely positional: reads must occur in the exact same order as writes. Renaming a field is a no-op on disk; reordering reads or adding/removing one without bumping the format version will silently corrupt deserialization.
+    The `name` arguments to `writer.Write` / `reader.Read` are **not** persisted — they exist for debug memory tracking (`GetMemoryReport`) and self-documentation. The binary format is purely positional: reads must occur in the same order as writes. Renaming a field is a no-op on disk; reordering reads or adding/removing one without bumping the format version silently corrupts deserialization.
 
 ### Blit registrations
 
@@ -91,7 +91,7 @@ Delta-capable types must implement `IEquatable<T>`.
 
 ## Extending world state with non-ECS data
 
-If your game has state that lives outside the ECS world (scripting VMs, external caches), subclass `WorldStateSerializer` to write/read your additional chunks:
+For state outside the ECS world (scripting VMs, external caches), subclass `WorldStateSerializer` to write/read additional chunks:
 
 ```csharp
 public sealed class MyGameStateSerializer : WorldStateSerializer
@@ -123,7 +123,7 @@ var snapshots = new SnapshotSerializer(worldStateSer, registry, world);
 
 ## Buffer reuse
 
-`SerializationBuffer` is the shared write/read buffer used internally by every handler. Most users never touch it directly — `SnapshotSerializer.SaveSnapshot(stream)` and friends manage it for you. Power users who need to drive the binary reader/writer themselves can construct one explicitly:
+`SerializationBuffer` is the shared write/read buffer used internally by every handler. Most users never touch it — `SnapshotSerializer.SaveSnapshot(stream)` and friends manage it. To drive the binary reader/writer yourself, construct one explicitly:
 
 ```csharp
 using var buffer = new SerializationBuffer(registry);
@@ -134,11 +134,11 @@ var roundTripped = buffer.ReadAll<MyType>();
 
 ## Determinism notes
 
-The full determinism checklist (RNG, fixed-time, sort keys, isolated inputs) lives on the [Recording & Playback](recording-and-playback.md#determinism-requirements) page. One serialization-specific flag is worth flagging here:
+The full determinism checklist (RNG, fixed-time, sort keys, isolated inputs) lives on the [Recording & Playback](recording-and-playback.md#determinism-requirements) page. One serialization-specific flag:
 
 ### `WorldSettings.AssertNoTimeInFixedPhase`
 
-For deterministic-lockstep workloads (e.g. RTS netcode) where the simulation must produce bit-identical results across machines, set `AssertNoTimeInFixedPhase = true`:
+For deterministic-lockstep workloads (e.g. RTS netcode) that must produce bit-identical results across machines, set `AssertNoTimeInFixedPhase = true`:
 
 ```csharp
 var settings = new WorldSettings
@@ -148,24 +148,24 @@ var settings = new WorldSettings
 };
 ```
 
-Trecs guarantees deterministic scheduling, iteration, and entity ordering, but it **cannot** guarantee deterministic floating-point math across hardware. Reading continuous time values (`DeltaTime`, `ElapsedTime`, `FixedDeltaTime`, `FixedElapsedTime`) during the fixed-update phase is a common source of drift, because accumulated floating-point error diverges across machines.
+Trecs guarantees deterministic scheduling, iteration, and entity ordering, but **cannot** guarantee deterministic floating-point math across hardware. Reading continuous time values (`DeltaTime`, `ElapsedTime`, `FixedDeltaTime`, `FixedElapsedTime`) during fixed update is a common source of drift, because accumulated floating-point error diverges across machines.
 
 With the flag enabled:
 
 - Accessing any of those four properties on `WorldAccessor` during fixed update **throws**.
-- In Burst jobs (where exceptions are unavailable), `NativeWorldAccessor.DeltaTime` / `NativeWorldAccessor.ElapsedTime` are populated with `float.NaN` so any arithmetic that uses them produces visibly broken output instead of silent desync.
+- In Burst jobs (where exceptions are unavailable), `NativeWorldAccessor.DeltaTime` / `NativeWorldAccessor.ElapsedTime` are populated with `float.NaN` so arithmetic using them produces visibly broken output instead of silent desync.
 
-Use `World.FixedFrame` — a discrete tick counter — as your time source in fixed update instead. Variable-update systems are unaffected.
+Use `World.FixedFrame` — a discrete tick counter — as your time source in fixed update. Variable-update systems are unaffected.
 
 See [Recording & Playback](recording-and-playback.md) for the determinism-sensitive lifecycle and desync-detection workflow.
 
 ## Threading
 
-All `SnapshotSerializer`, `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` methods are **main-thread only**. The blit fast-path uses a shared static byte buffer, and every read/write path asserts `UnityThreadHelper.IsMainThread`. Do not call save/load from a background thread.
+All `SnapshotSerializer`, `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` methods are **main-thread only**. The blit fast-path uses a shared static byte buffer, and every read/write path asserts `UnityThreadHelper.IsMainThread`. Never call save/load from a background thread.
 
 ## Writer / reader flags
 
-Every `ISerializationWriter` / `ISerializationReader` carries a `long Flags` bitmask you can consult from inside a custom serializer. Flags are threaded in at the top level (`WriteAll(value, version, includeTypeChecks, flags: …)`, `StartWrite(version, includeTypeChecks, flags: …)`) and propagate to every nested serializer.
+Every `ISerializationWriter` / `ISerializationReader` carries a `long Flags` bitmask available inside a custom serializer. Flags are passed at the top level (`WriteAll(value, version, includeTypeChecks, flags: …)`, `StartWrite(version, includeTypeChecks, flags: …)`) and propagate to every nested serializer.
 
 Typical use: excluding non-deterministic state from checksums. Define a constant, set it from the recording's `checksumFlags` parameter, then branch inside your serializer:
 
@@ -189,20 +189,20 @@ public void Serialize(in Npc value, ISerializationWriter writer)
 }
 ```
 
-`BundleRecorder` stores the flags on `BundleHeader.ChecksumFlags` and `BundlePlayer` passes them back in automatically during checksum verification, so recording and playback always agree on what was included.
+`BundleRecorder` stores the flags on `BundleHeader.ChecksumFlags` and `BundlePlayer` passes them back during checksum verification, so recording and playback always agree on what was included.
 
 ## Schema versioning
 
-The binary layout is **version-sensitive** and not forward-compatible. Adding, removing, or reordering fields on a blittable component changes the byte layout, invalidating every previously saved snapshot or bundle that used the old shape.
+The binary layout is **version-sensitive** and not forward-compatible. Adding, removing, or reordering fields on a blittable component changes the byte layout, invalidating every previously saved snapshot or bundle.
 
-The `version` integer you pass to `SaveSnapshot(version, …)` / `BundleRecorderSettings.Version` is stored in the file header and exposed on `SnapshotMetadata.Version` / `BundleHeader.Version`. Trecs doesn't interpret it — bumping `version` on a breaking change is your convention. Use `SnapshotSerializer.PeekMetadata(path)` to inspect the version before committing to a full `LoadSnapshot`, and surface a user-facing error for incompatible saves.
+The `version` integer you pass to `SaveSnapshot(version, …)` / `BundleRecorderSettings.Version` is stored in the file header and exposed on `SnapshotMetadata.Version` / `BundleHeader.Version`. Trecs doesn't interpret it — bumping `version` on a breaking change is your convention. Use `SnapshotSerializer.PeekMetadata(path)` to inspect the version before a full `LoadSnapshot`, and surface a user-facing error for incompatible saves.
 
 !!! note "Two different 'versions'"
-    Don't confuse the user `version` above with Trecs's own internal `FormatVersion` byte written at the start of every payload by `SerializationHeaderUtil`. The format version describes the layout of the header itself; it is bumped only when Trecs changes the framing, and users never set it. Your `version` parameter is the schema version of your game's serialized data — bump it whenever *your* serializers change shape.
+    Don't confuse the user `version` above with Trecs's internal `FormatVersion` byte written at the start of every payload by `SerializationHeaderUtil`. The format version describes the header layout itself; Trecs bumps it only when changing the framing, and users never set it. Your `version` parameter is the schema version of your game's serialized data — bump it whenever *your* serializers change shape.
 
 ### Versioned custom serializers
 
-The `version` integer is also exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). The deserializer can therefore recognize older saves and read them with the layout they were written in. Bump the version on every layout change, and a single serializer can keep handling all prior versions:
+The `version` integer is exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). The deserializer can recognize older saves and read them with the layout they were written in. Bump the version on every layout change, and a single serializer can keep handling all prior versions:
 
 ```csharp
 public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
@@ -243,9 +243,9 @@ public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
 }
 ```
 
-The example only adds a field, but `Version` lets you handle removals and reorderings too — branch the deserializer on `reader.Version` and read the appropriate layout for each historical version. The constraint is that you have to keep the read-side code for every old version you still want to support, and bump `version` every time the layout changes.
+The example only adds a field, but `Version` also handles removals and reorderings — branch the deserializer on `reader.Version` and read the appropriate layout for each historical version. You have to keep the read-side code for every old version you still want to support, and bump `version` every time the layout changes.
 
-If your game needs long-term save compatibility across deeper schema changes (renamed types, restructured aggregates, splitting one component into two), wrap the Trecs snapshot inside your own versioned format and perform migrations before calling `LoadSnapshot`.
+For long-term save compatibility across deeper schema changes (renamed types, restructured aggregates, splitting one component into two), wrap the Trecs snapshot inside your own versioned format and migrate before calling `LoadSnapshot`.
 
 For the exact on-disk layout (header fields, stream guards, endianness, integrity caveats), see the [Binary Format Reference](binary-format.md).
 

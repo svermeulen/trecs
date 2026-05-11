@@ -1,6 +1,6 @@
 # 02 — Spawn & Destroy
 
-Dynamic entity creation and destruction. Spheres spawn at random positions, live for a set duration, then are removed along with their GameObjects.
+Spheres spawn at random positions, live for a set duration, then are removed along with their GameObjects.
 
 **Source:** `com.trecs.core/Samples~/Tutorials/02_SpawnAndDestroy/`
 
@@ -39,7 +39,7 @@ public partial class SphereEntity : ITemplate, ITagged<SampleTags.Sphere>
 
 ### SpawnSystem
 
-Spawns a new sphere every 0.5 seconds at a random position with a random color:
+Spawns a new sphere every 0.5 seconds with a random position and color:
 
 ```csharp
 World.AddEntity<SampleTags.Sphere>()
@@ -52,7 +52,7 @@ Uses `World.Rng` for deterministic random placement.
 
 ### LifetimeSystem
 
-Counts down lifetime and removes expired entities, cleaning up their GameObjects inline:
+Counts down the lifetime and removes expired entities, cleaning up GameObjects inline:
 
 ```csharp
 public partial class LifetimeSystem : ISystem
@@ -90,4 +90,4 @@ Syncs position to GameObjects each visual frame.
 - **Entity removal** with `RemoveEntity` (deferred until submission)
 - **`World.Rng`** for deterministic random numbers — see [Time & RNG](../advanced/time-and-rng.md)
 - **Individual component parameters** — `[ForEachEntity]` receives components directly. See [Queries & Iteration](../data-access/queries-and-iteration.md).
-- **Inline cleanup** — destroying GameObjects at removal time inside the system. See also [Entity Events](../entity-management/entity-events.md) for centralized cleanup via `OnRemoved`, demonstrated in [Predator Prey](04-predator-prey.md).
+- **Inline cleanup** — destroying GameObjects inside the system at removal time. See [Entity Events](../entity-management/entity-events.md) for centralized cleanup via `OnRemoved`, demonstrated in [Predator Prey](04-predator-prey.md).

@@ -1,10 +1,10 @@
 # Entity Events
 
-Entity events let a service react to structural changes — whenever entities are added, removed, or moved between groups. Observer callbacks fire during [submission](structural-changes.md#when-submission-happens), after the queued change has been applied.
+Entity events let a service react to structural changes — entities added, removed, or moved between groups. Observer callbacks fire during [submission](structural-changes.md#when-submission-happens), after the queued change has been applied.
 
 ## Anatomy of a subscription
 
-Every entity-event subscription is built fluently in three parts: pick the **scope** (which groups to watch), pick the **event** (add / remove / move), and supply a **handler**:
+Build a subscription in three parts: pick the **scope** (which groups to watch), the **event** (add / remove / move), and a **handler**:
 
 ```csharp
 World.Events
@@ -14,7 +14,7 @@ World.Events
 
 ### Scopes
 
-A scope picks which groups the subscription watches. One of:
+A scope picks which groups the subscription watches:
 
 | Method | Matches |
 |---|---|
@@ -63,7 +63,7 @@ public partial class RemoveCleanupHandler : IDisposable
 }
 ```
 
-All `[ForEachEntity]` features are supported on event handlers, so for example you can use aspects as well:
+All `[ForEachEntity]` features are supported on event handlers, including aspects:
 
 ```csharp
 public partial class CleanupHandlers : IDisposable
@@ -98,7 +98,7 @@ public partial class CleanupHandlers : IDisposable
 }
 ```
 
-Note that components read inside `OnRemoved` are still valid, even though the callback fires *after* removal — removed entities are parked at the end of the backing array (past the active count), so the buffers haven't been cleared yet. The removed components are also contiguous in memory, which is cache-friendly for cleanup.
+Components read inside `OnRemoved` are still valid even though the callback fires *after* removal — removed entities are parked at the end of the backing array (past the active count), so the buffers haven't been cleared. Removed components are contiguous in memory, which is cache-friendly for cleanup.
 
 ## Priorities
 
@@ -113,7 +113,7 @@ World.Events
 
 ## Disposing subscriptions
 
-The returned subscription objects all implement `IDisposable`. Dispose the subscription to unregister the handler.
+Subscription objects implement `IDisposable`. Dispose to unregister the handler.
 
 ```csharp
 var sub = World.Events
@@ -123,15 +123,15 @@ var sub = World.Events
 sub.Dispose();
 ```
 
-Trecs doesn't ship a `DisposeCollection` type to aggregate subscription disposables together. The samples define a small helper, but a `List<IDisposable>` walked during your object cleanup works fine too.
+Trecs doesn't ship a `DisposeCollection` type for aggregating subscriptions. The samples define a small helper, but a `List<IDisposable>` walked during cleanup works fine too.
 
 ## Cascading structural changes from callbacks
 
-A callback can itself queue structural changes — e.g. an `OnRemoved` handler that removes a follower, or an `OnAdded` handler that spawns a child.  Trecs keeps processing the queue until empty or a maximum number of iterations is reached - configurable via `WorldSettings.MaxSubmissionIterations` (default 10). Hitting the cap throws `"possible circular submission detected"` in `DEBUG` builds — usually a sign that an observer is feeding itself.
+A callback can itself queue structural changes — e.g. an `OnRemoved` handler that removes a follower, or an `OnAdded` handler that spawns a child. Trecs keeps processing the queue until empty or until `WorldSettings.MaxSubmissionIterations` (default 10) is reached. Hitting the cap throws `"possible circular submission detected"` in `DEBUG` builds — usually a sign that an observer is feeding itself.
 
 ## Frame events
 
-Separate from the per-entity events above, `World.Events` exposes lifecycle hooks for the simulation loop and for snapshot / recording loads:
+Separate from the per-entity events, `World.Events` exposes lifecycle hooks for the simulation loop and for snapshot / recording loads:
 
 | Event | Fires when |
 |---|---|

@@ -1,6 +1,6 @@
 # Components
 
-Components are plain data attached to entities. They're **unmanaged structs** — no classes, no managed references, no garbage collection.
+Components are plain data attached to entities — **unmanaged structs**, no classes, no managed references, no garbage collection.
 
 ## Defining components
 
@@ -34,7 +34,7 @@ Inside an aspect that reads `Position`, `aspect.Position` returns a `float3` rat
 
 ## Reading and writing components
 
-The most common access happens through [aspects](../data-access/aspects.md) and `[ForEachEntity]` parameters — those are the patterns you'll use day-to-day. For ad-hoc access by `EntityHandle`:
+Most access goes through [aspects](../data-access/aspects.md) and `[ForEachEntity]` parameters. For ad-hoc access by `EntityHandle`:
 
 ```csharp
 ref readonly Health hp = ref World.Component<Health>(handle).Read;
@@ -45,7 +45,7 @@ hpW.Current -= damage;
 
 The `.Read` / `.Write` split lets Trecs lazily complete any in-flight jobs with conflicting access before handing back the reference. See [Dependency Tracking](../performance/dependency-tracking.md).
 
-For a single-entity view bundling several component lookups (and `TryGet` for optional components), see [`EntityAccessor`](entities.md#accessing-entity-data):
+For a single-entity view that bundles several lookups (with `TryGet` for optional components), see [`EntityAccessor`](entities.md#accessing-entity-data):
 
 ```csharp
 var entity = World.Entity(handle);
@@ -87,7 +87,7 @@ public partial class PlayerEntity : ITemplate, ITagged<PlayerTag>
 | `[Constant]` | Immutable after entity creation. Asserted at the write site. |
 | `[Input(...)]` | Marks the component as input data. See [Input System](input-system.md). |
 
-A component without an attribute is **simulation state**: any phase may read it, but only `Fixed` systems may write it.
+A component with no attribute is **simulation state**: any phase may read it; only `Fixed` systems may write it.
 
 ## Global entity
 

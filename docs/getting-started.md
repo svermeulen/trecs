@@ -1,6 +1,6 @@
 # Getting Started
 
-A five-minute walkthrough: one entity, one component, one system, ticking inside a Unity scene.
+A five-minute walkthrough: one entity, one component, one system, ticking in a Unity scene.
 
 ## Installation
 
@@ -53,11 +53,11 @@ Add `com.trecs.core` first — Unity can't resolve versioned dependencies from g
 
 ## Your first entity
 
-We'll build a spinning cube. The pieces:
+We'll build a spinning cube using these pieces:
 
 - **Component** — the data
 - **Tag** — what kind of entity this is
-- **Template** — the blueprint (which components, which tags)
+- **Template** — the blueprint (components and tags)
 - **System** — the logic
 - **World** — the runtime
 
@@ -76,7 +76,7 @@ public partial struct Rotation : IEntityComponent
 
 ### 2. Define a tag
 
-Tags are empty marker structs that classify entities and serve as query filters:
+Tags are empty marker structs that classify entities and act as query filters:
 
 ```csharp
 public struct Spinner : ITag { }
@@ -84,7 +84,7 @@ public struct Spinner : ITag { }
 
 ### 3. Define a template
 
-A template is the blueprint for an entity kind — its tags (`ITagged<...>`) and its components (declared as fields):
+A template declares an entity kind — its tags (`ITagged<...>`) and its components (as fields):
 
 ```csharp
 public partial class SpinnerEntity : ITemplate, ITagged<Spinner>
@@ -93,11 +93,11 @@ public partial class SpinnerEntity : ITemplate, ITagged<Spinner>
 }
 ```
 
-The template class is never instantiated at runtime — it's read by the source generator at compile time.
+The template class is never instantiated — the source generator reads it at compile time.
 
 ### 4. Write a system
 
-`[ForEachEntity]` tells the generator to iterate every entity tagged with `Spinner` and call this method for each one:
+`[ForEachEntity]` iterates every entity tagged with `Spinner`, calling this method for each:
 
 ```csharp
 using Unity.Mathematics;
@@ -121,7 +121,7 @@ public partial class SpinnerSystem : ISystem
 
 ### 5. Build and run
 
-Wire it from a `MonoBehaviour`:
+Wire it up from a `MonoBehaviour`:
 
 ```csharp
 using UnityEngine;
@@ -153,11 +153,11 @@ public class GameLoop : MonoBehaviour
 Two things to notice:
 
 - `AddEntity<Spinner>()` takes the **tag**, not the template. Trecs matches `Spinner` to `SpinnerEntity` via `ITagged<Spinner>`.
-- `AccessorRole.Unrestricted` is used for setup outside the tick loop. Inside systems, the right role is wired automatically — see [Accessor Roles](advanced/accessor-roles.md).
+- `AccessorRole.Unrestricted` is for setup outside the tick loop. Inside systems, the right role is wired automatically — see [Accessor Roles](advanced/accessor-roles.md).
 
 ## Where to next
 
 - **[World Setup](core/world-setup.md)** — `WorldBuilder`, `WorldSettings`, lifecycle, `WorldAccessor`. Read this next.
 - **[Systems](core/systems.md)** — defining systems, iteration, update phases.
 - **[Aspects](data-access/aspects.md)** and **[Queries & Iteration](data-access/queries-and-iteration.md)** once you have multiple components per entity.
-- **[Samples](samples/index.md)** — each one focuses on a single feature, with a companion doc. The runnable version of this walkthrough lives in `Samples~/Tutorials/01_HelloEntity` (install via the Package Manager *Samples* tab).
+- **[Samples](samples/index.md)** — one feature each, with a companion doc. The runnable version of this walkthrough lives in `Samples~/Tutorials/01_HelloEntity` (install via the Package Manager *Samples* tab).

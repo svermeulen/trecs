@@ -1,12 +1,12 @@
 # Trecs
 
-A high-performance Entity Component System framework for Unity, designed for **deterministic simulation, recording/playback, and Burst/Jobs**.
+A high-performance Entity Component System for Unity, built for **deterministic simulation, recording/playback, and Burst/Jobs**.
 
 ## Why Trecs
 
 - **Cache-friendly storage.** Components live in contiguous structure-of-arrays buffers grouped by tag set.
-- **Small surface, lots of leverage.** Aspects bundle component access; sets give you sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; pointers (`SharedPtr` / `UniquePtr`) let components reference data on the heap.
-- **Burst & Jobs out of the box.** A source generator emits the job structs and chains the right `JobHandle` dependencies based on the components you read and write — no manual wiring.
+- **Small surface, lots of leverage.** Aspects bundle component access; sets give sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; `SharedPtr` / `UniquePtr` let components reference heap data.
+- **Burst & Jobs out of the box.** A source generator emits job structs and chains `JobHandle` dependencies from the components you read and write — no manual wiring.
 - **Designed for determinism.** Fixed-timestep simulation, deterministic RNG, isolated input, and built-in snapshot / record / replay with desync detection.
 - **Editor tooling.** A live entity inspector and a record / scrub / fork timeline window for diagnosing transient bugs.
 
@@ -48,12 +48,12 @@ void Update()    => world.Tick();
 void OnDestroy() => world.Dispose();
 ```
 
-`World` inside a system body is a source-generated property — your access into the running world for that phase. See [Getting Started](getting-started.md) for the full walkthrough.
+`World` inside a system body is a source-generated property — your handle into the running world for that phase.
 
 ## Where to go next
 
 - **[Getting Started](getting-started.md)** — install Trecs and run your first entity in a Unity scene.
-- **[Core: World Setup](core/world-setup.md)** — the deeper reference for `WorldBuilder`, lifecycle, and `WorldAccessor`.
+- **[Core: World Setup](core/world-setup.md)** — reference for `WorldBuilder`, lifecycle, and `WorldAccessor`.
 - **[Glossary](glossary.md)** — the terms (Group, Partition, Set, Tag, Aspect, Accessor, …) and how they relate.
 - **[Samples](samples/index.md)** — a progressive tutorial series plus full sample games.
 - **[FAQ](faq.md)** and **[Trecs vs Unity ECS](guides/trecs-vs-unity-ecs.md)** if you're sizing up the framework.

@@ -1,16 +1,16 @@
 # 01 — Hello Entity
 
-The simplest Trecs sample — a spinning cube. Introduces the fundamental building blocks: components, tags, templates, systems, and world setup.
+A spinning cube. Introduces components, tags, templates, systems, and world setup.
 
 **Source:** `com.trecs.core/Samples~/Tutorials/01_HelloEntity/`
 
 ## What it does
 
-By the end you'll have a single entity with a `Rotation` component being rotated each fixed update by a system, and its `GameObject` synced to the rotation each rendered frame.
+A single entity with a `Rotation` component is rotated each fixed update by a system. Its `GameObject` is synced to the rotation each rendered frame.
 
 ## Schema
 
-A schema is just the components, tags, and templates that describe your entities. This sample's schema is tiny:
+A schema is the components, tags, and templates that describe your entities:
 
 ```csharp
 public static class SampleTags
@@ -31,15 +31,15 @@ public static partial class SampleTemplates
 }
 ```
 
-`Rotation` and `GameObjectId` come from `Common/` — the samples folder reuses a small set of basic components across tutorials.
+`Rotation` and `GameObjectId` come from `Common/`, reused across tutorials.
 
-See [Components](../core/components.md), [Tags](../core/tags.md), and [Templates](../core/templates.md) for the underlying concepts.
+See [Components](../core/components.md), [Tags](../core/tags.md), and [Templates](../core/templates.md).
 
 ## Systems
 
 ### SpinnerSystem (fixed update)
 
-Spins anything that has a `Rotation` component:
+Spins anything with a `Rotation` component:
 
 ```csharp
 public partial class SpinnerSystem : ISystem
@@ -60,7 +60,7 @@ public partial class SpinnerSystem : ISystem
 }
 ```
 
-`MatchByComponents = true` iterates every entity that has the `Rotation` component, regardless of tags. See [Queries & Iteration](../data-access/queries-and-iteration.md).
+`MatchByComponents = true` iterates every entity with a `Rotation` component, regardless of tags. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 
 ### SpinnerGameObjectUpdater (variable update)
 
@@ -86,7 +86,7 @@ public partial class SpinnerGameObjectUpdater : ISystem
 }
 ```
 
-`[ExecuteIn(SystemPhase.Presentation)]` runs this system at the variable (display) frame rate rather than the fixed timestep — appropriate for anything that touches Unity GameObjects. See [Systems](../core/systems.md) and [Accessor Roles](../advanced/accessor-roles.md).
+`[ExecuteIn(SystemPhase.Presentation)]` runs at the variable (display) frame rate rather than the fixed timestep — appropriate for anything touching Unity GameObjects. See [Systems](../core/systems.md) and [Accessor Roles](../advanced/accessor-roles.md).
 
 ## Wiring it up
 
@@ -104,7 +104,7 @@ world.AddSystems(new ISystem[]
 });
 ```
 
-The single entity is created from a separate `SceneInitializer`, which runs once during the init phase. Init code lives outside any system so it uses `AccessorRole.Unrestricted`:
+A separate `SceneInitializer` creates the entity once during the init phase. Init code lives outside any system, so it uses `AccessorRole.Unrestricted`:
 
 ```csharp
 public void Initialize()

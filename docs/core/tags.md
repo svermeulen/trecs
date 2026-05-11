@@ -1,6 +1,6 @@
 # Tags
 
-Tags are zero-cost markers that classify entities. They carry no data — they exist to categorize entities for templates, systems, and queries.
+Tags are zero-cost markers that classify entities. They carry no data — they categorize entities for templates, systems, and queries.
 
 ## Defining tags
 
@@ -40,7 +40,7 @@ void Execute(ref Rotation rotation) { /* ... */ }
 void Execute(in ActiveBall ball) { /* ... */ }
 ```
 
-Tags also drive manual iteration. Both `World.Query()` and aspect queries accept tag filters:
+Tags also drive manual iteration. `World.Query()` and aspect queries both accept tag filters:
 
 ```csharp
 // Aspect query — bundled component access through the aspect's properties.
@@ -64,6 +64,6 @@ World.RemoveEntitiesWithTags<GameTags.Bullet>();
 
 ## Storage
 
-Entities with the same tag combination are stored together in contiguous memory for cache-friendly iteration. Iterating entities with a given tag is fast — they're packed together, and unrelated entities are skipped entirely.
+Entities with the same tag combination are stored together in contiguous memory for cache-friendly iteration. Unrelated entities are skipped entirely.
 
 For the storage model and the low-level `TagSet` / `GroupIndex` / `Tag<T>` APIs, see [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).

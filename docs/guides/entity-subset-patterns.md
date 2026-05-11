@@ -1,6 +1,6 @@
 # Entity Subset Patterns
 
-There are three main approaches to filtering entities at runtime. Each has different performance characteristics and use cases.
+Three approaches to filtering entities at runtime, with different performance characteristics and use cases.
 
 ## Approach A: check component values
 
@@ -17,9 +17,9 @@ void Execute(ref Health health)
 }
 ```
 
-**Pros:** Simple, no setup required.
+**Pros:** Simple, no setup.
 
-**Cons:** Visits every entity the query matches (every group with the requested components when using `MatchByComponents`, or every entity in the tag-scoped groups otherwise), including those that fail the branch. Only a real problem when the population is large and the check sits in a hot loop.
+**Cons:** Visits every entity the query matches (every group with the requested components under `MatchByComponents`, or every entity in the tag-scoped groups), including those that fail the branch. Only a problem when the population is large and the check sits in a hot loop.
 
 ## Approach B: [sets](../entity-management/sets.md) (indexed subsets)
 
@@ -72,7 +72,7 @@ void Execute(in DeadEnemy enemy) { ... }
 ## Decision guide
 
 !!! tip "Start simple — partitions are an optimization"
-    Branching on a component value (Approach A) is fast enough for most gameplay code and a fine default. Reach for **sets** whenever the subset is itself a concept you want to name, query, or iterate. **Partitions** are a cache-locality optimization for very large populations — pick them when the profiler or population size calls for it, not as a general way to model state.
+    Branching on a component value (Approach A) is a fine default for most gameplay code. Reach for **sets** when the subset is a concept you want to name, query, or iterate. **Partitions** are a cache-locality optimization for very large populations — pick them when the profiler or population size calls for it, not as a general way to model state.
 
 | Factor | Component Check | Sets | Template Partitions |
 |--------|----------------|------|---------------------|
@@ -97,7 +97,7 @@ At 3+ dimensions, prefer sets — they don't create additional groups.
 
 ## Mixing approaches
 
-Nothing forces you to pick one approach per template. A typical mix is to use **partitions** when a lifecycle split (e.g. `Alive` / dead) is hot enough that splitting the storage is worth it, and **sets** for everything else — dynamic categorizations, designer-meaningful subsets, multi-dimensional filters. Component-value branching covers the rest.
+You can mix approaches per template. Typical: **partitions** for a lifecycle split (e.g. `Alive` / dead) hot enough that splitting storage is worth it, **sets** for dynamic categorizations, designer-meaningful subsets, and multi-dimensional filters. Component-value branching covers the rest.
 
 ```csharp
 // Partitions: only because the alive/dead split is a measured hot path.

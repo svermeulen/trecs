@@ -27,7 +27,7 @@ void Execute(ref Position position, in Velocity velocity) { ... }
 void Execute(in ParticleView particle) { ... }
 ```
 
-The named `Tag = typeof(...)` / `Tags = new[] { typeof(...) }` properties also work. The constructor-positional form shown above is the canonical style.
+The named `Tag = typeof(...)` / `Tags = new[] { typeof(...) }` properties also work. The positional form above is the canonical style.
 
 ## QueryBuilder
 
@@ -46,7 +46,7 @@ World.Query().WithComponents<Position, Velocity>()
 World.Query().WithoutComponents<Frozen>()
 ```
 
-`WithTags` / `WithoutTags` and `WithComponents` / `WithoutComponents` come in 1–4-arg generic overloads. They can be combined — useful when a tag is shared across templates with different component layouts:
+`WithTags` / `WithoutTags` and `WithComponents` / `WithoutComponents` come in 1–4-arg generic overloads. Combine them when a tag is shared across templates with different component layouts:
 
 ```csharp
 // Renderable entities that also have a Velocity component (skips static obstacles).
@@ -91,7 +91,7 @@ Other counting helpers on `WorldAccessor`: `CountAllEntities()`, `CountEntitiesW
 
 ### Sets
 
-`InSet<T>()` filters to members of the given [set](../entity-management/sets.md). The query builder is limited to one set filter.  To match additional sets, test for membership inside the loop body.
+`InSet<T>()` filters to members of the given [set](../entity-management/sets.md). Only one set filter per query — test additional sets inside the loop body.
 
 ```csharp
 foreach (var entity in World.Query()
@@ -105,7 +105,7 @@ foreach (var entity in World.Query()
 
 ## Aspect queries
 
-Every [aspect](aspects.md) gets a generated `Query()` method that bundles component access into the iteration variable. Read and write through the aspect's properties rather than calling `World.Component<T>(...)`:
+Every [aspect](aspects.md) gets a generated `Query()` method that bundles component access into the iteration variable. Read and write through the aspect's properties instead of `World.Component<T>(...)`:
 
 ```csharp
 partial struct PlayerView : IAspect, IRead<Position>, IWrite<Health> { }
@@ -118,6 +118,7 @@ foreach (var player in PlayerView.Query(World).WithTags<GameTags.Player>())
 ```
 
 Aspect queries do **not** auto-filter by the aspect's declared components — always scope with `WithTags<…>()`, `MatchByComponents()`, or `InSet<…>()`.
+
 
 ```csharp
 // Match by the aspect's component shape, regardless of tags.

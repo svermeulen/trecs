@@ -1,59 +1,59 @@
 # Glossary
 
-Trecs uses several similar-sounding terms with distinct meanings. This page is a one-stop cross-reference. Each entry links to the page where the concept is explained in depth.
+Trecs uses several similar-sounding terms with distinct meanings. Each entry links to the page that covers it in depth.
 
 ## Identifying entities
 
 | Term | What it is |
 |---|---|
-| **[Entity](core/entities.md)** | An identifier that groups components together. Has no data of its own. |
-| **[`EntityHandle`](core/entities.md#entityhandle)** | The *stable* reference to an entity that survives structural changes. Use whenever you need to store a reference to another entity. |
-| **[`EntityAccessor`](core/entities.md#accessing-entity-data)** | A live single-entity view bound to a `WorldAccessor`. Exposes `Get<T>()` for component access plus no-arg `Remove()` / `MoveTo<…>()` / set / input ops on the bound entity. |
+| **[Entity](core/entities.md)** | An identifier that groups components. Has no data of its own. |
+| **[`EntityHandle`](core/entities.md#entityhandle)** | A *stable* reference to an entity that survives structural changes. Use whenever you store a reference to another entity. |
+| **[`EntityAccessor`](core/entities.md#accessing-entity-data)** | A live single-entity view bound to a `WorldAccessor`. Exposes `Get<T>()` plus no-arg `Remove()` / `MoveTo<…>()` / set / input ops on the bound entity. |
 
 ## Classifying entities
 
 | Term | What it is |
 |---|---|
-| **[Tag](core/tags.md)** | A zero-cost marker struct (`ITag`) that classifies entities. Used at template definition time and as query filter. |
-| **[`Tag<T>`](advanced/groups-and-tagsets.md#tagt)** | The runtime value/handle for a single tag type. |
-| **[`TagSet`](advanced/groups-and-tagsets.md#tagset)** | A stable identity for a tag combination — a 32-bit hash of the tag GUIDs. Portable across runs and serializable. |
-| **[Template](core/templates.md)** | A compile-time blueprint declaring an entity's tags, components, partitions, and inheritance. |
+| **[Tag](core/tags.md)** | A zero-cost marker struct (`ITag`) that classifies entities. Used in template definitions and as a query filter. |
+| **[`Tag<T>`](advanced/groups-and-tagsets.md#tagt)** | Runtime value/handle for a single tag type. |
+| **[`TagSet`](advanced/groups-and-tagsets.md#tagset)** | Stable identity for a tag combination — a 32-bit hash of the tag GUIDs. Portable across runs and serializable. |
+| **[Template](core/templates.md)** | Compile-time blueprint declaring an entity's tags, components, partitions, and inheritance. |
 
 ## Where entities live in memory
 
 | Term | What it is |
 |---|---|
-| **[Group](advanced/groups-and-tagsets.md#groups)** | A unique tag combination some entities carry, paired with the contiguous memory block holding them all. Created implicitly. |
-| **[`GroupIndex`](advanced/groups-and-tagsets.md#groupindex)** | A small `ushort` runtime handle for a group, valid only for the lifetime of one `World`. |
-| **[Partition](core/templates.md#partitions)** | A group an entity *moves between* at runtime, to improve cache locality for entities that share dynamic state. Each partition that an entity moves between is based on the same template and therefore has the same component types. |
-| **[Set](entity-management/sets.md)** | A dynamic membership flag on entities (`IEntitySet`). Independent of tags and groups; iteration visits only members. Allows for efficient sparse iteration over entities across groups. |
+| **[Group](advanced/groups-and-tagsets.md#groups)** | A unique tag combination plus the contiguous memory block holding entities that carry it. Created implicitly. |
+| **[`GroupIndex`](advanced/groups-and-tagsets.md#groupindex)** | `ushort` runtime handle for a group, valid only for one `World`'s lifetime. |
+| **[Partition](core/templates.md#partitions)** | A group an entity *moves between* at runtime, for cache locality across entities sharing dynamic state. Partitions an entity moves between share the same template and component types. |
+| **[Set](entity-management/sets.md)** | A dynamic membership flag on entities (`IEntitySet`), independent of tags and groups. Iteration visits only members — efficient sparse iteration across groups. |
 
 ## Bundling component access
 
 | Term | What it is |
 |---|---|
-| **[Component](core/components.md)** | An unmanaged struct (`IEntityComponent`) holding per-entity data. |
-| **[Aspect](data-access/aspects.md)** | A `partial struct` (with interfaces `IAspect` + `IRead<>` / `IWrite<>`) that bundles related component access into one reusable view. |
-| **[Aspect interface](advanced/aspect-interfaces.md)** | A `partial interface` extending `IAspect` for polymorphic helpers across multiple aspects sharing the same component shape. |
+| **[Component](core/components.md)** | Unmanaged struct (`IEntityComponent`) holding per-entity data. |
+| **[Aspect](data-access/aspects.md)** | A `partial struct` (`IAspect` + `IRead<>` / `IWrite<>`) bundling related component access into one reusable view. |
+| **[Aspect interface](advanced/aspect-interfaces.md)** | A `partial interface` extending `IAspect`, for polymorphic helpers across multiple aspects sharing the same component shape. |
 
 ## Touching the world
 
 | Term | What it is |
 |---|---|
-| **[`World`](core/world-setup.md)** | The container that owns all entities, components, and systems. Drives the per-frame update. |
-| **[`WorldAccessor`](core/world-setup.md#worldaccessor)** | The primary main-thread API for talking to a world (read components, query, queue structural changes). Tagged with an `AccessorRole`. |
-| **[`AccessorRole`](advanced/accessor-roles.md)** | `Fixed` / `Variable` / `Unrestricted` — controls what an accessor is allowed to do. System-owned accessors get the right role automatically from their phase. |
-| **[`NativeWorldAccessor`](performance/jobs-and-burst.md#nativeworldaccessor)** | The Burst-compatible counterpart to `WorldAccessor` for use inside jobs. |
+| **[`World`](core/world-setup.md)** | Container that owns all entities, components, and systems. Drives the per-frame update. |
+| **[`WorldAccessor`](core/world-setup.md#worldaccessor)** | Main-thread API for a world (read components, query, queue structural changes). Tagged with an `AccessorRole`. |
+| **[`AccessorRole`](advanced/accessor-roles.md)** | `Fixed` / `Variable` / `Unrestricted` — controls what an accessor can do. System-owned accessors get the right role from their phase. |
+| **[`NativeWorldAccessor`](performance/jobs-and-burst.md#nativeworldaccessor)** | Burst-compatible counterpart to `WorldAccessor` for use inside jobs. |
 
 ## Running logic
 
 | Term | What it is |
 |---|---|
-| **[System](core/systems.md)** | A class implementing `ISystem` whose `Execute()` runs each frame. |
+| **[System](core/systems.md)** | Class implementing `ISystem` whose `Execute()` runs each frame. |
 | **[Phase](core/systems.md#update-phases)** | One of `EarlyPresentation` / `Input` / `Fixed` / `Presentation` / `LatePresentation` — controls when a system runs and what role it gets. |
-| **[`[ForEachEntity]`](core/systems.md#foreachentity)** | Attribute that marks a method for source-generated entity iteration. |
-| **[`[WrapAsJob]`](performance/jobs-and-burst.md)** | Attribute that turns a `[ForEachEntity]` method into a Burst-compiled parallel job. |
-| **[`[FromWorld]`](advanced/advanced-jobs.md#fromworld--auto-wiring-job-fields)** | Attribute that auto-populates fields on a hand-written job struct. |
+| **[`[ForEachEntity]`](core/systems.md#foreachentity)** | Marks a method for source-generated entity iteration. |
+| **[`[WrapAsJob]`](performance/jobs-and-burst.md)** | Turns a `[ForEachEntity]` method into a Burst-compiled parallel job. |
+| **[`[FromWorld]`](advanced/advanced-jobs.md#fromworld--auto-wiring-job-fields)** | Auto-populates fields on a hand-written job struct. |
 
 ## Lifetime mechanics
 

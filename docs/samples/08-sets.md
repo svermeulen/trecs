@@ -1,12 +1,12 @@
 # 08 — Sets
 
-Dynamic entity subsets with overlapping membership. Unlike partitions (which are mutually exclusive), sets allow an entity to belong to multiple subsets simultaneously.
+Dynamic entity subsets with overlapping membership. Unlike partitions (mutually exclusive), an entity can belong to multiple sets at once.
 
 **Source:** `com.trecs.core/Samples~/Tutorials/08_Sets/`
 
 ## What it does
 
-A grid of particles is affected by two overlapping wave effects — a warm (orange) horizontal wave and a cool (blue) vertical wave. Where the waves overlap, particles turn purple. Particles rise when in the warm wave and scale when in the cool wave.
+A grid of particles is affected by two overlapping waves — a warm (orange) horizontal wave and a cool (blue) vertical wave. Particles rise in the warm wave, scale in the cool wave, and turn purple where they overlap.
 
 ## Schema
 
@@ -33,11 +33,11 @@ public struct WaveX : IEntitySet { }
 public struct WaveZ : IEntitySet { }
 ```
 
-Sets define sparse subsets of entities. Membership is managed at runtime via `Set<T>().Defer.Add` / `Defer.Remove`.
+Sets define sparse entity subsets. Membership is managed at runtime via `Set<T>().Defer.Add` / `Defer.Remove`.
 
 ### Registration
 
-Sets must be registered with the world builder:
+Register sets with the world builder:
 
 ```csharp
 new WorldBuilder()
@@ -50,7 +50,7 @@ new WorldBuilder()
 
 ### WaveMembershipSystem
 
-Each frame, determines which particles are inside each wave band and updates set membership:
+Each frame, decides which particles are inside each wave band and updates set membership:
 
 ```csharp
 public void Execute()
@@ -104,20 +104,20 @@ Same pattern, scoped to `WaveZ` set.
 
 ### ParticleRendererSystem
 
-Composites the final color from warm and cool intensities. A particle in both waves gets both effects blended together.
+Composites final color from warm and cool intensities. A particle in both waves blends both effects.
 
 ## Why sets, not partitions?
 
-With partitions, an entity can only be in one partition at a time. To represent "in WaveX", "in WaveZ", and "in both", you'd need four partitions (None, X, Z, XZ) — and that grows as 2^N for N wave effects.
+An entity can only be in one partition at a time. Representing "in WaveX", "in WaveZ", and "in both" needs four partitions (None, X, Z, XZ) — growing as 2^N.
 
-With sets, each wave is independent. A particle can be in zero, one, or both sets simultaneously without any combinatorial explosion.
+Sets are independent. A particle can be in zero, one, or both sets at once without combinatorial explosion.
 
-The drawback is that sets are sparse and may have slower iteration than partitions due to less memory locality
+The trade-off: sets are sparse and may iterate slower than partitions due to weaker memory locality.
 
 ## Concepts introduced
 
-- **`IEntitySet`** — defines a sparse entity subset. See [Sets](../entity-management/sets.md).
+- **`IEntitySet`** — sparse entity subset. See [Sets](../entity-management/sets.md).
 - **`Set<T>().Defer.Add` / `Defer.Remove`** — deferred membership changes. See [Structural Changes](../entity-management/structural-changes.md).
 - **`[ForEachEntity(Set = typeof(...))]`** — iterate only set members. See [Queries & Iteration](../data-access/queries-and-iteration.md).
-- **Overlapping membership** — entities can be in multiple sets simultaneously.
-- **Sets vs Partitions trade-off** — see [Partitions](06-partitions.md) for the mutually-exclusive alternative, and [Entity Subset Patterns](../guides/entity-subset-patterns.md) for how to choose.
+- **Overlapping membership** — entities can be in multiple sets at once.
+- **Sets vs Partitions** — see [Partitions](06-partitions.md) for the mutually-exclusive alternative, and [Entity Subset Patterns](../guides/entity-subset-patterns.md) for guidance.

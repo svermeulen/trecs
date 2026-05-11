@@ -1,12 +1,12 @@
 # 04 — Predator Prey
 
-Cross-entity relationships using `EntityHandle`. Predators chase prey, and cleanup handlers prevent dangling references.
+Cross-entity references via `EntityHandle`, with cleanup handlers to prevent dangling references.
 
 **Source:** `com.trecs.core/Samples~/Tutorials/04_PredatorPrey/`
 
 ## What it does
 
-Predators (red) chase the nearest prey (green). When a predator catches its prey, the prey is removed and a new one spawns. Predators continuously re-target the nearest available prey.
+Predators (red) chase the nearest prey (green). On contact, the prey is removed and a new one spawns. Predators re-target the nearest available prey.
 
 ## Schema
 
@@ -26,7 +26,7 @@ public partial struct ApproachingPredator : IEntityComponent
 }
 ```
 
-Plus `Speed` and `MoveDirection` defined in this sample, and `Position` / `GameObjectId` from `Common/`.
+Plus `Speed` and `MoveDirection` from this sample, and `Position` / `GameObjectId` from `Common/`.
 
 ### Tags & templates
 
@@ -107,7 +107,7 @@ partial struct Prey : IAspect, IRead<Position>, IWrite<ApproachingPredator> { }
 
 ### PredatorChaseSystem
 
-Steers predators toward their target prey, removes prey on contact.
+Steers predators toward their target prey and removes prey on contact.
 
 ### PreyRespawnSystem
 
@@ -115,10 +115,10 @@ Maintains the prey population by spawning replacements.
 
 ### Cleanup handler
 
-When prey are removed, clean up their GameObjects using an `OnRemoved` event handler. Using events for cleanup is good practice for two reasons:
+When prey are removed, an `OnRemoved` event handler cleans up GameObjects. Events are preferred for cleanup because:
 
-- **Consistency** — since entity removal is deferred, the entity still exists until the next submission. If not cleaning up via an event, subsequent systems could attempt to use stale data on the about-to-be-removed entity.
-- **Centralized cleanup** — if entities can be removed from multiple places (e.g., caught by a predator, starvation, despawning), the same cleanup handler runs regardless of the removal source.
+- **Consistency** — entity removal is deferred, so the entity still exists until submission. Without an event, later systems could read stale data on an about-to-be-removed entity.
+- **Centralized cleanup** — if entities can be removed from multiple places (caught, starved, despawned), the same handler runs regardless of source.
 
 ```csharp
 public partial class CleanupHandlers
@@ -153,8 +153,8 @@ public partial class CleanupHandlers
 
 ## Concepts introduced
 
-- **`EntityHandle`** for stable cross-entity references that survive structural changes. See [Entities](../core/entities.md).
-- **Template inheritance** with `IExtends<T>` to share common components. See [Templates](../core/templates.md).
-- **Nested aspect queries** — iterating one template while querying another. See [Queries & Iteration](../data-access/queries-and-iteration.md).
-- **Entity events** (`OnRemoved`) for cleanup of cross-references. See [Entity Events](../entity-management/entity-events.md).
-- **Bidirectional linking** — predator points to prey and prey points back to predator.
+- **`EntityHandle`** — stable cross-entity references that survive structural changes. See [Entities](../core/entities.md).
+- **Template inheritance** via `IExtends<T>` to share common components. See [Templates](../core/templates.md).
+- **Nested aspect queries** — iterate one template while querying another. See [Queries & Iteration](../data-access/queries-and-iteration.md).
+- **Entity events** (`OnRemoved`) for cross-reference cleanup. See [Entity Events](../entity-management/entity-events.md).
+- **Bidirectional linking** — predator points to prey and prey points back.

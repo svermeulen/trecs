@@ -1,6 +1,6 @@
 # Sets
 
-A set is a lightweight membership flag for entities — an entity is either in the set or it isn't. Sets are independent of an entity's components and tags, and iteration visits only the members.
+A set is a lightweight membership flag: an entity is either in the set or it isn't. Sets are independent of an entity's components and tags, and iteration visits only the members.
 
 ## Defining a set
 
@@ -25,7 +25,7 @@ new WorldBuilder()
 
 ## Adding, removing, and clearing
 
-All set mutations go through the gateway `World.Set<T>()`, which exposes three timing modes via its properties:
+All set mutations go through `World.Set<T>()`, which exposes three timing modes:
 
 | Property | Timing | When applied |
 |---|---|---|
@@ -43,7 +43,7 @@ World.Set<HighlightedParticle>().Defer.Remove(particle.Handle(World));
 World.Set<HighlightedParticle>().Defer.Clear();
 ```
 
-A queued `Defer.Clear()` **supersedes** any `Defer.Add` / `Defer.Remove` queued for the same set in the same submission, regardless of call order.  If you want sequential semantics within a single frame ("clear, then add these"), use the immediate APIs below.
+A queued `Defer.Clear()` **supersedes** any `Defer.Add` / `Defer.Remove` queued for the same set in the same submission, regardless of call order. For sequential semantics within a single frame ("clear, then add these"), use the immediate APIs below.
 
 ### Immediate
 
@@ -62,9 +62,9 @@ highlighted.Remove(handle, world);
 ```
 
 !!! warning "Don't mutate a set while iterating it"
-    Using an immediate `Add` / `Remove` / `Clear` on the **same set in the same group** you're currently iterating throws in DEBUG builds. In release builds (where the assertion is compiled out) iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
+    An immediate `Add` / `Remove` / `Clear` on the **same set in the same group** you're iterating throws in DEBUG builds. In release builds (assertion compiled out) iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
 
-    Everything else is safe: mutating a different set, mutating the same set in a different group, or using the deferred API (`Set<T>().Defer`) on the iterated set (it applies at the next submission).
+    Safe: mutating a different set, mutating the same set in a different group, or using the deferred API (`Set<T>().Defer`) on the iterated set (applies at the next submission).
 
     To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `NativeList<EntityHandle>` and apply them after the loop.
 
@@ -87,7 +87,7 @@ int highlighted = World.Query().InSet<HighlightedParticle>().Count();
 
 ## Per-frame staging
 
-A common pattern: use a set as a **per-frame scratch list**. One system clears and populates it; downstream systems iterate only the members. This avoids recomputing the same predicate against many entities in every consumer (rendering, physics sync, audio cues, etc.).
+A common pattern: use a set as a **per-frame scratch list**. One system clears and populates it; downstream systems iterate only the members. Avoids recomputing the same predicate in every consumer (rendering, physics sync, audio cues, etc.).
 
 To make this work *within a single frame*, use the **immediate** APIs. Deferred set ops only land at the next submission, so a downstream system in the same frame would see last frame's contents.
 
@@ -121,9 +121,9 @@ public partial class RenderSystem : ISystem
 
 Notes:
 
-- Sets are **not auto-cleared** between frames. Clear them yourself in the producer system if that's the contract you want.
-- Cache the `SetWrite<T>` returned by `Set<T>().Write` outside the loop. Each `.Write` access syncs outstanding job writes; caching syncs once and then writes hit the buffer directly.
-- From a Burst job, capture a `NativeSetCommandBuffer<T>` as a field for thread-safe `Add` / `Remove` / `Clear`. Job-side `Clear` wipes the set's pre-existing contents and supersedes any `Add` / `Remove` queued in the same writer-job-cycle, regardless of call order — analogous to the deferred-clear semantics on `Set<T>().Defer.Clear()`.
+- Sets are **not auto-cleared** between frames. Clear them in the producer system if that's the contract you want.
+- Cache the `SetWrite<T>` returned by `Set<T>().Write` outside the loop. Each `.Write` access syncs outstanding job writes; caching syncs once, then writes hit the buffer directly.
+- From a Burst job, capture a `NativeSetCommandBuffer<T>` as a field for thread-safe `Add` / `Remove` / `Clear`. Job-side `Clear` wipes pre-existing contents and supersedes any `Add` / `Remove` queued in the same writer-job-cycle — analogous to `Set<T>().Defer.Clear()`.
 
 ## Sets vs tags
 
@@ -133,7 +133,7 @@ Notes:
 | **Iteration** | All entities with that tag are contiguous in memory | Sparse — only set members are visited |
 | **Best for** | Core identity, maximum cache locality | Dynamic membership, temporary flags, filtering |
 
-Both tags (via [partitions](../core/templates.md#partitions)) and sets can represent state, but the trade-offs differ. Tag changes move entity data in memory, giving you dense iteration. Set changes are cheap but iteration is sparse. See [Entity Subset Patterns](../guides/entity-subset-patterns.md) for a deeper comparison.
+Both tags (via [partitions](../core/templates.md#partitions)) and sets can represent state. Tag changes move entity data in memory, giving dense iteration. Set changes are cheap but iteration is sparse. See [Entity Subset Patterns](../guides/entity-subset-patterns.md) for a deeper comparison.
 
 ## See also
 

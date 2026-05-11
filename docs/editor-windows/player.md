@@ -1,8 +1,8 @@
 # Trecs Player Window
 
-The **Trecs Player** is the editor's transport for a running world: record a session, scrub back to any earlier moment, replay forward, fork the timeline, pin labelled snapshots, and load saved recordings — all without leaving Play mode. It's the standard tool for diagnosing transient bugs ("what was the state two seconds before that crash?") and for capturing reproducible repro fixtures.
+The **Trecs Player** is the editor's transport for a running world: record a session, scrub back, replay forward, fork the timeline, pin labelled snapshots, and load saved recordings — all without leaving Play mode. Use it to diagnose transient bugs ("what was the state two seconds before that crash?") and to capture reproducible repro fixtures.
 
-**To open it:** `Window > Trecs > Player`. Worlds appear in the dropdown automatically. Most settings (auto-record, anchor cadence, scrub-cache caps) are EditorPrefs-backed, so you can tune them outside Play mode and they apply the next time a world starts.
+**To open it:** `Window > Trecs > Player`. Worlds appear in the dropdown automatically. Most settings (auto-record, anchor cadence, scrub-cache caps) are EditorPrefs-backed — tune them outside Play mode and they apply the next time a world starts.
 
 !!! warning "Screenshot pending: `images/player-overview.png`"
     Whole window mid-recording: world dropdown, recording header row with `(unsaved)` name and the `REC` badge, transport row with the slider showing a few anchor ticks and a snapshot marker. FeedingFrenzy or Snake sample, light theme.
@@ -29,16 +29,14 @@ A capacity banner appears under the slider when the recorder is paused against i
 
 ## State badge
 
-The badge in the header shows the recorder's state at a glance:
-
 | Badge | Meaning |
 |---|---|
-| **LIVE** | Not recording. The world is running but no buffer is being captured (Record hasn't been pressed, or **Auto-Record** is off). |
+| **LIVE** | Not recording. The world is running but no buffer is captured (Record not pressed, or **Auto-Record** is off). |
 | **REC** | Recording at the live edge of the buffer. |
-| **PLAY** | Scrubbed back from the live edge, or playing a recording loaded from disk. Live input systems are silenced; the captured input drives the world instead, so playback is verbatim. |
+| **PLAY** | Scrubbed back from the live edge, or playing a recording loaded from disk. Live input systems are silenced; captured input drives the world, so playback is verbatim. |
 | **⏸ suffix** | Paused. The play button turns green to mirror the state. |
 
-Switching from REC to PLAY happens implicitly when you scrub back into the buffer or load a saved recording. To return from PLAY to REC, press **Record** to fork (see below).
+REC switches to PLAY when you scrub back or load a saved recording. To return from PLAY to REC, press **Record** to fork (see below).
 
 ## Transport row
 
@@ -56,34 +54,34 @@ Switching from REC to PLAY happens implicitly when you scrub back into the buffe
 |---|---|---|
 | **● Record** | `R` | Context-sensitive. LIVE → start capturing. REC → stop and discard the buffer. PLAY → **fork** at the current scrub frame: commit snapshots up to here as the new live edge, drop everything after, and resume capture. |
 | **⏮ ◂ ▶ ▸ ⏭** | `Home` `←` `Space` `→` `End` | Standard transport. ◂/▸ step one frame; ⏮/⏭ jump to buffer start / live edge. `Shift+←/→` jump to the previous / next anchor. |
-| **↻ Loop** | `L` | PLAY only. When on, reaching the end of the recording rewinds to the first frame instead of pausing. Resets each playback session — it's a session-local toggle, not an EditorPref. |
-| **★ Snapshot** | `B` | REC only. Prompts for a label and pins a snapshot at the current frame. Snapshots appear as bright markers on the timeline. Click a marker to jump there; right-click to remove. Snapshots are saved with the recording. |
+| **↻ Loop** | `L` | PLAY only. Rewinds to the first frame at the end of the recording instead of pausing. Session-local, not an EditorPref. |
+| **★ Snapshot** | `B` | REC only. Prompts for a label and pins a snapshot at the current frame. Snapshots appear as bright timeline markers. Click to jump; right-click to remove. Saved with the recording. |
 
-The play button turns green when paused, so you can tell at a glance whether a quiet world is paused or simply idle.
+The play button turns green when paused, so a quiet world is visibly distinct from an idle one.
 
 ## Timeline
 
-The slider commits a `JumpToFrame` on pointer release; while you drag, a throttled commit fires at most every few hundred milliseconds, so the world keeps stepping continuously without per-frame resim cost. The hover indicator under the cursor shows the frame number and the signed time offset from the live edge.
+The slider commits a `JumpToFrame` on pointer release; while dragging, a throttled commit fires at most every few hundred milliseconds, so the world keeps stepping continuously without per-frame resim cost. The hover indicator shows the frame number and signed time offset from the live edge.
 
-Two kinds of markers ride above the slider:
+Two marker kinds ride above the slider:
 
-- **Anchors** — faint ticks placed at the recorder's anchor cadence. They're recovery points: scrubs and desync recoveries land on the nearest one. Many appear in a long recording — they're tuned to be unobtrusive.
-- **Snapshots** — taller, brighter pins at frames you labelled with the ★ button. Their tooltip shows the label. Left-click jumps; right-click removes.
+- **Anchors** — faint ticks at the recorder's anchor cadence. Recovery points: scrubs and desync recoveries land on the nearest one. Tuned to be unobtrusive even in long recordings.
+- **Snapshots** — taller, brighter pins at frames labelled with the ★ button. Tooltip shows the label. Left-click jumps; right-click removes.
 
 ## Speed dropdown
 
-The speed button in the header cycles a discrete set of presets (0.1×, 0.25×, 0.5×, 1×, 2×, 4×, 8×). The button tints amber whenever the multiplier isn't 1× so a non-real-time session is visually obvious.
+The speed button cycles through presets (0.1×, 0.25×, 0.5×, 1×, 2×, 4×, 8×). It tints amber when the multiplier isn't 1× so non-real-time sessions are visually obvious.
 
 ## Recording vs snapshot
 
-Two distinct concepts share the timeline:
+Two concepts share the timeline:
 
 | Concept | What it captures | When useful |
 |---|---|---|
-| **Recording** | A time-range buffer you can scrub through. Live input is captured alongside world state, so replay is verbatim. | "Let me wind back five seconds and watch this bug happen again." |
+| **Recording** | A scrubbable time-range buffer. Live input is captured alongside world state, so replay is verbatim. | "Wind back five seconds and watch the bug again." |
 | **Snapshot** | A single-frame world state — no input history, no buffer. | "Save this exact state as a QA repro fixture / 'revert here later' pin." Loading a snapshot stops the current recording and (if Auto-Record is on) starts a fresh one from the snapshot's frame. |
 
-See [Recording & Playback](../advanced/recording-and-playback.md) for the underlying `RecordingBundle` API both surfaces use.
+See [Recording & Playback](../advanced/recording-and-playback.md) for the underlying `RecordingBundle` API.
 
 ## Actions ▾ menu
 
@@ -97,7 +95,7 @@ See [Recording & Playback](../advanced/recording-and-playback.md) for the underl
 </figure>
 -->
 
-The ▾ button in the header opens a single menu with everything that doesn't fit on the transport row. Entries grey out when they don't apply (e.g. **Save Recording** is disabled until there's a buffer to save).
+The ▾ button opens a menu with everything that doesn't fit on the transport row. Entries grey out when they don't apply (e.g. **Save Recording** is disabled until there's a buffer to save).
 
 | Group | Entry | Notes |
 |---|---|---|
@@ -113,7 +111,7 @@ The ▾ button in the header opens a single menu with everything that doesn't fi
 | Misc | Settings… | Opens the modal Settings popup. |
 |  | Help… | Opens an inline help popup with shortcuts and concept primer. |
 
-The full library — including rename, multi-select, reveal-in-Finder — lives in the [Saves window](saves.md).
+The full library — rename, multi-select, reveal-in-Finder — lives in the [Saves window](saves.md).
 
 ## Settings
 
@@ -131,13 +129,13 @@ The full library — including rename, multi-select, reveal-in-Finder — lives 
 
 | Field | What it controls |
 |---|---|
-| **Auto-Record** | Whether the recorder begins capturing the moment a Trecs world appears in Play mode (the Player window must be open). Off → press **Record** to begin capture on demand. |
+| **Auto-Record** | Whether the recorder starts capturing the moment a Trecs world appears in Play mode (the Player window must be open). Off → press **Record** to capture on demand. |
 | **Anchor interval (s)** | Simulated seconds between persisted-anchor captures. Anchors survive Save/Load and bound how far back a desync recovery or cold scrub can jump. Larger = smaller files; smaller = faster recovery. |
 | **Scrub-cache interval (s)** | Simulated seconds between transient (in-memory only) scrub-cache captures. Smaller = snappier scrubbing of recent frames. |
 | **Max anchor count** | `0` = unbounded. Drop-oldest when the cap is hit. |
 | **Max scrub-cache (MB)** | `0` = unbounded. Drop-oldest when the cap is hit. The capacity banner under the slider appears when the recorder pauses against this cap. |
 
-**Save** writes the values to EditorPrefs and pushes them onto every currently-running recorder, not only the next play-mode entry. **Reset to defaults** refills the form with the POCO defaults — you can still Cancel back out without committing.
+**Save** writes the values to EditorPrefs and pushes them onto every currently-running recorder, not just the next play-mode entry. **Reset to defaults** refills the form with the POCO defaults — Cancel still backs out without committing.
 
 ## Keyboard shortcuts
 
@@ -155,7 +153,7 @@ When the window has focus:
 
 ## Multi-world
 
-In a multi-world scene, the world dropdown appears at the top and selects which world the Player drives. Each world has its own recorder; the Player's transport, timeline, and Actions ▾ menu always operate on the world currently selected in the dropdown. The dropdown row is hidden when there's only one world.
+In a multi-world scene the dropdown selects which world the Player drives. Each world has its own recorder; the transport, timeline, and Actions ▾ menu operate on the selected world. The dropdown row is hidden when there's only one world.
 
 ## See also
 
