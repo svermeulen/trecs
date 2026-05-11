@@ -2,7 +2,9 @@ using NUnit.Framework;
 using Trecs.Internal;
 using Unity.Burst;
 using Unity.Jobs;
+using UnityEngine.TestTools.Constraints;
 using NAssert = NUnit.Framework.Assert;
+using NIs = UnityEngine.TestTools.Constraints.Is;
 
 namespace Trecs.Tests
 {
@@ -585,11 +587,42 @@ namespace Trecs.Tests
             sub.Dispose();
         }
 
-        // No end-to-end GC alloc regression test yet — even with the coalescer
-        // zero-alloc, FlushNativeOperations still constructs short-lived
-        // NativeList<(EntityIndex, …)> for removals and swaps. In DEBUG builds
-        // those allocate a managed DisposeSentinel, swamping the coalescer
-        // signal. Tracked in backlog: zero_gc_submission_native_list_pooling.md.
+        [Test]
+        public void Coalescer_AfterWarmup_DoesNotAllocateGCMemory()
+        {
+            using var env = CreateMcEnv();
+            var a = env.Accessor;
+
+            var handle = a.AddEntity<McBase, McAlive>()
+                .Set(new TestInt { Value = 0 })
+                .AssertComplete()
+                .Handle;
+            a.SubmitEntities();
+
+            // Warmup — drive every code path the measured block will hit, so
+            // any one-time allocations (lazy registry warmup, pool growth,
+            // jit) happen here rather than under the measurement.
+            // EntityHandle (not EntityIndex) is stable across partition moves.
+            for (int i = 0; i < 8; i++)
+            {
+                a.SetTag<McPoisoned>(handle);
+                a.SubmitEntities();
+                a.UnsetTag<McPoisoned>(handle);
+                a.SubmitEntities();
+            }
+
+            NAssert.That(
+                () =>
+                {
+                    a.SetTag<McPoisoned>(handle);
+                    a.SubmitEntities();
+                    a.UnsetTag<McPoisoned>(handle);
+                    a.SubmitEntities();
+                },
+                NIs.Not.AllocatingGCMemory(),
+                "Coalesced SetTag/UnsetTag + Submit cycle should be GC-free after warmup."
+            );
+        }
     }
 
     // Burst-compatible parallel-job that fires SetTag<McPoisoned> on each entity
