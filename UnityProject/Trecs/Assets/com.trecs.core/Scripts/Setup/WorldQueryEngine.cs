@@ -246,11 +246,19 @@ namespace Trecs
 
         public GroupIndex GetSingleGroupWithTags(TagSet tagset)
         {
-            var groups = GetGroupsWithTags(tagset);
+            var tagsetInfo = GetTagsetInfo(tagset);
+
+            if (!tagsetInfo.SingleGroup.IsNull)
+            {
+                return tagsetInfo.SingleGroup;
+            }
+
+            var groups = tagsetInfo.Groups;
             Assert.That(groups.Count > 0, "No groups found for tags {}", tagset);
 
             if (groups.Count == 1)
             {
+                tagsetInfo.SingleGroup = groups[0];
                 return groups[0];
             }
 
@@ -337,6 +345,7 @@ namespace Trecs
                 }
             }
 
+            tagsetInfo.SingleGroup = smallestGroup;
             return smallestGroup;
         }
 
@@ -1310,6 +1319,11 @@ namespace Trecs
 
             public TagSet TagSet { get; }
             public ReadOnlyFastList<GroupIndex> Groups { get; }
+
+            // Lazy cache for GetSingleGroupWithTags. Null until first
+            // successful resolve; ambiguous queries don't populate it (errors
+            // aren't on a hot path and re-throwing is fine).
+            public GroupIndex SingleGroup;
 
             public DenseDictionary<
                 int,
