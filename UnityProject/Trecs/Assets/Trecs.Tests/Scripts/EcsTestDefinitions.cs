@@ -3,27 +3,35 @@ using Trecs.Internal;
 
 namespace Trecs.Tests
 {
-    // Note: Guids chosen so PartitionA ^ PartitionB doesn't collide with any
-    // other 2-tag XOR combination used in the test schema (e.g. Alpha ^ Beta
-    // = 3). Since the new dimensions-list semantics constructs the TagSet
-    // {PartitionA, PartitionB} at template-build time, that combination now
-    // has a registered entry in the static TagSetRegistry and a collision
-    // would silently re-map other 2-tag sets that hash to the same XOR.
-    [TagId(990000105)]
+    // All test tags are ITag structs; their integer IDs come from
+    // TagFactory's hash of the type's FullName, which has good distribution
+    // and participates in the framework's per-type collision detection.
+    // (Sequentially-numbered hardcoded IDs were how this used to be done;
+    // they bypassed TagFactory and produced predictable XOR collisions on
+    // consecutive pairs — see git history if curious.)
+    public struct TestAlpha : ITag { }
+
+    public struct TestBeta : ITag { }
+
+    public struct TestGamma : ITag { }
+
+    public struct TestDelta : ITag { }
+
+    public struct TestEpsilon : ITag { }
+
     public struct TestPartitionA : ITag { }
 
-    [TagId(990000206)]
     public struct TestPartitionB : ITag { }
 
     public static class TestTags
     {
-        public static readonly Tag Alpha = new(990000001, "TestAlpha");
-        public static readonly Tag Beta = new(990000002, "TestBeta");
-        public static readonly Tag Gamma = new(990000003, "TestGamma");
-        public static readonly Tag Delta = new(990000004, "TestDelta");
+        public static readonly Tag Alpha = Tag<TestAlpha>.Value;
+        public static readonly Tag Beta = Tag<TestBeta>.Value;
+        public static readonly Tag Gamma = Tag<TestGamma>.Value;
+        public static readonly Tag Delta = Tag<TestDelta>.Value;
         public static readonly Tag PartitionA = Tag<TestPartitionA>.Value;
         public static readonly Tag PartitionB = Tag<TestPartitionB>.Value;
-        public static readonly Tag Epsilon = new(990000007, "TestEpsilon");
+        public static readonly Tag Epsilon = Tag<TestEpsilon>.Value;
     }
 
     public partial struct TestInt : IEntityComponent
