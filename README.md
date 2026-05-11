@@ -12,6 +12,8 @@ A high-performance Entity Component System framework for Unity, designed for **d
 
 **Full docs: [svermeulen.github.io/trecs](https://svermeulen.github.io/trecs)**
 
+<br clear="all" />
+
 ## Why Trecs
 
 - **Designed for determinism.** Fixed-timestep simulation, deterministic RNG, isolated input, and built-in snapshot / record / replay with desync detection.
