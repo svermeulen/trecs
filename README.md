@@ -10,11 +10,11 @@
 
 A high-performance Entity Component System framework for Unity, designed for **deterministic simulation, recording/playback, and Burst/Jobs**.
 
-**Full docs: [svermeulen.github.io/trecs](https://svermeulen.github.io/trecs)**
+**Full docs: [svermeulen.github.io/trecs](https://svermeulen.github.io/trecs)** 
 
-<br clear="all" />
+[Getting Started](https://svermeulen.github.io/trecs/getting-started/) · [Glossary](https://svermeulen.github.io/trecs/glossary/) · [Samples](https://svermeulen.github.io/trecs/samples/) · [FAQ](https://svermeulen.github.io/trecs/faq/) · [Trecs vs Unity ECS](https://svermeulen.github.io/trecs/guides/trecs-vs-unity-ecs/)
 
-## Why Trecs
+## Features
 
 - **Designed for determinism.** Fixed-timestep simulation, deterministic RNG, isolated input, and built-in snapshot / record / replay with desync detection.
 - **Burst & Jobs out of the box.** A source generator emits the job structs and chains the right `JobHandle` dependencies based on the components you read and write — no manual wiring.
@@ -22,7 +22,7 @@ A high-performance Entity Component System framework for Unity, designed for **d
 - **Small surface, lots of leverage.** Aspects bundle component access; sets give you sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; pointers (`SharedPtr` / `UniquePtr`) let components reference data on the heap.
 - **Editor tooling.** A live entity inspector and a record / scrub / fork timeline window for diagnosing transient bugs.
 
-## A taste
+## Quick Start
 
 ```csharp
 // 1. Components — unmanaged structs holding per-entity data
