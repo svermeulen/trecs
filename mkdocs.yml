@@ -73,8 +73,6 @@ nav:
       - Groups, GroupIndex & TagSets: advanced/groups-and-tagsets.md
       - Serialization: advanced/serialization.md
       - Recording & Playback: advanced/recording-and-playback.md
-      - Binary Format: advanced/binary-format.md
-      - Source Generator Reference: advanced/source-generator-reference.md
   - Editor Windows:
       - Overview: editor-windows/index.md
       - Hierarchy: editor-windows/hierarchy.md

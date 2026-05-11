@@ -97,7 +97,7 @@ The trailing **+ Save current recording as new…** row prompts for a name and w
 
 ## On-disk locations
 
-Recordings and snapshots live under the project's `Library/` folder, namespaced by Trecs. See [`TrecsPaths`](../advanced/binary-format.md) for the exact paths and the [Binary Format](../advanced/binary-format.md) page for the on-disk layout.
+Recordings and snapshots live under the project's `Library/` folder, namespaced by Trecs.
 
 ## Multi-world
 
@@ -109,4 +109,3 @@ The dropdown selects which world a Save / Capture / Load operates on. Save/Captu
 - [Hierarchy Window](hierarchy.md) — sibling editor window for inspecting world state.
 - [Recording & Playback](../advanced/recording-and-playback.md) — the `RecordingBundle` API and `BundleRecorder` / `BundlePlayer` types.
 - [Serialization](../advanced/serialization.md) — what's actually written to disk and how custom component types participate.
-- [Binary Format](../advanced/binary-format.md) — header layout and on-disk paths.

@@ -160,6 +160,5 @@ In a multi-world scene the dropdown selects which world the Player drives. Each 
 - [Saves Window](saves.md) — library view of all on-disk recordings and snapshots, with rename, multi-select, and search.
 - [Hierarchy Window](hierarchy.md) — sibling editor window for inspecting live world state alongside the Player.
 - [Recording & Playback](../advanced/recording-and-playback.md) — the `RecordingBundle` API the recorder is built on.
-- [Binary Format](../advanced/binary-format.md) — on-disk format for recordings and snapshots.
 - [Save Game sample](../samples/13-save-game.md) — how the snapshot side of the API is used in game code.
 - [Snake sample](../samples/11-snake.md) — a self-contained example of a recording-driven workflow.

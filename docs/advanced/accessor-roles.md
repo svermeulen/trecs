@@ -37,7 +37,7 @@ Every rule below is asserted at the call site. Crossing a role boundary throws a
 
 - **`[VariableUpdateOnly]` on a template class** — the entire template is render-cadence state (cameras, view-only helpers). The structural-change rule **inverts**: `Fixed` is rejected; `Variable` / input / `Unrestricted` create / remove / partition-transition them. These groups are skipped from the determinism checksum.
 
-See the [Components attribute reference](../core/components.md#component-field-attributes) for field-level usage and the [source-generator reference](source-generator-reference.md#components-and-templates) for both.
+See the [Components attribute reference](../core/components.md#component-field-attributes) for field-level usage.
 
 ## Picking a role for a standalone accessor
 

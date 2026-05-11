@@ -24,7 +24,7 @@ If files *don't* show up after an edit, the analyzer may have crashed. Check the
 
 ## What's the overhead of source generation?
 
-The generator runs per compilation and caches via the Roslyn incremental pipeline. Steady-state runs (one file changed) are sub-100ms for most projects; the first compile after a solution reload is the slow one. Use `SOURCEGEN_TIMING` (see [Source Generator Reference](advanced/source-generator-reference.md#inspecting-generated-output)) for per-step timings.
+The generator runs per compilation and caches via the Roslyn incremental pipeline. Steady-state runs (one file changed) are sub-100ms for most projects; the first compile after a solution reload is the slow one. Set the `SOURCEGEN_TIMING` environment variable for per-step timings.
 
 ## Do I have to use `[WrapAsJob]` — can I still write manual jobs?
 
