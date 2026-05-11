@@ -39,6 +39,30 @@ Groups are the foundation of Trecs' performance model:
 - **Targeted iteration** — systems iterate over specific groups by tag, skipping irrelevant entities.
 - **Partitions** — template [partitions](../core/templates.md#partitions) use groups to separate entities by state, so each partition iterates independently.
 
+## `AddEntity`: which group does the entity land in?
+
+A common source of confusion: the tags you pass to `AddEntity<...>()` are **not** a description of the entity you're creating, and they're **not** sufficient to mint a new group on the fly. They're a query that picks one of the groups your registered templates already declared. The lookup goes:
+
+1. Find every group whose tag set is a **superset** of the tags you passed.
+2. If exactly one matches, that's the target group.
+3. If several match, prefer the group whose tag set **exactly equals** the query — this lets you target the "empty" side of a presence/absence partition by omitting the partition tag.
+4. Otherwise, throw `ambiguous`.
+
+```csharp
+// Given the two templates above ({Player, Character} and {Enemy, Character}):
+
+accessor.AddEntity<GameTags.Player>();
+// → {Player, Character} — only one group contains Player
+
+accessor.AddEntity<GameTags.Enemy, GameTags.Character>();
+// → {Enemy, Character} — exact match
+
+accessor.AddEntity<GameTags.Character>();
+// → throws: both groups contain Character (ambiguous)
+```
+
+If you want a specific group unambiguously, pass its exact tag combination.
+
 ## TagSet vs GroupIndex
 
 Trecs exposes two first-class handles for groups:
