@@ -183,7 +183,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move entity 1 to partition B
-            a.MoveTo(entityHandles[1].ToIndex(a), partitionB);
+            a.SetTag<TestPartitionB>(entityHandles[1].ToIndex(a));
             // Remove entity 3
             a.RemoveEntity(entityHandles[3]);
             a.SubmitEntities();
@@ -276,7 +276,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move one Gamma entity to PartitionB, then bulk-remove all Alpha
-            a.MoveTo(gammaRefs[0].ToIndex(a), partitionB);
+            a.SetTag<TestPartitionB>(gammaRefs[0].ToIndex(a));
             a.RemoveEntitiesWithTags(TestTags.Alpha);
             a.SubmitEntities();
 

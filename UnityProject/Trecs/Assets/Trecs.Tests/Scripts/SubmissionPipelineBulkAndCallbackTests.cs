@@ -72,7 +72,7 @@ namespace Trecs.Tests
             // Move entity 0 to PartitionB, then bulk remove PartitionA
             // The bulk remove sees entity 0 still in PartitionA and removes it,
             // superseding the move.
-            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntitiesWithTags(PartitionA);
             a.SubmitEntities();
 
@@ -208,7 +208,7 @@ namespace Trecs.Tests
                         for (int idx = indices.Start; idx < indices.End; idx++)
                         {
                             var ei = new EntityIndex(idx, group);
-                            a.MoveTo(ei, PartitionB);
+                            a.SetTag<TestPartitionB>(ei);
                         }
                     }
                 );
@@ -348,7 +348,7 @@ namespace Trecs.Tests
                 .Handle;
             a.SubmitEntities();
 
-            a.MoveTo(handle.ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(handle.ToIndex(a));
             a.SubmitEntities();
 
             // Handle should still work after move
@@ -475,8 +475,8 @@ namespace Trecs.Tests
             var tracked = handles[3]; // Track entity 3
 
             // Frame 2: Move 0,1 to PartitionB, remove 4
-            a.MoveTo(handles[0].ToIndex(a), PartitionB);
-            a.MoveTo(handles[1].ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(handles[0].ToIndex(a));
+            a.SetTag<TestPartitionB>(handles[1].ToIndex(a));
             a.RemoveEntity(handles[4]);
             a.SubmitEntities();
 
@@ -485,14 +485,14 @@ namespace Trecs.Tests
 
             // Frame 3: Remove 2, move 5 to PartitionB
             a.RemoveEntity(handles[2]);
-            a.MoveTo(handles[5].ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(handles[5].ToIndex(a));
             a.SubmitEntities();
 
             NAssert.IsTrue(a.EntityExists(tracked));
             NAssert.AreEqual(3, a.Component<TestInt>(tracked).Read.Value);
 
             // Frame 4: Move tracked to PartitionB
-            a.MoveTo(tracked.ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(tracked.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.IsTrue(a.EntityExists(tracked));

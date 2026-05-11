@@ -3,14 +3,26 @@ using Trecs.Internal;
 
 namespace Trecs.Tests
 {
+    // Note: Guids chosen so PartitionA ^ PartitionB doesn't collide with any
+    // other 2-tag XOR combination used in the test schema (e.g. Alpha ^ Beta
+    // = 3). Since the new dimensions-list semantics constructs the TagSet
+    // {PartitionA, PartitionB} at template-build time, that combination now
+    // has a registered entry in the static TagSetRegistry and a collision
+    // would silently re-map other 2-tag sets that hash to the same XOR.
+    [TagId(990000105)]
+    public struct TestPartitionA : ITag { }
+
+    [TagId(990000206)]
+    public struct TestPartitionB : ITag { }
+
     public static class TestTags
     {
         public static readonly Tag Alpha = new(990000001, "TestAlpha");
         public static readonly Tag Beta = new(990000002, "TestBeta");
         public static readonly Tag Gamma = new(990000003, "TestGamma");
         public static readonly Tag Delta = new(990000004, "TestDelta");
-        public static readonly Tag PartitionA = new(990000005, "TestPartitionA");
-        public static readonly Tag PartitionB = new(990000006, "TestPartitionB");
+        public static readonly Tag PartitionA = Tag<TestPartitionA>.Value;
+        public static readonly Tag PartitionB = Tag<TestPartitionB>.Value;
         public static readonly Tag Epsilon = new(990000007, "TestEpsilon");
     }
 
@@ -116,7 +128,11 @@ namespace Trecs.Tests
                         default(TestVec)
                     ),
                 },
-                localTags: new Tag[] { TestTags.Gamma }
+                localTags: new Tag[] { TestTags.Gamma },
+                dimensions: new TagSet[]
+                {
+                    TagSet.FromTags(TestTags.PartitionA, TestTags.PartitionB),
+                }
             );
 
         public static Template WithDefaults =>

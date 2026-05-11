@@ -172,7 +172,7 @@ namespace Trecs.Tests
                 );
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
-            a.MoveTo(new EntityIndex(0, groupA), partitionB);
+            a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             NAssert.Greater(callCount, 0);
@@ -207,7 +207,7 @@ namespace Trecs.Tests
                     }
                 );
 
-            a.MoveTo(new EntityIndex(0, expectedGroupA), partitionB);
+            a.SetTag<TestPartitionB>(new EntityIndex(0, expectedGroupA));
             a.SubmitEntities();
 
             NAssert.AreEqual(expectedGroupA, observedFrom);
@@ -279,7 +279,7 @@ namespace Trecs.Tests
                 );
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
-            a.MoveTo(new EntityIndex(0, groupA), partitionB);
+            a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             NAssert.AreEqual(

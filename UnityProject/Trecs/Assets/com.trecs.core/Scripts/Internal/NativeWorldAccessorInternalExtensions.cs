@@ -18,44 +18,6 @@ namespace Trecs.Internal
         ) => world.RemoveEntity(entityIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void MoveTo(
-            this in NativeWorldAccessor world,
-            EntityIndex entityIndex,
-            TagSet tags
-        ) => world.MoveTo(entityIndex, tags);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void MoveTo<T1>(this in NativeWorldAccessor world, EntityIndex entityIndex)
-            where T1 : struct, ITag => world.MoveTo<T1>(entityIndex);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void MoveTo<T1, T2>(
-            this in NativeWorldAccessor world,
-            EntityIndex entityIndex
-        )
-            where T1 : struct, ITag
-            where T2 : struct, ITag => world.MoveTo<T1, T2>(entityIndex);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void MoveTo<T1, T2, T3>(
-            this in NativeWorldAccessor world,
-            EntityIndex entityIndex
-        )
-            where T1 : struct, ITag
-            where T2 : struct, ITag
-            where T3 : struct, ITag => world.MoveTo<T1, T2, T3>(entityIndex);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void MoveTo<T1, T2, T3, T4>(
-            this in NativeWorldAccessor world,
-            EntityIndex entityIndex
-        )
-            where T1 : struct, ITag
-            where T2 : struct, ITag
-            where T3 : struct, ITag
-            where T4 : struct, ITag => world.MoveTo<T1, T2, T3, T4>(entityIndex);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SetTag<T>(this in NativeWorldAccessor world, EntityIndex entityIndex)
             where T : struct, ITag => world.SetTag<T>(entityIndex);
 

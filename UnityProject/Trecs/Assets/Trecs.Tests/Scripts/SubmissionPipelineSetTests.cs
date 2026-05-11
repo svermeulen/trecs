@@ -82,7 +82,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(3, set.Read.Count);
 
             // Move entity 0 to PartitionB, remove entity 1, entity 2 stays
-            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.SetTag<SPPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[1]);
             a.SubmitEntities();
 
@@ -120,7 +120,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move entity 0, then remove it (reverts the move)
-            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.SetTag<SPPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[0].ToIndex(a));
             a.SubmitEntities();
 
@@ -261,7 +261,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move entity to PartitionB
-            a.MoveTo(handle.ToIndex(a), PartitionB);
+            a.SetTag<SPPartitionB>(handle.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(1, set1.Read.Count, "Set1 should track entity through move");
@@ -303,7 +303,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move entity 0 (set1), remove entity 1 (set2)
-            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.SetTag<SPPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[1]);
             a.SubmitEntities();
 
@@ -400,7 +400,7 @@ namespace Trecs.Tests
 
             // Move first 20 to PartitionB, native-remove every 4th among them (0, 4, 8, 12, 16)
             for (int i = 0; i < 20; i++)
-                a.MoveTo(handles[i].ToIndex(a), PartitionB);
+                a.SetTag<SPPartitionB>(handles[i].ToIndex(a));
             for (int i = 0; i < 20; i += 4)
                 nativeEcs.RemoveEntity(handles[i].ToIndex(a));
             a.SubmitEntities();
@@ -453,7 +453,7 @@ namespace Trecs.Tests
             // - Remove entity 1 (not in set, but causes swap-back)
             // - Add new entity
             a.Set<SPSet>().Defer.Add(new EntityIndex(3, groupA));
-            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.SetTag<SPPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[1]);
             var newHandle = a.AddEntity(PartitionA)
                 .Set(new TestInt { Value = 99 })
@@ -607,13 +607,13 @@ namespace Trecs.Tests
             NAssert.AreEqual(3, set.Read.Count);
 
             // Frame 2: Move entity 0 to PartitionB, remove entity 1
-            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.SetTag<SPPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[1]);
             a.SubmitEntities();
             NAssert.AreEqual(3, set.Read.Count, "Entity 0 moved but still tracked, 1 not in set");
 
             // Frame 3: Move entity 0 back, remove entity 4 (in set)
-            a.MoveTo(handles[0].ToIndex(a), PartitionA);
+            a.SetTag<SPPartitionA>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[4]);
             a.SubmitEntities();
             NAssert.AreEqual(2, set.Read.Count, "Lost entity 4, entity 0 moved back");

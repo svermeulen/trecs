@@ -34,7 +34,7 @@ namespace Trecs.Tests
 
             // Remove first, then move — remove should win
             a.RemoveEntity(handle.ToIndex(a));
-            a.MoveTo(handle.ToIndex(a), PartitionBSet);
+            a.SetTag<TestPartitionB>(handle.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(
@@ -60,7 +60,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move first, then remove — remove should win
-            a.MoveTo(handle.ToIndex(a), PartitionBSet);
+            a.SetTag<TestPartitionB>(handle.ToIndex(a));
             a.RemoveEntity(handle.ToIndex(a));
             a.SubmitEntities();
 
@@ -97,7 +97,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(5, a.CountEntitiesWithTags(PartitionASet));
 
             // Move entity 1 to PartitionB, remove entity 4 (at the tail — will be swap-back source)
-            a.MoveTo(handles[1].ToIndex(a), PartitionBSet);
+            a.SetTag<TestPartitionB>(handles[1].ToIndex(a));
             a.RemoveEntity(handles[4]);
             a.SubmitEntities();
 
@@ -140,7 +140,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move tail entity (4) to PartitionB, remove middle entity (2)
-            a.MoveTo(handles[4].ToIndex(a), PartitionBSet);
+            a.SetTag<TestPartitionB>(handles[4].ToIndex(a));
             a.RemoveEntity(handles[2]);
             a.SubmitEntities();
 
@@ -180,8 +180,8 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move entities 2, 5 to PartitionB. Remove entities 7, 8, 9 (tail entities).
-            a.MoveTo(handles[2].ToIndex(a), PartitionBSet);
-            a.MoveTo(handles[5].ToIndex(a), PartitionBSet);
+            a.SetTag<TestPartitionB>(handles[2].ToIndex(a));
+            a.SetTag<TestPartitionB>(handles[5].ToIndex(a));
             a.RemoveEntity(handles[7]);
             a.RemoveEntity(handles[8]);
             a.RemoveEntity(handles[9]);

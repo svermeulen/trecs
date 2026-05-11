@@ -69,6 +69,12 @@ namespace Trecs.Internal
         readonly AtomicNativeBags _nativeRemoveOperationQueue;
         readonly AtomicNativeBags _nativeMoveOperationQueue;
 
+        // Managed-side queue for SetTag/UnsetTag ops. Both managed and native ops
+        // feed into the per-entity coalescing pipeline at submission. Cleared
+        // after each FlushNativeOperations pass.
+        readonly FastList<(int accessorId, EntityIndex from, Tag tag, bool isSet)> _managedTagOps =
+            new();
+
         // Per-set deferred bags are now on EntitySetStorage; no centralized set queues needed.
         readonly WorldInfo _worldInfo;
         readonly WorldAccessorRegistry _accessorRegistry;
@@ -417,6 +423,24 @@ namespace Trecs.Internal
         )
         {
             _entitiesOperations.QueueMoveOperation(fromId, toGroup, componentBuilders);
+        }
+
+        // Managed-side enqueue of a SetTag op. Both managed and native paths feed
+        // the same per-entity coalescing pipeline in FlushNativeOperations.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void QueueManagedSetTag(int accessorId, EntityIndex from, Tag tag)
+        {
+            if (_entitiesOperations.IsScheduledForRemove(from))
+                return;
+            _managedTagOps.Add((accessorId, from, tag, true));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void QueueManagedUnsetTag(int accessorId, EntityIndex from, Tag tag)
+        {
+            if (_entitiesOperations.IsScheduledForRemove(from))
+                return;
+            _managedTagOps.Add((accessorId, from, tag, false));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1415,55 +1439,82 @@ namespace Trecs.Internal
             }
         }
 
-        // Move-queue variant: also handles the SetTag sentinel (-2), which encodes
-        // a partial tag change that needs the source group's dimension metadata to
-        // resolve. AddEntity-side queues never emit -2 because there's no source
-        // group, so they keep using the simpler DequeueTagSet.
-        TagSet DequeueMoveTagSet(ref NativeBag buffer, GroupIndex from)
+        // Per-entity coalescing state used in FlushNativeOperations. Accumulates
+        // dim-level set/unset ops on one entity into a final TagSet, ready to be
+        // resolved to a destination group at the end of dequeue. Throws on
+        // same-dim conflict — multiple ops on one dim in a single submission are
+        // a programming error, not a "last writer wins" knob.
+        sealed class PendingEntityChanges
         {
-            var sentinel = buffer.Dequeue<int>();
+            public ResolvedTemplate Template;
+            public TagSet FinalTagSet;
+            public ulong TouchedDimsMask;
+            public List<int> ContributingAccessors;
+        }
 
-            if (sentinel == -1)
-                return new TagSet(buffer.Dequeue<int>());
-
-            if (sentinel == -2)
+        void ApplyTagOpToPending(
+            Dictionary<EntityIndex, PendingEntityChanges> pending,
+            int accessorId,
+            EntityIndex from,
+            Tag tag,
+            bool isSet
+        )
+        {
+            if (!pending.TryGetValue(from, out var p))
             {
-                var tag = new Tag(buffer.Dequeue<int>());
-                return _worldInfo.ResolveSetTagDestination(from, tag);
+                var template = _worldInfo.GetResolvedTemplateForGroup(from.GroupIndex);
+                p = new PendingEntityChanges
+                {
+                    Template = template,
+                    FinalTagSet = _worldInfo.ToTagSet(from.GroupIndex),
+                    TouchedDimsMask = 0UL,
+                    ContributingAccessors = new List<int> { accessorId },
+                };
+                pending.Add(from, p);
+            }
+            else if (!p.ContributingAccessors.Contains(accessorId))
+            {
+                p.ContributingAccessors.Add(accessorId);
             }
 
-            if (sentinel == -3)
-            {
-                var tag = new Tag(buffer.Dequeue<int>());
-                return _worldInfo.ResolveUnsetTagDestination(from, tag);
-            }
+            var (dimIdx, dim) = WorldInfo.FindDimContainingTag(p.Template, tag);
+            if (dimIdx < 0)
+                throw Assert.CreateException(
+                    "Tag {} is not part of any partition dimension on template {}",
+                    tag,
+                    p.Template.DebugName
+                );
 
-            switch (sentinel)
+            // 64 dims is plenty — TRECS038 caps the partition count well below
+            // what this mask supports, and a template hitting >64 dims would
+            // mean 2^64+ partitions, which is nonsense.
+            Assert.That(
+                dimIdx < 64,
+                "Template {} has more than 64 partition dimensions — coalescing mask cannot represent this",
+                p.Template.DebugName
+            );
+            ulong bit = 1UL << dimIdx;
+            if ((p.TouchedDimsMask & bit) != 0)
+                throw Assert.CreateException(
+                    "Multiple SetTag/UnsetTag calls on the same partition dimension for entity in group {} (last tag: {}). Within one submission an entity can have at most one structural change per dimension — combine them into a single op or coordinate across systems.",
+                    from.GroupIndex,
+                    tag
+                );
+            p.TouchedDimsMask |= bit;
+
+            if (isSet)
             {
-                case 1:
-                    return TagSet.FromTags(new Tag(buffer.Dequeue<int>()));
-                case 2:
-                    return TagSet.FromTags(
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>())
+                p.FinalTagSet = WorldInfo.ReplaceDimensionTags(p.FinalTagSet, dim, tag);
+            }
+            else
+            {
+                if (dim.Tags.Count != 1)
+                    throw Assert.CreateException(
+                        "Cannot UnsetTag<{}>: it is a variant in a multi-variant dimension on template {}. Use SetTag to switch variants.",
+                        tag,
+                        p.Template.DebugName
                     );
-                case 3:
-                    return TagSet.FromTags(
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>())
-                    );
-                case 4:
-                    return TagSet.FromTags(
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>())
-                    );
-                default:
-                    throw new TrecsException(
-                        $"Unexpected sentinel {sentinel} in native move queue"
-                    );
+                p.FinalTagSet = WorldInfo.RemoveDimensionTags(p.FinalTagSet, dim);
             }
         }
 
@@ -1471,7 +1522,8 @@ namespace Trecs.Internal
         {
             return HasAnyNonEmpty(_nativeRemoveOperationQueue)
                 || HasAnyNonEmpty(_nativeMoveOperationQueue)
-                || HasAnyNonEmpty(_nativeAddOperationQueue);
+                || HasAnyNonEmpty(_nativeAddOperationQueue)
+                || _managedTagOps.Count > 0;
 
             static bool HasAnyNonEmpty(AtomicNativeBags queue)
             {
@@ -1557,12 +1609,15 @@ namespace Trecs.Internal
 
             using (TrecsProfiling.Start("Native Swap Operations"))
             {
-                var swapBuffersCount = _nativeMoveOperationQueue.ThreadSlotCount;
-
-                var swaps = new NativeList<(EntityIndex, GroupIndex, int)>(Allocator.TempJob);
+                // Per-entity coalescing: multiple SetTag/UnsetTag ops on the same
+                // entity merge into a single move. Same-dim conflict throws;
+                // independent-dim ops commute. Both managed and native paths feed
+                // this pipeline.
+                var pending = new Dictionary<EntityIndex, PendingEntityChanges>();
 
                 using (TrecsProfiling.Start("NatSwap Dequeue"))
                 {
+                    var swapBuffersCount = _nativeMoveOperationQueue.ThreadSlotCount;
                     for (int i = 0; i < swapBuffersCount; i++)
                     {
                         ref var buffer = ref _nativeMoveOperationQueue.GetBag(i);
@@ -1571,32 +1626,56 @@ namespace Trecs.Internal
                         {
                             var accessorId = buffer.Dequeue<int>();
                             var from = buffer.Dequeue<EntityIndex>();
-                            var toTagSet = DequeueMoveTagSet(ref buffer, from.GroupIndex);
-                            var toGroup = _worldInfo.GetSingleGroupWithTags(toTagSet);
+                            var sentinel = buffer.Dequeue<int>();
+                            if (sentinel != -2 && sentinel != -3)
+                                throw new TrecsException(
+                                    $"Unexpected sentinel {sentinel} in native move queue — only SetTag (-2) and UnsetTag (-3) are supported"
+                                );
+                            var tag = new Tag(buffer.Dequeue<int>());
+                            ApplyTagOpToPending(pending, accessorId, from, tag, isSet: sentinel == -2);
+                        }
+                    }
 
-                            // Skip no-op moves (SetTag/UnsetTag where the entity is
-                            // already in the destination partition) — applying them
-                            // would re-add the entity at a new slot.
-                            if (toGroup == from.GroupIndex)
-                                continue;
+                    foreach (var op in _managedTagOps)
+                        ApplyTagOpToPending(pending, op.accessorId, op.from, op.tag, op.isSet);
+                    _managedTagOps.Clear();
+                }
 
-                            _log.Trace(
-                                "Swapping entity {} from group {} to {} (from native operation)",
-                                from.Index,
+                var swaps = new NativeList<(EntityIndex, GroupIndex, int)>(Allocator.TempJob);
+
+                foreach (var kvp in pending)
+                {
+                    var from = kvp.Key;
+                    var p = kvp.Value;
+                    var toGroup = _worldInfo.GetSingleGroupWithTags(p.FinalTagSet);
+
+                    // Skip if every touched dim's net change was a no-op (e.g.
+                    // SetTag<T> when T was already this dim's active variant).
+                    if (toGroup == from.GroupIndex)
+                        continue;
+
+                    _log.Trace(
+                        "Coalesced move: entity {} from group {} to {}",
+                        from.Index,
+                        from.GroupIndex,
+                        toGroup
+                    );
+
+                    // Primary accessor for the swap is the first contributor; the
+                    // recorder receives one OnEntityMoved per contributor so each
+                    // accessor that participated gets attribution for the final move.
+                    swaps.Add((from, toGroup, p.ContributingAccessors[0]));
+
+                    if (_accessRecorder != null)
+                    {
+                        foreach (var aid in p.ContributingAccessors)
+                        {
+                            var accessor = _accessorRegistry.GetAccessorById(aid);
+                            _accessRecorder.OnEntityMoved(
+                                accessor.DebugName,
                                 from.GroupIndex,
                                 toGroup
                             );
-                            swaps.Add((from, toGroup, accessorId));
-
-                            if (_accessRecorder != null)
-                            {
-                                var accessor = _accessorRegistry.GetAccessorById(accessorId);
-                                _accessRecorder.OnEntityMoved(
-                                    accessor.DebugName,
-                                    from.GroupIndex,
-                                    toGroup
-                                );
-                            }
                         }
                     }
                 }

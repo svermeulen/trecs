@@ -33,7 +33,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move some
-            a.MoveTo(refs[1].ToIndex(a), partitionB);
+            a.SetTag<TestPartitionB>(refs[1].ToIndex(a));
             a.SubmitEntities();
 
             // Add more

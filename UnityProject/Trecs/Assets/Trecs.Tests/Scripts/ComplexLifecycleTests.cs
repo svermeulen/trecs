@@ -78,13 +78,13 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move A -> B
-            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
             a.SubmitEntities();
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
 
             // Move B -> A
-            a.MoveTo(entityHandle.ToIndex(a), PartitionA);
+            a.SetTag<TestPartitionA>(entityHandle.ToIndex(a));
             a.SubmitEntities();
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
@@ -109,9 +109,9 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move entities 0, 2, 4 to PartitionB
-            a.MoveTo(refs[0].ToIndex(a), PartitionB);
-            a.MoveTo(refs[2].ToIndex(a), PartitionB);
-            a.MoveTo(refs[4].ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(refs[0].ToIndex(a));
+            a.SetTag<TestPartitionB>(refs[2].ToIndex(a));
+            a.SetTag<TestPartitionB>(refs[4].ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA));
@@ -168,7 +168,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // In one submission: move existing entity + add new one
-            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
             a.AddEntity(PartitionA).Set(new TestInt { Value = 20 }).AssertComplete();
             a.SubmitEntities();
 
@@ -194,7 +194,7 @@ namespace Trecs.Tests
 
             // Remove entity 0, move entity 2 to PartitionB
             a.RemoveEntity(refs[0]);
-            a.MoveTo(refs[2].ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(refs[2].ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
@@ -314,7 +314,7 @@ namespace Trecs.Tests
             // Move all to PartitionB
             for (int i = 0; i < count; i++)
             {
-                a.MoveTo(refs[i].ToIndex(a), PartitionB);
+                a.SetTag<TestPartitionB>(refs[i].ToIndex(a));
             }
             a.SubmitEntities();
 
@@ -324,7 +324,7 @@ namespace Trecs.Tests
             // Move all back to PartitionA
             for (int i = 0; i < count; i++)
             {
-                a.MoveTo(refs[i].ToIndex(a), PartitionA);
+                a.SetTag<TestPartitionA>(refs[i].ToIndex(a));
             }
             a.SubmitEntities();
 
@@ -367,7 +367,7 @@ namespace Trecs.Tests
                     }
                 );
 
-            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(0, addedCallCount, "OnAdded should NOT fire for moved entities");
@@ -395,7 +395,7 @@ namespace Trecs.Tests
                     }
                 );
 
-            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(0, removedCallCount, "OnRemoved should NOT fire for moved entities");
@@ -429,7 +429,7 @@ namespace Trecs.Tests
             var expectedGroupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var expectedGroupB = a.WorldInfo.GetSingleGroupWithTags(PartitionB);
 
-            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(1, movedCallCount, "OnMoved should fire exactly once");
@@ -556,7 +556,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
-            nativeEcs.MoveTo(new EntityIndex(0, groupA), PartitionB);
+            nativeEcs.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
@@ -657,7 +657,7 @@ namespace Trecs.Tests
             // Remove 2, move 1 to PartitionB
             a.RemoveEntity(refs[0]);
             a.RemoveEntity(refs[1]);
-            a.MoveTo(refs[2].ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(refs[2].ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(2, a.Query().WithTags(PartitionA).Count());
@@ -761,9 +761,9 @@ namespace Trecs.Tests
             // Entity 4: move to PartitionB
             // Entity 5: stays
             a.RemoveEntity(refs[0]);
-            a.MoveTo(refs[1].ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(refs[1].ToIndex(a));
             a.RemoveEntity(refs[3]);
-            a.MoveTo(refs[4].ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(refs[4].ToIndex(a));
             a.SubmitEntities();
 
             NAssert.IsFalse(a.EntityExists(refs[0]));
@@ -848,7 +848,7 @@ namespace Trecs.Tests
 
             // Move via native path
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
-            nativeEcs.MoveTo(new EntityIndex(0, groupA), PartitionB);
+            nativeEcs.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));

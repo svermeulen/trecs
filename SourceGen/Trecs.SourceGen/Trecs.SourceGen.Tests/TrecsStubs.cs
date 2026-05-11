@@ -330,8 +330,8 @@ internal static class TrecsStubs
             // ----- Aspect / ForEach / RunOnce surface -----
             // Aspects emit substantial machinery that touches a wide slice of the runtime:
             // component buffer indexing, the full QueryBuilder DSL, dense + sparse slice
-            // iteration, NativeFactory for cross-entity Burst lookup, and MoveTo / Set
-            // surface routed through both WorldAccessor and NativeWorldAccessor.
+            // iteration, NativeFactory for cross-entity Burst lookup, and SetTag /
+            // UnsetTag / Set surface routed through both WorldAccessor and NativeWorldAccessor.
             // The stubs below are body-empty / default-returning; they exist to satisfy
             // C# name and shape resolution, not to actually run.
 
@@ -555,7 +555,7 @@ internal static class TrecsStubs
 
             // WorldAccessor — declared as a class so AutoSystemGenerator's emitted
             // `WorldAccessor _world;` field and `WorldAccessor World => _world;` property
-            // resolve. Aspect machinery additionally needs Query/ComponentBuffer/MoveTo/Set;
+            // resolve. Aspect machinery additionally needs Query/ComponentBuffer/SetTag/Set;
             // job machinery needs the *ForJob accessors that return tuples (the buffer +
             // its current count for jobs that read the count).
             public class WorldAccessor
@@ -564,10 +564,6 @@ internal static class TrecsStubs
                 public ComponentBufferAccessor<T> ComponentBuffer<T>(GroupIndex group)
                     where T : unmanaged, IEntityComponent => default;
 
-                public void MoveTo<T1>(EntityIndex entityIndex) where T1 : struct, ITag { }
-                public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
-                public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
-                public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
                 public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
                 public void UnsetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
 
@@ -648,14 +644,10 @@ internal static class TrecsStubs
                     System.Linq.Enumerable.Empty<GroupIndex>();
             }
 
-            // NativeWorldAccessor — Burst-compatible value-type counterpart. Aspect MoveTo /
-            // Set helpers also expose `(in NativeWorldAccessor)` overloads.
+            // NativeWorldAccessor — Burst-compatible value-type counterpart. Aspect Set
+            // helpers also expose `(in NativeWorldAccessor)` overloads.
             public readonly struct NativeWorldAccessor
             {
-                public void MoveTo<T1>(EntityIndex entityIndex) where T1 : struct, ITag { }
-                public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
-                public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
-                public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
                 public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
                 public void UnsetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
                 public void SetAdd<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }

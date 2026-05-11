@@ -112,7 +112,7 @@ namespace Trecs.Tests
                 .Handle;
             a.SubmitEntities();
 
-            nativeEcs.MoveTo(handle.ToIndex(a), partitionB);
+            nativeEcs.SetTag<TestPartitionB>(handle.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(partitionA));
@@ -136,7 +136,7 @@ namespace Trecs.Tests
                 .Handle;
             a.SubmitEntities();
 
-            nativeEcs.MoveTo(handle.ToIndex(a), partitionB);
+            nativeEcs.SetTag<TestPartitionB>(handle.ToIndex(a));
             a.SubmitEntities();
 
             var comp = a.Query().WithTags(partitionB).Single().Get<TestInt>();

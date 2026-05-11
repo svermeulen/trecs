@@ -452,118 +452,39 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Schedules moving an entity to the group identified by the given tags. The move is
-        /// deferred until the next entity submission. The entity's component data is preserved
-        /// for components shared between the source and destination groups.
-        /// </summary>
-        internal void MoveTo(EntityIndex entityIndex, TagSet tags)
-        {
-            // MoveTo touches both source and destination groups; both must
-            // be allowed for the role. The dest's role-allowance dictates
-            // whether VUO templates can receive moves from this accessor.
-            AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
-
-            var toGroup = _worldInfo.GetSingleGroupWithTags(tags);
-
-            AssertCanMakeStructuralChangesToGroup(toGroup);
-
-            // Same-group moves would re-add the entity at a new slot rather
-            // than no-op — short-circuit them. Matters in particular for
-            // SetTag/UnsetTag where the destination can already equal the
-            // source partition (e.g. SetTag<T> on an entity already tagged
-            // with T).
-            if (toGroup == entityIndex.GroupIndex)
-                return;
-
-            _structuralOps.MoveTo(entityIndex, toGroup);
-
-            AccessRecorder?.OnEntityMoved(_debugName, entityIndex.GroupIndex, toGroup);
-        }
-
-        internal void MoveTo<T1>(EntityIndex entityIndex)
-            where T1 : struct, ITag => MoveTo(entityIndex, TagSet<T1>.Value);
-
-        internal void MoveTo<T1, T2>(EntityIndex entityIndex)
-            where T1 : struct, ITag
-            where T2 : struct, ITag => MoveTo(entityIndex, TagSet<T1, T2>.Value);
-
-        internal void MoveTo<T1, T2, T3>(EntityIndex entityIndex)
-            where T1 : struct, ITag
-            where T2 : struct, ITag
-            where T3 : struct, ITag => MoveTo(entityIndex, TagSet<T1, T2, T3>.Value);
-
-        internal void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex)
-            where T1 : struct, ITag
-            where T2 : struct, ITag
-            where T3 : struct, ITag
-            where T4 : struct, ITag => MoveTo(entityIndex, TagSet<T1, T2, T3, T4>.Value);
-
-        public void MoveTo(EntityHandle entityHandle, TagSet tags) =>
-            MoveTo(entityHandle.ToIndex(_world), tags);
-
-        public void MoveTo<T1>(EntityHandle entityHandle)
-            where T1 : struct, ITag => MoveTo<T1>(entityHandle.ToIndex(_world));
-
-        public void MoveTo<T1, T2>(EntityHandle entityHandle)
-            where T1 : struct, ITag
-            where T2 : struct, ITag => MoveTo<T1, T2>(entityHandle.ToIndex(_world));
-
-        public void MoveTo<T1, T2, T3>(EntityHandle entityHandle)
-            where T1 : struct, ITag
-            where T2 : struct, ITag
-            where T3 : struct, ITag => MoveTo<T1, T2, T3>(entityHandle.ToIndex(_world));
-
-        public void MoveTo<T1, T2, T3, T4>(EntityHandle entityHandle)
-            where T1 : struct, ITag
-            where T2 : struct, ITag
-            where T3 : struct, ITag
-            where T4 : struct, ITag => MoveTo<T1, T2, T3, T4>(entityHandle.ToIndex(_world));
-
-        /// <summary>
         /// Schedules moving the entity to the partition where the dimension containing
         /// <typeparamref name="T"/> now has <typeparamref name="T"/> as its active
         /// variant. All other dimensions and tags are preserved. For presence/absence
         /// dimensions this sets the tag present; for multi-variant dimensions it
         /// switches the active variant. Throws if <typeparamref name="T"/> is not
         /// declared as a partition variant on the entity's template (via
-        /// <see cref="IPartitionedBy{T1}"/> / <see cref="IPartitionedBy{T1, T2}"/>).
+        /// <see cref="IPartitionedBy{T1}"/> / <see cref="IPartitionedBy{T1, T2}"/>),
+        /// or if another SetTag/UnsetTag has already touched the same dimension on
+        /// this entity in the current submission.
         /// </summary>
         internal void SetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
-            var newTagSet = _worldInfo.ResolveSetTagDestination(
-                entityIndex.GroupIndex,
-                Tag<T>.Value
-            );
-            // Skip the move when the entity is already in the destination — MoveTo
-            // does not de-dupe a same-group move and would re-add the entity at
-            // a new slot.
-            if (newTagSet == _worldInfo.ToTagSet(entityIndex.GroupIndex))
-                return;
-            MoveTo(entityIndex, newTagSet);
+            AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
+            _structuralOps.QueueSetTag(Id, entityIndex, Tag<T>.Value);
         }
 
         public void SetTag<T>(EntityHandle entityHandle)
             where T : struct, ITag => SetTag<T>(entityHandle.ToIndex(_world));
 
         /// <summary>
-        /// Schedules a tag-remove: moves the entity to the partition where
-        /// <typeparamref name="T"/> is absent. Only valid when
-        /// <typeparamref name="T"/> is in a presence/absence partition dimension
-        /// (declared via <see cref="IPartitionedBy{T1}"/>). For multi-variant
+        /// Schedules clearing <typeparamref name="T"/> from the entity, moving it to
+        /// the absent partition of <typeparamref name="T"/>'s presence/absence
+        /// dimension. Only valid when <typeparamref name="T"/> is declared via
+        /// <see cref="IPartitionedBy{T1}"/> (arity-1 form). For multi-variant
         /// dimensions there is no "absent" partition — use
         /// <see cref="SetTag{T}(EntityIndex)"/> to switch variants instead.
         /// </summary>
         internal void UnsetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
-            var newTagSet = _worldInfo.ResolveUnsetTagDestination(
-                entityIndex.GroupIndex,
-                Tag<T>.Value
-            );
-            if (newTagSet == _worldInfo.ToTagSet(entityIndex.GroupIndex))
-                return;
-            MoveTo(entityIndex, newTagSet);
+            AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
+            _structuralOps.QueueUnsetTag(Id, entityIndex, Tag<T>.Value);
         }
 
         public void UnsetTag<T>(EntityHandle entityHandle)

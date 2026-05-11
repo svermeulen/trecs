@@ -124,7 +124,7 @@ namespace Trecs.Tests
             a.GlobalComponent<TestGlobalInt>().Write.Value = 123;
 
             for (int i = 0; i < 5; i++)
-                a.MoveTo(handles[i].ToIndex(a), PartitionB);
+                a.SetTag<TestPartitionB>(handles[i].ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(123, a.GlobalComponent<TestGlobalInt>().Read.Value);
@@ -156,7 +156,7 @@ namespace Trecs.Tests
 
             // Mix: move 0-2, remove 3-5, add 3 new
             for (int i = 0; i < 3; i++)
-                a.MoveTo(handles[i].ToIndex(a), PartitionB);
+                a.SetTag<TestPartitionB>(handles[i].ToIndex(a));
             for (int i = 3; i < 6; i++)
                 a.RemoveEntity(handles[i]);
             for (int i = 0; i < 3; i++)
@@ -239,7 +239,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
             NAssert.IsTrue(a.EntityExists(globalHandle), "After adds");
 
-            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[1]);
             a.SubmitEntities();
             NAssert.IsTrue(a.EntityExists(globalHandle), "After move+remove");

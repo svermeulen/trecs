@@ -74,34 +74,6 @@ namespace Trecs
         public void Remove() => _world.RemoveEntity(_entityIndex);
 
         /// <summary>
-        /// Schedules moving this entity to the group identified by the given tags.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void MoveTo(TagSet tags) => _world.MoveTo(_entityIndex, tags);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void MoveTo<T1>()
-            where T1 : struct, ITag => _world.MoveTo<T1>(_entityIndex);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void MoveTo<T1, T2>()
-            where T1 : struct, ITag
-            where T2 : struct, ITag => _world.MoveTo<T1, T2>(_entityIndex);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void MoveTo<T1, T2, T3>()
-            where T1 : struct, ITag
-            where T2 : struct, ITag
-            where T3 : struct, ITag => _world.MoveTo<T1, T2, T3>(_entityIndex);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void MoveTo<T1, T2, T3, T4>()
-            where T1 : struct, ITag
-            where T2 : struct, ITag
-            where T3 : struct, ITag
-            where T4 : struct, ITag => _world.MoveTo<T1, T2, T3, T4>(_entityIndex);
-
-        /// <summary>
         /// Schedules moving this entity to the partition where the dimension
         /// containing <typeparamref name="T"/> now has <typeparamref name="T"/> as
         /// its active variant. Other dimensions are preserved.

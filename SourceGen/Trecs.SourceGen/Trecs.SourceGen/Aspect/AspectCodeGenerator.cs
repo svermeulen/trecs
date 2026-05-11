@@ -475,33 +475,9 @@ namespace Trecs.SourceGen.Aspect
 
             foreach (var (accessorType, paramPrefix) in accessorSpecs)
             {
-                // Remove and MoveTo(TagSet) are defined as extension methods in AspectExtensions.cs
+                // Remove is defined as an extension method in AspectExtensions.cs.
 
-                // MoveTo<T1..T4> generic overloads
-                // (Can't be extension methods due to C# partial type inference limitation)
-                for (int arity = 1; arity <= 4; arity++)
-                {
-                    var typeParams = string.Join(
-                        ", ",
-                        Enumerable.Range(1, arity).Select(i => $"T{i}")
-                    );
-                    var whereClause = string.Join(
-                        " ",
-                        Enumerable.Range(1, arity).Select(i => $"where T{i} : struct, ITag")
-                    );
-
-                    sb.AppendLine(
-                        indentLevel,
-                        "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
-                    );
-                    sb.AppendLine(
-                        indentLevel,
-                        $"public readonly void MoveTo<{typeParams}>({paramPrefix}{accessorType} world) {whereClause} => world.MoveTo<{typeParams}>(_entityIndex);"
-                    );
-                    sb.AppendLine();
-                }
-
-                // SetTag/UnsetTag — tag-change verbs that preserve other dimensions.
+                // SetTag/UnsetTag — the only structural tag-change verbs.
                 // SetTag works for both presence/absence (turns the tag on) and
                 // multi-variant (switches the active variant); UnsetTag is the inverse,
                 // valid only on presence/absence dims.

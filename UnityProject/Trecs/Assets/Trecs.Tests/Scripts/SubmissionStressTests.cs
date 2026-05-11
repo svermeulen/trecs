@@ -99,7 +99,7 @@ namespace Trecs.Tests
             int moveCount = count / 2;
             for (int i = 0; i < moveCount; i++)
             {
-                a.MoveTo(entityIds[i * 2].ToIndex(a), partitionB);
+                a.SetTag<TestPartitionB>(entityIds[i * 2].ToIndex(a));
             }
 
             var sw = Stopwatch.StartNew();
@@ -198,7 +198,7 @@ namespace Trecs.Tests
             }
             for (int i = 0; i < moveCount; i++)
             {
-                a.MoveTo(entityIds[removeCount + i].ToIndex(a), partitionB);
+                a.SetTag<TestPartitionB>(entityIds[removeCount + i].ToIndex(a));
             }
             // Also add new entities
             int addCount = count / 4;

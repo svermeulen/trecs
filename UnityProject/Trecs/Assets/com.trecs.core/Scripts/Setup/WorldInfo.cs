@@ -603,10 +603,29 @@ namespace Trecs
             return false;
         }
 
+        // Returns the index of the partition dimension on <paramref name="template"/>
+        // that contains <paramref name="tag"/>, along with the dim's TagSet, or
+        // (-1, default) if the tag is not a partition variant on the template.
+        // Used by the submission coalescing path to detect same-dim conflicts and
+        // apply per-dim replacements.
+        internal static (int index, TagSet dim) FindDimContainingTag(
+            ResolvedTemplate template,
+            Tag tag
+        )
+        {
+            for (int i = 0; i < template.Dimensions.Count; i++)
+            {
+                var d = template.Dimensions[i];
+                if (TagSetContainsTag(d, tag))
+                    return (i, d);
+            }
+            return (-1, default);
+        }
+
         // Builds a TagSet equal to <paramref name="current"/> with every tag from
         // <paramref name="dim"/> stripped, then with <paramref name="replacement"/>
         // appended. Used by SetTag to swap a dim's current variant for a new one.
-        static TagSet ReplaceDimensionTags(TagSet current, TagSet dim, Tag replacement)
+        internal static TagSet ReplaceDimensionTags(TagSet current, TagSet dim, Tag replacement)
         {
             var resultTags = new List<Tag>();
             foreach (var t in current.Tags)
@@ -622,7 +641,7 @@ namespace Trecs
         // <paramref name="dim"/> stripped. Used by UnsetTag on presence/absence
         // dims; for those, stripping the dim's only variant leaves the entity in
         // the absent partition.
-        static TagSet RemoveDimensionTags(TagSet current, TagSet dim)
+        internal static TagSet RemoveDimensionTags(TagSet current, TagSet dim)
         {
             var resultTags = new List<Tag>();
             foreach (var t in current.Tags)

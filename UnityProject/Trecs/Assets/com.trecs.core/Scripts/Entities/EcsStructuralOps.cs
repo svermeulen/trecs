@@ -77,37 +77,16 @@ namespace Trecs
             }
         }
 
-        internal void MoveTo(EntityIndex fromEntityIndex, GroupIndex toGroupId)
+        internal void QueueSetTag(int accessorId, EntityIndex from, Tag tag)
         {
             Assert.That(!_isDisposed);
+            _entitySubmitter.QueueManagedSetTag(accessorId, from, tag);
+        }
 
-            // Remove supersedes swap - skip if entity is already scheduled for removal
-            if (_entitySubmitter.IsScheduledForRemove(fromEntityIndex))
-                return;
-
-            var fromTemplate = _worldInfo.GetResolvedTemplateForGroup(fromEntityIndex.GroupIndex);
-            var toTemplate = _worldInfo.GetResolvedTemplateForGroup(toGroupId);
-            Assert.That(fromTemplate == toTemplate);
-
-            _log.Trace(
-                "Moving entity {} (group {}) to group {}",
-                fromEntityIndex.Index,
-                fromEntityIndex.GroupIndex,
-                toGroupId
-            );
-
-            Assert.That(fromEntityIndex != EntityIndex.Null);
-
-            _entitySubmitter.CheckMoveEntityHandle(
-                fromEntityIndex,
-                toGroupId,
-                toTemplate.DebugName
-            );
-            _entitySubmitter.QueueMoveEntityOperation(
-                fromEntityIndex,
-                toGroupId,
-                toTemplate.ComponentBuilders
-            );
+        internal void QueueUnsetTag(int accessorId, EntityIndex from, Tag tag)
+        {
+            Assert.That(!_isDisposed);
+            _entitySubmitter.QueueManagedUnsetTag(accessorId, from, tag);
         }
 
         internal bool IsScheduledForRemove(EntityIndex entityIndex)

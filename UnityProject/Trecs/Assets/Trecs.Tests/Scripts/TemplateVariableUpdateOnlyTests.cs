@@ -20,6 +20,11 @@ namespace Trecs.Tests
     // Tag exclusive to the VUO template's group.
     public struct VuoTemplateTag : ITag { }
 
+    // Presence/absence partition variant on the VUO template — used so the
+    // SetTag-based mover test below has a partition variant to flip. Without
+    // a partition the VUO template has no dim and SetTag has nothing to do.
+    public struct VuoPartitionTag : ITag { }
+
     // Tag exclusive to the child-of-VUO-base template's group, used by the
     // inheritance test below. Distinct from VuoTemplateTag so the two
     // templates don't share groups.
@@ -95,7 +100,7 @@ namespace Trecs.Tests
 
         public void Execute()
         {
-            World.MoveTo(Victim, TagSet<VuoTemplateTag>.Value);
+            World.SetTag<VuoPartitionTag>(Victim);
         }
     }
 
@@ -126,7 +131,11 @@ namespace Trecs.Tests
             return new Template(
                 debugName: "VuoTestTemplate",
                 localBaseTemplates: Array.Empty<Template>(),
-                partitions: Array.Empty<TagSet>(),
+                partitions: new TagSet[]
+                {
+                    TagSet.Null,
+                    TagSet.FromTags(Tag<VuoPartitionTag>.Value),
+                },
                 localComponentDeclarations: new IComponentDeclaration[]
                 {
                     new ComponentDeclaration<VuoTemplateRenderComp>(
@@ -139,7 +148,8 @@ namespace Trecs.Tests
                     ),
                 },
                 localTags: new Tag[] { Tag<VuoTemplateTag>.Value },
-                localVariableUpdateOnly: true
+                localVariableUpdateOnly: true,
+                dimensions: new TagSet[] { TagSet.FromTags(Tag<VuoPartitionTag>.Value) }
             );
         }
 

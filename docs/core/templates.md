@@ -206,7 +206,13 @@ enemy.SetTag<MoveState.Running>(World); // switch the active variant in MoveStat
 
 `SetTag<T>` works for both shapes: for a presence/absence dim it turns the tag on; for a multi-variant dim it switches the active variant (other dimensions are preserved). `UnsetTag<T>` is only valid for presence/absence dims — multi-variant dims have no defined "absent" partition, so use `SetTag` to switch variants there.
 
-For a fully-specified destination, the runtime form `World.MoveTo(entityIndex, tagSet)` still works.
+Multiple `SetTag` / `UnsetTag` calls on the same entity in one frame **coalesce**: changes on different dims merge into a single move at submission. Two ops on the *same* dim throw — this is a deliberate "no silent ordering" policy. To move an entity across several dims at once, just call `SetTag` for each:
+
+```csharp
+// Set Active on, switch MoveState to Running — one structural change at submit.
+ball.SetTag<BallTags.Active>(World);
+ball.SetTag<MoveState.Running>(World);
+```
 
 Partitions are an optimization — see [Entity Subset Patterns](../guides/entity-subset-patterns.md) for when to reach for partitions vs. sets vs. component-value branching.
 

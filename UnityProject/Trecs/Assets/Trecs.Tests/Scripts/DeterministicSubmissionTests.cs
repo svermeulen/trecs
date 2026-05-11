@@ -191,9 +191,9 @@ namespace Trecs.Tests
                 }
                 a.SubmitEntities();
 
-                nativeEcs.MoveTo(handles[0].ToIndex(a), PartitionB);
-                nativeEcs.MoveTo(handles[2].ToIndex(a), PartitionB);
-                nativeEcs.MoveTo(handles[4].ToIndex(a), PartitionB);
+                nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
+                nativeEcs.SetTag<TestPartitionB>(handles[2].ToIndex(a));
+                nativeEcs.SetTag<TestPartitionB>(handles[4].ToIndex(a));
                 a.SubmitEntities();
 
                 stateAForward = CollectValues(a, PartitionA);
@@ -217,9 +217,9 @@ namespace Trecs.Tests
                 }
                 a.SubmitEntities();
 
-                nativeEcs.MoveTo(handles[4].ToIndex(a), PartitionB);
-                nativeEcs.MoveTo(handles[2].ToIndex(a), PartitionB);
-                nativeEcs.MoveTo(handles[0].ToIndex(a), PartitionB);
+                nativeEcs.SetTag<TestPartitionB>(handles[4].ToIndex(a));
+                nativeEcs.SetTag<TestPartitionB>(handles[2].ToIndex(a));
+                nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
                 a.SubmitEntities();
 
                 stateAReverse = CollectValues(a, PartitionA);
@@ -274,8 +274,8 @@ namespace Trecs.Tests
 
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
-                nativeEcs.MoveTo(handles[0].ToIndex(a), PartitionB);
-                nativeEcs.MoveTo(handles[3].ToIndex(a), PartitionB);
+                nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
+                nativeEcs.SetTag<TestPartitionB>(handles[3].ToIndex(a));
                 a.SubmitEntities();
 
                 stateA1 = CollectValues(a, PartitionA);
@@ -299,9 +299,9 @@ namespace Trecs.Tests
                 }
                 a.SubmitEntities();
 
-                nativeEcs.MoveTo(handles[3].ToIndex(a), PartitionB);
+                nativeEcs.SetTag<TestPartitionB>(handles[3].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
-                nativeEcs.MoveTo(handles[0].ToIndex(a), PartitionB);
+                nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
                 a.SubmitEntities();
 

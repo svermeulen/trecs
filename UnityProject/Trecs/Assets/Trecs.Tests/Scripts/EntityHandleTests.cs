@@ -167,7 +167,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var entityIndex = entityHandle.ToIndex(a);
-            a.MoveTo(entityIndex, partitionB);
+            a.SetTag<TestPartitionB>(entityIndex);
             a.SubmitEntities();
 
             NAssert.IsTrue(a.EntityExists(entityHandle));
@@ -243,7 +243,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Round 2: move tracked entity to PartitionB, add 3 more, remove 1
-            a.MoveTo(trackedRef.ToIndex(a), partitionB);
+            a.SetTag<TestPartitionB>(trackedRef.ToIndex(a));
             var round2Refs = new EntityHandle[3];
             for (int i = 0; i < 3; i++)
             {

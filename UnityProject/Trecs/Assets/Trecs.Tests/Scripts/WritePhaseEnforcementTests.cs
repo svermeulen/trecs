@@ -487,9 +487,8 @@ namespace Trecs.Tests
             foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
             {
                 // Target tag is irrelevant — AssertCanMakeStructuralChanges
-                // throws before GetSingleGroupWithTags resolves the
-                // destination group.
-                World.MoveTo<WritePhaseSetTag>(idx);
+                // throws before the dim is resolved.
+                World.SetTag<WritePhaseSetTag>(idx);
                 return;
             }
         }

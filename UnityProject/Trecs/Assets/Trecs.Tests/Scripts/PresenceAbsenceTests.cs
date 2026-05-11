@@ -223,5 +223,69 @@ namespace Trecs.Tests
             a.SubmitEntities();
             NAssert.AreEqual(1, a.Query().WithTags<McBase, McAlive>().Count());
         }
+
+        [Test]
+        public void TwoSetTagsOnIndependentDims_CoalesceIntoOneMove()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            // Start as alive, not poisoned.
+            var init = a.AddEntity<McBase, McAlive>()
+                .Set(new TestInt { Value = 3 })
+                .AssertComplete();
+            a.SubmitEntities();
+
+            // Two SetTag calls on independent dims (poisoned dim + alive/dead dim).
+            // They should merge into a single move with the entity landing in
+            // {McBase, McDead, McPoisoned}.
+            var idx = init.Handle.ToIndex(a);
+            a.SetTag<McDead>(idx);
+            a.SetTag<McPoisoned>(idx);
+            a.SubmitEntities();
+
+            NAssert.AreEqual(1, a.Query().WithTags<McBase, McDead, McPoisoned>().Count());
+            NAssert.AreEqual(0, a.Query().WithTags<McBase, McAlive>().Count());
+        }
+
+        [Test]
+        public void TwoSetTagsOnSameDim_Throws()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var init = a.AddEntity<McBase, McAlive>()
+                .Set(new TestInt { Value = 4 })
+                .AssertComplete();
+            a.SubmitEntities();
+
+            // Both SetTag<McAlive> and SetTag<McDead> target the same dim
+            // (Alive/Dead). Coalescing detects the conflict at submission and
+            // throws — there is no "first wins" or "last wins" knob.
+            var idx = init.Handle.ToIndex(a);
+            a.SetTag<McAlive>(idx);
+            a.SetTag<McDead>(idx);
+            NAssert.Throws<TrecsException>(() => a.SubmitEntities());
+        }
+
+        [Test]
+        public void SetTagThenUnsetTagOnSamePresenceDim_Throws()
+        {
+            using var env = CreateEnv();
+            var a = env.Accessor;
+
+            var init = a.AddEntity<McBase, McAlive>()
+                .Set(new TestInt { Value = 5 })
+                .AssertComplete();
+            a.SubmitEntities();
+
+            // SetTag<McPoisoned> and UnsetTag<McPoisoned> are also a same-dim
+            // conflict, even though they're different verbs — the framework
+            // treats any pair of ops touching the same dim as a conflict.
+            var idx = init.Handle.ToIndex(a);
+            a.SetTag<McPoisoned>(idx);
+            a.UnsetTag<McPoisoned>(idx);
+            NAssert.Throws<TrecsException>(() => a.SubmitEntities());
+        }
     }
 }

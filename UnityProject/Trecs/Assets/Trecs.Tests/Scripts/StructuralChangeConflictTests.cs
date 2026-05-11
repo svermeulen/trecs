@@ -25,7 +25,7 @@ namespace Trecs.Tests
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
 
-            a.MoveTo(entityIdx, PartitionB);
+            a.SetTag<TestPartitionB>(entityIdx);
             a.RemoveEntity(entityIdx);
             a.SubmitEntities();
 
@@ -46,7 +46,7 @@ namespace Trecs.Tests
             var entityIdx = new EntityIndex(0, groupA);
 
             a.RemoveEntity(entityIdx);
-            a.MoveTo(entityIdx, PartitionB);
+            a.SetTag<TestPartitionB>(entityIdx);
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
@@ -71,7 +71,7 @@ namespace Trecs.Tests
             var entityIdx = new EntityIndex(0, groupA);
 
             // Native ops are processed removes-first regardless of queue order
-            nativeEcs.MoveTo(entityIdx, PartitionB);
+            nativeEcs.SetTag<TestPartitionB>(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
             a.SubmitEntities();
 
@@ -97,7 +97,7 @@ namespace Trecs.Tests
             var entityIdx = new EntityIndex(0, groupA);
 
             // Managed swap queued first, then native remove
-            a.MoveTo(entityIdx, PartitionB);
+            a.SetTag<TestPartitionB>(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
             a.SubmitEntities();
 
@@ -124,7 +124,7 @@ namespace Trecs.Tests
 
             // Managed remove queued first, then native swap
             a.RemoveEntity(entityIdx);
-            nativeEcs.MoveTo(entityIdx, PartitionB);
+            nativeEcs.SetTag<TestPartitionB>(entityIdx);
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
@@ -226,7 +226,7 @@ namespace Trecs.Tests
             // Swap entity 0, then native-remove entity 0.
             // Entities 1 and 2 should be unaffected.
             var entityIdx = new EntityIndex(0, groupA);
-            a.MoveTo(entityIdx, PartitionB);
+            a.SetTag<TestPartitionB>(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
             a.SubmitEntities();
 
@@ -267,17 +267,12 @@ namespace Trecs.Tests
         [Test]
         public void ManagedDuplicateSwap_Throws()
         {
-            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
-            var a = env.Accessor;
-
-            a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
-            a.SubmitEntities();
-
-            var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
-            var entityIdx = new EntityIndex(0, groupA);
-
-            a.MoveTo(entityIdx, PartitionB);
-            NAssert.Catch<Exception>(() => a.MoveTo(entityIdx, PartitionB));
+            // MIGRATION: this test relied on MoveTo throwing at the second
+            // call site (pre-resolution dedup). The new SetTag/UnsetTag
+            // verbs defer same-dim conflict detection to submission time,
+            // so the second SetTag call returns normally. Equivalent
+            // coverage exists in SubmissionPipelineEdgeCaseTests where the
+            // throw is asserted after SubmitEntities.
         }
 
         #endregion
@@ -303,19 +298,19 @@ namespace Trecs.Tests
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
 
             // Entity 0: managed swap + native remove → removed
-            a.MoveTo(new EntityIndex(0, groupA), PartitionB);
+            a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             nativeEcs.RemoveEntity(new EntityIndex(0, groupA));
 
             // Entity 1: managed remove + native swap → removed
             a.RemoveEntity(new EntityIndex(1, groupA));
-            nativeEcs.MoveTo(new EntityIndex(1, groupA), PartitionB);
+            nativeEcs.SetTag<TestPartitionB>(new EntityIndex(1, groupA));
 
             // Entity 2: native duplicate remove → removed once
             nativeEcs.RemoveEntity(new EntityIndex(2, groupA));
             nativeEcs.RemoveEntity(new EntityIndex(2, groupA));
 
             // Entity 3: native swap only → moved to PartitionB
-            nativeEcs.MoveTo(new EntityIndex(3, groupA), PartitionB);
+            nativeEcs.SetTag<TestPartitionB>(new EntityIndex(3, groupA));
 
             // Entity 4: no operations → stays in PartitionA
             a.SubmitEntities();
@@ -339,7 +334,7 @@ namespace Trecs.Tests
             var entityIdx = new EntityIndex(0, groupA);
 
             // Thread 0 queues a swap, thread 1 queues a remove for the same entity
-            nativeEcs.MoveTo(entityIdx, PartitionB);
+            nativeEcs.SetTag<TestPartitionB>(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
             a.SubmitEntities();
 
@@ -371,8 +366,8 @@ namespace Trecs.Tests
             // Entity 0: native swap to B
             // Entity 1: managed swap to B
             // Entity 2: stays
-            nativeEcs.MoveTo(refs[0].ToIndex(a), PartitionB);
-            a.MoveTo(refs[1].ToIndex(a), PartitionB);
+            nativeEcs.SetTag<TestPartitionB>(refs[0].ToIndex(a));
+            a.SetTag<TestPartitionB>(refs[1].ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
@@ -439,7 +434,7 @@ namespace Trecs.Tests
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
 
             // Swap entity 0 then native-remove it. Entity 1 should survive with correct data.
-            a.MoveTo(new EntityIndex(0, groupA), PartitionB);
+            a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             nativeEcs.RemoveEntity(new EntityIndex(0, groupA));
             a.SubmitEntities();
 

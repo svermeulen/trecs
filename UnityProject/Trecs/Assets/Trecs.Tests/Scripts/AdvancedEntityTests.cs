@@ -213,7 +213,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move to PartitionB
-            a.MoveTo(entityHandle.ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
             a.SubmitEntities();
 
             // Get the new index and convert back to ref

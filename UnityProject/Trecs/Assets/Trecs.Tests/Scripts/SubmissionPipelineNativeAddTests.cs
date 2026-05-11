@@ -107,7 +107,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move existing to PartitionB + native add new to PartitionA
-            a.MoveTo(handle.ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(handle.ToIndex(a));
             var init = nativeEcs.AddEntity(PartitionA, sortKey: 0);
             init.Set(new TestInt { Value = 77 });
             init.Set(new TestVec());
@@ -137,7 +137,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move 0 to PartitionB, remove 1, native add 2 new
-            a.MoveTo(handles[0].ToIndex(a), PartitionB);
+            a.SetTag<TestPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[1]);
             for (int i = 0; i < 2; i++)
             {

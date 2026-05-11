@@ -192,7 +192,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(0, a.CountEntitiesWithTags(partitionB));
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
-            a.MoveTo(new EntityIndex(0, groupA), partitionB);
+            a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(partitionA));
@@ -215,7 +215,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
-            a.MoveTo(new EntityIndex(0, groupA), partitionB);
+            a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             var intComp = a.Query().WithTags(partitionB).Single().Get<TestInt>();
@@ -240,7 +240,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
-            a.MoveTo(new EntityIndex(0, groupA), partitionB);
+            a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             NAssert.IsTrue(a.EntityExists(entityHandle));
@@ -260,7 +260,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
-            a.MoveTo(new EntityIndex(0, groupA), partitionB);
+            a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionA));

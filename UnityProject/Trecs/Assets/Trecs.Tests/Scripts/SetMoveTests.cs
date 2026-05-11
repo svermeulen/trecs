@@ -63,7 +63,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, set.Read.Count);
 
             // Move entity to PartitionB
-            a.MoveTo(entityHandle.ToIndex(a), FMPartitionBSet);
+            a.SetTag<FMPartitionB>(entityHandle.ToIndex(a));
             a.SubmitEntities();
 
             // Entity should still be in the set, but now under the PartitionB group
@@ -94,7 +94,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move to PartitionB
-            a.MoveTo(entityHandle.ToIndex(a), FMPartitionBSet);
+            a.SetTag<FMPartitionB>(entityHandle.ToIndex(a));
             a.SubmitEntities();
 
             // Query through set should find the entity
@@ -135,7 +135,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Move entity 1 (NOT in set) to PartitionB
-            a.MoveTo(init1.Handle.ToIndex(a), FMPartitionBSet);
+            a.SetTag<FMPartitionB>(init1.Handle.ToIndex(a));
             a.SubmitEntities();
 
             // Set should still have exactly 1 entity
@@ -172,9 +172,9 @@ namespace Trecs.Tests
             NAssert.AreEqual(3, set.Read.Count);
 
             // Move entities 0 and 2 (in set) plus entity 1 (not in set) to PartitionB
-            a.MoveTo(refs[0].ToIndex(a), FMPartitionBSet);
-            a.MoveTo(refs[1].ToIndex(a), FMPartitionBSet);
-            a.MoveTo(refs[2].ToIndex(a), FMPartitionBSet);
+            a.SetTag<FMPartitionB>(refs[0].ToIndex(a));
+            a.SetTag<FMPartitionB>(refs[1].ToIndex(a));
+            a.SetTag<FMPartitionB>(refs[2].ToIndex(a));
             a.SubmitEntities();
 
             // Set should still have 3 entities (0 and 2 moved but still tracked, 4 stayed)
@@ -226,7 +226,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(3, set.Read.Count);
 
             // Move entity 0 to PartitionB, remove entity 1
-            a.MoveTo(refs[0].ToIndex(a), FMPartitionBSet);
+            a.SetTag<FMPartitionB>(refs[0].ToIndex(a));
             a.RemoveEntity(refs[1]);
             a.SubmitEntities();
 
@@ -265,7 +265,7 @@ namespace Trecs.Tests
 
             // Remove entity 0 (in set), move entity 1 (NOT in set) to PartitionB
             a.RemoveEntity(refs[0]);
-            a.MoveTo(refs[1].ToIndex(a), FMPartitionBSet);
+            a.SetTag<FMPartitionB>(refs[1].ToIndex(a));
             a.SubmitEntities();
 
             // Entity 0 removed -> set loses it
@@ -299,17 +299,17 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, set.Read.Count);
 
             // Move A -> B
-            a.MoveTo(entityHandle.ToIndex(a), FMPartitionBSet);
+            a.SetTag<FMPartitionB>(entityHandle.ToIndex(a));
             a.SubmitEntities();
             NAssert.AreEqual(1, set.Read.Count, "After A->B");
 
             // Move B -> A
-            a.MoveTo(entityHandle.ToIndex(a), FMPartitionASet);
+            a.SetTag<FMPartitionA>(entityHandle.ToIndex(a));
             a.SubmitEntities();
             NAssert.AreEqual(1, set.Read.Count, "After B->A");
 
             // Move A -> B again
-            a.MoveTo(entityHandle.ToIndex(a), FMPartitionBSet);
+            a.SetTag<FMPartitionB>(entityHandle.ToIndex(a));
             a.SubmitEntities();
             NAssert.AreEqual(1, set.Read.Count, "After A->B again");
 
