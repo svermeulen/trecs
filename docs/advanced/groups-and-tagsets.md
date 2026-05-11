@@ -44,7 +44,7 @@ Groups are the foundation of Trecs' performance model:
 The tags you pass to `AddEntity<...>()` are a **filter**, not a label. Trecs picks the registered group whose tag set contains every tag you passed:
 
 - One group matches → that's the target.
-- Several match, but one matches your tags *exactly* → that one wins. (This is how partitioned templates let you target either side of a presence/absence partition by omitting the partition tag.)
+- Several match → if one of them has *only* your tags and no extras, that one wins. (This is how partitioned templates let you target either side of a presence/absence partition by omitting the partition tag.)
 - Otherwise → the call throws as ambiguous.
 
 ```csharp
@@ -54,27 +54,13 @@ accessor.AddEntity<GameTags.Player>();
 // → {Player, Character}. Only this group contains Player.
 
 accessor.AddEntity<GameTags.Enemy, GameTags.Character>();
-// → {Enemy, Character}. Both groups contain Character, but this one matches exactly.
+// → {Enemy, Character}. Only this group contains Enemy.
 
 accessor.AddEntity<GameTags.Character>();
-// → throws. Both groups contain Character and neither matches exactly.
+// → throws. Both groups contain Character, and neither has Character on its own.
 ```
 
 `AddEntity<Player>()` works because `Player` narrows to one group. `AddEntity<Character>()` doesn't — `Character` alone matches both, so you have to add `Player` or `Enemy` to disambiguate.
-
-## TagSet vs GroupIndex
-
-Trecs exposes two first-class handles for groups:
-
-| | `TagSet` | `GroupIndex` |
-|---|---|---|
-| **Role** | Stable identity for a tag combination | Runtime handle — a small array-indexable integer |
-| **Representation** | 32-bit stable hash of the tag GUIDs | Sequential `ushort` assigned at world build time |
-| **Serializable** | Yes — same value across runs | No — assignment depends on registration order |
-| **Typical use** | `[FromWorld(typeof(GameTags.Player))]`, `world.CountEntitiesWithTags<...>()`, save-game fields | `[ForEachEntity]` internals, group-slice iteration, `ComponentBuffer`, event callbacks |
-| **How you get one** | `TagSet<GameTags.Player>.Value`, `TagSet.FromTags(...)` | `worldInfo.GetSingleGroupWithTags(tagSet)`, capture from slice, event callback |
-
-Rule of thumb: to **store** the handle (component, disk, across sessions), use `TagSet`. To **use** it within a frame to reach into native storage, use `GroupIndex`.
 
 ## GroupSlices
 
@@ -132,7 +118,7 @@ TagSet tags = TagSet.FromTags(Tag<GameTags.Player>.Value, Tag<GameTags.Enemy>.Va
 TagSet combined = playerTags.CombineWith(TagSet<GameTags.Active>.Value);
 ```
 
-`TagSet` is a stable hash, so it's safe to serialize — the same tag combination hashes to the same value across runs. Use it for save-game fields or network messages that name a group.
+`TagSet` is a stable hash, so it's safe to serialize — the same tag combination hashes to the same value across runs.
 
 ## GroupIndex
 
