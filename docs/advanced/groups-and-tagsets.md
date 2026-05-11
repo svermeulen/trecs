@@ -39,30 +39,6 @@ Groups are the foundation of Trecs' performance model:
 - **Targeted iteration** — systems iterate over specific groups by tag, skipping irrelevant entities.
 - **Partitions** — template [partitions](../core/templates.md#partitions) use groups to separate entities by state, so each partition iterates independently.
 
-## Resolving tags to a group
-
-Several APIs take a tag set and return the group it names: `AddEntity<...>()`, `CountEntitiesWithTags<...>()`, `worldInfo.GetSingleGroupWithTags(...)`, event subscriptions, and so on. The tags you pass aren't required to be the group's full tag set — they're a query, and the lookup rule is:
-
-1. Find every group whose tag set is a **superset** of the query.
-2. If exactly one matches, return it.
-3. If several match, prefer the one whose tag set **exactly equals** the query — this is what lets you target the "empty" side of a presence/absence partition by omitting the partition tag.
-4. Otherwise, throw `ambiguous`.
-
-```csharp
-// Given the two templates above ({Player, Character} and {Enemy, Character}):
-
-accessor.AddEntity<GameTags.Player>();
-// → {Player, Character} — only one group contains Player
-
-accessor.AddEntity<GameTags.Enemy, GameTags.Character>();
-// → {Enemy, Character} — exact match
-
-accessor.AddEntity<GameTags.Character>();
-// → throws: both groups contain Character (ambiguous)
-```
-
-If you want a specific group unambiguously, pass its exact tag combination. If you want to iterate every group that contains some tags, use a tag query (`accessor.Query().WithTags<...>()`) instead — queries are intentionally many-to-many and won't throw on multiple matches.
-
 ## TagSet vs GroupIndex
 
 Trecs exposes two first-class handles for groups:
