@@ -24,7 +24,7 @@ public enum EnableChannel
 }
 ```
 
-Game-host / editor code calls these on a `WorldAccessor` (typically a long-lived `AccessorRole.Unrestricted` accessor created via `world.CreateAccessor(AccessorRole.Unrestricted, "MyHost")`):
+Game-host / editor code calls these on a `WorldAccessor` (typically a long-lived `AccessorRole.Unrestricted` accessor created via `world.CreateAccessor(AccessorRole.Unrestricted)`):
 
 ```csharp
 accessor.SetSystemEnabled(systemIndex, EnableChannel.User, false);  // disable

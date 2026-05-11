@@ -2,7 +2,7 @@
 
 Every `WorldAccessor` is tagged with an `AccessorRole` that controls what the accessor is allowed to do — which components it can read and write, whether it can make structural changes, whether it can allocate from the heap, and which RNG stream it can pull from. The role is set at accessor-creation time and never changes.
 
-System-owned accessors get their role automatically from their `SystemPhase` (see [System-owned accessors](#system-owned-accessors-vs-standalone-accessors) below).  Non system classes can also create accessors via `world.CreateAccessor(AccessorRole, ...)` and pick the role explicitly.
+System-owned accessors get their role automatically from their `SystemPhase` (see [System-owned accessors](#system-owned-accessors-vs-standalone-accessors) below).  Non system classes can also create accessors via `world.CreateAccessor(AccessorRole)` and pick the role explicitly.
 
 The framework asserts every rule below at the call site. Crossing a role boundary throws an immediate, clear `TrecsException` rather than producing silent desync later.
 
@@ -58,7 +58,7 @@ System-owned accessors map their `SystemPhase` to a role automatically:
 
 The presentation phases and the input phase all collapse into the single `Variable` role because they share the same access rules — only their execution-order positions within the per-frame pipeline differ.
 
-System code therefore never writes `world.CreateAccessor(AccessorRole.X, ...)` for itself — it gets the right role for free from its `[ExecuteIn(...)]` attribute. Use `CreateAccessor` only for the standalone cases listed in [Picking a role](#picking-a-role-for-a-standalone-accessor) above.
+System code therefore never writes `world.CreateAccessor(AccessorRole.X)` for itself — it gets the right role for free from its `[ExecuteIn(...)]` attribute. Use `CreateAccessor` only for the standalone cases listed in [Picking a role](#picking-a-role-for-a-standalone-accessor) above.
 
 ## Related
 

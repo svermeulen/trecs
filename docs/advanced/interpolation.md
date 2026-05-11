@@ -112,7 +112,7 @@ You write the interpolation math; scheduling, dependency tracking, and registrat
 ## Best practices
 
 - **Only interpolate visual components** — positions, rotations, scales, colors. Don't interpolate gameplay state like health or ammo.
-- **Use `SetInterpolated()` at creation** — ensures all three components start in sync, avoiding a visual pop on the first frame.
+- **Use `SetInterpolated()` at creation** — ensures all three components start in sync, avoiding a visual pop on the first frame.  If you forget, and the component does not have a default, Trecs will remind you with an exception.
 - **Group interpolators by project** — use a shared `GroupName` constant so a single `Add{GroupName}()` registers everything.
 - **Prefer `nlerp` over `slerp` for rotations** — angular deltas between fixed frames are typically small enough that the difference is imperceptible, and `nlerp` is significantly cheaper.
 
