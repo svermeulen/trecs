@@ -41,14 +41,12 @@ namespace Trecs.Internal
 
             if (_tagSetTags.TryGetValue(id, out var existing))
             {
-#if TRECS_INTERNAL_CHECKS && DEBUG
                 SortGuidsToBuffer(tags);
                 AssertTagGuidsMatch(
                     id,
                     existing,
                     new ReadOnlySpan<int>(_guidBuffer, 0, tags.Count)
                 );
-#endif
                 return new TagSet(id);
             }
 
@@ -77,10 +75,8 @@ namespace Trecs.Internal
 
             if (_tagSetTags.TryGetValue(id, out var existing))
             {
-#if TRECS_INTERNAL_CHECKS && DEBUG
                 Span<int> guids = stackalloc int[] { t1.Guid };
                 AssertTagGuidsMatch(id, existing, guids);
-#endif
             }
             else
             {
@@ -103,12 +99,10 @@ namespace Trecs.Internal
 
             if (_tagSetTags.TryGetValue(id, out var existing))
             {
-#if TRECS_INTERNAL_CHECKS && DEBUG
                 if (t1.Guid > t2.Guid)
                     (t1, t2) = (t2, t1);
                 Span<int> guids = stackalloc int[] { t1.Guid, t2.Guid };
                 AssertTagGuidsMatch(id, existing, guids);
-#endif
                 return new TagSet(id);
             }
 
@@ -131,7 +125,6 @@ namespace Trecs.Internal
 
             if (_tagSetTags.TryGetValue(id, out var existing))
             {
-#if TRECS_INTERNAL_CHECKS && DEBUG
                 if (t1.Guid > t2.Guid)
                     (t1, t2) = (t2, t1);
                 if (t2.Guid > t3.Guid)
@@ -140,7 +133,6 @@ namespace Trecs.Internal
                     (t1, t2) = (t2, t1);
                 Span<int> guids = stackalloc int[] { t1.Guid, t2.Guid, t3.Guid };
                 AssertTagGuidsMatch(id, existing, guids);
-#endif
                 return new TagSet(id);
             }
 
@@ -166,7 +158,6 @@ namespace Trecs.Internal
 
             if (_tagSetTags.TryGetValue(id, out var existing))
             {
-#if TRECS_INTERNAL_CHECKS && DEBUG
                 if (t1.Guid > t2.Guid)
                     (t1, t2) = (t2, t1);
                 if (t3.Guid > t4.Guid)
@@ -179,7 +170,6 @@ namespace Trecs.Internal
                     (t2, t3) = (t3, t2);
                 Span<int> guids = stackalloc int[] { t1.Guid, t2.Guid, t3.Guid, t4.Guid };
                 AssertTagGuidsMatch(id, existing, guids);
-#endif
                 return new TagSet(id);
             }
 
@@ -244,10 +234,8 @@ namespace Trecs.Internal
 
             if (_tagSetTags.TryGetValue(id, out var existing))
             {
-#if TRECS_INTERNAL_CHECKS && DEBUG
                 var mergedGuids = MergeSortedTagGuids(tagsA, tagsB);
                 AssertTagGuidsMatch(id, existing, mergedGuids);
-#endif
                 return new TagSet(id);
             }
 
@@ -298,7 +286,6 @@ namespace Trecs.Internal
             return result;
         }
 
-#if TRECS_INTERNAL_CHECKS && DEBUG
         static int[] MergeSortedTagGuids(IReadOnlyList<Tag> tagsA, IReadOnlyList<Tag> tagsB)
         {
             int totalMax = tagsA.Count + tagsB.Count;
@@ -339,7 +326,6 @@ namespace Trecs.Internal
             Array.Copy(_guidBuffer, result, count);
             return result;
         }
-#endif
 
         public static IReadOnlyList<Tag> TagSetToTags(TagSet tagSet)
         {
@@ -391,7 +377,12 @@ namespace Trecs.Internal
             _tagSetTags.Add(id, sortedTags);
         }
 
-#if TRECS_INTERNAL_CHECKS && DEBUG
+        // Verifies that an existing tagset entry actually matches the tags
+        // being looked up — guards against XOR-hash collisions silently
+        // aliasing two distinct sets. Runs on every cache hit, which is
+        // cold-path (one-time-per-set registration); the body is
+        // allocation-free in the happy path and only formats the diagnostic
+        // string on actual collision.
         static void AssertTagGuidsMatch(
             int id,
             IReadOnlyList<Tag> existing,
@@ -423,6 +414,5 @@ namespace Trecs.Internal
                     + $"but was requested with different tags"
             );
         }
-#endif
     }
 }
