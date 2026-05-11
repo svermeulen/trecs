@@ -1,8 +1,5 @@
 # Recording & Playback
 
-!!! note "When you need this page"
-    Read this for **deterministic replay**, **networked rollback**, **save games beyond a single snapshot**, or **debug-replay tooling**. For save/load of a single world snapshot, only the [Snapshots section](#snapshots-save-games) applies.
-
 Assumes you've read [Serialization](serialization.md), which covers `SerializerRegistry` and `WorldStateSerializer`.
 
 ## Overview
