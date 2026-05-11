@@ -278,7 +278,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor TemplatePartitionCountHigh = new(
             id: "TRECS038",
             title: "Template generates many partitions",
-            messageFormat: "Template '{0}' generates {1} partitions across {2} dimensions ({3}). Each partition pre-allocates a contiguous component buffer. Past ~8 partitions consider sets — they don't multiply. See docs/guides/entity-subset-patterns.md.",
+            messageFormat: "Template '{0}' generates {1} partitions across {2} dimensions ({3}). Each partition is a distinct group with its own per-component buffer. Past ~16 partitions consider sets — they don't multiply. See docs/guides/entity-subset-patterns.md.",
             category: TrecsCategory,
             DiagnosticSeverity.Warning,
             isEnabledByDefault: true

@@ -166,11 +166,11 @@ namespace Trecs.SourceGen.Template
             return isValid;
         }
 
-        // Threshold above which we emit TRECS038. Chosen so that a 1-D or 2-D
-        // partitioning (up to 4 groups) is silent, 3-D (up to 8) is silent, and
-        // anything beyond starts warning. Aligns with the "prefer sets past 8"
-        // rule in docs/guides/entity-subset-patterns.md.
-        const int PartitionWarningThreshold = 8;
+        // Threshold above which we emit TRECS038. Chosen so that up to 3 binary
+        // dims (8 partitions) and a 4-way + 2 binary mix (16) are silent — those
+        // shapes are common and reasonable. Above 16 the design is more clearly
+        // opting into a lot of groups and deserves a nudge toward sets.
+        const int PartitionWarningThreshold = 16;
 
         private static void CheckPartitionCount(
             TemplateDefinitionData data,
