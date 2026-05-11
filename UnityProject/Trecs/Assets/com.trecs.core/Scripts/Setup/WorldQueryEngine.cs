@@ -254,23 +254,87 @@ namespace Trecs
                 return groups[0];
             }
 
-            // Multiple groups contain this tag set as a subset. Prefer the group
-            // whose tags exactly equal the requested set — this lets users target
-            // the "absent" partition of a presence/absence dim by specifying just
-            // the ITagged tags (without ambiguity from the present partition,
-            // which would also match by subset).
-            for (int i = 0; i < groups.Count; i++)
+            // Multiple groups contain this tag set as a subset. The tiebreaker
+            // only fires when every match belongs to the same registered
+            // template — we never resolve silently across template
+            // boundaries. Within one template, return the unique match whose
+            // tag set is a subset of every other match's (the "narrowest"
+            // partition that still contains the query). This lets users elide
+            // presence/absence partition tags and inherited base tags when
+            // their template has a unique smallest match for the query.
+            var firstTemplate = _groupInfos[groups[0].Index].ResolvedTemplate.Template;
+            for (int i = 1; i < groups.Count; i++)
             {
-                if (_worldInfo.ToTagSet(groups[i]) == tagset)
+                if (_groupInfos[groups[i].Index].ResolvedTemplate.Template != firstTemplate)
                 {
-                    return groups[i];
+                    throw Assert.CreateException(
+                        "Ambiguous groups found for tags {}.  Matches span multiple templates; "
+                            + "the resolver only picks a smallest match within one template.  "
+                            + "Add a discriminator tag to make the desired template's tag set unique.",
+                        tagset
+                    );
                 }
             }
 
-            throw Assert.CreateException(
-                "Ambiguous groups found for tags {}.  Must be unique when creating.",
-                tagset
-            );
+            // Find the match with the fewest tags. If multiple matches tie at
+            // that size, throw — within one template's partition lattice,
+            // equal-sized matches are siblings (mutex-variant or independent
+            // presence/absence dims that differ), so there's no unique
+            // minimum.
+            int smallestIdx = 0;
+            int smallestCount = _groupInfos[groups[0].Index].Tags.Count;
+            bool smallestUnique = true;
+            for (int i = 1; i < groups.Count; i++)
+            {
+                var count = _groupInfos[groups[i].Index].Tags.Count;
+                if (count < smallestCount)
+                {
+                    smallestIdx = i;
+                    smallestCount = count;
+                    smallestUnique = true;
+                }
+                else if (count == smallestCount)
+                {
+                    smallestUnique = false;
+                }
+            }
+
+            if (!smallestUnique)
+            {
+                throw Assert.CreateException(
+                    "Ambiguous groups found for tags {}.  Multiple matching groups share the "
+                        + "smallest tag-set size — narrow the query with an additional tag.",
+                    tagset
+                );
+            }
+
+            // Verify the smallest is actually a subset of every other match.
+            // Within a single template this can fail when matches differ on a
+            // mutex-variant dim — the unique-smallest check alone isn't
+            // sufficient.
+            var smallestGroup = groups[smallestIdx];
+            var smallestTags = _groupInfos[smallestGroup.Index].Tags;
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (i == smallestIdx)
+                    continue;
+
+                var otherTags = _groupInfos[groups[i].Index].Tags;
+                foreach (var tag in smallestTags)
+                {
+                    if (!otherTags.Contains(tag))
+                    {
+                        throw Assert.CreateException(
+                            "Ambiguous groups found for tags {}.  The smallest match isn't a "
+                                + "subset of every other match — matches form siblings rather "
+                                + "than a chain.  Narrow the query with an additional tag.",
+                            tagset
+                        );
+                    }
+                }
+            }
+
+            return smallestGroup;
         }
 
         public GroupIndex GetSingleGroupWithTags<T1>()

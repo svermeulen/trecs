@@ -43,9 +43,9 @@ Groups are the foundation of Trecs' performance model:
 
 The tags you pass to `AddEntity<...>()` are a **filter**, not a label. Trecs picks the registered group whose tag set contains every tag you passed:
 
-- One group matches → that's the target.
-- Several match → if one of them has *only* your tags and no extras, that one wins. (This is how partitioned templates let you target either side of a presence/absence partition by omitting the partition tag.)
-- Otherwise → the call throws as ambiguous.
+- **One group matches** → that's the target.
+- **Several match, all from the same registered template** → if there's a unique smallest one whose tag set is a subset of every other match, that's the target. This handles binary partitions, inheritance, and any combination where the matches form a chain inside one template's partition lattice — for example, a template `BallEntity : IExtends<Shape>, ITagged<Ball>, IPartitionedBy<Active>` lets `AddEntity<Ball>()` land in the *absent* partition `{Shape, Ball}` without forcing you to spell out `<Ball, Shape>` everywhere.
+- **Matches span multiple templates, or no unique smallest exists** → throws ambiguous.
 
 ```csharp
 // Given the two templates above ({Player, Character} and {Enemy, Character}):
@@ -57,10 +57,13 @@ accessor.AddEntity<GameTags.Enemy, GameTags.Character>();
 // → {Enemy, Character}. Only this group contains Enemy.
 
 accessor.AddEntity<GameTags.Character>();
-// → throws. Both groups contain Character, and neither has Character on its own.
+// → throws. Both groups contain Character, and they belong to different
+//   templates — the resolver never picks across template boundaries.
 ```
 
-`AddEntity<Player>()` works because `Player` narrows to one group. `AddEntity<Character>()` doesn't — `Character` alone matches both, so you have to add `Player` or `Enemy` to disambiguate.
+`AddEntity<Player>()` works because `Player` narrows to one group. `AddEntity<Character>()` doesn't — `Character` alone matches both `PlayerEntity` and `EnemyEntity`, so you have to add `Player` or `Enemy` to disambiguate.
+
+The cross-template restriction is deliberate: a "forgotten tag" should surface as an error at the call site, not silently route the entity into one template's groups because they happened to be a subset. If your game needs both a base template and a derived template to exist concretely (e.g. `Orc` plus `FlyingOrc`), give each a distinct discriminator tag (`ITagged<Grounded>` on the base, `ITagged<Flying>` on the derived) so their tag sets become siblings rather than strict subsets.
 
 ## GroupSlices
 
