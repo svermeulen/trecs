@@ -75,6 +75,17 @@ namespace Trecs.Internal
         readonly FastList<(int accessorId, EntityIndex from, Tag tag, bool isSet)> _managedTagOps =
             new();
 
+        // Pooled per-entity coalescing state. Recycled between submissions so the
+        // hot path produces zero GC garbage. Value type PendingEntityChanges
+        // stores all per-entity state inline.
+        readonly DenseDictionary<EntityIndex, PendingEntityChanges> _pendingChanges = new();
+
+        // Side list for IAccessRecorder-only attribution of additional
+        // contributors. Populated only when _accessRecorder != null AND an op
+        // arrives from a different accessor than the one that created the
+        // pending entry. Cleared between submissions.
+        readonly FastList<(EntityIndex entity, int accessorId)> _pendingExtraContributors = new();
+
         // Per-set deferred bags are now on EntitySetStorage; no centralized set queues needed.
         readonly WorldInfo _worldInfo;
         readonly WorldAccessorRegistry _accessorRegistry;
@@ -1444,37 +1455,40 @@ namespace Trecs.Internal
         // resolved to a destination group at the end of dequeue. Throws on
         // same-dim conflict — multiple ops on one dim in a single submission are
         // a programming error, not a "last writer wins" knob.
-        sealed class PendingEntityChanges
+        //
+        // Struct (not class) so the pooled _pendingChanges dict stores values
+        // inline. PrimaryAccessorId is the first contributor; additional
+        // contributors are tracked in _pendingExtraContributors only when
+        // IAccessRecorder is active (rare, opt-in dev tooling).
+        struct PendingEntityChanges
         {
             public ResolvedTemplate Template;
             public TagSet FinalTagSet;
             public ulong TouchedDimsMask;
-            public List<int> ContributingAccessors;
+            public int PrimaryAccessorId;
         }
 
-        void ApplyTagOpToPending(
-            Dictionary<EntityIndex, PendingEntityChanges> pending,
-            int accessorId,
-            EntityIndex from,
-            Tag tag,
-            bool isSet
-        )
+        void ApplyTagOpToPending(int accessorId, EntityIndex from, Tag tag, bool isSet)
         {
-            if (!pending.TryGetValue(from, out var p))
+            // Count delta detects fresh-vs-existing without relying on field
+            // sentinels, which would carry stale data from the prior submission's
+            // recycled slot.
+            int countBefore = _pendingChanges.Count;
+            ref var p = ref _pendingChanges.GetOrAdd(from, out _);
+
+            if (_pendingChanges.Count > countBefore)
             {
-                var template = _worldInfo.GetResolvedTemplateForGroup(from.GroupIndex);
-                p = new PendingEntityChanges
-                {
-                    Template = template,
-                    FinalTagSet = _worldInfo.ToTagSet(from.GroupIndex),
-                    TouchedDimsMask = 0UL,
-                    ContributingAccessors = new List<int> { accessorId },
-                };
-                pending.Add(from, p);
+                p.Template = _worldInfo.GetResolvedTemplateForGroup(from.GroupIndex);
+                p.FinalTagSet = _worldInfo.ToTagSet(from.GroupIndex);
+                p.TouchedDimsMask = 0UL;
+                p.PrimaryAccessorId = accessorId;
             }
-            else if (!p.ContributingAccessors.Contains(accessorId))
+            else if (_accessRecorder != null && p.PrimaryAccessorId != accessorId)
             {
-                p.ContributingAccessors.Add(accessorId);
+                // Dev-tooling-only path. Dedup is skipped — duplicate OnEntityMoved
+                // events are not catastrophic for recording, and avoiding a Contains
+                // scan keeps hot-path simplicity even when recording is on.
+                _pendingExtraContributors.Add((from, accessorId));
             }
 
             var (dimIdx, dim) = WorldInfo.FindDimContainingTag(p.Template, tag);
@@ -1612,8 +1626,8 @@ namespace Trecs.Internal
                 // Per-entity coalescing: multiple SetTag/UnsetTag ops on the same
                 // entity merge into a single move. Same-dim conflict throws;
                 // independent-dim ops commute. Both managed and native paths feed
-                // this pipeline.
-                var pending = new Dictionary<EntityIndex, PendingEntityChanges>();
+                // this pipeline through the pooled _pendingChanges dict (recycled
+                // at the end of this block).
 
                 using (TrecsProfiling.Start("NatSwap Dequeue"))
                 {
@@ -1632,21 +1646,21 @@ namespace Trecs.Internal
                                     $"Unexpected sentinel {sentinel} in native move queue — only SetTag (-2) and UnsetTag (-3) are supported"
                                 );
                             var tag = new Tag(buffer.Dequeue<int>());
-                            ApplyTagOpToPending(pending, accessorId, from, tag, isSet: sentinel == -2);
+                            ApplyTagOpToPending(accessorId, from, tag, isSet: sentinel == -2);
                         }
                     }
 
                     foreach (var op in _managedTagOps)
-                        ApplyTagOpToPending(pending, op.accessorId, op.from, op.tag, op.isSet);
+                        ApplyTagOpToPending(op.accessorId, op.from, op.tag, op.isSet);
                     _managedTagOps.Clear();
                 }
 
                 var swaps = new NativeList<(EntityIndex, GroupIndex, int)>(Allocator.TempJob);
 
-                foreach (var kvp in pending)
+                foreach (var kvp in _pendingChanges)
                 {
                     var from = kvp.Key;
-                    var p = kvp.Value;
+                    ref var p = ref kvp.Value;
                     var toGroup = _worldInfo.GetSingleGroupWithTags(p.FinalTagSet);
 
                     // Skip if every touched dim's net change was a no-op (e.g.
@@ -1661,24 +1675,40 @@ namespace Trecs.Internal
                         toGroup
                     );
 
-                    // Primary accessor for the swap is the first contributor; the
-                    // recorder receives one OnEntityMoved per contributor so each
-                    // accessor that participated gets attribution for the final move.
-                    swaps.Add((from, toGroup, p.ContributingAccessors[0]));
+                    swaps.Add((from, toGroup, p.PrimaryAccessorId));
 
                     if (_accessRecorder != null)
                     {
-                        foreach (var aid in p.ContributingAccessors)
+                        // Primary contributor first, then any extras tracked while
+                        // the recorder was active. Each accessor that contributed
+                        // to the final coalesced move gets one OnEntityMoved event.
+                        var primary = _accessorRegistry.GetAccessorById(p.PrimaryAccessorId);
+                        _accessRecorder.OnEntityMoved(
+                            primary.DebugName,
+                            from.GroupIndex,
+                            toGroup
+                        );
+                        int extrasCount = _pendingExtraContributors.Count;
+                        for (int i = 0; i < extrasCount; i++)
                         {
-                            var accessor = _accessorRegistry.GetAccessorById(aid);
-                            _accessRecorder.OnEntityMoved(
-                                accessor.DebugName,
-                                from.GroupIndex,
-                                toGroup
-                            );
+                            var extra = _pendingExtraContributors[i];
+                            if (extra.entity == from)
+                            {
+                                var accessor = _accessorRegistry.GetAccessorById(
+                                    extra.accessorId
+                                );
+                                _accessRecorder.OnEntityMoved(
+                                    accessor.DebugName,
+                                    from.GroupIndex,
+                                    toGroup
+                                );
+                            }
                         }
                     }
                 }
+
+                _pendingChanges.Recycle();
+                _pendingExtraContributors.Clear();
 
                 if (_trecsSettings.RequireDeterministicSubmission)
                 {

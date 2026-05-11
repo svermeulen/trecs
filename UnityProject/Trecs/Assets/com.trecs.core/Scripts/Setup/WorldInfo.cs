@@ -526,78 +526,15 @@ namespace Trecs
         public ResolvedTemplate GetResolvedTemplateForTags(TagSet tags) =>
             _queryEngine.GetResolvedTemplateForTags(tags);
 
-        /// <summary>
-        /// Resolves the destination <see cref="TagSet"/> for a tag-set operation
-        /// (<c>SetTag&lt;T&gt;</c>): finds the partition dimension containing
-        /// <paramref name="newTag"/> on the source group's template and returns the
-        /// source group's tags with that dimension's current variant replaced by
-        /// <paramref name="newTag"/>. For presence/absence dimensions this is "set
-        /// tag present"; for multi-variant dimensions it's "switch to this variant".
-        /// </summary>
-        public TagSet ResolveSetTagDestination(GroupIndex from, Tag newTag)
+        // Allocation-free indexed scan. Callers pass `set.Tags` directly so the
+        // caller can hoist the registry lookup out of inner loops. foreach over
+        // IReadOnlyList<Tag> would box the enumerator.
+        static bool TagSetContainsTag(IReadOnlyList<Tag> tags, Tag tag)
         {
-            Assert.That(!from.IsNull, "Cannot resolve SetTag from null group");
-            var template = GetResolvedTemplateForGroup(from);
-            var currentTags = ToTagSet(from);
-
-            foreach (var dim in template.Dimensions)
+            int count = tags.Count;
+            for (int i = 0; i < count; i++)
             {
-                if (TagSetContainsTag(dim, newTag))
-                {
-                    return ReplaceDimensionTags(currentTags, dim, replacement: newTag);
-                }
-            }
-
-            throw Assert.CreateException(
-                "Tag {} is not part of any partition dimension on template {}",
-                newTag,
-                template.DebugName
-            );
-        }
-
-        /// <summary>
-        /// Resolves the destination <see cref="TagSet"/> for a tag-remove operation
-        /// (<c>UnsetTag&lt;T&gt;</c>): finds the presence/absence dimension whose
-        /// only variant is <paramref name="tagToRemove"/> and returns the source
-        /// group's tags with that variant stripped. Throws if
-        /// <paramref name="tagToRemove"/> is in a multi-variant dimension — there
-        /// is no defined "absent" partition there; use <c>SetTag</c> to switch
-        /// variants instead.
-        /// </summary>
-        public TagSet ResolveUnsetTagDestination(GroupIndex from, Tag tagToRemove)
-        {
-            Assert.That(!from.IsNull, "Cannot resolve UnsetTag from null group");
-            var template = GetResolvedTemplateForGroup(from);
-            var currentTags = ToTagSet(from);
-
-            foreach (var dim in template.Dimensions)
-            {
-                if (TagSetContainsTag(dim, tagToRemove))
-                {
-                    if (dim.Tags.Count != 1)
-                    {
-                        throw Assert.CreateException(
-                            "Cannot UnsetTag<{}>: it is a variant in a multi-variant dimension on template {}. Use SetTag to switch variants.",
-                            tagToRemove,
-                            template.DebugName
-                        );
-                    }
-                    return RemoveDimensionTags(currentTags, dim);
-                }
-            }
-
-            throw Assert.CreateException(
-                "Tag {} is not part of any partition dimension on template {}",
-                tagToRemove,
-                template.DebugName
-            );
-        }
-
-        static bool TagSetContainsTag(TagSet set, Tag tag)
-        {
-            foreach (var t in set.Tags)
-            {
-                if (t == tag)
+                if (tags[i] == tag)
                     return true;
             }
             return false;
@@ -616,40 +553,61 @@ namespace Trecs
             for (int i = 0; i < template.Dimensions.Count; i++)
             {
                 var d = template.Dimensions[i];
-                if (TagSetContainsTag(d, tag))
+                if (TagSetContainsTag(d.Tags, tag))
                     return (i, d);
             }
             return (-1, default);
         }
 
-        // Builds a TagSet equal to <paramref name="current"/> with every tag from
-        // <paramref name="dim"/> stripped, then with <paramref name="replacement"/>
-        // appended. Used by SetTag to swap a dim's current variant for a new one.
+        // Returns a TagSet equal to <paramref name="current"/> with the dim's
+        // currently-active variant (if any) replaced by <paramref name="replacement"/>.
+        // Computes the new id directly via XOR — no intermediate Tag list. Safe
+        // because every destination is a pre-registered partition cross-product
+        // variant. Mirrors TagSetRegistry's id==0→1 normalization so a non-empty
+        // result that XOR-collapses to 0 maps to the registered id.
         internal static TagSet ReplaceDimensionTags(TagSet current, TagSet dim, Tag replacement)
         {
-            var resultTags = new List<Tag>();
-            foreach (var t in current.Tags)
+            var currentTags = current.Tags;
+            var dimTags = dim.Tags;
+            int newId = current.Id;
+            int dimCount = dimTags.Count;
+            // At most one variant of any given dim is active in `current`.
+            for (int i = 0; i < dimCount; i++)
             {
-                if (!TagSetContainsTag(dim, t))
-                    resultTags.Add(t);
+                var t = dimTags[i];
+                if (TagSetContainsTag(currentTags, t))
+                {
+                    newId ^= t.Guid;
+                    break;
+                }
             }
-            resultTags.Add(replacement);
-            return TagSet.FromTags(resultTags);
+            newId ^= replacement.Guid;
+            if (newId == 0)
+                newId = 1;
+            return new TagSet(newId);
         }
 
-        // Builds a TagSet equal to <paramref name="current"/> with every tag from
-        // <paramref name="dim"/> stripped. Used by UnsetTag on presence/absence
-        // dims; for those, stripping the dim's only variant leaves the entity in
-        // the absent partition.
+        // Returns a TagSet equal to <paramref name="current"/> with the dim's
+        // currently-active variant (if any) stripped. XOR-direct — see
+        // ReplaceDimensionTags for the contract.
         internal static TagSet RemoveDimensionTags(TagSet current, TagSet dim)
         {
-            var resultTags = new List<Tag>();
-            foreach (var t in current.Tags)
+            var currentTags = current.Tags;
+            var dimTags = dim.Tags;
+            int newId = current.Id;
+            int dimCount = dimTags.Count;
+            for (int i = 0; i < dimCount; i++)
             {
-                if (!TagSetContainsTag(dim, t))
-                    resultTags.Add(t);
+                var t = dimTags[i];
+                if (TagSetContainsTag(currentTags, t))
+                {
+                    newId ^= t.Guid;
+                    break;
+                }
             }
-            return TagSet.FromTags(resultTags);
+            if (newId == 0)
+                newId = 1;
+            return new TagSet(newId);
         }
 
         public bool IsResolvedTemplate(Template template)
