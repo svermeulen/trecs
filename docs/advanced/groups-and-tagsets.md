@@ -44,8 +44,8 @@ Groups are the foundation of Trecs' performance model:
 The tags you pass to `AddEntity<...>()` are a **filter**, not a label. Trecs picks the registered group whose tag set contains every tag you passed:
 
 - **One group matches** → that's the target.
-- **Several match, all from the same registered template** → if there's a unique smallest one whose tag set is a subset of every other match, that's the target. This handles binary partitions, inheritance, and any combination where the matches form a chain inside one template's partition lattice — for example, a template `BallEntity : IExtends<Shape>, ITagged<Ball>, IPartitionedBy<Active>` lets `AddEntity<Ball>()` land in the *absent* partition `{Shape, Ball}` without forcing you to spell out `<Ball, Shape>` everywhere.
-- **Matches span multiple templates, or no unique smallest exists** → throws ambiguous.
+- **Several match, all from the same registered template** → the one with the fewest tags wins, as long as it's a unique minimum. This handles binary partitions, inheritance, and combinations — for example, a template `BallEntity : IExtends<Shape>, ITagged<Ball>, IPartitionedBy<Active>` lets `AddEntity<Ball>()` land in the *absent* partition `{Shape, Ball}` without forcing you to spell out `<Ball, Shape>` everywhere.
+- **Matches span multiple templates, or several tie at the smallest size** → throws ambiguous.
 
 ```csharp
 // Given the two templates above ({Player, Character} and {Enemy, Character}):
@@ -62,8 +62,6 @@ accessor.AddEntity<GameTags.Character>();
 ```
 
 `AddEntity<Player>()` works because `Player` narrows to one group. `AddEntity<Character>()` doesn't — `Character` alone matches both `PlayerEntity` and `EnemyEntity`, so you have to add `Player` or `Enemy` to disambiguate.
-
-The cross-template restriction is deliberate: a "forgotten tag" should surface as an error at the call site, not silently route the entity into one template's groups because they happened to be a subset. If your game needs both a base template and a derived template to exist concretely (e.g. `Orc` plus `FlyingOrc`), give each a distinct discriminator tag (`ITagged<Grounded>` on the base, `ITagged<Flying>` on the derived) so their tag sets become siblings rather than strict subsets.
 
 ## GroupSlices
 
