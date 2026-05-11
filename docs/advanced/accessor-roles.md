@@ -60,41 +60,6 @@ The presentation phases and the input phase all collapse into the single `Variab
 
 System code therefore never writes `world.CreateAccessor(AccessorRole.X, ...)` for itself — it gets the right role for free from its `[ExecuteIn(...)]` attribute. Use `CreateAccessor` only for the standalone cases listed in [Picking a role](#picking-a-role-for-a-standalone-accessor) above.
 
-## Strict-accessor-during-Fixed-execute rule
-
-> **During a `Fixed`-role system's `Execute`, only that system's own accessor is allowed to touch ECS state.** Other accessors — even `Fixed`-role ones held by services, even `Unrestricted` accessors — throw if they're used mid-Fixed-execute.
-
-Why: even when the data being touched is deterministic, recording access under the service's `DebugName` instead of the calling system's scrambles debug attribution and tooling. Also, it increases the risk of smuggling in non-deterministic state.
-
-The fix is to pass the calling system's `WorldAccessor` down to services rather than holding a separate one:
-
-```csharp
-// ❌ Service holds its own accessor; trips the strict-accessor rule
-//    when called from a Fixed system's Execute.
-class PaletteService
-{
-    WorldAccessor _world;
-
-    public PaletteService(World world)
-    {
-        _world = world.CreateAccessor(AccessorRole.Fixed);
-    }
-
-    public SharedPtr<ColorPalette> GetWarm() => _world.Heap.AllocShared<ColorPalette>(AssetIds.WarmPalette);
-}
-
-// ✅ Service takes the accessor in; the calling Fixed system passes its own.
-class PaletteService
-{
-    public SharedPtr<ColorPalette> GetWarm(WorldAccessor world) =>
-        world.Heap.AllocShared<ColorPalette>(AssetIds.WarmPalette);
-}
-```
-
-**Variable-cadence phases don't enforce this rule** — services may freely use their own accessors during `EarlyPresentation` / `Presentation` / `LatePresentation` since none of those phases have determinism guarantees a service could break.
-
-**Observer callbacks (`OnAdded` / `OnRemoved` / `OnMoved`) also don't enforce this rule** — they fire from inside `SubmitEntities`, which runs *between* Fixed-system executes rather than inside one. Service-class accessors are therefore valid in callbacks.
-
 ## Related
 
 - [Heap Allocation Rules](heap-allocation-rules.md) — the heap-specific subset of these rules, plus deterministic ID minting, the seeder pattern, and the `OnRemoved` cleanup convention.

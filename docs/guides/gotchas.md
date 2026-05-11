@@ -73,9 +73,34 @@ An entity spawned in a Fixed system is submitted in time for the same Tick's Pre
 
 ## Service-class accessor used during a Fixed system's `Execute`
 
-Strict-accessor rule: during a `Fixed` system's `Execute`, only that system's own accessor may touch ECS state. A service holding a separately-created accessor — even a `Fixed`-role one — throws.
+During a `Fixed`-role system's `Execute`, only that system's own accessor may touch ECS state. Other accessors — even another `Fixed`-role one held by a service, even an `Unrestricted` one — throw if used mid-Fixed-execute. Recording access under the service's `DebugName` instead of the calling system's scrambles debug attribution and tooling, and `Unrestricted` accessors risk smuggling non-deterministic state into the simulation.
 
-**Fix.** Pass the calling system's `WorldAccessor` into the service rather than holding a separate one. Variable-cadence phases and observer callbacks don't enforce this rule. See [Strict-accessor rule](../advanced/accessor-roles.md#strict-accessor-during-fixed-execute-rule).
+```csharp
+// ❌ Service holds its own accessor; trips the strict-accessor rule
+//    when called from a Fixed system's Execute.
+class PaletteService
+{
+    WorldAccessor _world;
+
+    public PaletteService(World world)
+    {
+        _world = world.CreateAccessor(AccessorRole.Fixed);
+    }
+
+    public SharedPtr<ColorPalette> GetWarm() => _world.Heap.AllocShared<ColorPalette>(AssetIds.WarmPalette);
+}
+
+// ✅ Service takes the accessor in; the calling Fixed system passes its own.
+class PaletteService
+{
+    public SharedPtr<ColorPalette> GetWarm(WorldAccessor world) =>
+        world.Heap.AllocShared<ColorPalette>(AssetIds.WarmPalette);
+}
+```
+
+Variable-cadence phases (`EarlyPresentation` / `Presentation` / `LatePresentation`) and observer callbacks (`OnAdded` / `OnRemoved` / `OnMoved`) don't enforce this rule — services may freely use their own accessors there. Callbacks fire from inside `SubmitEntities`, which runs *between* Fixed-system executes rather than inside one.
+
+**Fix.** Pass the calling system's `WorldAccessor` into the service rather than holding a separate one.
 
 ## Reading continuous time in fixed update with float-sensitive code
 
