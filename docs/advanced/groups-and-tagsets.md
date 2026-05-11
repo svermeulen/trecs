@@ -41,27 +41,26 @@ Groups are the foundation of Trecs' performance model:
 
 ## `AddEntity`: which group does the entity land in?
 
-A common source of confusion: the tags you pass to `AddEntity<...>()` are **not** a description of the entity you're creating, and they're **not** sufficient to mint a new group on the fly. They're a query that picks one of the groups your registered templates already declared. The lookup goes:
+The tags you pass to `AddEntity<...>()` are a **filter**, not a label. Trecs picks the registered group whose tag set contains every tag you passed:
 
-1. Find every group whose tag set is a **superset** of the tags you passed.
-2. If exactly one matches, that's the target group.
-3. If several match, prefer the group whose tag set **exactly equals** the query — this lets you target the "empty" side of a presence/absence partition by omitting the partition tag.
-4. Otherwise, throw `ambiguous`.
+- One group matches → that's the target.
+- Several match, but one matches your tags *exactly* → that one wins. (This is how partitioned templates let you target either side of a presence/absence partition by omitting the partition tag.)
+- Otherwise → the call throws as ambiguous.
 
 ```csharp
 // Given the two templates above ({Player, Character} and {Enemy, Character}):
 
 accessor.AddEntity<GameTags.Player>();
-// → {Player, Character} — only one group contains Player
+// → {Player, Character}. Only this group contains Player.
 
 accessor.AddEntity<GameTags.Enemy, GameTags.Character>();
-// → {Enemy, Character} — exact match
+// → {Enemy, Character}. Both groups contain Character, but this one matches exactly.
 
 accessor.AddEntity<GameTags.Character>();
-// → throws: both groups contain Character (ambiguous)
+// → throws. Both groups contain Character and neither matches exactly.
 ```
 
-If you want a specific group unambiguously, pass its exact tag combination.
+`AddEntity<Player>()` works because `Player` narrows to one group. `AddEntity<Character>()` doesn't — `Character` alone matches both, so you have to add `Player` or `Enemy` to disambiguate.
 
 ## TagSet vs GroupIndex
 
