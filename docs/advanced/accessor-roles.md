@@ -23,7 +23,8 @@ The framework asserts every rule below at the call site. Crossing a role boundar
 | Persistent heap alloc (`AllocShared`, `AllocUnique`, native variants) | ✅ | ❌ | ✅ |
 | Structural change (`AddEntity` / `RemoveEntity` / `MoveTo`) on a non-VUO template | ✅ | ❌ | ✅ |
 | Structural change on a [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) template | ❌ | ✅ | ✅ |
-| Set ops (`Set<T>().Defer`, `Set<T>().Write`) | ✅ | ❌ | ✅ |
+| Read set (`Set<T>().Read` — `Exists`, `Count`, iterate) | ✅ | ✅ | ✅ |
+| Mutate set (`Set<T>().Defer`, `Set<T>().Write`) | ✅ | ❌ | ✅ |
 | `SetSystemPaused` | ✅ | ❌ | ✅ |
 | `FixedRng` | ✅ | ❌ | ✅ |
 | `VariableRng` | ❌ | ✅ | ✅ |
@@ -44,7 +45,7 @@ Code outside the system model — services, scene initializers, editor inspector
 
 - **`Fixed`** — Service classes specifically for the deterministic game simulation. For example, a stats service that subscribes to `OnAdded` / `OnRemoved` for a tag and bumps a global score component on every spawn / despawn — see [Sample 18 — Reactive Events](../samples/18-reactive-events.md).
 - **`Variable`** — UI code, camera controller, rendering services that read both sim and render state.
-- **`Unrestricted`** — Scene initialization, lifecycle hooks (`Initialize` / `Dispose`) that need to touch both sim and variable state, debug menus, editor tooling.
+- **`Unrestricted`** — Scene initialization, debug menus, editor tooling.
 
 ## System-owned accessors vs standalone accessors
 
@@ -52,9 +53,8 @@ System-owned accessors map their `SystemPhase` to a role automatically:
 
 | `SystemPhase` | `AccessorRole` |
 |---|---|
-| `Input` | `Variable` |
 | `Fixed` | `Fixed` |
-| `EarlyPresentation` / `Presentation` / `LatePresentation` | `Variable` |
+| `Input` / `EarlyPresentation` / `Presentation` / `LatePresentation` | `Variable` |
 
 The presentation phases and the input phase all collapse into the single `Variable` role because they share the same access rules — only their execution-order positions within the per-frame pipeline differ.
 
@@ -64,9 +64,7 @@ System code therefore never writes `world.CreateAccessor(AccessorRole.X, ...)` f
 
 > **During a `Fixed`-role system's `Execute`, only that system's own accessor is allowed to touch ECS state.** Other accessors — even `Fixed`-role ones held by services, even `Unrestricted` accessors — throw if they're used mid-Fixed-execute.
 
-The rule fires regardless of role: the assertion compares the accessor's `Id` against the currently-executing system's accessor `Id`. A service holding its own `AccessorRole.Fixed` accessor with a different `Id` is rejected the same as a `Unrestricted` accessor would be.
-
-Why: even when the data being touched is deterministic, recording access under the service's `DebugName` instead of the calling system's scrambles debug attribution and tooling (profiler spans, dependency tracking, reactive-event accounting). And `Unrestricted` accessors smuggle non-deterministic state in besides.
+Why: even when the data being touched is deterministic, recording access under the service's `DebugName` instead of the calling system's scrambles debug attribution and tooling. Also, it increases the risk of smuggling in non-deterministic state.
 
 The fix is to pass the calling system's `WorldAccessor` down to services rather than holding a separate one:
 
@@ -79,7 +77,7 @@ class PaletteService
 
     public PaletteService(World world)
     {
-        _world = world.CreateAccessor(AccessorRole.Fixed, "PaletteService");
+        _world = world.CreateAccessor(AccessorRole.Fixed);
     }
 
     public SharedPtr<ColorPalette> GetWarm() => _world.Heap.AllocShared<ColorPalette>(AssetIds.WarmPalette);
@@ -95,7 +93,7 @@ class PaletteService
 
 **Variable-cadence phases don't enforce this rule** — services may freely use their own accessors during `EarlyPresentation` / `Presentation` / `LatePresentation` since none of those phases have determinism guarantees a service could break.
 
-**Observer callbacks (`OnAdded` / `OnRemoved` / `OnMoved`) also don't enforce this rule** — they fire from inside `SubmitEntities`, which runs *between* Fixed-system executes rather than inside one. Service-class accessors are therefore valid in callbacks, which is what enables patterns like the [pointer-cleanup sample](../samples/10-pointers.md). See [Cascading structural changes from callbacks](../entity-management/entity-events.md#cascading-structural-changes-from-callbacks) for the full callback-cascade contract.
+**Observer callbacks (`OnAdded` / `OnRemoved` / `OnMoved`) also don't enforce this rule** — they fire from inside `SubmitEntities`, which runs *between* Fixed-system executes rather than inside one. Service-class accessors are therefore valid in callbacks.
 
 ## Related
 
