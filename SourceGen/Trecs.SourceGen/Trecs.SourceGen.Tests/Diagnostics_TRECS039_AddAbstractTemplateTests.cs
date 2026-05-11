@@ -180,7 +180,9 @@ public class Diagnostics_TRECS039_AddAbstractTemplateTests
         );
     }
 
-    static string FormatDiagnostics(System.Collections.Immutable.ImmutableArray<Diagnostic> diagnostics)
+    static string FormatDiagnostics(
+        System.Collections.Immutable.ImmutableArray<Diagnostic> diagnostics
+    )
     {
         if (diagnostics.IsEmpty)
             return "  (none)";

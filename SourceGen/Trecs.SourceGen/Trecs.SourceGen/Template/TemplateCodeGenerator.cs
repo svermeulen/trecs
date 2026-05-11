@@ -210,10 +210,7 @@ namespace Trecs.SourceGen.Template
             // isAbstract — set when the source template class is declared `abstract`.
             // Such templates may be IExtends<> bases but cannot be passed to
             // WorldBuilder.AddTemplate (analyzer TRECS039 + runtime guard).
-            sb.AppendLine(
-                argIndent,
-                $"isAbstract: {(data.IsAbstract ? "true" : "false")}"
-            );
+            sb.AppendLine(argIndent, $"isAbstract: {(data.IsAbstract ? "true" : "false")}");
 
             sb.AppendLine(indentLevel, ");");
         }
