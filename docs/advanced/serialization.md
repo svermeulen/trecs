@@ -5,17 +5,6 @@
 
 Trecs ships an optional binary serialization framework for full ECS world state. It is the foundation for [Recording & Playback](recording-and-playback.md) and for save/load systems.
 
-## Overview
-
-Compose the pieces you need:
-
-- **`SerializerRegistry`** — maps types to their serializers.
-- **`WorldStateSerializer`** — reads/writes the entire ECS world (components, sets, heaps, entity handles).
-- **`SnapshotSerializer`** — captures and restores full-state snapshots.
-- **`BundleRecorder` / `BundlePlayer` / `RecordingBundleSerializer`** — capture and replay simulation history as a self-contained `RecordingBundle` (covered on the next page).
-
-`TrecsSerialization.CreateSerializerRegistry()` is the one-call entry point — it returns a registry pre-populated with everything Trecs needs (primitives, math types, ECS internals, recording metadata).
-
 ## Quick start
 
 ```csharp
@@ -31,9 +20,7 @@ var worldStateSerializer = new WorldStateSerializer(world);
 var snapshots = new SnapshotSerializer(worldStateSerializer, registry, world);
 ```
 
-For a save-game flow stop here and use `SnapshotSerializer.SaveSnapshot` / `LoadSnapshot`. For deterministic record/replay also construct `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` (see [Recording & Playback](recording-and-playback.md)).
-
-The samples ship a `SerializationFactory.CreateAll(world)` helper that wires up the full stack in one call — copy `Samples/Serialization/Common/Scripts/SerializationFactory.cs` into your project and trim what you don't need.
+For a save-game flow stop here and use `SnapshotSerializer.SaveSnapshot` / `LoadSnapshot`. For deterministic record/replay also construct `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` (see [Recording & Playback](recording-and-playback.md)).  If you just want to use the record/replay for debugging in editor you can wrap around `UNITY_EDITOR` - see samples project for more details.
 
 `SerializerRegistry` is independent of Trecs — it exposes generic `RegisterBlit<T>`, `RegisterEnum<T>`, `RegisterSerializer<TSerializer>` and can be used standalone in non-ECS code.
 

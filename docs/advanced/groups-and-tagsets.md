@@ -44,7 +44,7 @@ Groups are the foundation of Trecs' performance model:
 The tags you pass to `AddEntity<...>()` are a **filter**, not a label. Trecs picks the registered group whose tag set contains every tag you passed:
 
 - **One group matches** → that's the target.
-- **Several match, all from the same registered template** → the one with the fewest tags wins, as long as it's a unique minimum. This handles binary partitions, inheritance, and combinations — for example, a template `BallEntity : IExtends<Shape>, ITagged<Ball>, IPartitionedBy<Active>` lets `AddEntity<Ball>()` land in the *absent* partition `{Shape, Ball}` without forcing you to spell out `<Ball, Shape>` everywhere.
+- **Several match, all from different partitions on the same template** → the one with the fewest tags wins, as long as it's a unique minimum.
 - **Matches span multiple templates, or several tie at the smallest size** → throws ambiguous.
 
 ```csharp
