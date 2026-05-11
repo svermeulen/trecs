@@ -180,9 +180,9 @@ namespace Trecs
                 {
                     // A registered template's groups must be addressable
                     // unambiguously by tag set in single-group APIs
-                    // (AddEntity<...>(), Warmup<...>(), and
-                    // [FromWorld(typeof(Tag))] -> GroupIndex /
-                    // NativeEntitySetIndices<TSet>). If a base template B is
+                    // (AddEntity<...>() and [FromWorld(typeof(Tag))] ->
+                    // GroupIndex / NativeEntitySetIndices<TSet>). If a base
+                    // template B is
                     // registered alongside a derived template D, every group of
                     // D contains B's tag set as a subset — so any query
                     // expressed only in B's tags would match groups from both
@@ -198,8 +198,8 @@ namespace Trecs
                     // misrouted entity instead of an error.
                     //
                     // Catching the configuration here at world build is
-                    // friendlier than failing at every AddEntity / Warmup /
-                    // [FromWorld] call site that touches an affected tag set.
+                    // friendlier than failing at every AddEntity / [FromWorld]
+                    // call site that touches an affected tag set.
                     // If a game genuinely wants both a base and a derived
                     // template to exist concretely (e.g. Orc + FlyingOrc), give
                     // each template a distinct discriminator tag (e.g.

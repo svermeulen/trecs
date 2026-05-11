@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Trecs.Collections;
 using Trecs.Internal;
 
@@ -276,10 +277,11 @@ namespace Trecs
                 if (_groupInfos[groups[i].Index].ResolvedTemplate.Template != firstTemplate)
                 {
                     throw Assert.CreateException(
-                        "Ambiguous groups found for tags {}.  Matches span multiple templates; "
-                            + "the resolver only picks a smallest match within one template.  "
+                        "Ambiguous groups found for tags {}.  Matches span multiple templates: {}.  "
+                            + "The resolver only picks a smallest match within one template.  "
                             + "Add a discriminator tag to make the desired template's tag set unique.",
-                        tagset
+                        tagset,
+                        FormatMatches(groups)
                     );
                 }
             }
@@ -311,8 +313,9 @@ namespace Trecs
             {
                 throw Assert.CreateException(
                     "Ambiguous groups found for tags {}.  Multiple matching groups share the "
-                        + "smallest tag-set size — narrow the query with an additional tag.",
-                    tagset
+                        + "smallest tag-set size: {}.  Narrow the query with an additional tag.",
+                    tagset,
+                    FormatMatches(groups)
                 );
             }
 
@@ -338,8 +341,9 @@ namespace Trecs
                         throw Assert.CreateException(
                             "Ambiguous groups found for tags {}.  The smallest match isn't a "
                                 + "subset of every other match — matches form siblings rather "
-                                + "than a chain.  Narrow the query with an additional tag.",
-                            tagset
+                                + "than a chain: {}.  Narrow the query with an additional tag.",
+                            tagset,
+                            FormatMatches(groups)
                         );
                     }
                 }
@@ -347,6 +351,26 @@ namespace Trecs
 
             tagsetInfo.SingleGroup = smallestGroup;
             return smallestGroup;
+        }
+
+        // Formats the matching groups as "TemplateName[tag1, tag2]; ..." for
+        // inclusion in ambiguous-resolution error messages. Only called on the
+        // throw path, so allocation cost doesn't matter.
+        string FormatMatches(ReadOnlyFastList<GroupIndex> groups)
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (i > 0)
+                    sb.Append("; ");
+
+                var info = _groupInfos[groups[i].Index];
+                sb.Append(info.ResolvedTemplate.Template.DebugName);
+                sb.Append('[');
+                sb.Append(info.TagSet);
+                sb.Append(']');
+            }
+            return sb.ToString();
         }
 
         public GroupIndex GetSingleGroupWithTags<T1>()
@@ -1323,6 +1347,11 @@ namespace Trecs
             // Lazy cache for GetSingleGroupWithTags. Null until first
             // successful resolve; ambiguous queries don't populate it (errors
             // aren't on a hot path and re-throwing is fine).
+            //
+            // Relies on `default(GroupIndex) == GroupIndex.Null` so a freshly
+            // constructed TagSetInfo reads as "not cached" without an extra
+            // initializer. If GroupIndex's null sentinel ever stops being the
+            // default value, initialize this field explicitly.
             public GroupIndex SingleGroup;
 
             public DenseDictionary<

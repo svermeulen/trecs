@@ -24,7 +24,7 @@ new WorldBuilder()
     .BuildAndInitialize();
 ```
 
-Every group of `BallEntity` contains `ShapeEntity`'s tag set as a subset. If both templates were registered, single-group APIs (`AddEntity<...>()`, `Warmup<...>()`, `[FromWorld(typeof(Tag))] GroupIndex` / `NativeEntitySetIndices<TSet>`) couldn't disambiguate a query expressed only in `ShapeEntity`'s tags — it would match groups from both. Trecs catches the configuration at build instead of failing later at every affected call site.
+Every group of `BallEntity` contains `ShapeEntity`'s tag set as a subset. If both templates were registered, single-group APIs (`AddEntity<...>()`, `[FromWorld(typeof(Tag))] GroupIndex` / `NativeEntitySetIndices<TSet>`) couldn't disambiguate a query expressed only in `ShapeEntity`'s tags — it would match groups from both. Trecs catches the configuration at build instead of failing later at every affected call site.
 
 **Fix.** Register only the derived templates — base templates referenced via `IExtends` are discovered automatically and their components are folded into the derived groups. If your game truly needs both a `Shape` group and `Ball` groups concretely (e.g. `Orc` + `FlyingOrc`), give each a distinct discriminator tag (`ITagged<Grounded>` on the base, `ITagged<Flying>` on the derived) so their tag sets are siblings rather than strict subsets. See [Groups: `AddEntity` resolution](../advanced/groups-and-tagsets.md#addentity-which-group-does-the-entity-land-in).
 

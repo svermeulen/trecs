@@ -374,20 +374,21 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Warmup_WithSubsetQuery_WarmsAbsentGroup()
+        public void Warmup_WithSubsetQuery_WarmsAllMatchingGroups()
         {
-            // Warmup goes through GetSingleGroupWithTags — calling
-            // Warmup<ResolverBall>() on the inheritance + partition fixture
-            // must hit the absent-partition group (not throw, not warm the
-            // wrong group).
+            // Warmup uses plural resolution — Warmup<Ball> warms BOTH
+            // {Shape, Ball} (absent) and {Shape, Ball, Active} (present), not
+            // just the resolver's subset-minimum pick. Verified by adding
+            // entities into both partitions after the single Warmup call.
             using var env = EcsTestHelper.CreateEnvironment(b => { }, ResolverBallEntity.Template);
             var a = env.Accessor;
 
-            // Just verifying no throw and that subsequent AddEntity into the
-            // same resolved group works (i.e. capacity is reserved without
-            // hitting a structural-op mismatch).
             a.Warmup<ResolverBall>(initialCapacity: 16);
+
             a.AddEntity<ResolverBall>().Set(new TestInt { Value = 1 }).AssertComplete();
+            a.AddEntity<ResolverBall, ResolverActive>()
+                .Set(new TestInt { Value = 2 })
+                .AssertComplete();
             a.SubmitEntities();
 
             NAssert.AreEqual(
@@ -397,13 +398,62 @@ namespace Trecs.Tests
                     .WithoutTags<ResolverActive>()
                     .Count()
             );
+            NAssert.AreEqual(
+                1,
+                a.Query().WithTags<ResolverShape, ResolverBall, ResolverActive>().Count()
+            );
         }
 
         [Test]
-        public void Warmup_CrossTemplate_Throws()
+        public void AmbiguousError_CrossTemplate_ListsMatchingGroups()
         {
-            // Warmup is the other primary single-group entry point — verify
-            // the resolver error surfaces there too.
+            using var env = EcsTestHelper.CreateEnvironment(
+                b => { },
+                ResolverPlayerEntity.Template,
+                ResolverEnemyEntity.Template
+            );
+            var wi = env.Accessor.WorldInfo;
+
+            var ex = NAssert.Throws<TrecsException>(() =>
+            {
+                wi.GetSingleGroupWithTags(TagSet<ResolverCharacter>.Value);
+            });
+
+            // The error must name both templates so the user can see what
+            // collided rather than just "ambiguous".
+            NAssert.That(ex.Message, Does.Contain("ResolverPlayerEntity"));
+            NAssert.That(ex.Message, Does.Contain("ResolverEnemyEntity"));
+            NAssert.That(ex.Message, Does.Contain("multiple templates"));
+        }
+
+        [Test]
+        public void AmbiguousError_MultiVariantSiblings_ListsMatchingGroups()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(b => { }, McTestEntity.Template);
+            var wi = env.Accessor.WorldInfo;
+
+            // <McBase, McPoisoned> matches both {McBase, McAlive, McPoisoned}
+            // and {McBase, McDead, McPoisoned}.
+            var ex = NAssert.Throws<TrecsException>(() =>
+            {
+                wi.GetSingleGroupWithTags(TagSet<McBase, McPoisoned>.Value);
+            });
+
+            // The error must surface the variant tags that distinguish the
+            // tied matches so the user knows which dim to disambiguate on.
+            NAssert.That(ex.Message, Does.Contain("McTestEntity"));
+            NAssert.That(ex.Message, Does.Contain("McAlive"));
+            NAssert.That(ex.Message, Does.Contain("McDead"));
+            NAssert.That(ex.Message, Does.Contain("smallest tag-set size"));
+        }
+
+        [Test]
+        public void Warmup_CrossTemplate_WarmsAllMatchingGroups()
+        {
+            // Warmup uses plural resolution, so cross-template tag queries
+            // that AddEntity would reject as ambiguous are valid here —
+            // Warmup<Character> warms every group containing Character
+            // across both templates.
             using var env = EcsTestHelper.CreateEnvironment(
                 b => { },
                 ResolverPlayerEntity.Template,
@@ -411,9 +461,29 @@ namespace Trecs.Tests
             );
             var a = env.Accessor;
 
+            a.Warmup<ResolverCharacter>(initialCapacity: 4);
+
+            a.AddEntity<ResolverPlayer>().Set(new TestInt { Value = 1 }).AssertComplete();
+            a.AddEntity<ResolverEnemy>().Set(new TestInt { Value = 2 }).AssertComplete();
+            a.SubmitEntities();
+
+            NAssert.AreEqual(1, a.Query().WithTags<ResolverPlayer>().Count());
+            NAssert.AreEqual(1, a.Query().WithTags<ResolverEnemy>().Count());
+        }
+
+        [Test]
+        public void Warmup_NoMatchingGroups_Throws()
+        {
+            // Warmup still throws if zero groups match — degenerate case is
+            // surfaced as an error rather than a silent no-op.
+            using var env = EcsTestHelper.CreateEnvironment(b => { }, ResolverBallEntity.Template);
+            var a = env.Accessor;
+
+            // ResolverEnemy is registered as a Tag<> elsewhere in this fixture
+            // but no group in this env contains it.
             NAssert.Throws<TrecsException>(() =>
             {
-                a.Warmup<ResolverCharacter>(initialCapacity: 4);
+                a.Warmup<ResolverEnemy>(initialCapacity: 4);
             });
         }
 

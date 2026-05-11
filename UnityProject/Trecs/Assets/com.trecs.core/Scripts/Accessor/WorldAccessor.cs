@@ -666,10 +666,20 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Warms up the single group identified by <paramref name="tags"/>.
+        /// Warms up every group whose tag set contains <paramref name="tags"/>
+        /// — i.e. every group an entity added with these tags could land in
+        /// after the resolver picks a partition. <paramref name="initialCapacity"/>
+        /// is per-group. Throws if no groups match.
         /// </summary>
-        public void Warmup(TagSet tags, int initialCapacity = 1) =>
-            Warmup(_worldInfo.GetSingleGroupWithTags(tags), initialCapacity);
+        public void Warmup(TagSet tags, int initialCapacity = 1)
+        {
+            var groups = _worldInfo.GetGroupsWithTags(tags);
+            Assert.That(groups.Count > 0, "No groups found for tags {}", tags);
+            for (int i = 0; i < groups.Count; i++)
+            {
+                Warmup(groups[i], initialCapacity);
+            }
+        }
 
         public void Warmup<T1>(int initialCapacity = 1)
             where T1 : struct, ITag => Warmup(TagSet<T1>.Value, initialCapacity);
