@@ -17,16 +17,16 @@ These four terms are related but distinct — the docs and source are careful ab
 
 ## Groups
 
-A **group** is Trecs' storage unit: a contiguous block of component arrays holding the entities that share one tag combination. Entities tagged `{Player, Active}` live in one group; entities tagged `{Enemy, Active}` live in another.
+A **group** is Trecs' storage unit: a contiguous block of component arrays holding the entities that share one tag combination. Entities tagged `{Player, Character}` live in one group; entities tagged `{Enemy, Character}` live in another.
 
 Groups come from **templates** registered with the world at build time. Each unique tag combination across your registered templates defines exactly one group; the runtime API never creates new groups on the fly.
 
 ```csharp
 // Two templates registered with WorldBuilder:
-//   PlayerEntity : ITagged<Player, Active>
-//   EnemyEntity  : ITagged<Enemy, Active>
+//   PlayerEntity : ITagged<Player, Character>
+//   EnemyEntity  : ITagged<Enemy, Character>
 //
-// → Two groups exist: {Player, Active} and {Enemy, Active}.
+// → Two groups exist: {Player, Character} and {Enemy, Character}.
 ```
 
 Each group is named by two handles — a stable `TagSet` and a runtime `GroupIndex`. See [TagSet vs GroupIndex](#tagset-vs-groupindex) below.
@@ -49,16 +49,16 @@ Several APIs take a tag set and return the group it names: `AddEntity<...>()`, `
 4. Otherwise, throw `ambiguous`.
 
 ```csharp
-// Given the two templates above ({Player, Active} and {Enemy, Active}):
+// Given the two templates above ({Player, Character} and {Enemy, Character}):
 
 accessor.AddEntity<GameTags.Player>();
-// → {Player, Active} — only one group contains Player
+// → {Player, Character} — only one group contains Player
 
-accessor.AddEntity<GameTags.Enemy, GameTags.Active>();
-// → {Enemy, Active} — exact match
+accessor.AddEntity<GameTags.Enemy, GameTags.Character>();
+// → {Enemy, Character} — exact match
 
-accessor.AddEntity<GameTags.Active>();
-// → throws: both groups contain Active (ambiguous)
+accessor.AddEntity<GameTags.Character>();
+// → throws: both groups contain Character (ambiguous)
 ```
 
 If you want a specific group unambiguously, pass its exact tag combination. If you want to iterate every group that contains some tags, use a tag query (`accessor.Query().WithTags<...>()`) instead — queries are intentionally many-to-many and won't throw on multiple matches.
