@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using Trecs.Internal;
@@ -828,7 +829,7 @@ namespace Trecs.Tests
             // FiltOpTestSet's template is QId1; writing to a QId2 group must surface
             // the AssertValidGroup safety net (DEBUG-only). SetWrite is a ref struct
             // so we re-acquire it inside the lambda — ref locals can't be captured.
-            NAssert.Catch<System.Exception>(() =>
+            NAssert.Catch<Exception>(() =>
                 a.Set<FiltOpTestSet>().Write.Add(new EntityIndex(0, qId2Group))
             );
         }

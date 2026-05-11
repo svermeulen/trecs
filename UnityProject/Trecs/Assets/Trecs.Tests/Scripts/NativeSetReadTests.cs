@@ -1,7 +1,6 @@
 using NUnit.Framework;
 using Trecs.Internal;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests

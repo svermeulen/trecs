@@ -36,7 +36,7 @@ namespace Trecs
         internal void WarmupGroup(
             GroupIndex group,
             int initialCapacity,
-            Internal.IComponentBuilder[] componentBuilders
+            IComponentBuilder[] componentBuilders
         )
         {
             Assert.That(!_isDisposed);

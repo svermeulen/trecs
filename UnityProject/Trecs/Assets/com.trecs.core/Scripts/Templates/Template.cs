@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Trecs
@@ -25,7 +26,7 @@ namespace Trecs
             LocalComponentDeclarations = localComponentDeclarations;
             LocalTags = localTags;
             Partitions = partitions;
-            Dimensions = dimensions ?? System.Array.Empty<TagSet>();
+            Dimensions = dimensions ?? Array.Empty<TagSet>();
             LocalVariableUpdateOnly = localVariableUpdateOnly;
         }
 

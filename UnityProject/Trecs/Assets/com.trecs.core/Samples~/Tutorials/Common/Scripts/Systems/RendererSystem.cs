@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -160,12 +161,12 @@ namespace Trecs.Samples
                 );
             }
 
-            using (Trecs.Internal.TrecsProfiling.Start("Building native positions buffer"))
+            using (TrecsProfiling.Start("Building native positions buffer"))
             {
                 combined.Complete();
             }
 
-            using (Trecs.Internal.TrecsProfiling.Start("Sending data to gpu"))
+            using (TrecsProfiling.Start("Sending data to gpu"))
             {
                 foreach (var info in _renderables)
                 {
@@ -185,7 +186,7 @@ namespace Trecs.Samples
                 }
             }
 
-            using (Trecs.Internal.TrecsProfiling.Start("Graphics.RenderMeshIndirect"))
+            using (TrecsProfiling.Start("Graphics.RenderMeshIndirect"))
             {
                 foreach (var info in _renderables)
                 {
@@ -222,12 +223,12 @@ namespace Trecs.Samples
                 );
             }
 
-            using (Trecs.Internal.TrecsProfiling.Start("Building native positions buffer"))
+            using (TrecsProfiling.Start("Building native positions buffer"))
             {
                 combined.Complete();
             }
 
-            using (Trecs.Internal.TrecsProfiling.Start("Graphics.RenderMeshInstanced"))
+            using (TrecsProfiling.Start("Graphics.RenderMeshInstanced"))
             {
                 foreach (var info in _renderables)
                 {

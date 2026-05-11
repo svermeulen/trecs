@@ -1,4 +1,3 @@
-using System;
 using NUnit.Framework;
 using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
