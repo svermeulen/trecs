@@ -8,31 +8,25 @@ The framework asserts every rule below at the call site. Crossing a role boundar
 
 ## The three roles
 
-- **`Fixed`** — owns the deterministic simulation. Reads and writes simulation state, mutates entity structure, and allocates persistent heap. Render-only state (anything marked `[VariableUpdateOnly]`) is off-limits. Default for `[ExecuteIn(SystemPhase.Fixed)]` systems, which is the implicit default for any `ISystem`.
-- **`Variable`** — drives presentation. Reads simulation state to render it, and reads/writes the render-only `[VariableUpdateOnly]` state that goes with it. Doesn't touch deterministic state. Default for the three presentation phases and for input systems (input systems get a few extra permissions on top — see [Input System](../core/input-system.md)).
-- **`Unrestricted`** — escape hatch for non-system code (lifecycle hooks, event callbacks, networking, debug tooling, scripting bridges). Bypasses the per-role rules.
+- **`Fixed`** — owns the deterministic simulation. Reads and writes simulation state, and allocates persistent heap. Render-only state (anything marked `[VariableUpdateOnly]`) is off-limits. Default for `[ExecuteIn(SystemPhase.Fixed)]` systems, which is the implicit default for any `ISystem`.
+- **`Variable`** — drives presentation. Reads simulation state to render it, and reads/writes the render-only `[VariableUpdateOnly]` state that goes with it. Can read deterministic state but cannot mutate it. Default for the three presentation phases and for input systems (input systems get a few extra permissions on top — see [Input System](../core/input-system.md)).
+- **`Unrestricted`** — escape hatch for non-system code (lifecycle hooks, event callbacks, networking, debug tooling, scripting bridges). Bypasses all role rules.
 
 ## Capability matrix
 
 | Capability | `Fixed` | `Variable` | `Unrestricted` |
 |---|---|---|---|
-| Read sim component (non-`[VariableUpdateOnly]`) | ✅ | ✅ | ✅ |
-| Read `[VariableUpdateOnly]` component | ❌ | ✅ | ✅ |
-| Read `[Constant]` component | ✅ | ✅ | ✅ |
-| Write sim component (non-`[VariableUpdateOnly]`) | ✅ | ❌ | ✅ |
-| Write `[VariableUpdateOnly]` component | ❌ | ✅ | ✅ |
-| Write `[Constant]` component (post-creation) | ❌ | ❌ | ❌ [^constant] |
+| Read sim component (non-[`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template)) | ✅ | ✅ | ✅ |
+| Write sim component (non-[`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template)) | ✅ | ❌ | ✅ |
+| Read [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) component | ❌ | ✅ | ✅ |
+| Write [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) component | ❌ | ✅ | ✅ |
 | Persistent heap alloc (`AllocShared`, `AllocUnique`, native variants) | ✅ | ❌ | ✅ |
 | Structural change (`AddEntity` / `RemoveEntity` / `MoveTo`) on a non-VUO template | ✅ | ❌ | ✅ |
-| Structural change on a `[VariableUpdateOnly]` template [^vuo-template] | ❌ | ✅ | ✅ |
+| Structural change on a [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) template | ❌ | ✅ | ✅ |
 | Set ops (`Set<T>().Defer`, `Set<T>().Write`) | ✅ | ❌ | ✅ |
 | `SetSystemPaused` | ✅ | ❌ | ✅ |
 | `FixedRng` | ✅ | ❌ | ✅ |
 | `VariableRng` | ❌ | ✅ | ✅ |
-
-[^constant]: `[Constant]` components are immutable after entity creation regardless of role. Init-time writes go through `EntityInitializer.SetRawImpl` at `AddEntity` time, which doesn't go through the role-checked write path. Even `Unrestricted` cannot rewrite a `[Constant]` component post-creation.
-
-[^vuo-template]: See the [VUO field vs VUO template](#vuo-field-vs-vuo-template) section below.
 
 ### VUO field vs VUO template
 
