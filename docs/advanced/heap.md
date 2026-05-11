@@ -65,7 +65,7 @@ Mesh mesh = meshRef.Mesh.Get(World);
 
 ## Wrapping native collections
 
-Native collection types (`NativeList<T>`, `NativeHashMap<K,V>`, `NativeQueue<T>`, etc.) hold an internal pointer to externally-allocated storage, so they can't sit directly inside a component. Wrap them in a `NativeUniquePtr` to make a collection part of world state:
+Native collection types (`NativeList<T>`, `NativeHashMap<K,V>`, `NativeQueue<T>`, etc.) hold an internal pointer to externally-allocated storage, so they can't sit directly inside a component. Trecs serializes a component as raw memory and expects it to be self-contained — a bare `NativeList` field would write its pointer bytes, not the elements behind them, and snapshots/recordings would silently drop the contents. Wrap them in a `NativeUniquePtr` to put the collection on Trecs's heap, where serialization knows to walk the inner data:
 
 ```csharp
 public partial struct CCollisionPairBuffer : IEntityComponent
@@ -74,19 +74,7 @@ public partial struct CCollisionPairBuffer : IEntityComponent
 }
 ```
 
-The component holds an unmanaged pointer (legal as a component field), the `NativeList` lives behind it, and Trecs's [serialization](serialization.md) walks the inner list's raw data — snapshots and recordings capture the collection contents for free.
-
-**Disposal caveat.** The inner collection's storage is allocated in Unity's allocator (whichever one you passed to `new NativeList<T>(allocator)`), not in Trecs's heap. Disposing the `NativeUniquePtr` only frees the heap slot holding the `NativeList` header — the underlying storage leaks unless you dispose the inner collection first:
-
-```csharp
-ref var list = ref buffer.Value.Get(world);
-list.Dispose();              // free the NativeList's storage
-buffer.Value.Dispose(world); // then free the heap slot
-```
-
-For entity-scoped buffers, do this in an `OnRemoved` handler. For world/scene globals (like `CCollisionPairBuffer`), do it in scene teardown before world disposal.
-
-For fixed-size cases where serialization isn't a concern, [`FixedList<N>`](fixed-collections.md) sits directly in a component without wrapping.
+For collections with known bounds, [`FixedList<N>`](fixed-collections.md) can be easier, since it stores data inline with component and therefore doesn't require manual disposal.
 
 ## Shared pointers and reference counting
 
@@ -118,25 +106,6 @@ Use native pointer types (`NativeUniquePtr<T>` / `NativeSharedPtr<T>`) in jobs a
 ```csharp
 ref NativeData data = ref nativeShared.Get(in nativeWorld);
 ```
-
-`NativeUniquePtr<T>` is non-copyable — copying it inside a job is a `TRECS110` / `TRECS111` analyzer error. Pass it `ref` or move it explicitly.
-
-## Heap types
-
-Trecs maintains several heaps internally. You don't usually interact with them by name — call the matching `Alloc…` method on `HeapAccessor`.
-
-| Heap | Lifetime | Use case |
-|------|----------|----------|
-| `UniqueHeap` | Until disposed | Long-lived unique managed data |
-| `SharedHeap` | Until ref count reaches zero | Shared managed data |
-| `NativeUniqueHeap` | Until disposed | Long-lived unique unmanaged data |
-| `NativeSharedHeap` | Until ref count reaches zero | Shared unmanaged data |
-| `FrameScopedUniqueHeap` | Current fixed frame | Temporary per-frame data |
-| `FrameScopedSharedHeap` | Current fixed frame | Temporary shared per-frame data |
-| `FrameScopedNativeUniqueHeap` | Current fixed frame | Temporary native per-frame data |
-| `FrameScopedNativeSharedHeap` | Current fixed frame | Temporary shared native per-frame data |
-
-Frame-scoped heaps clean up at the end of each fixed update — no manual disposal needed. They can only be allocated from `Input` or `Unrestricted` accessors (not `Fixed` or `Variable`); see [Accessor Roles](accessor-roles.md#capability-matrix).
 
 ## See also
 
