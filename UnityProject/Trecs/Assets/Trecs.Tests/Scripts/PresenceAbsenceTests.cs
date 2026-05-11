@@ -64,7 +64,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void AddTag_MovesAbsentEntityToPresent()
+        public void SetTag_MovesAbsentEntityToPresent()
         {
             using var env = CreateEnv();
             var a = env.Accessor;
@@ -72,7 +72,7 @@ namespace Trecs.Tests
             var init = a.AddEntity<PaBase>().Set(new TestInt { Value = 42 }).AssertComplete();
             a.SubmitEntities();
 
-            a.AddTag<PaPresent>(init.Handle.ToIndex(a));
+            a.SetTag<PaPresent>(init.Handle.ToIndex(a));
             a.SubmitEntities();
 
             NAssert.AreEqual(1, a.Query().WithTags<PaBase, PaPresent>().Count());
@@ -116,7 +116,7 @@ namespace Trecs.Tests
     }
 
     // Multi-dim cross-product test: one presence/absence dim + one binary-variant
-    // dim. Yields 4 partitions; AddTag/RemoveTag on either dim preserves the
+    // dim. Yields 4 partitions; SetTag/RemoveTag on either dim preserves the
     // other.
     public struct McBase : ITag { }
 

@@ -527,17 +527,16 @@ namespace Trecs
             _queryEngine.GetResolvedTemplateForTags(tags);
 
         /// <summary>
-        /// Resolves the destination <see cref="TagSet"/> for a tag-add operation
-        /// (<c>AddTag&lt;T&gt;</c> / <c>SetTag&lt;T&gt;</c>): finds the partition
-        /// dimension containing <paramref name="newTag"/> on the source group's
-        /// template and returns the source group's tags with that dimension's
-        /// current variant replaced by <paramref name="newTag"/>. For
-        /// presence/absence dimensions this is "set tag present"; for
-        /// multi-variant dimensions it's "switch to this variant".
+        /// Resolves the destination <see cref="TagSet"/> for a tag-set operation
+        /// (<c>SetTag&lt;T&gt;</c>): finds the partition dimension containing
+        /// <paramref name="newTag"/> on the source group's template and returns the
+        /// source group's tags with that dimension's current variant replaced by
+        /// <paramref name="newTag"/>. For presence/absence dimensions this is "set
+        /// tag present"; for multi-variant dimensions it's "switch to this variant".
         /// </summary>
-        public TagSet ResolveAddTagDestination(GroupIndex from, Tag newTag)
+        public TagSet ResolveSetTagDestination(GroupIndex from, Tag newTag)
         {
-            Assert.That(!from.IsNull, "Cannot resolve AddTag from null group");
+            Assert.That(!from.IsNull, "Cannot resolve SetTag from null group");
             var template = GetResolvedTemplateForGroup(from);
             var currentTags = ToTagSet(from);
 
@@ -562,8 +561,8 @@ namespace Trecs
         /// only variant is <paramref name="tagToRemove"/> and returns the source
         /// group's tags with that variant stripped. Throws if
         /// <paramref name="tagToRemove"/> is in a multi-variant dimension — there
-        /// is no defined "absent" partition there; use <c>AddTag</c>/<c>SetTag</c>
-        /// to switch variants instead.
+        /// is no defined "absent" partition there; use <c>SetTag</c> to switch
+        /// variants instead.
         /// </summary>
         public TagSet ResolveRemoveTagDestination(GroupIndex from, Tag tagToRemove)
         {
@@ -578,7 +577,7 @@ namespace Trecs
                     if (dim.Tags.Count != 1)
                     {
                         throw Assert.CreateException(
-                            "Cannot RemoveTag<{}>: it is a variant in a multi-variant dimension on template {}. Use AddTag/SetTag to switch variants.",
+                            "Cannot RemoveTag<{}>: it is a variant in a multi-variant dimension on template {}. Use SetTag to switch variants.",
                             tagToRemove,
                             template.DebugName
                         );
@@ -606,8 +605,7 @@ namespace Trecs
 
         // Builds a TagSet equal to <paramref name="current"/> with every tag from
         // <paramref name="dim"/> stripped, then with <paramref name="replacement"/>
-        // appended. Used by AddTag/SetTag to swap a dim's current variant for a new
-        // one.
+        // appended. Used by SetTag to swap a dim's current variant for a new one.
         static TagSet ReplaceDimensionTags(TagSet current, TagSet dim, Tag replacement)
         {
             var resultTags = new List<Tag>();

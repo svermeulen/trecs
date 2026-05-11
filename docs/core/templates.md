@@ -197,14 +197,14 @@ Tag-change verbs handle moves between partitions; the runtime resolves the desti
 
 ```csharp
 // Presence/absence dim:
-ball.AddTag<BallTags.Active>(World);    // start simulating
+ball.SetTag<BallTags.Active>(World);    // start simulating
 ball.RemoveTag<BallTags.Active>(World); // ground → idle
 
-// Multi-variant dim (also valid for presence/absence):
+// Multi-variant dim:
 enemy.SetTag<MoveState.Running>(World); // switch the active variant in MoveState's dim
 ```
 
-`SetTag<T>` and `AddTag<T>` are aliases — `SetTag` reads more naturally for variant dims (a "switch"), `AddTag` for presence/absence (a "turn on"). `RemoveTag<T>` is only valid for presence/absence dims; for multi-variant dims there is no defined "absent" partition, so use `SetTag`/`AddTag` to switch instead.
+`SetTag<T>` works for both shapes: for a presence/absence dim it turns the tag on; for a multi-variant dim it switches the active variant (other dimensions are preserved). `RemoveTag<T>` is only valid for presence/absence dims — multi-variant dims have no defined "absent" partition, so use `SetTag` to switch variants there.
 
 For a fully-specified destination, the runtime form `World.MoveTo(entityIndex, tagSet)` still works.
 

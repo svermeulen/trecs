@@ -469,8 +469,8 @@ namespace Trecs
 
             // Same-group moves would re-add the entity at a new slot rather
             // than no-op — short-circuit them. Matters in particular for
-            // AddTag/RemoveTag where the destination can already equal the
-            // source partition (e.g. AddTag<T> on an entity already tagged
+            // SetTag/RemoveTag where the destination can already equal the
+            // source partition (e.g. SetTag<T> on an entity already tagged
             // with T).
             if (toGroup == entityIndex.GroupIndex)
                 return;
@@ -520,19 +520,18 @@ namespace Trecs
             where T4 : struct, ITag => MoveTo<T1, T2, T3, T4>(entityHandle.ToIndex(_world));
 
         /// <summary>
-        /// Schedules a tag-add: moves the entity to the partition where the dimension
-        /// containing <typeparamref name="T"/> now has <typeparamref name="T"/> as its
-        /// active variant. All other dimensions and tags are preserved. For
-        /// presence/absence dimensions this sets the tag present; for multi-variant
-        /// dimensions it switches the active variant. Throws if
-        /// <typeparamref name="T"/> is not declared as a partition variant on the
-        /// entity's template (via <see cref="IPartitionedBy{T1}"/> /
-        /// <see cref="IPartitionedBy{T1, T2}"/>).
+        /// Schedules moving the entity to the partition where the dimension containing
+        /// <typeparamref name="T"/> now has <typeparamref name="T"/> as its active
+        /// variant. All other dimensions and tags are preserved. For presence/absence
+        /// dimensions this sets the tag present; for multi-variant dimensions it
+        /// switches the active variant. Throws if <typeparamref name="T"/> is not
+        /// declared as a partition variant on the entity's template (via
+        /// <see cref="IPartitionedBy{T1}"/> / <see cref="IPartitionedBy{T1, T2}"/>).
         /// </summary>
-        internal void AddTag<T>(EntityIndex entityIndex)
+        internal void SetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
-            var newTagSet = _worldInfo.ResolveAddTagDestination(
+            var newTagSet = _worldInfo.ResolveSetTagDestination(
                 entityIndex.GroupIndex,
                 Tag<T>.Value
             );
@@ -544,19 +543,8 @@ namespace Trecs
             MoveTo(entityIndex, newTagSet);
         }
 
-        public void AddTag<T>(EntityHandle entityHandle)
-            where T : struct, ITag => AddTag<T>(entityHandle.ToIndex(_world));
-
-        /// <summary>
-        /// Alias for <see cref="AddTag{T}(EntityIndex)"/>. Reads more naturally for
-        /// multi-variant dimensions (where the operation is a "switch" rather than
-        /// a "set present").
-        /// </summary>
-        internal void SetTag<T>(EntityIndex entityIndex)
-            where T : struct, ITag => AddTag<T>(entityIndex);
-
         public void SetTag<T>(EntityHandle entityHandle)
-            where T : struct, ITag => AddTag<T>(entityHandle.ToIndex(_world));
+            where T : struct, ITag => SetTag<T>(entityHandle.ToIndex(_world));
 
         /// <summary>
         /// Schedules a tag-remove: moves the entity to the partition where
@@ -564,7 +552,7 @@ namespace Trecs
         /// <typeparamref name="T"/> is in a presence/absence partition dimension
         /// (declared via <see cref="IPartitionedBy{T1}"/>). For multi-variant
         /// dimensions there is no "absent" partition — use
-        /// <see cref="AddTag{T}(EntityIndex)"/> to switch variants instead.
+        /// <see cref="SetTag{T}(EntityIndex)"/> to switch variants instead.
         /// </summary>
         internal void RemoveTag<T>(EntityIndex entityIndex)
             where T : struct, ITag

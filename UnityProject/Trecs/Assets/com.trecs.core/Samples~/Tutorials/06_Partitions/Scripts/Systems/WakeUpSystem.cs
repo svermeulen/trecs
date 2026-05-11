@@ -21,7 +21,7 @@ namespace Trecs.Samples.Partitions
                 float angle = World.Rng.Next() * 2f * math.PI;
                 ball.Velocity = new float3(math.cos(angle) * 2f, LaunchSpeed, math.sin(angle) * 2f);
 
-                ball.AddTag<BallTags.Active>(World);
+                ball.SetTag<BallTags.Active>(World);
             }
         }
 

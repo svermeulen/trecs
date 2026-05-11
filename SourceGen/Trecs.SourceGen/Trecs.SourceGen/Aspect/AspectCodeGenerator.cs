@@ -501,19 +501,10 @@ namespace Trecs.SourceGen.Aspect
                     sb.AppendLine();
                 }
 
-                // AddTag/SetTag/RemoveTag — tag-change verbs that preserve other dimensions.
-                // AddTag and SetTag are aliases (one reads better for presence/absence dims,
-                // the other for variant dims); RemoveTag is the inverse for presence/absence.
-                sb.AppendLine(
-                    indentLevel,
-                    "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
-                );
-                sb.AppendLine(
-                    indentLevel,
-                    $"public readonly void AddTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => world.AddTag<T>(_entityIndex);"
-                );
-                sb.AppendLine();
-
+                // SetTag/RemoveTag — tag-change verbs that preserve other dimensions.
+                // SetTag works for both presence/absence (turns the tag on) and
+                // multi-variant (switches the active variant); RemoveTag is the inverse,
+                // valid only on presence/absence dims.
                 sb.AppendLine(
                     indentLevel,
                     "[MethodImpl(MethodImplOptions.AggressiveInlining)]"
