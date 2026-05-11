@@ -1,7 +1,7 @@
 
-<img src="docs/assets/logo.png" alt="Trecs" width="250" align="right" />
-
 # Trecs
+
+<img src="docs/assets/logo.png" alt="Trecs" width="300" align="right" />
 
 [![Source Generator](https://github.com/svermeulen/trecs/actions/workflows/sourcegen.yml/badge.svg)](https://github.com/svermeulen/trecs/actions/workflows/sourcegen.yml)
 [![Unity](https://github.com/svermeulen/trecs/actions/workflows/unity.yml/badge.svg)](https://github.com/svermeulen/trecs/actions/workflows/unity.yml)
@@ -11,8 +11,6 @@
 A high-performance Entity Component System framework for Unity, designed for **deterministic simulation, recording/playback, and Burst/Jobs**.
 
 **Full docs: [svermeulen.github.io/trecs](https://svermeulen.github.io/trecs)**
-
-<br clear="all" />
 
 ## Why Trecs
 
