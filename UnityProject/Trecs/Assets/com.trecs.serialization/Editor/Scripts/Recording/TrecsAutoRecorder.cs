@@ -570,7 +570,7 @@ namespace Trecs.Serialization
                 // Caller (saves library) caches results by mtime so this only
                 // runs on first read or when the file changes; constructing a
                 // fresh registry+serializer per call keeps the API static.
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 using var serializer = new RecordingBundleSerializer(registry);
                 var bundleHeader = serializer.PeekHeader(filePath);
                 header = new RecordingHeader(

@@ -1,21 +1,12 @@
 # 11 — Snake
 
-A grid-based game with deterministic input, recording/playback, and entity lifecycle management.
+A grid-based game with deterministic input and entity lifecycle management.
 
 **Source:** `Samples/11_Snake/`
 
 ## What it does
 
-Classic Snake — a head moves on a grid, eats food to grow, and leaves body segments behind. Hotkeys drive deterministic recording and playback:
-
-| Key | Action |
-|---|---|
-| F5 | Toggle recording |
-| F6 | Toggle playback |
-| F8 | Save snapshot |
-| F9 | Load snapshot |
-
-Recordings and snapshots are written under `{Application.persistentDataPath}/Snake/Recordings/`.
+Classic Snake — a head moves on a grid, eats food to grow, and leaves body segments behind. WASD moves the snake. The simulation is deterministic, so recording, scrubbing, and snapshot capture are available through the Trecs Player editor window (**Window → Trecs → Player**) without any sample-side wiring.
 
 ## Schema
 
@@ -146,7 +137,7 @@ Spawns food up to a maximum count at random unoccupied grid cells using `World.R
 
 Maps `GridPos` to world coordinates for rendering.
 
-## Determinism & recording
+## Determinism
 
 The world is configured for deterministic replay:
 
@@ -160,9 +151,9 @@ new WorldBuilder()
     // ...
 ```
 
-Serialization is wired up via the sample-side `SerializationFactory.CreateAll(world)` helper (in `Samples/Common/Scripts/`), which composes a registry + `WorldStateSerializer` + `SnapshotSerializer` + `BundleRecorder` + `BundlePlayer` + `RecordingBundleSerializer`. The `RecordAndPlaybackController` reads keyboard input and drives `SaveSnapshot(path)` / `LoadSnapshot(path)` for snapshots, and `recorder.Start()` / `recorder.Stop()` + `bundleSerializer.Save(bundle, path)` / `bundleSerializer.Load(path)` + `player.Start(bundle)` for recording bundles, against file paths under `persistentDataPath`.
+That's all the sample does on the serialization side — no recorder/player, no key bindings. The Trecs Player editor window (**Window → Trecs → Player**) attaches itself to any active Trecs `World` automatically, so recording, scrubbing, save/load, and snapshot capture are available out of the box.
 
-See [Serialization](../advanced/serialization.md) for custom-serializer authoring and [Recording & Playback](../advanced/recording-and-playback.md) for the full bundle API.
+See [Serialization](../advanced/serialization.md) for custom-serializer authoring and [Recording & Playback](../advanced/recording-and-playback.md) for the full bundle API if your game needs in-game record/playback rather than the editor window.
 
 ## Concepts introduced
 
@@ -172,4 +163,4 @@ See [Serialization](../advanced/serialization.md) for custom-serializer authorin
 - **`[SingleEntity(typeof(Tag))]`** parameter — binds the one tagged entity into the `Execute` signature
 - **Grid-based gameplay** — integer positions, discrete movement
 - **FIFO entity management** — `SegmentAge` tracks creation order for oldest-first removal
-- **Deterministic recording/playback** — seeded RNG + deterministic submission
+- **Deterministic simulation** — seeded RNG + deterministic submission

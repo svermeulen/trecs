@@ -149,6 +149,13 @@ namespace Trecs.Internal
             _totalEntitiesCreatedThisFrame++;
         }
 
+        // Reserved hook for post-Init configuration-change asserts. Mirrors
+        // ComponentStore.ConfigurationFrozen, which EntityQuerier reads to
+        // guard against late reconfiguration. No live readers yet here; left
+        // wired so future add-config-shaped methods can assert against it
+        // without having to re-introduce the plumbing.
+        public bool ConfigurationFrozen => _configurationFrozen;
+
         public void FreezeConfiguration()
         {
             _configurationFrozen = true;

@@ -15,7 +15,7 @@ namespace Trecs.Serialization.Tests
         [SetUp]
         public void SetUp()
         {
-            _serializerRegistry = TrecsSerialization.CreateSerializerRegistry();
+            _serializerRegistry = SerializationFactory.CreateRegistry();
             _cacheHelper = new SerializationBuffer(_serializerRegistry);
         }
 

@@ -15,16 +15,37 @@ namespace Trecs.Serialization
     public static class TrecsSerialization
     {
         /// <summary>
-        /// Convenience for the common case — returns a <see cref="SerializerRegistry"/>
-        /// pre-populated with core primitive, math, ECS, and recording-metadata
-        /// serializers. Equivalent to calling all three Register*Serializers helpers.
+        /// Returns a <see cref="SerializerRegistry"/> pre-populated with core
+        /// primitive, math, ECS, and recording-metadata serializers, and
+        /// associates it with <paramref name="world"/> via
+        /// <see cref="TrecsSerializerRegistries"/> so editor tooling (e.g. the
+        /// Trecs Player window) can discover it.
+        ///
+        /// Asserts if a registry is already associated with this world — only
+        /// one registry per world is supported. Callers needing an
+        /// unregistered registry (file-header peeks, unit tests, DI installers
+        /// before any world exists) should use
+        /// <c>Trecs.Internal.SerializationFactory.CreateRegistry</c>.
         /// </summary>
-        public static SerializerRegistry CreateSerializerRegistry()
+        public static SerializerRegistry CreateSerializerRegistry(World world)
         {
             var registry = new SerializerRegistry();
+            PopulateBuiltInSerializers(registry);
+            TrecsSerializerRegistries.Set(world, registry);
+            return registry;
+        }
+
+        /// <summary>
+        /// Populate <paramref name="registry"/> with the built-in core +
+        /// Trecs serializers. Exposed as <c>internal</c> so
+        /// <c>Trecs.Internal.SerializationFactory.CreateRegistry</c> can reuse
+        /// the same population logic without going through the world-tracked
+        /// path. Not part of the public API.
+        /// </summary>
+        internal static void PopulateBuiltInSerializers(SerializerRegistry registry)
+        {
             RegisterCoreSerializers(registry);
             RegisterTrecsSerializers(registry);
-            return registry;
         }
 
         /// <summary>

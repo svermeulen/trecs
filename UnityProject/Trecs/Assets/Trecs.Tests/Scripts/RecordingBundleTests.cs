@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using Trecs.Collections;
+using Trecs.Internal;
 using Trecs.Serialization;
 using NAssert = NUnit.Framework.Assert;
 
@@ -23,7 +24,7 @@ namespace Trecs.Tests
         [Test]
         public void RoundTrip_MinimalBundle()
         {
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             using var ser = new RecordingBundleSerializer(registry);
 
             var original = new RecordingBundle
@@ -49,7 +50,7 @@ namespace Trecs.Tests
         [Test]
         public void RoundTrip_FullBundle()
         {
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             using var ser = new RecordingBundleSerializer(registry);
 
             var checksums = new DenseDictionary<int, uint>();
@@ -126,7 +127,7 @@ namespace Trecs.Tests
         [Test]
         public void RoundTrip_ViaFile()
         {
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             using var ser = new RecordingBundleSerializer(registry);
 
             var original = new RecordingBundle
@@ -163,7 +164,7 @@ namespace Trecs.Tests
         [Test]
         public void PeekHeader_ReturnsHeaderWithoutFullLoad()
         {
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             using var ser = new RecordingBundleSerializer(registry);
 
             var original = new RecordingBundle
@@ -192,7 +193,7 @@ namespace Trecs.Tests
         [Test]
         public void Load_FailsOnEmptyStream()
         {
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             using var ser = new RecordingBundleSerializer(registry);
 
             using var stream = new MemoryStream();
@@ -202,7 +203,7 @@ namespace Trecs.Tests
         [Test]
         public void Save_RejectsNullRequiredFields()
         {
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             using var ser = new RecordingBundleSerializer(registry);
             using var stream = new MemoryStream();
 
@@ -233,7 +234,7 @@ namespace Trecs.Tests
                 a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 17 }).AssertComplete();
                 a.SubmitEntities();
 
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -243,7 +244,7 @@ namespace Trecs.Tests
             }
 
             // Wrap the snapshot bytes in a bundle and round-trip the bundle.
-            var registry2 = TrecsSerialization.CreateSerializerRegistry();
+            var registry2 = SerializationFactory.CreateRegistry();
             using var bundleSer = new RecordingBundleSerializer(registry2);
             var bundle = new RecordingBundle
             {
@@ -262,7 +263,7 @@ namespace Trecs.Tests
                 var a = env.Accessor;
                 NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
 
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -298,7 +299,7 @@ namespace Trecs.Tests
                     a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 88 }).AssertComplete();
                     a.SubmitEntities();
 
-                    var registry = TrecsSerialization.CreateSerializerRegistry();
+                    var registry = SerializationFactory.CreateRegistry();
                     var worldStateSer = new WorldStateSerializer(env.World);
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
@@ -346,7 +347,7 @@ namespace Trecs.Tests
                     var a = env.Accessor;
                     NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
 
-                    var registry = TrecsSerialization.CreateSerializerRegistry();
+                    var registry = SerializationFactory.CreateRegistry();
                     var worldStateSer = new WorldStateSerializer(env.World);
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
@@ -413,7 +414,7 @@ namespace Trecs.Tests
                     a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 5 }).AssertComplete();
                     a.SubmitEntities();
 
-                    var registry = TrecsSerialization.CreateSerializerRegistry();
+                    var registry = SerializationFactory.CreateRegistry();
                     var worldStateSer = new WorldStateSerializer(env.World);
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
@@ -456,7 +457,7 @@ namespace Trecs.Tests
 
                 using (var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha))
                 {
-                    var registry = TrecsSerialization.CreateSerializerRegistry();
+                    var registry = SerializationFactory.CreateRegistry();
                     var worldStateSer = new WorldStateSerializer(env.World);
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
@@ -504,7 +505,7 @@ namespace Trecs.Tests
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
             env.Accessor.SubmitEntities();
 
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new TrecsAutoRecorderSettings
@@ -544,7 +545,7 @@ namespace Trecs.Tests
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
             env.Accessor.SubmitEntities();
 
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new TrecsAutoRecorderSettings
@@ -590,7 +591,7 @@ namespace Trecs.Tests
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
             env.Accessor.SubmitEntities();
 
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new TrecsAutoRecorderSettings
@@ -632,7 +633,7 @@ namespace Trecs.Tests
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
             env.Accessor.SubmitEntities();
 
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new BundleRecorderSettings
@@ -684,7 +685,7 @@ namespace Trecs.Tests
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
             env.Accessor.SubmitEntities();
 
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new TrecsAutoRecorderSettings
@@ -737,7 +738,7 @@ namespace Trecs.Tests
                         .AssertComplete();
                     env.Accessor.SubmitEntities();
 
-                    var registry = TrecsSerialization.CreateSerializerRegistry();
+                    var registry = SerializationFactory.CreateRegistry();
                     var worldStateSer = new WorldStateSerializer(env.World);
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
@@ -775,7 +776,7 @@ namespace Trecs.Tests
 
                 using (var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha))
                 {
-                    var registry = TrecsSerialization.CreateSerializerRegistry();
+                    var registry = SerializationFactory.CreateRegistry();
                     var worldStateSer = new WorldStateSerializer(env.World);
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
@@ -836,7 +837,7 @@ namespace Trecs.Tests
                         .AssertComplete();
                     env.Accessor.SubmitEntities();
 
-                    var registry = TrecsSerialization.CreateSerializerRegistry();
+                    var registry = SerializationFactory.CreateRegistry();
                     var worldStateSer = new WorldStateSerializer(env.World);
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
@@ -873,7 +874,7 @@ namespace Trecs.Tests
                 // Reopen the file and inspect the dict directly via the
                 // serializer, since the recorder doesn't expose the dict.
                 {
-                    var registry = TrecsSerialization.CreateSerializerRegistry();
+                    var registry = SerializationFactory.CreateRegistry();
                     using var bundleSer = new RecordingBundleSerializer(registry);
                     var bundle = bundleSer.Load(path);
 

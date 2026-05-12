@@ -49,14 +49,14 @@ namespace Trecs.Serialization.Tests
 
         public static SerializerRegistry CreateTestRegistry()
         {
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             RegisterTestCollectionSerializers(registry);
             return registry;
         }
 
         public static SerializerRegistry CreateJsonTestRegistry()
         {
-            return TrecsSerialization.CreateSerializerRegistry();
+            return SerializationFactory.CreateRegistry();
         }
 
         public class TestClassSerializer : ISerializer<NullSerializationTests.TestClass>

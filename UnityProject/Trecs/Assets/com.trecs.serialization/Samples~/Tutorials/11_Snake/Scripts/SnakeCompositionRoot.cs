@@ -41,19 +41,6 @@ namespace Trecs.Serialization.Samples.Snake
             var goManager = new RenderableGameObjectManager(world);
             RegisterPrefabs(goManager);
 
-            // SerializationFactory bundles the registry + WorldStateSerializer +
-            // SnapshotSerializer + RecordingBundleSerializer + BundleRecorder +
-            // BundlePlayer. All of Snake's components are blittable so no custom
-            // serializers are needed; if you add a non-blittable component to
-            // your own game, register a custom ISerializer<T> via
-            // serialization.Registry here.
-            var serialization = SerializationFactory.CreateAll(world);
-
-            var recordController = new RecordAndPlaybackController(
-                serialization,
-                world,
-                sampleName: "Snake"
-            );
             var sceneInit = new SnakeSceneInitializer(Settings, world);
             var inputSystem = new SnakeInputSystem();
 
@@ -66,23 +53,17 @@ namespace Trecs.Serialization.Samples.Snake
                     new SegmentTrimSystem(),
                     new FoodSpawnSystem(Settings),
                     new SnakeRendererSystem(goManager),
-                    new TextDisplaySystem(HudText, recordController),
+                    new TextDisplaySystem(HudText),
                 }
             );
 
             initializables = new() { world.Initialize, sceneInit.Initialize };
 
-            tickables = new() { recordController.Tick, inputSystem.Tick, world.Tick };
+            tickables = new() { inputSystem.Tick, world.Tick };
 
             lateTickables = new() { world.LateTick };
 
-            disposables = new()
-            {
-                recordController.Dispose,
-                goManager.Dispose,
-                serialization.Dispose,
-                world.Dispose,
-            };
+            disposables = new() { goManager.Dispose, world.Dispose };
         }
 
         static void RegisterPrefabs(RenderableGameObjectManager goManager)

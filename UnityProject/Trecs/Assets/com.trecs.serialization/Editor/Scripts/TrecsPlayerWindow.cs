@@ -67,8 +67,8 @@ namespace Trecs.Serialization
         // swaps between these per tick so the text always describes what
         // clicking will actually do right now.
         const string RecordButtonNoControllerTooltip =
-            "Record (disabled): no Trecs world is loaded yet. Enter play "
-            + "mode and a TrecsGameStateController will register itself.";
+            "Record (disabled): no Trecs world is currently loaded. Enter "
+            + "Play mode — the Player window auto-attaches to active worlds.";
         const string RecordButtonIdleTooltip =
             "Record (R) — start capturing snapshots from the current frame.";
         const string RecordButtonRecordingTooltip =
@@ -268,6 +268,11 @@ namespace Trecs.Serialization
 
         void OnEnable()
         {
+            // Auto-attach must come first so by the time we subscribe to
+            // ControllerRegistered below, any already-active worlds have had
+            // their controllers constructed and registered.
+            TrecsEditorRecordingAutoAttach.Activate();
+
             WorldRegistry.WorldRegistered += OnWorldRegistered;
             WorldRegistry.WorldUnregistered += OnWorldUnregistered;
             TrecsGameStateRegistry.ControllerRegistered += OnControllerRegisteredOrUnregistered;
@@ -291,6 +296,11 @@ namespace Trecs.Serialization
             UnsubscribeFromController();
             TrecsReplayHelpPopup.CloseIfOpen();
             ClearAccessor();
+
+            // Deactivate last so the controllers are still alive while we
+            // unhook from registries above. The refcount holds them alive
+            // when another Player window is also open.
+            TrecsEditorRecordingAutoAttach.Deactivate();
         }
 
         // Keep _subscribedController in sync with the controller for the
@@ -1380,16 +1390,15 @@ namespace Trecs.Serialization
                 _stateBadge.text = "NOT INSTALLED";
                 _stateBadge.style.backgroundColor = new Color(0.5f, 0.35f, 0.05f);
                 _stateBadge.tooltip =
-                    "This World has no TrecsGameStateController installed, so "
-                    + "recording/scrubbing is unavailable.\n\n"
-                    + "Construct TrecsAutoRecorder + "
-                    + "TrecsGameStateController and call Initialize() / Dispose() "
-                    + "in lockstep with the World.";
+                    "Trecs Player failed to auto-attach to this World — "
+                    + "recording/scrubbing is unavailable. Check the Console "
+                    + "for errors from TrecsEditorRecordingAutoAttach.";
                 return;
             }
             // Restore the default tooltip on every controller-installed call so
-            // a NOT INSTALLED → installed transition (e.g. user fixes wiring
-            // and re-enters Play) doesn't leave the diagnostic tooltip stuck.
+            // a NOT INSTALLED → installed transition (e.g. auto-attach failed
+            // initially but later succeeded) doesn't leave the diagnostic
+            // tooltip stuck.
             _stateBadge.tooltip = DefaultBadgeTooltip;
             // Desync overrides the mode badge: the user really wants to see
             // this loud and immediate, not buried in a side banner. Mode is

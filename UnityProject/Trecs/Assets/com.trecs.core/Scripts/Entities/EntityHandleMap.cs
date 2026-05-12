@@ -19,6 +19,13 @@ namespace Trecs
 
         bool _configurationFrozen;
 
+        // Reserved hook for post-Init configuration-change asserts. Mirrors
+        // ComponentStore.ConfigurationFrozen, which EntityQuerier reads to
+        // guard against late reconfiguration. No live readers yet here; left
+        // wired so future add-config-shaped methods can assert against it
+        // without having to re-introduce the plumbing.
+        internal bool ConfigurationFrozen => _configurationFrozen;
+
         // Reverse map: per-group list of forward-map unique IDs (1-based),
         // indexed by GroupIndex.Index. Allocated once at world init with length
         // equal to the number of groups.

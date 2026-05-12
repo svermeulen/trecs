@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using NUnit.Framework;
+using Trecs.Internal;
 using Trecs.Serialization;
 using NAssert = NUnit.Framework.Assert;
 
@@ -19,7 +20,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 11 }).AssertComplete();
             a.SubmitEntities();
 
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -48,7 +49,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
             a.SubmitEntities();
 
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -71,7 +72,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 13 }).AssertComplete();
             a.SubmitEntities();
 
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -109,7 +110,7 @@ namespace Trecs.Tests
             // A user-defined component type (already blittable) registered explicitly
             // via the generic Register<TSerializer>() path. Demonstrates the same shape
             // a non-blittable custom serializer would take, except writing more fields.
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
 
             // CustomMarker is not a Trecs component; we just round-trip an instance
             // through SerializationBuffer to prove the registration path works.
@@ -131,7 +132,7 @@ namespace Trecs.Tests
         public void Snapshot_VersionIsPreservedInMetadata()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -153,7 +154,7 @@ namespace Trecs.Tests
         public void Snapshot_LoadingEmptyStream_Throws_SerializationException()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -165,7 +166,7 @@ namespace Trecs.Tests
         public void Snapshot_ArgumentValidation()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -187,7 +188,7 @@ namespace Trecs.Tests
         public void Snapshot_PostDispose_Throws_ObjectDisposedException()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = SerializationFactory.CreateRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             snapshots.Dispose();

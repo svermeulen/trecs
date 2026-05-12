@@ -30,7 +30,12 @@ namespace Trecs.Serialization
         readonly Dictionary<Type, ISerializer> _objectTypeToSerializer = new();
         readonly Dictionary<Type, ISerializerDelta> _objectTypeToSerializerDelta = new();
 
-        public SerializerRegistry() { }
+        // Constructor is internal — public callers go through
+        // TrecsSerialization.CreateSerializerRegistry(world) so the registry
+        // gets tracked in TrecsSerializerRegistries, or through
+        // Trecs.Internal.SerializationFactory.CreateRegistry() for static /
+        // file-peek paths where no world exists.
+        internal SerializerRegistry() { }
 
         static Type ExtractObjectType(Type serializerType, Type genericBase)
         {

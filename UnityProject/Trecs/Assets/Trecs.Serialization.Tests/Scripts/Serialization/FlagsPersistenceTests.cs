@@ -1,5 +1,6 @@
 using System.IO;
 using NUnit.Framework;
+using Trecs.Internal;
 using Assert = Trecs.Internal.Assert;
 
 namespace Trecs.Serialization.Tests
@@ -16,7 +17,7 @@ namespace Trecs.Serialization.Tests
         [SetUp]
         public void SetUp()
         {
-            _serializerRegistry = TrecsSerialization.CreateSerializerRegistry();
+            _serializerRegistry = SerializationFactory.CreateRegistry();
             _buffer = new SerializationBuffer(_serializerRegistry);
         }
 

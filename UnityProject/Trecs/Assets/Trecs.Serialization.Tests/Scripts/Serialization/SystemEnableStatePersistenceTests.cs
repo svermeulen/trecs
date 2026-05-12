@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using NUnit.Framework;
+using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Serialization.Tests
@@ -27,7 +28,7 @@ namespace Trecs.Serialization.Tests
         [SetUp]
         public void SetUp()
         {
-            _serializerRegistry = TrecsSerialization.CreateSerializerRegistry();
+            _serializerRegistry = SerializationFactory.CreateRegistry();
         }
 
         World CreateWorld()

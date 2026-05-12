@@ -16,7 +16,7 @@ namespace Trecs.Serialization.Tests
         [SetUp]
         public void Setup()
         {
-            _serializerRegistry = TrecsSerialization.CreateSerializerRegistry();
+            _serializerRegistry = Trecs.Internal.SerializationFactory.CreateRegistry();
 
             // Register test-specific serializers
             _serializerRegistry.RegisterSerializer<ListSerializer<int>>();

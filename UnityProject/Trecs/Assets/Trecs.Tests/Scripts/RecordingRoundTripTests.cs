@@ -69,7 +69,7 @@ namespace Trecs.Tests
             {
                 SpawnEntities(env);
 
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 var settings = new BundleRecorderSettings
@@ -141,7 +141,7 @@ namespace Trecs.Tests
                 // snapshot. Starting from an identical template is the simplest path.
                 SpawnEntities(env);
 
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);
@@ -197,7 +197,7 @@ namespace Trecs.Tests
             {
                 SpawnEntities(env);
 
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 var settings = new BundleRecorderSettings
@@ -246,7 +246,7 @@ namespace Trecs.Tests
             {
                 SpawnEntities(env);
 
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);
@@ -303,7 +303,7 @@ namespace Trecs.Tests
             {
                 SpawnEntities(env);
 
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 var settings = new BundleRecorderSettings
@@ -360,7 +360,7 @@ namespace Trecs.Tests
             // Reload the bundle from bytes and verify the snapshots survived the
             // wire-format round trip with their payloads intact.
             {
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 using var bundleSer = new RecordingBundleSerializer(registry);
                 using var stream = new MemoryStream(bundleBytes);
                 var loaded = bundleSer.Load(stream);
@@ -437,7 +437,7 @@ namespace Trecs.Tests
             {
                 SpawnEntities(env);
 
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 var settings = new BundleRecorderSettings
@@ -481,7 +481,7 @@ namespace Trecs.Tests
 
             // Reload and verify anchors survived bundle framing.
             {
-                var registry = TrecsSerialization.CreateSerializerRegistry();
+                var registry = SerializationFactory.CreateRegistry();
                 using var bundleSer = new RecordingBundleSerializer(registry);
                 using var stream = new MemoryStream(bundleBytes);
                 var loaded = bundleSer.Load(stream);

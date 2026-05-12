@@ -11,7 +11,7 @@ namespace Trecs.Serialization.Samples
     {
         public static SerializationServices CreateAll(World world)
         {
-            var registry = TrecsSerialization.CreateSerializerRegistry();
+            var registry = TrecsSerialization.CreateSerializerRegistry(world);
 
             var worldStateSerializer = new WorldStateSerializer(world);
             var snapshots = new SnapshotSerializer(worldStateSerializer, registry, world);

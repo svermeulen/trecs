@@ -7,15 +7,13 @@ namespace Trecs.Serialization.Samples.Snake
     public partial class TextDisplaySystem : ISystem
     {
         readonly TMP_Text _displayText;
-        readonly RecordAndPlaybackController _recordController;
         readonly StringBuilder _sb = new();
 
         float _refreshCountdown;
 
-        public TextDisplaySystem(TMP_Text displayText, RecordAndPlaybackController recordController)
+        public TextDisplaySystem(TMP_Text displayText)
         {
             _displayText = displayText;
-            _recordController = recordController;
         }
 
         public void Execute()
@@ -39,33 +37,16 @@ namespace Trecs.Serialization.Samples.Snake
                 .Get<Direction>()
                 .Read.Value;
 
-            var state = _recordController.State;
-
             _sb.Clear();
             AppendStat("Score", $"{score}");
             AppendStat("Length", $"{length}");
             AppendStat("Frame", $"{frame}");
             AppendStat("Heading", DirectionName(direction.x, direction.y));
-            AppendStat("Mode", $"{state}", ModeColor(state));
             _sb.AppendLine();
             AppendHeader("Controls:");
             AppendControl("WASD", "Move Snake");
-            AppendControl("F5", "Start / stop recording");
-            AppendControl("F6", "Start / stop playback");
-            AppendControl("F8", "Save snapshot");
-            AppendControl("F9", "Load snapshot");
 
             _displayText.text = _sb.ToString();
-        }
-
-        static string ModeColor(RecordAndPlaybackController.ControllerState state)
-        {
-            return state switch
-            {
-                RecordAndPlaybackController.ControllerState.Recording => RecordingColor,
-                RecordAndPlaybackController.ControllerState.Playback => PlaybackColor,
-                _ => ValueColor,
-            };
         }
 
         static string DirectionName(int x, int y)
@@ -115,7 +96,5 @@ namespace Trecs.Serialization.Samples.Snake
         const string ValueColor = "#00E5FF";
         const string SecondaryColor = "#9E9E9E";
         const string KeyColor = "#FFD54F";
-        const string RecordingColor = "#FF5252";
-        const string PlaybackColor = "#69F0AE";
     }
 }
