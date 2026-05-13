@@ -28,7 +28,7 @@ namespace Trecs
     /// </summary>
     public sealed class NativeSharedHeap
     {
-        static readonly TrecsLog _log = new(nameof(NativeSharedHeap));
+        readonly TrecsLog _log;
 
         readonly BlobCache _store;
         readonly DenseDictionary<BlobId, PtrHandle> _blobCacheHandles = new();
@@ -55,8 +55,9 @@ namespace Trecs
         bool _isDisposed;
         NativeSharedPtrResolver _resolver;
 
-        public NativeSharedHeap(BlobCache store)
+        public NativeSharedHeap(TrecsLog log, BlobCache store)
         {
+            _log = log;
             _store = store;
 
             _allEntries = new NativeDenseDictionary<BlobId, NativeSharedHeapEntry>(

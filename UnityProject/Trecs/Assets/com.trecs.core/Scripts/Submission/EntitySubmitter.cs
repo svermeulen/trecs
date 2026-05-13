@@ -12,7 +12,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class EntitySubmitter : IDisposable
     {
-        static readonly TrecsLog _log = new(nameof(EntitySubmitter));
+        readonly TrecsLog _log;
 
         readonly EventsManager _eventsManager;
         bool _isDisposed;
@@ -131,6 +131,7 @@ namespace Trecs.Internal
         }
 
         public EntitySubmitter(
+            TrecsLog log,
             WorldInfo worldInfo,
             WorldAccessorRegistry accessorRegistry,
             EventsManager eventsManager,
@@ -145,7 +146,8 @@ namespace Trecs.Internal
             RuntimeJobScheduler jobScheduler
         )
         {
-            _entitiesOperations = new EntitiesOperations(worldInfo.AllGroups.Count);
+            _log = log;
+            _entitiesOperations = new EntitiesOperations(log, worldInfo.AllGroups.Count);
 
             _jobScheduler = jobScheduler;
             _nativeSharedHeap = nativeSharedHeap;

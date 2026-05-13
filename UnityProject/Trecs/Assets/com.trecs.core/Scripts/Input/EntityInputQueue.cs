@@ -10,7 +10,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class EntityInputQueue : IEntityInputQueue
     {
-        static readonly TrecsLog _log = new(nameof(EntityInputQueue));
+        readonly TrecsLog _log;
 
         readonly List<ResetGroupInfo> _resetGroups;
         readonly SystemRunner _systemRunner;
@@ -29,6 +29,7 @@ namespace Trecs.Internal
         int _maxClearFrame = -1;
 
         public EntityInputQueue(
+            TrecsLog log,
             FrameScopedSharedHeap frameScopedSharedHeap,
             FrameScopedNativeSharedHeap nativeFrameScopedSharedHeap,
             FrameScopedUniqueHeap frameScopedUniqueHeap,
@@ -37,6 +38,7 @@ namespace Trecs.Internal
             WorldInfo worldDef
         )
         {
+            _log = log;
             _frameScopedSharedHeap = frameScopedSharedHeap;
             _nativeFrameScopedSharedHeap = nativeFrameScopedSharedHeap;
             _frameScopedUniqueHeap = frameScopedUniqueHeap;

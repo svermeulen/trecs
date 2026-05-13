@@ -10,7 +10,7 @@ namespace Trecs.Serialization.Internal
         where TKey : unmanaged, IEquatable<TKey>
         where TValue : unmanaged
     {
-        static readonly TrecsLog _log = new("NativeDenseDictionarySerializer");
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         public NativeDenseDictionarySerializer() { }
 

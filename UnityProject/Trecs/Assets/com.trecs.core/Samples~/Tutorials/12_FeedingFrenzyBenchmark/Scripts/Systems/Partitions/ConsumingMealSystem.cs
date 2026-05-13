@@ -9,8 +9,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
     [ExecuteAfter(typeof(ILookingForMeal))]
     public partial class ConsumingMealSystem : IConsumingMeal, ISystem
     {
-        static readonly TrecsLog _log = new(nameof(ConsumingMealSystem));
-
         public void Execute()
         {
             ref readonly var config = ref World.GlobalComponent<FrenzyConfig>().Read;

@@ -8,8 +8,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
     [ExecuteAfter(typeof(IConsumingMeal))]
     public partial class MovementSystem : IMovement, ISystem
     {
-        static readonly TrecsLog _log = new(nameof(MovementSystem));
-
         public void Execute()
         {
             ref readonly var config = ref World.GlobalComponent<FrenzyConfig>().Read;

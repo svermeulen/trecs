@@ -80,6 +80,24 @@ namespace Trecs
         public int MaxSubmissionIterations { get; init; } = 10;
 
         /// <summary>
+        /// Minimum severity at which Warning/Info/Debug/Trace messages from Trecs emit
+        /// to the console. Defaults to <see cref="LogLevel.Warning"/>, so users see
+        /// Trecs's warnings and errors out of the box but no Info noise.
+        /// <para>
+        /// <b>Error</b> messages always emit regardless of this setting — they cannot
+        /// be suppressed. Use <see cref="LogLevel.None"/> to silence everything except
+        /// errors.
+        /// </para>
+        /// <para>
+        /// In non-development release builds, Warning/Info/Debug calls are compiled
+        /// out entirely unless <c>TRECS_LOGGING_ENABLED</c> is defined, so this
+        /// setting only takes effect in the editor, in development builds, or when
+        /// that define is set.
+        /// </para>
+        /// </summary>
+        public LogLevel MinLogLevel { get; init; } = LogLevel.Warning;
+
+        /// <summary>
         /// When true, accessing <see cref="WorldAccessor.DeltaTime"/>, <see cref="WorldAccessor.ElapsedTime"/>,
         /// <see cref="WorldAccessor.FixedDeltaTime"/>, or <see cref="WorldAccessor.FixedElapsedTime"/> during
         /// the fixed-update phase throws. In Burst jobs (where exceptions are unavailable),

@@ -8,8 +8,6 @@ namespace Trecs
     /// </summary>
     public static class InterpolationUtil
     {
-        static readonly TrecsLog _log = new(nameof(InterpolationUtil));
-
         public static float CalculatePercentThroughFixedFrame(WorldAccessor world)
         {
             var fixedCurrentTime = world.FixedElapsedTime;

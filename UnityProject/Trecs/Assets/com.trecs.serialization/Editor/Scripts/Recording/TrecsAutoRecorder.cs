@@ -28,7 +28,7 @@ namespace Trecs.Serialization.Internal
         const string SnapshotsDirName = SvkjDebugConstants.TempDirName + "/snapshots";
 #endif
 
-        static readonly TrecsLog _log = new(nameof(TrecsAutoRecorder));
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         readonly World _world;
         readonly IWorldStateSerializer _stateSerializer;

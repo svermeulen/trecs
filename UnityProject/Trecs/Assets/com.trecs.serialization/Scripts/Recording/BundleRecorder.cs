@@ -22,7 +22,7 @@ namespace Trecs.Serialization.Internal
     /// </summary>
     public sealed class BundleRecorder : IInputHistoryLocker, IDisposable
     {
-        static readonly TrecsLog _log = new(nameof(BundleRecorder));
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         readonly World _world;
         readonly IWorldStateSerializer _stateSerializer;

@@ -62,8 +62,8 @@ namespace Trecs.Collections
                         BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly
                     ) == null
                 )
-                    new TrecsLog("DenseDictionary").Warning(
-                        "{} does not implement GetHashCode -> This will cause unwanted allocations (boxing)",
+                    UnityEngine.Debug.LogWarningFormat(
+                        "[Trecs] {0} does not implement GetHashCode -> This will cause unwanted allocations (boxing)",
                         keyType.Name
                     );
             }

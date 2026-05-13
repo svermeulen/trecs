@@ -6,14 +6,17 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class WorldAccessorRegistry
     {
-        static readonly TrecsLog _log = new(nameof(WorldAccessorRegistry));
+        readonly TrecsLog _log;
 
         readonly DenseDictionary<ISystem, WorldAccessor> _executeAccessors = new();
         readonly DenseDictionary<int, WorldAccessor> _accessorById = new();
 
         bool _isClosed;
 
-        public WorldAccessorRegistry() { }
+        public WorldAccessorRegistry(TrecsLog log)
+        {
+            _log = log;
+        }
 
         public ReadOnlyDenseDictionary<ISystem, WorldAccessor> ExecuteAccessors
         {

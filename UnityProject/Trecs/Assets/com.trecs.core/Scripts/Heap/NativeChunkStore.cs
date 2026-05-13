@@ -44,7 +44,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class NativeChunkStore : IDisposable
     {
-        static readonly TrecsLog _log = new(nameof(NativeChunkStore));
+        readonly TrecsLog _log;
 
         // Slot-size ladder: powers of two from 16 B up to 64 KB. Above this we use the
         // huge-alloc path (one dedicated page per allocation).
@@ -98,8 +98,9 @@ namespace Trecs.Internal
         bool _isDisposed;
         int _liveCount;
 
-        public NativeChunkStore()
+        public NativeChunkStore(TrecsLog log)
         {
+            _log = log;
             _buckets = new Bucket[BucketSlotSizes.Length];
             for (int i = 0; i < BucketSlotSizes.Length; i++)
             {

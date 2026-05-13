@@ -16,7 +16,7 @@ namespace Trecs
     /// </summary>
     public sealed class NativeUniqueHeap
     {
-        static readonly TrecsLog _log = new(nameof(NativeUniqueHeap));
+        readonly TrecsLog _log;
 
         readonly NativeChunkStore _chunkStore;
         readonly Dictionary<uint, Type> _typesByHandle = new();
@@ -24,9 +24,10 @@ namespace Trecs
 
         NativeUniquePtrResolver _resolver;
 
-        public NativeUniqueHeap(NativeChunkStore chunkStore)
+        public NativeUniqueHeap(TrecsLog log, NativeChunkStore chunkStore)
         {
             Assert.IsNotNull(chunkStore);
+            _log = log;
             _chunkStore = chunkStore;
             _resolver = new NativeUniquePtrResolver(_chunkStore.Resolver);
         }

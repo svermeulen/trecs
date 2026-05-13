@@ -14,7 +14,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class UniqueHeap
     {
-        static readonly TrecsLog _log = new(nameof(UniqueHeap));
+        readonly TrecsLog _log;
 
         readonly DenseDictionary<uint, HeapEntry> _entries = new();
         readonly ITrecsPoolManager _poolManager;
@@ -22,8 +22,9 @@ namespace Trecs.Internal
         readonly HeapIdCounter _idCounter = new(1, 2);
         bool _isDisposed;
 
-        internal UniqueHeap(ITrecsPoolManager poolManager)
+        internal UniqueHeap(TrecsLog log, ITrecsPoolManager poolManager)
         {
+            _log = log;
             _poolManager = poolManager;
         }
 

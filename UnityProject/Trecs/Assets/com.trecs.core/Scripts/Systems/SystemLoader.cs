@@ -8,7 +8,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class SystemLoader
     {
-        static readonly TrecsLog _log = new(nameof(SystemLoader));
+        readonly TrecsLog _log;
 
         readonly ISystemMetadataProvider _metadataProvider;
         readonly WorldInfo _worldDef;
@@ -17,11 +17,13 @@ namespace Trecs.Internal
         bool _isLocked;
 
         public SystemLoader(
+            TrecsLog log,
             WorldAccessorRegistry accessorRegistry,
             ISystemMetadataProvider metadataProvider,
             WorldInfo worldDef
         )
         {
+            _log = log;
             _accessorRegistry = accessorRegistry;
             _metadataProvider = metadataProvider;
             _worldDef = worldDef;

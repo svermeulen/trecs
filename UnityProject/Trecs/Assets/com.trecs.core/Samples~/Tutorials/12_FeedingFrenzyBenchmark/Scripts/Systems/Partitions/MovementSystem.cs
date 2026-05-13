@@ -8,8 +8,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
     [ExecuteAfter(typeof(IConsumingMeal))]
     public partial class MovementSystem : IMovement, ISystem
     {
-        static readonly TrecsLog _log = new(nameof(MovementSystem));
-
         partial struct Fish : IAspect, IRead<Velocity>, IWrite<Position> { }
 
         public void Execute()

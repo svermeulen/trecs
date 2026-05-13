@@ -26,7 +26,7 @@ namespace Trecs.Serialization
     /// </summary>
     public sealed class SerializerRegistry
     {
-        static readonly TrecsLog _log = new(nameof(SerializerRegistry));
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         readonly Dictionary<Type, ISerializer> _objectTypeToSerializer = new();
         readonly Dictionary<Type, ISerializerDelta> _objectTypeToSerializerDelta = new();

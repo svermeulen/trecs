@@ -21,7 +21,7 @@ namespace Trecs
     /// </summary>
     public sealed class BlobStoreInMemory : IBlobStore
     {
-        static readonly TrecsLog _log = new(nameof(BlobStoreInMemory));
+        TrecsLog _log;
 
         readonly DenseDictionary<BlobId, object> _memoryCache = new();
         readonly BlobManifest _manifest = new();
@@ -61,6 +61,15 @@ namespace Trecs
             // In-memory store never constructs new boxes — it just stores the
             // box objects handed to it by BlobCache — so the pool is unused.
             set { }
+        }
+
+        public TrecsLog Log
+        {
+            set
+            {
+                _log = value;
+                _common.Log = value;
+            }
         }
 
         public void ForcePurgeBlob(BlobId id)

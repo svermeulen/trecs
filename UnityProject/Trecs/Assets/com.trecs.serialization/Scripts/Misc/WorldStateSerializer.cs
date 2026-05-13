@@ -24,7 +24,7 @@ namespace Trecs.Serialization.Internal
     /// </summary>
     public sealed class WorldStateSerializer : IWorldStateSerializer
     {
-        static readonly TrecsLog _log = new(nameof(WorldStateSerializer));
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         readonly World _world;
         readonly WorldInfo _worldDef;

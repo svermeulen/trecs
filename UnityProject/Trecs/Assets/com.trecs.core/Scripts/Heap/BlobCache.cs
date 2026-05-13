@@ -42,7 +42,7 @@ namespace Trecs
     /// </summary>
     public sealed class BlobCache
     {
-        static readonly TrecsLog _log = new(nameof(BlobCache));
+        readonly TrecsLog _log;
 
         readonly DenseHashSet<BlobId> _cleanBuffer1 = new();
         readonly DenseDictionary<PtrHandle, BlobId> _handles = new();
@@ -56,18 +56,21 @@ namespace Trecs
         float _cleanCountdown;
 
         public BlobCache(
+            TrecsLog log,
             List<IBlobStore> stores,
             BlobCacheSettings settings,
             NativeBlobBoxPool nativeBlobBoxPool
         )
         {
             Assert.IsNotNull(nativeBlobBoxPool);
+            _log = log;
             _stores = stores;
             _settings = settings ?? BlobCacheSettings.Default;
             _nativeBlobBoxPool = nativeBlobBoxPool;
 
             foreach (var store in stores)
             {
+                store.Log = log;
                 store.SerializationVersion = _settings.SerializationVersion;
                 store.NativeBlobBoxPool = _nativeBlobBoxPool;
 

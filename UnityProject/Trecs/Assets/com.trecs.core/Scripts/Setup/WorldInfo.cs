@@ -13,7 +13,7 @@ namespace Trecs
     /// </summary>
     public sealed class WorldInfo
     {
-        static readonly TrecsLog _log = new(nameof(WorldInfo));
+        readonly TrecsLog _log;
 
         // Indexed by GroupIndex.Index. Every group registered in _allGroups
         // has a matching slot — pre-populated at construction, no null checks.
@@ -36,8 +36,13 @@ namespace Trecs
         readonly EntityIndex _globalEntityIndex;
         readonly ReadOnlyFastList<GroupIndex> _globalGroups;
 
-        public WorldInfo(IReadOnlyList<Template> templatesList, IReadOnlyList<EntitySet> sets)
+        public WorldInfo(
+            TrecsLog log,
+            IReadOnlyList<Template> templatesList,
+            IReadOnlyList<EntitySet> sets
+        )
         {
+            _log = log;
             _allSets = sets ?? Array.Empty<EntitySet>();
             if (!HasGlobalsTemplate(templatesList))
             {
@@ -324,7 +329,7 @@ namespace Trecs
             return false;
         }
 
-        static ResolvedTemplate ResolveTemplate(Template template)
+        ResolvedTemplate ResolveTemplate(Template template)
         {
             _log.Trace("Building entity with name {}", template.DebugName);
 

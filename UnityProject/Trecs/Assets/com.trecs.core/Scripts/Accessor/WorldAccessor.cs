@@ -22,8 +22,6 @@ namespace Trecs
     /// </summary>
     public sealed class WorldAccessor
     {
-        static readonly TrecsLog _log = new(nameof(WorldAccessor));
-
         readonly World _world;
         readonly SystemRunner _systemRunner;
         readonly SystemEnableState _systemEnableState;
@@ -43,6 +41,13 @@ namespace Trecs
         internal IAccessRecorder AccessRecorder;
 
         public HeapAccessor Heap { get; }
+
+        /// <summary>
+        /// The single <see cref="TrecsLog"/> instance shared by this world and every
+        /// framework class it owns. User systems should cache this in <c>Ready()</c>
+        /// and use it for all logging.
+        /// </summary>
+        public TrecsLog Log => _world.Log;
 
         internal WorldAccessor(
             int id,
@@ -1159,7 +1164,7 @@ namespace Trecs
 #if DEBUG && !TRECS_IS_PROFILING
                 if (synced && _systemRunner.WarnOnJobSyncPoints)
                 {
-                    _log.Warning(
+                    _world.Log.Warning(
                         "Sync point in '{}': main-thread write access to {} in group {} completed outstanding jobs. "
                             + "Consider reordering systems to avoid this.",
                         _debugName,
@@ -1190,7 +1195,7 @@ namespace Trecs
 #if DEBUG && !TRECS_IS_PROFILING
                 if (synced && _systemRunner.WarnOnJobSyncPoints)
                 {
-                    _log.Warning(
+                    _world.Log.Warning(
                         "Sync point in '{}': main-thread read access to {} in group {} completed outstanding writer job. "
                             + "Consider reordering systems to avoid this.",
                         _debugName,

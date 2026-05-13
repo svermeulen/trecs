@@ -16,16 +16,17 @@ namespace Trecs
     /// </summary>
     public sealed class FrameScopedNativeUniqueHeap
     {
-        static readonly TrecsLog _log = new(nameof(FrameScopedNativeUniqueHeap));
+        readonly TrecsLog _log;
 
         readonly NativeChunkStore _chunkStore;
         readonly DenseDictionary<uint, FrameEntry> _activeEntries = new();
         readonly List<uint> _removeBuffer = new();
         bool _isDisposed;
 
-        public FrameScopedNativeUniqueHeap(NativeChunkStore chunkStore)
+        public FrameScopedNativeUniqueHeap(TrecsLog log, NativeChunkStore chunkStore)
         {
             Assert.IsNotNull(chunkStore);
+            _log = log;
             _chunkStore = chunkStore;
         }
 

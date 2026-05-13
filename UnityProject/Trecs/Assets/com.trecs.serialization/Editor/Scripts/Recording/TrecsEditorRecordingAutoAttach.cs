@@ -21,7 +21,7 @@ namespace Trecs.Serialization.Internal
     /// </summary>
     static class TrecsEditorRecordingAutoAttach
     {
-        static readonly TrecsLog _log = new(nameof(TrecsEditorRecordingAutoAttach));
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         static int _activationCount;
         static readonly Dictionary<World, AttachedSet> _attached = new();

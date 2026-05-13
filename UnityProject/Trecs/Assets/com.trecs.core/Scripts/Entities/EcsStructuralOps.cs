@@ -6,7 +6,7 @@ namespace Trecs
 {
     internal class EcsStructuralOps
     {
-        static readonly TrecsLog _log = new(nameof(EcsStructuralOps));
+        readonly TrecsLog _log;
 
         readonly EntitySubmitter _entitySubmitter;
         readonly WorldInfo _worldInfo;
@@ -16,12 +16,14 @@ namespace Trecs
         bool _isDisposed;
 
         public EcsStructuralOps(
+            TrecsLog log,
             EntitySubmitter entitySubmitter,
             WorldInfo worldInfo,
             EntityQuerier.TrecsSets sets,
             SetStore setStore
         )
         {
+            _log = log;
             _entitySubmitter = entitySubmitter;
             _worldInfo = worldInfo;
             _sets = sets;

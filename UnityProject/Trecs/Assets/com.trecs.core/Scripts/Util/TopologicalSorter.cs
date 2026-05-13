@@ -6,8 +6,6 @@ namespace Trecs.Internal
 {
     public sealed class TopologicalSorter
     {
-        static readonly TrecsLog _log = new(nameof(TopologicalSorter));
-
         /// <summary>
         /// Note - int[] should be same length for all items
         /// </summary>

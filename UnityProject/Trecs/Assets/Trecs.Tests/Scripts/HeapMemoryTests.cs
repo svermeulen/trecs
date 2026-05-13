@@ -18,7 +18,7 @@ namespace Trecs.Tests
         [Test]
         public void UniquePtr_Alloc_IsValid()
         {
-            var heap = new UniqueHeap(null);
+            var heap = new UniqueHeap(TrecsLog.Default, null);
             var ptr = heap.AllocUnique(new TestHeapObject { Value = 42 });
 
             NAssert.IsFalse(ptr.Handle.IsNull);
@@ -30,7 +30,7 @@ namespace Trecs.Tests
         [Test]
         public void UniquePtr_GetEntry_ReturnsCorrectValue()
         {
-            var heap = new UniqueHeap(null);
+            var heap = new UniqueHeap(TrecsLog.Default, null);
             var ptr = heap.AllocUnique(new TestHeapObject { Value = 99 });
 
             var resolved = heap.GetEntry<TestHeapObject>(ptr.Handle.Value);
@@ -42,7 +42,7 @@ namespace Trecs.Tests
         [Test]
         public void UniquePtr_DisposeEntry_ReducesCount()
         {
-            var heap = new UniqueHeap(null);
+            var heap = new UniqueHeap(TrecsLog.Default, null);
             var ptr = heap.AllocUnique(new TestHeapObject { Value = 1 });
 
             NAssert.AreEqual(1, heap.NumEntries);
@@ -57,7 +57,7 @@ namespace Trecs.Tests
         [Test]
         public void UniquePtr_MultipleAllocs_IndependentHandles()
         {
-            var heap = new UniqueHeap(null);
+            var heap = new UniqueHeap(TrecsLog.Default, null);
             var ptr1 = heap.AllocUnique(new TestHeapObject { Value = 10 });
             var ptr2 = heap.AllocUnique(new TestHeapObject { Value = 20 });
 
@@ -73,7 +73,7 @@ namespace Trecs.Tests
         [Test]
         public void UniquePtr_DisposeOne_OtherStillValid()
         {
-            var heap = new UniqueHeap(null);
+            var heap = new UniqueHeap(TrecsLog.Default, null);
             var ptr1 = heap.AllocUnique(new TestHeapObject { Value = 10 });
             var ptr2 = heap.AllocUnique(new TestHeapObject { Value = 20 });
 

@@ -22,7 +22,7 @@ namespace Trecs.Serialization.Internal
     /// </summary>
     public class TrecsGameStateController : IDisposable
     {
-        static readonly TrecsLog _log = new(nameof(TrecsGameStateController));
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         /// <summary>File extension for full <see cref="RecordingBundle"/> files
         /// (input timeline + periodic auto-anchors + user snapshots). Distinct from the

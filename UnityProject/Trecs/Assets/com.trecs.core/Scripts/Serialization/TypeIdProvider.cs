@@ -12,7 +12,6 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static class TypeIdProvider
     {
-        static readonly TrecsLog _log = new(nameof(TypeIdProvider));
         static readonly DenseDictionary<Type, int> _cache = new();
         static readonly DenseDictionary<int, Type> _reverseCache = new();
 

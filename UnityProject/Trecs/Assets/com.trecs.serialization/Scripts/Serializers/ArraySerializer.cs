@@ -11,7 +11,7 @@ namespace Trecs.Serialization.Internal
     /// </summary>
     public sealed class ArraySerializer<T, TElem> : ISerializer<T>
     {
-        static readonly TrecsLog _log = new("ArraySerializer");
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         public ArraySerializer() { }
 

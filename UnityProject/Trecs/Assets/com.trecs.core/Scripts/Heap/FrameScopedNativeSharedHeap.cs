@@ -11,7 +11,7 @@ namespace Trecs
     /// </summary>
     public sealed class FrameScopedNativeSharedHeap
     {
-        static readonly TrecsLog _log = new(nameof(FrameScopedNativeSharedHeap));
+        readonly TrecsLog _log;
 
         readonly DenseDictionary<uint, HeapEntry> _entries = new();
         readonly DenseDictionary<uint, PtrHandle> _blobCacheHandles = new();
@@ -21,8 +21,9 @@ namespace Trecs
 
         bool _isDisposed;
 
-        public FrameScopedNativeSharedHeap(BlobCache store)
+        public FrameScopedNativeSharedHeap(TrecsLog log, BlobCache store)
         {
+            _log = log;
             _store = store;
         }
 

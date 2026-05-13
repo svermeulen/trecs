@@ -27,7 +27,7 @@ namespace Trecs
     /// </summary>
     public sealed class World : IDisposable
     {
-        static readonly TrecsLog _log = new(nameof(World));
+        readonly TrecsLog _log;
 
         readonly EntityQuerier _querier;
         readonly SystemRunner _systemRunner;
@@ -61,6 +61,7 @@ namespace Trecs
         readonly SetStore _setStore;
 
         internal World(
+            TrecsLog log,
             SetStore setStore,
             EntityInputQueue entityInputQueue,
             SystemRunner systemRunner,
@@ -88,6 +89,7 @@ namespace Trecs
             List<ISystem> systems
         )
         {
+            _log = log;
             _setStore = setStore;
             _entityInputQueue = entityInputQueue;
             _systemLoader = systemLoader;
@@ -124,6 +126,7 @@ namespace Trecs
             );
 
             _structuralOps = new EcsStructuralOps(
+                log,
                 entitySubmitter,
                 worldInfo,
                 entitiesDb.GetSets(),
@@ -142,6 +145,13 @@ namespace Trecs
         /// Null by default.
         /// </summary>
         public string DebugName { get; set; }
+
+        /// <summary>
+        /// The single <see cref="TrecsLog"/> instance shared by this world and every
+        /// framework class it owns. User systems should obtain it via
+        /// <see cref="WorldAccessor.Log"/> rather than this property.
+        /// </summary>
+        public TrecsLog Log => _log;
 
         internal BlobCache BlobCache
         {

@@ -6,8 +6,6 @@ namespace Trecs.Internal
 {
     internal static class DotNetExtensions
     {
-        static readonly TrecsLog _log = new(nameof(DotNetExtensions));
-
         // Don't use this because Any() causes an alloc for some reason
         // public static bool IsEmpty<T>(this IEnumerable<T> enumerable)
         // {

@@ -6,7 +6,7 @@ namespace Trecs.Serialization.Internal
 {
     public sealed class BinarySerializationWriter : ISerializationWriter, IDisposable
     {
-        static readonly TrecsLog _log = new(nameof(BinarySerializationWriter));
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         readonly SerializerRegistry _serializerManager;
         readonly MemoryStream _dataBuffer;

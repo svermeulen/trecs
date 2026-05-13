@@ -29,9 +29,9 @@ namespace Trecs.Tests
             NativeChunkStore chunkStore
         ) CreateHeap()
         {
-            var chunkStore = new NativeChunkStore();
-            var heap = new NativeUniqueHeap(chunkStore);
-            var frameScopedHeap = new FrameScopedNativeUniqueHeap(chunkStore);
+            var chunkStore = new NativeChunkStore(TrecsLog.Default);
+            var heap = new NativeUniqueHeap(TrecsLog.Default, chunkStore);
+            var frameScopedHeap = new FrameScopedNativeUniqueHeap(TrecsLog.Default, chunkStore);
             return (heap, frameScopedHeap, chunkStore);
         }
 

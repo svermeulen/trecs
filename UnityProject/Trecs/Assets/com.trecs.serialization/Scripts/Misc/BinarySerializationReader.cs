@@ -6,7 +6,7 @@ namespace Trecs.Serialization.Internal
 {
     public sealed class BinarySerializationReader : ISerializationReader
     {
-        static readonly TrecsLog _log = new(nameof(BinarySerializationReader));
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         readonly SerializerRegistry _serializerManager;
         readonly BitReader _bitReader = new();

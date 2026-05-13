@@ -304,6 +304,7 @@ namespace Trecs.Tests
             // native memory to AllocatorManager on Dispose, and the pool's free-list
             // holds only managed wrapper references that GC reclaims when the test ends.
             return new BlobCache(
+                TrecsLog.Default,
                 new List<IBlobStore> { blobStore },
                 settings,
                 new NativeBlobBoxPool()
@@ -578,7 +579,7 @@ namespace Trecs.Tests
         static (SharedHeap heap, BlobCache blobCache) CreateSharedHeap()
         {
             var blobCache = CreateBlobCache();
-            var heap = new SharedHeap(blobCache);
+            var heap = new SharedHeap(TrecsLog.Default, blobCache);
             return (heap, blobCache);
         }
 
@@ -680,7 +681,7 @@ namespace Trecs.Tests
 
         static UniqueHeap CreateUniqueHeap()
         {
-            return new UniqueHeap(null);
+            return new UniqueHeap(TrecsLog.Default, null);
         }
 
         [Test]
@@ -912,7 +913,7 @@ namespace Trecs.Tests
         static (NativeSharedHeap heap, BlobCache blobCache) CreateNativeSharedHeap()
         {
             var blobCache = CreateBlobCache();
-            var heap = new NativeSharedHeap(blobCache);
+            var heap = new NativeSharedHeap(TrecsLog.Default, blobCache);
             return (heap, blobCache);
         }
 
@@ -1061,9 +1062,9 @@ namespace Trecs.Tests
             NativeChunkStore chunkStore
         ) CreateNativeUniqueHeap()
         {
-            var chunkStore = new NativeChunkStore();
-            var heap = new NativeUniqueHeap(chunkStore);
-            var frameScopedHeap = new FrameScopedNativeUniqueHeap(chunkStore);
+            var chunkStore = new NativeChunkStore(TrecsLog.Default);
+            var heap = new NativeUniqueHeap(TrecsLog.Default, chunkStore);
+            var frameScopedHeap = new FrameScopedNativeUniqueHeap(TrecsLog.Default, chunkStore);
             return (heap, frameScopedHeap, chunkStore);
         }
 

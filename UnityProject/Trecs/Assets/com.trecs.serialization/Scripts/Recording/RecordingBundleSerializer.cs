@@ -16,7 +16,7 @@ namespace Trecs.Serialization.Internal
     /// </summary>
     public sealed class RecordingBundleSerializer : IDisposable
     {
-        static readonly TrecsLog _log = new(nameof(RecordingBundleSerializer));
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         readonly SerializationBuffer _buffer;
         bool _disposed;

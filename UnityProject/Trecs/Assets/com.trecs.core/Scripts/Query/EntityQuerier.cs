@@ -7,17 +7,23 @@ namespace Trecs.Internal
 {
     public sealed class EntityQuerier
     {
-        static readonly TrecsLog _log = new(nameof(EntityQuerier));
+        readonly TrecsLog _log;
 
         readonly ComponentStore _componentStore;
         readonly SetStore _setStore;
 
         internal EntityHandleMap _entityLocator;
 
-        internal EntityQuerier(ComponentStore componentStore, SetStore setStore, int groupCount)
+        internal EntityQuerier(
+            TrecsLog log,
+            ComponentStore componentStore,
+            SetStore setStore,
+            int groupCount
+        )
         {
             _entityLocator.InitEntityHandleMap(groupCount);
 
+            _log = log;
             _componentStore = componentStore;
             _setStore = setStore;
         }

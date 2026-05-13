@@ -12,7 +12,7 @@ namespace Trecs
     /// </summary>
     public sealed class SharedHeap
     {
-        static readonly TrecsLog _log = new(nameof(SharedHeap));
+        readonly TrecsLog _log;
 
         readonly BlobCache _store;
         readonly DenseDictionary<BlobId, PtrHandle> _blobCacheHandles = new();
@@ -23,8 +23,9 @@ namespace Trecs
         readonly HeapIdCounter _idCounter = new(1, 2);
         bool _isDisposed;
 
-        public SharedHeap(BlobCache store)
+        public SharedHeap(TrecsLog log, BlobCache store)
         {
+            _log = log;
             _store = store;
         }
 

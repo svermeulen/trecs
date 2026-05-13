@@ -8,7 +8,7 @@ namespace Trecs.Internal
 {
     class EntitiesOperations
     {
-        static readonly TrecsLog _log = new(nameof(EntitiesOperations));
+        readonly TrecsLog _log;
 
         Info _lastSubmittedInfo;
         Info _thisSubmissionInfo;
@@ -16,8 +16,9 @@ namespace Trecs.Internal
         readonly Func<DenseDictionary<int, MoveInfo>> _newInnerMoveDict;
         readonly ActionRef<DenseDictionary<int, MoveInfo>> _recycleInnerMoveDict;
 
-        public EntitiesOperations(int groupCount)
+        public EntitiesOperations(TrecsLog log, int groupCount)
         {
+            _log = log;
             _thisSubmissionInfo.Init(groupCount);
             _lastSubmittedInfo.Init(groupCount);
 

@@ -1,118 +1,185 @@
-// #define TRECS_LOGGING_ENABLED
-// #define TRECS_TRACE_LOGGING_ENABLED
-
 using System.Diagnostics;
+using System.Text;
 
-namespace Trecs.Internal
+namespace Trecs
 {
-    public enum LogLevels
+    /// <summary>
+    /// Severity levels for <see cref="Trecs.Internal.TrecsLog"/>. Set the minimum
+    /// emit level via <see cref="WorldSettings.MinLogLevel"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Error"/> messages are always emitted regardless of this setting and
+    /// regardless of build configuration. The setting controls the minimum level for
+    /// Warning, Info, Debug, and Trace messages. Use <see cref="None"/> to suppress
+    /// everything below Error.
+    /// </remarks>
+    public enum LogLevel
     {
         Trace,
         Debug,
         Info,
         Warning,
         Error,
+        None,
     }
+}
 
-    public class TrecsLog
+namespace Trecs.Internal
+{
+    /// <summary>
+    /// Trecs's shared logger. Exactly one instance is constructed per <c>World</c>
+    /// by <c>WorldBuilder</c> and injected into every framework class that needs to
+    /// log; user systems read it from <c>WorldAccessor.Log</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Error</b> calls are never gated by build configuration or by
+    /// <see cref="WorldSettings.MinLogLevel"/> — they always emit. <b>Warning</b>,
+    /// <b>Info</b>, and <b>Debug</b> calls are compiled out unless one of
+    /// <c>UNITY_EDITOR</c>, <c>DEVELOPMENT_BUILD</c>, or <c>TRECS_LOGGING_ENABLED</c>
+    /// is defined. <b>Trace</b> calls are compiled out unless
+    /// <c>TRECS_TRACE_LOGGING_ENABLED</c> is defined.
+    /// </para>
+    /// <para>
+    /// In builds where the calls compile in, the runtime level check (against
+    /// <see cref="WorldSettings.MinLogLevel"/>) filters further.
+    /// </para>
+    /// </remarks>
+    public sealed class TrecsLog
     {
-#if TRECS_LOGGING_ENABLED
-        static readonly Dictionary<int, float> _throttledLogTimes = new();
+        const string EditorDefine = "UNITY_EDITOR";
+        const string DevelopmentBuildDefine = "DEVELOPMENT_BUILD";
+        const string LoggingDefine = "TRECS_LOGGING_ENABLED";
+        const string TraceLoggingDefine = "TRECS_TRACE_LOGGING_ENABLED";
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        static void OnRuntimeInitialize()
+        const string Prefix = "[Trecs] ";
+
+        readonly WorldSettings _settings;
+
+        public TrecsLog(WorldSettings settings)
         {
-            _throttledLogTimes.Clear();
-        }
-#endif
-
-        public TrecsLog(string _) { }
-
-        public bool IsLevelEnabled(LogLevels level)
-        {
-#if TRECS_LOGGING_ENABLED
-            return level >= LogLevels.Info;
-            // return level >= LogLevels.Debug;
-#else
-            return false;
-#endif
+            _settings = settings;
         }
 
-        public bool IsTraceEnabled()
+        /// <summary>
+        /// Convenience logger for code paths that run outside a <c>World</c>'s
+        /// lifecycle (test fixtures, file-peek serialization, etc.). Uses a default
+        /// <see cref="WorldSettings"/> so its level is <see cref="LogLevel.Warning"/>.
+        /// Production framework code should not use this — it should accept the
+        /// world's <c>TrecsLog</c> via constructor injection.
+        /// </summary>
+        public static TrecsLog Default { get; } = new(new WorldSettings());
+
+        public bool IsLevelEnabled(LogLevel level) => level >= _settings.MinLogLevel;
+
+        public bool IsTraceEnabled() => IsLevelEnabled(LogLevel.Trace);
+
+        public bool IsDebugEnabled() => IsLevelEnabled(LogLevel.Debug);
+
+        public bool IsInfoEnabled() => IsLevelEnabled(LogLevel.Info);
+
+        public bool IsWarningEnabled() => IsLevelEnabled(LogLevel.Warning);
+
+        // Trecs log call sites use Rust/Serilog-style placeholders — `{}` for the next
+        // positional arg, optionally with a format hint like `{0.00}`, `{l}`, or `{@}`.
+        // Translate them to .NET String.Format syntax (`{0}`, `{0:0.00}`, ...) so the
+        // underlying Debug.LogFormat call can render them. The `{l}` and `{@}` hints
+        // come from Serilog (stringify list / destructure object); here we just route
+        // them through the default ToString since UnityEngine.Debug.LogFormat doesn't
+        // do structured logging.
+        static string ConvertPlaceholders(string template)
         {
-            return IsLevelEnabled(LogLevels.Trace);
+            if (string.IsNullOrEmpty(template) || template.IndexOf('{') < 0)
+            {
+                return template;
+            }
+            var sb = new StringBuilder(template.Length + 8);
+            int argIndex = 0;
+            int i = 0;
+            while (i < template.Length)
+            {
+                char c = template[i];
+                if (c == '{')
+                {
+                    int end = template.IndexOf('}', i + 1);
+                    if (end < 0)
+                    {
+                        sb.Append(c);
+                        i++;
+                        continue;
+                    }
+                    var inner = template.Substring(i + 1, end - i - 1);
+                    sb.Append('{').Append(argIndex);
+                    if (inner.Length > 0 && inner != "@" && inner != "l")
+                    {
+                        sb.Append(':').Append(inner);
+                    }
+                    sb.Append('}');
+                    argIndex++;
+                    i = end + 1;
+                }
+                else
+                {
+                    sb.Append(c);
+                    i++;
+                }
+            }
+            return sb.ToString();
         }
 
-        public bool IsDebugEnabled()
-        {
-            return IsLevelEnabled(LogLevels.Debug);
-        }
-
-        public bool IsInfoEnabled()
-        {
-            return IsLevelEnabled(LogLevels.Info);
-        }
-
-        public bool IsWarningEnabled()
-        {
-            return IsLevelEnabled(LogLevels.Warning);
-        }
-
-        public bool IsErrorEnabled()
-        {
-            return IsLevelEnabled(LogLevels.Error);
-        }
+        string FormatTemplate(string messageTemplate) =>
+            Prefix + ConvertPlaceholders(messageTemplate);
 
         ////////////////////////////////
         // Trace
         ////////////////////////////////
 
-        [Conditional("TRECS_TRACE_LOGGING_ENABLED")]
+        [Conditional(TraceLoggingDefine)]
         public void Trace(string messageTemplate)
         {
-            if (IsLevelEnabled(LogLevels.Trace))
+            if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate));
             }
         }
 
-        [Conditional("TRECS_TRACE_LOGGING_ENABLED")]
+        [Conditional(TraceLoggingDefine)]
         public void Trace<T0>(string messageTemplate, T0 p0)
         {
-            if (IsLevelEnabled(LogLevels.Trace))
+            if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0);
             }
         }
 
-        [Conditional("TRECS_TRACE_LOGGING_ENABLED")]
+        [Conditional(TraceLoggingDefine)]
         public void Trace<T0, T1>(string messageTemplate, T0 p0, T1 p1)
         {
-            if (IsLevelEnabled(LogLevels.Trace))
+            if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1);
             }
         }
 
-        [Conditional("TRECS_TRACE_LOGGING_ENABLED")]
+        [Conditional(TraceLoggingDefine)]
         public void Trace<T0, T1, T2>(string messageTemplate, T0 p0, T1 p1, T2 p2)
         {
-            if (IsLevelEnabled(LogLevels.Trace))
+            if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1, p2);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2);
             }
         }
 
-        [Conditional("TRECS_TRACE_LOGGING_ENABLED")]
+        [Conditional(TraceLoggingDefine)]
         public void Trace<T0, T1, T2, T3>(string messageTemplate, T0 p0, T1 p1, T2 p2, T3 p3)
         {
-            if (IsLevelEnabled(LogLevels.Trace))
+            if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1, p2, p3);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3);
             }
         }
 
-        [Conditional("TRECS_TRACE_LOGGING_ENABLED")]
+        [Conditional(TraceLoggingDefine)]
         public void Trace<T0, T1, T2, T3, T4>(
             string messageTemplate,
             T0 p0,
@@ -122,9 +189,9 @@ namespace Trecs.Internal
             T4 p4
         )
         {
-            if (IsLevelEnabled(LogLevels.Trace))
+            if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1, p2, p3, p4);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3, p4);
             }
         }
 
@@ -132,52 +199,64 @@ namespace Trecs.Internal
         // Debug
         ////////////////////////////////
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Debug(string messageTemplate)
         {
-            if (IsLevelEnabled(LogLevels.Debug))
+            if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate));
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Debug<T0>(string messageTemplate, T0 p0)
         {
-            if (IsLevelEnabled(LogLevels.Debug))
+            if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Debug<T0, T1>(string messageTemplate, T0 p0, T1 p1)
         {
-            if (IsLevelEnabled(LogLevels.Debug))
+            if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Debug<T0, T1, T2>(string messageTemplate, T0 p0, T1 p1, T2 p2)
         {
-            if (IsLevelEnabled(LogLevels.Debug))
+            if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1, p2);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Debug<T0, T1, T2, T3>(string messageTemplate, T0 p0, T1 p1, T2 p2, T3 p3)
         {
-            if (IsLevelEnabled(LogLevels.Debug))
+            if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1, p2, p3);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Debug<T0, T1, T2, T3, T4>(
             string messageTemplate,
             T0 p0,
@@ -187,9 +266,9 @@ namespace Trecs.Internal
             T4 p4
         )
         {
-            if (IsLevelEnabled(LogLevels.Debug))
+            if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1, p2, p3, p4);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3, p4);
             }
         }
 
@@ -197,52 +276,64 @@ namespace Trecs.Internal
         // Info
         ////////////////////////////////
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Info(string messageTemplate)
         {
-            if (IsLevelEnabled(LogLevels.Info))
+            if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate));
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Info<T0>(string messageTemplate, T0 p0)
         {
-            if (IsLevelEnabled(LogLevels.Info))
+            if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Info<T0, T1>(string messageTemplate, T0 p0, T1 p1)
         {
-            if (IsLevelEnabled(LogLevels.Info))
+            if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Info<T0, T1, T2>(string messageTemplate, T0 p0, T1 p1, T2 p2)
         {
-            if (IsLevelEnabled(LogLevels.Info))
+            if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1, p2);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Info<T0, T1, T2, T3>(string messageTemplate, T0 p0, T1 p1, T2 p2, T3 p3)
         {
-            if (IsLevelEnabled(LogLevels.Info))
+            if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1, p2, p3);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Info<T0, T1, T2, T3, T4>(
             string messageTemplate,
             T0 p0,
@@ -252,9 +343,9 @@ namespace Trecs.Internal
             T4 p4
         )
         {
-            if (IsLevelEnabled(LogLevels.Info))
+            if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(messageTemplate, p0, p1, p2, p3, p4);
+                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3, p4);
             }
         }
 
@@ -262,52 +353,64 @@ namespace Trecs.Internal
         // Warning
         ////////////////////////////////
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Warning(string messageTemplate)
         {
-            if (IsLevelEnabled(LogLevels.Warning))
+            if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(messageTemplate);
+                UnityEngine.Debug.LogWarningFormat(FormatTemplate(messageTemplate));
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Warning<T0>(string messageTemplate, T0 p0)
         {
-            if (IsLevelEnabled(LogLevels.Warning))
+            if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(messageTemplate, p0);
+                UnityEngine.Debug.LogWarningFormat(FormatTemplate(messageTemplate), p0);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Warning<T0, T1>(string messageTemplate, T0 p0, T1 p1)
         {
-            if (IsLevelEnabled(LogLevels.Warning))
+            if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(messageTemplate, p0, p1);
+                UnityEngine.Debug.LogWarningFormat(FormatTemplate(messageTemplate), p0, p1);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Warning<T0, T1, T2>(string messageTemplate, T0 p0, T1 p1, T2 p2)
         {
-            if (IsLevelEnabled(LogLevels.Warning))
+            if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(messageTemplate, p0, p1, p2);
+                UnityEngine.Debug.LogWarningFormat(FormatTemplate(messageTemplate), p0, p1, p2);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Warning<T0, T1, T2, T3>(string messageTemplate, T0 p0, T1 p1, T2 p2, T3 p3)
         {
-            if (IsLevelEnabled(LogLevels.Warning))
+            if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(messageTemplate, p0, p1, p2, p3);
+                UnityEngine.Debug.LogWarningFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3);
             }
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
+        [Conditional(EditorDefine)]
+        [Conditional(DevelopmentBuildDefine)]
+        [Conditional(LoggingDefine)]
         public void Warning<T0, T1, T2, T3, T4>(
             string messageTemplate,
             T0 p0,
@@ -317,62 +420,48 @@ namespace Trecs.Internal
             T4 p4
         )
         {
-            if (IsLevelEnabled(LogLevels.Warning))
+            if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(messageTemplate, p0, p1, p2, p3, p4);
+                UnityEngine.Debug.LogWarningFormat(
+                    FormatTemplate(messageTemplate),
+                    p0,
+                    p1,
+                    p2,
+                    p3,
+                    p4
+                );
             }
         }
 
         ////////////////////////////////
-        // Error
+        // Error — always emits in every build configuration; ignores MinLogLevel.
         ////////////////////////////////
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
         public void Error(string messageTemplate)
         {
-            if (IsLevelEnabled(LogLevels.Error))
-            {
-                UnityEngine.Debug.LogErrorFormat(messageTemplate);
-            }
+            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate));
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
         public void Error<T0>(string messageTemplate, T0 p0)
         {
-            if (IsLevelEnabled(LogLevels.Error))
-            {
-                UnityEngine.Debug.LogErrorFormat(messageTemplate, p0);
-            }
+            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate), p0);
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
         public void Error<T0, T1>(string messageTemplate, T0 p0, T1 p1)
         {
-            if (IsLevelEnabled(LogLevels.Error))
-            {
-                UnityEngine.Debug.LogErrorFormat(messageTemplate, p0, p1);
-            }
+            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate), p0, p1);
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
         public void Error<T0, T1, T2>(string messageTemplate, T0 p0, T1 p1, T2 p2)
         {
-            if (IsLevelEnabled(LogLevels.Error))
-            {
-                UnityEngine.Debug.LogErrorFormat(messageTemplate, p0, p1, p2);
-            }
+            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate), p0, p1, p2);
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
         public void Error<T0, T1, T2, T3>(string messageTemplate, T0 p0, T1 p1, T2 p2, T3 p3)
         {
-            if (IsLevelEnabled(LogLevels.Error))
-            {
-                UnityEngine.Debug.LogErrorFormat(messageTemplate, p0, p1, p2, p3);
-            }
+            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3);
         }
 
-        [Conditional("TRECS_LOGGING_ENABLED")]
         public void Error<T0, T1, T2, T3, T4>(
             string messageTemplate,
             T0 p0,
@@ -382,10 +471,7 @@ namespace Trecs.Internal
             T4 p4
         )
         {
-            if (IsLevelEnabled(LogLevels.Error))
-            {
-                UnityEngine.Debug.LogErrorFormat(messageTemplate, p0, p1, p2, p3, p4);
-            }
+            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3, p4);
         }
     }
 }

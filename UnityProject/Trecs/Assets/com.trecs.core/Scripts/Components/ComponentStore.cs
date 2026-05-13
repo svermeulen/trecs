@@ -8,7 +8,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class ComponentStore : IDisposable
     {
-        static readonly TrecsLog _log = new(nameof(ComponentStore));
+        readonly TrecsLog _log;
 
         // Per-group component arrays, indexed directly by GroupIndex.Index.
         // The outer array is sized at world build (one DenseDictionary per
@@ -21,8 +21,9 @@ namespace Trecs.Internal
 
         bool _configurationFrozen;
 
-        public ComponentStore(int groupCount)
+        public ComponentStore(TrecsLog log, int groupCount)
         {
+            _log = log;
             _groupEntityComponentsDB = new DenseDictionary<ComponentId, IComponentArray>[
                 groupCount
             ];

@@ -17,8 +17,8 @@ namespace Trecs.Tests
     {
         static (TrecsListHeap heap, NativeChunkStore chunkStore) CreateHeap()
         {
-            var chunkStore = new NativeChunkStore();
-            return (new TrecsListHeap(chunkStore), chunkStore);
+            var chunkStore = new NativeChunkStore(TrecsLog.Default);
+            return (new TrecsListHeap(TrecsLog.Default, chunkStore), chunkStore);
         }
 
         [Test]

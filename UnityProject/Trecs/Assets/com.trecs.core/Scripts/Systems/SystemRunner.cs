@@ -9,7 +9,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed partial class SystemRunner
     {
-        static readonly TrecsLog _log = new(nameof(SystemRunner));
+        readonly TrecsLog _log;
 
         readonly SimpleSubject _readyToApplyInputs = new();
 
@@ -94,6 +94,7 @@ namespace Trecs.Internal
         bool _hasRunFirstTick;
 
         public SystemRunner(
+            TrecsLog log,
             EntitySubmitter entitySubmitter,
             WorldSettings settings,
             InterpolatedPreviousSaverManager interpolatedPreviousSaverManager,
@@ -102,6 +103,7 @@ namespace Trecs.Internal
         {
             settings ??= new WorldSettings();
 
+            _log = log;
             _maxSecondsPerFixedUpdate = settings.MaxSecondsForFixedUpdatePerFrame;
             _interpolatedPreviousSaverManager = interpolatedPreviousSaverManager;
 

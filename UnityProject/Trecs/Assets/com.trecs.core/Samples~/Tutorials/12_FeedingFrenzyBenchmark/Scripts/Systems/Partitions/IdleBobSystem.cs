@@ -9,8 +9,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
     [ExecuteAfter(typeof(IConsumingMeal))]
     public partial class IdleBobSystem : IIdleBob, ISystem
     {
-        static readonly TrecsLog _log = new(nameof(IdleBobSystem));
-
         const float GoldenRatio = 1.61803f;
 
         readonly IdleBobSystemSettings _settings;

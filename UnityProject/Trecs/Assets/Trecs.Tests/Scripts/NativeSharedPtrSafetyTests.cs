@@ -32,11 +32,12 @@ namespace Trecs.Tests
                 null
             );
             var cache = new BlobCache(
+                TrecsLog.Default,
                 new List<IBlobStore> { blobStore },
                 new BlobCacheSettings { CleanIntervalSeconds = 99999, SerializationVersion = 1 },
                 new NativeBlobBoxPool()
             );
-            var heap = new NativeSharedHeap(cache);
+            var heap = new NativeSharedHeap(TrecsLog.Default, cache);
             return (heap, cache);
         }
 

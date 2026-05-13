@@ -22,7 +22,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class EventsManager : IDisposable
     {
-        static readonly TrecsLog _log = new(nameof(EventsManager));
+        readonly TrecsLog _log;
 
         readonly SimpleSubject _deserializeStartedEvent = new();
         readonly SimpleSubject _deserializeCompletedEvent = new();
@@ -74,8 +74,9 @@ namespace Trecs.Internal
             FastList<PrioritizedObserver<EntitiesRemovedObserver>>
         > ReactiveOnRemovedObservers => _reactiveOnRemovedObservers;
 
-        public EventsManager()
+        public EventsManager(TrecsLog log)
         {
+            _log = log;
             _reactiveOnAddedObservers = new();
             _reactiveOnMovedObservers = new();
             _reactiveOnRemovedObservers = new();

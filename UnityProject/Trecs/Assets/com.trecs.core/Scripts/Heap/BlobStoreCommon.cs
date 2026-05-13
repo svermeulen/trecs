@@ -6,7 +6,7 @@ namespace Trecs.Internal
 {
     public sealed class BlobStoreCommon
     {
-        static readonly TrecsLog _log = new(nameof(BlobStoreCommon));
+        TrecsLog _log;
 
         readonly List<MemoryCacheCleanupToRemoveInfo> _cleanBuffer2 = new();
         readonly ITrecsPoolManager _poolManager;
@@ -14,6 +14,11 @@ namespace Trecs.Internal
         public BlobStoreCommon(ITrecsPoolManager poolManager)
         {
             _poolManager = poolManager;
+        }
+
+        public TrecsLog Log
+        {
+            set { _log = value; }
         }
 
         public void DisposeBlob(object blob, bool isNative)

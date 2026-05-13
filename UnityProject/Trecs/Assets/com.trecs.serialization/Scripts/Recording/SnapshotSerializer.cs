@@ -24,7 +24,7 @@ namespace Trecs.Serialization.Internal
     /// </remarks>
     public sealed class SnapshotSerializer : IDisposable
     {
-        static readonly TrecsLog _log = new(nameof(SnapshotSerializer));
+        static readonly TrecsLog _log = TrecsLog.Default;
 
         readonly IWorldStateSerializer _worldStateSerializer;
         readonly SerializationBuffer _buffer;

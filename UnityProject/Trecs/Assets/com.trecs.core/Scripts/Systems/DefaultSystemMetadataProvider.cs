@@ -9,16 +9,18 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class DefaultSystemMetadataProvider : ISystemMetadataProvider
     {
-        static readonly TrecsLog _log = new(nameof(DefaultSystemMetadataProvider));
+        readonly TrecsLog _log;
 
         readonly List<SystemOrderConstraint> _constraints;
         readonly WorldAccessorRegistry _accessorRegistry;
 
         public DefaultSystemMetadataProvider(
+            TrecsLog log,
             List<SystemOrderConstraint> constraints,
             WorldAccessorRegistry accessorRegistry
         )
         {
+            _log = log;
             _constraints = constraints;
             _accessorRegistry = accessorRegistry;
         }

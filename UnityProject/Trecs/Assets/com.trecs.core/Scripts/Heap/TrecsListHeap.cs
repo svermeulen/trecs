@@ -19,7 +19,7 @@ namespace Trecs
     /// </summary>
     public sealed class TrecsListHeap
     {
-        static readonly TrecsLog _log = new(nameof(TrecsListHeap));
+        readonly TrecsLog _log;
 
         readonly NativeChunkStore _chunkStore;
         readonly Dictionary<uint, Type> _typesByHandle = new();
@@ -33,9 +33,10 @@ namespace Trecs
         static readonly Action<NativeChunkStoreEntry> s_freeDataBufferOnDrained =
             FreeDataBufferOnDrained;
 
-        public TrecsListHeap(NativeChunkStore chunkStore)
+        public TrecsListHeap(TrecsLog log, NativeChunkStore chunkStore)
         {
             Assert.IsNotNull(chunkStore);
+            _log = log;
             _chunkStore = chunkStore;
             _resolver = new NativeTrecsListResolver(_chunkStore.Resolver);
         }

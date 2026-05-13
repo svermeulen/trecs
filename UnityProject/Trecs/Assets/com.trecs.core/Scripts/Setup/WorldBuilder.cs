@@ -264,39 +264,46 @@ namespace Trecs
 
             var settings = _settings ?? new WorldSettings();
 
-            var worldInfo = new WorldInfo(_templates, _sets);
+            // One TrecsLog instance per World — every framework class caches this same
+            // reference. WorldAccessor.Log exposes it to user systems.
+            var log = new TrecsLog(settings);
 
-            var uniqueHeap = new UniqueHeap(_poolManager);
+            var worldInfo = new WorldInfo(log, _templates, _sets);
+
+            var uniqueHeap = new UniqueHeap(log, _poolManager);
             var nativeBlobBoxPool = new NativeBlobBoxPool();
-            var blobCache = new BlobCache(_blobStores, _blobCacheSettings, nativeBlobBoxPool);
-            var sharedHeap = new SharedHeap(blobCache);
-            var nativeSharedHeap = new NativeSharedHeap(blobCache);
-            var frameScopedUniqueHeap = new FrameScopedUniqueHeap(_poolManager);
-            var frameScopedSharedHeap = new FrameScopedSharedHeap(blobCache);
-            var nativeFrameScopedSharedHeap = new FrameScopedNativeSharedHeap(blobCache);
-            var nativeUniqueChunkStore = new NativeChunkStore();
-            var nativeUniqueHeap = new NativeUniqueHeap(nativeUniqueChunkStore);
+            var blobCache = new BlobCache(log, _blobStores, _blobCacheSettings, nativeBlobBoxPool);
+            var sharedHeap = new SharedHeap(log, blobCache);
+            var nativeSharedHeap = new NativeSharedHeap(log, blobCache);
+            var frameScopedUniqueHeap = new FrameScopedUniqueHeap(log, _poolManager);
+            var frameScopedSharedHeap = new FrameScopedSharedHeap(log, blobCache);
+            var nativeFrameScopedSharedHeap = new FrameScopedNativeSharedHeap(log, blobCache);
+            var nativeUniqueChunkStore = new NativeChunkStore(log);
+            var nativeUniqueHeap = new NativeUniqueHeap(log, nativeUniqueChunkStore);
             var frameScopedNativeUniqueHeap = new FrameScopedNativeUniqueHeap(
+                log,
                 nativeUniqueChunkStore
             );
-            var trecsListHeap = new TrecsListHeap(nativeUniqueChunkStore);
+            var trecsListHeap = new TrecsListHeap(log, nativeUniqueChunkStore);
 
-            var accessorRegistry = new WorldAccessorRegistry();
+            var accessorRegistry = new WorldAccessorRegistry(log);
 
             _systemMetadataProvider ??= new DefaultSystemMetadataProvider(
+                log,
                 _systemOrderConstraints,
                 accessorRegistry
             );
 
             var systemLoader = new SystemLoader(
+                log,
                 accessorRegistry,
                 _systemMetadataProvider,
                 worldInfo
             );
 
-            var eventsManager = new EventsManager();
+            var eventsManager = new EventsManager(log);
 
-            var componentStore = new ComponentStore(worldInfo.AllGroups.Count);
+            var componentStore = new ComponentStore(log, worldInfo.AllGroups.Count);
             var setStore = new SetStore(worldInfo.AllGroups.Count);
 
             foreach (var entitySet in _sets)
@@ -305,6 +312,7 @@ namespace Trecs
             }
 
             var entityQuerier = new EntityQuerier(
+                log,
                 componentStore,
                 setStore,
                 worldInfo.AllGroups.Count
@@ -313,6 +321,7 @@ namespace Trecs
             var jobScheduler = new RuntimeJobScheduler();
 
             var submitter = new EntitySubmitter(
+                log,
                 worldInfo,
                 accessorRegistry,
                 eventsManager,
@@ -332,6 +341,7 @@ namespace Trecs
             );
 
             var systemRunner = new SystemRunner(
+                log,
                 submitter,
                 settings,
                 interpolatedPreviousSaverManager,
@@ -339,6 +349,7 @@ namespace Trecs
             );
 
             var entityInputQueue = new EntityInputQueue(
+                log,
                 frameScopedSharedHeap,
                 nativeFrameScopedSharedHeap,
                 frameScopedUniqueHeap,
@@ -348,6 +359,7 @@ namespace Trecs
             );
 
             var world = new World(
+                log: log,
                 entityInputQueue: entityInputQueue,
                 systemRunner: systemRunner,
                 uniqueHeap: uniqueHeap,

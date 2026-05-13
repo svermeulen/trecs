@@ -11,7 +11,7 @@ namespace Trecs
     /// </summary>
     public sealed class FrameScopedUniqueHeap
     {
-        static readonly TrecsLog _log = new(nameof(FrameScopedUniqueHeap));
+        readonly TrecsLog _log;
 
         readonly DenseDictionary<uint, HeapEntry> _entries = new();
         readonly ITrecsPoolManager _poolManager;
@@ -20,8 +20,9 @@ namespace Trecs
 
         bool _isDisposed;
 
-        public FrameScopedUniqueHeap(ITrecsPoolManager poolManager)
+        public FrameScopedUniqueHeap(TrecsLog log, ITrecsPoolManager poolManager)
         {
+            _log = log;
             _poolManager = poolManager;
         }
 
