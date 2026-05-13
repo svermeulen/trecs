@@ -20,7 +20,7 @@ namespace Trecs
         /// pushes its own logger here at construction time so the store can emit messages
         /// that respect the world's <see cref="WorldSettings.MinLogLevel"/>.
         /// </summary>
-        Trecs.Internal.TrecsLog Log { set; }
+        TrecsLog Log { set; }
 
         /// <summary>
         /// Pool used to rent <see cref="NativeBlobBox"/> wrappers when reading native blobs

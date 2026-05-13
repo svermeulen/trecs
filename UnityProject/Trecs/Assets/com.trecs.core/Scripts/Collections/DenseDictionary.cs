@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
+using UnityEngine;
 
 namespace Trecs.Collections
 {
@@ -62,7 +63,7 @@ namespace Trecs.Collections
                         BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly
                     ) == null
                 )
-                    UnityEngine.Debug.LogWarningFormat(
+                    Debug.LogWarningFormat(
                         "[Trecs] {0} does not implement GetHashCode -> This will cause unwanted allocations (boxing)",
                         keyType.Name
                     );
