@@ -33,23 +33,20 @@ namespace Trecs.Internal
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Error</b> calls are never gated by build configuration or by
-    /// <see cref="WorldSettings.MinLogLevel"/> — they always emit. <b>Warning</b>,
-    /// <b>Info</b>, and <b>Debug</b> calls are compiled out unless one of
-    /// <c>UNITY_EDITOR</c>, <c>DEVELOPMENT_BUILD</c>, or <c>TRECS_LOGGING_ENABLED</c>
-    /// is defined. <b>Trace</b> calls are compiled out unless
-    /// <c>TRECS_TRACE_LOGGING_ENABLED</c> is defined.
+    /// Compile-time gating: <b>Error</b> and <b>Warning</b> always compile in (any
+    /// build configuration). <b>Info</b> and <b>Debug</b> are gated by
+    /// <c>UNITY_EDITOR</c> — they are stripped from non-editor builds. <b>Trace</b>
+    /// is gated by <c>TRECS_TRACE_LOGGING_ENABLED</c> — stripped from every build
+    /// unless that define is set.
     /// </para>
     /// <para>
-    /// In builds where the calls compile in, the runtime level check (against
-    /// <see cref="WorldSettings.MinLogLevel"/>) filters further.
+    /// Runtime gating: in builds where a call compiles in, it is then filtered by
+    /// <see cref="WorldSettings.MinLogLevel"/>. Error ignores this and always emits.
     /// </para>
     /// </remarks>
     public sealed class TrecsLog
     {
         const string EditorDefine = "UNITY_EDITOR";
-        const string DevelopmentBuildDefine = "DEVELOPMENT_BUILD";
-        const string LoggingDefine = "TRECS_LOGGING_ENABLED";
         const string TraceLoggingDefine = "TRECS_TRACE_LOGGING_ENABLED";
 
         const string Prefix = "[Trecs] ";
@@ -200,8 +197,6 @@ namespace Trecs.Internal
         ////////////////////////////////
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Debug(string messageTemplate)
         {
             if (IsLevelEnabled(LogLevel.Debug))
@@ -211,8 +206,6 @@ namespace Trecs.Internal
         }
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Debug<T0>(string messageTemplate, T0 p0)
         {
             if (IsLevelEnabled(LogLevel.Debug))
@@ -222,8 +215,6 @@ namespace Trecs.Internal
         }
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Debug<T0, T1>(string messageTemplate, T0 p0, T1 p1)
         {
             if (IsLevelEnabled(LogLevel.Debug))
@@ -233,8 +224,6 @@ namespace Trecs.Internal
         }
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Debug<T0, T1, T2>(string messageTemplate, T0 p0, T1 p1, T2 p2)
         {
             if (IsLevelEnabled(LogLevel.Debug))
@@ -244,8 +233,6 @@ namespace Trecs.Internal
         }
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Debug<T0, T1, T2, T3>(string messageTemplate, T0 p0, T1 p1, T2 p2, T3 p3)
         {
             if (IsLevelEnabled(LogLevel.Debug))
@@ -255,8 +242,6 @@ namespace Trecs.Internal
         }
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Debug<T0, T1, T2, T3, T4>(
             string messageTemplate,
             T0 p0,
@@ -277,8 +262,6 @@ namespace Trecs.Internal
         ////////////////////////////////
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Info(string messageTemplate)
         {
             if (IsLevelEnabled(LogLevel.Info))
@@ -288,8 +271,6 @@ namespace Trecs.Internal
         }
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Info<T0>(string messageTemplate, T0 p0)
         {
             if (IsLevelEnabled(LogLevel.Info))
@@ -299,8 +280,6 @@ namespace Trecs.Internal
         }
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Info<T0, T1>(string messageTemplate, T0 p0, T1 p1)
         {
             if (IsLevelEnabled(LogLevel.Info))
@@ -310,8 +289,6 @@ namespace Trecs.Internal
         }
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Info<T0, T1, T2>(string messageTemplate, T0 p0, T1 p1, T2 p2)
         {
             if (IsLevelEnabled(LogLevel.Info))
@@ -321,8 +298,6 @@ namespace Trecs.Internal
         }
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Info<T0, T1, T2, T3>(string messageTemplate, T0 p0, T1 p1, T2 p2, T3 p3)
         {
             if (IsLevelEnabled(LogLevel.Info))
@@ -332,8 +307,6 @@ namespace Trecs.Internal
         }
 
         [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Info<T0, T1, T2, T3, T4>(
             string messageTemplate,
             T0 p0,
@@ -353,9 +326,6 @@ namespace Trecs.Internal
         // Warning
         ////////////////////////////////
 
-        [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Warning(string messageTemplate)
         {
             if (IsLevelEnabled(LogLevel.Warning))
@@ -364,9 +334,6 @@ namespace Trecs.Internal
             }
         }
 
-        [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Warning<T0>(string messageTemplate, T0 p0)
         {
             if (IsLevelEnabled(LogLevel.Warning))
@@ -375,9 +342,6 @@ namespace Trecs.Internal
             }
         }
 
-        [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Warning<T0, T1>(string messageTemplate, T0 p0, T1 p1)
         {
             if (IsLevelEnabled(LogLevel.Warning))
@@ -386,9 +350,6 @@ namespace Trecs.Internal
             }
         }
 
-        [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Warning<T0, T1, T2>(string messageTemplate, T0 p0, T1 p1, T2 p2)
         {
             if (IsLevelEnabled(LogLevel.Warning))
@@ -397,9 +358,6 @@ namespace Trecs.Internal
             }
         }
 
-        [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Warning<T0, T1, T2, T3>(string messageTemplate, T0 p0, T1 p1, T2 p2, T3 p3)
         {
             if (IsLevelEnabled(LogLevel.Warning))
@@ -408,9 +366,6 @@ namespace Trecs.Internal
             }
         }
 
-        [Conditional(EditorDefine)]
-        [Conditional(DevelopmentBuildDefine)]
-        [Conditional(LoggingDefine)]
         public void Warning<T0, T1, T2, T3, T4>(
             string messageTemplate,
             T0 p0,
