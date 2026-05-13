@@ -222,10 +222,10 @@ namespace Trecs.Internal
                     + "Call scheduler.CompleteAllOutstanding() first."
             );
 
+            // NativeSharedHeap still has its own pending model independent of the chunk
+            // store; the chunk-store-backed heaps (unique / frame-scoped / TrecsList)
+            // now do allocs and frees immediately, so no flush is needed for them.
             _nativeSharedHeap.FlushPendingOperations();
-            _nativeUniqueHeap.FlushPendingOperations();
-            _frameScopedNativeUniqueHeap.FlushPendingOperations();
-            _trecsListHeap.FlushPendingOperations();
 
             using (TrecsProfiling.Start("Deferred Set Operations"))
             {

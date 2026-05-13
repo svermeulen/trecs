@@ -24,7 +24,7 @@ namespace Trecs
 
         NativeUniquePtrResolver _resolver;
 
-        public NativeUniqueHeap(TrecsLog log, NativeChunkStore chunkStore)
+        internal NativeUniqueHeap(TrecsLog log, NativeChunkStore chunkStore)
         {
             Assert.IsNotNull(chunkStore);
             _log = log;
@@ -168,25 +168,20 @@ namespace Trecs
         {
             Assert.That(!_isDisposed);
             Assert.That(address != 0);
-            if (!_typesByHandle.Remove(address))
+            if (!_typesByHandle.ContainsKey(address))
             {
                 throw Assert.CreateException(
                     "Attempted to dispose invalid native unique heap address ({}) — handle is not owned by NativeUniqueHeap",
                     address
                 );
             }
+            // Call chunk-store Free first; it may throw via CheckDeallocateAndThrow
+            // if a Burst job is still using the handle. If we removed from
+            // _typesByHandle first, that throw would leave the heap in an
+            // inconsistent state with a leaked side-table slot.
             _chunkStore.Free(new PtrHandle(address));
+            _typesByHandle.Remove(address);
             _log.Trace("Disposed NativeUniquePtr with handle {0}", address);
-        }
-
-        /// <summary>
-        /// Applies any deferred chunk-store operations.
-        /// Must be called when no jobs are reading via the resolver (e.g. at submission time).
-        /// </summary>
-        internal void FlushPendingOperations()
-        {
-            Assert.That(!_isDisposed);
-            _chunkStore.FlushPendingOperations();
         }
 
         public void ClearAll(bool warnUndisposed)
@@ -211,9 +206,6 @@ namespace Trecs
                 _chunkStore.Free(new PtrHandle(address));
             }
             _typesByHandle.Clear();
-            // Drain pending-frees through the chunk store so subsequent restore-time
-            // AllocAtSlot calls don't see those slots as still-in-use.
-            _chunkStore.FlushPendingOperations();
         }
 
         internal void Dispose()
@@ -225,12 +217,6 @@ namespace Trecs
 
         public unsafe void Serialize(ITrecsSerializationWriter writer)
         {
-            // Force a flush so every live handle is fully reflected in the chunk store before
-            // we serialise (otherwise pending-add entries would only be visible via main-thread
-            // resolution, which is fine for us — both go through chunk_store.ResolveEntry —
-            // but the flush also drains pending-frees that may free slots we'd otherwise scan).
-            FlushPendingOperations();
-
             writer.Write<int>("NumEntries", _typesByHandle.Count);
 
             foreach (var (address, type) in _typesByHandle)

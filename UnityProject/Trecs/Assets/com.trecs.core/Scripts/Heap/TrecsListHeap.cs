@@ -33,7 +33,7 @@ namespace Trecs
         static readonly Action<NativeChunkStoreEntry> s_freeDataBufferOnDrained =
             FreeDataBufferOnDrained;
 
-        public TrecsListHeap(TrecsLog log, NativeChunkStore chunkStore)
+        internal TrecsListHeap(TrecsLog log, NativeChunkStore chunkStore)
         {
             Assert.IsNotNull(chunkStore);
             _log = log;
@@ -151,7 +151,7 @@ namespace Trecs
             Assert.That(!_isDisposed);
             Assert.That(address != 0);
 
-            if (!_typesByHandle.Remove(address))
+            if (!_typesByHandle.ContainsKey(address))
             {
                 throw Assert.CreateException(
                     "Attempted to dispose invalid TrecsList handle ({})",
@@ -161,9 +161,12 @@ namespace Trecs
 
             // Free the chunk-store header AND the AllocatorManager-owned data buffer.
             // s_freeDataBufferOnDrained reads the data pointer out of the header — it runs
-            // after the safety handle has been drained but before the header slot is
-            // released, so no Burst job can be reading header->Data when we free it.
+            // after the safety handle has been released but before the header slot is
+            // returned to its bucket, so no Burst job can be reading header->Data when we
+            // free it. Call chunk-store Free first; if it throws (job still using), our
+            // managed-side bookkeeping stays intact and the caller can retry.
             _chunkStore.Free(new PtrHandle(address), s_freeDataBufferOnDrained);
+            _typesByHandle.Remove(address);
             _log.Trace("Disposed TrecsList {0}", address);
         }
 
@@ -180,12 +183,6 @@ namespace Trecs
                     headerPtr->Capacity
                 );
             }
-        }
-
-        internal void FlushPendingOperations()
-        {
-            Assert.That(!_isDisposed);
-            _chunkStore.FlushPendingOperations();
         }
 
         public void ClearAll(bool warnUndisposed)
@@ -210,7 +207,6 @@ namespace Trecs
                 _chunkStore.Free(new PtrHandle(address), s_freeDataBufferOnDrained);
             }
             _typesByHandle.Clear();
-            _chunkStore.FlushPendingOperations();
         }
 
         internal void Dispose()
@@ -223,7 +219,6 @@ namespace Trecs
         public unsafe void Serialize(ITrecsSerializationWriter writer)
         {
             Assert.That(!_isDisposed);
-            FlushPendingOperations();
 
             writer.Write<int>("NumEntries", _typesByHandle.Count);
 

@@ -261,7 +261,6 @@ namespace Trecs.Tests
             NAssert.AreEqual(0, heap.NumEntries);
 
             // Should be safe to flush after — no leftover state.
-            heap.FlushPendingOperations();
             heap.Dispose();
             chunkStore.Dispose();
         }
@@ -332,7 +331,6 @@ namespace Trecs.Tests
             w.Add(22);
 
             // Force the entry into _allEntries; main-thread Read should still work.
-            heap.FlushPendingOperations();
 
             var read = heap.Read(in list);
             NAssert.AreEqual(2, read.Count);

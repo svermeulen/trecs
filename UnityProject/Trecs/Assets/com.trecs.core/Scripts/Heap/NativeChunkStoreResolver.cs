@@ -55,8 +55,15 @@ namespace Trecs.Internal
 
     /// <summary>
     /// Burst-compatible resolver over the chunk store's side table. Cheap to copy by value into
-    /// job structs. Resolution is a single indexed array load (plus a generation/inuse check):
-    /// no hash lookup, no dictionary probe.
+    /// job structs. Resolution is two indexed loads (chunk-directory entry → entry within
+    /// chunk) plus a generation/in-use check: no hash lookup, no dictionary probe.
+    ///
+    /// <para>The side table is stored as a fixed-capacity directory of pointers to
+    /// fixed-size chunks of <see cref="NativeChunkStoreEntry"/>. New chunks are appended
+    /// when slot indices cross a chunk boundary; existing chunks never move. That stability
+    /// is what lets main-thread <c>Alloc</c> materialise new slots concurrent with jobs
+    /// reading via this resolver — the list-growth-moves-the-backing-buffer race that a
+    /// flat <c>NativeList</c> would have is eliminated by design.</para>
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
     public readonly struct NativeChunkStoreResolver
@@ -69,12 +76,22 @@ namespace Trecs.Internal
         internal const int GenerationShift = IndexBits;
         internal const uint MaxIndex = IndexMask; // 0xFFFFFF == 16,777,215
 
-        [NativeDisableContainerSafetyRestriction]
-        readonly NativeList<NativeChunkStoreEntry> _sideTable;
+        // Chunked side-table layout. Each chunk is a fixed-size block of
+        // NativeChunkStoreEntry; the directory is a fixed-capacity array of pointers
+        // to those chunks (or IntPtr.Zero for chunks not yet materialised).
+        internal const int ChunkSizeBits = 10;
+        internal const int ChunkSize = 1 << ChunkSizeBits; // 1024 entries per chunk
+        internal const int ChunkIndexMask = ChunkSize - 1;
 
-        public NativeChunkStoreResolver(NativeList<NativeChunkStoreEntry> sideTable)
+        // Total chunk slots needed to address every possible side-table index.
+        internal const int MaxChunkCount = (int)((MaxIndex + 1u) >> ChunkSizeBits); // 16,384
+
+        [NativeDisableContainerSafetyRestriction]
+        readonly NativeArray<IntPtr> _chunkDirectory;
+
+        public NativeChunkStoreResolver(NativeArray<IntPtr> chunkDirectory)
         {
-            _sideTable = sideTable;
+            _chunkDirectory = chunkDirectory;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -97,7 +114,7 @@ namespace Trecs.Internal
         /// failing the resolve outright.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryResolveEntry(PtrHandle handle, out NativeChunkStoreEntry entry)
+        public unsafe bool TryResolveEntry(PtrHandle handle, out NativeChunkStoreEntry entry)
         {
             if (handle.IsNull)
             {
@@ -107,13 +124,23 @@ namespace Trecs.Internal
 
             DecodeHandle(handle, out var index, out var generation);
 
-            if ((int)index >= _sideTable.Length)
+            var chunkIdx = (int)index >> ChunkSizeBits;
+            if (chunkIdx >= _chunkDirectory.Length)
             {
                 entry = default;
                 return false;
             }
 
-            entry = _sideTable[(int)index];
+            var chunkPtr = (NativeChunkStoreEntry*)_chunkDirectory[chunkIdx].ToPointer();
+            if (chunkPtr == null)
+            {
+                // Chunk not yet materialised — the handle's index is past the
+                // current high-water mark from this resolver's point of view.
+                entry = default;
+                return false;
+            }
+
+            entry = chunkPtr[(int)index & ChunkIndexMask];
             return entry.InUse == 1 && entry.Generation == generation;
         }
 

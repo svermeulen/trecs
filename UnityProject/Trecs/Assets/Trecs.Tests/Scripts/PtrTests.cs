@@ -939,7 +939,8 @@ namespace Trecs.Tests
 
             var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
 
-            // Native resolve (NativeSharedPtrResolver) requires flush first
+            // NativeSharedHeap has its own pending model (independent of the
+            // chunk-store-backed heaps); resolver still needs flush.
             heap.FlushPendingOperations();
             ref readonly int value = ref heap.Resolver.Read(in ptr).Value;
             NAssert.AreEqual(42, value);
@@ -997,7 +998,6 @@ namespace Trecs.Tests
 
             // Both pending add and pending remove for the same blob —
             // flush should process adds first so the remove finds the entry
-            heap.FlushPendingOperations();
             NAssert.AreEqual(0, heap.NumEntries);
 
             heap.Dispose();
@@ -1090,7 +1090,6 @@ namespace Trecs.Tests
             var ptr = heap.Alloc<int>(42);
 
             // Resolver requires flush first
-            heap.FlushPendingOperations();
             ref readonly int value = ref heap.Resolver.Read(in ptr).Value;
             NAssert.AreEqual(42, value);
 
@@ -1106,7 +1105,6 @@ namespace Trecs.Tests
 
             var ptr = heap.Alloc<int>(42);
 
-            heap.FlushPendingOperations();
             ref int value = ref heap.Resolver.Write(in ptr).Value;
             NAssert.AreEqual(42, value);
 
@@ -1126,7 +1124,6 @@ namespace Trecs.Tests
 
             var ptr = heap.Alloc<int>(42);
 
-            heap.FlushPendingOperations();
             heap.Resolver.Write(in ptr).Set(123);
 
             ref readonly int readBack = ref heap.Resolver.Read(in ptr).Value;
@@ -1154,15 +1151,14 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void NativeUniqueHeap_FlushPendingOperations_MakesEntriesVisibleToResolver()
+        public void NativeUniqueHeap_Alloc_ImmediatelyVisibleToResolver()
         {
             var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             var ptr = heap.Alloc<int>(42);
 
-            // Before flush, resolver can't see the entry
-            // After flush, resolver can
-            heap.FlushPendingOperations();
+            // Under the immediate-write model, the new entry is in the side table
+            // before Alloc returns — resolver can see it without any flush.
             ref readonly int readValue = ref heap.Resolver.Read(in ptr).Value;
             NAssert.AreEqual(42, readValue);
 
@@ -1183,7 +1179,6 @@ namespace Trecs.Tests
             heap.DisposeEntry(ptr.Handle.Value);
             NAssert.AreEqual(0, heap.NumEntries);
 
-            heap.FlushPendingOperations();
             NAssert.AreEqual(0, heap.NumEntries);
 
             heap.Dispose();

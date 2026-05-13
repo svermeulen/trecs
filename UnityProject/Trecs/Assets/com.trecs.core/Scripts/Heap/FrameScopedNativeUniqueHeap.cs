@@ -23,7 +23,7 @@ namespace Trecs
         readonly List<uint> _removeBuffer = new();
         bool _isDisposed;
 
-        public FrameScopedNativeUniqueHeap(TrecsLog log, NativeChunkStore chunkStore)
+        internal FrameScopedNativeUniqueHeap(TrecsLog log, NativeChunkStore chunkStore)
         {
             Assert.IsNotNull(chunkStore);
             _log = log;
@@ -45,10 +45,11 @@ namespace Trecs
             Assert.That(!_isDisposed);
             Assert.That(frame >= 0);
 
-            // AllocImmediate (not the deferred-pending Alloc) — frame-scoped entries are
-            // allocated during the input phase and must be resolvable from Burst jobs scheduled
-            // in the same step, before the world's next FlushPendingOperations.
-            var handle = _chunkStore.AllocImmediate(
+            // Plain Alloc — under the unified immediate-write model, new entries are
+            // visible to Burst jobs as soon as Alloc returns. Frame-scoped allocations
+            // made in the input phase resolve correctly from jobs scheduled later in
+            // the same step without needing a flush boundary.
+            var handle = _chunkStore.Alloc(
                 UnsafeUtility.SizeOf<T>(),
                 UnsafeUtility.AlignOf<T>(),
                 TypeHash<T>.Value,
@@ -88,7 +89,7 @@ namespace Trecs
             Assert.That(frame >= 0);
             Assert.That(alloc.Ptr != IntPtr.Zero, "AllocTakingOwnership: null pointer");
 
-            var handle = _chunkStore.AllocExternalImmediate(
+            var handle = _chunkStore.AllocExternal(
                 alloc.Ptr,
                 alloc.AllocSize,
                 alloc.Alignment,
@@ -189,26 +190,18 @@ namespace Trecs
         void DisposeEntry(uint address)
         {
             Assert.That(!_isDisposed);
-            if (!_activeEntries.TryRemove(address, out _))
+            if (!_activeEntries.ContainsKey(address))
             {
                 throw Assert.CreateException(
                     "Attempted to dispose invalid frame-scoped native unique heap address ({})",
                     address
                 );
             }
+            // Chunk-store Free first; if it throws (job still using the handle), the
+            // managed-side bookkeeping stays intact so the caller can retry after
+            // completing the job.
             _chunkStore.Free(new PtrHandle(address));
-        }
-
-        /// <summary>
-        /// Applies any deferred chunk-store operations. Called by the world's flush pipeline.
-        /// </summary>
-        internal void FlushPendingOperations()
-        {
-            Assert.That(!_isDisposed);
-            // The shared chunk store flushes once (via NativeUniqueHeap.FlushPendingOperations);
-            // we don't double-flush here, but we keep the method for symmetry / callers that
-            // bypass NativeUniqueHeap.
-            _chunkStore.FlushPendingOperations();
+            _activeEntries.TryRemove(address, out _);
         }
 
         internal void ClearAll()
@@ -219,7 +212,6 @@ namespace Trecs
                 _chunkStore.Free(new PtrHandle(address));
             }
             _activeEntries.Clear();
-            _chunkStore.FlushPendingOperations();
         }
 
         internal void Dispose()

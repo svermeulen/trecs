@@ -40,7 +40,6 @@ namespace Trecs.Tests
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var handle = store.Alloc(64, 8, typeHash: 7);
-            store.FlushPendingOperations();
 
             var entry = store.ResolveEntry(handle);
             NAssert.AreNotEqual(IntPtr.Zero, entry.Address);
@@ -57,7 +56,6 @@ namespace Trecs.Tests
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var handle = store.Alloc(sizeof(int) * 4, 4, typeHash: 0);
-            store.FlushPendingOperations();
 
             var addr = store.ResolveEntry(handle).Address;
             Marshal.WriteInt32(addr, 0 * sizeof(int), 11);
@@ -87,7 +85,7 @@ namespace Trecs.Tests
         // ─── Free paths ─────────────────────────────────────────
 
         [Test]
-        public void Free_PreFlush_DecrementsLiveCount()
+        public void Free_DecrementsLiveCount()
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var handle = store.Alloc(32, 8, typeHash: 0);
@@ -98,23 +96,10 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Free_AfterFlush_Deferred_DecrementsLiveCount()
+        public void Free_HandleNoLongerResolves()
         {
-            using var store = new NativeChunkStore(TrecsLog.Default);
-            var handle = store.Alloc(32, 8, typeHash: 0);
-            store.FlushPendingOperations();
-
-            store.Free(handle);
-            NAssert.AreEqual(0, store.NumLiveAllocations);
-
-            // After the next flush, side-table slot is released.
-            store.FlushPendingOperations();
-            NAssert.Throws<TrecsException>(() => store.ResolveEntry(handle));
-        }
-
-        [Test]
-        public void Free_PreFlush_HandleNoLongerResolves()
-        {
+            // Free is synchronous: the slot is marked InUse=0 and returned to its
+            // bucket before Free returns. Resolution after Free should fail.
             using var store = new NativeChunkStore(TrecsLog.Default);
             var handle = store.Alloc(32, 8, typeHash: 0);
             store.Free(handle);
@@ -131,16 +116,13 @@ namespace Trecs.Tests
 
             // Fill enough to get a stable page.
             var first = store.Alloc(64, 8, typeHash: 0);
-            store.FlushPendingOperations();
             var entry1 = store.ResolveEntry(first);
             var addr1 = entry1.Address;
 
             store.Free(first);
-            store.FlushPendingOperations();
 
             // Next 64-byte alloc should reuse the same physical slot.
             var second = store.Alloc(64, 8, typeHash: 0);
-            store.FlushPendingOperations();
             var entry2 = store.ResolveEntry(second);
 
             NAssert.AreEqual(
@@ -163,7 +145,6 @@ namespace Trecs.Tests
             var small = store.Alloc(16, 8, typeHash: 0);
             var medium = store.Alloc(256, 8, typeHash: 0);
             var large = store.Alloc(4096, 8, typeHash: 0);
-            store.FlushPendingOperations();
 
             var es = store.ResolveEntry(small);
             var em = store.ResolveEntry(medium);
@@ -207,7 +188,6 @@ namespace Trecs.Tests
             using var store = new NativeChunkStore(TrecsLog.Default);
 
             var huge = store.Alloc(200 * 1024, 16, typeHash: 0); // 200 KB > 64 KB max bucket
-            store.FlushPendingOperations();
 
             var entry = store.ResolveEntry(huge);
             NAssert.AreEqual(1, entry.IsHuge, "Huge alloc must be marked IsHuge=1");
@@ -221,65 +201,28 @@ namespace Trecs.Tests
             using var store = new NativeChunkStore(TrecsLog.Default);
 
             var huge = store.Alloc(200 * 1024, 16, typeHash: 0);
-            store.FlushPendingOperations();
             NAssert.AreEqual(1, store.NumPages);
 
             store.Free(huge);
-            store.FlushPendingOperations();
             NAssert.AreEqual(0, store.NumPages);
         }
 
         [Test]
-        public void HugeAlloc_PreFlushFree_OnDrainedRunsBeforePageRelease()
+        public void HugeAlloc_Free_OnDrainedRunsBeforePageRelease()
         {
-            // Regression for the Free-orders-safety-drain-before-page-release fix. The
-            // pre-flush path used to call ReturnSlot (which calls AllocatorManager.Free for
-            // huge pages) before EnforceAllBufferJobsHaveCompletedAndRelease ran on the
-            // safety handle. Now Free's onDrained callback runs after EnforceAll but
-            // before ReturnSlot, so the entry's Address is still valid memory when the
-            // callback inspects it.
+            // onDrained runs after the safety-handle release but before ReturnSlot
+            // frees the huge page, so the entry's Address is still live memory when
+            // the callback inspects it.
             using var store = new NativeChunkStore(TrecsLog.Default);
             var huge = store.Alloc(200 * 1024, 16, typeHash: 0);
 
             IntPtr observedAddress = IntPtr.Zero;
-            store.Free(
-                huge,
-                entry =>
-                {
-                    // Callback runs post-drain, pre-release: the entry's Address must
-                    // still point at a live page allocation (chunk store hasn't called
-                    // AllocatorManager.Free on it yet).
-                    observedAddress = entry.Address;
-                }
-            );
+            store.Free(huge, entry => observedAddress = entry.Address);
 
             NAssert.AreNotEqual(
                 IntPtr.Zero,
                 observedAddress,
                 "onDrained should have run with a valid address"
-            );
-        }
-
-        [Test]
-        public void HugeAlloc_DeferredFree_OnDrainedRunsAtFlush()
-        {
-            // Same as above but for the deferred (post-flush) path: onDrained should run
-            // during FlushPendingOperations, after EnforceAll but before ReturnSlot.
-            using var store = new NativeChunkStore(TrecsLog.Default);
-            var huge = store.Alloc(200 * 1024, 16, typeHash: 0);
-            store.FlushPendingOperations(); // Promote to side table → next Free is deferred.
-
-            IntPtr observedAddress = IntPtr.Zero;
-            store.Free(huge, entry => observedAddress = entry.Address);
-
-            // Callback hasn't fired yet — it's queued in pending-frees.
-            NAssert.AreEqual(IntPtr.Zero, observedAddress);
-
-            store.FlushPendingOperations();
-            NAssert.AreNotEqual(
-                IntPtr.Zero,
-                observedAddress,
-                "onDrained should have run at flush time"
             );
         }
 
@@ -291,14 +234,11 @@ namespace Trecs.Tests
             using var store = new NativeChunkStore(TrecsLog.Default);
 
             var h1 = store.Alloc(32, 8, typeHash: 0);
-            store.FlushPendingOperations();
             store.Free(h1);
-            store.FlushPendingOperations();
 
             // Second alloc almost certainly reuses h1's bucket slot AND side-table slot,
             // but with a bumped generation. The original h1 must no longer resolve.
             var h2 = store.Alloc(32, 8, typeHash: 0);
-            store.FlushPendingOperations();
             NAssert.AreNotEqual(h1.Value, h2.Value, "Generation bump must change the handle value");
             NAssert.Throws<TrecsException>(() => store.ResolveEntry(h1));
             NAssert.DoesNotThrow(() => store.ResolveEntry(h2));
@@ -318,7 +258,6 @@ namespace Trecs.Tests
             var h2 = store.Alloc(32, 8, typeHash: 0);
             NAssert.AreNotEqual(h1.Value, h2.Value, "Pre-flush reuse must still bump generation");
 
-            store.FlushPendingOperations();
             NAssert.Throws<TrecsException>(() => store.ResolveEntry(h1));
             NAssert.DoesNotThrow(() => store.ResolveEntry(h2));
         }
@@ -333,13 +272,10 @@ namespace Trecs.Tests
             for (int i = 0; i < 260; i++)
             {
                 latest = store.Alloc(32, 8, typeHash: 0);
-                store.FlushPendingOperations();
                 store.Free(latest);
-                store.FlushPendingOperations();
             }
 
             var fresh = store.Alloc(32, 8, typeHash: 0);
-            store.FlushPendingOperations();
             var entry = store.ResolveEntry(fresh);
             NAssert.AreNotEqual(0, entry.Generation, "Generation must skip 0 on wrap");
         }
@@ -372,12 +308,10 @@ namespace Trecs.Tests
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var h1 = store.Alloc(32, 8, typeHash: 0);
-            store.FlushPendingOperations();
 
             NativeChunkStoreResolver.DecodeHandle(h1, out var idx1, out _);
 
             store.Free(h1);
-            store.FlushPendingOperations();
 
             var h2 = store.Alloc(32, 8, typeHash: 0);
             NativeChunkStoreResolver.DecodeHandle(h2, out var idx2, out _);
@@ -398,14 +332,12 @@ namespace Trecs.Tests
             {
                 handles[i] = store.Alloc(65536, 16, typeHash: 0);
             }
-            store.FlushPendingOperations();
             NAssert.AreEqual(2, store.NumPages);
 
             for (int i = 0; i < handles.Length; i++)
             {
                 store.Free(handles[i]);
             }
-            store.FlushPendingOperations();
 
             var reclaimed = store.ReclaimEmptyPages();
             NAssert.AreEqual(2, reclaimed);
@@ -423,11 +355,9 @@ namespace Trecs.Tests
             {
                 handles[i] = store.Alloc(65536, 16, typeHash: 0);
             }
-            store.FlushPendingOperations();
 
             // The 65th alloc forced a new page; freeing exactly it should reclaim only that page.
             store.Free(handles[64]);
-            store.FlushPendingOperations();
 
             var reclaimed = store.ReclaimEmptyPages();
             NAssert.AreEqual(1, reclaimed);
@@ -439,14 +369,11 @@ namespace Trecs.Tests
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var h = store.Alloc(65536, 16, typeHash: 0);
-            store.FlushPendingOperations();
             var firstPageId = store.ResolveEntry(h).PageId;
             store.Free(h);
-            store.FlushPendingOperations();
             store.ReclaimEmptyPages();
 
             var h2 = store.Alloc(65536, 16, typeHash: 0);
-            store.FlushPendingOperations();
             var secondPageId = store.ResolveEntry(h2).PageId;
             NAssert.AreEqual(
                 firstPageId,
@@ -464,7 +391,6 @@ namespace Trecs.Tests
             for (int align = 16; align <= 1024; align *= 2)
             {
                 var h = store.Alloc(8, align, typeHash: 0);
-                store.FlushPendingOperations();
                 var addr = store.ResolveEntry(h).Address.ToInt64();
                 NAssert.AreEqual(
                     0,
@@ -481,7 +407,6 @@ namespace Trecs.Tests
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var h = store.Alloc(32, 8, typeHash: 123456789);
-            store.FlushPendingOperations();
             NAssert.AreEqual(123456789, store.ResolveEntry(h).TypeHash);
         }
 
@@ -511,7 +436,6 @@ namespace Trecs.Tests
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var h = store.Alloc(64, 8, typeHash: 999);
-            store.FlushPendingOperations();
 
             var expectedAddress = store.ResolveEntry(h).Address.ToInt64();
 
@@ -570,7 +494,6 @@ namespace Trecs.Tests
                 using var src = new NativeChunkStore(TrecsLog.Default);
                 var h1 = src.Alloc(64, 8, typeHash: 111);
                 var h2 = src.Alloc(64, 8, typeHash: 222);
-                src.FlushPendingOperations();
                 h1Value = h1.Value;
                 h2Value = h2.Value;
                 NAssert.AreNotEqual(h1Value, h2Value);
@@ -616,7 +539,6 @@ namespace Trecs.Tests
 
             // Subsequent fresh Allocs must avoid slots 10 and 20.
             var fresh = store.Alloc(32, 8, typeHash: 0);
-            store.FlushPendingOperations();
             NativeChunkStoreResolver.DecodeHandle(fresh, out var idx, out _);
             NAssert.AreNotEqual(10u, idx);
             NAssert.AreNotEqual(20u, idx);
@@ -633,7 +555,6 @@ namespace Trecs.Tests
 
             // Slots 1..4 are unused; one of them should come back from the next fresh Alloc.
             var fresh = store.Alloc(32, 8, typeHash: 0);
-            store.FlushPendingOperations();
             NativeChunkStoreResolver.DecodeHandle(fresh, out var idx, out _);
             NAssert.LessOrEqual(
                 idx,
@@ -664,7 +585,6 @@ namespace Trecs.Tests
             // A plain Alloc must NOT hand out slot 5. The stale free-list entry should
             // be popped and discarded, with the next genuinely-free slot returned instead.
             var fresh = store.Alloc(32, 8, typeHash: 0);
-            store.FlushPendingOperations();
             NativeChunkStoreResolver.DecodeHandle(fresh, out var idx, out _);
             NAssert.AreNotEqual(
                 5u,
@@ -718,9 +638,7 @@ namespace Trecs.Tests
                 var addr = new IntPtr(raw);
 
                 var h1 = store.AllocExternal(addr, size, alignment, typeHash: 0);
-                store.FlushPendingOperations();
                 store.Free(h1);
-                store.FlushPendingOperations();
                 // Chunk store has called AllocatorManager.Free on addr by now; in real use
                 // the address would be invalid. For this test we don't dereference — we just
                 // verify the tracking set correctly drops the entry and a re-register works.
@@ -741,14 +659,6 @@ namespace Trecs.Tests
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var handle = store.Alloc(64, 8, typeHash: 0, out var address);
-            NAssert.AreEqual(address, store.ResolveEntry(handle).Address);
-        }
-
-        [Test]
-        public void AllocImmediate_AddressOutOverload_MatchesResolveEntry()
-        {
-            using var store = new NativeChunkStore(TrecsLog.Default);
-            var handle = store.AllocImmediate(64, 8, typeHash: 0, out var address);
             NAssert.AreEqual(address, store.ResolveEntry(handle).Address);
         }
 
@@ -785,12 +695,9 @@ namespace Trecs.Tests
             using var store = new NativeChunkStore(TrecsLog.Default);
 
             var h1 = store.Alloc(64, 8, typeHash: 111);
-            store.FlushPendingOperations();
             store.Free(h1);
-            store.FlushPendingOperations();
 
             var h2 = store.Alloc(64, 8, typeHash: 222);
-            store.FlushPendingOperations();
 
             using var addrSink = new NativeReference<long>(Allocator.TempJob);
             using var hashSink = new NativeReference<int>(Allocator.TempJob);
@@ -813,6 +720,156 @@ namespace Trecs.Tests
                 2,
                 "Generation should have advanced past the freed h1"
             );
+        }
+
+        // ─── Concurrent Alloc/Free vs Burst resolve ─────────────
+
+        [BurstCompile]
+        struct ResolveLoopJob : IJob
+        {
+            [ReadOnly]
+            public NativeChunkStoreResolver Resolver;
+
+            [ReadOnly]
+            public NativeArray<PtrHandle> Handles;
+            public int Iterations;
+            public NativeReference<int> SuccessCount;
+            public NativeReference<int> FailureCount;
+            public NativeReference<int> TornCount;
+
+            public void Execute()
+            {
+                int successes = 0;
+                int failures = 0;
+                int torn = 0;
+                for (int iter = 0; iter < Iterations; iter++)
+                {
+                    for (int i = 0; i < Handles.Length; i++)
+                    {
+                        if (Resolver.TryResolveEntry(Handles[i], out var entry))
+                        {
+                            // Each pre-flushed handle was allocated with TypeHash =
+                            // (slot index + 1) and Generation = 1. Anything else means
+                            // a torn struct read or wrong-slot resolve.
+                            if (
+                                entry.InUse != 1
+                                || entry.Generation != 1
+                                || entry.TypeHash != i + 1
+                            )
+                            {
+                                torn++;
+                            }
+                            else
+                            {
+                                successes++;
+                            }
+                        }
+                        else
+                        {
+                            failures++;
+                        }
+                    }
+                }
+                SuccessCount.Value = successes;
+                FailureCount.Value = failures;
+                TornCount.Value = torn;
+            }
+        }
+
+        [Test]
+        public void Resolver_ConcurrentWith_MainThreadAllocAndFree_Is_Safe()
+        {
+            using var store = new NativeChunkStore(TrecsLog.Default);
+
+            const int PreallocCount = 256;
+            const int JobIterations = 4000;
+
+            // Pre-allocate a stable set of handles. Each gets typeHash = slot index + 1
+            // so the job can distinguish torn reads from clean resolves.
+            var seed = new PtrHandle[PreallocCount];
+            for (int i = 0; i < PreallocCount; i++)
+            {
+                seed[i] = store.Alloc(64, 8, typeHash: i + 1);
+            }
+            using var stableHandles = new NativeArray<PtrHandle>(seed, Allocator.TempJob);
+
+            using var successCount = new NativeReference<int>(Allocator.TempJob);
+            using var failureCount = new NativeReference<int>(Allocator.TempJob);
+            using var tornCount = new NativeReference<int>(Allocator.TempJob);
+
+            var jobHandle = new ResolveLoopJob
+            {
+                Resolver = store.Resolver,
+                Handles = stableHandles,
+                Iterations = JobIterations,
+                SuccessCount = successCount,
+                FailureCount = failureCount,
+                TornCount = tornCount,
+            }.Schedule();
+
+            // Concurrent main-thread churn while the job is resolving:
+            //  - Pre-flush Alloc + Free cycles (exercises the fast-path Free that
+            //    writes the side-table slot's generation).
+            //  - Mixed deferred frees (Alloc, Flush, hold, then Free → _pendingFrees).
+            //  - Enough fresh allocs to cross a chunk boundary (>1024 slots) so the
+            //    new-chunk publish path runs while the job is reading.
+            var rng = new Random(12345);
+            var deferredHandles = new List<PtrHandle>(64);
+            for (int i = 0; i < 2000; i++)
+            {
+                var h = store.Alloc(rng.Next(8, 200), 8, typeHash: 0);
+                if ((i & 7) == 0)
+                {
+                    // Promote to side-table, free later through deferred path.
+                    deferredHandles.Add(h);
+                }
+                else
+                {
+                    // Pre-flush fast-path free.
+                    store.Free(h);
+                }
+
+                if (deferredHandles.Count > 50)
+                {
+                    store.Free(deferredHandles[0]);
+                    deferredHandles.RemoveAt(0);
+                }
+            }
+
+            // Force a fresh-chunk allocation during the job by burning past slot 1024.
+            var crossingHandles = new List<PtrHandle>(1200);
+            for (int i = 0; i < 1200; i++)
+            {
+                crossingHandles.Add(store.Alloc(32, 8, typeHash: 0));
+            }
+
+            jobHandle.Complete();
+
+            NAssert.AreEqual(
+                0,
+                tornCount.Value,
+                "No torn reads of stable handles should ever be observed"
+            );
+            NAssert.AreEqual(
+                0,
+                failureCount.Value,
+                "Stable pre-flushed handles should always resolve"
+            );
+            NAssert.AreEqual(PreallocCount * JobIterations, successCount.Value);
+
+            // Cleanup so Dispose doesn't warn about leaks.
+            foreach (var h in deferredHandles)
+            {
+                store.Free(h);
+            }
+            foreach (var h in crossingHandles)
+            {
+                store.Free(h);
+            }
+            foreach (var h in stableHandles)
+            {
+                store.Free(h);
+            }
         }
     }
 }

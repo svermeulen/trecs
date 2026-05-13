@@ -65,7 +65,6 @@ namespace Trecs.Tests
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
 
             var ptr = heap.Alloc<int>(7);
-            heap.FlushPendingOperations();
 
             using var sinkA = new NativeReference<int>(Allocator.TempJob);
             using var sinkB = new NativeReference<int>(Allocator.TempJob);
@@ -78,7 +77,6 @@ namespace Trecs.Tests
             NAssert.AreEqual(7, sinkB.Value);
 
             heap.DisposeEntry(ptr.Handle.Value);
-            heap.FlushPendingOperations();
             heap.Dispose();
             frameScopedHeap.Dispose();
             chunkStore.Dispose();
@@ -90,7 +88,6 @@ namespace Trecs.Tests
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
 
             var ptr = heap.Alloc<int>(0);
-            heap.FlushPendingOperations();
 
             var first = new WriteJob
             {
@@ -109,7 +106,6 @@ namespace Trecs.Tests
             {
                 first.Complete();
                 heap.DisposeEntry(ptr.Handle.Value);
-                heap.FlushPendingOperations();
                 heap.Dispose();
                 frameScopedHeap.Dispose();
                 chunkStore.Dispose();
@@ -122,7 +118,6 @@ namespace Trecs.Tests
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
 
             var ptr = heap.Alloc<int>(0);
-            heap.FlushPendingOperations();
 
             using var sink = new NativeReference<int>(Allocator.TempJob);
             var reader = new ReadJob { Read = heap.Resolver.Read(in ptr), Sink = sink }.Schedule();
@@ -138,7 +133,6 @@ namespace Trecs.Tests
             {
                 reader.Complete();
                 heap.DisposeEntry(ptr.Handle.Value);
-                heap.FlushPendingOperations();
                 heap.Dispose();
                 frameScopedHeap.Dispose();
                 chunkStore.Dispose();
@@ -157,7 +151,6 @@ namespace Trecs.Tests
 
             var ptr = heap.Alloc<int>(0);
             var aliasOfPtr = ptr;
-            heap.FlushPendingOperations();
 
             var first = new WriteJob
             {
@@ -180,7 +173,6 @@ namespace Trecs.Tests
             {
                 first.Complete();
                 heap.DisposeEntry(ptr.Handle.Value);
-                heap.FlushPendingOperations();
                 heap.Dispose();
                 frameScopedHeap.Dispose();
                 chunkStore.Dispose();
@@ -204,7 +196,6 @@ namespace Trecs.Tests
             // ClearAtOrBeforeFrame — jobs scheduled before the flush may still
             // be reading. After flush, the handle's Release call drains any
             // outstanding jobs first.
-            frameScopedHeap.FlushPendingOperations();
 
             heap.Dispose();
             frameScopedHeap.Dispose();
@@ -217,9 +208,7 @@ namespace Trecs.Tests
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
 
             var ptr = heap.Alloc<int>(42);
-            heap.FlushPendingOperations();
             heap.DisposeEntry(ptr.Handle.Value);
-            heap.FlushPendingOperations();
 
             NAssert.Throws<TrecsException>(() => heap.Resolver.Read(in ptr));
 
@@ -237,7 +226,6 @@ namespace Trecs.Tests
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
 
             var ptr = heap.Alloc<int>(42);
-            heap.FlushPendingOperations();
 
             NAssert.Throws<TrecsException>(() =>
             {
@@ -246,7 +234,6 @@ namespace Trecs.Tests
             });
 
             heap.DisposeEntry(ptr.Handle.Value);
-            heap.FlushPendingOperations();
             heap.Dispose();
             frameScopedHeap.Dispose();
             chunkStore.Dispose();
@@ -258,7 +245,6 @@ namespace Trecs.Tests
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
 
             var ptr = heap.Alloc<int>(42);
-            heap.FlushPendingOperations();
 
             NAssert.Throws<TrecsException>(() =>
             {
@@ -267,7 +253,6 @@ namespace Trecs.Tests
             });
 
             heap.DisposeEntry(ptr.Handle.Value);
-            heap.FlushPendingOperations();
             heap.Dispose();
             frameScopedHeap.Dispose();
             chunkStore.Dispose();
@@ -280,7 +265,6 @@ namespace Trecs.Tests
             // held past Dispose carry a released handle and throw on next access.
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
             var ptr = heap.Alloc<int>(7);
-            heap.FlushPendingOperations();
 
             var read = heap.Resolver.Read(in ptr);
             NAssert.AreEqual(7, read.Value); // works while alive
@@ -324,7 +308,6 @@ namespace Trecs.Tests
             {
                 first.Complete();
                 frameScopedHeap.ClearAtOrBeforeFrame(0);
-                frameScopedHeap.FlushPendingOperations();
                 heap.Dispose();
                 frameScopedHeap.Dispose();
                 chunkStore.Dispose();
@@ -338,7 +321,6 @@ namespace Trecs.Tests
             var ptr = frameScopedHeap.Alloc<int>(frame: 0, value: 42);
 
             frameScopedHeap.ClearAtOrBeforeFrame(0);
-            frameScopedHeap.FlushPendingOperations();
 
             // The frame-scoped entry's safety handle was released at flush; the
             // resolver no longer has the entry, so Read throws TrecsException.
@@ -350,32 +332,27 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void PreFlushDispose_WithInFlightJob_DrainsBeforeRelease()
+        public void DisposeEntry_WithInFlightJob_ThrowsInEditor()
         {
-            // Regression for the pre-flush dispose path: a wrapper opened via the
-            // main-thread pending-add path can still be sitting in a scheduled job.
-            // The dispose must wait for that job to complete before releasing the
-            // safety handle (EnforceAll...), not just release immediately, otherwise
-            // the running job races with handle invalidation.
+            // Under the immediate-Free model (matches NativeList<T>.Dispose() semantics),
+            // freeing a handle while a Burst job still holds the safety handle throws
+            // InvalidOperationException via CheckDeallocateAndThrow. The caller is
+            // responsible for completing in-flight jobs before disposing the handle.
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
 
             var ptr = heap.Alloc<int>(123);
-            // Note: NOT flushed — entry is in _pendingAdds, not yet in _allEntries.
 
             using var sink = new NativeReference<int>(Allocator.TempJob);
-            // Main-thread Read on a pending entry hands out a wrapper carrying the
-            // same per-allocation safety handle the resolver-side wrappers would.
             var read = heap.Read(in ptr);
             var job = new ReadJob { Read = read, Sink = sink }.Schedule();
 
-            // DisposeEntry on a pending entry takes the fast-path that releases the
-            // safety handle directly. EnforceAll... must drain the in-flight job
-            // first; otherwise this throws "you can't dispose, jobs still hold it."
-            heap.DisposeEntry(ptr.Handle.Value);
+            // DisposeEntry should throw because the job is still using the safety handle.
+            NAssert.Throws<InvalidOperationException>(() => heap.DisposeEntry(ptr.Handle.Value));
 
-            // The job was drained by DisposeEntry; .Complete() is a no-op for it.
+            // Correct pattern: complete the job first, then dispose.
             job.Complete();
             NAssert.AreEqual(123, sink.Value);
+            heap.DisposeEntry(ptr.Handle.Value);
 
             heap.Dispose();
             frameScopedHeap.Dispose();

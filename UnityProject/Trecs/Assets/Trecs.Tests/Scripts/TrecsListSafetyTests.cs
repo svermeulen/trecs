@@ -51,7 +51,12 @@ namespace Trecs.Tests
             }
         }
 
-        static void Flush(TrecsListHeap heap) => heap.FlushPendingOperations();
+        // Vestigial helper from the deferred-flush era; immediate-write model no longer
+        // needs a flush boundary. Kept as a no-op to avoid touching every call site.
+        static void Flush(TrecsListHeap heap)
+        {
+            _ = heap;
+        }
 
         [Test]
         public void TwoReaders_OnSameList_NoConflict()
@@ -204,28 +209,27 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void PreFlushDispose_WithInFlightJob_DrainsBeforeRelease()
+        public void DisposeEntry_WithInFlightJob_ThrowsInEditor()
         {
-            // Regression for the pre-flush dispose path: a wrapper opened via the
-            // main-thread pending-add path can still be sitting in a scheduled job.
-            // The dispose must wait for that job to complete before releasing the
-            // safety handle, otherwise the running job races with handle invalidation.
+            // Under the immediate-Free model, disposing a handle while a Burst job
+            // still holds the safety handle throws InvalidOperationException via
+            // CheckDeallocateAndThrow. Caller must complete in-flight jobs first.
             var (heap, chunkStore) = CreateHeap();
             var list = heap.Alloc<int>(8);
-            // Pre-populate before flushing so the read job has something to read.
             var w = heap.Write(in list);
             w.Add(456);
-            // Note: NOT flushed — entry is in _pendingAdds, not yet in _allEntries.
 
             using var sink = new NativeReference<int>(Allocator.TempJob);
             var read = heap.Read(in list);
             var job = new ReadJob { Read = read, Sink = sink }.Schedule();
 
-            heap.DisposeEntry(list.Handle.Value); // pre-flush path
+            // Job is still running with read's safety handle scheduled. Dispose must throw.
+            NAssert.Throws<InvalidOperationException>(() => heap.DisposeEntry(list.Handle.Value));
 
-            // DisposeEntry drained the job; .Complete() is a no-op.
+            // Correct pattern: complete the job first, then dispose.
             job.Complete();
             NAssert.AreEqual(456, sink.Value);
+            heap.DisposeEntry(list.Handle.Value);
 
             heap.Dispose();
             chunkStore.Dispose();

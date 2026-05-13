@@ -42,13 +42,6 @@ namespace Trecs
 
         public HeapAccessor Heap { get; }
 
-        /// <summary>
-        /// The single <see cref="TrecsLog"/> instance shared by this world and every
-        /// framework class it owns. User systems should cache this in <c>Ready()</c>
-        /// and use it for all logging.
-        /// </summary>
-        public TrecsLog Log => _world.Log;
-
         internal WorldAccessor(
             int id,
             World world,
