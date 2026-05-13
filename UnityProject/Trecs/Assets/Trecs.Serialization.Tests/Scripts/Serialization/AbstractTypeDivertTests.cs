@@ -1,5 +1,6 @@
 using System;
 using NUnit.Framework;
+using Trecs.Serialization.Internal;
 using Assert = NUnit.Framework.Assert;
 
 namespace Trecs.Serialization.Tests

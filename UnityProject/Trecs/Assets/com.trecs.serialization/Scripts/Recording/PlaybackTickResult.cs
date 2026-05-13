@@ -1,4 +1,4 @@
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Result from a single <see cref="BundlePlayer.Tick"/> call. When the

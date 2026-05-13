@@ -91,8 +91,6 @@ internal static class TrecsStubs
 
         namespace Trecs
         {
-            using Trecs.Internal;
-
             // Marker interfaces consumed by EntityComponentGenerator and
             // AspectGenerator base-list scanning.
             public interface IEntityComponent { }
@@ -110,9 +108,23 @@ internal static class TrecsStubs
                 public static GroupIndex Null => default;
             }
 
+            public readonly struct EntityIndex
+            {
+                public readonly int Index;
+                public readonly GroupIndex GroupIndex;
+                public static EntityIndex Null => default;
+                public bool IsNull => false;
+
+                public EntityIndex(int index, GroupIndex group) { Index = index; GroupIndex = group; }
+
+                // Aspect ctors call `_entityIndex.WithIndex(...)` to advance the index field
+                // during iteration without rebuilding the GroupIndex.
+                public EntityIndex WithIndex(int index) => new EntityIndex(index, GroupIndex);
+            }
+
             public readonly struct EntityHandle
             {
-                public readonly int Id;
+                public readonly int UniqueId;
                 public readonly int Version;
                 public static EntityHandle Null => default;
                 public bool IsNull => false;
@@ -121,11 +133,6 @@ internal static class TrecsStubs
                 public EntityIndex ToIndex(WorldAccessor world) => default;
                 public EntityIndex ToIndex(NativeWorldAccessor world) => default;
             }
-
-            // EntityAccessor — main-thread live entity reference. Mirrors the real
-            // type's `ref struct` shape so test scenarios that try to box / capture /
-            // store one would surface as compile errors here too.
-            public readonly ref struct EntityAccessor { }
 
             public readonly struct Tag { }
             public readonly struct TagSet
@@ -194,42 +201,35 @@ internal static class TrecsStubs
             [System.AttributeUsage(System.AttributeTargets.Field, AllowMultiple = false)]
             public sealed class ConstantAttribute : System.Attribute { }
 
-            // InputAttribute mirrors the runtime ctor: (MissingInputBehavior).
+            // InputAttribute mirrors the runtime ctor: (MissingInputBehavior, bool warnOnMissing = false).
             // The parser reads the enum arg via ConstructorArguments[0]; signature has to match.
             [System.AttributeUsage(System.AttributeTargets.Field, AllowMultiple = false)]
             public sealed class InputAttribute : System.Attribute
             {
                 public MissingInputBehavior OnMissing { get; }
+                public bool WarnOnMissing { get; }
 
-                public InputAttribute(MissingInputBehavior onMissing)
+                public InputAttribute(MissingInputBehavior onMissing, bool warnOnMissing = false)
                 {
                     OnMissing = onMissing;
+                    WarnOnMissing = warnOnMissing;
                 }
             }
 
             // Built-in tag/template chain used to mark the singleton globals entity.
             // TemplateAttributeParser.IsGlobalsTemplate looks up
-            // ITagged<TrecsTags.Globals> by name + containing-type name, so the
+            // IHasTags<TrecsTags.Globals> by name + containing-type name, so the
             // shapes here just need to satisfy that lookup.
             public static class TrecsTags
             {
                 public struct Globals : ITag { }
             }
 
-            public interface ITagged<T1> where T1 : struct, ITag { }
-            public interface ITagged<T1, T2> where T1 : struct, ITag where T2 : struct, ITag { }
-            public interface ITagged<T1, T2, T3>
+            public interface IHasTags<T1> where T1 : struct, ITag { }
+            public interface IHasTags<T1, T2> where T1 : struct, ITag where T2 : struct, ITag { }
+            public interface IHasTags<T1, T2, T3>
                 where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
-            public interface ITagged<T1, T2, T3, T4>
-                where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
-
-            // Partition-dimension declarations. The source generator inspects these on
-            // template classes to compute cross-product partitions and dim metadata.
-            public interface IPartitionedBy<T1> where T1 : struct, ITag { }
-            public interface IPartitionedBy<T1, T2> where T1 : struct, ITag where T2 : struct, ITag { }
-            public interface IPartitionedBy<T1, T2, T3>
-                where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
-            public interface IPartitionedBy<T1, T2, T3, T4>
+            public interface IHasTags<T1, T2, T3, T4>
                 where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
 
             // Iteration / job attributes consumed by ForEach / Job / RunOnce generators.
@@ -241,8 +241,6 @@ internal static class TrecsStubs
                 public System.Type[]? Tags { get; set; }
                 public System.Type? Tag { get; set; }
                 public System.Type? Set { get; set; }
-                public System.Type? Without { get; set; }
-                public System.Type[]? Withouts { get; set; }
                 public bool MatchByComponents { get; set; }
                 public ForEachEntityAttribute() { }
                 public ForEachEntityAttribute(params System.Type[] tags) { Tags = tags; }
@@ -330,8 +328,8 @@ internal static class TrecsStubs
             // ----- Aspect / ForEach / RunOnce surface -----
             // Aspects emit substantial machinery that touches a wide slice of the runtime:
             // component buffer indexing, the full QueryBuilder DSL, dense + sparse slice
-            // iteration, NativeFactory for cross-entity Burst lookup, and SetTag /
-            // UnsetTag / Set surface routed through both WorldAccessor and NativeWorldAccessor.
+            // iteration, NativeFactory for cross-entity Burst lookup, and MoveTo / SetAdd /
+            // SetRemove surface routed through both WorldAccessor and NativeWorldAccessor.
             // The stubs below are body-empty / default-returning; they exist to satisfy
             // C# name and shape resolution, not to actually run.
 
@@ -416,41 +414,14 @@ internal static class TrecsStubs
             // of these appears in a main-thread iteration method. Real types live in
             // com.trecs.core/Scripts/Native/.
             public readonly struct NativeSetRead<T> where T : struct, IEntitySet { }
-            public readonly struct NativeSetCommandBuffer<T>
-                where T : struct, IEntitySet
-            {
-                public void Add(EntityIndex entityIndex) { }
-                public void Add(EntityHandle entityHandle, in NativeWorldAccessor world) { }
-                public void Remove(EntityIndex entityIndex) { }
-                public void Remove(EntityHandle entityHandle, in NativeWorldAccessor world) { }
-                public void Clear() { }
-            }
+            public readonly struct NativeSetWrite<T> where T : struct, IEntitySet { }
 
             // Main-thread set accessors. ParameterClassifier recognizes these in
-            // [WrapAsJob] methods and emits TRECS098. SetAccessor is the gateway
-            // exposing .Defer / .Read / .Write. Real types live in com.trecs.core/Scripts/Sets/.
-            public readonly struct SetAccessor<T> where T : struct, IEntitySet
-            {
-                public SetDefer<T> Defer => default;
-                public SetRead<T> Read => default;
-                public SetWrite<T> Write => default;
-            }
-            public readonly struct SetDefer<T> where T : struct, IEntitySet
-            {
-                public void Add(EntityIndex entityIndex) { }
-                public void Remove(EntityIndex entityIndex) { }
-                public void Clear() { }
-            }
+            // [WrapAsJob] methods and emits TRECS098. SetAccessor is iterated; SetRead
+            // is read-only. Real types live in com.trecs.core/Scripts/Sets/.
+            public readonly struct SetAccessor<T> where T : struct, IEntitySet { }
             public readonly struct SetRead<T> where T : struct, IEntitySet { }
             public readonly struct SetWrite<T> where T : struct, IEntitySet { }
-
-            // NativeUniquePtr<T> — minimal shape for NativeUniquePtrCopyAnalyzer
-            // (TRECS110 / TRECS111). The analyzer matches by name + namespace + arity,
-            // not by member signatures, so the body just needs to be a generic struct.
-            // Real type lives at Packages/com.trecs.core/Scripts/Heap/NativeUniquePtr.cs.
-            public readonly struct NativeUniquePtr<T> where T : unmanaged
-            {
-            }
 
             // Slice types yielded by the dense / sparse iterators below.
             public readonly struct DenseGroupSlice
@@ -555,7 +526,7 @@ internal static class TrecsStubs
 
             // WorldAccessor — declared as a class so AutoSystemGenerator's emitted
             // `WorldAccessor _world;` field and `WorldAccessor World => _world;` property
-            // resolve. Aspect machinery additionally needs Query/ComponentBuffer/SetTag/Set;
+            // resolve. Aspect machinery additionally needs Query/ComponentBuffer/MoveTo/Set;
             // job machinery needs the *ForJob accessors that return tuples (the buffer +
             // its current count for jobs that read the count).
             public class WorldAccessor
@@ -564,11 +535,12 @@ internal static class TrecsStubs
                 public ComponentBufferAccessor<T> ComponentBuffer<T>(GroupIndex group)
                     where T : unmanaged, IEntityComponent => default;
 
-                public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
-                public void UnsetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
-
-                // Set gateway: Set<T>() returns SetAccessor<T> with .Defer / .Read / .Write properties.
-                public SetAccessor<TSet> Set<TSet>() where TSet : struct, IEntitySet => default;
+                public void MoveTo<T1>(EntityIndex entityIndex) where T1 : struct, ITag { }
+                public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
+                public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
+                public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
+                public void SetAdd<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
+                public void SetRemove<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
 
                 // Job-scheduling surface (real impls live in com.trecs.core/Scripts/Jobs).
                 public Trecs.Internal.JobScheduler GetJobSchedulerForJob() => default!;
@@ -602,31 +574,6 @@ internal static class TrecsStubs
                 // AutoJobGenerator's ScheduleParallel shim calls this when forwarding into
                 // a Burst job that takes `in NativeWorldAccessor`.
                 public NativeWorldAccessor ToNative() => default;
-
-                // Per-entity helpers used by source-gen-emitted iteration code when the
-                // user takes `EntityHandle` / `EntityAccessor` parameters. The real
-                // versions live in WorldAccessorInternalExtensions (Trecs.Internal) but
-                // generators emit `world.GetEntityHandle(...)` / `world.Entity(...)`
-                // and the C# compiler resolves them either way.
-                public EntityHandle GetEntityHandle(EntityIndex entityIndex) => default;
-                public EntityAccessor Entity(EntityIndex entityIndex) => default;
-
-                // Job-side per-group EntityHandle buffer. Source-gen-emitted job code
-                // calls `__world.GetEntityHandleBufferForJob(group)` once per group at
-                // schedule time and stashes the result in a hidden field; the inner
-                // Execute(int i) shim then dereferences `__EntityHandles[i]` to pass the
-                // handle into a user method that took an EntityHandle parameter.
-                public NativeEntityHandleBuffer GetEntityHandleBufferForJob(GroupIndex group) =>
-                    default;
-            }
-
-            // NativeEntityHandleBuffer — read-only per-group view. Source-gen-emitted
-            // job structs hold one as a hidden field, indexed per-iteration to materialize
-            // the user's EntityHandle parameter.
-            public readonly struct NativeEntityHandleBuffer
-            {
-                public EntityHandle this[int index] => default;
-                public int Length => 0;
             }
 
             public class WorldInfo
@@ -644,12 +591,14 @@ internal static class TrecsStubs
                     System.Linq.Enumerable.Empty<GroupIndex>();
             }
 
-            // NativeWorldAccessor — Burst-compatible value-type counterpart. Aspect Set
-            // helpers also expose `(in NativeWorldAccessor)` overloads.
+            // NativeWorldAccessor — Burst-compatible value-type counterpart. Aspect MoveTo /
+            // Set helpers also expose `(in NativeWorldAccessor)` overloads.
             public readonly struct NativeWorldAccessor
             {
-                public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
-                public void UnsetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
+                public void MoveTo<T1>(EntityIndex entityIndex) where T1 : struct, ITag { }
+                public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
+                public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
+                public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
                 public void SetAdd<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
                 public void SetRemove<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
             }
@@ -669,9 +618,11 @@ internal static class TrecsStubs
                 where T : unmanaged, IEntityComponent
             {
                 public ComponentDeclaration(
+                    bool? fixedUpdateOnly,
                     bool? variableUpdateOnly,
                     bool? isInput,
                     object? inputFrameBehaviour,
+                    bool? warnOnMissingInput,
                     bool? isConstant,
                     bool? isInterpolated,
                     object? defaultValue
@@ -686,9 +637,7 @@ internal static class TrecsStubs
                     TagSet[] partitions,
                     IComponentDeclaration[] localComponentDeclarations,
                     Tag[] localTags,
-                    bool localVariableUpdateOnly = false,
-                    TagSet[] dimensions = null,
-                    bool isAbstract = false
+                    bool localVariableUpdateOnly = false
                 ) { }
             }
 
@@ -717,7 +666,7 @@ internal static class TrecsStubs
                 public static TagSet Value { get; }
             }
 
-            public enum MissingInputBehavior { Reset, Retain }
+            public enum MissingInputBehavior { ResetToDefault, KeepLast }
 
             // ----- InterpolatorInstaller surface -----
             // InterpolatorInstallerGenerator emits a WorldBuilder extension method
@@ -763,36 +712,17 @@ internal static class TrecsStubs
                 public WorldBuilder AddInterpolatedPreviousSaver<T>(InterpolatedPreviousSaver<T> saver)
                     where T : unmanaged, IEntityComponent => this;
                 public WorldBuilder AddSystem(ISystem system) => this;
-                public WorldBuilder AddTemplate(Template template) => this;
-                public WorldBuilder AddTemplates(System.Collections.Generic.IEnumerable<Template> templates) => this;
             }
         }
 
         namespace Trecs.Internal
         {
-            // EntityIndex lives in Trecs.Internal — the public Trecs API uses EntityHandle.
-            // The type stays public so source-generated code in user assemblies can reference it.
-            public readonly struct EntityIndex
-            {
-                public readonly int Index;
-                public readonly GroupIndex GroupIndex;
-                public static EntityIndex Null => default;
-                public bool IsNull => false;
-
-                public EntityIndex(int index, GroupIndex group) { Index = index; GroupIndex = group; }
-
-                // Aspect ctors call `_entityIndex.WithIndex(...)` to advance the index field
-                // during iteration without rebuilding the GroupIndex.
-                public EntityIndex WithIndex(int index) => new EntityIndex(index, GroupIndex);
-            }
-
             // Real signature lives at Packages/com.trecs.core/Scripts/Util/UnmanagedUtil.cs.
             // Generated equality / operator overloads in EntityComponentGenerator
             // call BlittableEquals; the body doesn't matter for compile-cleanliness tests.
             public static class UnmanagedUtil
             {
                 public static bool BlittableEquals<T>(in T lhs, in T rhs) where T : unmanaged => false;
-                public static int BlittableHashCode<T>(in T value) where T : unmanaged => 0;
             }
 
             // ISystemInternal — internal extension point that AutoSystemGenerator emits an
@@ -802,7 +732,6 @@ internal static class TrecsStubs
             {
                 Trecs.WorldAccessor World { get; set; }
                 void Ready();
-                void Shutdown();
             }
 
             // Assert.That — generated code (e.g. AutoSystemGenerator's World setter, aspect

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Tracks every <see cref="TrecsGameStateController"/> currently alive (one

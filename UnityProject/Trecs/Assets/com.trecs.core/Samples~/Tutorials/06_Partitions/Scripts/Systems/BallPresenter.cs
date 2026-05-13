@@ -1,0 +1,47 @@
+using UnityEngine;
+
+namespace Trecs.Samples.Partitions
+{
+    /// <summary>
+    /// Syncs ball positions to GameObjects and tints active balls differently
+    /// from resting ones. Uses two aspects with different tag constraints
+    /// to iterate each partition separately.
+    /// </summary>
+    [ExecuteIn(SystemPhase.Presentation)]
+    [ExecuteAfter(typeof(WakeUpSystem))]
+    public partial class BallPresenter : ISystem
+    {
+        readonly RenderableGameObjectManager _goManager;
+
+        public BallPresenter(RenderableGameObjectManager goManager)
+        {
+            _goManager = goManager;
+        }
+
+        [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
+        void RenderActive(in ActiveBallView ball)
+        {
+            var go = _goManager.Resolve(ball.GameObjectId);
+            go.transform.position = (Vector3)ball.Position;
+            go.GetComponent<Renderer>().material.color = Color.Lerp(Color.yellow, Color.red, 0.5f);
+        }
+
+        [ForEachEntity(typeof(BallTags.Ball), Without = typeof(BallTags.Active))]
+        void RenderResting(in RestingBallView ball)
+        {
+            var go = _goManager.Resolve(ball.GameObjectId);
+            go.transform.position = (Vector3)ball.Position;
+            go.GetComponent<Renderer>().material.color = Color.gray;
+        }
+
+        public void Execute()
+        {
+            RenderActive();
+            RenderResting();
+        }
+
+        partial struct ActiveBallView : IAspect, IRead<Position, GameObjectId> { }
+
+        partial struct RestingBallView : IAspect, IRead<Position, GameObjectId> { }
+    }
+}

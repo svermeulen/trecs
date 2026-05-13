@@ -28,7 +28,6 @@ A progressive tutorial series plus full game samples. Each builds on the previou
 |---|--------|-------------|
 | 11 | [Snake](11-snake.md) | Complete grid-based game with input handling and recording/playback |
 | 12 | [Feeding Frenzy Benchmark](12-feeding-frenzy-benchmark.md) | Performance benchmark comparing partition approaches and iteration styles |
-| 13 | [Save Game](13-save-game.md) | Sokoban puzzle demonstrating snapshot-based save/load slots |
 
 ## Running the samples
 

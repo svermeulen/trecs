@@ -1,4 +1,4 @@
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     public sealed class StringSerializer : ISerializer<string>
     {

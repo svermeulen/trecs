@@ -25,7 +25,7 @@ namespace Trecs.SourceGen.Tests;
 /// <para><see cref="RunAnalyzers"/> — runs one or more <see cref="DiagnosticAnalyzer"/>s
 /// against an in-memory compilation via Roslyn's <see cref="CompilationWithAnalyzers"/> and
 /// returns the analyzer-emitted diagnostics. Used by the diagnostic tests for descriptors
-/// emitted by analyzers (TRECS070, TRECS110, TRECS111) rather than incremental generators.</para>
+/// emitted by analyzers (e.g. TRECS070) rather than incremental generators.</para>
 /// </summary>
 internal static class GeneratorTestHarness
 {
@@ -95,11 +95,10 @@ internal static class GeneratorTestHarness
     /// (filtered to the analyzers' supported descriptor IDs) — base compile diagnostics are
     /// not surfaced, since analyzer-focused tests assert on the analyzer's own output.
     ///
-    /// <para>Some of these diagnostics (TRECS110, TRECS111) are emitted with severity
-    /// <see cref="DiagnosticSeverity.Error"/>, which would cause Roslyn to fail the
-    /// compilation if the analyzer were plugged in via the IDE. Tests intentionally feed
-    /// invalid input to assert the analyzer fires, so we do not assert on absence of errors
-    /// here.</para>
+    /// <para>Analyzer-emitted diagnostics include severity <see cref="DiagnosticSeverity.Error"/>
+    /// entries, which would cause Roslyn to fail the compilation if the analyzer were plugged
+    /// in via the IDE. Tests intentionally feed invalid input to assert the analyzer fires, so
+    /// we do not assert on absence of errors here.</para>
     /// </summary>
     public static ImmutableArray<Diagnostic> RunAnalyzers(
         DiagnosticAnalyzer[] analyzers,

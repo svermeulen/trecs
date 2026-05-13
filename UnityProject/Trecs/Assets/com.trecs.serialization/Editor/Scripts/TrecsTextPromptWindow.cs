@@ -2,7 +2,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Tiny modal text-input dialog. Returns null on cancel, the trimmed text

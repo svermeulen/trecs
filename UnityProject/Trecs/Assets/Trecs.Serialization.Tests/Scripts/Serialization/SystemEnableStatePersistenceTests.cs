@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using NUnit.Framework;
-using Trecs.Internal;
+using Trecs.Serialization.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Serialization.Tests

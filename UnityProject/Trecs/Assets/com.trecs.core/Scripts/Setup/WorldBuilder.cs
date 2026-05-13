@@ -267,14 +267,19 @@ namespace Trecs
             var worldInfo = new WorldInfo(_templates, _sets);
 
             var uniqueHeap = new UniqueHeap(_poolManager);
-            var blobCache = new BlobCache(_blobStores, _blobCacheSettings);
+            var nativeBlobBoxPool = new NativeBlobBoxPool();
+            var blobCache = new BlobCache(_blobStores, _blobCacheSettings, nativeBlobBoxPool);
             var sharedHeap = new SharedHeap(blobCache);
             var nativeSharedHeap = new NativeSharedHeap(blobCache);
             var frameScopedUniqueHeap = new FrameScopedUniqueHeap(_poolManager);
             var frameScopedSharedHeap = new FrameScopedSharedHeap(blobCache);
             var nativeFrameScopedSharedHeap = new FrameScopedNativeSharedHeap(blobCache);
-            var nativeUniqueHeap = new NativeUniqueHeap();
-            var frameScopedNativeUniqueHeap = new FrameScopedNativeUniqueHeap();
+            var nativeUniqueChunkStore = new NativeChunkStore();
+            var nativeUniqueHeap = new NativeUniqueHeap(nativeUniqueChunkStore);
+            var frameScopedNativeUniqueHeap = new FrameScopedNativeUniqueHeap(
+                nativeUniqueChunkStore
+            );
+            var trecsListHeap = new TrecsListHeap(nativeUniqueChunkStore);
 
             var accessorRegistry = new WorldAccessorRegistry();
 
@@ -318,6 +323,7 @@ namespace Trecs
                 nativeSharedHeap,
                 nativeUniqueHeap,
                 frameScopedNativeUniqueHeap,
+                trecsListHeap,
                 jobScheduler
             );
 
@@ -350,6 +356,8 @@ namespace Trecs
                 nativeFrameScopedSharedHeap: nativeFrameScopedSharedHeap,
                 nativeUniqueHeap: nativeUniqueHeap,
                 frameScopedNativeUniqueHeap: frameScopedNativeUniqueHeap,
+                nativeUniqueChunkStore: nativeUniqueChunkStore,
+                trecsListHeap: trecsListHeap,
                 accessorRegistry: accessorRegistry,
                 entitySubmitter: submitter,
                 entitiesDb: entityQuerier,
@@ -361,6 +369,7 @@ namespace Trecs
                 sharedHeap: sharedHeap,
                 settings: settings,
                 blobCache: blobCache,
+                nativeBlobBoxPool: nativeBlobBoxPool,
                 interpolatedPreviousSaverManager: interpolatedPreviousSaverManager,
                 componentStore: componentStore,
                 systems: _systems

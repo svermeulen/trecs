@@ -139,7 +139,7 @@ Variable-cadence phases (`EarlyPresentation` / `Presentation` / `LatePresentatio
 
 `DeltaTime` / `ElapsedTime` accumulate floating-point error that drifts across machines. For lockstep-deterministic workloads (RTS netcode etc.) this causes desync even when everything else is deterministic.
 
-**Fix.** Set `WorldSettings.AssertNoTimeInFixedPhase = true` (throws on access during fixed phase) and use `World.FixedFrame` (a discrete tick counter) as your time source. See [`AssertNoTimeInFixedPhase`](../advanced/serialization.md#worldsettingsassertnotimeinfixedphase). Only applies to multiplayer games requiring cross-machine sync.
+**Fix.** Set `WorldSettings.AssertNoTimeInFixedPhase = true` (throws on access during fixed phase) and use `World.FixedFrame` (a discrete tick counter) as your time source. Only applies to multiplayer games requiring cross-machine sync.
 
 ## Main-thread sync mid-phase stalls workers
 

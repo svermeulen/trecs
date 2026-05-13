@@ -1,31 +1,27 @@
 using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Trecs.Internal;
-using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
     /// <summary>
     /// Exclusive-ownership pointer to a native (unmanaged) heap allocation. Burst-compatible.
-    /// Resolve to a <c>ref readonly T</c> via <see cref="Get(in NativeUniquePtrResolver)"/> in jobs
-    /// or <see cref="Get(HeapAccessor)"/> on the main thread. For mutable access use
-    /// <see cref="NativeUniquePtrExtensions.GetMut{T}"/>.
     /// <para>
-    /// Allocate via <see cref="HeapAccessor.AllocNativeUnique{T}"/>. Frame-scoped variants
-    /// are cleaned up automatically; persistent pointers must be disposed explicitly.
+    /// Allocate via <see cref="HeapAccessor.AllocNativeUnique{T}"/>. Open a safety-checked view
+    /// with <see cref="HeapAccessor.Read{T}"/> / <see cref="HeapAccessor.Write{T}"/> on the main
+    /// thread, or <see cref="NativeUniquePtrResolver.Read{T}"/> /
+    /// <see cref="NativeUniquePtrResolver.Write{T}"/> in Burst jobs. Frame-scoped variants are
+    /// cleaned up automatically; persistent pointers must be disposed explicitly via
+    /// <see cref="Dispose(HeapAccessor)"/>.
     /// </para>
     /// <para>
-    /// Public verb set: <c>GetUnsafePtr</c>, <c>Get</c>, <c>Dispose</c>, <c>IsNull</c>, plus
-    /// the <c>GetMut</c> / <c>Set</c> extensions in <see cref="NativeUniquePtrExtensions"/>.
-    /// <c>Get</c> / <c>GetUnsafePtr</c> have job-side overloads
-    /// (<see cref="NativeUniquePtrResolver"/> / <see cref="NativeWorldAccessor"/>) and main-thread
-    /// overloads (<see cref="HeapAccessor"/> / <see cref="WorldAccessor"/>). There is intentionally
-    /// no <c>Clone</c> — exclusive ownership means duplicating the ptr would create two owners of
-    /// the same heap entry. <c>Dispose</c> is main-thread-only by design (mutates heap bookkeeping
-    /// not exposed to Burst jobs). There is no public <c>TryGet</c> / <c>CanGet</c>: a live
-    /// <see cref="NativeUniquePtr{T}"/> is expected to resolve, mirroring
-    /// <see cref="NativeSharedPtr{T}"/>.
+    /// The persistent struct stores only a <see cref="PtrHandle"/> — it is intentionally cheap
+    /// to copy and store on components. Per-allocation <c>AtomicSafetyHandle</c>s live on the
+    /// owning heap and are attached to the <see cref="NativeUniqueRead{T}"/> /
+    /// <see cref="NativeUniqueWrite{T}"/> wrappers at Open time, so Unity's job-safety walker
+    /// can detect cross-job read/write conflicts at schedule time. There is intentionally no
+    /// <c>Clone</c> — exclusive ownership means duplicating the ptr would create two owners of
+    /// the same heap entry.
     /// </para>
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -37,50 +33,6 @@ namespace Trecs
         public NativeUniquePtr(PtrHandle handle)
         {
             Handle = handle;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe void* GetUnsafePtr(in NativeUniquePtrResolver resolver)
-        {
-            return resolver.ResolveUnsafePtr<T>(Handle.Value);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe void* GetUnsafePtr(HeapAccessor heap)
-        {
-            return heap.NativeUniqueHeap.ResolveUnsafePtr<T>(Handle.Value);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe void* GetUnsafePtr(WorldAccessor accessor)
-        {
-            return GetUnsafePtr(accessor.Heap);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref readonly T Get(in NativeUniquePtrResolver resolver)
-        {
-            return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(resolver));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref readonly T Get(HeapAccessor heap)
-        {
-            return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(heap));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref readonly T Get(WorldAccessor accessor)
-        {
-            return ref Get(accessor.Heap);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref readonly T Get(in NativeWorldAccessor accessor)
-        {
-            return ref UnsafeUtility.AsRef<T>(
-                accessor.UniquePtrResolver.ResolveUnsafePtr<T>(Handle.Value)
-            );
         }
 
         public readonly void Dispose(HeapAccessor heap)

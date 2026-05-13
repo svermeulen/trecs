@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static class SerializationHeaderUtil
@@ -67,7 +67,7 @@ namespace Trecs.Internal
     }
 }
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Header fields read from the start of a serialized payload. Obtain via

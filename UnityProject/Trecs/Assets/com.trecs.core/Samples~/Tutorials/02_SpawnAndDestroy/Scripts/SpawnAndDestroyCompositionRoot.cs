@@ -11,6 +11,8 @@ namespace Trecs.Samples.SpawnAndDestroy
         public float Lifetime = 3f;
         public float SpawnRadius = 5f;
 
+        // All we do here is call constructors and set up dependencies
+        // between classes.  No initialization logic otherwise
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -18,25 +20,27 @@ namespace Trecs.Samples.SpawnAndDestroy
             out List<Action> disposables
         )
         {
-            var gameObjectRegistry = new GameObjectRegistry();
-
             var world = new WorldBuilder()
                 .AddTemplate(SampleTemplates.SphereEntity.Template)
                 .Build();
 
+            var goManager = new RenderableGameObjectManager(world);
+
             world.AddSystems(
                 new ISystem[]
                 {
-                    new SpawnSystem(SpawnInterval, Lifetime, SpawnRadius, gameObjectRegistry),
-                    new LifetimeSystem(gameObjectRegistry),
-                    new SphereRendererSystem(gameObjectRegistry),
+                    new SpawnSystem(SpawnInterval, Lifetime, SpawnRadius),
+                    new LifetimeSystem(),
+                    new SpherePresenter(goManager),
                 }
             );
 
-            initializables = new() { world.Initialize };
+            var sceneInitializer = new SceneInitializer(goManager);
+
+            initializables = new() { world.Initialize, sceneInitializer.Initialize };
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { world.Dispose };
+            disposables = new() { goManager.Dispose, world.Dispose };
         }
     }
 }

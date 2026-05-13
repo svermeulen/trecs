@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Trecs.Internal;
+using Trecs.Serialization.Internal;
 
 namespace Trecs.Serialization
 {
@@ -33,7 +34,7 @@ namespace Trecs.Serialization
         // Constructor is internal — public callers go through
         // TrecsSerialization.CreateSerializerRegistry(world) so the registry
         // gets tracked in TrecsSerializerRegistries, or through
-        // Trecs.Internal.SerializationFactory.CreateRegistry() for static /
+        // Trecs.Serialization.Internal.SerializationFactory.CreateRegistry() for static /
         // file-peek paths where no world exists.
         internal SerializerRegistry() { }
 

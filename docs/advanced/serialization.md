@@ -1,142 +1,92 @@
 # Serialization
 
-Trecs ships an optional binary serialization framework (`com.trecs.serialization` package) for full ECS world state. It is the foundation for [Recording & Playback](recording-and-playback.md) and for save/load systems.
+Components are unmanaged structs, so they round-trip to bytes automatically — the framework treats them as plain memory. The one case where you need to write any serialization code is when a component points at a **managed** type (a `class`, or a struct with managed fields) via the [heap](heap.md). Examples: `SharedPtr<MyClass>`, `UniquePtr<MyClass>`, anything whose payload contains a `string`, `List<T>`, or another reference type.
 
-## Quick start
+For those types you register an `ISerializer<T>` against the world's [`SerializerRegistry`](#registering-the-registry). For everything else there is nothing to do — the [Trecs Player window](../editor-windows/player.md) records, scrubs, and replays world state without any setup beyond the world itself.
+
+## Registering the registry
+
+Call `TrecsSerialization.CreateSerializerRegistry` once during world setup, after the world is built. The returned registry is associated with the world automatically — the Trecs Player window finds it through that association.
 
 ```csharp
-// 1. Build a registry with all Trecs serializers pre-registered.
-var registry = TrecsSerialization.CreateSerializerRegistry();
+var registry = TrecsSerialization.CreateSerializerRegistry(world);
 
-// 2. Register any custom serializers your game needs (see below).
-//    Blittable component types are auto-handled — no registration needed.
-//    registry.RegisterSerializer<MyCustomSerializer>();
-
-// 3. Compose only the handlers you actually use.
-var worldStateSerializer = new WorldStateSerializer(world);
-var snapshots = new SnapshotSerializer(worldStateSerializer, registry, world);
+// Register one ISerializer<T> per managed type you store on the heap:
+registry.RegisterSerializer<PatrolRouteSerializer>();
+registry.RegisterSerializer<TrailHistorySerializer>();
 ```
 
-For a save-game flow stop here and use `SnapshotSerializer.SaveSnapshot` / `LoadSnapshot`. For deterministic record/replay also construct `BundleRecorder`, `BundlePlayer`, and `RecordingBundleSerializer` (see [Recording & Playback](recording-and-playback.md)).
-
-`SerializerRegistry` is a generic serializer independent of Trecs — it exposes generic `RegisterBlit<T>`, `RegisterEnum<T>`, `RegisterSerializer<TSerializer>` and can be used standalone in non-ECS code.
+If the type happens to be blittable (no managed fields), you can skip the custom serializer entirely with `registry.RegisterBlit<T>()`. Enums use `registry.RegisterEnum<T>()`. The common primitives (`int`, `float`, `string`, `Vector3`, `quaternion`, …) are pre-registered.
 
 ## Authoring a custom serializer
 
-Components are unmanaged structs and serialize automatically via the built-in blit serializer. You only need a custom `ISerializer<T>` if you are storing custom types on the [heap](heap.md).
+Implement `ISerializer<T>` with paired `Serialize` and `Deserialize` methods. The binary format is purely positional — `Deserialize` must call the same readers in the same order as `Serialize` calls writers.
+
+Take the `PatrolRoute` shape from [Sample 10 — Pointers](../samples/10-pointers.md): a managed class holding a `List<Vector3>` and a speed, allocated via `World.Heap.AllocShared` and stored on a component as `SharedPtr<PatrolRoute>`.
 
 ```csharp
-public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
+public class PatrolRoute
 {
-    public void Serialize(in HighScoreTable value, ISerializationWriter writer)
+    public List<Vector3> Waypoints;
+    public float Speed;
+}
+
+public sealed class PatrolRouteSerializer : ISerializer<PatrolRoute>
+{
+    public void Serialize(in PatrolRoute value, ISerializationWriter writer)
     {
-        writer.Write("count", value.Entries.Count);
-        foreach (var entry in value.Entries)
+        writer.Write("count", value.Waypoints.Count);
+        foreach (var waypoint in value.Waypoints)
         {
-            writer.Write("name", entry.Name);     // managed string
-            writer.Write("score", entry.Score);
+            writer.Write("waypoint", waypoint);
         }
+        writer.Write("speed", value.Speed);
     }
 
-    public void Deserialize(ref HighScoreTable value, ISerializationReader reader)
+    public void Deserialize(ref PatrolRoute value, ISerializationReader reader)
     {
-        value ??= new HighScoreTable();
+        value ??= new PatrolRoute { Waypoints = new() };
         var count = reader.Read<int>("count");
-        value.Entries.Clear();
+        value.Waypoints.Clear();
         for (int i = 0; i < count; i++)
         {
-            value.Entries.Add(new HighScoreEntry
-            {
-                Name = reader.Read<string>("name"),
-                Score = reader.Read<int>("score"),
-            });
+            value.Waypoints.Add(reader.Read<Vector3>("waypoint"));
         }
+        value.Speed = reader.Read<float>("speed");
     }
 }
-
-// Register before constructing any handler:
-registry.RegisterSerializer<HighScoreTableSerializer>();
 ```
 
-!!! note "Field names are discarded"
-    The `name` arguments to `writer.Write` / `reader.Read` are **not** persisted — they exist for debug memory tracking and to help debug desyncs. The binary format is purely positional: reads must occur in the same order as writes.
+!!! note "Field names are debug-only"
+    The `name` arguments to `writer.Write` / `reader.Read` are **not** persisted — they only surface in debug memory tracking and desync diagnostics. Reads must match writes by position, not by name.
 
-### Blit registrations
+If `value` is a struct with managed fields rather than a class, the `??=` line is unnecessary — `Deserialize` just populates the fields directly.
 
-Unmanaged value types can be registered as a fast raw-byte copy:
+## Versioning
+
+If the type's shape changes between releases, bump a version on the write side and branch on `reader.Version` to keep loading older saves:
 
 ```csharp
-registry.RegisterBlit<MyStruct>();              // serialize only
-registry.RegisterBlit<MyStruct>(includeDelta: true);  // also enable delta encoding
-registry.RegisterEnum<MyEnum>();                // for enum types
-```
-
-## Writer / reader flags
-
-Every `ISerializationWriter` / `ISerializationReader` carries a `long Flags` bitmask available inside a custom serializer. Flags are passed at the top level (`WriteAll(value, version, includeTypeChecks, flags: …)`, `StartWrite(version, includeTypeChecks, flags: …)`) and propagate to every nested serializer.
-
-Typical use: excluding non-deterministic state from checksums. Define a constant, set it from the recording's `checksumFlags` parameter, then branch inside your serializer:
-
-```csharp
-public static class MyAppFlags
+public void Deserialize(ref PatrolRoute value, ISerializationReader reader)
 {
-    public const long ForChecksum = 1L << 0;
-}
-
-public void Serialize(in Npc value, ISerializationWriter writer)
-{
-    writer.Write("position", value.Position);
-    writer.Write("hp", value.Hp);
-
-    // Skip the animator fingerprint when computing checksums — it's
-    // driven by a non-deterministic presentation layer.
-    if ((writer.Flags & MyAppFlags.ForChecksum) == 0)
+    value ??= new PatrolRoute { Waypoints = new() };
+    var count = reader.Read<int>("count");
+    value.Waypoints.Clear();
+    for (int i = 0; i < count; i++)
     {
-        writer.Write("animatorHash", value.AnimatorHash);
+        value.Waypoints.Add(reader.Read<Vector3>("waypoint"));
     }
+    value.Speed = reader.Read<float>("speed");
+
+    // v2 added the Reverse flag; older saves default it to false.
+    value.Reverse = reader.Version >= 2 && reader.Read<bool>("reverse");
 }
 ```
 
-### Versioned custom serializers
+`ISerializationWriter.Version` is available on the write side for the symmetric branch.
 
-The `version` integer is exposed to custom serializers via `ISerializationWriter.Version` (during write) and `ISerializationReader.Version` (during read). The deserializer can recognize older saves and read them with the layout they were written in. Bump the version on every layout change, and a single serializer can keep handling all prior versions:
+## See also
 
-```csharp
-public sealed class HighScoreTableSerializer : ISerializer<HighScoreTable>
-{
-    public void Serialize(in HighScoreTable value, ISerializationWriter writer)
-    {
-        // The writer always emits the current (latest) layout. The version stored
-        // in the file header records *which* layout this is, so old files saved by
-        // earlier code are still readable below.
-        writer.Write("count", value.Entries.Count);
-        foreach (var entry in value.Entries)
-        {
-            writer.Write("name", entry.Name);
-            writer.Write("score", entry.Score);
-            writer.Write("timestamp", entry.Timestamp);   // added in v2
-        }
-    }
-
-    public void Deserialize(ref HighScoreTable value, ISerializationReader reader)
-    {
-        value ??= new HighScoreTable();
-        var count = reader.Read<int>("count");
-        value.Entries.Clear();
-        for (int i = 0; i < count; i++)
-        {
-            var entry = new HighScoreEntry
-            {
-                Name = reader.Read<string>("name"),
-                Score = reader.Read<int>("score"),
-                // v1 saves don't contain timestamp; default it instead of reading.
-                Timestamp = reader.Version >= 2
-                    ? reader.Read<long>("timestamp")
-                    : 0,
-            };
-            value.Entries.Add(entry);
-        }
-    }
-}
-```
-
+- [Heap](heap.md) — pointer types and which kinds of data need to live on the heap.
+- [Trecs Player Window](../editor-windows/player.md) — uses the registered serializers to record, scrub, and replay world state.
+- [Sample 10 — Pointers](../samples/10-pointers.md) — full example of `SharedPtr` / `UniquePtr` over managed types.

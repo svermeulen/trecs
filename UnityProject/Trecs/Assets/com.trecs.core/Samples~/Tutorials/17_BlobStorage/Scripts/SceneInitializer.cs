@@ -12,16 +12,18 @@ namespace Trecs.Samples.BlobStorage
     public class SceneInitializer
     {
         readonly World _world;
-        readonly GameObjectRegistry _registry;
+        readonly RenderableGameObjectManager _goManager;
 
-        public SceneInitializer(World world, GameObjectRegistry registry)
+        public SceneInitializer(World world, RenderableGameObjectManager goManager)
         {
             _world = world;
-            _registry = registry;
+            _goManager = goManager;
         }
 
         public void Initialize()
         {
+            _goManager.RegisterFactory(BlobStoragePrefabs.Swatch, CreateSwatch);
+
             var world = _world.CreateAccessor(AccessorRole.Fixed);
             const int gridSize = 6;
             const float spacing = 1.5f;
@@ -33,9 +35,6 @@ namespace Trecs.Samples.BlobStorage
                 {
                     bool useWarm = (x + z) % 2 == 0;
                     var paletteId = useWarm ? PaletteIds.Warm : PaletteIds.Cool;
-
-                    var go = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
-                    go.name = useWarm ? "Warm" : "Cool";
 
                     world
                         .AddEntity<SampleTags.Swatch>()
@@ -58,10 +57,14 @@ namespace Trecs.Samples.BlobStorage
                                 CycleSpeed = useWarm ? 0.3f : 0.2f,
                             }
                         )
-                        .Set(_registry.Register(go))
                         .AssertComplete();
                 }
             }
+        }
+
+        static GameObject CreateSwatch()
+        {
+            return SampleUtil.CreatePrimitive(PrimitiveType.Cube);
         }
     }
 }

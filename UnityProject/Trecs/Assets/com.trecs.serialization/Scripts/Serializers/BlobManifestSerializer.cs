@@ -1,6 +1,6 @@
 using Trecs.Collections;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     public sealed class BlobManifestSerializer : ISerializer<BlobManifest>
     {

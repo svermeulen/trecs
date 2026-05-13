@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Static per-<see cref="World"/> lookup for <see cref="SerializerRegistry"/>
@@ -22,14 +22,7 @@ namespace Trecs.Serialization
             WorldRegistry.WorldUnregistered += world => _byWorld.Remove(world);
         }
 
-        /// <summary>
-        /// Associate <paramref name="registry"/> with <paramref name="world"/>.
-        /// Called by <see cref="TrecsSerialization.CreateSerializerRegistry"/>
-        /// so users don't have to register manually. Asserts on duplicate
-        /// registration — silently replacing a registry mid-life would let
-        /// downstream serializers diverge from upstream callers' expectations.
-        /// </summary>
-        internal static void Set(World world, SerializerRegistry registry)
+        public static void Set(World world, SerializerRegistry registry)
         {
             Assert.That(world != null);
             Assert.That(registry != null);

@@ -13,6 +13,8 @@ namespace Trecs
         readonly FrameScopedNativeSharedHeap _nativeFrameScopedSharedHeap;
         readonly NativeUniqueHeap _nativeUniqueHeap;
         readonly FrameScopedNativeUniqueHeap _frameScopedNativeUniqueHeap;
+        readonly NativeChunkStore _nativeUniqueChunkStore;
+        readonly TrecsListHeap _trecsListHeap;
 
         bool _isDisposed;
 
@@ -24,7 +26,9 @@ namespace Trecs
             FrameScopedSharedHeap frameScopedSharedHeap,
             FrameScopedNativeSharedHeap nativeFrameScopedSharedHeap,
             NativeUniqueHeap nativeUniqueHeap,
-            FrameScopedNativeUniqueHeap frameScopedNativeUniqueHeap
+            FrameScopedNativeUniqueHeap frameScopedNativeUniqueHeap,
+            NativeChunkStore nativeUniqueChunkStore,
+            TrecsListHeap trecsListHeap
         )
         {
             _uniqueHeap = uniqueHeap;
@@ -35,8 +39,8 @@ namespace Trecs
             _nativeFrameScopedSharedHeap = nativeFrameScopedSharedHeap;
             _nativeUniqueHeap = nativeUniqueHeap;
             _frameScopedNativeUniqueHeap = frameScopedNativeUniqueHeap;
-
-            _nativeUniqueHeap.SetFrameScopedEntries(_frameScopedNativeUniqueHeap.AllEntries);
+            _nativeUniqueChunkStore = nativeUniqueChunkStore;
+            _trecsListHeap = trecsListHeap;
         }
 
         internal UniqueHeap UniqueHeap
@@ -111,6 +115,15 @@ namespace Trecs
             }
         }
 
+        internal TrecsListHeap TrecsListHeap
+        {
+            get
+            {
+                Assert.That(!_isDisposed);
+                return _trecsListHeap;
+            }
+        }
+
         internal ref NativeUniquePtrResolver NativeUniquePtrResolver
         {
             get
@@ -120,18 +133,32 @@ namespace Trecs
             }
         }
 
+        internal ref NativeTrecsListResolver NativeTrecsListResolver
+        {
+            get
+            {
+                Assert.That(!_isDisposed);
+                return ref _trecsListHeap.Resolver;
+            }
+        }
+
         public void Dispose()
         {
             Assert.That(!_isDisposed);
             _isDisposed = true;
 
             _nativeSharedHeap.Dispose();
+            // All three native heaps share one chunk store; they must all finish freeing
+            // their handles before the chunk store itself can be disposed (anything still
+            // allocated at chunk-store dispose is reported as a leak).
             _nativeUniqueHeap.Dispose();
+            _frameScopedNativeUniqueHeap.Dispose();
+            _trecsListHeap.Dispose();
+            _nativeUniqueChunkStore.Dispose();
             _sharedHeap.Dispose();
             _frameScopedUniqueHeap.Dispose();
             _frameScopedSharedHeap.Dispose();
             _nativeFrameScopedSharedHeap.Dispose();
-            _frameScopedNativeUniqueHeap.Dispose();
             _uniqueHeap.Dispose();
         }
 
@@ -257,6 +284,13 @@ namespace Trecs
             return _nativeFrameScopedSharedHeap.TryGetBlob<T>(frame, blobId, out ptr);
         }
 
+        internal TrecsList<T> AllocTrecsList<T>(int initialCapacity)
+            where T : unmanaged
+        {
+            Assert.That(!_isDisposed);
+            return _trecsListHeap.Alloc<T>(initialCapacity);
+        }
+
         internal NativeUniquePtr<T> AllocNativeUnique<T>(in T value)
             where T : unmanaged
         {
@@ -271,15 +305,11 @@ namespace Trecs
             return _nativeUniqueHeap.Alloc<T>();
         }
 
-        internal NativeUniquePtr<T> AllocNativeUniqueTakingOwnership<T>(
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
-        )
+        internal NativeUniquePtr<T> AllocNativeUniqueTakingOwnership<T>(NativeBlobAllocation alloc)
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
-            return _nativeUniqueHeap.AllocTakingOwnership<T>(ptr, allocSize, allocAlignment);
+            return _nativeUniqueHeap.AllocTakingOwnership<T>(alloc);
         }
 
         internal NativeUniquePtr<T> AllocNativeUniqueFrameScoped<T>(int frame, in T value)
@@ -298,55 +328,33 @@ namespace Trecs
 
         internal NativeUniquePtr<T> AllocNativeUniqueFrameScopedTakingOwnership<T>(
             int frame,
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
+            NativeBlobAllocation alloc
         )
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
-            return _frameScopedNativeUniqueHeap.AllocTakingOwnership<T>(
-                frame,
-                ptr,
-                allocSize,
-                allocAlignment
-            );
+            return _frameScopedNativeUniqueHeap.AllocTakingOwnership<T>(frame, alloc);
         }
 
         internal NativeSharedPtr<T> AllocNativeSharedTakingOwnership<T>(
             BlobId blobId,
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
+            NativeBlobAllocation alloc
         )
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
-            return _nativeSharedHeap.CreateBlobTakingOwnership<T>(
-                blobId,
-                ptr,
-                allocSize,
-                allocAlignment
-            );
+            return _nativeSharedHeap.CreateBlobTakingOwnership<T>(blobId, alloc);
         }
 
         internal NativeSharedPtr<T> AllocNativeSharedFrameScopedTakingOwnership<T>(
             int frame,
             BlobId blobId,
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
+            NativeBlobAllocation alloc
         )
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
-            return _nativeFrameScopedSharedHeap.CreateBlobTakingOwnership<T>(
-                frame,
-                blobId,
-                ptr,
-                allocSize,
-                allocAlignment
-            );
+            return _nativeFrameScopedSharedHeap.CreateBlobTakingOwnership<T>(frame, blobId, alloc);
         }
     }
 }

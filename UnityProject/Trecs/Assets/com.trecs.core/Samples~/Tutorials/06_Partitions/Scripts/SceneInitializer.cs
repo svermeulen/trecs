@@ -6,25 +6,27 @@ namespace Trecs.Samples.Partitions
     public class SceneInitializer
     {
         readonly WorldAccessor _world;
-        readonly GameObjectRegistry _gameObjectRegistry;
         readonly int _ballCount;
         readonly float _spawnRadius;
+        readonly RenderableGameObjectManager _goManager;
 
         public SceneInitializer(
             World world,
-            GameObjectRegistry gameObjectRegistry,
             int ballCount,
-            float spawnRadius
+            float spawnRadius,
+            RenderableGameObjectManager goManager
         )
         {
             _world = world.CreateAccessor(AccessorRole.Fixed);
-            _gameObjectRegistry = gameObjectRegistry;
             _ballCount = ballCount;
             _spawnRadius = spawnRadius;
+            _goManager = goManager;
         }
 
         public void Initialize()
         {
+            _goManager.RegisterFactory(PartitionsPrefabs.Ball, CreateBall);
+
             var rng = _world.FixedRng;
 
             for (int i = 0; i < _ballCount; i++)
@@ -35,19 +37,20 @@ namespace Trecs.Samples.Partitions
                     rng.NextFloat(-_spawnRadius, _spawnRadius)
                 );
 
-                var go = SampleUtil.CreatePrimitive(PrimitiveType.Sphere);
-                go.name = $"Ball_{i}";
-                go.transform.position = (Vector3)position;
-                go.transform.localScale = Vector3.one * 0.6f;
-
                 // Balls start in Active partition — they'll fall under gravity
                 _world
                     .AddEntity<BallTags.Ball, BallTags.Active>()
                     .Set(new Position(position))
                     .Set(new Velocity(float3.zero))
-                    .Set(new RestTimer(0f))
-                    .Set(_gameObjectRegistry.Register(go));
+                    .Set(new RestTimer(0f));
             }
+        }
+
+        static GameObject CreateBall()
+        {
+            var go = SampleUtil.CreatePrimitive(PrimitiveType.Sphere);
+            go.transform.localScale = Vector3.one * 0.6f;
+            return go;
         }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using Trecs.Collections;
+using Trecs.Internal;
 
 namespace Trecs
 {
@@ -13,6 +14,14 @@ namespace Trecs
         bool TryGetManifestEntry(BlobId id, out BlobMetadata manifestEntry, bool updateAccessTime);
 
         int SerializationVersion { set; }
+
+        /// <summary>
+        /// Pool used to rent <see cref="NativeBlobBox"/> wrappers when reading native blobs
+        /// off the underlying medium. <see cref="BlobCache"/> pushes the world-scoped pool
+        /// here at construction time. Stores that never deserialize native blobs (e.g. the
+        /// in-memory store) may ignore the setter.
+        /// </summary>
+        NativeBlobBoxPool NativeBlobBoxPool { set; }
 
         void CleanCache(DenseHashSet<BlobId> activeBlobs);
 

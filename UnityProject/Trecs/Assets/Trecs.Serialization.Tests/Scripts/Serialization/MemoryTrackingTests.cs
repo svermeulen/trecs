@@ -2,6 +2,7 @@
 using Trecs;
 using Trecs.Internal;
 using Trecs.Collections;
+using Trecs.Serialization.Internal;
 
 namespace Trecs.Serialization.Tests
 {
@@ -16,7 +17,8 @@ namespace Trecs.Serialization.Tests
         [SetUp]
         public void Setup()
         {
-            _serializerRegistry = Trecs.Internal.SerializationFactory.CreateRegistry();
+            _serializerRegistry =
+                Trecs.Serialization.Internal.SerializationFactory.CreateRegistry();
 
             // Register test-specific serializers
             _serializerRegistry.RegisterSerializer<ListSerializer<int>>();

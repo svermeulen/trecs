@@ -1,6 +1,5 @@
 using System;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
 namespace Trecs.Internal
@@ -9,15 +8,20 @@ namespace Trecs.Internal
     /// Type-erased holder for a single unmanaged value living in native memory.
     /// Owns an allocation made via AllocatorManager.Allocate(Allocator.Persistent).
     ///
+    /// Instances are rented from and returned to a <see cref="NativeBlobBoxPool"/>
+    /// (one per world) so that per-frame allocations don't churn the GC. Direct
+    /// construction is forbidden — all entry points go through the pool.
+    ///
     /// Used internally by all Trecs native heaps as the canonical ownership type.
     /// Not intended for direct use outside of Trecs.
     /// </summary>
     internal sealed class NativeBlobBox : IDisposable
     {
+        readonly NativeBlobBoxPool _pool;
         IntPtr _ptr;
-        readonly int _size;
-        readonly int _alignment;
-        readonly Type _innerType;
+        int _size;
+        int _alignment;
+        Type _innerType;
 
         public IntPtr Ptr => _ptr;
         public int Size => _size;
@@ -25,24 +29,63 @@ namespace Trecs.Internal
         public Type InnerType => _innerType;
         public bool IsDisposed => _ptr == IntPtr.Zero;
 
-        NativeBlobBox(IntPtr ptr, int size, int alignment, Type innerType)
+        internal NativeBlobBox(NativeBlobBoxPool pool)
         {
-            Assert.That(ptr != IntPtr.Zero);
+            Assert.IsNotNull(pool);
+            _pool = pool;
+        }
+
+        internal unsafe void Init(int size, int alignment, Type innerType)
+        {
+            AssertCleanState();
+            AssertInitArgs(size, alignment, innerType);
+            var addr = new IntPtr(
+                AllocatorManager.Allocate(Allocator.Persistent, size, alignment, items: 1)
+            );
+            Assert.That(
+                addr != IntPtr.Zero && (addr.ToInt64() & (alignment - 1)) == 0,
+                "AllocatorManager returned a null or misaligned pointer (alignment {})",
+                alignment
+            );
+            _ptr = addr;
+            _size = size;
+            _alignment = alignment;
+            _innerType = innerType;
+        }
+
+        internal void InitFromExistingPointer(NativeBlobAllocation alloc, Type innerType)
+        {
+            AssertCleanState();
+            Assert.That(alloc.Ptr != IntPtr.Zero);
+            AssertInitArgs(alloc.AllocSize, alloc.Alignment, innerType);
+            Assert.That(
+                (alloc.Ptr.ToInt64() & (alloc.Alignment - 1)) == 0,
+                "Pointer is not aligned to {} bytes",
+                alloc.Alignment
+            );
+            _ptr = alloc.Ptr;
+            _size = alloc.AllocSize;
+            _alignment = alloc.Alignment;
+            _innerType = innerType;
+        }
+
+        void AssertCleanState()
+        {
+            Assert.That(
+                _ptr == IntPtr.Zero,
+                "NativeBlobBox re-initialized while still holding an allocation (inner type {})",
+                _innerType
+            );
+        }
+
+        static void AssertInitArgs(int size, int alignment, Type innerType)
+        {
             Assert.IsNotNull(innerType);
             Assert.That(size > 0);
             Assert.That(
                 alignment > 0 && (alignment & (alignment - 1)) == 0,
                 "Alignment must be a positive power of two"
             );
-            Assert.That(
-                (ptr.ToInt64() & (alignment - 1)) == 0,
-                "Pointer is not aligned to {} bytes",
-                alignment
-            );
-            _ptr = ptr;
-            _size = size;
-            _alignment = alignment;
-            _innerType = innerType;
         }
 
         ~NativeBlobBox()
@@ -72,49 +115,13 @@ namespace Trecs.Internal
                 items: 1
             );
             _ptr = IntPtr.Zero;
-            GC.SuppressFinalize(this);
-        }
-
-        /// <summary>
-        /// Allocates a new NativeBlobBox sized to hold a value of type T and copies the value in.
-        /// </summary>
-        public static unsafe NativeBlobBox AllocFromValue<T>(in T value)
-            where T : unmanaged
-        {
-            var size = UnsafeUtility.SizeOf<T>();
-            var alignment = UnsafeUtility.AlignOf<T>();
-            void* ptr = AllocatorManager.Allocate(Allocator.Persistent, size, alignment, items: 1);
-            *(T*)ptr = value;
-            return new NativeBlobBox(new IntPtr(ptr), size, alignment, typeof(T));
-        }
-
-        /// <summary>
-        /// Allocates a new uninitialized NativeBlobBox of the given size and alignment.
-        /// Used for deserialization paths that fill the bytes manually.
-        /// </summary>
-        public static unsafe NativeBlobBox AllocUninitialized(
-            int size,
-            int alignment,
-            Type innerType
-        )
-        {
-            void* ptr = AllocatorManager.Allocate(Allocator.Persistent, size, alignment, items: 1);
-            return new NativeBlobBox(new IntPtr(ptr), size, alignment, innerType);
-        }
-
-        /// <summary>
-        /// Wraps an existing native pointer that was allocated via
-        /// AllocatorManager.Allocate(Allocator.Persistent, size, alignment, 1).
-        /// The caller transfers ownership: the box will free the pointer on Dispose.
-        /// </summary>
-        public static NativeBlobBox FromExistingPointer(
-            IntPtr ptr,
-            int size,
-            int alignment,
-            Type innerType
-        )
-        {
-            return new NativeBlobBox(ptr, size, alignment, innerType);
+            _size = 0;
+            _alignment = 0;
+            _innerType = null;
+            // Don't SuppressFinalize — the box is going back on the free-list
+            // and may be rented again, so its finalizer must still fire on a
+            // future leak.
+            _pool.Return(this);
         }
     }
 }

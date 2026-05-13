@@ -122,9 +122,6 @@ namespace Trecs.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator SaveGame() => RunScene("SaveGame");
-
-        [UnityTest]
         public IEnumerator NativePointers() => RunScene("NativePointers");
 
         [UnityTest]

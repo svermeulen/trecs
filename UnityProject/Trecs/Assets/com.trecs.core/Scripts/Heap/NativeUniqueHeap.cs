@@ -1,40 +1,34 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Burst;
-using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
     /// <summary>
     /// Manages exclusive-ownership native (unmanaged) allocations backing <see cref="NativeUniquePtr{T}"/>.
+    /// Storage is provided by a shared <see cref="NativeChunkStore"/> (also used by
+    /// <see cref="FrameScopedNativeUniqueHeap"/>) — this heap is responsible only for the managed-side
+    /// bookkeeping (type tracking for warnings and serialization) and lifecycle of persistent entries.
     /// Provides a <see cref="NativeUniquePtrResolver"/> for Burst-compatible pointer resolution in jobs.
-    /// Accessed internally through <see cref="HeapAccessor"/>; not typically used directly.
     /// </summary>
     public sealed class NativeUniqueHeap
     {
         static readonly TrecsLog _log = new(nameof(NativeUniqueHeap));
 
-        readonly NativeDenseDictionary<uint, NativeUniqueHeapEntry> _allEntries;
-        readonly Dictionary<uint, NativeBlobBox> _pendingAdds = new();
-        readonly List<(uint Address, NativeBlobBox Box)> _pendingRemoves = new();
-        readonly DenseDictionary<uint, NativeBlobBox> _activeBoxes = new();
-
-        readonly HeapIdCounter _idCounter = new(1, 2);
+        readonly NativeChunkStore _chunkStore;
+        readonly Dictionary<uint, Type> _typesByHandle = new();
         bool _isDisposed;
 
-        // Resolver is rebuilt when frame-scoped heap reference changes
         NativeUniquePtrResolver _resolver;
-        NativeDenseDictionary<uint, NativeUniqueHeapEntry> _frameScopedEntries;
 
-        public NativeUniqueHeap()
+        public NativeUniqueHeap(NativeChunkStore chunkStore)
         {
-            _allEntries = new NativeDenseDictionary<uint, NativeUniqueHeapEntry>(
-                1,
-                Allocator.Persistent
-            );
+            Assert.IsNotNull(chunkStore);
+            _chunkStore = chunkStore;
+            _resolver = new NativeUniquePtrResolver(_chunkStore.Resolver);
         }
 
         public int NumEntries
@@ -42,16 +36,8 @@ namespace Trecs
             get
             {
                 Assert.That(!_isDisposed);
-                return _activeBoxes.Count;
+                return _typesByHandle.Count;
             }
-        }
-
-        internal void SetFrameScopedEntries(
-            NativeDenseDictionary<uint, NativeUniqueHeapEntry> frameScopedEntries
-        )
-        {
-            _frameScopedEntries = frameScopedEntries;
-            _resolver = new NativeUniquePtrResolver(_allEntries, _frameScopedEntries);
         }
 
         public ref NativeUniquePtrResolver Resolver
@@ -64,40 +50,84 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Resolves a pointer from managed (main-thread) code.
-        /// Unlike NativeUniquePtrResolver, this can resolve entries that were just created
-        /// in the current frame (before FlushPendingOperations).
+        /// True if <paramref name="address"/> is a handle this persistent heap owns. Used by
+        /// <see cref="HeapAccessor"/> to disambiguate persistent vs frame-scoped handles before
+        /// dispatching Read / Write to the right heap (the chunk store itself doesn't track
+        /// which heap an entry belongs to).
         /// </summary>
-        internal unsafe void* ResolveUnsafePtr<T>(uint address)
+        internal bool ContainsEntry(uint address)
+        {
+            Assert.That(!_isDisposed);
+            return _typesByHandle.ContainsKey(address);
+        }
+
+        public unsafe NativeUniqueRead<T> Read<T>(in NativeUniquePtr<T> ptr)
+            where T : unmanaged
+        {
+            var entry = ResolveEntry<T>(ptr.Handle.Value);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            return new NativeUniqueRead<T>(entry.Address.ToPointer(), entry.Safety);
+#else
+            return new NativeUniqueRead<T>(entry.Address.ToPointer());
+#endif
+        }
+
+        public unsafe NativeUniqueWrite<T> Write<T>(in NativeUniquePtr<T> ptr)
+            where T : unmanaged
+        {
+            var entry = ResolveEntry<T>(ptr.Handle.Value);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            return new NativeUniqueWrite<T>(entry.Address.ToPointer(), entry.Safety);
+#else
+            return new NativeUniqueWrite<T>(entry.Address.ToPointer());
+#endif
+        }
+
+        /// <summary>
+        /// Resolves a handle through the chunk store with a managed-side type-hash check.
+        /// Main-thread only; Burst jobs use <see cref="NativeUniquePtrResolver"/>.
+        /// </summary>
+        internal NativeChunkStoreEntry ResolveEntry<T>(uint address)
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
             Assert.That(
                 UnityThreadHelper.IsMainThread,
-                "ResolveUnsafePtr must be called from the main thread; jobs use NativeUniquePtrResolver"
+                "NativeUniqueHeap.ResolveEntry must be called from the main thread; jobs use NativeUniquePtrResolver"
             );
             Assert.That(address != 0, "Attempted to resolve null address");
 
-            if (_pendingAdds.TryGetValue(address, out var box))
-            {
-                AssertTypeMatches<T>(box);
-                return box.Ptr.ToPointer();
-            }
-
-            return _resolver.ResolveUnsafePtr<T>(address);
+            var entry = _chunkStore.ResolveEntry(new PtrHandle(address));
+            AssertTypeHashMatches<T>(entry.TypeHash);
+            return entry;
         }
 
-        public NativeUniquePtr<T> Alloc<T>(in T value)
+        internal unsafe void* ResolveUnsafePtr<T>(uint address)
+            where T : unmanaged
+        {
+            return ResolveEntry<T>(address).Address.ToPointer();
+        }
+
+        public unsafe NativeUniquePtr<T> Alloc<T>(in T value)
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
-            return AllocFromBox<T>(NativeBlobBox.AllocFromValue(in value));
+            var handle = _chunkStore.Alloc(
+                UnsafeUtility.SizeOf<T>(),
+                UnsafeUtility.AlignOf<T>(),
+                TypeHash<T>.Value,
+                out var address
+            );
+            UnsafeUtility.WriteArrayElement(address.ToPointer(), 0, value);
+            _typesByHandle.Add(handle.Value, typeof(T));
+            _log.Trace("Allocated NativeUniquePtr<{}> with handle {}", typeof(T), handle.Value);
+            return new NativeUniquePtr<T>(handle);
         }
 
         public NativeUniquePtr<T> Alloc<T>()
             where T : unmanaged
         {
-            return Alloc<T>(default(T));
+            return Alloc<T>(default);
         }
 
         /// <summary>
@@ -107,242 +137,177 @@ namespace Trecs
         /// <list type="number">
         ///   <item>The pointer must have been allocated via
         ///     <c>AllocatorManager.Allocate(Allocator.Persistent, sizeof(T), alignof(T), 1)</c>
-        ///     or an equivalent path that produces a pointer compatible with
-        ///     <c>AllocatorManager.Free(Allocator.Persistent, ptr, sizeof(T), alignof(T), 1)</c>.</item>
+        ///     or an equivalent path. The chunk store stores the supplied size/alignment and
+        ///     calls <c>AllocatorManager.Free</c> with them at dispose time.</item>
         ///   <item>No other code may free this pointer — the heap takes exclusive ownership.</item>
-        ///   <item>No other code may hold a reference to this pointer after this call;
-        ///     the heap may move/free it during dispose, deferred flush, or shutdown.</item>
+        ///   <item>No other code may hold a reference to this pointer after this call.</item>
         /// </list>
-        /// <para>Unity does NOT validate the pointer at the allocator level. Misuse will
-        /// typically corrupt the heap or crash on a later allocation. Use only when you
-        /// have control over the original allocation.</para>
         /// </summary>
-        public NativeUniquePtr<T> AllocTakingOwnership<T>(
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
-        )
+        public NativeUniquePtr<T> AllocTakingOwnership<T>(NativeBlobAllocation alloc)
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
-            var box = NativeBlobBox.FromExistingPointer(ptr, allocSize, allocAlignment, typeof(T));
-            return AllocFromBox<T>(box);
-        }
-
-        internal NativeUniquePtr<T> AllocFromBox<T>(NativeBlobBox box)
-            where T : unmanaged
-        {
-            Assert.That(!_isDisposed);
-            Assert.That(
-                box.InnerType == typeof(T),
-                "NativeBlobBox inner type {} does not match requested type {}",
-                box.InnerType,
-                typeof(T)
+            Assert.That(alloc.Ptr != IntPtr.Zero, "AllocTakingOwnership: null pointer");
+            var handle = _chunkStore.AllocExternal(
+                alloc.Ptr,
+                alloc.AllocSize,
+                alloc.Alignment,
+                TypeHash<T>.Value
             );
-
-            var address = _idCounter.Alloc();
-            Assert.That(address != 0);
-
-            _activeBoxes.Add(address, box);
-            _pendingAdds.Add(address, box);
-
+            _typesByHandle.Add(handle.Value, typeof(T));
             _log.Trace(
-                "Allocated new native unique ptr with address {} and type {}",
-                address,
-                typeof(T)
+                "Allocated external NativeUniquePtr<{}> with handle {}",
+                typeof(T),
+                handle.Value
             );
-
-            return new NativeUniquePtr<T>(new PtrHandle(address));
+            return new NativeUniquePtr<T>(handle);
         }
 
         public void DisposeEntry(uint address)
         {
             Assert.That(!_isDisposed);
             Assert.That(address != 0);
-
-            if (!_activeBoxes.TryRemove(address, out var box))
+            if (!_typesByHandle.Remove(address))
             {
                 throw Assert.CreateException(
-                    "Attempted to dispose invalid native unique heap address ({})",
+                    "Attempted to dispose invalid native unique heap address ({}) — handle is not owned by NativeUniqueHeap",
                     address
                 );
             }
-
-            if (_pendingAdds.Remove(address))
-            {
-                // Entry was allocated but never flushed to _allEntries (never visible to jobs),
-                // so we can free immediately.
-                box.Dispose();
-                _log.Trace("Disposed native unique ptr with address {} (pre-flush)", address);
-            }
-            else
-            {
-                // Entry is in _allEntries — defer free until FlushPendingOperations
-                // since jobs may still be reading via the resolver.
-                _pendingRemoves.Add((address, box));
-                _log.Trace("Disposed native unique ptr with address {} (deferred)", address);
-            }
+            _chunkStore.Free(new PtrHandle(address));
+            _log.Trace("Disposed NativeUniquePtr with handle {}", address);
         }
 
         /// <summary>
-        /// Applies deferred _allEntries additions and removals.
-        /// Must be called when no jobs are reading from _allEntries (e.g. at submission time).
+        /// Applies any deferred chunk-store operations.
+        /// Must be called when no jobs are reading via the resolver (e.g. at submission time).
         /// </summary>
         internal void FlushPendingOperations()
         {
             Assert.That(!_isDisposed);
-            Assert.That(UnityThreadHelper.IsMainThread);
-
-            if (_pendingAdds.Count > 0)
-            {
-                _allEntries.EnsureCapacity(_allEntries.Count + _pendingAdds.Count);
-                foreach (var (address, box) in _pendingAdds)
-                {
-                    _allEntries.Add(
-                        address,
-                        new NativeUniqueHeapEntry(BurstHashFromType(box.InnerType), box.Ptr)
-                    );
-                }
-                _pendingAdds.Clear();
-            }
-
-            foreach (var (address, box) in _pendingRemoves)
-            {
-                _allEntries.Remove(address);
-                box.Dispose();
-            }
-            _pendingRemoves.Clear();
+            _chunkStore.FlushPendingOperations();
         }
 
         public void ClearAll(bool warnUndisposed)
         {
             Assert.That(!_isDisposed);
 
-            if (warnUndisposed && _activeBoxes.Count > 0 && _log.IsWarningEnabled())
+            if (warnUndisposed && _typesByHandle.Count > 0 && _log.IsWarningEnabled())
             {
-                var typeNames = _activeBoxes
-                    .Select(kv => kv.Value.InnerType.GetPrettyName())
+                var typeNames = _typesByHandle
+                    .Values.Select(t => t.GetPrettyName())
                     .Distinct()
                     .Join(", ");
                 _log.Warning(
                     "Found {} undisposed entries in NativeUniqueHeap with types: {}",
-                    _activeBoxes.Count,
+                    _typesByHandle.Count,
                     typeNames
                 );
             }
 
-            // Free all pending-removes (already removed from _activeBoxes)
-            foreach (var (_, box) in _pendingRemoves)
+            foreach (var address in _typesByHandle.Keys.ToArray())
             {
-                box.Dispose();
+                _chunkStore.Free(new PtrHandle(address));
             }
-            _pendingRemoves.Clear();
-
-            // Free everything still tracked in _activeBoxes (covers _pendingAdds + flushed entries)
-            foreach (var (_, box) in _activeBoxes)
-            {
-                box.Dispose();
-            }
-            _activeBoxes.Clear();
-            _pendingAdds.Clear();
-            _allEntries.Clear();
-
-            Assert.That(_activeBoxes.Count == 0);
-            Assert.That(_allEntries.Count == 0);
+            _typesByHandle.Clear();
+            // Drain pending-frees through the chunk store so subsequent restore-time
+            // AllocAtSlot calls don't see those slots as still-in-use.
+            _chunkStore.FlushPendingOperations();
         }
 
         internal void Dispose()
         {
             Assert.That(!_isDisposed);
             ClearAll(warnUndisposed: true);
-
-            _allEntries.Dispose();
-
             _isDisposed = true;
         }
 
         public unsafe void Serialize(ITrecsSerializationWriter writer)
         {
+            // Force a flush so every live handle is fully reflected in the chunk store before
+            // we serialise (otherwise pending-add entries would only be visible via main-thread
+            // resolution, which is fine for us — both go through chunk_store.ResolveEntry —
+            // but the flush also drains pending-frees that may free slots we'd otherwise scan).
             FlushPendingOperations();
-            Assert.That(_allEntries.Count == _activeBoxes.Count);
 
-            writer.Write<uint>("IdCounter", _idCounter.Value);
-            writer.Write<int>("NumEntries", _activeBoxes.Count);
+            writer.Write<int>("NumEntries", _typesByHandle.Count);
 
-            foreach (var (address, box) in _activeBoxes)
+            foreach (var (address, type) in _typesByHandle)
             {
+                var entry = _chunkStore.ResolveEntry(new PtrHandle(address));
+                var size = UnsafeSizeOfRuntimeType(type);
+                var alignment = UnsafeAlignOfRuntimeType(type);
+
                 writer.Write<uint>("Address", address);
-                writer.Write<int>("InnerTypeId", TypeIdProvider.GetTypeId(box.InnerType));
-                writer.Write<int>("DataSize", box.Size);
-                writer.Write<int>("Alignment", box.Alignment);
-                writer.BlitWriteRawBytes("Data", box.Ptr.ToPointer(), box.Size);
+                writer.Write<int>("InnerTypeId", TypeIdProvider.GetTypeId(type));
+                writer.Write<int>("DataSize", size);
+                writer.Write<int>("Alignment", alignment);
+                writer.BlitWriteRawBytes("Data", entry.Address.ToPointer(), size);
             }
 
-            _log.Trace("Serialized {} native unique entries", _activeBoxes.Count);
+            _log.Trace("Serialized {} native unique entries", _typesByHandle.Count);
         }
 
         public unsafe void Deserialize(ITrecsSerializationReader reader)
         {
-            Assert.That(_allEntries.Count == 0);
-            Assert.That(_pendingAdds.Count == 0);
-            Assert.That(_pendingRemoves.Count == 0);
-            Assert.That(_activeBoxes.Count == 0);
+            Assert.That(_typesByHandle.Count == 0);
 
-            _idCounter.Value = reader.Read<uint>("IdCounter");
             var numEntries = reader.Read<int>("NumEntries");
-
-            _allEntries.EnsureCapacity(numEntries);
 
             for (int i = 0; i < numEntries; i++)
             {
-                var address = reader.Read<uint>("Address");
+                var savedAddress = reader.Read<uint>("Address");
                 var innerTypeId = reader.Read<int>("InnerTypeId");
                 var dataSize = reader.Read<int>("DataSize");
                 var alignment = reader.Read<int>("Alignment");
-
                 var innerType = TypeIdProvider.GetTypeFromId(innerTypeId);
 
-                NativeBlobBox box = null;
-                try
-                {
-                    box = NativeBlobBox.AllocUninitialized(dataSize, alignment, innerType);
-                    reader.BlitReadRawBytes("Data", box.Ptr.ToPointer(), dataSize);
-                }
-                catch
-                {
-                    box?.Dispose();
-                    throw;
-                }
-
-                _activeBoxes.Add(address, box);
-                _allEntries.Add(
-                    address,
-                    new NativeUniqueHeapEntry(BurstHashFromType(innerType), box.Ptr)
+                // Restore at the exact slot/generation encoded in the saved handle so that
+                // components storing this handle can be blit through save/load without remap.
+                var handle = _chunkStore.AllocAtSlot(
+                    savedAddress,
+                    dataSize,
+                    alignment,
+                    BurstRuntime.GetHashCode32(innerType),
+                    out var address
                 );
+                reader.BlitReadRawBytes("Data", address.ToPointer(), dataSize);
+                _typesByHandle.Add(handle.Value, innerType);
             }
 
+            _chunkStore.OnDeserializeComplete();
             _log.Debug("Deserialized {} native unique entries", numEntries);
         }
 
         // ─── Helpers ──────────────────────────────────────────────
 
-        static void AssertTypeMatches<T>(NativeBlobBox box)
+        static void AssertTypeHashMatches<T>(int storedHash)
             where T : unmanaged
         {
-            Assert.That(
-                box.InnerType == typeof(T),
-                "Type mismatch resolving NativeUniquePtr: stored {}, requested {}",
-                box.InnerType,
-                typeof(T)
-            );
+            if (storedHash != TypeHash<T>.Value)
+            {
+                throw new TrecsException(
+                    $"Type hash mismatch resolving NativeUniquePtr<{typeof(T).Name}>: "
+                        + $"stored {storedHash}, requested {TypeHash<T>.Value}"
+                );
+            }
         }
 
-        // The resolver compares against TypeHash<T>.Value which is BurstRuntime.GetHashCode32<T>().
-        // BurstRuntime.GetHashCode32(Type) returns the same hash from a managed Type, so this
-        // is interchangeable across managed and Burst contexts.
-        static int BurstHashFromType(Type t)
+        // UnsafeUtility.SizeOf<T> and AlignOf<T> are generic; for serialization the type is
+        // only known at runtime. We bounce through reflection to get the equivalent values.
+        static int UnsafeSizeOfRuntimeType(Type t)
         {
-            return BurstRuntime.GetHashCode32(t);
+            return UnsafeUtility.SizeOf(t);
+        }
+
+        static int UnsafeAlignOfRuntimeType(Type t)
+        {
+            // Unity's UnsafeUtility doesn't expose AlignOf(Type) directly, but
+            // Marshal.SizeOf is structurally equivalent for blittable structs. For simplicity
+            // we fall back to the platform's max useful alignment (16) — chunk store rounds up
+            // to a power of two ≥ alignment anyway. Replace with a proper Type-aware AlignOf
+            // if it becomes important.
+            return 16;
         }
     }
 }

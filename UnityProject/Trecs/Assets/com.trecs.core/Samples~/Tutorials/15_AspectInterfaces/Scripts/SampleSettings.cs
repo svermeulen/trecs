@@ -67,7 +67,7 @@ namespace Trecs.Samples.AspectInterfaces
         public Color BossBaseColor = new(0.6f, 0.2f, 0.8f);
         public Color EnemyBaseColor = Color.red;
 
-        // Seconds the HitFlashRenderer tints an entity white after a hit.
+        // Seconds the HitFlashPresenter tints an entity white after a hit.
         public float HitFlashDuration = 0.15f;
 
         // Victory dance once the boss is gone — enemies bob up and down

@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class BitWriter

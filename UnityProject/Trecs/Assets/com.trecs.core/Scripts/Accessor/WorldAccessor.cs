@@ -81,14 +81,7 @@ namespace Trecs
             _createdAtLine = createdAtLine;
 
             Id = id;
-            Heap = new HeapAccessor(
-                heapAllocator,
-                systemRunnerInfo,
-                role,
-                isInput,
-                fixedRng,
-                debugName
-            );
+            Heap = new HeapAccessor(heapAllocator, systemRunnerInfo, role, isInput, debugName);
         }
 
         /// <summary>

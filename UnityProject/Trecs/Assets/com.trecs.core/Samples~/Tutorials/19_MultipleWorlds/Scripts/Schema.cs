@@ -13,11 +13,14 @@ namespace Trecs.Samples.MultipleWorlds
 
     public static partial class SampleTemplates
     {
-        public partial class CritterEntity : ITemplate, ITagged<SampleTags.Critter>
+        public partial class CritterEntity
+            : ITemplate,
+                IExtends<CommonTemplates.RenderableGameObject>,
+                ITagged<SampleTags.Critter>
         {
             Position Position = default;
             Lifetime Lifetime;
-            GameObjectId GameObjectId;
+            PrefabId PrefabId = new(MultipleWorldsPrefabs.Critter);
         }
     }
 }

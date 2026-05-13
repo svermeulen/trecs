@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using Trecs.Serialization;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -79,7 +80,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var blob = new List<string> { "shared" };
-            var ptr = a.Heap.AllocShared(blob);
+            var ptr = a.Heap.AllocShared(BlobIdGenerator.FromKey(1), blob);
 
             NAssert.IsFalse(ptr.IsNull);
 
@@ -96,7 +97,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var blob = new List<string> { "cloneable" };
-            var ptr = a.Heap.AllocShared(blob);
+            var ptr = a.Heap.AllocShared(BlobIdGenerator.FromKey(1), blob);
             var clone = ptr.Clone(a);
 
             NAssert.IsFalse(clone.IsNull);

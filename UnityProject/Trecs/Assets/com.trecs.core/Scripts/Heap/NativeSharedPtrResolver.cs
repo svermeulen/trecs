@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using Trecs.Internal;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Internal
 {
@@ -10,20 +11,33 @@ namespace Trecs.Internal
         public readonly int TypeHash;
         public readonly IntPtr Ptr;
 
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+        public readonly AtomicSafetyHandle Safety;
+
+        public NativeSharedHeapEntry(int typeHash, IntPtr ptr, AtomicSafetyHandle safety)
+        {
+            TypeHash = typeHash;
+            Ptr = ptr;
+            Safety = safety;
+        }
+#else
         public NativeSharedHeapEntry(int typeHash, IntPtr ptr)
         {
             TypeHash = typeHash;
             Ptr = ptr;
         }
+#endif
     }
 }
 
 namespace Trecs
 {
     /// <summary>
-    /// Burst-compatible resolver that maps <see cref="BlobId"/> values to native memory addresses
+    /// Burst-compatible resolver that maps <see cref="BlobId"/> values to native memory
     /// for <see cref="NativeSharedPtr{T}"/> lookups inside jobs. Obtain via
-    /// <see cref="HeapAccessor.NativeSharedPtrResolver"/> or <see cref="NativeWorldAccessor.SharedPtrResolver"/>.
+    /// <see cref="HeapAccessor.NativeSharedPtrResolver"/> or
+    /// <see cref="NativeWorldAccessor.SharedPtrResolver"/>. Open a typed view with
+    /// <see cref="Read{T}"/>.
     /// </summary>
     public readonly unsafe struct NativeSharedPtrResolver
     {
@@ -34,7 +48,18 @@ namespace Trecs
             _entries = entries;
         }
 
-        public unsafe void* ResolveUnsafePtr<T>(BlobId address)
+        public NativeSharedRead<T> Read<T>(in NativeSharedPtr<T> ptr)
+            where T : unmanaged
+        {
+            var entry = ResolveEntry<T>(ptr.BlobId);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            return new NativeSharedRead<T>(entry.Ptr.ToPointer(), entry.Safety);
+#else
+            return new NativeSharedRead<T>(entry.Ptr.ToPointer());
+#endif
+        }
+
+        internal NativeSharedHeapEntry ResolveEntry<T>(BlobId address)
             where T : unmanaged
         {
             Assert.That(!address.IsNull, "Attempted to resolve null blob address");
@@ -58,7 +83,13 @@ namespace Trecs
                 );
             }
 
-            return entry.Ptr.ToPointer();
+            return entry;
+        }
+
+        internal unsafe void* ResolveUnsafePtr<T>(BlobId address)
+            where T : unmanaged
+        {
+            return ResolveEntry<T>(address).Ptr.ToPointer();
         }
     }
 }

@@ -1,8 +1,8 @@
 using System;
 using System.ComponentModel;
-using Trecs.Serialization;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class SharedSerializerCacheHelper : IDisposable

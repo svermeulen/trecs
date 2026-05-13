@@ -30,6 +30,8 @@ namespace Trecs.Samples.Interpolation
         public float OrbitRadius = 3f;
         public float OrbitSpeed = 2f;
 
+        // All we do here is call constructors and set up dependencies
+        // between classes.  No initialization logic otherwise
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -37,8 +39,6 @@ namespace Trecs.Samples.Interpolation
             out List<Action> disposables
         )
         {
-            var gameObjectRegistry = new GameObjectRegistry();
-
             var world = new WorldBuilder()
                 .SetSettings(
                     new WorldSettings
@@ -57,23 +57,23 @@ namespace Trecs.Samples.Interpolation
                 .AddInterpolationSampleInterpolators()
                 .Build();
 
-            world.AddSystems(
-                new ISystem[] { new OrbitSystem(), new OrbitRendererSystem(gameObjectRegistry) }
-            );
+            var goManager = new RenderableGameObjectManager(world);
+
+            world.AddSystems(new ISystem[] { new OrbitSystem(), new OrbitPresenter(goManager) });
 
             var sceneInitializer = new SceneInitializer(
                 world,
-                gameObjectRegistry,
                 EntitiesPerRing,
                 OrbitRadius,
-                OrbitSpeed
+                OrbitSpeed,
+                goManager
             );
 
             initializables = new() { world.Initialize, sceneInitializer.Initialize };
 
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { world.Dispose };
+            disposables = new() { goManager.Dispose, world.Dispose };
         }
     }
 }

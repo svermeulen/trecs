@@ -1,7 +1,7 @@
 using Trecs.Internal;
 using Unity.Collections;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     public sealed class NativeRingDequeSerializer<T> : ISerializer<NativeRingDeque<T>>
         where T : unmanaged

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Trecs.Collections;
 using Trecs.Internal;
@@ -88,19 +87,12 @@ namespace Trecs
         internal NativeSharedPtr<T> CreateBlobTakingOwnership<T>(
             int frame,
             BlobId blobId,
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
+            NativeBlobAllocation alloc
         )
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
-            var handle = _store.CreateNativeBlobPtrTakingOwnership<T>(
-                blobId,
-                ptr,
-                allocSize,
-                allocAlignment
-            );
+            var handle = _store.CreateNativeBlobPtrTakingOwnership<T>(blobId, alloc);
             return CreateBlobImpl<T>(frame, handle.BlobId, handle.Handle);
         }
 

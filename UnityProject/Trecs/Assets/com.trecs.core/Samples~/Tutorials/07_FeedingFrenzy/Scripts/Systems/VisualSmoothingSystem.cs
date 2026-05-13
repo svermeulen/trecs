@@ -7,8 +7,8 @@ namespace Trecs.Samples.FeedingFrenzy101
     /// simulation values, making visuals fluid even at low fixed
     /// timestep rates.
     ///
-    /// Runs in the Presentation phase before the RendererSystem. Writes to
-    /// Position/Rotation (read by RendererSystem) by lerping toward
+    /// Runs in the Presentation phase before the IndirectRenderer. Writes to
+    /// Position/Rotation (read by IndirectRenderer) by lerping toward
     /// SimPosition/SimRotation (written by fixed-update systems).
     /// </summary>
     [ExecuteIn(SystemPhase.Presentation)]

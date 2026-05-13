@@ -1,6 +1,4 @@
-using Trecs.Serialization;
-
-namespace Trecs.Internal
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Escape hatch for code that needs a <see cref="SerializerRegistry"/>

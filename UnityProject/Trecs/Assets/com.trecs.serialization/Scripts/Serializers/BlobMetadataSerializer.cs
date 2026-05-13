@@ -1,6 +1,6 @@
 using System;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     public sealed class BlobMetadataSerializer : ISerializer<BlobMetadata>
     {

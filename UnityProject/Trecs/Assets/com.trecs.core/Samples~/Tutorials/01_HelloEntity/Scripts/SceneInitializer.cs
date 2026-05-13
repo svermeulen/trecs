@@ -1,28 +1,17 @@
-using UnityEngine;
-
 namespace Trecs.Samples.HelloEntity
 {
     public class SceneInitializer
     {
-        readonly World _world;
-        readonly GameObjectRegistry _gameObjectRegistry;
+        readonly WorldAccessor _world;
 
-        public SceneInitializer(World world, GameObjectRegistry gameObjectRegistry)
+        public SceneInitializer(World world)
         {
-            _world = world;
-            _gameObjectRegistry = gameObjectRegistry;
+            _world = world.CreateAccessor(AccessorRole.Unrestricted);
         }
 
         public void Initialize()
         {
-            var world = _world.CreateAccessor(AccessorRole.Unrestricted);
-
-            var cube = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
-            cube.name = "SpinnerCube";
-
-            world
-                .AddEntity<SampleTags.Spinner>()
-                .Set(_gameObjectRegistry.Register(cube.gameObject));
+            _world.AddEntity<SampleTags.Spinner>();
         }
     }
 }

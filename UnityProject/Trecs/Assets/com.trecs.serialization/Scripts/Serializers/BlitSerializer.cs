@@ -1,4 +1,4 @@
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Serializer for any unmanaged (blittable) type — writes the struct as

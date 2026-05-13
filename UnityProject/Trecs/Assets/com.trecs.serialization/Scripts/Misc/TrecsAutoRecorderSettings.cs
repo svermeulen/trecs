@@ -1,4 +1,4 @@
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Tunables for <see cref="TrecsAutoRecorder"/>'s capture cadence and

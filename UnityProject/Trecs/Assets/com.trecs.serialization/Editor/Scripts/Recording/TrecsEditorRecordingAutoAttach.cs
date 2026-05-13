@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Refcounted helper that constructs a <see cref="TrecsAutoRecorder"/> +

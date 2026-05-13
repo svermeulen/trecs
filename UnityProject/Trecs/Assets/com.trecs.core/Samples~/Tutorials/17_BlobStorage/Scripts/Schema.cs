@@ -46,13 +46,16 @@ namespace Trecs.Samples.BlobStorage
 
     public static partial class SampleTemplates
     {
-        public partial class SwatchEntity : ITemplate, ITagged<SampleTags.Swatch>
+        public partial class SwatchEntity
+            : ITemplate,
+                IExtends<CommonTemplates.RenderableGameObject>,
+                ITagged<SampleTags.Swatch>
         {
             Position Position;
             UniformScale Scale = new(1f);
             ColorComponent Color;
             PaletteRef Palette;
-            GameObjectId GameObjectId;
+            PrefabId PrefabId = new(BlobStoragePrefabs.Swatch);
         }
     }
 }

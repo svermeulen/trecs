@@ -1,6 +1,6 @@
 using UnityEditor;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Wires Trecs game-state recording to the time travel window's open

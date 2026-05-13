@@ -1,4 +1,5 @@
 using Trecs.Internal;
+using Trecs.Serialization.Internal;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -25,7 +26,7 @@ namespace Trecs.Serialization
         /// one registry per world is supported. Callers needing an
         /// unregistered registry (file-header peeks, unit tests, DI installers
         /// before any world exists) should use
-        /// <c>Trecs.Internal.SerializationFactory.CreateRegistry</c>.
+        /// <c>Trecs.Serialization.Internal.SerializationFactory.CreateRegistry</c>.
         /// </summary>
         public static SerializerRegistry CreateSerializerRegistry(World world)
         {
@@ -38,7 +39,7 @@ namespace Trecs.Serialization
         /// <summary>
         /// Populate <paramref name="registry"/> with the built-in core +
         /// Trecs serializers. Exposed as <c>internal</c> so
-        /// <c>Trecs.Internal.SerializationFactory.CreateRegistry</c> can reuse
+        /// <c>Trecs.Serialization.Internal.SerializationFactory.CreateRegistry</c> can reuse
         /// the same population logic without going through the world-tracked
         /// path. Not part of the public API.
         /// </summary>

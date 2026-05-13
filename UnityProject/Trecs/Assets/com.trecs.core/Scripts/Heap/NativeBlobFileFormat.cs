@@ -40,7 +40,8 @@ namespace Trecs.Internal
             Stream stream,
             int expectedSerializationVersion,
             Type innerType,
-            string sourceDescription
+            string sourceDescription,
+            NativeBlobBoxPool pool
         )
         {
             int magic = reader.ReadInt32();
@@ -89,7 +90,7 @@ namespace Trecs.Internal
             NativeBlobBox box = null;
             try
             {
-                box = NativeBlobBox.AllocUninitialized(size, alignment, innerType);
+                box = pool.RentUninitialized(size, alignment, innerType);
 
                 // Read directly into native memory — no managed byte[] intermediate.
                 // Stream.Read may return fewer bytes than requested, so loop until full.

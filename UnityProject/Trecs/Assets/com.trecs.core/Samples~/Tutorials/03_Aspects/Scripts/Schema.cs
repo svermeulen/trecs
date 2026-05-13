@@ -21,12 +21,16 @@ namespace Trecs.Samples.Aspects
 
     public static partial class SampleTemplates
     {
-        public partial class BoidEntity : ITemplate, ITagged<SampleTags.Boid>
+        public partial class BoidEntity
+            : ITemplate,
+                IExtends<CommonTemplates.RenderableGameObject>,
+                ITagged<SampleTags.Boid>
         {
             Position Position = default;
             Velocity Velocity;
             Speed Speed;
-            GameObjectId GameObjectId;
+            ColorComponent Color = new(UnityEngine.Color.white);
+            PrefabId PrefabId = new(AspectsPrefabs.Boid);
         }
     }
 }

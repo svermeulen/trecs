@@ -29,7 +29,7 @@ namespace Trecs.Samples.JobSystem
     {
         public partial class ParticleEntity
             : ITemplate,
-                IExtends<CommonTemplates.Renderable>,
+                IExtends<CommonTemplates.IndirectRenderable>,
                 ITagged<SampleTags.Particle>
         {
             Velocity Velocity;

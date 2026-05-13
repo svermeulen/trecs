@@ -153,7 +153,7 @@ new WorldBuilder()
 
 That's all the sample does on the serialization side — no recorder/player, no key bindings. The Trecs Player editor window (**Window → Trecs → Player**) attaches itself to any active Trecs `World` automatically, so recording, scrubbing, save/load, and snapshot capture are available out of the box.
 
-See [Serialization](../advanced/serialization.md) for custom-serializer authoring and [Recording & Playback](../advanced/recording-and-playback.md) for the full bundle API if your game needs in-game record/playback rather than the editor window.
+See [Serialization](../advanced/serialization.md) for custom-serializer authoring if any of the world's heap data is a managed type that needs to round-trip through recording / scrub.
 
 ## Concepts introduced
 

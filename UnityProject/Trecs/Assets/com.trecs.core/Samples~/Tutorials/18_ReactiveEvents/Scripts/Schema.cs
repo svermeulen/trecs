@@ -28,12 +28,15 @@ namespace Trecs.Samples.ReactiveEvents
 
     public static partial class SampleTemplates
     {
-        public partial class BubbleEntity : ITemplate, ITagged<SampleTags.Bubble>
+        public partial class BubbleEntity
+            : ITemplate,
+                IExtends<CommonTemplates.RenderableGameObject>,
+                ITagged<SampleTags.Bubble>
         {
             Position Position;
             Velocity Velocity;
             Lifetime Lifetime;
-            GameObjectId GameObjectId;
+            PrefabId PrefabId = new(ReactiveEventsPrefabs.Bubble);
         }
 
         public partial class Globals : ITemplate, IExtends<TrecsTemplates.Globals>

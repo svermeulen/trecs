@@ -1,4 +1,4 @@
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Tunables for <see cref="BundleRecorder"/>'s capture cadence. Sparse

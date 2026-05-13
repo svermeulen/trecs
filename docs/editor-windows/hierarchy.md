@@ -5,7 +5,7 @@ The **Trecs Hierarchy** window is the editor's main inspector for a running worl
 **To open it:** `Window > Trecs > Hierarchy`
 
 <figure markdown>
-  ![The Trecs Hierarchy window with all five sections expanded](../images/hierarchy-overview.png){ width="720" }
+  ![The Trecs Hierarchy window with all five sections expanded](../images/hierarchy-overview.png){ width="400" }
   <figcaption>The Trecs Hierarchy window in live mode</figcaption>
 </figure>
 

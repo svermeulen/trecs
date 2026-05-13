@@ -8,7 +8,7 @@ using Trecs.Internal;
 using Trecs.Collections;
 using Trecs;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     internal sealed class SerializationMemoryTracker
     {

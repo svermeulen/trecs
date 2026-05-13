@@ -1,13 +1,13 @@
 using Unity.Mathematics;
-using UnityEngine;
 
 namespace Trecs.Samples.ReactiveEvents
 {
     /// <summary>
     /// Spawns a new Bubble entity every <c>_spawnInterval</c> seconds at a
-    /// random position. The accompanying GameObject is created here and
-    /// destroyed by the OnRemoved observer — a natural fit for the reactive
-    /// pattern, since entity lifetime is the source of truth.
+    /// random position. The accompanying GameObject is created reactively by
+    /// the RenderableGameObjectManager's OnAdded subscription on
+    /// &lt;GameObjectId, PrefabId&gt; — a natural fit, since entity lifetime is
+    /// the source of truth.
     ///
     /// Mutable per-tick state (the spawn cooldown) lives on a global
     /// component, not a system member variable, so the world's state is
@@ -17,12 +17,10 @@ namespace Trecs.Samples.ReactiveEvents
     public partial class BubbleSpawnerSystem : ISystem
     {
         readonly float _spawnInterval;
-        readonly GameObjectRegistry _registry;
 
-        public BubbleSpawnerSystem(float spawnInterval, GameObjectRegistry registry)
+        public BubbleSpawnerSystem(float spawnInterval)
         {
             _spawnInterval = spawnInterval;
-            _registry = registry;
         }
 
         public void Execute()
@@ -51,16 +49,11 @@ namespace Trecs.Samples.ReactiveEvents
             );
             float lifetime = 1.5f + World.Rng.Next() * 2f;
 
-            var go = SampleUtil.CreatePrimitive(PrimitiveType.Sphere);
-            go.name = "Bubble";
-            go.transform.localScale = new Vector3(0.3f, 0.3f, 0.3f);
-
             World
                 .AddEntity<SampleTags.Bubble>()
                 .Set(new Position(position))
                 .Set(new Velocity(velocity))
-                .Set(new Lifetime(lifetime))
-                .Set(_registry.Register(go));
+                .Set(new Lifetime(lifetime));
         }
 
         public partial struct State : IEntityComponent

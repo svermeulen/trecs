@@ -7,6 +7,8 @@ namespace Trecs.Samples.BlobStorage
 {
     public class BlobStorageCompositionRoot : CompositionRootBase
     {
+        // All we do here is call constructors and set up dependencies
+        // between classes.  No initialization logic otherwise
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -14,8 +16,6 @@ namespace Trecs.Samples.BlobStorage
             out List<Action> disposables
         )
         {
-            var registry = new GameObjectRegistry();
-
             var blobStore = new BlobStoreInMemory(
                 new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
                 null
@@ -26,12 +26,14 @@ namespace Trecs.Samples.BlobStorage
                 .AddBlobStore(blobStore)
                 .Build();
 
+            var goManager = new RenderableGameObjectManager(world);
+
             world.AddSystems(
-                new ISystem[] { new PaletteCycleSystem(), new SwatchRendererSystem(registry) }
+                new ISystem[] { new PaletteCycleSystem(), new SwatchPresenter(goManager) }
             );
 
             var seeder = new PaletteSeeder(world);
-            var sceneInitializer = new SceneInitializer(world, registry);
+            var sceneInitializer = new SceneInitializer(world, goManager);
 
             // Order matters: world.Initialize first, then seed the heap, then
             // spawn entities that look up the seeded blobs by ID.
@@ -43,7 +45,7 @@ namespace Trecs.Samples.BlobStorage
             };
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { seeder.Dispose, world.Dispose };
+            disposables = new() { seeder.Dispose, goManager.Dispose, world.Dispose };
         }
     }
 }

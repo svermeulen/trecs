@@ -41,6 +41,7 @@ namespace Trecs
         readonly NativeWorldAccessorFlags _flags;
         readonly NativeSharedPtrResolver _sharedPtrResolver;
         readonly NativeUniquePtrResolver _uniquePtrResolver;
+        readonly NativeTrecsListResolver _trecsListResolver;
         readonly NativeDenseDictionary<SetId, NativeSetDeferredQueues> _deferredQueues;
 
         /// <summary>
@@ -76,6 +77,12 @@ namespace Trecs
         /// </summary>
         public NativeUniquePtrResolver UniquePtrResolver => _uniquePtrResolver;
 
+        /// <summary>
+        /// Provides <see cref="TrecsList{T}"/> resolution for use in Burst jobs.
+        /// Only resolves entries flushed to the heap (not pending adds from the current frame).
+        /// </summary>
+        public NativeTrecsListResolver TrecsListResolver => _trecsListResolver;
+
         internal NativeWorldAccessor(
             AtomicNativeBags addQueue,
             AtomicNativeBags moveQueue,
@@ -85,6 +92,7 @@ namespace Trecs
             NativeWorldAccessorFlags flags,
             NativeSharedPtrResolver sharedPtrResolver,
             NativeUniquePtrResolver uniquePtrResolver,
+            NativeTrecsListResolver trecsListResolver,
             NativeDenseDictionary<SetId, NativeSetDeferredQueues> deferredQueues,
             float deltaTime,
             float elapsedTime
@@ -98,6 +106,7 @@ namespace Trecs
             _flags = flags;
             _sharedPtrResolver = sharedPtrResolver;
             _uniquePtrResolver = uniquePtrResolver;
+            _trecsListResolver = trecsListResolver;
             _deferredQueues = deferredQueues;
             _threadIndex = 0;
             DeltaTime = deltaTime;

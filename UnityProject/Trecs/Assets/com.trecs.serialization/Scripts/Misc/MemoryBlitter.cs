@@ -1,9 +1,9 @@
 using System;
 using System.ComponentModel;
 using System.IO;
-using Trecs.Serialization;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization.Internal
 {
     // NOTE: Not thread safe
     // If needed then use thread locals instead

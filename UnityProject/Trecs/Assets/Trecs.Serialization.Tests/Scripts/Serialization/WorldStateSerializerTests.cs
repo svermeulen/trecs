@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using Trecs.Internal;
+using Trecs.Serialization.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Serialization.Tests

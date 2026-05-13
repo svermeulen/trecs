@@ -4,7 +4,7 @@ using System.IO;
 using Trecs.Collections;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Runtime recorder that captures a Trecs <see cref="World"/> session into

@@ -11,4 +11,4 @@ Trecs ships three editor windows under `Window > Trecs`.
 ## See also
 
 - [World Setup](../core/world-setup.md) — for `SetDebugName` and where the windows pick worlds up from.
-- [Recording &amp; Playback](../advanced/recording-and-playback.md) — the underlying `RecordingBundle` API the Player and Saves wrap.
+- [Serialization](../advanced/serialization.md) — how custom managed types stored on the heap participate in recording, scrubbing, and save/load.

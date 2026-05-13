@@ -13,11 +13,15 @@ namespace Trecs.Samples.SpawnAndDestroy
 
     public static partial class SampleTemplates
     {
-        public partial class SphereEntity : ITemplate, ITagged<SampleTags.Sphere>
+        public partial class SphereEntity
+            : ITemplate,
+                IExtends<CommonTemplates.RenderableGameObject>,
+                ITagged<SampleTags.Sphere>
         {
             Position Position = default;
             Lifetime Lifetime;
-            GameObjectId GameObjectId;
+            ColorComponent Color = new(UnityEngine.Color.white);
+            PrefabId PrefabId = new(SpawnAndDestroyPrefabs.Sphere);
         }
     }
 }

@@ -21,6 +21,8 @@ namespace Trecs.Samples.FeedingFrenzy101
         public Color MealColor;
         public StarvationSystem.Settings StarvationSystemSettings;
 
+        // All we do here is call constructors and set up dependencies
+        // between classes.  No initialization logic otherwise
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -33,7 +35,7 @@ namespace Trecs.Samples.FeedingFrenzy101
             Application.targetFrameRate = 2000;
 
             // ─── GPU instanced rendering ────────────────────────────
-            var renderer = new RendererSystem();
+            var renderer = new IndirectRenderer();
 
             // Fish color is driven per-entity by StarvationSystem via ColorComponent
             // (cyan = healthy, red-orange = starving). Material base color is

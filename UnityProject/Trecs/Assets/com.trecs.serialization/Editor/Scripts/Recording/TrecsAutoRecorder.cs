@@ -11,7 +11,7 @@ using UnityEngine;
 using Newtonsoft.Json;
 #endif
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Periodically captures full-state snapshots of a Trecs <see cref="World"/>

@@ -1,7 +1,7 @@
 using Trecs.Collections;
-using Trecs.Serialization;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Serializer for <see cref="FastList{T}"/> of unmanaged elements. Writes

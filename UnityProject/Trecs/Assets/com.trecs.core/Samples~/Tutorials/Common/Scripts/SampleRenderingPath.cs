@@ -5,7 +5,7 @@ using UnityEditor;
 
 namespace Trecs.Samples
 {
-    // Central gate for the RendererSystem's two rendering paths. Runtime default
+    // Central gate for the IndirectRenderer's two rendering paths. Runtime default
     // is "compute-capable platform uses indirect; everyone else uses fallback".
     // In the Editor, the menu toggle below lets you force the fallback path so
     // you can reproduce WebGL/mobile behavior without a full player build.

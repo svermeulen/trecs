@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Trecs.Internal;
+using Trecs.Serialization.Internal;
 using Unity.Mathematics;
 using UnityEngine;
 

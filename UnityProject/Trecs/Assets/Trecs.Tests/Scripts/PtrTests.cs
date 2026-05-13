@@ -300,7 +300,14 @@ namespace Trecs.Tests
                 CleanIntervalSeconds = 99999,
                 SerializationVersion = 1,
             };
-            return new BlobCache(new List<IBlobStore> { blobStore }, settings);
+            // The pool is intentionally not disposed by the test — boxes return their
+            // native memory to AllocatorManager on Dispose, and the pool's free-list
+            // holds only managed wrapper references that GC reclaims when the test ends.
+            return new BlobCache(
+                new List<IBlobStore> { blobStore },
+                settings,
+                new NativeBlobBoxPool()
+            );
         }
 
         [Test]
@@ -933,7 +940,7 @@ namespace Trecs.Tests
 
             // Native resolve (NativeSharedPtrResolver) requires flush first
             heap.FlushPendingOperations();
-            ref readonly int value = ref ptr.Get(heap.Resolver);
+            ref readonly int value = ref heap.Resolver.Read(in ptr).Value;
             NAssert.AreEqual(42, value);
 
             heap.Dispose();
@@ -969,7 +976,7 @@ namespace Trecs.Tests
             heap.DisposeHandle(ptr.Handle);
 
             heap.FlushPendingOperations();
-            ref readonly int value = ref clone.Get(heap.Resolver);
+            ref readonly int value = ref heap.Resolver.Read(in clone).Value;
             NAssert.AreEqual(42, value);
 
             heap.Dispose();
@@ -1050,19 +1057,20 @@ namespace Trecs.Tests
 
         static (
             NativeUniqueHeap heap,
-            FrameScopedNativeUniqueHeap frameScopedHeap
+            FrameScopedNativeUniqueHeap frameScopedHeap,
+            NativeChunkStore chunkStore
         ) CreateNativeUniqueHeap()
         {
-            var heap = new NativeUniqueHeap();
-            var frameScopedHeap = new FrameScopedNativeUniqueHeap();
-            heap.SetFrameScopedEntries(frameScopedHeap.AllEntries);
-            return (heap, frameScopedHeap);
+            var chunkStore = new NativeChunkStore();
+            var heap = new NativeUniqueHeap(chunkStore);
+            var frameScopedHeap = new FrameScopedNativeUniqueHeap(chunkStore);
+            return (heap, frameScopedHeap, chunkStore);
         }
 
         [Test]
         public void NativeUniqueHeap_Alloc_ReturnsValidPtr()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             var ptr = heap.Alloc<int>(42);
 
@@ -1070,64 +1078,68 @@ namespace Trecs.Tests
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         [Test]
         public void NativeUniqueHeap_Get_ReturnsSameValue()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             var ptr = heap.Alloc<int>(42);
 
             // Resolver requires flush first
             heap.FlushPendingOperations();
-            ref readonly int value = ref ptr.Get(heap.Resolver);
+            ref readonly int value = ref heap.Resolver.Read(in ptr).Value;
             NAssert.AreEqual(42, value);
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         [Test]
         public void NativeUniqueHeap_GetMut_SupportsWrite()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             var ptr = heap.Alloc<int>(42);
 
             heap.FlushPendingOperations();
-            ref int value = ref ptr.GetMut(heap.Resolver);
+            ref int value = ref heap.Resolver.Write(in ptr).Value;
             NAssert.AreEqual(42, value);
 
             value = 99;
-            ref readonly int readBack = ref ptr.Get(heap.Resolver);
+            ref readonly int readBack = ref heap.Resolver.Read(in ptr).Value;
             NAssert.AreEqual(99, readBack);
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         [Test]
         public void NativeUniqueHeap_Set_OverwritesValue()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             var ptr = heap.Alloc<int>(42);
 
             heap.FlushPendingOperations();
-            ptr.Set(heap.Resolver, 123);
+            heap.Resolver.Write(in ptr).Set(123);
 
-            ref readonly int readBack = ref ptr.Get(heap.Resolver);
+            ref readonly int readBack = ref heap.Resolver.Read(in ptr).Value;
             NAssert.AreEqual(123, readBack);
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         [Test]
         public void NativeUniqueHeap_DisposeEntry_RemovesEntry()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             var ptr = heap.Alloc<int>(42);
             NAssert.AreEqual(1, heap.NumEntries);
@@ -1137,29 +1149,31 @@ namespace Trecs.Tests
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         [Test]
         public void NativeUniqueHeap_FlushPendingOperations_MakesEntriesVisibleToResolver()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             var ptr = heap.Alloc<int>(42);
 
             // Before flush, resolver can't see the entry
             // After flush, resolver can
             heap.FlushPendingOperations();
-            ref readonly int readValue = ref ptr.Get(heap.Resolver);
+            ref readonly int readValue = ref heap.Resolver.Read(in ptr).Value;
             NAssert.AreEqual(42, readValue);
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         [Test]
         public void NativeUniqueHeap_CreateAndDispose_BeforeFlush()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             var ptr = heap.Alloc<int>(42);
             NAssert.AreEqual(1, heap.NumEntries);
@@ -1173,12 +1187,13 @@ namespace Trecs.Tests
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         [Test]
         public void NativeUniqueHeap_NumEntries_TracksActiveEntries()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             NAssert.AreEqual(0, heap.NumEntries);
 
@@ -1196,6 +1211,7 @@ namespace Trecs.Tests
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         // ───────────────────────────────────────────────────────────
@@ -1205,7 +1221,7 @@ namespace Trecs.Tests
         [Test]
         public void FrameScopedNativeUniqueHeap_Alloc_ReturnsValidPtr()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             var ptr = frameScopedHeap.Alloc<int>(1, 42);
 
@@ -1214,27 +1230,29 @@ namespace Trecs.Tests
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         [Test]
         public void FrameScopedNativeUniqueHeap_Get_ViaResolver()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             var ptr = frameScopedHeap.Alloc<int>(1, 42);
 
             // Frame-scoped entries go directly into NativeDenseDictionary, no flush needed
-            ref readonly int value = ref ptr.Get(heap.Resolver);
+            ref readonly int value = ref heap.Resolver.Read(in ptr).Value;
             NAssert.AreEqual(42, value);
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         [Test]
         public void FrameScopedNativeUniqueHeap_ClearAtOrAfterFrame_RemovesEntries()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             frameScopedHeap.Alloc<int>(1, 10);
             frameScopedHeap.Alloc<int>(2, 20);
@@ -1247,12 +1265,13 @@ namespace Trecs.Tests
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
 
         [Test]
         public void FrameScopedNativeUniqueHeap_ClearAtOrBeforeFrame_RemovesEntries()
         {
-            var (heap, frameScopedHeap) = CreateNativeUniqueHeap();
+            var (heap, frameScopedHeap, chunkStore) = CreateNativeUniqueHeap();
 
             frameScopedHeap.Alloc<int>(1, 10);
             frameScopedHeap.Alloc<int>(2, 20);
@@ -1265,6 +1284,7 @@ namespace Trecs.Tests
 
             heap.Dispose();
             frameScopedHeap.Dispose();
+            chunkStore.Dispose();
         }
     }
 }

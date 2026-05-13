@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using NUnit.Framework;
 using Trecs.Collections;
+using Trecs.Serialization.Internal;
 using Unity.Mathematics;
 using UnityEngine;
 using Assert = Trecs.Internal.Assert;

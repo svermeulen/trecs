@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using Trecs.Serialization;
+using Trecs.Serialization.Internal;
 using Trecs;
 using Trecs.Internal;
 using Trecs.Collections;

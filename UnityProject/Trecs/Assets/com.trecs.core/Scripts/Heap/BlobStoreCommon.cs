@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Trecs.Collections;
 
 namespace Trecs.Internal
@@ -92,7 +91,9 @@ namespace Trecs.Internal
 
             var numRemoved = 0;
 
-            foreach (var info in removeQueue.OrderBy(x => x.LastAccessTime))
+            removeQueue.Sort(_byLastAccessTime);
+
+            foreach (var info in removeQueue)
             {
                 bytesToRemove -= info.NumBytes;
 
@@ -117,6 +118,10 @@ namespace Trecs.Internal
         }
 
         public const int ManifestSerializationVersion = 1;
+
+        // Cached so .Sort doesn't allocate a Comparison delegate per cleanup tick.
+        static readonly Comparison<MemoryCacheCleanupToRemoveInfo> _byLastAccessTime = (a, b) =>
+            a.LastAccessTime.CompareTo(b.LastAccessTime);
 
         struct MemoryCacheCleanupToRemoveInfo
         {

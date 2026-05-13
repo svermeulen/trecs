@@ -105,7 +105,7 @@ namespace Trecs.Samples.FeedingFrenzy101
         /// </summary>
         public partial class FishEntity
             : ITemplate,
-                IExtends<CommonTemplates.Renderable>,
+                IExtends<CommonTemplates.IndirectRenderable>,
                 ITagged<FrenzyTags.Fish>,
                 IPartitionedBy<FrenzyTags.NotEating, FrenzyTags.Eating>
         {
@@ -133,7 +133,7 @@ namespace Trecs.Samples.FeedingFrenzy101
         /// </summary>
         public partial class MealEntity
             : ITemplate,
-                IExtends<CommonTemplates.Renderable>,
+                IExtends<CommonTemplates.IndirectRenderable>,
                 ITagged<FrenzyTags.Meal>,
                 IPartitionedBy<FrenzyTags.NotEating, FrenzyTags.Eating>
         {

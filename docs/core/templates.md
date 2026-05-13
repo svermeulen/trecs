@@ -76,6 +76,31 @@ public partial class FishEntity : ITemplate,
 }
 ```
 
+### Abstract templates
+
+Mark a base-only template with the C# `abstract` keyword to declare it exists only as an `IExtends<>` target. Abstract templates have every other template feature — fields with defaults, `ITagged<>`, `IPartitionedBy<>`, `IExtends<>` chains — but `WorldBuilder.AddTemplate(SomeAbstract.Template)` is rejected:
+
+- **At authoring time:** source analyzer `TRECS039` flags the call site with a red squiggle.
+- **At runtime:** `WorldBuilder.AddTemplate` throws if it's ever reached (covers locals, conditionals, and reflection paths the analyzer can't statically resolve).
+
+```csharp
+public abstract partial class Renderable : ITemplate, ITagged<CommonTags.Renderable>
+{
+    Position Position;
+    Rotation Rotation;
+    UniformScale Scale;
+}
+
+public partial class FishEntity : ITemplate, IExtends<Renderable>, ITagged<FrenzyTags.Fish> { /* ... */ }
+
+// At World setup:
+builder.AddTemplate(FishEntity.Template);     // OK
+builder.AddTemplate(Renderable.Template);     // TRECS039: abstract template
+```
+
+Use it whenever a template is conceptually a "role" or "mixin" rather than a concrete entity shape. Concrete derived templates are still registered as usual.
+
+
 Multiple bases work too:
 
 ```csharp

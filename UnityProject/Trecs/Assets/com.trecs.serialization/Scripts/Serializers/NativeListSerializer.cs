@@ -2,7 +2,7 @@ using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Serializer for <see cref="NativeList{T}"/> of unmanaged elements.

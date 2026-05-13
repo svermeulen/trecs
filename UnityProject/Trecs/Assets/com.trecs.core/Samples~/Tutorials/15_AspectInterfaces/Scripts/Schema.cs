@@ -27,7 +27,7 @@ namespace Trecs.Samples.AspectInterfaces
 
     // Time of the last hit this entity took. Serves two purposes — it's the
     // cooldown clock TryTakeHit gates on, and it's the flash trigger the
-    // HitFlashRenderer reads to briefly tint the GameObject white.
+    // HitFlashPresenter reads to briefly tint the GameObject white.
     [Unwrap]
     public partial struct HitFlashTime : IEntityComponent
     {
@@ -71,7 +71,10 @@ namespace Trecs.Samples.AspectInterfaces
     // between the template and settings.
     public static partial class SampleTemplates
     {
-        public partial class EnemyEntity : ITemplate, ITagged<SampleTags.Enemy>
+        public partial class EnemyEntity
+            : ITemplate,
+                IExtends<CommonTemplates.RenderableGameObject>,
+                ITagged<SampleTags.Enemy>
         {
             Position Position = default;
             Armor Armor = default;
@@ -82,10 +85,13 @@ namespace Trecs.Samples.AspectInterfaces
             FleeEndTime FleeEndTime = default;
             Mood Mood = default;
             ColorComponent ColorComponent = default;
-            GameObjectId GameObjectId;
+            PrefabId PrefabId = new(AspectInterfacesPrefabs.Enemy);
         }
 
-        public partial class BossEntity : ITemplate, ITagged<SampleTags.Boss>
+        public partial class BossEntity
+            : ITemplate,
+                IExtends<CommonTemplates.RenderableGameObject>,
+                ITagged<SampleTags.Boss>
         {
             Position Position = default;
             Armor Armor = default;
@@ -93,7 +99,7 @@ namespace Trecs.Samples.AspectInterfaces
             Health Health = default;
             HitFlashTime HitFlashTime = default;
             ColorComponent ColorComponent = default;
-            GameObjectId GameObjectId;
+            PrefabId PrefabId = new(AspectInterfacesPrefabs.Boss);
         }
     }
 }

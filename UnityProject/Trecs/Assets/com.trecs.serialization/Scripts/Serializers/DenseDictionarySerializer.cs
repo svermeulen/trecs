@@ -2,7 +2,7 @@ using System;
 using Trecs.Collections;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Serializer for <see cref="DenseDictionary{TKey,TValue}"/> — the

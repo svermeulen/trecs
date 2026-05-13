@@ -6,22 +6,24 @@ namespace Trecs.Samples.Sets
     public class SceneInitializer
     {
         readonly WorldAccessor _world;
-        readonly GameObjectRegistry _gameObjectRegistry;
         readonly SampleSettings _settings;
+        readonly RenderableGameObjectManager _goManager;
 
         public SceneInitializer(
             World world,
-            GameObjectRegistry gameObjectRegistry,
-            SampleSettings settings
+            SampleSettings settings,
+            RenderableGameObjectManager goManager
         )
         {
             _world = world.CreateAccessor(AccessorRole.Fixed);
-            _gameObjectRegistry = gameObjectRegistry;
             _settings = settings;
+            _goManager = goManager;
         }
 
         public void Initialize()
         {
+            _goManager.RegisterFactory(SetsPrefabs.Particle, CreateParticle);
+
             var offset = (_settings.GridSize - 1) * _settings.Spacing * 0.5f;
 
             for (int x = 0; x < _settings.GridSize; x++)
@@ -34,18 +36,16 @@ namespace Trecs.Samples.Sets
                         z * _settings.Spacing - offset
                     );
 
-                    var go = SampleUtil.CreatePrimitive(PrimitiveType.Sphere);
-                    go.name = $"Particle_{x}_{z}";
-                    go.transform.position = (Vector3)position;
-                    go.transform.localScale = Vector3.one * _settings.BaseScale;
-                    go.GetComponent<Renderer>().material.color = Color.gray;
-
-                    _world
-                        .AddEntity<SampleTags.Particle>()
-                        .Set(new Position(position))
-                        .Set(_gameObjectRegistry.Register(go));
+                    _world.AddEntity<SampleTags.Particle>().Set(new Position(position));
                 }
             }
+        }
+
+        GameObject CreateParticle()
+        {
+            var go = SampleUtil.CreatePrimitive(PrimitiveType.Sphere);
+            go.transform.localScale = Vector3.one * _settings.BaseScale;
+            return go;
         }
     }
 }

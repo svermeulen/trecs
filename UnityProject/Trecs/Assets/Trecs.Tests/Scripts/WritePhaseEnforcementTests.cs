@@ -1,6 +1,7 @@
 using System;
 using NUnit.Framework;
 using Trecs.Internal;
+using Trecs.Serialization;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -380,9 +381,20 @@ namespace Trecs.Tests
     [ExecuteIn(SystemPhase.Input)]
     partial class InputAllocSharedFrameScopedSystem : ISystem
     {
+        // The Input phase can run more than once per World.Tick() if the fixed
+        // loop iterates multiple times — gate to a single alloc so we exercise
+        // the role check once without re-creating the same BlobId.
+        bool _hasAllocated;
+
         public void Execute()
         {
+            if (_hasAllocated)
+            {
+                return;
+            }
+            _hasAllocated = true;
             var _ = World.Heap.AllocSharedFrameScoped<WritePhaseHeapPayload>(
+                BlobIdGenerator.FromKey(1),
                 new WritePhaseHeapPayload()
             );
         }
@@ -395,7 +407,10 @@ namespace Trecs.Tests
         {
             // Persistent (non-frame-scoped) allocation must be rejected from
             // the Input role with the "use the FrameScoped variant" message.
-            var _ = World.Heap.AllocShared<WritePhaseHeapPayload>(new WritePhaseHeapPayload());
+            var _ = World.Heap.AllocShared<WritePhaseHeapPayload>(
+                BlobIdGenerator.FromKey(1),
+                new WritePhaseHeapPayload()
+            );
         }
     }
 

@@ -30,7 +30,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
         public partial class FishEntity
             : ITemplate,
-                IExtends<CommonTemplates.Renderable>,
+                IExtends<CommonTemplates.IndirectRenderable>,
                 ITagged<FrenzyTags.Fish>
         {
             Position Position;
@@ -50,7 +50,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         // Base meal entity (no eating partition tracking)
         public partial class MealEntity
             : ITemplate,
-                IExtends<CommonTemplates.Renderable>,
+                IExtends<CommonTemplates.IndirectRenderable>,
                 ITagged<FrenzyTags.Meal>
         {
             Rotation Rotation = new(quaternion.identity);

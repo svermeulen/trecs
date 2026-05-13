@@ -1,6 +1,6 @@
 using System;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Serializer for <see cref="Type"/> references. Round-trips via

@@ -3,8 +3,6 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-#if TRECS_INTERNAL_CHECKS && DEBUG
-#endif
 
 namespace Trecs.Internal
 {

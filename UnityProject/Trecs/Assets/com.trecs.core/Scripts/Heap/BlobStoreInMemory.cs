@@ -30,7 +30,10 @@ namespace Trecs
 
         bool _hasDisposed;
 
-        public BlobStoreInMemory(BlobStoreInMemorySettings settings, ITrecsPoolManager poolManager)
+        public BlobStoreInMemory(
+            BlobStoreInMemorySettings settings,
+            ITrecsPoolManager poolManager = null
+        )
         {
             _settings = settings;
             _common = new(poolManager);
@@ -48,7 +51,16 @@ namespace Trecs
 
         public int SerializationVersion
         {
-            set { Assert.That(value > 0); }
+            // In-memory store doesn't serialize anything, so the version
+            // wired up by BlobCache is intentionally ignored here.
+            set { }
+        }
+
+        public NativeBlobBoxPool NativeBlobBoxPool
+        {
+            // In-memory store never constructs new boxes — it just stores the
+            // box objects handed to it by BlobCache — so the pool is unused.
+            set { }
         }
 
         public void ForcePurgeBlob(BlobId id)

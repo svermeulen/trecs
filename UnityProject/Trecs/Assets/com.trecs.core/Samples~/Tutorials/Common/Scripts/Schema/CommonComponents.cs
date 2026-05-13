@@ -9,6 +9,12 @@ namespace Trecs.Samples
     }
 
     [Unwrap]
+    public partial struct PrefabId : IEntityComponent
+    {
+        public int Value;
+    }
+
+    [Unwrap]
     public partial struct Position : IEntityComponent
     {
         public float3 Value;

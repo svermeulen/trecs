@@ -7,17 +7,18 @@ removed, or moved between groups — without polling.
 
 ## What the sample does
 
-- A `BubbleSpawnerSystem` adds a new `Bubble` entity every 0.3 s. Each entity
-  has a companion `GameObject` (a small sphere) registered in the
-  `GameObjectRegistry`.
+- A `BubbleSpawnerSystem` adds a new `Bubble` entity every 0.3 s.
+  `RenderableGameObjectManager` reactively spawns the companion `GameObject`
+  (a small sphere) when it observes the new entity, so the spawn system
+  itself does not touch Unity GameObjects.
 - A `BubbleLifetimeSystem` removes bubbles whose lifetime has run out.
-- An `EventObserverInstaller` subscribes to `OnAdded` and `OnRemoved` for the
-  `Bubble` tag.
-  - **OnAdded** reads each new entity's `Position` and logs the spawn.
-  - **OnRemoved** reads each outgoing entity's `GameObjectId` component,
-    destroys the associated `GameObject`, and unregisters it. This is the
-    reactive pattern's sweet spot: a single place that owns the cleanup side
-    of entity destruction.
+- A `GameStatsUpdater` subscribes to `OnAdded` and `OnRemoved` for the
+  `Bubble` tag and maintains an `AliveCount`/`TotalSpawned`/`TotalRemoved`
+  global stats component (rendered by `TextDisplaySystem`).
+  - **OnAdded** bumps `AliveCount` and `TotalSpawned`.
+  - **OnRemoved** bumps `TotalRemoved` and decrements `AliveCount`.
+  GameObject cleanup happens in the manager's own `OnRemoved` subscription
+  — observers compose cleanly.
 
   Both handlers are `[ForEachEntity]` methods — the source generator emits
   the per-entity iteration, so the handler body only has to deal with one
@@ -57,11 +58,12 @@ World
     .AddTo(_disposables);
 
 [ForEachEntity]
-void OnBubbleRemoved(in GameObjectId id) { /* clean up GO for `id` */ }
+void OnBubbleRemoved(in Position position) { /* react to the removal */ }
 ```
 
-This is how the sample's `OnRemoved` handler reaches the `GameObjectId` of
-each bubble about to be destroyed.
+This is how the sample's `OnRemoved` handler reaches each bubble's
+`Position` (or any other component on the entity) at the moment of
+removal.
 
 ## Setup (manual)
 

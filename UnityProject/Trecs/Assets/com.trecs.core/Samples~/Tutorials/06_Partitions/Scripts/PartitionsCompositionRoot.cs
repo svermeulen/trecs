@@ -19,6 +19,8 @@ namespace Trecs.Samples.Partitions
         public int BallCount = 100;
         public float SpawnRadius = 8f;
 
+        // All we do here is call constructors and set up dependencies
+        // between classes.  No initialization logic otherwise
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -26,25 +28,20 @@ namespace Trecs.Samples.Partitions
             out List<Action> disposables
         )
         {
-            var gameObjectRegistry = new GameObjectRegistry();
-
             var world = new WorldBuilder().AddTemplate(SampleTemplates.BallEntity.Template).Build();
+
+            var goManager = new RenderableGameObjectManager(world);
 
             world.AddSystems(
                 new ISystem[]
                 {
                     new PhysicsSystem(),
                     new WakeUpSystem(),
-                    new BallRendererSystem(gameObjectRegistry),
+                    new BallPresenter(goManager),
                 }
             );
 
-            var sceneInitializer = new SceneInitializer(
-                world,
-                gameObjectRegistry,
-                BallCount,
-                SpawnRadius
-            );
+            var sceneInitializer = new SceneInitializer(world, BallCount, SpawnRadius, goManager);
 
             initializables = new()
             {
@@ -55,7 +52,7 @@ namespace Trecs.Samples.Partitions
 
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { world.Dispose };
+            disposables = new() { goManager.Dispose, world.Dispose };
         }
     }
 }

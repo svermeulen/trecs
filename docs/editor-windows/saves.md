@@ -92,5 +92,4 @@ The dropdown selects which world a Save / Capture / Load operates on. Save/Captu
 
 - [Player Window](player.md) — transport, scrub, and live recording for the active world.
 - [Hierarchy Window](hierarchy.md) — sibling editor window for inspecting world state.
-- [Recording & Playback](../advanced/recording-and-playback.md) — the `RecordingBundle` API and `BundleRecorder` / `BundlePlayer` types.
-- [Serialization](../advanced/serialization.md) — what's actually written to disk and how custom component types participate.
+- [Serialization](../advanced/serialization.md) — how managed types stored on the heap need a custom `ISerializer<T>` to round-trip into saved files.

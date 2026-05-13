@@ -9,6 +9,8 @@ namespace Trecs.Samples.Aspects
     {
         public SampleSettings Settings;
 
+        // All we do here is call constructors and set up dependencies
+        // between classes.  No initialization logic otherwise
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -16,26 +18,26 @@ namespace Trecs.Samples.Aspects
             out List<Action> disposables
         )
         {
-            var gameObjectRegistry = new GameObjectRegistry();
-
             var world = new WorldBuilder().AddTemplate(SampleTemplates.BoidEntity.Template).Build();
+
+            var goManager = new RenderableGameObjectManager(world);
 
             world.AddSystems(
                 new ISystem[]
                 {
                     new BoidMovementSystem(),
                     new BoidWrapSystem(Settings.AreaSize),
-                    new BoidRendererSystem(gameObjectRegistry),
+                    new BoidPresenter(goManager),
                 }
             );
 
-            var sceneInitializer = new SceneInitializer(world, gameObjectRegistry, Settings);
+            var sceneInitializer = new SceneInitializer(world, Settings, goManager);
 
             initializables = new() { world.Initialize, sceneInitializer.Initialize };
 
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { world.Dispose };
+            disposables = new() { goManager.Dispose, world.Dispose };
         }
     }
 

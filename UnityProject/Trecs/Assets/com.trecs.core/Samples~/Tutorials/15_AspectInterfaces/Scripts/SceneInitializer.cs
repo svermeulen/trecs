@@ -7,41 +7,42 @@ namespace Trecs.Samples.AspectInterfaces
     public class SceneInitializer
     {
         readonly WorldAccessor _world;
-        readonly GameObjectRegistry _gameObjectRegistry;
         readonly SampleSettings _settings;
+        readonly RenderableGameObjectManager _goManager;
 
         public SceneInitializer(
             World world,
-            GameObjectRegistry gameObjectRegistry,
-            SampleSettings settings
+            SampleSettings settings,
+            RenderableGameObjectManager goManager
         )
         {
             _world = world.CreateAccessor(AccessorRole.Fixed);
-            _gameObjectRegistry = gameObjectRegistry;
             _settings = settings;
+            _goManager = goManager;
         }
 
         public void Initialize()
         {
+            _goManager.RegisterFactory(
+                AspectInterfacesPrefabs.Boss,
+                () => CreateCube(_settings.BossScale)
+            );
+            _goManager.RegisterFactory(
+                AspectInterfacesPrefabs.Enemy,
+                () => CreateCube(_settings.EnemyScale)
+            );
+
             // One boss at the origin. Every per-entity stat is pulled
             // from SampleSettings so the scene inspector is the single
             // source of truth.
             var bossPos = float3.zero;
-            var bossGO = MakePrimitive(
-                PrimitiveType.Cube,
-                _settings.BossBaseColor,
-                "Boss",
-                bossPos,
-                _settings.BossScale
-            );
             _world
                 .AddEntity<SampleTags.Boss>()
                 .Set(new Position(bossPos))
                 .Set(new Armor { Value = _settings.BossArmor })
                 .Set(new MaxHealth { Value = _settings.BossMaxHealth })
                 .Set(new Health { Value = _settings.BossMaxHealth })
-                .Set(new ColorComponent { Value = _settings.BossBaseColor })
-                .Set(_gameObjectRegistry.Register(bossGO));
+                .Set(new ColorComponent { Value = _settings.BossBaseColor });
 
             // Enemies arranged on a ring around the boss. Each gets a
             // different armor value so per-entity flee cadence visibly
@@ -60,13 +61,6 @@ namespace Trecs.Samples.AspectInterfaces
                     _settings.EnemySpawnY,
                     radius * math.sin(angle)
                 );
-                var go = MakePrimitive(
-                    PrimitiveType.Cube,
-                    _settings.EnemyBaseColor,
-                    $"Enemy_{i}",
-                    pos,
-                    _settings.EnemyScale
-                );
                 _world
                     .AddEntity<SampleTags.Enemy>()
                     .Set(new Position(pos))
@@ -74,24 +68,14 @@ namespace Trecs.Samples.AspectInterfaces
                     .Set(new MaxHealth { Value = _settings.EnemyMaxHealth })
                     .Set(new Health { Value = _settings.EnemyMaxHealth })
                     .Set(new ChaseSpeed { Value = _settings.EnemyChaseSpeed })
-                    .Set(new ColorComponent { Value = _settings.EnemyBaseColor })
-                    .Set(_gameObjectRegistry.Register(go));
+                    .Set(new ColorComponent { Value = _settings.EnemyBaseColor });
             }
         }
 
-        static GameObject MakePrimitive(
-            PrimitiveType type,
-            Color color,
-            string name,
-            float3 pos,
-            float scale
-        )
+        static GameObject CreateCube(float scale)
         {
-            var go = SampleUtil.CreatePrimitive(type);
-            go.name = name;
-            go.transform.position = (Vector3)pos;
+            var go = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
             go.transform.localScale = Vector3.one * scale;
-            go.GetComponent<Renderer>().material.color = color;
             return go;
         }
     }

@@ -73,7 +73,7 @@ Trecs has a deliberately small API surface — a handful of high-level concepts,
 | | Unity ECS | Trecs |
 |---|---|---|
 | **Stance toward determinism** | Nice-to-have, not enforced | Core design goal, enforced via API |
-| **Recording / playback with desync detection** | Not built-in | Built-in [recording / playback](../advanced/recording-and-playback.md) with desync detection |
+| **Recording / playback with desync detection** | Not built-in | Built-in via the [Trecs Player editor window](../editor-windows/player.md) — scrub back, replay forward, fork the timeline |
 | **Deterministic RNG** | None built-in | Framework-level [`World.Rng`](../advanced/time-and-rng.md) with fork support |
 | **Frame-isolated input for replay** | Not built-in (NetCode for Entities provides one) | [Input system](../core/input-system.md) with frame isolation |
 | **Networking** | NetCode for Entities (separate package) — Client / Server / ThinClient world roles | No direct equivalent |
@@ -83,10 +83,10 @@ Trecs has a deliberately small API surface — a handful of high-level concepts,
 | | Unity ECS | Trecs |
 |---|---|---|
 | **Edit-time authoring → entities** | Subscene baking — designers author with `MonoBehaviour`s, baked at edit/build time | No direct equivalent (yet) |
-| **Runtime save/load of full world state** | Limited runtime serialization | Built-in full game state [serialization](../advanced/serialization.md) (snapshots, save/load, replays) |
+| **Runtime save/load of full world state** | Limited runtime serialization | Built-in via the [Trecs Player editor window](../editor-windows/player.md) — capture, restore, and label full-state snapshots |
 | **Incremental scene streaming** | Subscenes load incrementally (open-world / large-scale streaming) | None built-in — full snapshots only |
-| **Custom type serializers** | None built-in for ECS save/load; managed/non-blittable types need bespoke save/load code | Built in full serialization library — register `ISerializer<T>` for any managed type and reuse across snapshots, recording bundles, or your own save format |
-| **Per-save versioning** | Handled outside the engine | `Reader.Version` / `Writer.Version` for evolving custom serializers across save format revisions |
+| **Custom type serializers** | None built-in for ECS save/load; managed/non-blittable types need bespoke save/load code | Register an [`ISerializer<T>`](../advanced/serialization.md) for any managed type stored on the heap; pure unmanaged components round-trip automatically |
+| **Per-save versioning** | Handled outside the engine | `Reader.Version` / `Writer.Version` for evolving custom serializers across save-format revisions |
 
 ## Editor tooling
 

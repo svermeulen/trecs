@@ -1,6 +1,6 @@
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Serializer for typed arrays (<typeparamref name="T"/> is an array type,

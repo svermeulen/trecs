@@ -5,7 +5,7 @@ using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Serializes or deserializes the full game state. Implemented by
@@ -198,6 +198,7 @@ namespace Trecs.Serialization
             _world.GetSharedHeap().ClearAll(warnUndisposed: false);
             _world.GetNativeSharedHeap().ClearAll(warnUndisposed: false);
             _world.GetNativeUniqueHeap().ClearAll(warnUndisposed: false);
+            _world.GetTrecsListHeap().ClearAll(warnUndisposed: false);
 
             DeserializeImpl(reader);
 
@@ -415,6 +416,7 @@ namespace Trecs.Serialization
                 _world.GetSharedHeap().Serialize(trecsWriter);
                 _world.GetNativeSharedHeap().Serialize(trecsWriter);
                 _world.GetNativeUniqueHeap().Serialize(trecsWriter);
+                _world.GetTrecsListHeap().Serialize(trecsWriter);
             }
 
             _log.Trace(
@@ -664,6 +666,7 @@ namespace Trecs.Serialization
                 _world.GetSharedHeap().Deserialize(trecsReader);
                 _world.GetNativeSharedHeap().Deserialize(trecsReader);
                 _world.GetNativeUniqueHeap().Deserialize(trecsReader);
+                _world.GetTrecsListHeap().Deserialize(trecsReader);
             }
 
             using (TrecsProfiling.Start("Reading system enable state"))

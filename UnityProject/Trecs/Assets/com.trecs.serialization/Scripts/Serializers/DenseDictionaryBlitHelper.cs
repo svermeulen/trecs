@@ -2,7 +2,7 @@ using System;
 using Trecs.Collections;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Interface for blit serialization of DenseDictionary without unmanaged constraint.

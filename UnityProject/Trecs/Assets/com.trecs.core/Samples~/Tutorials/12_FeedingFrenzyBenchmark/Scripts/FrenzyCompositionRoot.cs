@@ -23,6 +23,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         // (e.g. cycling IterationStyle without needing a scene reload).
         public static WorldAccessor CurrentWorld;
 
+        // All we do here is call constructors and set up dependencies
+        // between classes.  No initialization logic otherwise
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -73,6 +75,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             var removeCleanupHandler = new RemoveCleanupHandler(world);
             var configInput = new ConfigInputSystem();
             var presetInput = new FishCountPresetInputSystem(fishCountPresets);
+            var configUpdate = new FrenzyConfigUpdateSystem();
             var manageFishCount = new FishAdderAndRemover(
                 Settings.FishAdderAndRemover,
                 Settings.Common,
@@ -93,7 +96,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             var sceneInitializer = new SceneInitializer(Settings.Common, world, config);
 
-            var renderer = new RendererSystem();
+            var renderer = new IndirectRenderer();
 
             var fishMesh = SampleUtil.CreateDartMesh();
             var mealMesh = SampleUtil.CreateScaledCubeMesh();
@@ -121,6 +124,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 {
                     configInput,
                     presetInput,
+                    configUpdate,
                     manageFishCount,
                     manageMealCount,
                     lookingForMeal,

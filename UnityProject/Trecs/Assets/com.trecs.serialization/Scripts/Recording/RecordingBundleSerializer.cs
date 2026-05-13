@@ -4,7 +4,7 @@ using System.IO;
 using Trecs.Collections;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Reads and writes <see cref="RecordingBundle"/> instances to streams or

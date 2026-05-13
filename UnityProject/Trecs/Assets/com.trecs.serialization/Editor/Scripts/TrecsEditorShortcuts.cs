@@ -4,7 +4,7 @@ using Trecs.Internal;
 using UnityEditor.ShortcutManagement;
 using UnityEngine;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Editor shortcuts for driving the Trecs game-state controller from the

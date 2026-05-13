@@ -44,6 +44,7 @@ namespace Trecs
         readonly EcsStructuralOps _structuralOps;
         readonly DisposeGroup _eventSubscriptions = new();
         readonly BlobCache _blobCache;
+        readonly NativeBlobBoxPool _nativeBlobBoxPool;
         readonly InterpolatedPreviousSaverManager _interpolatedPreviousSaverManager;
         readonly ComponentStore _componentStore;
         readonly SystemLoader _systemLoader;
@@ -69,6 +70,8 @@ namespace Trecs
             FrameScopedNativeSharedHeap nativeFrameScopedSharedHeap,
             NativeUniqueHeap nativeUniqueHeap,
             FrameScopedNativeUniqueHeap frameScopedNativeUniqueHeap,
+            NativeChunkStore nativeUniqueChunkStore,
+            TrecsListHeap trecsListHeap,
             WorldAccessorRegistry accessorRegistry,
             SystemLoader systemLoader,
             EntitySubmitter entitySubmitter,
@@ -79,6 +82,7 @@ namespace Trecs
             SharedHeap sharedHeap,
             WorldSettings settings,
             BlobCache blobCache,
+            NativeBlobBoxPool nativeBlobBoxPool,
             InterpolatedPreviousSaverManager interpolatedPreviousSaverManager,
             ComponentStore componentStore,
             List<ISystem> systems
@@ -94,8 +98,10 @@ namespace Trecs
             _querier = entitiesDb;
             _componentStore = componentStore;
             _eventsManager = eventsManager;
+            Assert.IsNotNull(nativeBlobBoxPool);
             _settings = settings ?? new WorldSettings();
             _blobCache = blobCache;
+            _nativeBlobBoxPool = nativeBlobBoxPool;
             _fixedRng = new Rng(_settings.RandomSeed);
             _interpolatedPreviousSaverManager = interpolatedPreviousSaverManager;
 
@@ -112,7 +118,9 @@ namespace Trecs
                 frameScopedSharedHeap,
                 nativeFrameScopedSharedHeap,
                 nativeUniqueHeap,
-                frameScopedNativeUniqueHeap
+                frameScopedNativeUniqueHeap,
+                nativeUniqueChunkStore,
+                trecsListHeap
             );
 
             _structuralOps = new EcsStructuralOps(
@@ -382,6 +390,15 @@ namespace Trecs
             }
         }
 
+        internal TrecsListHeap TrecsListHeap
+        {
+            get
+            {
+                Assert.That(!_isDisposed);
+                return _heapAllocator.TrecsListHeap;
+            }
+        }
+
         internal int FixedFrame
         {
             get
@@ -503,6 +520,10 @@ namespace Trecs
             _structuralOps.MarkDisposed();
 
             _blobCache.Dispose();
+
+            // Pool is disposed last — heaps and blob stores both return boxes to it
+            // during their own Dispose, so it must outlive everything that holds boxes.
+            _nativeBlobBoxPool.Dispose();
 
             _isDisposed = true;
             GC.SuppressFinalize(this);
@@ -982,6 +1003,12 @@ namespace Trecs.Internal
         public static FrameScopedNativeUniqueHeap GetFrameScopedNativeUniqueHeap(this World world)
         {
             return world.FrameScopedNativeUniqueHeap;
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static TrecsListHeap GetTrecsListHeap(this World world)
+        {
+            return world.TrecsListHeap;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]

@@ -66,8 +66,6 @@ Two concepts share the timeline:
 | **Recording** | A scrubbable time-range buffer. Live input is captured alongside world state, so replay is verbatim. | "Wind back five seconds and watch the bug again." |
 | **Snapshot** | A single-frame world state — no input history, no buffer. | "Save this exact state as a QA repro fixture / 'revert here later' pin." Loading a snapshot stops the current recording and (if Auto-Record is on) starts a fresh one from the snapshot's frame. |
 
-See [Recording & Playback](../advanced/recording-and-playback.md) for the underlying `RecordingBundle` API.
-
 ## Actions ▾ menu
 
 The ▾ button opens a menu with everything that doesn't fit on the transport row. Entries grey out when they don't apply (e.g. **Save Recording** is disabled until there's a buffer to save).
@@ -124,6 +122,5 @@ In a multi-world scene the dropdown selects which world the Player drives. Each 
 
 - [Saves Window](saves.md) — library view of all on-disk recordings and snapshots, with rename, multi-select, and search.
 - [Hierarchy Window](hierarchy.md) — sibling editor window for inspecting live world state alongside the Player.
-- [Recording & Playback](../advanced/recording-and-playback.md) — the `RecordingBundle` API the recorder is built on.
-- [Save Game sample](../samples/13-save-game.md) — how the snapshot side of the API is used in game code.
+- [Serialization](../advanced/serialization.md) — how managed types stored on the heap participate in recording and snapshots.
 - [Snake sample](../samples/11-snake.md) — a self-contained example of a recording-driven workflow.

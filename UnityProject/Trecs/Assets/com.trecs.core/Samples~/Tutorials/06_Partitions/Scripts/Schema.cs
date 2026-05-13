@@ -31,13 +31,14 @@ namespace Trecs.Samples.Partitions
         /// </summary>
         public partial class BallEntity
             : ITemplate,
+                IExtends<CommonTemplates.RenderableGameObject>,
                 ITagged<BallTags.Ball>,
                 IPartitionedBy<BallTags.Active>
         {
             Position Position;
             Velocity Velocity;
             RestTimer RestTimer;
-            GameObjectId GameObjectId;
+            PrefabId PrefabId = new(PartitionsPrefabs.Ball);
         }
     }
 }

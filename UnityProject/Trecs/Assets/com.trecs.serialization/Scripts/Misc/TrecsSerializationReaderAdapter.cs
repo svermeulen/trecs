@@ -1,6 +1,6 @@
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     public struct TrecsSerializationReaderAdapter : ITrecsSerializationReader
     {

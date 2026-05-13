@@ -49,19 +49,27 @@ namespace Trecs
         readonly BlobCacheSettings _settings;
         readonly List<IBlobStore> _stores;
         readonly IBlobStore _writableStore;
+        readonly NativeBlobBoxPool _nativeBlobBoxPool;
 
         uint _handleIdCounter = 1;
         bool _hasDisposed;
         float _cleanCountdown;
 
-        public BlobCache(List<IBlobStore> stores, BlobCacheSettings settings)
+        public BlobCache(
+            List<IBlobStore> stores,
+            BlobCacheSettings settings,
+            NativeBlobBoxPool nativeBlobBoxPool
+        )
         {
+            Assert.IsNotNull(nativeBlobBoxPool);
             _stores = stores;
             _settings = settings ?? BlobCacheSettings.Default;
+            _nativeBlobBoxPool = nativeBlobBoxPool;
 
             foreach (var store in stores)
             {
                 store.SerializationVersion = _settings.SerializationVersion;
+                store.NativeBlobBoxPool = _nativeBlobBoxPool;
 
                 if (!store.IsReadOnly)
                 {
@@ -76,15 +84,19 @@ namespace Trecs
             get { return _stores; }
         }
 
-        public IBlobStore WritableBlobStore
-        {
-            get { return RequireWritableStore(); }
-        }
-
         IBlobStore RequireWritableStore()
         {
             Assert.IsNotNull(_writableStore, "No writable blob store found");
             return _writableStore;
+        }
+
+        // BlobCache is a main-thread-only abstraction. Asserts both invariants
+        // (alive + on the right thread) at the top of every method so a
+        // misuse from a job surfaces immediately instead of corrupting state.
+        void AssertMainThreadAndNotDisposed()
+        {
+            Assert.That(!_hasDisposed);
+            Assert.That(UnityThreadHelper.IsMainThread, "BlobCache is main-thread only");
         }
 
         /// <summary>
@@ -97,8 +109,7 @@ namespace Trecs
         /// </summary>
         public void Tick()
         {
-            Assert.That(!_hasDisposed);
-            Assert.That(UnityThreadHelper.IsMainThread, "BlobCache.Tick is main-thread only");
+            AssertMainThreadAndNotDisposed();
 
             _cleanCountdown -= Time.deltaTime;
 
@@ -112,7 +123,7 @@ namespace Trecs
 
         bool TryGetManifestEntry(BlobId id, out BlobMetadata manifestEntry, bool updateAccessTime)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             foreach (var store in _stores)
             {
@@ -134,7 +145,7 @@ namespace Trecs
 
         internal Type TryGetManagedBlobType(BlobId id, bool updateAccessTime = true)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime))
             {
@@ -155,7 +166,7 @@ namespace Trecs
 
         internal Type TryGetNativeBlobType(BlobId id, bool updateAccessTime = true)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime))
             {
@@ -175,6 +186,8 @@ namespace Trecs
 
         public void GetAllActiveBlobIds(DenseHashSet<BlobId> blobIds)
         {
+            AssertMainThreadAndNotDisposed();
+
             foreach (var (_, blobId) in _handles)
             {
                 blobIds.Add(blobId);
@@ -201,13 +214,13 @@ namespace Trecs
 
         public bool HasBlob(BlobId id, bool updateAccessTime = true)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
             return TryGetManifestEntry(id, out var _, updateAccessTime: updateAccessTime);
         }
 
         public bool HasManagedBlob(BlobId id, bool updateAccessTime = true)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime: updateAccessTime))
             {
@@ -221,7 +234,7 @@ namespace Trecs
         public bool HasManagedBlob<T>(BlobId id, bool updateAccessTime = true)
             where T : class
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime: updateAccessTime))
             {
@@ -233,7 +246,7 @@ namespace Trecs
 
         public bool HasNativeBlob(BlobId id, bool updateAccessTime = true)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime: updateAccessTime))
             {
@@ -246,7 +259,7 @@ namespace Trecs
         public bool HasNativeBlob<T>(BlobId id, bool updateAccessTime = true)
             where T : unmanaged
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime: updateAccessTime))
             {
@@ -280,7 +293,7 @@ namespace Trecs
         internal T GetManagedBlob<T>(BlobId id, bool updateAccessTime = true)
             where T : class
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
@@ -293,7 +306,7 @@ namespace Trecs
         public BlobPtr<T> CreateBlobPtr<T>(BlobId id, T blob)
             where T : class
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
             RequireWritableStore().CreateBlobImpl(id, blob, isNative: false);
             return new BlobPtr<T>(CreateHandle(id), id);
         }
@@ -356,7 +369,7 @@ namespace Trecs
 
         public IBlobAnchor CreateBlobAnchor(BlobId blobId, bool updateAccessTime = true)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             if (
                 !TryGetManifestEntry(
@@ -378,9 +391,6 @@ namespace Trecs
 
         internal void ForcePurgeBlob(BlobId id)
         {
-            _log.Warning(
-                "Received call to BlobCache.ForcePurgeBlob - this method should not be used"
-            );
             RequireWritableStore().ForcePurgeBlob(id);
         }
 
@@ -391,7 +401,7 @@ namespace Trecs
         )
             where T : unmanaged
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             if (!TryGetBlobAndMetadata(id, out var blob, out var metadata, updateAccessTime))
             {
@@ -413,7 +423,7 @@ namespace Trecs
 
         internal IntPtr GetNativeBlobPtr(BlobId id, int innerTypeId, bool updateAccessTime = true)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             _log.Trace("Looking up native blob with inner type id {}", innerTypeId);
 
@@ -428,7 +438,7 @@ namespace Trecs
         internal unsafe ref T GetNativeBlobRef<T>(BlobId id, bool updateAccessTime = true)
             where T : unmanaged
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
@@ -462,14 +472,14 @@ namespace Trecs
 
         internal bool TryGetBlob(BlobId id, out object blob, bool updateAccessTime = true)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             return TryGetBlobAndMetadata(id, out blob, out _, updateAccessTime);
         }
 
         public void WarmUpBlob(BlobId id)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             foreach (var store in _stores)
             {
@@ -485,7 +495,7 @@ namespace Trecs
 
         public BlobLoadingState GetBlobLoadingState(BlobId id)
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             foreach (var store in _stores)
             {
@@ -523,7 +533,7 @@ namespace Trecs
             bool updateAccessTime = true
         )
         {
-            Assert.That(!_hasDisposed);
+            AssertMainThreadAndNotDisposed();
 
             using var _ = TrecsProfiling.Start("BlobCache.TryGetBlobAndMetadata");
 
@@ -552,8 +562,8 @@ namespace Trecs
         public NativeBlobPtr<T> CreateNativeBlobPtr<T>(BlobId id, in T value)
             where T : unmanaged
         {
-            Assert.That(!_hasDisposed);
-            var box = NativeBlobBox.AllocFromValue(in value);
+            AssertMainThreadAndNotDisposed();
+            var box = _nativeBlobBoxPool.RentFromValue(in value);
             try
             {
                 RequireWritableStore().CreateBlobImpl(id, box, isNative: true);
@@ -576,14 +586,12 @@ namespace Trecs
         /// </summary>
         public NativeBlobPtr<T> CreateNativeBlobPtrTakingOwnership<T>(
             BlobId id,
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
+            NativeBlobAllocation alloc
         )
             where T : unmanaged
         {
-            Assert.That(!_hasDisposed);
-            var box = NativeBlobBox.FromExistingPointer(ptr, allocSize, allocAlignment, typeof(T));
+            AssertMainThreadAndNotDisposed();
+            var box = _nativeBlobBoxPool.RentTakingOwnership(alloc, typeof(T));
             try
             {
                 RequireWritableStore().CreateBlobImpl(id, box, isNative: true);

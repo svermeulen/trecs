@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// For cases where you are serializing / deserializing multiple times

@@ -11,6 +11,8 @@ namespace Trecs.Samples.ReactiveEvents
         public float SpawnInterval = 0.3f;
         public TMP_Text StatusText;
 
+        // All we do here is call constructors and set up dependencies
+        // between classes.  No initialization logic otherwise
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -18,8 +20,6 @@ namespace Trecs.Samples.ReactiveEvents
             out List<Action> disposables
         )
         {
-            var registry = new GameObjectRegistry();
-
             var world = new WorldBuilder()
                 .AddTemplates(
                     new[]
@@ -30,24 +30,28 @@ namespace Trecs.Samples.ReactiveEvents
                 )
                 .Build();
 
+            var goManager = new RenderableGameObjectManager(world);
+
             world.AddSystems(
                 new ISystem[]
                 {
-                    new BubbleSpawnerSystem(SpawnInterval, registry),
+                    new BubbleSpawnerSystem(SpawnInterval),
                     new BubblePhysicsSystem(),
                     new BubbleLifetimeSystem(),
-                    new BubbleRendererSystem(registry),
+                    new BubblePresenter(goManager),
                 }
             );
 
-            var observer = new GameStatsUpdater(world, registry);
+            var observer = new GameStatsUpdater(world);
 
             world.AddSystem(new TextDisplaySystem(StatusText));
 
-            initializables = new() { world.Initialize };
+            var sceneInitializer = new SceneInitializer(goManager);
+
+            initializables = new() { world.Initialize, sceneInitializer.Initialize };
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { observer.Dispose, world.Dispose };
+            disposables = new() { observer.Dispose, goManager.Dispose, world.Dispose };
         }
     }
 }

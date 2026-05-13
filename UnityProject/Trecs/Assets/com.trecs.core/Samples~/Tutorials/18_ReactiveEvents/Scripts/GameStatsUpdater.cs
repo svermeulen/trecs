@@ -1,5 +1,4 @@
 using System;
-using Object = UnityEngine.Object;
 
 namespace Trecs.Samples.ReactiveEvents
 {
@@ -20,13 +19,11 @@ namespace Trecs.Samples.ReactiveEvents
     /// </summary>
     public partial class GameStatsUpdater : IDisposable
     {
-        readonly GameObjectRegistry _registry;
         readonly DisposeCollection _disposables = new();
 
-        public GameStatsUpdater(World world, GameObjectRegistry registry)
+        public GameStatsUpdater(World world)
         {
             World = world.CreateAccessor(AccessorRole.Fixed);
-            _registry = registry;
 
             World
                 .Events.EntitiesWithTags<SampleTags.Bubble>()
@@ -46,12 +43,8 @@ namespace Trecs.Samples.ReactiveEvents
         }
 
         [ForEachEntity]
-        void OnBubbleRemoved(in GameObjectId id)
+        void OnBubbleRemoved(in Position position)
         {
-            var go = _registry.Resolve(id);
-            _registry.Unregister(id);
-            Object.Destroy(go);
-
             ref var stats = ref World.GlobalComponent<GameStats>().Write;
             stats.AliveCount--;
             stats.TotalRemoved++;

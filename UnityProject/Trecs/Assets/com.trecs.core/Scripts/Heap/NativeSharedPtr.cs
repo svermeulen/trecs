@@ -2,32 +2,26 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Trecs.Internal;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 namespace Trecs
 {
     /// <summary>
     /// Reference-counted pointer to a shared native (unmanaged) heap allocation. Burst-compatible.
-    /// Multiple entities can reference the same data via <see cref="BlobId"/>. Resolve to a
-    /// <c>ref readonly T</c> via <see cref="Get(in NativeSharedPtrResolver)"/> in jobs or
-    /// <see cref="Get(HeapAccessor)"/> on the main thread. Shared native data is immutable by
-    /// design — any number of readers can resolve the same blob in parallel without coordination,
-    /// so the API only exposes read-only access.
+    /// Multiple entities can reference the same data via <see cref="BlobId"/>.
     /// <para>
-    /// Allocate via <see cref="HeapAccessor.AllocNativeShared{T}"/>. Cloning increments the
-    /// reference count; disposing decrements it and frees when zero.
+    /// Allocate via <see cref="HeapAccessor.AllocNativeShared{T}(BlobId)"/>. Open a safety-checked
+    /// view with <see cref="HeapAccessor.Read{T}(in NativeSharedPtr{T})"/> on the main thread, or
+    /// <see cref="NativeSharedPtrResolver.Read{T}"/> in Burst jobs. <see cref="Clone"/> increments
+    /// the reference count; <see cref="Dispose(HeapAccessor)"/> decrements it and frees on zero.
     /// </para>
     /// <para>
-    /// Public verb set: <c>GetUnsafePtr</c>, <c>Get</c>, <c>Clone</c>, <c>Dispose</c>,
-    /// <c>IsNull</c>. <c>Get</c> / <c>GetUnsafePtr</c> have job-side overloads
-    /// (<see cref="NativeSharedPtrResolver"/> / <see cref="NativeWorldAccessor"/>) and main-thread
-    /// overloads (<see cref="HeapAccessor"/> / <see cref="WorldAccessor"/>). <c>Clone</c> and
-    /// <c>Dispose</c> are main-thread-only by design — they mutate ref-count bookkeeping in the
-    /// shared heap, which isn't accessible from a Burst job. There is no public <c>TryGet</c> /
-    /// <c>CanGet</c>: a live <see cref="NativeSharedPtr{T}"/> is expected to resolve, since
-    /// disposal mirrors managed <see cref="SharedPtr{T}"/> — if you're worried about lifetimes,
-    /// you're holding a stale ptr.
+    /// Shared native data is immutable by design — any number of readers can resolve the same
+    /// blob in parallel without coordination, so the API only exposes read-only access. The
+    /// persistent struct stores only (<see cref="PtrHandle"/>, <see cref="BlobId"/>) — 12 bytes,
+    /// cheap to copy and store on components. Per-blob <c>AtomicSafetyHandle</c>s live on the
+    /// owning heap and are attached to the <see cref="NativeSharedRead{T}"/> wrapper at Open
+    /// time so Unity's job-safety walker can detect use-after-free.
     /// </para>
     /// </summary>
     /// <remarks>
@@ -44,53 +38,6 @@ namespace Trecs
         {
             Handle = handle;
             BlobId = blobId;
-        }
-
-        public readonly unsafe void* GetUnsafePtr(in NativeSharedPtrResolver nativePtrResolver)
-        {
-            return nativePtrResolver.ResolveUnsafePtr<T>(BlobId);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe void* GetUnsafePtr(in NativeWorldAccessor accessor)
-        {
-            return GetUnsafePtr(accessor.SharedPtrResolver);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe void* GetUnsafePtr(HeapAccessor heap)
-        {
-            return heap.ResolveUnsafePtr<T>(BlobId);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe void* GetUnsafePtr(WorldAccessor world)
-        {
-            return GetUnsafePtr(world.Heap);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref readonly T Get(in NativeSharedPtrResolver nativePtrResolver)
-        {
-            return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(nativePtrResolver));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref readonly T Get(in NativeWorldAccessor accessor)
-        {
-            return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(accessor.SharedPtrResolver));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref readonly T Get(HeapAccessor heap)
-        {
-            return ref UnsafeUtility.AsRef<T>(GetUnsafePtr(heap));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly unsafe ref readonly T Get(WorldAccessor world)
-        {
-            return ref Get(world.Heap);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

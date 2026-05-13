@@ -5,10 +5,11 @@ namespace Trecs
 {
     /// <summary>
     /// Identifier for a shared blob allocation in <see cref="SharedPtr{T}"/> and
-    /// <see cref="NativeSharedPtr{T}"/> heaps. The framework assigns IDs automatically,
-    /// but callers can supply an explicit <see cref="BlobId"/> to enable content-based
-    /// deduplication (two allocations with the same ID share the same underlying data).
-    /// A zero value represents a null (unallocated) blob.
+    /// <see cref="NativeSharedPtr{T}"/> heaps. Callers always supply an explicit
+    /// <see cref="BlobId"/> for persistent allocations — use one of the factories
+    /// (<see cref="FromKey"/>, <see cref="FromGuid"/>, <see cref="FromBytes"/>,
+    /// or the content-hash extension from Trecs.Serialization) to obtain one with
+    /// the semantics you want. A zero value represents a null (unallocated) blob.
     /// </summary>
     [TypeId(283746019)]
     public readonly struct BlobId : IEquatable<BlobId>, IStableHashProvider

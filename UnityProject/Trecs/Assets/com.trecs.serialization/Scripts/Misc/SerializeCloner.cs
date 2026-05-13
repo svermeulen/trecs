@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class SerializeCloner

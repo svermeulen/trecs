@@ -2,7 +2,7 @@ using System;
 using Trecs.Collections;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Serializer for <see cref="DenseHashSet{T}"/> — the deterministic,

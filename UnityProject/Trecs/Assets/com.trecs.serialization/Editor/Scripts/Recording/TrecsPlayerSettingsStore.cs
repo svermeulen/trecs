@@ -1,7 +1,7 @@
 using System.Globalization;
 using UnityEditor;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// EditorPrefs-backed defaults for the auto-recorder. Decouples settings

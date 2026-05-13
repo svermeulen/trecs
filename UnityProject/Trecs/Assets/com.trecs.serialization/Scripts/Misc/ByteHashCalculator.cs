@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     // Fast FNV-1a byte-array hash. Intended use: non-cryptographic fingerprinting
     // for sanity checks (e.g. recording/playback desync detection), dictionary

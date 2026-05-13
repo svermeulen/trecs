@@ -1,25 +1,25 @@
+using UnityEngine;
+
 namespace Trecs.Samples.HelloEntity
 {
-    // Use variable update since it's best practice to not reference
-    // outside simulation when in Fixed update, and we reference game objects here
-    // This is because fixed update should be deterministic and not rely on outside state
-    // so that we can serialize, snapshot, make recordings, playback recordings
-    // Determinism might be important for other reasons as well
+    // Presentation phase: it's a best practice to never touch GameObjects from
+    // a Fixed update system. Fixed update is supposed to be deterministic
+    // (free of outside state) so the world can be serialized, snapshotted,
+    // recorded, and replayed.
     [ExecuteIn(SystemPhase.Presentation)]
     public partial class SpinnerGameObjectUpdater : ISystem
     {
-        readonly GameObjectRegistry _gameObjectRegistry;
+        readonly Transform _spinnerCube;
 
-        public SpinnerGameObjectUpdater(GameObjectRegistry gameObjectRegistry)
+        public SpinnerGameObjectUpdater(Transform spinnerCube)
         {
-            _gameObjectRegistry = gameObjectRegistry;
+            _spinnerCube = spinnerCube;
         }
 
         [ForEachEntity(MatchByComponents = true)]
-        void Execute(in GameObjectId id, in Rotation rotation)
+        void Execute(in Rotation rotation)
         {
-            var go = _gameObjectRegistry.Resolve(id);
-            go.transform.rotation = rotation.Value;
+            _spinnerCube.rotation = rotation.Value;
         }
     }
 }

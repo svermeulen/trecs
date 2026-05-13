@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using Trecs.Serialization.Internal;
 using UnityEngine;
 using Assert = NUnit.Framework.Assert;
 

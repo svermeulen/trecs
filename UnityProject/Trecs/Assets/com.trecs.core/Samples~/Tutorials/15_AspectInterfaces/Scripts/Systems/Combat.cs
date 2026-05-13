@@ -26,7 +26,7 @@ namespace Trecs.Samples.AspectInterfaces
         //
         // Three of IHittable's four fields are touched here (Armor, Health,
         // HitFlashTime); MaxHealth rides along in the aspect for callers
-        // that need it (EnemyAiSystem's heal clamp, HitFlashRenderer's
+        // that need it (EnemyAiSystem's heal clamp, HitFlashPresenter's
         // tint ratio). That's the payoff of the aspect interface — a
         // single `in T` argument instead of shuffling four component refs
         // through every helper and caller's signature.

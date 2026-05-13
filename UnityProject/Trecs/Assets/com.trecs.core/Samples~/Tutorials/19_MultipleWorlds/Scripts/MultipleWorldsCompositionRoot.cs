@@ -19,6 +19,8 @@ namespace Trecs.Samples.MultipleWorlds
         bool _pausedA;
         bool _pausedB;
 
+        // All we do here is call constructors and set up dependencies
+        // between classes.  No initialization logic otherwise
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -26,15 +28,17 @@ namespace Trecs.Samples.MultipleWorlds
             out List<Action> disposables
         )
         {
-            // Both worlds share a single GameObjectRegistry because GameObjectId is just a process-wide
-            // integer handle into Unity's scene — the registry has nothing to do with ECS isolation.
-            // Each world still has its own entity store, system instances, and accessors.
-            var gameObjectRegistry = new GameObjectRegistry();
-
+            // Each world gets its own RenderableGameObjectManager — the
+            // manager's id counter lives in its world's heap so it must be
+            // 1:1 with a World. GameObjectId values are world-local now,
+            // not shared. Either world can be snapshotted independently
+            // and its GameObjects will be rebuilt from its entity set.
             _worldA = new WorldBuilder()
                 .SetDebugName("World A — Red Spheres")
                 .AddTemplate(SampleTemplates.CritterEntity.Template)
                 .Build();
+
+            var goManagerA = new RenderableGameObjectManager(_worldA);
 
             _worldA.AddSystems(
                 new ISystem[]
@@ -43,13 +47,10 @@ namespace Trecs.Samples.MultipleWorlds
                         SpawnIntervalA,
                         Lifetime,
                         SpawnRadius,
-                        new Vector3(-WorldSeparation, 0, 0),
-                        Color.red,
-                        PrimitiveType.Sphere,
-                        gameObjectRegistry
+                        new Vector3(-WorldSeparation, 0, 0)
                     ),
-                    new LifetimeSystem(gameObjectRegistry),
-                    new PrimitiveRendererSystem(gameObjectRegistry),
+                    new LifetimeSystem(),
+                    new PrimitivePresenter(goManagerA),
                 }
             );
 
@@ -58,6 +59,8 @@ namespace Trecs.Samples.MultipleWorlds
                 .AddTemplate(SampleTemplates.CritterEntity.Template)
                 .Build();
 
+            var goManagerB = new RenderableGameObjectManager(_worldB);
+
             _worldB.AddSystems(
                 new ISystem[]
                 {
@@ -65,17 +68,23 @@ namespace Trecs.Samples.MultipleWorlds
                         SpawnIntervalB,
                         Lifetime,
                         SpawnRadius,
-                        new Vector3(WorldSeparation, 0, 0),
-                        Color.blue,
-                        PrimitiveType.Cube,
-                        gameObjectRegistry
+                        new Vector3(WorldSeparation, 0, 0)
                     ),
-                    new LifetimeSystem(gameObjectRegistry),
-                    new PrimitiveRendererSystem(gameObjectRegistry),
+                    new LifetimeSystem(),
+                    new PrimitivePresenter(goManagerB),
                 }
             );
 
-            initializables = new() { _worldA.Initialize, _worldB.Initialize };
+            var sceneInitA = new SceneInitializer(goManagerA, PrimitiveType.Sphere, Color.red);
+            var sceneInitB = new SceneInitializer(goManagerB, PrimitiveType.Cube, Color.blue);
+
+            initializables = new()
+            {
+                _worldA.Initialize,
+                _worldB.Initialize,
+                sceneInitA.Initialize,
+                sceneInitB.Initialize,
+            };
 
             tickables = new()
             {
@@ -106,7 +115,13 @@ namespace Trecs.Samples.MultipleWorlds
                 },
             };
 
-            disposables = new() { _worldA.Dispose, _worldB.Dispose };
+            disposables = new()
+            {
+                goManagerA.Dispose,
+                goManagerB.Dispose,
+                _worldA.Dispose,
+                _worldB.Dispose,
+            };
         }
 
         void ReadInput()

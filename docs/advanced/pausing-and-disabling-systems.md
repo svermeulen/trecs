@@ -71,5 +71,5 @@ SystemMetadata meta = world.GetSystemMetadata(systemIndex);
 ## Related
 
 - [Accessor Roles](accessor-roles.md) — why `SetSystemPaused` requires a `Fixed`-role accessor and `SetSystemEnabled` doesn't.
-- [Recording & Playback](recording-and-playback.md) — how `BundlePlayer` uses `EnableChannel.Playback` to silence input systems automatically.
+- [Trecs Player Window](../editor-windows/player.md) — uses `EnableChannel.Playback` to silence input systems automatically while a recording is being replayed.
 - [Hierarchy Window](../editor-windows/hierarchy.md) — the editor surface for `EnableChannel.Editor` toggles.

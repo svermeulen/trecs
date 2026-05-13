@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Trecs.Collections;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// A self-contained replayable session bundled into a single file: an

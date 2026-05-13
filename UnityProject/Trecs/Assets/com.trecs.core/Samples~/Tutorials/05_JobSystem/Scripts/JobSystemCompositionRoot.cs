@@ -18,6 +18,8 @@ namespace Trecs.Samples.JobSystem
         public Color ParticleColor = new(0.2f, 0.8f, 1f);
         public TMP_Text StatusText;
 
+        // All we do here is call constructors and set up dependencies
+        // between classes.  No initialization logic otherwise
         public override void Construct(
             out List<Action> initializables,
             out List<Action> tickables,
@@ -29,7 +31,7 @@ namespace Trecs.Samples.JobSystem
             // not vsync, determines throughput.
             Application.targetFrameRate = 2000;
 
-            var renderer = new RendererSystem();
+            var renderer = new IndirectRenderer();
 
             renderer.RegisterRenderable(
                 TagSet<SampleTags.Particle>.Value,

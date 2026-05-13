@@ -61,6 +61,7 @@ namespace Trecs.Internal
 
         readonly NativeSharedHeap _nativeSharedHeap;
         readonly NativeUniqueHeap _nativeUniqueHeap;
+        readonly TrecsListHeap _trecsListHeap;
         readonly FrameScopedNativeUniqueHeap _frameScopedNativeUniqueHeap;
 
         readonly RuntimeJobScheduler _jobScheduler;
@@ -140,6 +141,7 @@ namespace Trecs.Internal
             NativeSharedHeap nativeSharedHeap,
             NativeUniqueHeap nativeUniqueHeap,
             FrameScopedNativeUniqueHeap frameScopedNativeUniqueHeap,
+            TrecsListHeap trecsListHeap,
             RuntimeJobScheduler jobScheduler
         )
         {
@@ -149,6 +151,7 @@ namespace Trecs.Internal
             _nativeSharedHeap = nativeSharedHeap;
             _nativeUniqueHeap = nativeUniqueHeap;
             _frameScopedNativeUniqueHeap = frameScopedNativeUniqueHeap;
+            _trecsListHeap = trecsListHeap;
             _cachedRangeOfSubmittedIndices = new FastList<EntityRange>();
             _transientEntityIDsAffectedByRemoveAtSwapBack = new DenseDictionary<int, int>();
             _cachedSortedDescendingRemoveIndices = new NativeList<int>(16, Allocator.Persistent);
@@ -220,6 +223,7 @@ namespace Trecs.Internal
             _nativeSharedHeap.FlushPendingOperations();
             _nativeUniqueHeap.FlushPendingOperations();
             _frameScopedNativeUniqueHeap.FlushPendingOperations();
+            _trecsListHeap.FlushPendingOperations();
 
             using (TrecsProfiling.Start("Deferred Set Operations"))
             {
@@ -1423,6 +1427,7 @@ namespace Trecs.Internal
                 flags,
                 _nativeSharedHeap.Resolver,
                 _nativeUniqueHeap.Resolver,
+                _trecsListHeap.Resolver,
                 _setStore.DeferredQueues,
                 deltaTime,
                 elapsedTime

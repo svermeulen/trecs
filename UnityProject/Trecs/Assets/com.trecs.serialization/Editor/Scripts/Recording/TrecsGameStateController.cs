@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Coordinates the game-state-serialization features that touch the World's

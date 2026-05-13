@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Serializer for <see cref="List{T}"/>. Writes the item count followed by

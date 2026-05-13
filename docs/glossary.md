@@ -18,6 +18,7 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 | **[`Tag<T>`](advanced/groups-and-tagsets.md#tagt)** | Runtime value/handle for a single tag type. |
 | **[`TagSet`](advanced/groups-and-tagsets.md#tagset)** | Stable identity for a tag combination — a 32-bit hash of the tag GUIDs. Portable across runs and serializable. |
 | **[Template](core/templates.md)** | Compile-time blueprint declaring an entity's tags, components, partitions, and inheritance. |
+| **[Abstract template](core/templates.md#abstract-templates)** | A template marked with the C# `abstract` keyword. Usable as an `IExtends<>` base but cannot be passed to `WorldBuilder.AddTemplate` — enforced by analyzer `TRECS039` and a runtime guard. |
 
 ## Where entities live in memory
 

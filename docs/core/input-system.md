@@ -10,7 +10,7 @@ The mechanics:
 - Inside an `[ExecuteIn(SystemPhase.Input)]` system, call `World.AddInput<T>(entity, value)`. Input systems run just before each fixed step, in lockstep with the simulation.
 - The queued value is applied to the target entity at the start of the upcoming fixed step.
 
-During [recording](../advanced/recording-and-playback.md), every `AddInput` call is captured into the recording bundle alongside its target frame. During playback, every Input-phase system is disabled and recorded inputs are replayed onto the exact frames they originally targeted, so the simulation sees byte-identical input on every run regardless of live keyboard / network / clock activity.
+When the [Trecs Player window](../editor-windows/player.md) records, every `AddInput` call is captured alongside its target frame. During scrub or replay, Input-phase systems are disabled and recorded inputs are replayed onto the exact frames they originally targeted, so the simulation sees byte-identical input on every run regardless of live keyboard / network / clock activity.
 
 ## Marking input fields
 
@@ -106,4 +106,4 @@ public partial class ProcessInputSystem : ISystem
 ## See also
 
 - [Sample 11 — Snake](../samples/11-snake.md) — full keyboard-driven input wired to a recordable global entity.
-- [Recording & Playback](../advanced/recording-and-playback.md) — full record / replay workflow, the `RecordingBundle` format, and the desync detection that piggybacks on the input pipeline.
+- [Trecs Player Window](../editor-windows/player.md) — records every `AddInput` call into a scrubbable buffer and replays them on playback.

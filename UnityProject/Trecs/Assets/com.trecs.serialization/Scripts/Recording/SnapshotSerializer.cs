@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Trecs.Internal;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Captures and restores full ECS world-state snapshots as binary

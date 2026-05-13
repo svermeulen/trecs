@@ -1,6 +1,6 @@
 using Trecs.Collections;
 
-namespace Trecs.Serialization
+namespace Trecs.Serialization.Internal
 {
     /// <summary>
     /// Header data for a snapshot. Returned by

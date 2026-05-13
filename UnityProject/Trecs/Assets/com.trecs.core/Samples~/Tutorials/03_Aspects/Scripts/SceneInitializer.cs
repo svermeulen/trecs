@@ -6,22 +6,24 @@ namespace Trecs.Samples.Aspects
     public class SceneInitializer
     {
         readonly WorldAccessor _world;
-        readonly GameObjectRegistry _gameObjectRegistry;
         readonly SampleSettings _settings;
+        readonly RenderableGameObjectManager _goManager;
 
         public SceneInitializer(
             World world,
-            GameObjectRegistry gameObjectRegistry,
-            SampleSettings settings
+            SampleSettings settings,
+            RenderableGameObjectManager goManager
         )
         {
             _world = world.CreateAccessor(AccessorRole.Fixed);
-            _gameObjectRegistry = gameObjectRegistry;
             _settings = settings;
+            _goManager = goManager;
         }
 
         public void Initialize()
         {
+            _goManager.RegisterFactory(AspectsPrefabs.Boid, CreateBoidGameObject);
+
             var rng = _world.FixedRng;
             float halfSize = _settings.AreaSize / 2f;
 
@@ -37,21 +39,22 @@ namespace Trecs.Samples.Aspects
                     rng.NextFloat(-halfSize, halfSize)
                 );
 
-                var go = SampleUtil.CreatePrimitive(PrimitiveType.Capsule);
-                go.name = $"Boid_{i}";
-                go.transform.localScale = new Vector3(0.3f, 0.3f, 0.6f);
-                go.transform.position = (Vector3)position;
-
-                var renderer = go.GetComponent<Renderer>();
-                renderer.material.color = Color.HSVToRGB(rng.Next(), 0.7f, 0.9f);
+                var color = Color.HSVToRGB(rng.Next(), 0.7f, 0.9f);
 
                 _world
                     .AddEntity<SampleTags.Boid>()
                     .Set(new Position(position))
                     .Set(new Velocity(velocity))
                     .Set(new Speed(speed))
-                    .Set(_gameObjectRegistry.Register(go));
+                    .Set(new ColorComponent(color));
             }
+        }
+
+        static GameObject CreateBoidGameObject()
+        {
+            var go = SampleUtil.CreatePrimitive(PrimitiveType.Capsule);
+            go.transform.localScale = new Vector3(0.3f, 0.3f, 0.6f);
+            return go;
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Linq;
 using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
@@ -17,7 +18,7 @@ namespace Trecs
     /// <see cref="NativeSharedPtrResolver"/> reads from) until <c>FlushPendingOperations</c> runs
     /// at the next submission boundary. Consequences for callers:</para>
     /// <list type="bullet">
-    ///   <item><description><c>ResolveUnsafePtr</c> on the main thread (e.g. via <c>HeapAccessor</c>)
+    ///   <item><description>Main-thread access (e.g. via <see cref="HeapAccessor.Read{T}(in NativeSharedPtr{T})"/>)
     ///     transparently checks <c>_pendingAdds</c> and works on freshly-created blobs.</description></item>
     ///   <item><description><see cref="NativeSharedPtrResolver"/> inside a Burst job only sees flushed
     ///     entries. Scheduling a job that resolves a <c>NativeSharedPtr</c> created in the same frame
@@ -37,6 +38,18 @@ namespace Trecs
         readonly List<PtrHandle> _tempBuffer1 = new();
         readonly List<(BlobId blobId, PtrHandle cacheHandle)> _pendingRemoves = new();
         readonly Dictionary<BlobId, NativeSharedHeapEntry> _pendingAdds = new();
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+        // Per-blob safety handles. One handle per active BlobId; shared by every
+        // NativeSharedRead wrapper opened against that blob so Unity's job-safety
+        // walker can detect cross-job conflicts. The wrappers are
+        // [NativeContainerIsReadOnly] so the only real conflict the walker catches
+        // is "blob in flight while another job is mutating it" — but the shared
+        // heap doesn't expose a Write wrapper, so in practice the handle exists
+        // mostly to support clean lifetime tracking (Release on free, throw on
+        // post-free access).
+        readonly Dictionary<BlobId, AtomicSafetyHandle> _safetyHandles = new();
+#endif
 
         readonly HeapIdCounter _idCounter = new(1, 2);
         bool _isDisposed;
@@ -84,17 +97,29 @@ namespace Trecs
         public int PendingAddCount => _pendingAdds.Count;
 
         /// <summary>
-        /// Resolves a blob pointer from managed (main-thread) code.
-        /// Unlike NativeSharedPtrResolver, this can resolve blobs that were just created
-        /// in the current frame (before FlushPendingOperations).
+        /// Opens a safety-checked read view over the given <see cref="NativeSharedPtr{T}"/>.
+        /// Main-thread only; jobs use <see cref="NativeSharedPtrResolver.Read{T}"/>.
+        /// Bridges <c>_pendingAdds</c> so freshly-created blobs are readable before the
+        /// next <see cref="FlushPendingOperations"/>.
         /// </summary>
-        internal unsafe void* ResolveUnsafePtr<T>(BlobId address)
+        public unsafe NativeSharedRead<T> Read<T>(in NativeSharedPtr<T> ptr)
+            where T : unmanaged
+        {
+            var entry = ResolveEntry<T>(ptr.BlobId);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            return new NativeSharedRead<T>(entry.Ptr.ToPointer(), entry.Safety);
+#else
+            return new NativeSharedRead<T>(entry.Ptr.ToPointer());
+#endif
+        }
+
+        internal NativeSharedHeapEntry ResolveEntry<T>(BlobId address)
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
             Assert.That(
                 UnityThreadHelper.IsMainThread,
-                "NativeSharedHeap.ResolveUnsafePtr (and ISharedPtrResolver) is main-thread only. "
+                "NativeSharedHeap.ResolveEntry is main-thread only. "
                     + "Burst jobs must use NativeSharedPtrResolver instead."
             );
             Assert.That(!address.IsNull, "Attempted to resolve null blob address");
@@ -108,11 +133,16 @@ namespace Trecs
                             + $"stored hash {entry.TypeHash}, requested {TypeHash<T>.Value}"
                     );
                 }
-
-                return entry.Ptr.ToPointer();
+                return entry;
             }
 
-            return _resolver.ResolveUnsafePtr<T>(address);
+            return _resolver.ResolveEntry<T>(address);
+        }
+
+        internal unsafe void* ResolveUnsafePtr<T>(BlobId address)
+            where T : unmanaged
+        {
+            return ResolveEntry<T>(address).Ptr.ToPointer();
         }
 
         unsafe NativeSharedPtr<T> AddBlobEntry<T>(BlobId blobId, PtrHandle blobCacheHandleId)
@@ -136,7 +166,15 @@ namespace Trecs
             // Defer adding to _allEntries until FlushPendingOperations,
             // since jobs may be reading _allEntries via NativeSharedPtrResolver
             var ptr = _store.GetNativeBlobPtr(blobId, TypeIdProvider.GetTypeId<T>());
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            var safety = AtomicSafetyHandle.Create();
+            AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(safety, true);
+            _safetyHandles.Add(blobId, safety);
+            var entry = new NativeSharedHeapEntry(burstTypeHash, ptr, safety);
+#else
             var entry = new NativeSharedHeapEntry(burstTypeHash, ptr);
+#endif
             _pendingAdds.Add(blobId, entry);
 
             return AddBlobHandle<T>(blobId);
@@ -162,19 +200,12 @@ namespace Trecs
         /// </summary>
         public NativeSharedPtr<T> CreateBlobTakingOwnership<T>(
             BlobId blobId,
-            IntPtr ptr,
-            int allocSize,
-            int allocAlignment
+            NativeBlobAllocation alloc
         )
             where T : unmanaged
         {
             Assert.That(!_isDisposed);
-            var handle = _store.CreateNativeBlobPtrTakingOwnership<T>(
-                blobId,
-                ptr,
-                allocSize,
-                allocAlignment
-            );
+            var handle = _store.CreateNativeBlobPtrTakingOwnership<T>(blobId, alloc);
             return AddBlobEntry<T>(blobId, handle.Handle);
         }
 
@@ -295,6 +326,17 @@ namespace Trecs
             // (safe because ClearAll is only called when no jobs are running)
             FlushPendingOperations();
 
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            // Any handles left behind belong to blobs neither active nor pending —
+            // shouldn't happen, but release them so we don't leak slots on a buggy
+            // teardown.
+            foreach (var safety in _safetyHandles.Values)
+            {
+                AtomicSafetyHandle.EnforceAllBufferJobsHaveCompletedAndRelease(safety);
+            }
+            _safetyHandles.Clear();
+#endif
+
             Assert.That(_activeBlobs.Count == 0);
             Assert.That(_activeHandles.Count == 0);
             Assert.That(_blobCacheHandles.Count == 0);
@@ -320,6 +362,12 @@ namespace Trecs
             foreach (var (blobId, cacheHandle) in _pendingRemoves)
             {
                 _allEntries.Remove(blobId);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                if (_safetyHandles.Remove(blobId, out var safety))
+                {
+                    AtomicSafetyHandle.EnforceAllBufferJobsHaveCompletedAndRelease(safety);
+                }
+#endif
                 _store.DisposeHandle(cacheHandle);
             }
             _pendingRemoves.Clear();
@@ -403,7 +451,14 @@ namespace Trecs
             foreach (var (blobId, info) in _activeBlobs)
             {
                 var ptr = _store.GetNativeBlobPtr(blobId, info.InnerTypeId, updateAccessTime: true);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                var safety = AtomicSafetyHandle.Create();
+                AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(safety, true);
+                _safetyHandles.Add(blobId, safety);
+                _allEntries.Add(blobId, new NativeSharedHeapEntry(info.BurstTypeHash, ptr, safety));
+#else
                 _allEntries.Add(blobId, new NativeSharedHeapEntry(info.BurstTypeHash, ptr));
+#endif
                 _blobCacheHandles.Add(blobId, _store.CreateHandle(blobId));
             }
         }
