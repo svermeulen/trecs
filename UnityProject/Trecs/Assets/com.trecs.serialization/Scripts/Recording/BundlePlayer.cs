@@ -22,7 +22,7 @@ namespace Trecs.Serialization.Internal
     /// </summary>
     public sealed class BundlePlayer : IInputHistoryLocker, IDisposable
     {
-        static readonly TrecsLog _log = TrecsLog.Default;
+        readonly TrecsLog _log;
 
         readonly IWorldStateSerializer _worldStateSerializer;
         readonly RecordingChecksumCalculator _checksumCalculator;
@@ -53,6 +53,7 @@ namespace Trecs.Serialization.Internal
             if (snapshotSerializer == null)
                 throw new ArgumentNullException(nameof(snapshotSerializer));
 
+            _log = world.Log;
             _worldOwner = world;
             _worldStateSerializer = worldStateSerializer;
             _serializerRegistry = registry;
@@ -153,7 +154,7 @@ namespace Trecs.Serialization.Internal
             _state = BundlePlaybackState.Playing;
 
             _log.Info(
-                "Playback started: frames {} .. {}",
+                "Playback started: frames {0} .. {1}",
                 bundle.Header.StartFixedFrame,
                 bundle.Header.EndFixedFrame
             );
@@ -192,7 +193,7 @@ namespace Trecs.Serialization.Internal
             if (expected != actual)
             {
                 _log.Warning(
-                    "Desync detected at frame {}. expected={} actual={}",
+                    "Desync detected at frame {0}. expected={1} actual={2}",
                     currentFrame,
                     expected,
                     actual

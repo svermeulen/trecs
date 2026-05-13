@@ -162,7 +162,7 @@ namespace Trecs
             );
 
             _blobCacheHandles.Add(blobId, blobCacheHandleId);
-            _log.Trace("Added new blob {}", blobId);
+            _log.Trace("Added new blob {0}", blobId);
 
             // Defer adding to _allEntries until FlushPendingOperations,
             // since jobs may be reading _allEntries via NativeSharedPtrResolver
@@ -221,7 +221,7 @@ namespace Trecs
         {
             Assert.That(!_isDisposed);
 
-            _log.Trace("Looking up native blob with id {}", blobId);
+            _log.Trace("Looking up native blob with id {0}", blobId);
 
             if (_activeBlobs.ContainsKey(blobId))
             {
@@ -261,7 +261,7 @@ namespace Trecs
 
             var newHandle = new PtrHandle(_idCounter.Alloc());
             _activeHandles.Add(newHandle, blobId);
-            _log.Trace("Added blob handle {}", newHandle);
+            _log.Trace("Added blob handle {0}", newHandle);
 
             return new NativeSharedPtr<T>(newHandle, blobId);
         }
@@ -300,7 +300,7 @@ namespace Trecs
                         }
 
                         _log.Warning(
-                            "Found {} native blob handles that were not disposed, with types: {l}",
+                            "Found {0} native blob handles that were not disposed, with types: {1}",
                             _activeHandles.Count,
                             debugStrings.Select(x => x.GetPrettyName()).Join(", ")
                         );
@@ -398,7 +398,7 @@ namespace Trecs
             }
 
             _activeHandles.RemoveMustExist(id);
-            _log.Trace("Disposed blob handle {}", id);
+            _log.Trace("Disposed blob handle {0}", id);
 
             ref var info = ref _activeBlobs.GetValueByRef(blobId);
             info.RefCount -= 1;
@@ -428,7 +428,7 @@ namespace Trecs
             writer.Write<DenseDictionary<BlobId, BlobInfo>>("ActiveBlobs", _activeBlobs);
             writer.Write<DenseDictionary<PtrHandle, BlobId>>("ActiveHandles", _activeHandles);
 
-            _log.Trace("Serialized {} native blob handles", _activeHandles.Count);
+            _log.Trace("Serialized {0} native blob handles", _activeHandles.Count);
         }
 
         public void Deserialize(ITrecsSerializationReader reader)
@@ -445,7 +445,7 @@ namespace Trecs
             reader.ReadInPlace<DenseDictionary<BlobId, BlobInfo>>("ActiveBlobs", _activeBlobs);
             reader.ReadInPlace<DenseDictionary<PtrHandle, BlobId>>("ActiveHandles", _activeHandles);
 
-            _log.Debug("Deserialized {} native blob handles", _activeHandles.Count);
+            _log.Debug("Deserialized {0} native blob handles", _activeHandles.Count);
 
             Assert.IsEqual(_activeBlobs.Count, numEntries);
 

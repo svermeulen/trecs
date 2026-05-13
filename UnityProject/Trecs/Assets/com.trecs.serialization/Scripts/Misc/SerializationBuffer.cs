@@ -13,7 +13,6 @@ namespace Trecs.Serialization.Internal
             ISerializationReader,
             ISerializationWriter
     {
-        static readonly TrecsLog _log = TrecsLog.Default;
         readonly MemoryStream _memoryStream;
         readonly BinaryReader _binaryReader;
         readonly BinarySerializationReader _reader;

@@ -153,7 +153,7 @@ namespace Trecs
                 new BlobInfo { RefCount = 0, TypeHash = TypeIdProvider.GetTypeId<T>() }
             );
             _blobCacheHandles.Add(blobId, blobCacheHandleId);
-            _log.Trace("Added new blob {}", blobId);
+            _log.Trace("Added new blob {0}", blobId);
             return AddBlobHandle<T>(blobId);
         }
 
@@ -207,7 +207,7 @@ namespace Trecs
 
             var newHandle = new PtrHandle(_idCounter.Alloc());
             _activeHandles.Add(newHandle, blobId);
-            _log.Trace("Added blob handle {}", newHandle);
+            _log.Trace("Added blob handle {0}", newHandle);
 
             return new SharedPtr<T>(newHandle, blobId);
         }
@@ -247,7 +247,7 @@ namespace Trecs
                         }
 
                         _log.Warning(
-                            "Found {} managed blob handles that were not disposed, with types: {l}",
+                            "Found {0} managed blob handles that were not disposed, with types: {1}",
                             _activeHandles.Count,
                             debugStrings.Select(x => x.GetPrettyName()).Join(", ")
                         );
@@ -292,7 +292,7 @@ namespace Trecs
             }
 
             _activeHandles.RemoveMustExist(id);
-            _log.Trace("Disposed blob handle {}", id);
+            _log.Trace("Disposed blob handle {0}", id);
 
             ref var info = ref _activeBlobs.GetValueByRef(blobId);
             info.RefCount -= 1;

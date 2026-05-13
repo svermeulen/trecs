@@ -44,7 +44,7 @@ namespace Trecs
             var id = _idCounter.Alloc();
             _entries.Add(id, new HeapEntry(frame, blobId));
             _blobCacheHandles.Add(id, blobCacheHandleId);
-            _log.Trace("Allocated new input pointer with id {} and type {}", id, typeof(T));
+            _log.Trace("Allocated new input pointer with id {0} and type {1}", id, typeof(T));
             return new SharedPtr<T>(new PtrHandle(id), blobId);
         }
 
@@ -224,7 +224,7 @@ namespace Trecs
 
             var blobHandle = _blobCacheHandles.RemoveAndGet(address);
             _store.DisposeHandle(blobHandle);
-            _log.Trace("Disposed input ptr with address {}", address);
+            _log.Trace("Disposed input ptr with address {0}", address);
         }
 
         internal void Serialize(ITrecsSerializationWriter writer)
@@ -289,7 +289,7 @@ namespace Trecs
                 _entries.Add(address, new HeapEntry(frame, blobId));
                 _blobCacheHandles.Add(address, _store.CreateHandle(blobId));
 
-                _log.Trace("Deserialized dynamic pointer with id {}", address);
+                _log.Trace("Deserialized dynamic pointer with id {0}", address);
             }
 
             // Defense in depth: if the saved IdCounter was somehow lower than max entry
@@ -299,7 +299,7 @@ namespace Trecs
                 _idCounter.AdvancePast(maxAddress);
             }
 
-            _log.Debug("Deserialized {} input heap entries", _entries.Count);
+            _log.Debug("Deserialized {0} input heap entries", _entries.Count);
         }
 
         readonly struct HeapEntry

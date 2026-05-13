@@ -331,7 +331,7 @@ namespace Trecs
 
         ResolvedTemplate ResolveTemplate(Template template)
         {
-            _log.Trace("Building entity with name {}", template.DebugName);
+            _log.Trace("Building entity with name {0}", template.DebugName);
 
             var enqueuedBaseTypes = new HashSet<Template>();
             var allBaseTypesList = new List<Template>();
@@ -349,7 +349,7 @@ namespace Trecs
                 Assert.That(enqueuedBaseTypes.Contains(baseType));
                 allBaseTypesList.Add(baseType);
                 _log.Trace(
-                    "Added base type {} to entity {}",
+                    "Added base type {0} to entity {1}",
                     baseType.DebugName,
                     template.DebugName
                 );

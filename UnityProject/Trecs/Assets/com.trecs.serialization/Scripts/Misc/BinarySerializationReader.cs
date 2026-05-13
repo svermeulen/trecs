@@ -74,12 +74,12 @@ namespace Trecs.Serialization.Internal
                 binaryReader
             );
 
-            _log.Trace("Completed reading header at byte {}", binaryReader.BaseStream.Position);
+            _log.Trace("Completed reading header at byte {0}", binaryReader.BaseStream.Position);
 
             var positionBefore = binaryReader.BaseStream.Position;
             _bitReader.Reset(binaryReader);
             _log.Trace(
-                "Bit fields read in {} bytes",
+                "Bit fields read in {0} bytes",
                 binaryReader.BaseStream.Position - positionBefore
             );
         }

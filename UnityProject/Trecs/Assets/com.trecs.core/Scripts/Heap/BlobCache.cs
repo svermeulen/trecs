@@ -428,7 +428,7 @@ namespace Trecs
         {
             AssertMainThreadAndNotDisposed();
 
-            _log.Trace("Looking up native blob with inner type id {}", innerTypeId);
+            _log.Trace("Looking up native blob with inner type id {0}", innerTypeId);
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
@@ -540,7 +540,7 @@ namespace Trecs
 
             using var _ = TrecsProfiling.Start("BlobCache.TryGetBlobAndMetadata");
 
-            _log.Trace("Attempting to look up blob with id {}", id);
+            _log.Trace("Attempting to look up blob with id {0}", id);
 
             foreach (var store in _stores)
             {
@@ -576,7 +576,7 @@ namespace Trecs
                 box.Dispose();
                 throw;
             }
-            _log.Trace("Added new blob with id {} and type {}", id, typeof(T));
+            _log.Trace("Added new blob with id {0} and type {1}", id, typeof(T));
             return new NativeBlobPtr<T>(CreateHandle(id), id);
         }
 
@@ -604,7 +604,11 @@ namespace Trecs
                 box.Dispose();
                 throw;
             }
-            _log.Trace("Added new blob (ownership transfer) with id {} and type {}", id, typeof(T));
+            _log.Trace(
+                "Added new blob (ownership transfer) with id {0} and type {1}",
+                id,
+                typeof(T)
+            );
             return new NativeBlobPtr<T>(CreateHandle(id), id);
         }
 
@@ -637,7 +641,7 @@ namespace Trecs
                 }
 
                 _log.Warning(
-                    "Found {} undisposed blob handles (types: {})",
+                    "Found {0} undisposed blob handles (types: {1})",
                     _handles.Count,
                     typeNames
                 );

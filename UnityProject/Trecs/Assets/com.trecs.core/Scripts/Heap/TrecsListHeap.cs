@@ -98,7 +98,7 @@ namespace Trecs
 
             _typesByHandle.Add(handle.Value, typeof(T));
 
-            _log.Trace("Allocated TrecsList<{}> with handle {}", typeof(T), handle.Value);
+            _log.Trace("Allocated TrecsList<{0}> with handle {1}", typeof(T), handle.Value);
 
             return new TrecsList<T>(handle);
         }
@@ -164,7 +164,7 @@ namespace Trecs
             // after the safety handle has been drained but before the header slot is
             // released, so no Burst job can be reading header->Data when we free it.
             _chunkStore.Free(new PtrHandle(address), s_freeDataBufferOnDrained);
-            _log.Trace("Disposed TrecsList {}", address);
+            _log.Trace("Disposed TrecsList {0}", address);
         }
 
         static unsafe void FreeDataBufferOnDrained(NativeChunkStoreEntry entry)
@@ -199,7 +199,7 @@ namespace Trecs
                     .Distinct()
                     .Join(", ");
                 _log.Warning(
-                    "Found {} undisposed TrecsLists with element types: {}",
+                    "Found {0} undisposed TrecsLists with element types: {1}",
                     _typesByHandle.Count,
                     typeNames
                 );
@@ -248,7 +248,7 @@ namespace Trecs
                 }
             }
 
-            _log.Trace("Serialized {} TrecsList entries", _typesByHandle.Count);
+            _log.Trace("Serialized {0} TrecsList entries", _typesByHandle.Count);
         }
 
         public unsafe void Deserialize(ITrecsSerializationReader reader)
@@ -307,7 +307,7 @@ namespace Trecs
             }
 
             _chunkStore.OnDeserializeComplete();
-            _log.Debug("Deserialized {} TrecsList entries", numEntries);
+            _log.Debug("Deserialized {0} TrecsList entries", numEntries);
         }
     }
 }

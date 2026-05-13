@@ -150,7 +150,7 @@ namespace Trecs.Internal
                 list = new FastList<PrioritizedObserver<EntitiesRemovedObserver>>();
                 _reactiveOnRemovedObservers.Add(group, list);
 
-                _log.Trace("Added to observe removes for group {}", group);
+                _log.Trace("Added to observe removes for group {0}", group);
             }
 
             InsertSorted(
@@ -222,53 +222,53 @@ namespace Trecs.Internal
             {
                 if (_deserializeStartedEvent.NumObservers > 0)
                     _log.Warning(
-                        "DeserializeStarted observers not cleaned up (count: {})",
+                        "DeserializeStarted observers not cleaned up (count: {0})",
                         _deserializeStartedEvent.NumObservers
                     );
                 if (_deserializeCompletedEvent.NumObservers > 0)
                     _log.Warning(
-                        "DeserializeCompleted observers not cleaned up (count: {})",
+                        "DeserializeCompleted observers not cleaned up (count: {0})",
                         _deserializeCompletedEvent.NumObservers
                     );
                 if (_submissionStartedEvent.NumObservers > 0)
                     _log.Warning(
-                        "SubmissionStarted observers not cleaned up (count: {})",
+                        "SubmissionStarted observers not cleaned up (count: {0})",
                         _submissionStartedEvent.NumObservers
                     );
                 if (_submissionCompletedEvent.NumObservers > 0)
                     _log.Warning(
-                        "SubmissionCompleted observers not cleaned up (count: {})",
+                        "SubmissionCompleted observers not cleaned up (count: {0})",
                         _submissionCompletedEvent.NumObservers
                     );
                 if (_fixedUpdateStartedEvent.NumObservers > 0)
                     _log.Warning(
-                        "FixedUpdateStarted observers not cleaned up (count: {})",
+                        "FixedUpdateStarted observers not cleaned up (count: {0})",
                         _fixedUpdateStartedEvent.NumObservers
                     );
                 if (_fixedUpdateCompletedEvent.NumObservers > 0)
                     _log.Warning(
-                        "FixedUpdateCompleted observers not cleaned up (count: {})",
+                        "FixedUpdateCompleted observers not cleaned up (count: {0})",
                         _fixedUpdateCompletedEvent.NumObservers
                     );
                 if (_variableUpdateStartedEvent.NumObservers > 0)
                     _log.Warning(
-                        "VariableUpdateStarted observers not cleaned up (count: {})",
+                        "VariableUpdateStarted observers not cleaned up (count: {0})",
                         _variableUpdateStartedEvent.NumObservers
                     );
                 if (_variableUpdateCompletedEvent.NumObservers > 0)
                     _log.Warning(
-                        "VariableUpdateCompleted observers not cleaned up (count: {})",
+                        "VariableUpdateCompleted observers not cleaned up (count: {0})",
                         _variableUpdateCompletedEvent.NumObservers
                     );
                 if (_inputsAppliedEvent.NumObservers > 0)
                     _log.Warning(
-                        "InputsApplied observers not cleaned up (count: {})",
+                        "InputsApplied observers not cleaned up (count: {0})",
                         _inputsAppliedEvent.NumObservers
                     );
                 foreach (var (group, observers) in _reactiveOnAddedObservers)
                     if (observers.Count > 0)
                         _log.Warning(
-                            "Entity added observers not cleaned up by accessors {} for group {} (count: {})",
+                            "Entity added observers not cleaned up by accessors {0} for group {1} (count: {2})",
                             GetDebugNames(observers),
                             group,
                             observers.Count
@@ -276,7 +276,7 @@ namespace Trecs.Internal
                 foreach (var (group, observers) in _reactiveOnRemovedObservers)
                     if (observers.Count > 0)
                         _log.Warning(
-                            "Entity removed observers not cleaned up by accessors {} for group {} (count: {})",
+                            "Entity removed observers not cleaned up by accessors {0} for group {1} (count: {2})",
                             GetDebugNames(observers),
                             group,
                             observers.Count
@@ -284,7 +284,7 @@ namespace Trecs.Internal
                 foreach (var (group, observers) in _reactiveOnMovedObservers)
                     if (observers.Count > 0)
                         _log.Warning(
-                            "Entity moved observers not cleaned up by accessors {} for group {} (count: {})",
+                            "Entity moved observers not cleaned up by accessors {0} for group {1} (count: {2})",
                             GetDebugNames(observers),
                             group,
                             observers.Count

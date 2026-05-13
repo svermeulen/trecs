@@ -109,7 +109,7 @@ namespace Trecs.Internal
             }
 
             _log.Trace(
-                "Initialized group {} with {} component arrays",
+                "Initialized group {0} with {1} component arrays",
                 groupId,
                 numberOfEntityComponents
             );

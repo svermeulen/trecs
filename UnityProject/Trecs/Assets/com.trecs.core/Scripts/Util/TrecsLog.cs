@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 
 namespace Trecs
 {
@@ -59,11 +58,13 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// Convenience logger for code paths that run outside a <c>World</c>'s
-        /// lifecycle (test fixtures, file-peek serialization, etc.). Uses a default
-        /// <see cref="WorldSettings"/> so its level is <see cref="LogLevel.Warning"/>.
-        /// Production framework code should not use this — it should accept the
-        /// world's <c>TrecsLog</c> via constructor injection.
+        /// Convenience logger for code paths that genuinely run with no
+        /// <see cref="World"/> in scope — the file-peek serialization helpers
+        /// (<c>BinarySerializationReader</c>, <c>BinarySerializationWriter</c>,
+        /// <c>SerializerRegistry</c>, <c>RecordingBundleSerializer</c>) and test
+        /// fixtures that exercise individual heaps. Anything that has a
+        /// <see cref="World"/> should use <c>world.Log</c> instead so it honors
+        /// that world's <see cref="WorldSettings.MinLogLevel"/>.
         /// </summary>
         public static TrecsLog Default { get; } = new(new WorldSettings());
 
@@ -77,56 +78,6 @@ namespace Trecs.Internal
 
         public bool IsWarningEnabled() => IsLevelEnabled(LogLevel.Warning);
 
-        // Trecs log call sites use Rust/Serilog-style placeholders — `{}` for the next
-        // positional arg, optionally with a format hint like `{0.00}`, `{l}`, or `{@}`.
-        // Translate them to .NET String.Format syntax (`{0}`, `{0:0.00}`, ...) so the
-        // underlying Debug.LogFormat call can render them. The `{l}` and `{@}` hints
-        // come from Serilog (stringify list / destructure object); here we just route
-        // them through the default ToString since UnityEngine.Debug.LogFormat doesn't
-        // do structured logging.
-        static string ConvertPlaceholders(string template)
-        {
-            if (string.IsNullOrEmpty(template) || template.IndexOf('{') < 0)
-            {
-                return template;
-            }
-            var sb = new StringBuilder(template.Length + 8);
-            int argIndex = 0;
-            int i = 0;
-            while (i < template.Length)
-            {
-                char c = template[i];
-                if (c == '{')
-                {
-                    int end = template.IndexOf('}', i + 1);
-                    if (end < 0)
-                    {
-                        sb.Append(c);
-                        i++;
-                        continue;
-                    }
-                    var inner = template.Substring(i + 1, end - i - 1);
-                    sb.Append('{').Append(argIndex);
-                    if (inner.Length > 0 && inner != "@" && inner != "l")
-                    {
-                        sb.Append(':').Append(inner);
-                    }
-                    sb.Append('}');
-                    argIndex++;
-                    i = end + 1;
-                }
-                else
-                {
-                    sb.Append(c);
-                    i++;
-                }
-            }
-            return sb.ToString();
-        }
-
-        string FormatTemplate(string messageTemplate) =>
-            Prefix + ConvertPlaceholders(messageTemplate);
-
         ////////////////////////////////
         // Trace
         ////////////////////////////////
@@ -136,7 +87,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate));
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate);
             }
         }
 
@@ -145,7 +96,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0);
             }
         }
 
@@ -154,7 +105,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1);
             }
         }
 
@@ -163,7 +114,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1, p2);
             }
         }
 
@@ -172,7 +123,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1, p2, p3);
             }
         }
 
@@ -188,7 +139,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Trace))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3, p4);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1, p2, p3, p4);
             }
         }
 
@@ -201,7 +152,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate));
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate);
             }
         }
 
@@ -210,7 +161,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0);
             }
         }
 
@@ -219,7 +170,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1);
             }
         }
 
@@ -228,7 +179,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1, p2);
             }
         }
 
@@ -237,7 +188,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1, p2, p3);
             }
         }
 
@@ -253,7 +204,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Debug))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3, p4);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1, p2, p3, p4);
             }
         }
 
@@ -266,7 +217,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate));
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate);
             }
         }
 
@@ -275,7 +226,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0);
             }
         }
 
@@ -284,7 +235,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1);
             }
         }
 
@@ -293,7 +244,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1, p2);
             }
         }
 
@@ -302,7 +253,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1, p2, p3);
             }
         }
 
@@ -318,7 +269,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Info))
             {
-                UnityEngine.Debug.LogFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3, p4);
+                UnityEngine.Debug.LogFormat(Prefix + messageTemplate, p0, p1, p2, p3, p4);
             }
         }
 
@@ -330,7 +281,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(FormatTemplate(messageTemplate));
+                UnityEngine.Debug.LogWarningFormat(Prefix + messageTemplate);
             }
         }
 
@@ -338,7 +289,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(FormatTemplate(messageTemplate), p0);
+                UnityEngine.Debug.LogWarningFormat(Prefix + messageTemplate, p0);
             }
         }
 
@@ -346,7 +297,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(FormatTemplate(messageTemplate), p0, p1);
+                UnityEngine.Debug.LogWarningFormat(Prefix + messageTemplate, p0, p1);
             }
         }
 
@@ -354,7 +305,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(FormatTemplate(messageTemplate), p0, p1, p2);
+                UnityEngine.Debug.LogWarningFormat(Prefix + messageTemplate, p0, p1, p2);
             }
         }
 
@@ -362,7 +313,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3);
+                UnityEngine.Debug.LogWarningFormat(Prefix + messageTemplate, p0, p1, p2, p3);
             }
         }
 
@@ -377,14 +328,7 @@ namespace Trecs.Internal
         {
             if (IsLevelEnabled(LogLevel.Warning))
             {
-                UnityEngine.Debug.LogWarningFormat(
-                    FormatTemplate(messageTemplate),
-                    p0,
-                    p1,
-                    p2,
-                    p3,
-                    p4
-                );
+                UnityEngine.Debug.LogWarningFormat(Prefix + messageTemplate, p0, p1, p2, p3, p4);
             }
         }
 
@@ -394,27 +338,27 @@ namespace Trecs.Internal
 
         public void Error(string messageTemplate)
         {
-            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate));
+            UnityEngine.Debug.LogErrorFormat(Prefix + messageTemplate);
         }
 
         public void Error<T0>(string messageTemplate, T0 p0)
         {
-            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate), p0);
+            UnityEngine.Debug.LogErrorFormat(Prefix + messageTemplate, p0);
         }
 
         public void Error<T0, T1>(string messageTemplate, T0 p0, T1 p1)
         {
-            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate), p0, p1);
+            UnityEngine.Debug.LogErrorFormat(Prefix + messageTemplate, p0, p1);
         }
 
         public void Error<T0, T1, T2>(string messageTemplate, T0 p0, T1 p1, T2 p2)
         {
-            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate), p0, p1, p2);
+            UnityEngine.Debug.LogErrorFormat(Prefix + messageTemplate, p0, p1, p2);
         }
 
         public void Error<T0, T1, T2, T3>(string messageTemplate, T0 p0, T1 p1, T2 p2, T3 p3)
         {
-            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3);
+            UnityEngine.Debug.LogErrorFormat(Prefix + messageTemplate, p0, p1, p2, p3);
         }
 
         public void Error<T0, T1, T2, T3, T4>(
@@ -426,7 +370,7 @@ namespace Trecs.Internal
             T4 p4
         )
         {
-            UnityEngine.Debug.LogErrorFormat(FormatTemplate(messageTemplate), p0, p1, p2, p3, p4);
+            UnityEngine.Debug.LogErrorFormat(Prefix + messageTemplate, p0, p1, p2, p3, p4);
         }
     }
 }

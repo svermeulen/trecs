@@ -24,7 +24,7 @@ namespace Trecs.Serialization.Internal
     /// </summary>
     public sealed class WorldStateSerializer : IWorldStateSerializer
     {
-        static readonly TrecsLog _log = TrecsLog.Default;
+        readonly TrecsLog _log;
 
         readonly World _world;
         readonly WorldInfo _worldDef;
@@ -33,6 +33,7 @@ namespace Trecs.Serialization.Internal
 
         public WorldStateSerializer(World world)
         {
+            _log = world.Log;
             _worldDef = world.WorldInfo;
             _world = world;
 
@@ -70,7 +71,7 @@ namespace Trecs.Serialization.Internal
             if (_customComponentSerializers.ContainsKey(key))
             {
                 _log.Warning(
-                    "Replacing existing custom component serializer for component type {}",
+                    "Replacing existing custom component serializer for component type {0}",
                     typeof(T)
                 );
             }
@@ -358,7 +359,7 @@ namespace Trecs.Serialization.Internal
                 }
 
                 _log.Trace(
-                    "GroupIndex {} serialized in {} kb",
+                    "GroupIndex {0} serialized in {1} kb",
                     group,
                     (writer.NumBytesWritten - bytesBefore) / 1024f
                 );
@@ -379,7 +380,7 @@ namespace Trecs.Serialization.Internal
             }
 
             _log.Trace(
-                "Component arrays serialized in {} kb",
+                "Component arrays serialized in {0} kb",
                 (writer.NumBytesWritten - bytesBefore) / 1024f
             );
             bytesBefore = writer.NumBytesWritten;
@@ -390,7 +391,7 @@ namespace Trecs.Serialization.Internal
             }
 
             _log.Trace(
-                "Entity references map serialized in {} kb",
+                "Entity references map serialized in {0} kb",
                 (writer.NumBytesWritten - bytesBefore) / 1024f
             );
 
@@ -403,7 +404,7 @@ namespace Trecs.Serialization.Internal
                 WriteSetRoutingIndex(setStore.SetIdsByGroup, writer);
             }
             _log.Trace(
-                "Entity sets serialized in {} kb",
+                "Entity sets serialized in {0} kb",
                 (writer.NumBytesWritten - bytesBefore) / 1024f
             );
 
@@ -420,7 +421,7 @@ namespace Trecs.Serialization.Internal
             }
 
             _log.Trace(
-                "Heap memory serialized in {} kb",
+                "Heap memory serialized in {0} kb",
                 (writer.NumBytesWritten - bytesBefore) / 1024f
             );
 

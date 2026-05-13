@@ -32,7 +32,7 @@ namespace Trecs.Internal
                 return;
             }
 
-            _log.Trace("Added system constraint {} -> {}", before, after);
+            _log.Trace("Added system constraint {0} -> {1}", before, after);
 
             if (!directDeps.ContainsKey(after))
             {
@@ -47,7 +47,7 @@ namespace Trecs.Internal
             DenseDictionary<Type, HashSet<Type>> directDeps
         )
         {
-            _log.Trace("Adding system constraint for system {}", system.GetType());
+            _log.Trace("Adding system constraint for system {0}", system.GetType());
 
             var systemType = system.GetType();
 
@@ -178,7 +178,7 @@ namespace Trecs.Internal
                         if (!typeToIndexMap.Keys.Any(t => type.IsAssignableFrom(t)))
                         {
                             _log.Warning(
-                                "System {} depends on system {} which is not in the system list",
+                                "System {0} depends on system {1} which is not in the system list",
                                 systemType,
                                 type
                             );

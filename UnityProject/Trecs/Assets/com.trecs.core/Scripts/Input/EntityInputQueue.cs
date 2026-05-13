@@ -284,7 +284,7 @@ namespace Trecs.Internal
 
         public void ClearInputsBeforeOrAt(int frame)
         {
-            _log.Trace("ClearInputsBeforeOrAt frame {}", frame);
+            _log.Trace("ClearInputsBeforeOrAt frame {0}", frame);
 
             foreach (var (_, info) in _componentTypeHelpers)
             {
@@ -345,7 +345,7 @@ namespace Trecs.Internal
                 }
 
                 _log.Debug(
-                    "Serialized {0.00} kb for type {} ({} frames)",
+                    "Serialized {0:0.00} kb for type {1} ({2} frames)",
                     (writer.NumBytesWritten - bytesStart) / 1024f,
                     info.Helper.ComponentType,
                     info.FrameEntries.Count
@@ -355,28 +355,28 @@ namespace Trecs.Internal
             bytesStart = writer.NumBytesWritten;
             _frameScopedUniqueHeap.Serialize(writer);
             _log.Debug(
-                "Serialized {0.00} kb for FrameScopedUniqueHeap",
+                "Serialized {0:0.00} kb for FrameScopedUniqueHeap",
                 (writer.NumBytesWritten - bytesStart) / 1024f
             );
 
             bytesStart = writer.NumBytesWritten;
             _frameScopedSharedHeap.Serialize(writer);
             _log.Debug(
-                "Serialized {0.00} kb for FrameScopedSharedHeap",
+                "Serialized {0:0.00} kb for FrameScopedSharedHeap",
                 (writer.NumBytesWritten - bytesStart) / 1024f
             );
 
             bytesStart = writer.NumBytesWritten;
             _nativeFrameScopedSharedHeap.Serialize(writer);
             _log.Debug(
-                "Serialized {0.00} kb for FrameScopedNativeSharedHeap",
+                "Serialized {0:0.00} kb for FrameScopedNativeSharedHeap",
                 (writer.NumBytesWritten - bytesStart) / 1024f
             );
 
             bytesStart = writer.NumBytesWritten;
             _frameScopedNativeUniqueHeap.Serialize(writer);
             _log.Debug(
-                "Serialized {0.00} kb for FrameScopedNativeUniqueHeap",
+                "Serialized {0:0.00} kb for FrameScopedNativeUniqueHeap",
                 (writer.NumBytesWritten - bytesStart) / 1024f
             );
         }
@@ -464,7 +464,7 @@ namespace Trecs.Internal
                 if (!entityHandle.Exists(world))
                 {
                     _log.Warning(
-                        "Attempted to apply input for non-existing entity {}",
+                        "Attempted to apply input for non-existing entity {0}",
                         entityHandle
                     );
                     continue;
@@ -481,7 +481,7 @@ namespace Trecs.Internal
                     values.Remove(valuesKey);
 
                     _log.Warning(
-                        "Found input with type {} for entity but entity doesn't exist. Discarding input",
+                        "Found input with type {0} for entity but entity doesn't exist. Discarding input",
                         typeof(T)
                     );
                     continue;

@@ -425,7 +425,7 @@ namespace Trecs.Serialization.Internal
 
             _frameSubscription = _accessor.Events.OnFixedUpdateCompleted(OnFixedFrameChange);
 
-            _log.Debug("Auto recording started at fixed frame {}", _startFrame);
+            _log.Debug("Auto recording started at fixed frame {0}", _startFrame);
         }
 
         public void Stop()
@@ -441,7 +441,7 @@ namespace Trecs.Serialization.Internal
             EnsureLockerRegistered(false);
 
             _log.Debug(
-                "Auto recording stopped — captured {} anchors ({} bytes total)",
+                "Auto recording stopped — captured {0} anchors ({1} bytes total)",
                 _anchors.Count,
                 _totalBytes
             );
@@ -543,14 +543,14 @@ namespace Trecs.Serialization.Internal
                 // would silently capture corrupt snapshots. Stop cleanly so the
                 // user sees auto-recording as inactive and can decide to
                 // restart.
-                _log.Error("JumpToFrame to snapshot @ frame {} failed: {}", anchorFrame, e);
+                _log.Error("JumpToFrame to snapshot @ frame {0} failed: {1}", anchorFrame, e);
                 _isRecording = false;
                 _fastForwardTargetFrame = null;
                 _pendingDivergenceFrame = null;
                 return false;
             }
 
-            _log.Debug("Jumped to frame {} via snapshot at frame {}", targetFrame, anchorFrame);
+            _log.Debug("Jumped to frame {0} via snapshot at frame {1}", targetFrame, anchorFrame);
             return true;
         }
 
@@ -669,7 +669,7 @@ namespace Trecs.Serialization.Internal
             LoadedRecordingPath = filePath;
 
             _log.Debug(
-                "Saved recording: {} anchors, {} snapshots, {} blob refs, {} bytes input queue",
+                "Saved recording: {0} anchors, {1} snapshots, {2} blob refs, {3} bytes input queue",
                 _anchors.Count,
                 _snapshots.Count,
                 blobs.Count,
@@ -689,7 +689,7 @@ namespace Trecs.Serialization.Internal
         {
             if (!File.Exists(filePath))
             {
-                _log.Warning("Recording file does not exist: {}", filePath);
+                _log.Warning("Recording file does not exist: {0}", filePath);
                 return false;
             }
 
@@ -700,7 +700,7 @@ namespace Trecs.Serialization.Internal
             }
             catch (Exception e)
             {
-                _log.Error("Failed to read recording from {}: {}", filePath, e);
+                _log.Error("Failed to read recording from {0}: {1}", filePath, e);
                 return false;
             }
 
@@ -713,7 +713,7 @@ namespace Trecs.Serialization.Internal
             if (bundle.Header.Version != _settings.Version)
             {
                 _log.Warning(
-                    "Recording schema version {} does not match current {} — "
+                    "Recording schema version {0} does not match current {1} — "
                         + "load may fail or the simulation may desync",
                     bundle.Header.Version,
                     _settings.Version
@@ -724,7 +724,7 @@ namespace Trecs.Serialization.Internal
             if (!Mathf.Approximately(bundle.Header.FixedDeltaTime, currentFixedDeltaTime))
             {
                 _log.Warning(
-                    "Recording fixed delta time {} differs from current {} — input replay may desync",
+                    "Recording fixed delta time {0} differs from current {1} — input replay may desync",
                     bundle.Header.FixedDeltaTime,
                     currentFixedDeltaTime
                 );
@@ -829,7 +829,7 @@ namespace Trecs.Serialization.Internal
             {
                 // Same recovery as JumpToFrame: world state may be partially
                 // loaded; stop recording cleanly so the user can decide.
-                _log.Error("LoadRecordingFromFile from {} failed: {}", filePath, e);
+                _log.Error("LoadRecordingFromFile from {0} failed: {1}", filePath, e);
                 _anchors.Clear();
                 _snapshots.Clear();
                 _scrubCache.Clear();
@@ -849,7 +849,7 @@ namespace Trecs.Serialization.Internal
             }
 
             _log.Debug(
-                "Loaded recording with {} anchors (frames {} .. {})",
+                "Loaded recording with {0} anchors (frames {1} .. {2})",
                 _anchors.Count,
                 _anchors[0].FixedFrame,
                 _anchors[_anchors.Count - 1].FixedFrame
@@ -876,7 +876,7 @@ namespace Trecs.Serialization.Internal
             if (FindAnchorIndexAtOrBefore(current) < 0)
             {
                 _log.Warning(
-                    "ForkAtCurrentFrame: no anchor at or before frame {} — cannot fork",
+                    "ForkAtCurrentFrame: no anchor at or before frame {0} — cannot fork",
                     current
                 );
                 return false;
@@ -894,7 +894,7 @@ namespace Trecs.Serialization.Internal
             // overwrites the original file — fork is the "edit this recording
             // from frame N onward" gesture. Save As remains the path for
             // saving under a different name.
-            _log.Debug("Forked recording at frame {}; trailing anchors dropped", current);
+            _log.Debug("Forked recording at frame {0}; trailing anchors dropped", current);
             return true;
         }
 
@@ -934,7 +934,7 @@ namespace Trecs.Serialization.Internal
                 _accessor.GetEntityInputQueue().ClearInputsBeforeOrAt(_startFrame - 1);
             }
             _log.Debug(
-                "Trimmed {} anchors before frame {} ({} bytes dropped)",
+                "Trimmed {0} anchors before frame {1} ({2} bytes dropped)",
                 keepFrom,
                 frame,
                 droppedBytes
@@ -977,7 +977,7 @@ namespace Trecs.Serialization.Internal
                 _accessor.GetEntityInputQueue().ClearFutureInputsAfterOrAt(frame + 1);
             }
             _log.Debug(
-                "Trimmed {} anchors after frame {} ({} bytes dropped)",
+                "Trimmed {0} anchors after frame {1} ({2} bytes dropped)",
                 dropped,
                 frame,
                 bytesBefore - _totalBytes
@@ -1015,7 +1015,7 @@ namespace Trecs.Serialization.Internal
             _desyncedFrame = null;
             LoadedRecordingPath = null;
             DropAbandonedTimelineInputs();
-            _log.Debug("Auto recording reset at frame {}", _startFrame);
+            _log.Debug("Auto recording reset at frame {0}", _startFrame);
         }
 
         /// <summary>
@@ -1070,7 +1070,7 @@ namespace Trecs.Serialization.Internal
                 {
                     _snapshots[i] = snapshot;
                     _log.Debug(
-                        "Replaced snapshot at frame {} (label='{}')",
+                        "Replaced snapshot at frame {0} (label='{1}')",
                         snapshot.FixedFrame,
                         label
                     );
@@ -1085,7 +1085,7 @@ namespace Trecs.Serialization.Internal
                 insertAt++;
             }
             _snapshots.Insert(insertAt, snapshot);
-            _log.Debug("Captured snapshot at frame {} (label='{}')", snapshot.FixedFrame, label);
+            _log.Debug("Captured snapshot at frame {0} (label='{1}')", snapshot.FixedFrame, label);
             return true;
         }
 
@@ -1153,7 +1153,7 @@ namespace Trecs.Serialization.Internal
                     _totalBytes -= _anchors[i].Payload.Length;
                     _anchors[i] = anchor;
                     _totalBytes += data.Length;
-                    _log.Debug("Replaced anchor at frame {}", metadata.FixedFrame);
+                    _log.Debug("Replaced anchor at frame {0}", metadata.FixedFrame);
                     return true;
                 }
             }
@@ -1167,7 +1167,7 @@ namespace Trecs.Serialization.Internal
 
             EnforceCapacityLimits();
 
-            _log.Debug("Captured anchor at frame {}", metadata.FixedFrame);
+            _log.Debug("Captured anchor at frame {0}", metadata.FixedFrame);
             return true;
         }
 
@@ -1220,7 +1220,7 @@ namespace Trecs.Serialization.Internal
             }
             if (target == int.MinValue)
             {
-                _log.Debug("No previous anchor before frame {}", current);
+                _log.Debug("No previous anchor before frame {0}", current);
                 return false;
             }
             return JumpToFrame(target);
@@ -1258,7 +1258,7 @@ namespace Trecs.Serialization.Internal
             }
             if (target == int.MaxValue)
             {
-                _log.Debug("No next anchor past frame {}", current);
+                _log.Debug("No next anchor past frame {0}", current);
                 return false;
             }
             return JumpToFrame(target);
@@ -1876,7 +1876,7 @@ namespace Trecs.Serialization.Internal
                     {
                         _desyncedFrame = frame;
                         _log.Warning(
-                            "Desync at frame {}: expected checksum {} but got {} "
+                            "Desync at frame {0}: expected checksum {1} but got {2} "
                                 + "(simulation re-run from an earlier anchor produced "
                                 + "different state — non-determinism in your code or data).",
                             frame,

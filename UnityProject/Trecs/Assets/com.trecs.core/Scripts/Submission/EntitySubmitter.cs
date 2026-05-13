@@ -1623,7 +1623,10 @@ namespace Trecs.Internal
                             var accessorId = buffer.Dequeue<int>();
                             var entityHandlex = buffer.Dequeue<EntityIndex>();
 
-                            _log.Trace("Removing entity {} (from native operation)", entityHandlex);
+                            _log.Trace(
+                                "Removing entity {0} (from native operation)",
+                                entityHandlex
+                            );
                             removals.Add((entityHandlex, accessorId));
 
                             if (_accessRecorder != null)
@@ -1719,7 +1722,7 @@ namespace Trecs.Internal
                         continue;
 
                     _log.Trace(
-                        "Coalesced move: entity {} from group {} to {}",
+                        "Coalesced move: entity {0} from group {1} to {2}",
                         from.Index,
                         from.GroupIndex,
                         toGroup
@@ -1831,7 +1834,7 @@ namespace Trecs.Internal
                             var componentCounts = buffer.Dequeue<uint>();
 
                             _log.Trace(
-                                "Adding new entity to group {} (from native operation)",
+                                "Adding new entity to group {0} (from native operation)",
                                 group
                             );
 

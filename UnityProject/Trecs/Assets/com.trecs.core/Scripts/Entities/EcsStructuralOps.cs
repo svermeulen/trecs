@@ -58,14 +58,14 @@ namespace Trecs
             if (_log.IsTraceEnabled())
             {
                 _log.Trace(
-                    "Constructing entity with components {}",
+                    "Constructing entity with components {0}",
                     resolvedTemplate
                         .ComponentDeclarations.Select(c => c.ComponentType.ToString())
                         .Join(", ")
                 );
             }
 
-            _log.Trace("Building new entity of type {}", resolvedTemplate);
+            _log.Trace("Building new entity of type {0}", resolvedTemplate);
 
             using (TrecsProfiling.Start("EntitySubmitter.AddEntity"))
             {

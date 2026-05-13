@@ -121,7 +121,7 @@ namespace Trecs
             );
             UnsafeUtility.WriteArrayElement(address.ToPointer(), 0, value);
             _typesByHandle.Add(handle.Value, typeof(T));
-            _log.Trace("Allocated NativeUniquePtr<{}> with handle {}", typeof(T), handle.Value);
+            _log.Trace("Allocated NativeUniquePtr<{0}> with handle {1}", typeof(T), handle.Value);
             return new NativeUniquePtr<T>(handle);
         }
 
@@ -157,7 +157,7 @@ namespace Trecs
             );
             _typesByHandle.Add(handle.Value, typeof(T));
             _log.Trace(
-                "Allocated external NativeUniquePtr<{}> with handle {}",
+                "Allocated external NativeUniquePtr<{0}> with handle {1}",
                 typeof(T),
                 handle.Value
             );
@@ -176,7 +176,7 @@ namespace Trecs
                 );
             }
             _chunkStore.Free(new PtrHandle(address));
-            _log.Trace("Disposed NativeUniquePtr with handle {}", address);
+            _log.Trace("Disposed NativeUniquePtr with handle {0}", address);
         }
 
         /// <summary>
@@ -200,7 +200,7 @@ namespace Trecs
                     .Distinct()
                     .Join(", ");
                 _log.Warning(
-                    "Found {} undisposed entries in NativeUniqueHeap with types: {}",
+                    "Found {0} undisposed entries in NativeUniqueHeap with types: {1}",
                     _typesByHandle.Count,
                     typeNames
                 );
@@ -246,7 +246,7 @@ namespace Trecs
                 writer.BlitWriteRawBytes("Data", entry.Address.ToPointer(), size);
             }
 
-            _log.Trace("Serialized {} native unique entries", _typesByHandle.Count);
+            _log.Trace("Serialized {0} native unique entries", _typesByHandle.Count);
         }
 
         public unsafe void Deserialize(ITrecsSerializationReader reader)
@@ -277,7 +277,7 @@ namespace Trecs
             }
 
             _chunkStore.OnDeserializeComplete();
-            _log.Debug("Deserialized {} native unique entries", numEntries);
+            _log.Debug("Deserialized {0} native unique entries", numEntries);
         }
 
         // ─── Helpers ──────────────────────────────────────────────

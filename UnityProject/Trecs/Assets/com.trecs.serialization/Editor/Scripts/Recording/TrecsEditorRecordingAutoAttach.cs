@@ -133,7 +133,7 @@ namespace Trecs.Serialization.Internal
                     snapshots.Dispose();
                 }
                 catch { }
-                _log.Error("Failed to auto-attach Trecs Player to world {}: {}", world, e);
+                _log.Error("Failed to auto-attach Trecs Player to world {0}: {1}", world, e);
                 return;
             }
             _attached[world] = new AttachedSet
@@ -142,7 +142,7 @@ namespace Trecs.Serialization.Internal
                 Controller = controller,
                 Snapshots = snapshots,
             };
-            _log.Trace("Auto-attached Trecs Player to world {}", world);
+            _log.Trace("Auto-attached Trecs Player to world {0}", world);
         }
 
         static void DetachForWorld(World world)
@@ -155,7 +155,7 @@ namespace Trecs.Serialization.Internal
             attached.Controller.Dispose();
             attached.Recorder.Dispose();
             attached.Snapshots.Dispose();
-            _log.Trace("Auto-detached Trecs Player from world {}", world);
+            _log.Trace("Auto-detached Trecs Player from world {0}", world);
         }
     }
 }

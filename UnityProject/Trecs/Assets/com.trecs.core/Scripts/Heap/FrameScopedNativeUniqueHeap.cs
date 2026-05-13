@@ -62,7 +62,7 @@ namespace Trecs
             _activeEntries.Add(handle.Value, new FrameEntry(typeof(T), frame));
 
             _log.Trace(
-                "Allocated frame-scoped NativeUniquePtr<{}> with handle {} for frame {}",
+                "Allocated frame-scoped NativeUniquePtr<{0}> with handle {1} for frame {2}",
                 typeof(T),
                 handle.Value,
                 frame
@@ -279,7 +279,7 @@ namespace Trecs
             }
 
             _chunkStore.OnDeserializeComplete();
-            _log.Debug("Deserialized {} frame-scoped native unique entries", _activeEntries.Count);
+            _log.Debug("Deserialized {0} frame-scoped native unique entries", _activeEntries.Count);
         }
 
         readonly struct FrameEntry

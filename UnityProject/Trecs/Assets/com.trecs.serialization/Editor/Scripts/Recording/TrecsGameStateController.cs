@@ -381,7 +381,7 @@ namespace Trecs.Serialization.Internal
             {
                 return false;
             }
-            _log.Info("Saved recording '{}' to {}", name, path);
+            _log.Info("Saved recording '{0}' to {1}", name, path);
             // Save sets the recorder's LoadedRecordingPath so a subsequent
             // "Save" overwrites the same slot. Poll so subscribers learn
             // about the new name without waiting for the next fixed tick.
@@ -401,7 +401,7 @@ namespace Trecs.Serialization.Internal
             var path = GetRecordingPath(name);
             if (!File.Exists(path))
             {
-                _log.Warning("Recording '{}' does not exist at {}", name, path);
+                _log.Warning("Recording '{0}' does not exist at {1}", name, path);
                 return false;
             }
 
@@ -416,7 +416,7 @@ namespace Trecs.Serialization.Internal
 
             // Recorder set _isRecording=true internally; broadcast the new mode.
             PollModeChanged();
-            _log.Info("Loaded recording '{}'", name);
+            _log.Info("Loaded recording '{0}'", name);
             return true;
         }
 
@@ -433,7 +433,7 @@ namespace Trecs.Serialization.Internal
             // header doesn't keep showing a stale name.
             _autoRecorder.ClearLoadedPathIfMatches(path);
             PollModeChanged();
-            _log.Info("Deleted recording '{}'", name);
+            _log.Info("Deleted recording '{0}'", name);
             NotifySavesChanged();
             return true;
         }
@@ -473,7 +473,7 @@ namespace Trecs.Serialization.Internal
                 return false;
             }
             File.Move(src, dst);
-            _log.Info("Renamed '{}' → '{}' in {}", oldName, newName, directory);
+            _log.Info("Renamed '{0}' → '{1}' in {2}", oldName, newName, directory);
             NotifySavesChanged();
             return true;
         }
@@ -527,13 +527,13 @@ namespace Trecs.Serialization.Internal
                     path,
                     includeTypeChecks: true
                 );
-                _log.Info("Saved snapshot '{}' to {}", name, path);
+                _log.Info("Saved snapshot '{0}' to {1}", name, path);
                 NotifySavesChanged();
                 return true;
             }
             catch (Exception e)
             {
-                _log.Warning("Failed to save snapshot '{}': {}", name, e.Message);
+                _log.Warning("Failed to save snapshot '{0}': {1}", name, e.Message);
                 return false;
             }
         }
@@ -544,7 +544,7 @@ namespace Trecs.Serialization.Internal
             var path = GetSnapshotPath(name);
             if (!File.Exists(path))
             {
-                _log.Warning("Snapshot '{}' does not exist at {}", name, path);
+                _log.Warning("Snapshot '{0}' does not exist at {1}", name, path);
                 return false;
             }
             // Loading a snapshot restores world state to a different frame, which
@@ -574,12 +574,12 @@ namespace Trecs.Serialization.Internal
                     StartAutoRecording();
                 }
                 PollModeChanged();
-                _log.Info("Loaded snapshot '{}'", name);
+                _log.Info("Loaded snapshot '{0}'", name);
                 return true;
             }
             catch (Exception e)
             {
-                _log.Warning("Failed to load snapshot '{}': {}", name, e.Message);
+                _log.Warning("Failed to load snapshot '{0}': {1}", name, e.Message);
                 return false;
             }
         }
@@ -593,7 +593,7 @@ namespace Trecs.Serialization.Internal
                 return false;
             }
             File.Delete(path);
-            _log.Info("Deleted snapshot '{}'", name);
+            _log.Info("Deleted snapshot '{0}'", name);
             NotifySavesChanged();
             return true;
         }

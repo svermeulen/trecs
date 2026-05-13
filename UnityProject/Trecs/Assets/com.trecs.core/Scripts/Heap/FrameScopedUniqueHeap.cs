@@ -48,7 +48,7 @@ namespace Trecs
             var typeId = TypeIdProvider.GetTypeId<T>();
             var id = _idCounter.Alloc();
             _entries.Add(id, new HeapEntry(value, typeId, frame));
-            _log.Trace("Allocated new input pointer with id {} and type {}", id, typeof(T));
+            _log.Trace("Allocated new input pointer with id {0} and type {1}", id, typeof(T));
             return new UniquePtr<T>(new PtrHandle(id));
         }
 
@@ -199,7 +199,7 @@ namespace Trecs
             var entryType = entry.Value.GetType();
             _poolManager.Despawn(entryType, entry.Value);
 
-            _log.Trace("Disposed input ptr with address {} and type {}", address, entryType);
+            _log.Trace("Disposed input ptr with address {0} and type {1}", address, entryType);
         }
 
         internal void Serialize(ITrecsSerializationWriter writer)
@@ -253,7 +253,11 @@ namespace Trecs
 
                 _entries.Add(address, new HeapEntry(obj, typeId, frame));
 
-                _log.Trace("Deserialized dynamic pointer with id {} and type {}", address, objType);
+                _log.Trace(
+                    "Deserialized dynamic pointer with id {0} and type {1}",
+                    address,
+                    objType
+                );
             }
 
             if (maxAddress > 0)
@@ -261,7 +265,7 @@ namespace Trecs
                 _idCounter.AdvancePast(maxAddress);
             }
 
-            _log.Debug("Deserialized {} input heap entries", _entries.Count);
+            _log.Debug("Deserialized {0} input heap entries", _entries.Count);
         }
 
         readonly struct HeapEntry

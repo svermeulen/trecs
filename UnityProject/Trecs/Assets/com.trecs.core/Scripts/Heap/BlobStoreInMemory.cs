@@ -85,10 +85,10 @@ namespace Trecs
 
             if (!_manifest.Values.TryRemove(id, out var _))
             {
-                _log.Warning("Blob with id {} was not found in manifest when force purging", id);
+                _log?.Warning("Blob with id {0} was not found in manifest when force purging", id);
             }
 
-            _log.Debug("Force removed blob with id {}", id);
+            _log?.Debug("Force removed blob with id {0}", id);
         }
 
         public void CreateBlobImpl(BlobId id, object blob, bool isNative)
@@ -149,7 +149,7 @@ namespace Trecs
                 numDisposed += 1;
             }
 
-            _log.Debug("Disposed {} blobs", numDisposed);
+            _log?.Debug("Disposed {0} blobs", numDisposed);
 
             _memoryCache.Clear();
         }
@@ -188,11 +188,11 @@ namespace Trecs
         {
             Assert.That(!_hasDisposed);
 
-            _log.Trace("Attempting to look up blob with id {}", id);
+            _log?.Trace("Attempting to look up blob with id {0}", id);
 
             if (!_manifest.Values.TryGetIndex(id, out var index))
             {
-                _log.Trace("No cached file found for blob {}", id);
+                _log?.Trace("No cached file found for blob {0}", id);
                 blob = null;
                 metadata = default;
                 return false;
@@ -203,7 +203,7 @@ namespace Trecs
             blob = _memoryCache[id];
             Assert.IsNotNull(blob);
 
-            _log.Trace("Found blob {} of type {} already in memory cache", id, entry.Type);
+            _log?.Trace("Found blob {0} of type {1} already in memory cache", id, entry.Type);
             entry.LastAccessTime = BlobManifest.GetTimeForAccessTime();
             metadata = entry;
             return true;

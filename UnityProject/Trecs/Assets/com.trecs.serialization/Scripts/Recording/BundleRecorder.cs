@@ -22,7 +22,7 @@ namespace Trecs.Serialization.Internal
     /// </summary>
     public sealed class BundleRecorder : IInputHistoryLocker, IDisposable
     {
-        static readonly TrecsLog _log = TrecsLog.Default;
+        readonly TrecsLog _log;
 
         readonly World _world;
         readonly IWorldStateSerializer _stateSerializer;
@@ -72,6 +72,7 @@ namespace Trecs.Serialization.Internal
                     "ChecksumFrameInterval must be >= 1"
                 );
 
+            _log = world.Log;
             _world = world;
             _stateSerializer = stateSerializer;
             _serializerRegistry = serializerRegistry;
@@ -169,7 +170,7 @@ namespace Trecs.Serialization.Internal
             _frameSubscription = _accessor.Events.OnFixedUpdateCompleted(OnFixedUpdateCompleted);
             _isRecording = true;
 
-            _log.Debug("Recording started at fixed frame {}", _startFrame);
+            _log.Debug("Recording started at fixed frame {0}", _startFrame);
         }
 
         /// <summary>
@@ -235,7 +236,7 @@ namespace Trecs.Serialization.Internal
             };
 
             _log.Debug(
-                "Recording stopped: {} frames, {} anchors, {} snapshots, {} checksums, {} bytes input queue",
+                "Recording stopped: {0} frames, {1} anchors, {2} snapshots, {3} checksums, {4} bytes input queue",
                 endFrame - _startFrame,
                 _anchors.Count,
                 _snapshots.Count,

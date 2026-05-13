@@ -74,7 +74,7 @@ namespace Trecs.Serialization
                 objectType
             );
 
-            _log.Trace("Registering serializer {} for type {}", serializer.GetType(), objectType);
+            _log.Trace("Registering serializer {0} for type {1}", serializer.GetType(), objectType);
 
             TypeIdProvider.Register(objectType);
             _objectTypeToSerializer.Add(objectType, serializer);
@@ -91,7 +91,7 @@ namespace Trecs.Serialization
             );
 
             _log.Trace(
-                "Registering serializer delta {} for type {}",
+                "Registering serializer delta {0} for type {1}",
                 serializer.GetType(),
                 objectType
             );

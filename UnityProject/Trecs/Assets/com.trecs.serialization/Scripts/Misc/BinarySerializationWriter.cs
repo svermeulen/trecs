@@ -290,7 +290,7 @@ namespace Trecs.Serialization.Internal
             );
 #endif
 
-            _log.Trace("Writing bit fields starting at byte {}", outputWriter.BaseStream.Position);
+            _log.Trace("Writing bit fields starting at byte {0}", outputWriter.BaseStream.Position);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             long bitFieldStartPos = outputWriter.BaseStream.Position;
 #endif
@@ -301,12 +301,15 @@ namespace Trecs.Serialization.Internal
                 "BitFields"
             );
 #endif
-            _log.Trace("Completed writing bit fields at byte {}", outputWriter.BaseStream.Position);
+            _log.Trace(
+                "Completed writing bit fields at byte {0}",
+                outputWriter.BaseStream.Position
+            );
 
             _dataBuffer.Position = 0;
             _dataBuffer.CopyTo(outputWriter.BaseStream);
             _log.Trace(
-                "Completed writing data buffer at byte {}",
+                "Completed writing data buffer at byte {0}",
                 outputWriter.BaseStream.Position
             );
 
@@ -321,7 +324,7 @@ namespace Trecs.Serialization.Internal
                 "Sentinel"
             );
 #endif
-            _log.Trace("Wrote sentinel value at byte {}", outputWriter.BaseStream.Position);
+            _log.Trace("Wrote sentinel value at byte {0}", outputWriter.BaseStream.Position);
         }
 
         public void ResetForErrorRecovery()

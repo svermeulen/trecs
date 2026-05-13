@@ -248,7 +248,7 @@ namespace Trecs.Internal
             _liveCount++;
 
             _log.Trace(
-                "Alloc: handle={} bucket={} page={} slot={} addr={}",
+                "Alloc: handle={0} bucket={1} page={2} slot={3} addr={4}",
                 handleValue,
                 bucketIdx,
                 pageId,
@@ -298,7 +298,7 @@ namespace Trecs.Internal
                 ReturnSlot(pendingEntry.PageId, pendingEntry.SlotIndex, pendingEntry.IsHuge != 0);
                 ReleasePreFlushSideTableSlot(handle, pendingEntry);
                 _liveCount--;
-                _log.Trace("Free (pre-flush): handle={}", handle.Value);
+                _log.Trace("Free (pre-flush): handle={0}", handle.Value);
                 return;
             }
 
@@ -335,7 +335,7 @@ namespace Trecs.Internal
                 }
             );
             _liveCount--;
-            _log.Trace("Free (deferred): handle={}", handle.Value);
+            _log.Trace("Free (deferred): handle={0}", handle.Value);
         }
 
         /// <summary>
@@ -564,7 +564,7 @@ namespace Trecs.Internal
             }
 
             _log.Trace(
-                "Allocated bucket page: bucket={} slotSize={} slots={} pageId={}",
+                "Allocated bucket page: bucket={0} slotSize={1} slots={2} pageId={3}",
                 bucketIdx,
                 bucket.SlotSize,
                 bucket.SlotsPerPage,
@@ -606,7 +606,7 @@ namespace Trecs.Internal
             slotIdx = 0;
             address = page.Address;
 
-            _log.Trace("Allocated huge page: size={} pageId={}", size, pageId);
+            _log.Trace("Allocated huge page: size={0} pageId={1}", size, pageId);
         }
 
         /// <summary>

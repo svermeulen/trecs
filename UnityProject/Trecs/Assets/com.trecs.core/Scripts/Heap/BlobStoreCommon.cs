@@ -53,8 +53,8 @@ namespace Trecs.Internal
 
                 if (!activeBlobs.Contains(blobId))
                 {
-                    _log.Trace(
-                        "Could not find blob {} in active blob list - adding to remove queue",
+                    _log?.Trace(
+                        "Could not find blob {0} in active blob list - adding to remove queue",
                         blobId
                     );
 
@@ -72,15 +72,18 @@ namespace Trecs.Internal
             }
 
             // _dbg.Text("Blob Total Memory Usage: {0.00} mb", (float)totalNumBytes / 1024f / 1024f);
-            _log.Trace("Blob Total Memory Usage: {0.00} mb", (float)totalNumBytes / 1024f / 1024f);
+            _log?.Trace(
+                "Blob Total Memory Usage: {0:0.00} mb",
+                (float)totalNumBytes / 1024f / 1024f
+            );
 
             // _dbg.Text(
             //     "Blob Extra Memory Usage: {0.00} mb / {0.00} mb",
             //     (float)numExtraBytes / 1024f / 1024f,
             //     maxMemoryCacheMb
             // );
-            _log.Trace(
-                "Blob Extra Memory Usage: {0.00} mb / {0.00} mb",
+            _log?.Trace(
+                "Blob Extra Memory Usage: {0:0.00} mb / {1:0.00} mb",
                 (float)numExtraBytes / 1024f / 1024f,
                 maxMemoryCacheMb
             );
@@ -90,7 +93,7 @@ namespace Trecs.Internal
 
             if (bytesToRemove <= 0)
             {
-                // _log.Trace("No need to clean memory cache - under limit");
+                // _log?.Trace("No need to clean memory cache - under limit");
                 return;
             }
 
@@ -105,7 +108,7 @@ namespace Trecs.Internal
                 var wasRemoved = cache.TryRemove(info.BlobId, out var blobValue);
                 Assert.That(wasRemoved);
 
-                _log.Trace("Disposing blob {}", info.BlobId);
+                _log?.Trace("Disposing blob {0}", info.BlobId);
                 DisposeBlob(blobValue, info.IsNative);
 
                 numRemoved += 1;
@@ -116,8 +119,8 @@ namespace Trecs.Internal
                 }
             }
 
-            _log.Debug(
-                "Removed {} blobs from in-memory cache, to get under memory limit",
+            _log?.Debug(
+                "Removed {0} blobs from in-memory cache, to get under memory limit",
                 numRemoved
             );
         }

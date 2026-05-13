@@ -95,7 +95,7 @@ namespace Trecs
         /// that define is set.
         /// </para>
         /// </summary>
-        public LogLevel MinLogLevel { get; init; } = LogLevel.Warning;
+        public LogLevel MinLogLevel { get; set; } = LogLevel.Warning;
 
         /// <summary>
         /// When true, accessing <see cref="WorldAccessor.DeltaTime"/>, <see cref="WorldAccessor.ElapsedTime"/>,

@@ -486,7 +486,7 @@ namespace Trecs
             }
 
             _log.Debug(
-                "Called all ECS remove callbacks for all {} groups",
+                "Called all ECS remove callbacks for all {0} groups",
                 _worldInfo.AllGroups.Count
             );
         }
@@ -567,7 +567,7 @@ namespace Trecs
                 if (!anyGroupUsed)
                 {
                     _log.Warning(
-                        "Template '{}' was registered but no entities were ever created in any of its groups",
+                        "Template '{0}' was registered but no entities were ever created in any of its groups",
                         resolvedTemplate.DebugName
                     );
                 }
@@ -586,7 +586,7 @@ namespace Trecs
             // for templates with many partitions; the per-group startup
             // cost is paid only for groups that actually get populated.
 
-            _log.Debug("Registered {} groups (lazy buffer init)", _worldInfo.AllGroups.Count);
+            _log.Debug("Registered {0} groups (lazy buffer init)", _worldInfo.AllGroups.Count);
 
             using (TrecsProfiling.Start("EntitySubmitter.FreezeConfiguration"))
             {
@@ -609,7 +609,7 @@ namespace Trecs
             if (_log.IsTraceEnabled())
             {
                 _log.Trace(
-                    "Constructing global entity with components {}",
+                    "Constructing global entity with components {0}",
                     globalTemplate
                         .ComponentDeclarations.Select(c => c.ComponentType.ToString())
                         .Join(", ")

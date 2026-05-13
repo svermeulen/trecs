@@ -113,7 +113,7 @@ namespace Trecs.Internal
 
             _entitySubmitter = entitySubmitter;
 
-            _log.Trace("Using Trecs Settings: {@}", settings);
+            _log.Trace("Using Trecs Settings: {0}", settings);
         }
 
         public bool IsPaused
@@ -508,7 +508,7 @@ namespace Trecs.Internal
                 {
                     // This is fairly common actually, in cases where we add to input queue, or just create/remove entities, etc.
                     _log.Trace(
-                        "System {} (type {}) does not have any queriers",
+                        "System {0} (type {1}) does not have any queriers",
                         info.Metadata.DebugName,
                         info.System.GetType()
                     );
@@ -521,7 +521,7 @@ namespace Trecs.Internal
             }
 
             _log.Debug(
-                "SystemRunner initialization complete. Loaded {} trecs systems in total",
+                "SystemRunner initialization complete. Loaded {0} trecs systems in total",
                 _systems.Count
             );
         }
@@ -690,7 +690,7 @@ namespace Trecs.Internal
                 if (_settings.WarnOnFixedUpdateFallingBehind)
                 {
                     _log.Warning(
-                        "Fixed update is falling behind variable update!  Skipping forward by {} seconds to catch up",
+                        "Fixed update is falling behind variable update!  Skipping forward by {0} seconds to catch up",
                         fallBehindTime + 0.01f
                     );
                 }
@@ -715,7 +715,7 @@ namespace Trecs.Internal
                 if (_settings.WarnOnFixedUpdateFallingBehind)
                 {
                     _log.Warning(
-                        "Fixed update has started falling behind render update! ({} frames behind) This could enter the dreaded physics timestep spiral of death.  To fix this - provide a value for MaxSecondsPerFixedUpdate in trecs setting.  Note that if you do this that it may get out of sync with recordings or online environments",
+                        "Fixed update has started falling behind render update! ({0} frames behind) This could enter the dreaded physics timestep spiral of death.  To fix this - provide a value for MaxSecondsPerFixedUpdate in trecs setting.  Note that if you do this that it may get out of sync with recordings or online environments",
                         numUpdates
                     );
                 }
@@ -849,7 +849,7 @@ namespace Trecs.Internal
                 if (targetFrame <= _currentFixedFrameCount)
                 {
                     _log.Trace(
-                        "Ignored fast forward to frame {} since current frame is already {}",
+                        "Ignored fast forward to frame {0} since current frame is already {1}",
                         targetFrame,
                         _currentFixedFrameCount
                     );

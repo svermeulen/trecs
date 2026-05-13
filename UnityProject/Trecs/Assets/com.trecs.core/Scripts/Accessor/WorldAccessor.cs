@@ -1165,7 +1165,7 @@ namespace Trecs
                 if (synced && _systemRunner.WarnOnJobSyncPoints)
                 {
                     _world.Log.Warning(
-                        "Sync point in '{}': main-thread write access to {} in group {} completed outstanding jobs. "
+                        "Sync point in '{0}': main-thread write access to {1} in group {2} completed outstanding jobs. "
                             + "Consider reordering systems to avoid this.",
                         _debugName,
                         typeof(T).Name,
@@ -1196,7 +1196,7 @@ namespace Trecs
                 if (synced && _systemRunner.WarnOnJobSyncPoints)
                 {
                     _world.Log.Warning(
-                        "Sync point in '{}': main-thread read access to {} in group {} completed outstanding writer job. "
+                        "Sync point in '{0}': main-thread read access to {1} in group {2} completed outstanding writer job. "
                             + "Consider reordering systems to avoid this.",
                         _debugName,
                         typeof(T).Name,

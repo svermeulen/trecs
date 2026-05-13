@@ -152,7 +152,7 @@ namespace Trecs.Internal
             if (_log.IsDebugEnabled())
             {
                 _log.Debug(
-                    "{} systems provided to trecs:\n  {l}",
+                    "{0} systems provided to trecs:\n  {1}",
                     metadatas.Count,
                     metadatas.Select(x => x.DebugName).Join("\n  ")
                 );
@@ -191,7 +191,7 @@ namespace Trecs.Internal
             }
 
             _log.Debug(
-                "Phase counts — Input: {}, Fixed: {}, EarlyPresentation: {}, Presentation: {}, LatePresentation: {}",
+                "Phase counts — Input: {0}, Fixed: {1}, EarlyPresentation: {2}, Presentation: {3}, LatePresentation: {4}",
                 phaseBuckets[SystemPhase.Input].Count,
                 phaseBuckets[SystemPhase.Fixed].Count,
                 phaseBuckets[SystemPhase.EarlyPresentation].Count,

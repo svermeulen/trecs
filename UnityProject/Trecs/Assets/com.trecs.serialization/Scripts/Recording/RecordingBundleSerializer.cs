@@ -96,7 +96,7 @@ namespace Trecs.Serialization.Internal
             _buffer.MemoryStream.CopyTo(stream);
 
             _log.Debug(
-                "Bundle serialized ({0.00} kb): {} anchors, {} snapshots",
+                "Bundle serialized ({0:0.00} kb): {1} anchors, {2} snapshots",
                 totalBytes / 1024f,
                 bundle.Anchors.Count,
                 bundle.Snapshots.Count

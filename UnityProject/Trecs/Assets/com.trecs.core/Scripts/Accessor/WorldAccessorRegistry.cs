@@ -31,7 +31,7 @@ namespace Trecs.Internal
         public void RegisterById(WorldAccessor accessor)
         {
             _accessorById.Add(accessor.Id, accessor);
-            _log.Trace("Registered accessor '{}' with id {}", accessor.DebugName, accessor.Id);
+            _log.Trace("Registered accessor '{0}' with id {1}", accessor.DebugName, accessor.Id);
         }
 
         public void RegisterExecute(ISystem system, WorldAccessor accessor, string debugName)
@@ -45,7 +45,7 @@ namespace Trecs.Internal
 
             _executeAccessors.Add(system, accessor);
 
-            _log.Trace("Registered execute accessor for system {}", debugName);
+            _log.Trace("Registered execute accessor for system {0}", debugName);
         }
 
         public WorldAccessor GetAccessorById(int id)

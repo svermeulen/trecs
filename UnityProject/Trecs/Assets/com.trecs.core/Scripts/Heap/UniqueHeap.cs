@@ -45,7 +45,7 @@ namespace Trecs.Internal
             var id = _idCounter.Alloc();
             var entry = new HeapEntry(value, typeof(T));
             _entries.Add(id, entry);
-            _log.Trace("Allocated new dynamic pointer with id {} and type {}", id, typeof(T));
+            _log.Trace("Allocated new dynamic pointer with id {0} and type {1}", id, typeof(T));
             return new UniquePtr<T>(new PtrHandle(id));
         }
 
@@ -167,7 +167,7 @@ namespace Trecs.Internal
                     allTypes.Add(value.Type);
                 }
                 _log.Warning(
-                    "Found {} undisposed dynamic entries in UniqueHeap with types:\n - {}",
+                    "Found {0} undisposed dynamic entries in UniqueHeap with types:\n - {1}",
                     _entries.Count,
                     allTypes.Select(x => x.FullName).Join("\n - ")
                 );
@@ -207,7 +207,11 @@ namespace Trecs.Internal
                     _poolManager.Despawn(entry.Type, entry.Value);
                 }
 
-                _log.Trace("Disposed dynamic ptr with address {} and type {}", address, entry.Type);
+                _log.Trace(
+                    "Disposed dynamic ptr with address {0} and type {1}",
+                    address,
+                    entry.Type
+                );
             }
             else
             {
@@ -254,7 +258,11 @@ namespace Trecs.Internal
 
                 _entries.Add(address, heapEntry);
 
-                _log.Trace("Deserialized dynamic pointer with id {} and type {}", address, objType);
+                _log.Trace(
+                    "Deserialized dynamic pointer with id {0} and type {1}",
+                    address,
+                    objType
+                );
             }
         }
 

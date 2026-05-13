@@ -24,7 +24,7 @@ namespace Trecs.Serialization.Internal
     /// </remarks>
     public sealed class SnapshotSerializer : IDisposable
     {
-        static readonly TrecsLog _log = TrecsLog.Default;
+        readonly TrecsLog _log;
 
         readonly IWorldStateSerializer _worldStateSerializer;
         readonly SerializationBuffer _buffer;
@@ -44,6 +44,7 @@ namespace Trecs.Serialization.Internal
             if (world == null)
                 throw new ArgumentNullException(nameof(world));
 
+            _log = world.Log;
             _worldStateSerializer =
                 worldStateSerializer
                 ?? throw new ArgumentNullException(nameof(worldStateSerializer));
@@ -88,7 +89,7 @@ namespace Trecs.Serialization.Internal
                 _buffer.Write("metadata", metadata);
                 _worldStateSerializer.SerializeState(_buffer);
                 var numBytes = _buffer.EndWrite();
-                _log.Trace("Saved snapshot ({0.00} kb)", numBytes / 1024f);
+                _log.Trace("Saved snapshot ({0:0.00} kb)", numBytes / 1024f);
             }
             catch
             {
