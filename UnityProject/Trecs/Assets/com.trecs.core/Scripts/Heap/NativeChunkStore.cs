@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Trecs.Collections;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -82,7 +83,7 @@ namespace Trecs.Internal
         // _pendingAdds keeps newly-allocated entries main-thread-visible before they
         // reach the Burst-readable side table; _pendingFrees defers slot release until
         // the next flush so jobs that still hold the freed handle drain cleanly.
-        readonly Dictionary<uint, NativeChunkStoreEntry> _pendingAdds = new();
+        readonly DenseDictionary<uint, NativeChunkStoreEntry> _pendingAdds = new();
         readonly List<PendingFree> _pendingFrees = new();
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -289,7 +290,7 @@ namespace Trecs.Internal
             // it. Critical ordering: drain BEFORE ReturnSlot, because for huge/external pages
             // ReturnSlot frees the page memory and a drain-blocked job would otherwise read
             // freed memory during EnforceAll's blocking window.
-            if (_pendingAdds.Remove(handle.Value, out var pendingEntry))
+            if (_pendingAdds.TryRemove(handle.Value, out var pendingEntry))
             {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.EnforceAllBufferJobsHaveCompletedAndRelease(pendingEntry.Safety);
@@ -652,7 +653,7 @@ namespace Trecs.Internal
 
         void PromotePendingEntryToSideTable(PtrHandle handle)
         {
-            if (_pendingAdds.Remove(handle.Value, out var entry))
+            if (_pendingAdds.TryRemove(handle.Value, out var entry))
             {
                 NativeChunkStoreResolver.DecodeHandle(handle, out var idxU, out _);
                 _sideTable[(int)idxU] = entry;
