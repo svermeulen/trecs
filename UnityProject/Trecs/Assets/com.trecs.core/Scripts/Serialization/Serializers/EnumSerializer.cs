@@ -10,7 +10,8 @@ namespace Trecs.Serialization
     /// (byte/short/int/etc.). Delta encoding (for non-<c>[Flags]</c> enums) uses
     /// a compact byte index into the declared value set, so enums must declare
     /// at most 256 distinct values and must not declare aliases (duplicate
-    /// values). Register via <see cref="SerializerRegistry.RegisterEnum{T}(bool)"/>.
+    /// values). Register via
+    /// <c>SerializerRegistry.RegisterSerializer(new EnumSerializer&lt;T&gt;())</c>.
     /// </summary>
     public sealed class EnumSerializer<T> : ISerializer<T>, ISerializerDelta<T>
         where T : unmanaged

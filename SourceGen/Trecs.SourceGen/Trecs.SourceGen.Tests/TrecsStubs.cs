@@ -91,18 +91,34 @@ internal static class TrecsStubs
 
         namespace Trecs
         {
-            // EntityIndex lives in Trecs.Internal in the real runtime, but the bulk of
-            // the stubbed surface in this Trecs block (aspects, queries, accessors) takes
-            // EntityIndex as a parameter type — a namespace-scoped using brings it in here
-            // so we don't have to fully-qualify every signature.
-            using Trecs.Internal;
-
             // Marker interfaces consumed by EntityComponentGenerator and
             // AspectGenerator base-list scanning.
             public interface IEntityComponent { }
             public interface ITag { }
             public interface IEntitySet { }
             public interface ITemplate { }
+
+            // EntityIndex — handle used by aspect / iteration plumbing.
+            // Real type lives at com.trecs.core/Scripts/Entities/EntityIndex.cs in the
+            // Trecs namespace. Source generators look it up by `Trecs.EntityIndex`.
+            public readonly struct EntityIndex
+            {
+                public readonly int Index;
+                public readonly GroupIndex GroupIndex;
+                public static EntityIndex Null => default;
+                public bool IsNull => false;
+
+                public EntityIndex(int index, GroupIndex group) { Index = index; GroupIndex = group; }
+
+                // Aspect ctors call `_entityIndex.WithIndex(...)` to advance the index field
+                // during iteration without rebuilding the GroupIndex.
+                public EntityIndex WithIndex(int index) => new EntityIndex(index, GroupIndex);
+
+                // EntityRefEmitter emits `__entityIndex.ToHandle(__world)` for iteration
+                // callbacks that declare an `EntityHandle` parameter.
+                public EntityHandle ToHandle(WorldAccessor world) => default;
+                public EntityHandle ToHandle(NativeWorldAccessor world) => default;
+            }
 
             // Note: every "Null" / "IsNull" member is expression-bodied (or omitted via
             // `=> default`) so additional constructors below don't have to chain to a
@@ -540,11 +556,10 @@ internal static class TrecsStubs
                 public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
                 public void UnsetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
 
-                // Entity / EntityHandle materialization from an EntityIndex — emitted by
-                // EntityRefEmitter when an iteration callback declares an EntityHandle or
-                // EntityAccessor parameter. Real impls live in WorldAccessor.cs and
-                // WorldAccessorInternalExtensions.cs.
-                public EntityHandle GetEntityHandle(EntityIndex entityIndex) => default;
+                // Entity materialization from an EntityIndex — emitted by EntityRefEmitter
+                // when an iteration callback declares an EntityAccessor parameter. The
+                // EntityHandle case routes through `EntityIndex.ToHandle(world)` instead.
+                // Real impls live in WorldAccessor.cs and WorldAccessorInternalExtensions.cs.
                 public EntityAccessor Entity(EntityIndex entityIndex) => default;
 
                 // Per-group EntityHandle buffer fetched by jobs that declare a
@@ -751,24 +766,6 @@ internal static class TrecsStubs
 
         namespace Trecs.Internal
         {
-            // EntityIndex — internal-only handle used by aspect / iteration plumbing.
-            // Real type lives at com.trecs.core/Scripts/Entities/EntityIndex.cs (also in
-            // the Trecs.Internal namespace). Tests reference it as Trecs.Internal.EntityIndex,
-            // so the namespace matters.
-            public readonly struct EntityIndex
-            {
-                public readonly int Index;
-                public readonly Trecs.GroupIndex GroupIndex;
-                public static EntityIndex Null => default;
-                public bool IsNull => false;
-
-                public EntityIndex(int index, Trecs.GroupIndex group) { Index = index; GroupIndex = group; }
-
-                // Aspect ctors call `_entityIndex.WithIndex(...)` to advance the index field
-                // during iteration without rebuilding the GroupIndex.
-                public EntityIndex WithIndex(int index) => new EntityIndex(index, GroupIndex);
-            }
-
             // Real signature lives at Packages/com.trecs.core/Scripts/Util/UnmanagedUtil.cs.
             // Generated equality / operator overloads in EntityComponentGenerator
             // call BlittableEquals / BlittableHashCode; bodies don't matter for compile-cleanliness tests.

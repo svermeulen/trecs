@@ -196,11 +196,11 @@ namespace Trecs.Tests
             NAssert.AreEqual(10, movedComp.Read.Value);
 
             // Verify remaining in partition A
-            NAssert.IsTrue(a.EntityExists(entityHandles[0]));
+            NAssert.IsTrue(entityHandles[0].Exists(a));
             NAssert.AreEqual(0, a.Component<TestInt>(entityHandles[0]).Read.Value);
-            NAssert.IsTrue(a.EntityExists(entityHandles[2]));
+            NAssert.IsTrue(entityHandles[2].Exists(a));
             NAssert.AreEqual(20, a.Component<TestInt>(entityHandles[2]).Read.Value);
-            NAssert.IsTrue(a.EntityExists(entityHandles[4]));
+            NAssert.IsTrue(entityHandles[4].Exists(a));
             NAssert.AreEqual(40, a.Component<TestInt>(entityHandles[4]).Read.Value);
         }
 
@@ -231,12 +231,12 @@ namespace Trecs.Tests
             NAssert.AreEqual(6, a.CountEntitiesWithTags(TestTags.Alpha));
 
             // Verify surviving entities
-            NAssert.IsTrue(a.EntityExists(entityHandles[0]));
-            NAssert.IsTrue(a.EntityExists(entityHandles[1]));
-            NAssert.IsTrue(a.EntityExists(entityHandles[3]));
-            NAssert.IsTrue(a.EntityExists(entityHandles[4]));
-            NAssert.IsTrue(a.EntityExists(entityHandles[6]));
-            NAssert.IsTrue(a.EntityExists(entityHandles[7]));
+            NAssert.IsTrue(entityHandles[0].Exists(a));
+            NAssert.IsTrue(entityHandles[1].Exists(a));
+            NAssert.IsTrue(entityHandles[3].Exists(a));
+            NAssert.IsTrue(entityHandles[4].Exists(a));
+            NAssert.IsTrue(entityHandles[6].Exists(a));
+            NAssert.IsTrue(entityHandles[7].Exists(a));
 
             // Verify values
             NAssert.AreEqual(0, a.Component<TestInt>(entityHandles[0]).Read.Value);

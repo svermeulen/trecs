@@ -14,6 +14,7 @@ namespace Trecs.Tests
         public void SetUp()
         {
             _serializerRegistry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
 
             // Register custom serializers for test classes
             _serializerRegistry.RegisterSerializer<Foo.Serializer>();

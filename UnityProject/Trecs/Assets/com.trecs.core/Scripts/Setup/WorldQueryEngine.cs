@@ -11,7 +11,7 @@ namespace Trecs
     /// Cached query engine that resolves groups matching tag, component, and exclusion criteria.
     /// Results are memoized so repeated queries within a frame are allocation-free.
     /// </summary>
-    public sealed class WorldQueryEngine
+    internal sealed class WorldQueryEngine
     {
         readonly ReadOnlyFastList<GroupIndex> _allGroups;
 

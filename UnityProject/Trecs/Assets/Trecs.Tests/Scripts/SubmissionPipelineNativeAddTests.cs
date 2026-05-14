@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Trecs.Internal;
 using Unity.Collections;
 using NAssert = NUnit.Framework.Assert;
 
@@ -45,7 +44,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
-            NAssert.IsFalse(a.EntityExists(existing));
+            NAssert.IsFalse(existing.Exists(a));
         }
 
         [Test]
@@ -81,11 +80,11 @@ namespace Trecs.Tests
 
             // 5 - 3 + 2 = 4
             NAssert.AreEqual(4, a.CountEntitiesWithTags(PartitionA));
-            NAssert.IsFalse(a.EntityExists(handles[0]));
-            NAssert.IsTrue(a.EntityExists(handles[1]));
-            NAssert.IsFalse(a.EntityExists(handles[2]));
-            NAssert.IsTrue(a.EntityExists(handles[3]));
-            NAssert.IsFalse(a.EntityExists(handles[4]));
+            NAssert.IsFalse(handles[0].Exists(a));
+            NAssert.IsTrue(handles[1].Exists(a));
+            NAssert.IsFalse(handles[2].Exists(a));
+            NAssert.IsTrue(handles[3].Exists(a));
+            NAssert.IsFalse(handles[4].Exists(a));
         }
 
         #endregion
@@ -152,7 +151,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(4, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
             NAssert.AreEqual(0, a.Component<TestInt>(handles[0]).Read.Value);
-            NAssert.IsFalse(a.EntityExists(handles[1]));
+            NAssert.IsFalse(handles[1].Exists(a));
         }
 
         #endregion
@@ -273,9 +272,9 @@ namespace Trecs.Tests
 
             // Should have 2 original + 5 new = 7
             NAssert.AreEqual(7, a.CountEntitiesWithTags(PartitionA));
-            NAssert.IsFalse(a.EntityExists(existing[1]));
-            NAssert.IsTrue(a.EntityExists(existing[0]));
-            NAssert.IsTrue(a.EntityExists(existing[2]));
+            NAssert.IsFalse(existing[1].Exists(a));
+            NAssert.IsTrue(existing[0].Exists(a));
+            NAssert.IsTrue(existing[2].Exists(a));
         }
 
         #endregion
@@ -305,7 +304,7 @@ namespace Trecs.Tests
             // Verify all entities accessible via reserved handles
             for (int i = 0; i < count; i++)
             {
-                NAssert.IsTrue(a.EntityExists(refs[i]), $"Entity {i} should exist");
+                NAssert.IsTrue(refs[i].Exists(a), $"Entity {i} should exist");
                 NAssert.AreEqual(
                     i,
                     a.Component<TestInt>(refs[i]).Read.Value,

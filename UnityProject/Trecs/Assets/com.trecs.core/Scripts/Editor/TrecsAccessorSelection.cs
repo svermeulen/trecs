@@ -399,11 +399,11 @@ namespace Trecs
                 return;
             }
 
-            // Live mode also needs the runtime ExecutableSystemInfo to
-            // render system metadata (type, dependencies). Resolve it via
-            // the live world's system list.
-            ExecutableSystemInfo liveSystem = null;
-            IReadOnlyList<ExecutableSystemInfo> liveSystems = null;
+            // Live mode also needs the runtime SystemMetadata to render
+            // system info (type, dependencies). Resolve it via the live
+            // world's system list.
+            SystemMetadata liveSystem = null;
+            IReadOnlyList<SystemMetadata> liveSystems = null;
             SystemRunner liveRunner = null;
             World liveWorld = null;
             if (src is LiveSchemaSource live)
@@ -451,8 +451,8 @@ namespace Trecs
 
         static AccessorEntry BuildEntryFromRef(
             AccessorRef aref,
-            ExecutableSystemInfo liveSystem,
-            IReadOnlyList<ExecutableSystemInfo> liveSystems
+            SystemMetadata liveSystem,
+            IReadOnlyList<SystemMetadata> liveSystems
         )
         {
             AccessorEntry entry;
@@ -521,8 +521,8 @@ namespace Trecs
 
         static AccessorEntry BuildEntryFromLive(
             string debugName,
-            ExecutableSystemInfo systemInfo,
-            IReadOnlyList<ExecutableSystemInfo> allSystems,
+            SystemMetadata systemInfo,
+            IReadOnlyList<SystemMetadata> allSystems,
             int systemIndex
         )
         {
@@ -535,10 +535,10 @@ namespace Trecs
             entry.IsSystem = true;
             entry.TypeName = sysType.Name;
             entry.TypeNamespace = sysType.Namespace;
-            entry.Phase = systemInfo.Metadata.Phase.ToString();
-            entry.HasPriority = systemInfo.Metadata.ExecutionPriority.HasValue;
-            entry.Priority = systemInfo.Metadata.ExecutionPriority ?? 0;
-            var deps = systemInfo.Metadata.SystemDependencies;
+            entry.Phase = systemInfo.Phase.ToString();
+            entry.HasPriority = systemInfo.ExecutionPriority.HasValue;
+            entry.Priority = systemInfo.ExecutionPriority ?? 0;
+            var deps = systemInfo.SystemDependencies;
             if (deps != null && allSystems != null)
             {
                 foreach (var depIdx in deps)
@@ -550,7 +550,7 @@ namespace Trecs
                     }
                     var depInfo = allSystems[depIdx];
                     entry.DependsOnSystemDebugNames.Add(
-                        depInfo.Metadata.DebugName ?? depInfo.System.GetType().Name
+                        depInfo.DebugName ?? depInfo.System.GetType().Name
                     );
                 }
             }
@@ -563,7 +563,7 @@ namespace Trecs
                 for (int i = 0; i < allSystems.Count; i++)
                 {
                     var other = allSystems[i];
-                    var otherDeps = other.Metadata.SystemDependencies;
+                    var otherDeps = other.SystemDependencies;
                     if (otherDeps == null)
                         continue;
                     foreach (var idx in otherDeps)
@@ -571,7 +571,7 @@ namespace Trecs
                         if (idx == systemIndex)
                         {
                             entry.DependentSystemDebugNames.Add(
-                                other.Metadata.DebugName ?? other.System.GetType().Name
+                                other.DebugName ?? other.System.GetType().Name
                             );
                             break;
                         }
@@ -656,7 +656,7 @@ namespace Trecs
         void UpdateRuntimeFields(
             ITrecsSchemaSource src,
             AccessorRef aref,
-            ExecutableSystemInfo liveSystem,
+            SystemMetadata liveSystem,
             SystemRunner liveRunner
         )
         {

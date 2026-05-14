@@ -43,7 +43,6 @@ namespace Trecs
         readonly EventsManager _eventsManager;
         readonly EcsHeapAllocator _heapAllocator;
         readonly EcsStructuralOps _structuralOps;
-        readonly DisposeGroup _eventSubscriptions = new();
         readonly BlobCache _blobCache;
         readonly NativeBlobBoxPool _nativeBlobBoxPool;
         readonly InterpolatedPreviousSaverManager _interpolatedPreviousSaverManager;
@@ -146,7 +145,7 @@ namespace Trecs
         /// serializers. Register additional <c>ISerializer&lt;T&gt;</c>
         /// implementations for any managed type stored on the heap
         /// (<c>SharedPtr&lt;T&gt;</c>, <c>UniquePtr&lt;T&gt;</c>, etc.);
-        /// blittable types can use <see cref="SerializerRegistry.RegisterBlit{T}"/>.
+        /// blittable types can wrap a <see cref="Trecs.Serialization.BlitSerializer{T}"/>.
         /// Registrations made before <see cref="Initialize"/> are picked up
         /// by all editor tooling; registering later is still fine for
         /// runtime save / load.
@@ -172,7 +171,7 @@ namespace Trecs
         /// </summary>
         public TrecsLog Log => _log;
 
-        internal BlobCache BlobCache
+        public BlobCache BlobCache
         {
             get { return _blobCache; }
         }
@@ -230,37 +229,18 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Total number of systems registered in this world. Stable for the lifetime
-        /// of the world; system indices are in the range <c>[0, SystemCount)</c> and
-        /// can be used with <see cref="GetSystemMetadata"/> and
-        /// <see cref="WorldAccessor.SetSystemEnabled"/>.
+        /// Returns metadata for every system registered in this world, in registration
+        /// order. The returned list is stable for the lifetime of the world; indices
+        /// match <see cref="SystemMetadata.DeclarationIndex"/> and can be used with
+        /// <see cref="WorldAccessor.SetSystemEnabled"/> /
+        /// <see cref="WorldAccessor.SetSystemPaused"/>. Use this to build custom
+        /// groupings (e.g. "all systems matching some game tag") that drive enable /
+        /// pause calls.
         /// </summary>
-        public int SystemCount
-        {
-            get
-            {
-                TrecsAssert.That(!_isDisposed);
-                return _systemRunner.Systems.Count;
-            }
-        }
-
-        /// <summary>
-        /// Returns metadata for the system at <paramref name="systemIndex"/>. Use this to
-        /// iterate systems and build custom groupings (e.g. "all systems matching some tag")
-        /// that drive <see cref="WorldAccessor.SetSystemEnabled"/> or
-        /// <see cref="WorldAccessor.SetSystemPaused"/> calls.
-        /// </summary>
-        public SystemMetadata GetSystemMetadata(int systemIndex)
+        public IReadOnlyList<SystemMetadata> GetSystems()
         {
             TrecsAssert.That(!_isDisposed);
-            var systems = _systemRunner.Systems;
-            TrecsAssert.That(
-                systemIndex >= 0 && systemIndex < systems.Count,
-                "System index {0} out of range [0, {1})",
-                systemIndex,
-                systems.Count
-            );
-            return systems[systemIndex].Metadata;
+            return _systemRunner.Systems;
         }
 
         /// <summary>
@@ -584,7 +564,6 @@ namespace Trecs
 
             _entityInputQueue.Dispose();
 
-            _eventSubscriptions.Dispose();
             _systemRunner.Dispose();
             _systemEnableState.Dispose();
             _heapAllocator.Dispose();
@@ -807,10 +786,6 @@ namespace Trecs
             );
 
             _systemRunner.SetEventSubjects(_eventsManager);
-
-            _eventsManager
-                .DeserializeCompletedEvent.Subscribe(_systemRunner.OnEcsDeserializeCompleted)
-                .AddTo(_eventSubscriptions);
 
             _entityInputQueue.SetInputsAppliedSubject(_eventsManager.InputsAppliedEvent);
 
@@ -1089,12 +1064,6 @@ namespace Trecs.Internal
         public static TrecsListHeap GetTrecsListHeap(this World world)
         {
             return world.TrecsListHeap;
-        }
-
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        public static BlobCache GetBlobCache(this World world)
-        {
-            return world.BlobCache;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]

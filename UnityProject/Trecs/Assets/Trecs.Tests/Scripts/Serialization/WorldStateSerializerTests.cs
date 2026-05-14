@@ -51,6 +51,7 @@ namespace Trecs.Tests
         public void SetUp()
         {
             _serializerRegistry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
         }
 
         World CreateWorld()

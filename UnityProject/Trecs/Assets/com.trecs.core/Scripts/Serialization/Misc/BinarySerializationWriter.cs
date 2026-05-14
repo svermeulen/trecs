@@ -142,12 +142,12 @@ namespace Trecs.Internal
                 )
             );
 #endif
-            using (TrecsProfiling.Start("WriteTypeId({})", concreteValueType))
+            using (TrecsProfiling.Start("WriteTypeId({0})", concreteValueType))
             {
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 long typeIdStartPos = _dataBuffer.Position;
 #endif
-                _serializerManager.WriteTypeId(concreteValueType, _dataWriter);
+                TypeIdSerializer.Write(concreteValueType, _dataWriter);
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 _memoryTracker.TrackTypeId(
                     concreteValueType,
@@ -158,7 +158,7 @@ namespace Trecs.Internal
 
             // Note that we don't do equality checks here, so it's up to
             // the serializer to do delta optimization logic
-            using (TrecsProfiling.Start("Serializing {}", concreteValueType))
+            using (TrecsProfiling.Start("Serializing {0}", concreteValueType))
             {
                 var serializer = _serializerManager.GetSerializerDelta(concreteValueType);
                 serializer.SerializeObjectDelta(value, baseValue, this);
@@ -223,12 +223,12 @@ namespace Trecs.Internal
 
             if (_includeTypeChecks)
             {
-                using (TrecsProfiling.Start("WriteTypeId({})", type))
+                using (TrecsProfiling.Start("WriteTypeId({0})", type))
                 {
 #if TRECS_INTERNAL_CHECKS && DEBUG
                     long typeIdStartPos = _dataBuffer.Position;
 #endif
-                    _serializerManager.WriteTypeId(type, _dataWriter);
+                    TypeIdSerializer.Write(type, _dataWriter);
 #if TRECS_INTERNAL_CHECKS && DEBUG
                     typeIdBytes = _dataBuffer.Position - typeIdStartPos;
 #endif
@@ -239,7 +239,7 @@ namespace Trecs.Internal
             // the serializer to do delta optimization logic
             ISerializerDelta<T> serializer;
 
-            using (TrecsProfiling.Start("Looking up serializer for type {}", type))
+            using (TrecsProfiling.Start("Looking up serializer for type {0}", type))
             {
                 serializer = _serializerManager.GetSerializerDelta<T>();
             }
@@ -249,7 +249,7 @@ namespace Trecs.Internal
             _memoryTracker.BeginTrackingField(name, type);
 #endif
 
-            using (TrecsProfiling.Start("{}.Serialize", serializer.GetType()))
+            using (TrecsProfiling.Start("{0}.Serialize", serializer.GetType()))
             {
                 serializer.SerializeDelta(value, baseValue, this);
             }
@@ -391,7 +391,7 @@ namespace Trecs.Internal
         {
             TrecsAssert.That(_hasStarted);
 
-            _serializerManager.WriteTypeId(type, _dataWriter);
+            TypeIdSerializer.Write(type, _dataWriter);
         }
 
         public void WriteObject(string name, object value)
@@ -414,18 +414,18 @@ namespace Trecs.Internal
             _memoryTracker.BeginTrackingField(name, type);
 #endif
 
-            using (TrecsProfiling.Start("WriteTypeId({})", type))
+            using (TrecsProfiling.Start("WriteTypeId({0})", type))
             {
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 long typeIdStartPos = _dataBuffer.Position;
 #endif
-                _serializerManager.WriteTypeId(type, _dataWriter);
+                TypeIdSerializer.Write(type, _dataWriter);
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 _memoryTracker.TrackTypeId(type, (int)(_dataBuffer.Position - typeIdStartPos));
 #endif
             }
 
-            using (TrecsProfiling.Start("Serializing {}", type))
+            using (TrecsProfiling.Start("Serializing {0}", type))
             {
                 var serializer = _serializerManager.GetSerializer(type);
                 serializer.SerializeObject(value, this);
@@ -492,12 +492,12 @@ namespace Trecs.Internal
 
             if (_includeTypeChecks)
             {
-                using (TrecsProfiling.Start("WriteTypeId({})", type))
+                using (TrecsProfiling.Start("WriteTypeId({0})", type))
                 {
 #if TRECS_INTERNAL_CHECKS && DEBUG
                     long typeIdStartPos = _dataBuffer.Position;
 #endif
-                    _serializerManager.WriteTypeId(type, _dataWriter);
+                    TypeIdSerializer.Write(type, _dataWriter);
 #if TRECS_INTERNAL_CHECKS && DEBUG
                     _memoryTracker.TrackTypeId(type, (int)(_dataBuffer.Position - typeIdStartPos));
 #endif
@@ -506,12 +506,12 @@ namespace Trecs.Internal
 
             ISerializer<T> serializer;
 
-            using (TrecsProfiling.Start("Looking up serializer for type {}", type))
+            using (TrecsProfiling.Start("Looking up serializer for type {0}", type))
             {
                 serializer = _serializerManager.GetSerializer<T>();
             }
 
-            using (TrecsProfiling.Start("{}.Serialize", serializer.GetType()))
+            using (TrecsProfiling.Start("{0}.Serialize", serializer.GetType()))
             {
                 serializer.Serialize(value, this);
             }

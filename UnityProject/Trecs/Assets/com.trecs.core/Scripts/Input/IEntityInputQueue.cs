@@ -9,7 +9,7 @@ namespace Trecs.Internal
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public interface IEntityInputQueue
+    internal interface IEntityInputQueue
     {
         void ClearFutureInputsAfterOrAt(int frame);
         void ClearInputsBeforeOrAt(int frame);
@@ -28,6 +28,6 @@ namespace Trecs.Internal
             where T : unmanaged, IEntityComponent;
         void SetInput<T>(int frame, EntityHandle entityHandle, in T value)
             where T : unmanaged, IEntityComponent;
-        int GetMaxClearFrame();
+        int GetMaxClearFrame(int currentFixedFrame);
     }
 }

@@ -169,7 +169,7 @@ namespace Trecs.Internal
                 _log.Warning(
                     "Found {0} undisposed dynamic entries in UniqueHeap with types:\n - {1}",
                     _entries.Count,
-                    allTypes.Select(x => x.FullName).Join("\n - ")
+                    string.Join("\n - ", allTypes.Select(x => x.FullName).ToArray())
                 );
             }
 

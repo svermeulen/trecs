@@ -275,7 +275,6 @@ public class JobGeneratorTests
         // they're independent; ExtraParamOrder preserves declaration order so
         // the call args land in the right slots.
         const string source = """
-            using Trecs.Internal;
             namespace Sample
             {
                 public partial struct CPos : Trecs.IEntityComponent { public float X; }
@@ -287,7 +286,7 @@ public class JobGeneratorTests
                     [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
                     public void Execute(
                         in PlayerView player,
-                        EntityIndex ei,
+                        Trecs.EntityIndex ei,
                         Trecs.EntityHandle handle
                     ) { }
                 }

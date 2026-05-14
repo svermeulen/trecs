@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 
 namespace Trecs
 {
@@ -9,7 +8,7 @@ namespace Trecs
     /// Obtained per-type via <see cref="EntitySet{T}.Value"/>, or enumerated via
     /// <see cref="WorldInfo.AllSets"/>.
     /// </summary>
-    public readonly struct EntitySet : IEquatable<EntitySet>, IStableHashProvider
+    public readonly struct EntitySet : IEquatable<EntitySet>
     {
         public readonly SetId Id;
 
@@ -47,12 +46,8 @@ namespace Trecs
             return Id == other.Id;
         }
 
+        // Stable hash across sessions.
         public override int GetHashCode()
-        {
-            return GetStableHashCode();
-        }
-
-        public int GetStableHashCode()
         {
             return Id.Id;
         }

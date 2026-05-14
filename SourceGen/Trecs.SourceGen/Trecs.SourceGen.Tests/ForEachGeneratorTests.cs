@@ -210,7 +210,7 @@ public class ForEachGeneratorTests
     public void ForEachWithEntityHandleParameter_CompilesCleanly()
     {
         // EntityHandle is the public stable identifier — generator must resolve
-        // it per-iteration via __world.GetEntityHandle(__entityIndex).
+        // it per-iteration via __entityIndex.ToHandle(__world).
         const string source = """
             namespace Sample
             {
@@ -284,7 +284,7 @@ public class ForEachGeneratorTests
                     [Trecs.ForEachEntity(typeof(PlayerTag))]
                     void Process(
                         in CPos pos,
-                        Trecs.Internal.EntityIndex idx,
+                        Trecs.EntityIndex idx,
                         Trecs.EntityHandle handle,
                         Trecs.EntityAccessor entity
                     ) { }

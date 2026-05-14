@@ -33,14 +33,14 @@ namespace Trecs
         // ── Write operations ─────────────────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void Add(EntityIndex entityIndex)
+        public void Add(EntityIndex entityIndex)
         {
             AssertValidGroup(entityIndex.GroupIndex);
             _entriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void Remove(EntityIndex entityIndex)
+        public void Remove(EntityIndex entityIndex)
         {
             AssertValidGroup(entityIndex.GroupIndex);
             _entriesPerGroup[entityIndex.GroupIndex.Index].Remove(entityIndex.Index);
@@ -67,7 +67,7 @@ namespace Trecs
         // ── Read operations (write-sync is a superset of read-sync) ──────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool Exists(EntityIndex entityIndex)
+        public bool Exists(EntityIndex entityIndex)
         {
             var group = entityIndex.GroupIndex;
             if (group.IsNull)

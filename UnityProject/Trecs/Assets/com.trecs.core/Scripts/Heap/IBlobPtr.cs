@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace Trecs.Internal
+namespace Trecs
 {
     /// <summary>
     /// Common interface for typed blob pointers (<see cref="BlobPtr{T}"/> and

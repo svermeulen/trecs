@@ -13,6 +13,7 @@ namespace Trecs.Tests
         public void SetUp()
         {
             _serializerRegistry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
             _binary = new SerializationBuffer(_serializerRegistry);
         }
 

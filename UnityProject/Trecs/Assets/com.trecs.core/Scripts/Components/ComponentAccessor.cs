@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Trecs.Internal;
 
 namespace Trecs
 {

@@ -17,7 +17,7 @@ namespace Trecs.Internal
     /// while running. Snapshots are kept in memory only — no disk I/O. Designed
     /// to be enabled on demand by editor tooling (see <c>TrecsPlayerWindow</c>).
     /// </summary>
-    public class TrecsAutoRecorder : IDisposable, IInputHistoryLocker
+    internal class TrecsAutoRecorder : IDisposable, IInputHistoryLocker
     {
 #if ENABLE_DESYNC_DEBUGGING
         // JSON snapshots for diff-driven desync diagnosis. One file per
@@ -570,6 +570,7 @@ namespace Trecs.Internal
                 // runs on first read or when the file changes; constructing a
                 // fresh registry+serializer per call keeps the API static.
                 var registry = new SerializerRegistry();
+                DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 using var serializer = new RecordingBundleSerializer(registry);
                 var bundleHeader = serializer.PeekHeader(filePath);
                 header = new RecordingHeader(
@@ -606,7 +607,7 @@ namespace Trecs.Internal
 
             var fixedDeltaTime = _accessor.GetSystemRunner().FixedDeltaTime;
             var blobs = new DenseHashSet<BlobId>();
-            _world.GetBlobCache().GetAllActiveBlobIds(blobs);
+            _world.BlobCache.GetAllActiveBlobIds(blobs);
 
             // EntityInputQueue is serialized via its own SerializationBuffer
             // envelope; the resulting bytes are an opaque payload inside the
@@ -1939,7 +1940,7 @@ namespace Trecs.Internal
     /// tooling can inspect frame span / tick rate without loading the full
     /// snapshot list. See <see cref="TrecsAutoRecorder.TryReadRecordingHeader"/>.
     /// </summary>
-    public readonly struct RecordingHeader
+    internal readonly struct RecordingHeader
     {
         public readonly int StartFrame;
         public readonly int EndFrame;

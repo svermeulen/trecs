@@ -30,7 +30,7 @@ namespace Trecs
             this TAspect aspect,
             in NativeWorldAccessor world
         )
-            where TAspect : struct, IAspect => world.GetEntityHandle(aspect.EntityIndex);
+            where TAspect : struct, IAspect => aspect.EntityIndex.ToHandle(world);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Remove<TAspect>(this TAspect aspect, WorldAccessor world)

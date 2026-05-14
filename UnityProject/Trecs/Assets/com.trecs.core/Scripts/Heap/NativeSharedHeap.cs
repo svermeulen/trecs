@@ -466,7 +466,7 @@ namespace Trecs.Internal
             }
         }
 
-        public struct BlobInfo
+        internal struct BlobInfo
         {
             public int RefCount;
             public int InnerTypeId;

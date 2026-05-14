@@ -13,8 +13,6 @@ namespace Trecs.Internal
         readonly TrecsLog _log;
 
         readonly List<ResetGroupInfo> _resetGroups;
-        readonly SystemRunner _systemRunner;
-        readonly DisposeGroup _subscriptions = new();
         readonly List<IInputHistoryLocker> _historyLockers = new();
         readonly FrameScopedSharedHeap _frameScopedSharedHeap;
         readonly FrameScopedUniqueHeap _frameScopedUniqueHeap;
@@ -34,7 +32,6 @@ namespace Trecs.Internal
             FrameScopedNativeSharedHeap nativeFrameScopedSharedHeap,
             FrameScopedUniqueHeap frameScopedUniqueHeap,
             FrameScopedNativeUniqueHeap frameScopedNativeUniqueHeap,
-            SystemRunner systemRunner,
             WorldInfo worldDef
         )
         {
@@ -44,7 +41,6 @@ namespace Trecs.Internal
             _frameScopedUniqueHeap = frameScopedUniqueHeap;
             _frameScopedNativeUniqueHeap = frameScopedNativeUniqueHeap;
             _resetGroups = new();
-            _systemRunner = systemRunner;
 
             foreach (var group in worldDef.AllGroups)
             {
@@ -67,8 +63,6 @@ namespace Trecs.Internal
                     }
                 }
             }
-
-            systemRunner.ReadyToApplyInputs.Subscribe(OnReadyForInputs).AddTo(_subscriptions);
         }
 
         public WorldAccessor Accessor
@@ -521,16 +515,16 @@ namespace Trecs.Internal
             TrecsAssert.That(wasRemoved);
         }
 
-        public int GetMaxClearFrame()
+        public int GetMaxClearFrame(int currentFixedFrame)
         {
-            return CalculateMaxClearFrame();
+            return CalculateMaxClearFrame(currentFixedFrame);
         }
 
-        int CalculateMaxClearFrame()
+        int CalculateMaxClearFrame(int currentFixedFrame)
         {
             // We need to do -1 for the heap allocated inputs
             // since we don't want to dispose those until next frame, since they could be used this frame
-            int maxClearFrame = _systemRunner.FixedFrame - 1;
+            int maxClearFrame = currentFixedFrame - 1;
 
             foreach (var locker in _historyLockers)
             {
@@ -545,7 +539,7 @@ namespace Trecs.Internal
             return maxClearFrame;
         }
 
-        void OnReadyForInputs()
+        internal void ApplyInputs(int currentFixedFrame)
         {
             using (TrecsProfiling.Start("Resetting Input Values"))
             {
@@ -555,21 +549,19 @@ namespace Trecs.Internal
                 }
             }
 
-            var frame = _systemRunner.FixedFrame;
-
 #if TRECS_IS_PROFILING
             using (TrecsProfiling.Start("Applying Inputs"))
 #endif
             {
                 foreach (var (_, info) in _componentTypeHelpers)
                 {
-                    if (info.FrameEntries.TryGetValue(frame, out var entityHandles))
+                    if (info.FrameEntries.TryGetValue(currentFixedFrame, out var entityHandles))
                     {
-                        info.Helper.ApplyInputs(this, entityHandles, frame);
+                        info.Helper.ApplyInputs(this, entityHandles, currentFixedFrame);
 
                         if (entityHandles.IsEmpty)
                         {
-                            info.FrameEntries.RemoveMustExist(frame);
+                            info.FrameEntries.RemoveMustExist(currentFixedFrame);
                             DespawnEntityHandleSet(info, entityHandles);
                         }
                     }
@@ -580,7 +572,7 @@ namespace Trecs.Internal
             using (TrecsProfiling.Start("Clearing old input"))
 #endif
             {
-                _maxClearFrame = CalculateMaxClearFrame();
+                _maxClearFrame = CalculateMaxClearFrame(currentFixedFrame);
                 // _dbg.Text("MaxClearFrame: {}", _maxClearFrame);
 
                 ClearInputsBeforeOrAt(_maxClearFrame);
@@ -591,8 +583,6 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            _subscriptions.Dispose();
-
             foreach (var (_, info) in _componentTypeHelpers)
             {
                 info.Helper.Dispose();
@@ -627,7 +617,7 @@ namespace Trecs.Internal
             {
                 // we don't want to use HashCode.Combine because
                 // it's not deterministic across restarts
-                return unchecked((int)math.hash(new int2(Frame, EntityHandle.GetStableHashCode())));
+                return unchecked((int)math.hash(new int2(Frame, EntityHandle.GetHashCode())));
             }
 
             public static bool operator ==(FrameEntityHandlePair left, FrameEntityHandlePair right)

@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using Trecs.Serialization;
 
 namespace Trecs.Samples.NativePointers
 {
@@ -21,8 +22,9 @@ namespace Trecs.Samples.NativePointers
     /// <see cref="Trecs.Internal.NativeUniqueHeap"/> writes each blob's
     /// inner type id during snapshot save — so the Player window needs a
     /// per-world serializer registry with <see cref="TrailHistory"/>
-    /// registered, or the save fails. We register it as blit (the struct
-    /// is unmanaged) — no hand-written <see cref="ISerializer{T}"/> needed.
+    /// registered, or the save fails. We register it via
+    /// <see cref="BlitSerializer{T}"/> (the struct is unmanaged) — no
+    /// hand-written <see cref="ISerializer{T}"/> needed.
     ///
     /// <see cref="NativeSharedPtr{T}"/> is a more advanced topic and is
     /// intentionally NOT used here — a follow-up sample can introduce
@@ -48,9 +50,9 @@ namespace Trecs.Samples.NativePointers
 
             // Register TrailHistory with the serializer registry so its
             // type id round-trips through snapshot save / load. The struct
-            // is unmanaged, so RegisterBlit is enough — no custom
+            // is unmanaged, so a BlitSerializer is enough — no custom
             // ISerializer<TrailHistory> needed.
-            world.SerializerRegistry.RegisterBlit<TrailHistory>();
+            world.SerializerRegistry.RegisterSerializer(new BlitSerializer<TrailHistory>());
 
             var goManager = new RenderableGameObjectManager(world);
 

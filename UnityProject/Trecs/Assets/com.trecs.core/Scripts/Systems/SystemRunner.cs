@@ -11,8 +11,6 @@ namespace Trecs.Internal
     {
         readonly TrecsLog _log;
 
-        readonly SimpleSubject _readyToApplyInputs = new();
-
         readonly InterpolatedPreviousSaverManager _interpolatedPreviousSaverManager;
         readonly Stopwatch _fixedUpdateStopwatch = new();
         readonly WorldSettings _settings;
@@ -26,7 +24,7 @@ namespace Trecs.Internal
         readonly SimpleSubject<bool> _fixedIsPausedChangedEvent = new();
         readonly RuntimeJobScheduler _jobScheduler;
         readonly WorldSafetyManager _safetyManager = new();
-
+        readonly EntityInputQueue _entityInputQueue;
         readonly EntitySubmitter _entitySubmitter;
 
         SimpleSubject _fixedUpdateCompleted;
@@ -35,7 +33,7 @@ namespace Trecs.Internal
         SimpleSubject _variableUpdateCompleted;
 
         SystemEnableState _enableState;
-        List<ExecutableSystemInfo> _systems;
+        List<SystemMetadata> _systems;
         List<SystemRuntimeInfo> _systemRuntimeInfos;
         List<int> _sortedInputSystems;
         List<int> _sortedFixedSystems;
@@ -93,12 +91,13 @@ namespace Trecs.Internal
         bool _hasDisposed;
         bool _hasRunFirstTick;
 
-        public SystemRunner(
+        internal SystemRunner(
             TrecsLog log,
             EntitySubmitter entitySubmitter,
             WorldSettings settings,
             InterpolatedPreviousSaverManager interpolatedPreviousSaverManager,
-            RuntimeJobScheduler jobScheduler
+            RuntimeJobScheduler jobScheduler,
+            EntityInputQueue entityInputQueue
         )
         {
             settings ??= new WorldSettings();
@@ -110,7 +109,7 @@ namespace Trecs.Internal
             _isPaused = settings.StartPaused;
             _settings = settings;
             _jobScheduler = jobScheduler;
-
+            _entityInputQueue = entityInputQueue;
             _entitySubmitter = entitySubmitter;
 
             _log.Trace("Using Trecs Settings: {0}", settings);
@@ -186,15 +185,6 @@ namespace Trecs.Internal
             {
                 TrecsAssert.That(!_hasDisposed);
                 _pendingFastForwardRequest = value;
-            }
-        }
-
-        internal ISimpleObservable ReadyToApplyInputs
-        {
-            get
-            {
-                TrecsAssert.That(!_hasDisposed);
-                return _readyToApplyInputs;
             }
         }
 
@@ -357,7 +347,7 @@ namespace Trecs.Internal
             }
         }
 
-        public IReadOnlyList<ExecutableSystemInfo> Systems
+        public IReadOnlyList<SystemMetadata> Systems
         {
             get
             {
@@ -435,7 +425,6 @@ namespace Trecs.Internal
             _jobScheduler.CompleteAllOutstanding();
             _safetyManager.Dispose();
 
-            TrecsAssert.That(_readyToApplyInputs.NumObservers == 0);
             TrecsAssert.That(_variableDeltaTimeChangeEvent.NumObservers == 0);
             TrecsAssert.That(_fixedCurrentFrameChangeEvent.NumObservers == 0);
             TrecsAssert.That(_elapsedVariableTimeChangeEvent.NumObservers == 0);
@@ -469,7 +458,7 @@ namespace Trecs.Internal
 
             _enableState = enableState;
             TrecsAssert.IsNull(_systems);
-            _systems = new List<ExecutableSystemInfo>(loadInfo.Systems.Count);
+            _systems = new List<SystemMetadata>(loadInfo.Systems.Count);
             TrecsAssert.IsNull(_systemRuntimeInfos);
             _systemRuntimeInfos = new List<SystemRuntimeInfo>(loadInfo.Systems.Count);
             TrecsAssert.IsNull(_sortedInputSystems);
@@ -502,22 +491,8 @@ namespace Trecs.Internal
 
             for (int i = 0; i < loadInfo.Systems.Count; i++)
             {
-                var info = loadInfo.Systems[i];
-
-                if (_log.IsTraceEnabled() && info.Querier == null)
-                {
-                    // This is fairly common actually, in cases where we add to input queue, or just create/remove entities, etc.
-                    _log.Trace(
-                        "System {0} (type {1}) does not have any queriers",
-                        info.Metadata.DebugName,
-                        info.System.GetType()
-                    );
-                }
-
                 _systemRuntimeInfos.Add(new SystemRuntimeInfo());
-                _systems.Add(
-                    new ExecutableSystemInfo(info.System, info.Metadata, info.DeclarationIndex)
-                );
+                _systems.Add(loadInfo.Systems[i]);
             }
 
             _log.Debug(
@@ -619,7 +594,7 @@ namespace Trecs.Internal
 
                 using (TrecsProfiling.Start("ApplyInputs"))
                 {
-                    _readyToApplyInputs.Invoke();
+                    _entityInputQueue.ApplyInputs(_currentFixedFrameCount);
                 }
 
                 // We can't add "TrecsAssert.That(allFixedJobs.IsCompleted)" because it seems that
@@ -742,7 +717,7 @@ namespace Trecs.Internal
             // _currentlyExecutingAccessorId field comment. Variable-cadence
             // phases don't have determinism guarantees that service-class
             // accessors could break, so we leave the tracker at 0 for them.
-            bool trackAccessor = systemInfo.Metadata.Phase == SystemPhase.Fixed;
+            bool trackAccessor = systemInfo.Phase == SystemPhase.Fixed;
             if (trackAccessor)
             {
                 _currentlyExecutingAccessorId = ((ISystemInternal)systemInfo.System).World.Id;
@@ -750,7 +725,7 @@ namespace Trecs.Internal
 
             try
             {
-                using (TrecsProfiling.Start("{l}.Execute", systemInfo.Metadata.DebugName))
+                using (TrecsProfiling.Start("{0}.Execute", systemInfo.DebugName))
                 {
                     ((ISystem)systemInfo.System).Execute();
                 }

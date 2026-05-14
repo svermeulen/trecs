@@ -1,6 +1,7 @@
 using System;
 using NUnit.Framework;
 using Trecs.Internal;
+using Trecs.Serialization;
 using Assert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -17,10 +18,10 @@ namespace Trecs.Tests
             _serializerRegistry = TestSerializerInstaller.CreateTestRegistry();
 
             // Register enum types (includeDelta for delta serialization tests)
-            _serializerRegistry.RegisterEnum<TestByteEnum>(includeDelta: true);
-            _serializerRegistry.RegisterEnum<TestIntEnum>(includeDelta: true);
-            _serializerRegistry.RegisterEnum<TestLongEnum>(includeDelta: true);
-            _serializerRegistry.RegisterEnum<TestFlagsEnum>(includeDelta: true);
+            RegisterEnumWithDelta<TestByteEnum>(_serializerRegistry);
+            RegisterEnumWithDelta<TestIntEnum>(_serializerRegistry);
+            RegisterEnumWithDelta<TestLongEnum>(_serializerRegistry);
+            RegisterEnumWithDelta<TestFlagsEnum>(_serializerRegistry);
             _cacheHelper = new SerializationBuffer(_serializerRegistry);
         }
 
@@ -28,6 +29,14 @@ namespace Trecs.Tests
         public void TearDown()
         {
             _cacheHelper?.Dispose();
+        }
+
+        static void RegisterEnumWithDelta<T>(SerializerRegistry registry)
+            where T : unmanaged
+        {
+            var serializer = new EnumSerializer<T>();
+            registry.RegisterSerializer(serializer);
+            registry.RegisterSerializerDelta(serializer);
         }
 
         [Test]

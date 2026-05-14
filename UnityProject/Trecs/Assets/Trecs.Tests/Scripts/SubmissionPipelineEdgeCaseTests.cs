@@ -55,15 +55,15 @@ namespace Trecs.Tests
                 a.CountEntitiesWithTags(PartitionB),
                 "8 entities should be in PartitionB"
             );
-            NAssert.IsFalse(a.EntityExists(handles[5]), "Entity 5 should be removed");
-            NAssert.IsTrue(a.EntityExists(handles[9]), "Entity 9 should still exist in PartitionA");
+            NAssert.IsFalse(handles[5].Exists(a), "Entity 5 should be removed");
+            NAssert.IsTrue(handles[9].Exists(a), "Entity 9 should still exist in PartitionA");
 
             // Verify moved entities have correct data
             for (int i = 0; i < 9; i++)
             {
                 if (i == 5)
                     continue;
-                NAssert.IsTrue(a.EntityExists(handles[i]), $"Moved entity {i} should exist");
+                NAssert.IsTrue(handles[i].Exists(a), $"Moved entity {i} should exist");
                 NAssert.AreEqual(
                     i,
                     a.Component<TestInt>(handles[i]).Read.Value,
@@ -110,15 +110,15 @@ namespace Trecs.Tests
                 "15 entities moved to PartitionB"
             );
 
-            NAssert.IsFalse(a.EntityExists(handles[3]));
-            NAssert.IsFalse(a.EntityExists(handles[7]));
-            NAssert.IsFalse(a.EntityExists(handles[12]));
+            NAssert.IsFalse(handles[3].Exists(a));
+            NAssert.IsFalse(handles[7].Exists(a));
+            NAssert.IsFalse(handles[12].Exists(a));
 
             for (int i = 0; i < 20; i++)
             {
                 if (i == 3 || i == 7 || i == 12)
                     continue;
-                NAssert.IsTrue(a.EntityExists(handles[i]), $"Entity {i} should exist");
+                NAssert.IsTrue(handles[i].Exists(a), $"Entity {i} should exist");
                 NAssert.AreEqual(
                     i,
                     a.Component<TestInt>(handles[i]).Read.Value,
@@ -159,7 +159,7 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA), "Entities 3,4 stay");
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionB), "Entities 0,2 moved");
-            NAssert.IsFalse(a.EntityExists(handles[1]), "Entity 1 removed");
+            NAssert.IsFalse(handles[1].Exists(a), "Entity 1 removed");
 
             NAssert.AreEqual(0, a.Component<TestInt>(handles[0]).Read.Value);
             NAssert.AreEqual(20, a.Component<TestInt>(handles[2]).Read.Value);
@@ -195,14 +195,14 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA), "Entities 6,7 stay");
             NAssert.AreEqual(5, a.CountEntitiesWithTags(PartitionB), "Entities 0,1,2,4,5 moved");
-            NAssert.IsFalse(a.EntityExists(handles[3]), "Entity 3 removed");
+            NAssert.IsFalse(handles[3].Exists(a), "Entity 3 removed");
 
             // Verify all surviving entities
             for (int i = 0; i < 8; i++)
             {
                 if (i == 3)
                     continue;
-                NAssert.IsTrue(a.EntityExists(handles[i]), $"Entity {i} should exist");
+                NAssert.IsTrue(handles[i].Exists(a), $"Entity {i} should exist");
                 NAssert.AreEqual(
                     i,
                     a.Component<TestInt>(handles[i]).Read.Value,
@@ -246,7 +246,7 @@ namespace Trecs.Tests
             // PartitionB: entity 1 = 1
             NAssert.AreEqual(3, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
-            NAssert.IsFalse(a.EntityExists(handles[0]));
+            NAssert.IsFalse(handles[0].Exists(a));
             NAssert.AreEqual(1, a.Component<TestInt>(handles[1]).Read.Value);
             NAssert.AreEqual(2, a.Component<TestInt>(handles[2]).Read.Value);
             NAssert.AreEqual(3, a.Component<TestInt>(handles[3]).Read.Value);
@@ -279,7 +279,7 @@ namespace Trecs.Tests
             nativeInit.Set(new TestVec());
             a.SubmitEntities();
 
-            NAssert.IsFalse(a.EntityExists(handles[0]));
+            NAssert.IsFalse(handles[0].Exists(a));
             NAssert.AreEqual(10, a.Component<TestInt>(handles[1]).Read.Value);
             NAssert.AreEqual(20, a.Component<TestInt>(handles[2]).Read.Value);
         }
@@ -462,11 +462,11 @@ namespace Trecs.Tests
                 bool removed = i < 80 && i % 10 == 0;
                 if (removed)
                 {
-                    NAssert.IsFalse(a.EntityExists(handles[i]), $"Entity {i} should be removed");
+                    NAssert.IsFalse(handles[i].Exists(a), $"Entity {i} should be removed");
                 }
                 else
                 {
-                    NAssert.IsTrue(a.EntityExists(handles[i]), $"Entity {i} should exist");
+                    NAssert.IsTrue(handles[i].Exists(a), $"Entity {i} should exist");
                     NAssert.AreEqual(
                         i,
                         a.Component<TestInt>(handles[i]).Read.Value,
@@ -527,8 +527,8 @@ namespace Trecs.Tests
             // PartitionB: empty
             NAssert.AreEqual(10, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
-            NAssert.IsFalse(a.EntityExists(handles[5]));
-            NAssert.IsFalse(a.EntityExists(handles[6]));
+            NAssert.IsFalse(handles[5].Exists(a));
+            NAssert.IsFalse(handles[6].Exists(a));
 
             // Verify data
             for (int i = 0; i < 10; i++)
@@ -572,8 +572,8 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
-            NAssert.IsFalse(a.EntityExists(existing));
-            NAssert.IsTrue(a.EntityExists(newHandle));
+            NAssert.IsFalse(existing.Exists(a));
+            NAssert.IsTrue(newHandle.Exists(a));
             NAssert.AreEqual(2, a.Component<TestInt>(newHandle).Read.Value);
         }
 
@@ -598,7 +598,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
-            NAssert.IsFalse(a.EntityExists(handle));
+            NAssert.IsFalse(handle.Exists(a));
         }
 
         [Test]

@@ -516,7 +516,7 @@ namespace Trecs.SourceGen
                 bool isEntityIndex =
                     paramType.Name == "EntityIndex"
                     && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
-                        == TrecsNamespaces.TrecsInternal;
+                        == TrecsNamespaces.Trecs;
                 bool isEntityHandleParam =
                     paramType.Name == "EntityHandle"
                     && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
@@ -709,7 +709,7 @@ namespace Trecs.SourceGen
                 if (
                     paramType.Name == "EntityIndex"
                     && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
-                        == TrecsNamespaces.TrecsInternal
+                        == TrecsNamespaces.Trecs
                 )
                 {
                     if (hasEntityIndex)

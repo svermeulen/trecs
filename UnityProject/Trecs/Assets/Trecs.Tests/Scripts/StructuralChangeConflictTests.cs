@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -389,8 +388,8 @@ namespace Trecs.Tests
 
             // Should have 2 entities: entity 1 (value 1) and the native-added one (value 99)
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
-            NAssert.IsFalse(a.EntityExists(refs[0]));
-            NAssert.IsTrue(a.EntityExists(refs[1]));
+            NAssert.IsFalse(refs[0].Exists(a));
+            NAssert.IsTrue(refs[1].Exists(a));
         }
 
         #endregion

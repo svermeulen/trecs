@@ -482,7 +482,7 @@ namespace Trecs
             }
         }
 
-        public WorldQueryEngine QueryEngine => _queryEngine;
+        internal WorldQueryEngine QueryEngine => _queryEngine;
 
         public ReadOnlyFastList<ResolvedTemplate> ResolvedTemplates
         {

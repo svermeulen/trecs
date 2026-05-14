@@ -2,9 +2,10 @@ using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Trecs.Internal;
 using Unity.Mathematics;
 
-namespace Trecs.Internal
+namespace Trecs
 {
     /// <summary>
     /// Pointer to a native (unmanaged) blob stored in the <see cref="BlobCache"/>.

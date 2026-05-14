@@ -271,9 +271,10 @@ namespace Trecs.Internal
         {
             if (_world == null || _worldOwner.IsDisposed)
                 return;
-            for (int i = 0; i < _worldOwner.SystemCount; i++)
+            var systems = _worldOwner.GetSystems();
+            for (int i = 0; i < systems.Count; i++)
             {
-                if (_worldOwner.GetSystemMetadata(i).Phase != SystemPhase.Input)
+                if (systems[i].Phase != SystemPhase.Input)
                     continue;
                 if (_world.IsSystemEnabled(i, EnableChannel.Playback) != enable)
                 {

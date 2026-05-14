@@ -5,7 +5,7 @@ using System.IO;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class BitWriter
+    internal sealed class BitWriter
     {
         readonly List<byte> _bytes = new();
         byte _currentByte = 0;

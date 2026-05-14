@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -278,7 +277,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
 
                 FishMeals[fi] = new TargetMeal
                 {
-                    Value = World.GetEntityHandle(new EntityIndex(mi, MealGroup)),
+                    Value = new EntityIndex(mi, MealGroup).ToHandle(World),
                 };
                 FishDestPositions[fi] = new DestinationPosition { Value = destPos };
                 FishRotations[fi] = new Rotation

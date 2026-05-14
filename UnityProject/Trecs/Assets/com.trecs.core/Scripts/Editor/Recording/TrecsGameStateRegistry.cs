@@ -9,7 +9,7 @@ namespace Trecs.Internal
     /// shape — editor tooling subscribes to register/unregister events and
     /// looks up the controller for a chosen World.
     /// </summary>
-    public static class TrecsGameStateRegistry
+    internal static class TrecsGameStateRegistry
     {
         static readonly List<TrecsGameStateController> _all = new();
 

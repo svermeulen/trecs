@@ -1,5 +1,3 @@
-using Trecs.Internal;
-
 namespace Trecs.Samples.Snake
 {
     /// <summary>

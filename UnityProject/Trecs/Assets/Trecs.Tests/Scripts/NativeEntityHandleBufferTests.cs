@@ -48,7 +48,7 @@ namespace Trecs.Tests
             // then forward map -> Version.
             for (int i = 0; i < buffer.Length; i++)
             {
-                var expected = a.GetEntityHandle(new EntityIndex(i, group));
+                var expected = new EntityIndex(i, group).ToHandle(a);
                 NAssert.AreEqual(
                     expected,
                     buffer[i],

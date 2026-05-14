@@ -8,7 +8,7 @@ namespace Trecs
     [ExecuteIn(SystemPhase.Presentation)]
     [ExecutePriority(-1000)]
     [AllowMultiple]
-    public partial class InterpolatedUpdater<T> : ISystem
+    internal partial class InterpolatedUpdater<T> : ISystem
         where T : unmanaged, IEntityComponent
     {
         readonly Interpolator _interpolator;
@@ -54,7 +54,7 @@ namespace Trecs
             }
         }
 
-        public delegate void Interpolator(
+        internal delegate void Interpolator(
             in T previous,
             in T current,
             ref T interpolated,

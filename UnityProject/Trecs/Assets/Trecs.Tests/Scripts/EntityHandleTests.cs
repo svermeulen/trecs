@@ -82,7 +82,7 @@ namespace Trecs.Tests
             var entityHandle = init.Handle;
             a.SubmitEntities();
 
-            NAssert.IsTrue(a.EntityExists(entityHandle));
+            NAssert.IsTrue(entityHandle.Exists(a));
         }
 
         [Test]
@@ -98,7 +98,7 @@ namespace Trecs.Tests
             a.RemoveEntity(entityHandle);
             a.SubmitEntities();
 
-            NAssert.IsFalse(a.EntityExists(entityHandle));
+            NAssert.IsFalse(entityHandle.Exists(a));
         }
 
         #endregion
@@ -119,7 +119,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.SubmitEntities();
 
-            NAssert.IsTrue(a.EntityExists(entityHandle));
+            NAssert.IsTrue(entityHandle.Exists(a));
             var comp = a.Component<TestInt>(entityHandle);
             NAssert.AreEqual(11, comp.Read.Value);
         }
@@ -148,7 +148,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // First entity should still be valid
-            NAssert.IsTrue(a.EntityExists(entityHandle1));
+            NAssert.IsTrue(entityHandle1.Exists(a));
             var comp = a.Component<TestInt>(entityHandle1);
             NAssert.AreEqual(11, comp.Read.Value);
         }
@@ -170,7 +170,7 @@ namespace Trecs.Tests
             a.SetTag<TestPartitionB>(entityIndex);
             a.SubmitEntities();
 
-            NAssert.IsTrue(a.EntityExists(entityHandle));
+            NAssert.IsTrue(entityHandle.Exists(a));
             var comp = a.Component<TestInt>(entityHandle);
             NAssert.AreEqual(42, comp.Read.Value);
         }
@@ -204,8 +204,8 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Both remaining entity refs should still resolve to valid entity indices
-            NAssert.IsTrue(a.EntityExists(entityHandle0));
-            NAssert.IsTrue(a.EntityExists(entityHandle2));
+            NAssert.IsTrue(entityHandle0.Exists(a));
+            NAssert.IsTrue(entityHandle2.Exists(a));
 
             var comp0 = a.Component<TestInt>(entityHandle0);
             var comp2 = a.Component<TestInt>(entityHandle2);
@@ -264,7 +264,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Verify tracked entity ref still resolves correctly
-            NAssert.IsTrue(a.EntityExists(trackedRef), "Tracked entity should still exist");
+            NAssert.IsTrue(trackedRef.Exists(a), "Tracked entity should still exist");
             var entityIndex = trackedRef.ToIndex(a);
             var intComp = a.Component<TestInt>(entityIndex);
             var vecComp = a.Component<TestVec>(entityIndex);
@@ -294,7 +294,7 @@ namespace Trecs.Tests
         #region Hash Determinism
 
         [Test]
-        public void EntityHandle_GetStableHashCode_SameForSameRef()
+        public void EntityHandle_GetHashCode_SameForSameRef()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
@@ -302,11 +302,11 @@ namespace Trecs.Tests
             var init = a.AddEntity(TestTags.Alpha).AssertComplete();
             var entityHandle = init.Handle;
 
-            NAssert.AreEqual(entityHandle.GetStableHashCode(), entityHandle.GetStableHashCode());
+            NAssert.AreEqual(entityHandle.GetHashCode(), entityHandle.GetHashCode());
         }
 
         [Test]
-        public void EntityHandle_GetStableHashCode_DifferentForDifferentRefs()
+        public void EntityHandle_GetHashCode_DifferentForDifferentRefs()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
@@ -314,17 +314,17 @@ namespace Trecs.Tests
             var init1 = a.AddEntity(TestTags.Alpha).AssertComplete();
             var init2 = a.AddEntity(TestTags.Alpha).AssertComplete();
 
-            NAssert.AreNotEqual(init1.Handle.GetStableHashCode(), init2.Handle.GetStableHashCode());
+            NAssert.AreNotEqual(init1.Handle.GetHashCode(), init2.Handle.GetHashCode());
         }
 
         [Test]
-        public void EntityHandle_GetStableHashCode_DeterministicAcrossWorlds()
+        public void EntityHandle_GetHashCode_DeterministicAcrossWorlds()
         {
             int HashForFirstEntity()
             {
                 using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
                 var init = env.Accessor.AddEntity(TestTags.Alpha).AssertComplete();
-                return init.Handle.GetStableHashCode();
+                return init.Handle.GetHashCode();
             }
 
             var hash1 = HashForFirstEntity();

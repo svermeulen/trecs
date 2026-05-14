@@ -294,7 +294,7 @@ namespace Trecs
         // ── Entity Remove ───────────────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal readonly void RemoveEntity(EntityIndex entityIndex)
+        public readonly void RemoveEntity(EntityIndex entityIndex)
         {
             AssertStructuralChangesAllowed();
             TrecsAssert.That(entityIndex != EntityIndex.Null);
@@ -319,7 +319,7 @@ namespace Trecs
         /// main thread.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal readonly void SetTag<T>(EntityIndex entityIndex)
+        public readonly void SetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertStructuralChangesAllowed();
@@ -339,7 +339,7 @@ namespace Trecs
         /// Sentinel <c>-3</c>; resolved at submit time.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal readonly void UnsetTag<T>(EntityIndex entityIndex)
+        public readonly void UnsetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertStructuralChangesAllowed();
@@ -371,13 +371,13 @@ namespace Trecs
             _entityIds.GetEntityHandle(entityIndex);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool EntityExists(EntityHandle entityHandle) =>
+        internal readonly bool EntityExists(EntityHandle entityHandle) =>
             _entityIds.TryGetEntityIndex(entityHandle, out _);
 
         // ── Deferred Set Operations ─────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void SetAdd<TSet>(EntityIndex entityIndex)
+        public void SetAdd<TSet>(EntityIndex entityIndex)
             where TSet : struct, IEntitySet
         {
             AssertStructuralChangesAllowed();
@@ -395,7 +395,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void SetRemove<TSet>(EntityIndex entityIndex)
+        public void SetRemove<TSet>(EntityIndex entityIndex)
             where TSet : struct, IEntitySet
         {
             AssertStructuralChangesAllowed();

@@ -8,7 +8,7 @@ namespace Trecs.Serialization
     /// Interface for blit serialization of DenseDictionary without unmanaged constraint.
     /// This allows the serializer to dispatch to a concrete implementation at runtime.
     /// </summary>
-    public interface IDenseDictionaryBlitHelper<TKey, TValue>
+    internal interface IDenseDictionaryBlitHelper<TKey, TValue>
         where TKey : struct, IEquatable<TKey>
     {
         void SerializeBlit(in DenseDictionary<TKey, TValue> dict, ISerializationWriter writer);
@@ -123,7 +123,7 @@ namespace Trecs.Serialization
     /// Static cache that determines at type load time whether blit serialization
     /// can be used for a given DenseDictionary type combination.
     /// </summary>
-    public static class DenseDictionaryBlitHelperCache<TKey, TValue>
+    internal static class DenseDictionaryBlitHelperCache<TKey, TValue>
         where TKey : struct, IEquatable<TKey>
     {
         public static readonly bool CanUseBlit;

@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -243,7 +242,7 @@ namespace Trecs.Tests
             a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
-            NAssert.IsTrue(a.EntityExists(entityHandle));
+            NAssert.IsTrue(entityHandle.Exists(a));
         }
 
         [Test]

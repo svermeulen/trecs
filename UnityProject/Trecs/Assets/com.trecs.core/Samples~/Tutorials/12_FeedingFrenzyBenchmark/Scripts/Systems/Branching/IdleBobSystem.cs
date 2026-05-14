@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -76,13 +75,13 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             in TargetMeal targetMeal,
             in UniformScale uniformScale,
             ref Position position,
-            EntityIndex entityIndex
+            EntityHandle entityHandle
         )
         {
             if (targetMeal.Value.IsNull)
             {
                 float baseY = _settings.BobBaseY * uniformScale.Value;
-                float phaseOffset = entityIndex.Index * GoldenRatio;
+                float phaseOffset = entityHandle.Id * GoldenRatio;
                 position.Value.y =
                     baseY
                     + _settings.BobAmplitude
@@ -169,7 +168,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             in TargetMeal targetMeal,
             in UniformScale uniformScale,
             ref Position position,
-            EntityIndex entityIndex,
+            EntityHandle entityHandle,
             in NativeWorldAccessor world,
             [PassThroughArgument] IdleBobSystemSettings settings
         )
@@ -177,7 +176,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             if (targetMeal.Value.IsNull)
             {
                 float baseY = settings.BobBaseY * uniformScale.Value;
-                float phaseOffset = entityIndex.Index * GoldenRatio;
+                float phaseOffset = entityHandle.Id * GoldenRatio;
                 position.Value.y =
                     baseY
                     + settings.BobAmplitude
@@ -219,12 +218,12 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             public IdleBobSystemSettings Settings;
 
             [ForEachEntity(typeof(FrenzyTags.Fish))]
-            public readonly void Execute(in Fish fish, EntityIndex entityIndex)
+            public readonly void Execute(in Fish fish, EntityHandle entityHandle)
             {
                 if (fish.TargetMeal.IsNull)
                 {
                     float baseY = Settings.BobBaseY * fish.UniformScale;
-                    float phaseOffset = entityIndex.Index * GoldenRatio;
+                    float phaseOffset = entityHandle.Id * GoldenRatio;
                     fish.Position.y =
                         baseY
                         + Settings.BobAmplitude
@@ -245,13 +244,13 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
                 in TargetMeal targetMeal,
                 in UniformScale uniformScale,
                 ref Position position,
-                EntityIndex entityIndex
+                EntityHandle entityHandle
             )
             {
                 if (targetMeal.Value.IsNull)
                 {
                     float baseY = Settings.BobBaseY * uniformScale.Value;
-                    float phaseOffset = entityIndex.Index * GoldenRatio;
+                    float phaseOffset = entityHandle.Id * GoldenRatio;
                     position.Value.y =
                         baseY
                         + Settings.BobAmplitude

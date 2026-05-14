@@ -43,7 +43,7 @@ namespace Trecs.SourceGen.Shared
             if (info.HasEntityHandleParameter)
                 sb.AppendLine(
                     indentLevel,
-                    $"var __entityHandle = {worldVar}.GetEntityHandle(__entityIndex);"
+                    $"var __entityHandle = __entityIndex.ToHandle({worldVar});"
                 );
             if (info.HasEntityAccessorParameter)
                 sb.AppendLine(

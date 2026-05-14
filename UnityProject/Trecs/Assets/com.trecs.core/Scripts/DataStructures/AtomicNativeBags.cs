@@ -9,7 +9,7 @@ using Unity.Jobs.LowLevel.Unsafe;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public unsafe struct AtomicNativeBags : IDisposable
+    internal unsafe struct AtomicNativeBags : IDisposable
     {
         int _threadsCount;
 

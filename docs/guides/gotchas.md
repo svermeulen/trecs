@@ -86,7 +86,7 @@ parent.ChildRef = childHandle;
 ref readonly var pos = ref World.Component<Position>(parent.ChildRef).Read;  // throws
 ```
 
-**Fix.** Check `World.EntityExists(handle)` before dereferencing and skip if false — the handle becomes dereferenceable on the next step, once submission has run.
+**Fix.** Check `handle.Exists(World)` before dereferencing and skip if false — the handle becomes dereferenceable on the next step, once submission has run.
 
 ## Native heap allocations aren't visible to jobs in the same step
 

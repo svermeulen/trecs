@@ -29,6 +29,7 @@ namespace Trecs.Tests
         public void SetUp()
         {
             _serializerRegistry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
         }
 
         World CreateWorld()
@@ -80,9 +81,10 @@ namespace Trecs.Tests
 
         int FindSystemIndex(World world, Type systemType)
         {
-            for (int i = 0; i < world.SystemCount; i++)
+            var systems = world.GetSystems();
+            for (int i = 0; i < systems.Count; i++)
             {
-                if (world.GetSystemMetadata(i).System.GetType() == systemType)
+                if (systems[i].System.GetType() == systemType)
                 {
                     return i;
                 }
@@ -149,21 +151,22 @@ namespace Trecs.Tests
             var a = world.CreateAccessor(AccessorRole.Unrestricted);
 
             // Pause every system, snapshot, then mutate to unpaused, then restore.
-            for (int i = 0; i < world.SystemCount; i++)
+            var systemCount = world.GetSystems().Count;
+            for (int i = 0; i < systemCount; i++)
             {
                 a.SetSystemPaused(i, true);
             }
 
             var data = SerializeWorld(world);
 
-            for (int i = 0; i < world.SystemCount; i++)
+            for (int i = 0; i < systemCount; i++)
             {
                 a.SetSystemPaused(i, false);
             }
 
             DeserializeWorld(world, data);
 
-            for (int i = 0; i < world.SystemCount; i++)
+            for (int i = 0; i < systemCount; i++)
             {
                 NAssert.IsTrue(a.IsSystemPaused(i), $"System {i} stayed paused after restore");
             }

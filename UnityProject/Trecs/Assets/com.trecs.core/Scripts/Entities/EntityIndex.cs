@@ -1,23 +1,30 @@
 using System;
 using System.Runtime.CompilerServices;
+using Trecs.Internal;
 using Unity.Mathematics;
 
-namespace Trecs.Internal
+namespace Trecs
 {
     /// <summary>
     /// A transient entity identifier composed of a buffer index within a specific group.
-    /// Unlike <see cref="EntityHandle"/>, this value may change when entities are added or removed.
+    /// Secondary to <see cref="EntityHandle"/>: prefer handles in user code, since they
+    /// remain stable across structural changes. An <see cref="EntityIndex"/> is only
+    /// guaranteed valid until the next entity submission — any add, remove, or tag-change
+    /// that touches the entity's group may shift buffer positions, and switching the
+    /// entity's partition moves it to a different group entirely.
     /// <para>
-    /// This type lives in <c>Trecs.Internal</c> to communicate that it is not part of the
-    /// public API. It remains <c>public</c> so source-generated code can reference it.
-    /// User code should use <see cref="EntityHandle"/> and <see cref="EntityAccessor"/>.
+    /// Use this overload set in hot loops where a handle has already been resolved and
+    /// you want to perform multiple operations on the same entity without paying the
+    /// handle-to-index lookup each time. Round-trip via
+    /// <see cref="EntityHandle.ToIndex(WorldAccessor)"/> /
+    /// <see cref="ToHandle(WorldAccessor)"/> when you need to cross a submission
+    /// boundary.
     /// </para>
     /// </summary>
     public readonly struct EntityIndex
         : IEquatable<EntityIndex>,
             IComparable<EntityIndex>,
-            IComparable,
-            IStableHashProvider
+            IComparable
     {
         /// <summary>
         /// The index of the entity within its group's component buffers.
@@ -75,19 +82,15 @@ namespace Trecs.Internal
             return other.Index == Index && other.GroupIndex == GroupIndex;
         }
 
-        public readonly int GetStableHashCode()
+        // Stable hash across sessions.
+        /// <inheritdoc/>
+        public override int GetHashCode()
         {
-            // we don't want to use HashCode.Combine or GetHashCode because
+            // we don't want to use HashCode.Combine because
             // it's not deterministic across restarts.
             // Uses GroupIndex.GetHashCode() (raw value) so null GroupIndex
             // hashes correctly without throwing.
             return unchecked((int)math.hash(new int2(Index, GroupIndex.GetHashCode())));
-        }
-
-        /// <inheritdoc/>
-        public override int GetHashCode()
-        {
-            return GetStableHashCode();
         }
 
         /// <inheritdoc/>

@@ -14,23 +14,23 @@ namespace Trecs.Internal
 
         static void RegisterCoreSerializers(SerializerRegistry registry)
         {
-            registry.RegisterBlit<float>();
-            registry.RegisterBlit<byte>(includeDelta: true);
-            registry.RegisterBlit<sbyte>(includeDelta: true);
-            registry.RegisterBlit<short>(includeDelta: true);
-            registry.RegisterBlit<ushort>(includeDelta: true);
-            registry.RegisterBlit<int>(includeDelta: true);
-            registry.RegisterBlit<uint>(includeDelta: true);
-            registry.RegisterBlit<ulong>(includeDelta: true);
-            registry.RegisterBlit<long>(includeDelta: true);
-            registry.RegisterBlit<double>(includeDelta: true);
-            registry.RegisterBlit<decimal>(includeDelta: true);
-            registry.RegisterBlit<float2>(includeDelta: true);
-            registry.RegisterBlit<int2>(includeDelta: true);
-            registry.RegisterBlit<float3>(includeDelta: true);
-            registry.RegisterBlit<quaternion>(includeDelta: true);
-            registry.RegisterBlit<Vector3>(includeDelta: true);
-            registry.RegisterBlit<Vector4>(includeDelta: true);
+            RegisterBlit<float>(registry);
+            RegisterBlit<byte>(registry, includeDelta: true);
+            RegisterBlit<sbyte>(registry, includeDelta: true);
+            RegisterBlit<short>(registry, includeDelta: true);
+            RegisterBlit<ushort>(registry, includeDelta: true);
+            RegisterBlit<int>(registry, includeDelta: true);
+            RegisterBlit<uint>(registry, includeDelta: true);
+            RegisterBlit<ulong>(registry, includeDelta: true);
+            RegisterBlit<long>(registry, includeDelta: true);
+            RegisterBlit<double>(registry, includeDelta: true);
+            RegisterBlit<decimal>(registry, includeDelta: true);
+            RegisterBlit<float2>(registry, includeDelta: true);
+            RegisterBlit<int2>(registry, includeDelta: true);
+            RegisterBlit<float3>(registry, includeDelta: true);
+            RegisterBlit<quaternion>(registry, includeDelta: true);
+            RegisterBlit<Vector3>(registry, includeDelta: true);
+            RegisterBlit<Vector4>(registry, includeDelta: true);
 
             registry.RegisterSerializer<BoolSerializer>();
             registry.RegisterSerializer<TypeSerializer>();
@@ -39,36 +39,36 @@ namespace Trecs.Internal
 
         static void RegisterTrecsSerializers(SerializerRegistry registry)
         {
-            registry.RegisterBlit<ComponentId>();
+            RegisterBlit<ComponentId>(registry);
 
             // Heap serializers
             registry.RegisterSerializer<
                 DenseDictionarySerializer<BlobId, NativeSharedHeap.BlobInfo>
             >();
             registry.RegisterSerializer<DenseDictionarySerializer<PtrHandle, BlobId>>();
-            registry.RegisterBlit<PtrHandle>();
-            registry.RegisterBlit<NativeSharedHeap.BlobInfo>();
+            RegisterBlit<PtrHandle>(registry);
+            RegisterBlit<NativeSharedHeap.BlobInfo>(registry);
 
             registry.RegisterSerializer<DenseDictionarySerializer<BlobId, SharedHeap.BlobInfo>>();
-            registry.RegisterBlit<SharedHeap.BlobInfo>();
+            RegisterBlit<SharedHeap.BlobInfo>(registry);
 
             registry.RegisterSerializer<ListSerializer<object>>();
             registry.RegisterSerializer<BlobManifest.Serializer>();
             registry.RegisterSerializer<DenseDictionarySerializer<BlobId, BlobMetadata>>();
             registry.RegisterSerializer<BlobMetadata.Serializer>();
-            registry.RegisterBlit<BlobId>();
+            RegisterBlit<BlobId>(registry);
 
             // Entity serializers
-            registry.RegisterBlit<EntityHandleMapElement>();
-            registry.RegisterBlit<EntityHandle>();
-            registry.RegisterBlit<TagSet>();
+            RegisterBlit<EntityHandleMapElement>(registry);
+            RegisterBlit<EntityHandle>(registry);
+            RegisterBlit<TagSet>(registry);
             // SetId is written by WorldStateSerializer.WriteSets /
             // WriteSetRoutingIndex unconditionally — register it here so
             // any world serialization works without callers having to
             // remember to register it themselves. Same for the per-set
             // entity-id-to-dense-index dictionary, written for each
             // group's entries.
-            registry.RegisterBlit<SetId>();
+            RegisterBlit<SetId>(registry);
             registry.RegisterSerializer<NativeDenseDictionarySerializer<int, int>>();
 
             // For EntityInputQueue
@@ -81,6 +81,17 @@ namespace Trecs.Internal
 
             SnapshotMetadata.RegisterSerializers(registry);
             BundleHeader.RegisterSerializers(registry);
+        }
+
+        static void RegisterBlit<T>(SerializerRegistry registry, bool includeDelta = false)
+            where T : unmanaged
+        {
+            var serializer = new BlitSerializer<T>();
+            registry.RegisterSerializer(serializer);
+            if (includeDelta)
+            {
+                registry.RegisterSerializerDelta(serializer);
+            }
         }
     }
 }

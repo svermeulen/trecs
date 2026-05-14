@@ -12,7 +12,7 @@ namespace Trecs.Internal
 {
     internal sealed class SerializationMemoryTracker
     {
-        public sealed class MemoryNode
+        internal sealed class MemoryNode
         {
             public string Name { get; }
             public string TypeName { get; }

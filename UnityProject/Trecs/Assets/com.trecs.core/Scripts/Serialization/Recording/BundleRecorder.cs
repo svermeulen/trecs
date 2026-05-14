@@ -211,7 +211,7 @@ namespace Trecs.Internal
             }
 
             var blobs = new DenseHashSet<BlobId>();
-            _world.GetBlobCache().GetAllActiveBlobIds(blobs);
+            _world.BlobCache.GetAllActiveBlobIds(blobs);
 
             var bundle = new RecordingBundle
             {

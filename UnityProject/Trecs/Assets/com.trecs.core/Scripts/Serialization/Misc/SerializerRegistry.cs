@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using Trecs.Serialization;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs
 {
     /// <summary>
     /// Registry of serializers and their associated type IDs.
@@ -32,32 +31,6 @@ namespace Trecs.Internal
 
         readonly Dictionary<Type, ISerializer> _objectTypeToSerializer = new();
         readonly Dictionary<Type, ISerializerDelta> _objectTypeToSerializerDelta = new();
-
-        static Type ExtractObjectType(Type serializerType, Type genericBase)
-        {
-            foreach (var interfaceCandidate in serializerType.GetInterfaces())
-            {
-                if (
-                    interfaceCandidate.IsGenericType
-                    && interfaceCandidate.GetGenericTypeDefinition() == genericBase
-                )
-                {
-                    var objectType = interfaceCandidate.GetGenericArguments()[0];
-                    TrecsAssert.That(
-                        !objectType.IsAbstract || objectType == typeof(Type),
-                        "Expected non abstract type but found {0}",
-                        objectType
-                    );
-                    return objectType;
-                }
-            }
-
-            throw TrecsAssert.CreateException(
-                "Serializer {0} does not implement {1}",
-                serializerType,
-                genericBase
-            );
-        }
 
         public void RegisterSerializer(ISerializer serializer)
         {
@@ -95,36 +68,6 @@ namespace Trecs.Internal
             _objectTypeToSerializerDelta.Add(objectType, serializer);
         }
 
-        public void RegisterBlit<T>(bool includeDelta = false)
-            where T : unmanaged
-        {
-            var serializer = new BlitSerializer<T>();
-            RegisterSerializer(serializer);
-
-            if (includeDelta)
-            {
-                RegisterSerializerDelta(serializer);
-            }
-        }
-
-        public void RegisterEnum<T>(bool includeDelta = false)
-            where T : unmanaged
-        {
-            TrecsAssert.That(typeof(T).IsEnum);
-            var serializer = new EnumSerializer<T>();
-            RegisterSerializer(serializer);
-
-            if (includeDelta)
-            {
-                RegisterSerializerDelta(serializer);
-            }
-        }
-
-        public void RegisterSkip<T>()
-        {
-            RegisterSerializer(new SkipSerializer<T>());
-        }
-
         public void RegisterSerializer<TSerializer>()
             where TSerializer : ISerializer, new()
         {
@@ -146,25 +89,6 @@ namespace Trecs.Internal
             where TSerializer : ISerializerDelta, new()
         {
             RegisterSerializerDelta(new TSerializer());
-        }
-
-        public void WriteTypeId(Type objectType, BinaryWriter writer)
-        {
-            using var _ = TrecsProfiling.Start("WriteTypeId");
-
-            if (objectType.DerivesFrom<Type>())
-            {
-                objectType = typeof(Type);
-            }
-
-            TrecsAssert.That(!objectType.IsGenericTypeDefinition);
-            writer.Write(TypeIdProvider.GetTypeId(objectType));
-        }
-
-        public Type ReadTypeId(BinaryReader reader)
-        {
-            int id = reader.ReadInt32();
-            return TypeIdProvider.GetTypeFromId(id);
         }
 
         // finds or creates a serializer for the given type
@@ -239,6 +163,32 @@ namespace Trecs.Internal
             }
 
             return null;
+        }
+
+        static Type ExtractObjectType(Type serializerType, Type genericBase)
+        {
+            foreach (var interfaceCandidate in serializerType.GetInterfaces())
+            {
+                if (
+                    interfaceCandidate.IsGenericType
+                    && interfaceCandidate.GetGenericTypeDefinition() == genericBase
+                )
+                {
+                    var objectType = interfaceCandidate.GetGenericArguments()[0];
+                    TrecsAssert.That(
+                        !objectType.IsAbstract || objectType == typeof(Type),
+                        "Expected non abstract type but found {0}",
+                        objectType
+                    );
+                    return objectType;
+                }
+            }
+
+            throw TrecsAssert.CreateException(
+                "Serializer {0} does not implement {1}",
+                serializerType,
+                genericBase
+            );
         }
     }
 }

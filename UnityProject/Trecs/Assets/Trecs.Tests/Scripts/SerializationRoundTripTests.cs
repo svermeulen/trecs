@@ -20,6 +20,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -57,6 +58,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -84,6 +86,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -107,6 +110,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -145,6 +149,7 @@ namespace Trecs.Tests
             // via the generic Register<TSerializer>() path. Demonstrates the same shape
             // a non-blittable custom serializer would take, except writing more fields.
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
 
             // CustomMarker is not a Trecs component; we just round-trip an instance
             // through SerializationBuffer to prove the registration path works.
@@ -167,6 +172,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -189,6 +195,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -201,6 +208,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -223,6 +231,7 @@ namespace Trecs.Tests
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             snapshots.Dispose();
@@ -253,6 +262,7 @@ namespace Trecs.Tests
             var savedHandle = ptr.Handle;
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -290,6 +300,7 @@ namespace Trecs.Tests
             var savedHandle = list.Handle;
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 
@@ -331,6 +342,7 @@ namespace Trecs.Tests
             var savedHandle = list.Handle;
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
 

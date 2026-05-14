@@ -157,12 +157,12 @@ namespace Trecs.Internal
                 "Delta serialization doesn't support null base values"
             );
 
-            var concreteType = _serializerManager.ReadTypeId(_binaryReader);
+            var concreteType = TypeIdSerializer.Read(_binaryReader);
 
             // Note that we don't do equality checks here, so it's up to
             // the serializer to do delta optimization logic
 
-            using (TrecsProfiling.Start("Deserializing {}", concreteType))
+            using (TrecsProfiling.Start("Deserializing {0}", concreteType))
             {
                 var serializer = _serializerManager.GetSerializerDelta(concreteType);
                 serializer.DeserializeObjectDelta(ref value, baseValue, this);
@@ -221,7 +221,7 @@ namespace Trecs.Internal
             {
                 // a potential optimization here is to just skip the type id in release mode
                 // since it's only needed for verification purposes
-                var savedType = _serializerManager.ReadTypeId(_binaryReader);
+                var savedType = TypeIdSerializer.Read(_binaryReader);
                 TrecsAssert.That(
                     savedType == type,
                     "Expected type {0} but found '{1}'",
@@ -233,7 +233,7 @@ namespace Trecs.Internal
             // Note that we don't do equality checks here, so it's up to
             // the serializer to do delta optimization logic
 
-            using (TrecsProfiling.Start("Deserializing {}", type))
+            using (TrecsProfiling.Start("Deserializing {0}", type))
             {
                 var serializer = _serializerManager.GetSerializerDelta<T>();
                 serializer.DeserializeDelta(ref value, baseValue, this);
@@ -266,7 +266,7 @@ namespace Trecs.Internal
         {
             TrecsAssert.That(_hasStarted);
 
-            return _serializerManager.ReadTypeId(_binaryReader);
+            return TypeIdSerializer.Read(_binaryReader);
         }
 
         public void ReadObject(string name, ref object value)
@@ -281,9 +281,9 @@ namespace Trecs.Internal
                 return;
             }
 
-            var concreteType = _serializerManager.ReadTypeId(_binaryReader);
+            var concreteType = TypeIdSerializer.Read(_binaryReader);
 
-            using (TrecsProfiling.Start("Deserializing {}", concreteType))
+            using (TrecsProfiling.Start("Deserializing {0}", concreteType))
             {
                 var serializer = _serializerManager.GetSerializer(concreteType);
                 serializer.DeserializeObject(ref value, this);
@@ -349,7 +349,7 @@ namespace Trecs.Internal
 
             if (_includesTypeChecks)
             {
-                var savedType = _serializerManager.ReadTypeId(_binaryReader);
+                var savedType = TypeIdSerializer.Read(_binaryReader);
                 TrecsAssert.That(
                     savedType == type,
                     "Expected type {0} but found '{1}'",
@@ -358,7 +358,7 @@ namespace Trecs.Internal
                 );
             }
 
-            using (TrecsProfiling.Start("Deserializing {}", type))
+            using (TrecsProfiling.Start("Deserializing {0}", type))
             {
                 var serializer = _serializerManager.GetSerializer<T>();
                 serializer.Deserialize(ref value, this);

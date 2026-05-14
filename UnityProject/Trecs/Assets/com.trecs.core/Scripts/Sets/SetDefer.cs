@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Trecs.Internal;
 
 namespace Trecs
 {
@@ -28,7 +27,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void Add(EntityIndex entityIndex)
+        public void Add(EntityIndex entityIndex)
         {
             _queues.AddQueue.GetBag(0).Enqueue(entityIndex);
         }
@@ -40,7 +39,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void Remove(EntityIndex entityIndex)
+        public void Remove(EntityIndex entityIndex)
         {
             _queues.RemoveQueue.GetBag(0).Enqueue(entityIndex);
         }

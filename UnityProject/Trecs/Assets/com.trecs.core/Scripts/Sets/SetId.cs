@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 
 namespace Trecs
 {
@@ -8,11 +7,7 @@ namespace Trecs
     /// <see cref="EntitySet"/> registered via <see cref="WorldBuilder.AddSet{T}"/>.
     /// </summary>
     [TypeId(364820517)]
-    public readonly struct SetId
-        : IEquatable<SetId>,
-            IComparable<SetId>,
-            IComparable,
-            IStableHashProvider
+    public readonly struct SetId : IEquatable<SetId>, IComparable<SetId>, IComparable
     {
         public readonly int Id;
 
@@ -25,9 +20,8 @@ namespace Trecs
 
         public override bool Equals(object obj) => obj is SetId other && Equals(other);
 
+        // Stable hash across sessions.
         public override int GetHashCode() => Id;
-
-        public int GetStableHashCode() => Id;
 
         public int CompareTo(SetId other) => Id.CompareTo(other.Id);
 

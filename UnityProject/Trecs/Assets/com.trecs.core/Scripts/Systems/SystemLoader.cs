@@ -11,26 +11,17 @@ namespace Trecs.Internal
         readonly TrecsLog _log;
 
         readonly ISystemMetadataProvider _metadataProvider;
-        readonly WorldInfo _worldDef;
-        readonly WorldAccessorRegistry _accessorRegistry;
 
         bool _isLocked;
 
-        public SystemLoader(
-            TrecsLog log,
-            WorldAccessorRegistry accessorRegistry,
-            ISystemMetadataProvider metadataProvider,
-            WorldInfo worldDef
-        )
+        public SystemLoader(TrecsLog log, ISystemMetadataProvider metadataProvider)
         {
             _log = log;
-            _accessorRegistry = accessorRegistry;
             _metadataProvider = metadataProvider;
-            _worldDef = worldDef;
         }
 
         List<int> SortPhaseSystems(
-            List<SystemInfo> allSystems,
+            IReadOnlyList<SystemMetadata> allSystems,
             List<int> phaseSystems,
             List<int> globalToLocalIndexMap,
             List<HashSet<int>> systemDepsMap,
@@ -50,13 +41,13 @@ namespace Trecs.Internal
                 var localDeps = new HashSet<int>();
                 localDepsList.Add(localDeps);
 
-                TrecsAssert.That(systemInfo.Metadata.Phase == phaseToSort);
+                TrecsAssert.That(systemInfo.Phase == phaseToSort);
 
                 foreach (var otherGlobalIndex in systemDepsMap[systemGlobalIndex])
                 {
                     var otherInfo = allSystems[otherGlobalIndex];
 
-                    if (otherInfo.Metadata.Phase == phaseToSort)
+                    if (otherInfo.Phase == phaseToSort)
                     {
                         var otherLocalIndex = globalToLocalIndexMap[otherGlobalIndex];
                         TrecsAssert.IsEqual(phaseSystems[otherLocalIndex], otherGlobalIndex);
@@ -73,7 +64,7 @@ namespace Trecs.Internal
                     localDepsList[globalToLocalIndexMap[globalIndex]]
                         .OrderBy(x => allSystems[globalIndex].DeclarationIndex),
                 globalIndex => GetSystemAndMetaDataOrderBy(allSystems[globalIndex]),
-                globalIndex => allSystems[globalIndex].Metadata.DebugName
+                globalIndex => allSystems[globalIndex].DebugName
             );
 
             TrecsAssert.IsEqual(sortedLocal.Count, phaseSystems.Count);
@@ -85,16 +76,16 @@ namespace Trecs.Internal
                 var localIndex = sortedLocal[i];
                 var globalIndex = phaseSystems[localIndex];
                 var info = allSystems[globalIndex];
-                TrecsAssert.That(info.Metadata.Phase == phaseToSort);
+                TrecsAssert.That(info.Phase == phaseToSort);
                 sortedGlobal.Add(globalIndex);
             }
 
             return sortedGlobal;
         }
 
-        int[] GetSystemAndMetaDataOrderBy(SystemInfo info)
+        int[] GetSystemAndMetaDataOrderBy(SystemMetadata info)
         {
-            return new int[] { info.Metadata.ExecutionPriority ?? 0, info.DeclarationIndex };
+            return new int[] { info.ExecutionPriority ?? 0, info.DeclarationIndex };
         }
 
         void PrintFullSystemsExecutionOrder(LoadInfo loadInfo)
@@ -115,7 +106,7 @@ namespace Trecs.Internal
 
                 foreach (var globalIndex in sorted)
                 {
-                    message.AppendLine(loadInfo.Systems[globalIndex].Metadata.DebugName);
+                    message.AppendLine(loadInfo.Systems[globalIndex].DebugName);
                 }
             }
 
@@ -134,8 +125,6 @@ namespace Trecs.Internal
             _isLocked = true;
 
             var metadatas = _metadataProvider.GetSystemMetadata(world, systems);
-
-            var allSystems = new List<SystemInfo>(metadatas.Count);
 
             var phaseBuckets = new Dictionary<SystemPhase, List<int>>
             {
@@ -167,13 +156,7 @@ namespace Trecs.Internal
             for (int i = 0; i < metadatas.Count; i++)
             {
                 var metadata = metadatas[i];
-
-                var systemInfo = new SystemInfo(
-                    querier: metadata.Accessor,
-                    system: metadata.System,
-                    metadata: metadata,
-                    declarationIndex: i
-                );
+                metadata.DeclarationIndex = i;
 
                 var depsSet = metadata.SystemDependencies.ToHashSet();
                 TrecsAssert.That(
@@ -182,8 +165,6 @@ namespace Trecs.Internal
                     metadata.DebugName
                 );
                 systemDepsMap.Add(depsSet);
-
-                allSystems.Add(systemInfo);
 
                 var bucket = phaseBuckets[metadata.Phase];
                 globalToLocalIndexMap.Add(bucket.Count);
@@ -201,7 +182,7 @@ namespace Trecs.Internal
 
             List<int> Sort(SystemPhase phase) =>
                 SortPhaseSystems(
-                    allSystems,
+                    metadatas,
                     phaseBuckets[phase],
                     globalToLocalIndexMap,
                     systemDepsMap,
@@ -210,7 +191,7 @@ namespace Trecs.Internal
 
             var loadInfo = new LoadInfo
             {
-                Systems = allSystems,
+                Systems = metadatas,
                 SortedInputSystems = Sort(SystemPhase.Input),
                 SortedFixedSystems = Sort(SystemPhase.Fixed),
                 SortedEarlyPresentationSystems = Sort(SystemPhase.EarlyPresentation),
@@ -229,31 +210,9 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public sealed class SystemInfo
-        {
-            public SystemInfo(
-                WorldAccessor querier,
-                ISystem system,
-                SystemMetadata metadata,
-                int declarationIndex
-            )
-            {
-                Querier = querier;
-                System = system;
-                Metadata = metadata;
-                DeclarationIndex = declarationIndex;
-            }
-
-            public WorldAccessor Querier { get; }
-            public ISystem System { get; }
-            public SystemMetadata Metadata { get; }
-            public int DeclarationIndex { get; }
-        }
-
-        [EditorBrowsable(EditorBrowsableState.Never)]
         public sealed class LoadInfo
         {
-            public List<SystemInfo> Systems;
+            public IReadOnlyList<SystemMetadata> Systems;
 
             // indices into Systems list, in execution order within each phase
             public List<int> SortedInputSystems;

@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 
 namespace Trecs
 {
@@ -9,7 +8,7 @@ namespace Trecs
     /// and <see cref="NativeSharedPtr{T}"/>. A zero value represents a null handle.
     /// </summary>
     [TypeId(604918273)]
-    public readonly struct PtrHandle : IEquatable<PtrHandle>, IStableHashProvider
+    public readonly struct PtrHandle : IEquatable<PtrHandle>
     {
         public readonly uint Value;
 
@@ -38,12 +37,8 @@ namespace Trecs
             return obj is PtrHandle other && Equals(other);
         }
 
+        // Stable hash across sessions.
         public override readonly int GetHashCode()
-        {
-            return GetStableHashCode();
-        }
-
-        public readonly int GetStableHashCode()
         {
             return unchecked((int)Value);
         }

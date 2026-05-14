@@ -91,7 +91,7 @@ namespace Trecs
                 EntityHandle handle;
                 try
                 {
-                    handle = _accessor.GetEntityHandle(new EntityIndex(i, group));
+                    handle = new EntityIndex(i, group).ToHandle(_accessor);
                 }
                 catch
                 {
@@ -351,7 +351,7 @@ namespace Trecs
             if (_accessor == null || _world == null)
                 return phases;
 
-            IReadOnlyList<ExecutableSystemInfo> systems;
+            IReadOnlyList<SystemMetadata> systems;
             IReadOnlyList<int> sortedEarly;
             IReadOnlyList<int> sortedInput;
             IReadOnlyList<int> sortedFixed;
@@ -374,7 +374,7 @@ namespace Trecs
             var systemAccessorIds = new HashSet<int>();
             for (int i = 0; i < systems.Count; i++)
             {
-                var acc = systems[i].Metadata.Accessor;
+                var acc = systems[i].Accessor;
                 if (acc != null)
                     systemAccessorIds.Add(acc.Id);
             }
@@ -422,15 +422,15 @@ namespace Trecs
                 foreach (var sysIdx in sortedGlobalIndices)
                 {
                     var info = systems[sysIdx];
-                    var acc = info.Metadata.Accessor;
+                    var acc = info.Accessor;
                     if (acc == null || !validAccessorIds.Contains(acc.Id))
                         continue;
                     bucket.Add(
                         new AccessorRef(
-                            info.Metadata.DebugName ?? acc.DebugName ?? $"#{acc.Id}",
+                            info.DebugName ?? acc.DebugName ?? $"#{acc.Id}",
                             accessorId: acc.Id,
                             systemIndex: sysIdx,
-                            executionPriority: info.Metadata.ExecutionPriority,
+                            executionPriority: info.ExecutionPriority,
                             isManual: false,
                             // System-owned accessors carry the role
                             // derived from their phase — surface it on the

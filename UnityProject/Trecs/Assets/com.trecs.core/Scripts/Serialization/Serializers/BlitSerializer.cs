@@ -1,5 +1,3 @@
-using Trecs.Internal;
-
 namespace Trecs.Serialization
 {
     /// <summary>
@@ -7,7 +5,7 @@ namespace Trecs.Serialization
     /// raw bytes via <c>BlitWrite</c>. Preferred over the generic
     /// <see cref="ISerializer{T}"/> path for POD types since it avoids any
     /// name/type framing per field. Register via
-    /// <see cref="SerializerRegistry.RegisterBlit{T}(bool)"/>.
+    /// <c>SerializerRegistry.RegisterSerializer(new BlitSerializer&lt;T&gt;())</c>.
     /// </summary>
     public sealed class BlitSerializer<T> : ISerializer<T>, ISerializerDelta<T>
         where T : unmanaged

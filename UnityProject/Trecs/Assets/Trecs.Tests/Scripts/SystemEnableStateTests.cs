@@ -53,9 +53,10 @@ namespace Trecs.Tests
 
         int FindSystemIndex(World world, Type systemType)
         {
-            for (int i = 0; i < world.SystemCount; i++)
+            var systems = world.GetSystems();
+            for (int i = 0; i < systems.Count; i++)
             {
-                if (world.GetSystemMetadata(i).System.GetType() == systemType)
+                if (systems[i].System.GetType() == systemType)
                 {
                     return i;
                 }
@@ -73,7 +74,7 @@ namespace Trecs.Tests
         {
             using var env = CreateEnv(new CountingEnableSystemA());
 
-            for (int i = 0; i < env.World.SystemCount; i++)
+            for (int i = 0; i < env.World.GetSystems().Count; i++)
             {
                 NAssert.IsTrue(
                     env.Accessor.IsSystemEnabled(i, EnableChannel.Editor),
@@ -288,23 +289,22 @@ namespace Trecs.Tests
         #region Metadata API
 
         [Test]
-        public void SystemCount_EqualsRegistered()
+        public void GetSystems_CountEqualsRegistered()
         {
             using var env = CreateEnv(new CountingEnableSystemA(), new CountingEnableSystemB());
-            NAssert.AreEqual(2, env.World.SystemCount);
-            NAssert.AreEqual(2, env.Accessor.SystemCount);
+            NAssert.AreEqual(2, env.World.GetSystems().Count);
+            NAssert.AreEqual(2, env.Accessor.GetSystems().Count);
         }
 
         [Test]
-        public void GetSystemMetadata_ReturnsRegisteredSystems()
+        public void GetSystems_ReturnsRegisteredSystems()
         {
             using var env = CreateEnv(new CountingEnableSystemA(), new CountingEnableSystemB());
 
             bool foundA = false;
             bool foundB = false;
-            for (int i = 0; i < env.World.SystemCount; i++)
+            foreach (var meta in env.World.GetSystems())
             {
-                var meta = env.World.GetSystemMetadata(i);
                 NAssert.IsNotNull(meta);
                 NAssert.IsNotNull(meta.System);
                 if (meta.System is CountingEnableSystemA)
@@ -312,18 +312,7 @@ namespace Trecs.Tests
                 if (meta.System is CountingEnableSystemB)
                     foundB = true;
             }
-            NAssert.IsTrue(foundA && foundB, "both systems discoverable via GetSystemMetadata");
-        }
-
-        [Test]
-        public void GetSystemMetadata_OutOfRange_Asserts()
-        {
-            using var env = CreateEnv(new CountingEnableSystemA());
-
-            NAssert.Throws<TrecsException>(() => env.World.GetSystemMetadata(-1));
-            NAssert.Throws<TrecsException>(() =>
-                env.World.GetSystemMetadata(env.World.SystemCount)
-            );
+            NAssert.IsTrue(foundA && foundB, "both systems discoverable via GetSystems");
         }
 
         #endregion

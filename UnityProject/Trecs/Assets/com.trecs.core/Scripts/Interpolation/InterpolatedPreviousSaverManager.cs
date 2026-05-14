@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using Unity.Jobs;
 
 namespace Trecs.Internal
 {
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class InterpolatedPreviousSaverManager
+    internal sealed class InterpolatedPreviousSaverManager
     {
         readonly List<IInterpolatedPreviousSaver> _savers;
 

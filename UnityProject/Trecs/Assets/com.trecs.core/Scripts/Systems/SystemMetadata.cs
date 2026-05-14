@@ -61,10 +61,17 @@ namespace Trecs
         public IReadOnlyCollection<int> SystemDependencies { get; }
         public string DebugName { get; }
 
+        /// <summary>
+        /// Position of this system in the original registration order. Stable for the
+        /// lifetime of the world; matches the index returned by
+        /// <see cref="WorldAccessor.GetSystems"/>. Populated by Trecs during loading,
+        /// not by <see cref="ISystemMetadataProvider"/> implementations.
+        /// </summary>
+        public int DeclarationIndex { get; internal set; }
+
         public override string ToString()
         {
-            // Useful when getting errors during topological sorting
-            return System.GetType().ToString();
+            return DebugName;
         }
     }
 }

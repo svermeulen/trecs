@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Trecs.Internal;
 
 namespace Trecs
 {
@@ -49,7 +48,13 @@ namespace Trecs
             return _world.TryComponent(_entityIndex, out componentRef);
         }
 
-        internal EntityIndex EntityIndex => _entityIndex;
+        /// <summary>
+        /// The transient buffer-position identifier for this entity. Companion to
+        /// <see cref="Handle"/>: use this when threading the index into APIs that
+        /// take <see cref="EntityIndex"/> directly to skip the handle-to-index
+        /// lookup. Valid only until the next entity submission.
+        /// </summary>
+        public EntityIndex EntityIndex => _entityIndex;
 
         /// <summary>
         /// The stable entity identifier. Performs a reverse lookup.

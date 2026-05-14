@@ -168,7 +168,7 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
                     public void Execute(in PlayerView a) { }
 
                     [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
-                    public void Execute(in PlayerView a, Trecs.Internal.EntityIndex ei) { }
+                    public void Execute(in PlayerView a, Trecs.EntityIndex ei) { }
                 }
             }
             """;
@@ -199,7 +199,7 @@ public class Diagnostics_TRECS001_to_008_ForEachTests
                 public partial struct BadJob : Unity.Jobs.IJobFor
                 {
                     [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
-                    public void Execute(in CPos a, Trecs.Internal.EntityIndex one, Trecs.Internal.EntityIndex two) { }
+                    public void Execute(in CPos a, Trecs.EntityIndex one, Trecs.EntityIndex two) { }
                 }
             }
             """;

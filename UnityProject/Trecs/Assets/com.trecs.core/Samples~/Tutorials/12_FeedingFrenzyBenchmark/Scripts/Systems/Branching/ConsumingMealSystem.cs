@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -70,7 +69,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
             in Position position,
             in DestinationPosition destinationPosition,
             ref TargetMeal fishMeal,
-            EntityIndex entityIndex
+            EntityHandle entityHandle
         )
         {
             if (fishMeal.Value.IsNull)
@@ -235,7 +234,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
                 in Position position,
                 in DestinationPosition destinationPosition,
                 ref TargetMeal fishMeal,
-                EntityIndex entityIndex
+                EntityHandle entityHandle
             )
             {
                 if (fishMeal.Value.IsNull)

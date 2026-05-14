@@ -16,7 +16,7 @@ namespace Trecs.Internal
     /// in-window manual tooltip at the editor window's bounds — a 70-line
     /// help body just doesn't fit there.
     /// </summary>
-    public class TrecsReplayHelpPopup : EditorWindow
+    internal class TrecsReplayHelpPopup : EditorWindow
     {
         const float Width = 480f;
         const float Height = 360f;

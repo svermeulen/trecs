@@ -19,7 +19,7 @@ namespace Trecs
         readonly List<Template> _templates = new();
         readonly List<EntitySet> _sets = new();
         internal ISystemMetadataProvider _systemMetadataProvider;
-        readonly SerializerRegistry _serializerRegistry = new();
+        readonly SerializerRegistry _serializerRegistry;
 
         bool _hasBuilt;
         BlobCacheSettings _blobCacheSettings;
@@ -28,11 +28,26 @@ namespace Trecs
         string _debugName;
 
         /// <summary>
-        /// Creates a new empty WorldBuilder.
+        /// Creates a new WorldBuilder. Pass an externally-owned
+        /// <see cref="SerializerRegistry"/> when the registry must live in
+        /// the DI container and be resolvable before the world exists
+        /// (e.g. installers that register custom serializers at install
+        /// time). The caller is responsible for pre-populating defaults
+        /// on a supplied registry; when <paramref name="serializerRegistry"/>
+        /// is null the builder creates one and auto-populates it with the
+        /// common trecs serializers.
         /// </summary>
-        public WorldBuilder()
+        public WorldBuilder(SerializerRegistry serializerRegistry = null)
         {
-            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
+            if (serializerRegistry == null)
+            {
+                _serializerRegistry = new SerializerRegistry();
+                DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
+            }
+            else
+            {
+                _serializerRegistry = serializerRegistry;
+            }
         }
 
         /// <summary>
@@ -325,12 +340,7 @@ namespace Trecs
                 accessorRegistry
             );
 
-            var systemLoader = new SystemLoader(
-                log,
-                accessorRegistry,
-                _systemMetadataProvider,
-                worldInfo
-            );
+            var systemLoader = new SystemLoader(log, _systemMetadataProvider);
 
             var eventsManager = new EventsManager(log);
 
@@ -371,22 +381,22 @@ namespace Trecs
                 _interpolatedPreviousSavers
             );
 
-            var systemRunner = new SystemRunner(
-                log,
-                submitter,
-                settings,
-                interpolatedPreviousSaverManager,
-                jobScheduler
-            );
-
             var entityInputQueue = new EntityInputQueue(
                 log,
                 frameScopedSharedHeap,
                 nativeFrameScopedSharedHeap,
                 frameScopedUniqueHeap,
                 frameScopedNativeUniqueHeap,
-                systemRunner,
                 worldInfo
+            );
+
+            var systemRunner = new SystemRunner(
+                log,
+                submitter,
+                settings,
+                interpolatedPreviousSaverManager,
+                jobScheduler,
+                entityInputQueue
             );
 
             var world = new World(
@@ -436,10 +446,11 @@ namespace Trecs.Internal
         /// <summary>
         /// Registers an interpolated previous-frame state saver for smooth visual interpolation.
         /// </summary>
-        public static WorldBuilder AddInterpolatedPreviousSaver(
+        public static WorldBuilder AddInterpolatedPreviousSaver<T>(
             this WorldBuilder builder,
-            IInterpolatedPreviousSaver saver
+            InterpolatedPreviousSaver<T> saver
         )
+            where T : unmanaged, IEntityComponent
         {
             builder._interpolatedPreviousSavers.Add(saver);
             return builder;

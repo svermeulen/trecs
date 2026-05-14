@@ -47,7 +47,7 @@ namespace Trecs.Internal
             _worldStateSerializer =
                 worldStateSerializer
                 ?? throw new ArgumentNullException(nameof(worldStateSerializer));
-            _blobCache = world.GetBlobCache();
+            _blobCache = world.BlobCache;
             _world = world.CreateAccessor(AccessorRole.Unrestricted);
             _buffer = new SerializationBuffer(registry);
         }

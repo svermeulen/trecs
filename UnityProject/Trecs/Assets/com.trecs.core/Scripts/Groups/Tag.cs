@@ -12,7 +12,7 @@ namespace Trecs
     /// tag combination share a group and its contiguous component buffers.
     /// Use <see cref="Tag{T}"/> for zero-allocation access to a tag's runtime value.
     /// </summary>
-    public readonly struct Tag : IEquatable<Tag>, IStableHashProvider
+    public readonly struct Tag : IEquatable<Tag>
     {
         /// <summary>
         /// Stable integer identifier for this tag, derived from the tag type's
@@ -41,12 +41,8 @@ namespace Trecs
             return Guid == other.Guid;
         }
 
+        // Stable hash across sessions.
         public override readonly int GetHashCode()
-        {
-            return GetStableHashCode();
-        }
-
-        public readonly int GetStableHashCode()
         {
             return Guid;
         }

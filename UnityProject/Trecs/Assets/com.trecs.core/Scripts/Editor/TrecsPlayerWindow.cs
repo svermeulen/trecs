@@ -24,7 +24,7 @@ namespace Trecs.Internal
     /// Keyboard shortcuts (Space, Home/End, ←/→, Shift+arrows) drive the
     /// same actions when the window has focus.
     /// </summary>
-    public class TrecsPlayerWindow : EditorWindow
+    internal class TrecsPlayerWindow : EditorWindow
     {
         [InitializeOnLoadMethod]
         static void RegisterEditorAccessorName() =>

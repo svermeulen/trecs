@@ -224,7 +224,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var globalHandle = a.GlobalEntityHandle;
-            NAssert.IsTrue(a.EntityExists(globalHandle));
+            NAssert.IsTrue(globalHandle.Exists(a));
 
             // Add, submit, remove, submit, move, submit — global handle should be stable
             var handles = new EntityHandle[5];
@@ -237,20 +237,17 @@ namespace Trecs.Tests
                     .Handle;
             }
             a.SubmitEntities();
-            NAssert.IsTrue(a.EntityExists(globalHandle), "After adds");
+            NAssert.IsTrue(globalHandle.Exists(a), "After adds");
 
             a.SetTag<TestPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[1]);
             a.SubmitEntities();
-            NAssert.IsTrue(a.EntityExists(globalHandle), "After move+remove");
+            NAssert.IsTrue(globalHandle.Exists(a), "After move+remove");
 
             a.RemoveEntitiesWithTags(PartitionA);
             a.RemoveEntitiesWithTags(PartitionB);
             a.SubmitEntities();
-            NAssert.IsTrue(
-                a.EntityExists(globalHandle),
-                "After bulk remove of all regular entities"
-            );
+            NAssert.IsTrue(globalHandle.Exists(a), "After bulk remove of all regular entities");
         }
 
         #endregion

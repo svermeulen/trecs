@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -72,11 +71,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
         void RunForEachMethodComponents(
             in UniformScale uniformScale,
             ref Position position,
-            EntityIndex entityIndex
+            EntityHandle entityHandle
         )
         {
             float baseY = _settings.BobBaseY * uniformScale.Value;
-            float phaseOffset = entityIndex.Index * GoldenRatio;
+            float phaseOffset = entityHandle.Id * GoldenRatio;
             position.Value.y =
                 baseY
                 + _settings.BobAmplitude
@@ -106,13 +105,13 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
         static void RunWrapAsJobComponents(
             in UniformScale uniformScale,
             ref Position position,
-            EntityIndex entityIndex,
+            EntityHandle entityHandle,
             in NativeWorldAccessor world,
             [PassThroughArgument] IdleBobSystemSettings settings
         )
         {
             float baseY = settings.BobBaseY * uniformScale.Value;
-            float phaseOffset = entityIndex.Index * GoldenRatio;
+            float phaseOffset = entityHandle.Id * GoldenRatio;
             position.Value.y =
                 baseY
                 + settings.BobAmplitude
@@ -213,10 +212,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             public float BobBaseY;
 
             [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
-            public readonly void Execute(in Fish fish, EntityIndex entityIndex)
+            public readonly void Execute(in Fish fish, EntityHandle entityHandle)
             {
                 float baseY = BobBaseY * fish.UniformScale;
-                float phaseOffset = entityIndex.Index * GoldenRatio;
+                float phaseOffset = entityHandle.Id * GoldenRatio;
                 fish.Position.y =
                     baseY
                     + BobAmplitude
@@ -237,11 +236,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             public readonly void Execute(
                 in UniformScale uniformScale,
                 ref Position position,
-                EntityIndex entityIndex
+                EntityHandle entityHandle
             )
             {
                 float baseY = BobBaseY * uniformScale.Value;
-                float phaseOffset = entityIndex.Index * GoldenRatio;
+                float phaseOffset = entityHandle.Id * GoldenRatio;
                 position.Value.y =
                     baseY
                     + BobAmplitude

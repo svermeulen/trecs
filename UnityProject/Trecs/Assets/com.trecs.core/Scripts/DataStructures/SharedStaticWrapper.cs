@@ -6,7 +6,7 @@ namespace Trecs.Internal
 {
     //Note: SharedStatic MUST always be initialised outside burst otherwise undefined behaviour will happen
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct SharedStaticWrapper<T, Key>
+    internal struct SharedStaticWrapper<T, Key>
         where T : unmanaged
     {
         static readonly SharedStatic<T> uniqueContextId = SharedStatic<T>.GetOrCreate<Key>();

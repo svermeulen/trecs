@@ -4,7 +4,7 @@ using System.ComponentModel;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class NativeDenseDictionarySerializer<TKey, TValue>
+    internal sealed class NativeDenseDictionarySerializer<TKey, TValue>
         : ISerializer<NativeDenseDictionary<TKey, TValue>>
         where TKey : unmanaged, IEquatable<TKey>
         where TValue : unmanaged

@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using NUnit.Framework;
-using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests

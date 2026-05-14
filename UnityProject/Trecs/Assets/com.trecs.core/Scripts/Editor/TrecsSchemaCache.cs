@@ -783,7 +783,7 @@ namespace Trecs
                     for (int i = 0; i < systems.Count; i++)
                     {
                         debugNameByIndex[i] =
-                            systems[i].Metadata.DebugName ?? systems[i].System.GetType().Name;
+                            systems[i].DebugName ?? systems[i].System.GetType().Name;
                     }
                     // Walk in the runner's actual execution order so cache
                     // mode's per-phase grouping ends up in the same order as
@@ -826,16 +826,16 @@ namespace Trecs
                         var sysType = s.System.GetType();
                         var sysSchema = new TrecsSchemaSystem
                         {
-                            DebugName = s.Metadata.DebugName ?? sysType.Name,
+                            DebugName = s.DebugName ?? sysType.Name,
                             TypeName = sysType.Name,
                             TypeNamespace = sysType.Namespace ?? string.Empty,
-                            Phase = s.Metadata.Phase.ToString(),
+                            Phase = s.Phase.ToString(),
                             // System-owned accessor's role mirrors phase.
-                            Role = s.Metadata.Phase.ToAccessorRole().ToString(),
-                            HasPriority = s.Metadata.ExecutionPriority.HasValue,
-                            Priority = s.Metadata.ExecutionPriority ?? 0,
+                            Role = s.Phase.ToAccessorRole().ToString(),
+                            HasPriority = s.ExecutionPriority.HasValue,
+                            Priority = s.ExecutionPriority ?? 0,
                         };
-                        var deps = s.Metadata.SystemDependencies;
+                        var deps = s.SystemDependencies;
                         if (deps != null)
                         {
                             foreach (var dep in deps)
@@ -863,9 +863,9 @@ namespace Trecs
                     var systemAccessorIds = new HashSet<int>();
                     foreach (var s in accessor.GetSystems())
                     {
-                        if (s.Metadata.Accessor != null)
+                        if (s.Accessor != null)
                         {
-                            systemAccessorIds.Add(s.Metadata.Accessor.Id);
+                            systemAccessorIds.Add(s.Accessor.Id);
                         }
                     }
                     foreach (var entry in world.GetAccessorsById())

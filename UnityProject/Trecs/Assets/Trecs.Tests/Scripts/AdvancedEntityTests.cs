@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using NUnit.Framework;
-using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -86,7 +85,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(activeRefs.Count, a.CountEntitiesWithTags(TestTags.Alpha));
             foreach (var r in activeRefs)
             {
-                NAssert.IsTrue(a.EntityExists(r));
+                NAssert.IsTrue(r.Exists(a));
             }
         }
 
@@ -198,7 +197,7 @@ namespace Trecs.Tests
 
             // Ref -> Index -> Ref
             var entityIndex = originalRef.ToIndex(a);
-            var roundTripRef = a.GetEntityHandle(entityIndex);
+            var roundTripRef = entityIndex.ToHandle(a);
             NAssert.AreEqual(originalRef, roundTripRef);
         }
 
@@ -218,7 +217,7 @@ namespace Trecs.Tests
 
             // Get the new index and convert back to ref
             var newIndex = entityHandle.ToIndex(a);
-            var roundTripRef = a.GetEntityHandle(newIndex);
+            var roundTripRef = newIndex.ToHandle(a);
             NAssert.AreEqual(entityHandle, roundTripRef);
         }
 

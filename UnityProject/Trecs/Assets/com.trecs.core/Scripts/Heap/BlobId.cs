@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 
 namespace Trecs
 {
@@ -12,7 +11,7 @@ namespace Trecs
     /// the semantics you want. A zero value represents a null (unallocated) blob.
     /// </summary>
     [TypeId(283746019)]
-    public readonly struct BlobId : IEquatable<BlobId>, IStableHashProvider
+    public readonly struct BlobId : IEquatable<BlobId>
     {
         public readonly long Value;
 
@@ -38,12 +37,8 @@ namespace Trecs
             return obj is BlobId other && Equals(other);
         }
 
+        // Stable hash across sessions.
         public override int GetHashCode()
-        {
-            return GetStableHashCode();
-        }
-
-        public int GetStableHashCode()
         {
             return Value.GetHashCode();
         }

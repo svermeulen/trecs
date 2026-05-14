@@ -37,7 +37,7 @@ namespace Trecs
                 "UniqueHashGenerator is main-thread only"
             );
 
-            using (TrecsProfiling.Start("Generating guid for type {}", typeof(T)))
+            using (TrecsProfiling.Start("Generating guid for type {0}", typeof(T)))
             {
                 _serializeHelper.ClearMemoryStream();
 

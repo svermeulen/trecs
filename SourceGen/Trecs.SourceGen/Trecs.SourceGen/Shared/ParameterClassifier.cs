@@ -359,7 +359,7 @@ namespace Trecs.SourceGen.Shared
                 bool isEntityIndex = SymbolAnalyzer.IsExactType(
                     paramType,
                     "EntityIndex",
-                    TrecsNamespaces.TrecsInternal
+                    TrecsNamespaces.Trecs
                 );
                 bool isEntityHandle = SymbolAnalyzer.IsExactType(
                     paramType,

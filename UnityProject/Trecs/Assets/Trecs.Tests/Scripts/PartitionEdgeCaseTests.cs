@@ -515,7 +515,7 @@ namespace Trecs.Tests
             a.RemoveEntity(idx);
             a.SubmitEntities();
 
-            NAssert.IsFalse(a.EntityExists(init.Handle), "Entity should be removed");
+            NAssert.IsFalse(init.Handle.Exists(a), "Entity should be removed");
             NAssert.AreEqual(
                 0,
                 a.Query().WithTags<PeBase, PeAlive, PePoisoned, PeOnFire>().Count(),

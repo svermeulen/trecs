@@ -1,9 +1,10 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Trecs.Internal;
 using Unity.Mathematics;
 
-namespace Trecs.Internal
+namespace Trecs
 {
     /// <summary>
     /// Pointer to a managed (class) blob stored in the <see cref="BlobCache"/>.

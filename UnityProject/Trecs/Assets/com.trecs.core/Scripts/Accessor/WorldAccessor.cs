@@ -303,7 +303,7 @@ namespace Trecs
 
         public EntityHandle GlobalEntityHandle => _world.GlobalEntityHandle;
 
-        internal EntityIndex GlobalEntityIndex => _worldInfo.GlobalEntityIndex;
+        public EntityIndex GlobalEntityIndex => _worldInfo.GlobalEntityIndex;
 
         public float VariableElapsedTime
         {
@@ -369,8 +369,6 @@ namespace Trecs
         {
             get { return _world; }
         }
-
-        internal IReadOnlyList<ExecutableSystemInfo> Systems => _systemRunner.Systems;
 
         internal IReadOnlyList<int> SortedFixedSystems => _systemRunner.SortedFixedSystems;
 
@@ -453,7 +451,7 @@ namespace Trecs
         /// or if another SetTag/UnsetTag has already touched the same dimension on
         /// this entity in the current submission.
         /// </summary>
-        internal void SetTag<T>(EntityIndex entityIndex)
+        public void SetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
@@ -471,7 +469,7 @@ namespace Trecs
         /// dimensions there is no "absent" partition — use
         /// <see cref="SetTag{T}(EntityIndex)"/> to switch variants instead.
         /// </summary>
-        internal void UnsetTag<T>(EntityIndex entityIndex)
+        public void UnsetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
@@ -484,7 +482,7 @@ namespace Trecs
         /// <summary>
         /// Schedules removal of an entity. The removal is deferred until the next entity submission.
         /// </summary>
-        internal void RemoveEntity(EntityIndex entityIndex)
+        public void RemoveEntity(EntityIndex entityIndex)
         {
             AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
 
@@ -709,7 +707,7 @@ namespace Trecs
             return new ComponentBufferAccessor<T>(this, group);
         }
 
-        internal ComponentAccessor<T> Component<T>(EntityIndex entityIndex)
+        public ComponentAccessor<T> Component<T>(EntityIndex entityIndex)
             where T : unmanaged, IEntityComponent
         {
             return new ComponentAccessor<T>(this, entityIndex);
@@ -721,10 +719,7 @@ namespace Trecs
             return new ComponentAccessor<T>(this, entityHandle.ToIndex(_entitiesDb));
         }
 
-        internal bool TryComponent<T>(
-            EntityIndex entityIndex,
-            out ComponentAccessor<T> componentRef
-        )
+        public bool TryComponent<T>(EntityIndex entityIndex, out ComponentAccessor<T> componentRef)
             where T : unmanaged, IEntityComponent
         {
             SyncAndRecordRead<T>(entityIndex.GroupIndex);
@@ -756,7 +751,7 @@ namespace Trecs
             return Component<T>(_worldInfo.GlobalEntityIndex);
         }
 
-        internal EntityAccessor Entity(EntityIndex entityIndex)
+        public EntityAccessor Entity(EntityIndex entityIndex)
         {
             return new EntityAccessor(this, entityIndex);
         }
@@ -875,26 +870,6 @@ namespace Trecs
             return new SetGroupLookup(_structuralOps.GetSet(id));
         }
 
-        public bool EntityExists(EntityHandle entityHandle)
-        {
-            return entityHandle.Exists(_entitiesDb);
-        }
-
-        internal EntityHandle GetEntityHandle(EntityIndex entityIndex)
-        {
-            return entityIndex.ToHandle(_entitiesDb);
-        }
-
-        internal EntityIndex GetEntityIndex(EntityHandle entityHandle)
-        {
-            return entityHandle.ToIndex(_entitiesDb);
-        }
-
-        internal bool TryGetEntityIndex(EntityHandle entityHandle, out EntityIndex entityIndex)
-        {
-            return entityHandle.TryToIndex(_entitiesDb, out entityIndex);
-        }
-
         /// <summary>
         /// Enqueues an input component value for the next fixed-update frame. Only callable from
         /// <see cref="SystemPhase.Input"/> systems. The value is applied to the entity's
@@ -908,14 +883,14 @@ namespace Trecs
             _entityInputQueue.AddInput(_systemRunner.FixedFrame, entityHandle, value);
         }
 
-        internal void AddInput<T>(EntityIndex entityIndex, in T value)
+        public void AddInput<T>(EntityIndex entityIndex, in T value)
             where T : unmanaged, IEntityComponent
         {
             AssertCanAddInputsSystem();
 
             _entityInputQueue.AddInput(
                 _systemRunner.FixedFrame,
-                GetEntityHandle(entityIndex),
+                entityIndex.ToHandle(_entitiesDb),
                 value
             );
         }
@@ -1385,30 +1360,16 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Total number of systems registered in this world. Stable for the lifetime of
-        /// the world; system indices are in the range <c>[0, SystemCount)</c> and can be
-        /// used with <see cref="GetSystemMetadata"/> and <see cref="SetSystemPaused"/>.
+        /// Returns metadata for every system registered in this world, in registration
+        /// order. The returned list is stable for the lifetime of the world; indices
+        /// match <see cref="SystemMetadata.DeclarationIndex"/> and can be used with
+        /// <see cref="SetSystemEnabled"/> / <see cref="SetSystemPaused"/>. Use this to
+        /// build custom groupings (e.g. "all systems matching some game tag") that
+        /// drive enable / pause calls.
         /// </summary>
-        public int SystemCount
+        public IReadOnlyList<SystemMetadata> GetSystems()
         {
-            get { return _systemRunner.Systems.Count; }
-        }
-
-        /// <summary>
-        /// Returns metadata for the system at <paramref name="systemIndex"/>. Use this to
-        /// iterate systems and build custom groupings (e.g. "all systems matching some
-        /// game tag") that drive <see cref="SetSystemPaused"/> calls.
-        /// </summary>
-        public SystemMetadata GetSystemMetadata(int systemIndex)
-        {
-            var systems = _systemRunner.Systems;
-            TrecsAssert.That(
-                systemIndex >= 0 && systemIndex < systems.Count,
-                "System index {0} out of range [0, {1})",
-                systemIndex,
-                systems.Count
-            );
-            return systems[systemIndex].Metadata;
+            return _systemRunner.Systems;
         }
 
         /// <summary>
@@ -1682,12 +1643,6 @@ namespace Trecs.Internal // Unsupported internal APIs
         public static EntityInputQueue GetEntityInputQueue(this WorldAccessor world)
         {
             return world.World.GetEntityInputQueue();
-        }
-
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        public static IReadOnlyList<ExecutableSystemInfo> GetSystems(this WorldAccessor world)
-        {
-            return world.Systems;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]

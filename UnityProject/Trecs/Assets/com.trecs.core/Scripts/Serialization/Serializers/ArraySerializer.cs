@@ -37,7 +37,10 @@ namespace Trecs.Serialization
                 return;
             }
 
-            value = new TElem[length];
+            if (value == null || value.Length != length)
+            {
+                value = new TElem[length];
+            }
 
             for (int i = 0; i < length; i++)
             {

@@ -855,8 +855,7 @@ namespace Trecs
                 // for the trailing array index. Built-in Unity types
                 // (Vector*/Color/Quaternion/etc.) and Unity.Mathematics
                 // types already carry [Serializable], so this rejects only
-                // custom structs (e.g. svkj-physics CollisionFilter,
-                // Material) that nobody has marked.
+                // custom structs that nobody has marked.
                 if (!type.IsDefined(typeof(SerializableAttribute), inherit: false))
                 {
                     return true;

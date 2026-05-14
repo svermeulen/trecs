@@ -124,7 +124,7 @@ namespace Trecs.Tests
             using var env = CreateEnv();
             var a = env.Accessor;
 
-            NAssert.IsTrue(a.EntityExists(a.GlobalEntityHandle));
+            NAssert.IsTrue(a.GlobalEntityHandle.Exists(a));
         }
 
         [Test]

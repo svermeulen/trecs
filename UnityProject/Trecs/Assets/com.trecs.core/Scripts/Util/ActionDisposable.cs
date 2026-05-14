@@ -2,7 +2,7 @@ using System;
 
 namespace Trecs.Internal
 {
-    public class ActionDisposable : IDisposable
+    internal class ActionDisposable : IDisposable
     {
         private readonly Action _action;
         private bool _hasDisposed;

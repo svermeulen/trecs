@@ -4,7 +4,7 @@ namespace Trecs.Internal
 {
     [TypeId(592038417)]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct EntityHandleMapElement
+    internal struct EntityHandleMapElement
     {
         internal int Index;
         internal GroupIndex GroupIndex; // 2 bytes (ushort)

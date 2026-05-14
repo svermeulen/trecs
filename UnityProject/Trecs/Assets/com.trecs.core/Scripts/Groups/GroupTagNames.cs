@@ -4,7 +4,7 @@ using System.ComponentModel;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static class GroupTagNames
+    internal static class GroupTagNames
     {
         static readonly Dictionary<int, string> _names = new();
 

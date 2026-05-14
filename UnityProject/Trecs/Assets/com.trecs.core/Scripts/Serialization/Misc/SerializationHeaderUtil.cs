@@ -6,7 +6,7 @@ using System.Text;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static class SerializationHeaderUtil
+    internal static class SerializationHeaderUtil
     {
         // Magic bytes at the start of every Trecs-serialized payload ("TR" in ASCII).
         // Readers check these to fail loudly on unrelated/corrupt streams.

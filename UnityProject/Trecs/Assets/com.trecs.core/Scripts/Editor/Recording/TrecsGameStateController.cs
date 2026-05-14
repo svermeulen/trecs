@@ -19,7 +19,7 @@ namespace Trecs.Internal
     ///   * Run: <see cref="IsPaused"/> — straight pass-through of the
     ///     SystemRunner's FixedIsPaused flag.
     /// </summary>
-    public class TrecsGameStateController : IDisposable
+    internal class TrecsGameStateController : IDisposable
     {
         static readonly TrecsLog _log = TrecsLog.Default;
 
@@ -235,9 +235,10 @@ namespace Trecs.Internal
             {
                 return;
             }
-            for (int i = 0; i < _world.SystemCount; i++)
+            var systems = _world.GetSystems();
+            for (int i = 0; i < systems.Count; i++)
             {
-                if (_world.GetSystemMetadata(i).Phase != SystemPhase.Input)
+                if (systems[i].Phase != SystemPhase.Input)
                 {
                     continue;
                 }

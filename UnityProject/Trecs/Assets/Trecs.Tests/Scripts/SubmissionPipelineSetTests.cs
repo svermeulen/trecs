@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -126,7 +125,7 @@ namespace Trecs.Tests
 
             // Entity 0 is gone; entity 1 should still be in set
             NAssert.AreEqual(1, set.Read.Count);
-            NAssert.IsFalse(a.EntityExists(handles[0]));
+            NAssert.IsFalse(handles[0].Exists(a));
         }
 
         #endregion
@@ -504,7 +503,7 @@ namespace Trecs.Tests
                 .OnRemoved(
                     (group, indices) =>
                     {
-                        if (a.EntityExists(handles[3]))
+                        if (handles[3].Exists(a))
                         {
                             var idx = handles[3].ToIndex(a);
                             a.Set<SPSet>().Write.Add(idx);
@@ -516,7 +515,7 @@ namespace Trecs.Tests
             a.RemoveEntity(handles[0]);
             a.SubmitEntities();
 
-            NAssert.IsFalse(a.EntityExists(handles[0]));
+            NAssert.IsFalse(handles[0].Exists(a));
             NAssert.AreEqual(
                 1,
                 a.Set<SPSet>().Read.Count,
@@ -557,7 +556,7 @@ namespace Trecs.Tests
                 .OnRemoved(
                     (group, indices) =>
                     {
-                        if (a.EntityExists(handles[2]))
+                        if (handles[2].Exists(a))
                             a.RemoveEntity(handles[2]);
                     }
                 );
@@ -566,8 +565,8 @@ namespace Trecs.Tests
             a.RemoveEntity(handles[0]);
             a.SubmitEntities();
 
-            NAssert.IsFalse(a.EntityExists(handles[0]));
-            NAssert.IsFalse(a.EntityExists(handles[2]));
+            NAssert.IsFalse(handles[0].Exists(a));
+            NAssert.IsFalse(handles[2].Exists(a));
             // Set should have lost entity 2 (removed by callback)
             // Entity 1 should still be in set
             NAssert.AreEqual(1, set.Read.Count, "Only entity 1 should remain in set");

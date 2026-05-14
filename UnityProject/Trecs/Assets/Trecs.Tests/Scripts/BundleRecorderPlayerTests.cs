@@ -33,6 +33,7 @@ namespace Trecs.Tests
             env.Accessor.SubmitEntities();
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new BundleRecorderSettings
@@ -94,6 +95,7 @@ namespace Trecs.Tests
             env.Accessor.SubmitEntities();
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new BundleRecorderSettings
@@ -139,6 +141,7 @@ namespace Trecs.Tests
             env.Accessor.SubmitEntities();
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new BundleRecorderSettings
@@ -205,6 +208,7 @@ namespace Trecs.Tests
             env.Accessor.SubmitEntities();
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             using var player = new BundlePlayer(env.World, worldStateSer, registry, snapshots);
@@ -260,6 +264,7 @@ namespace Trecs.Tests
                 SpawnEntities(env);
 
                 var registry = new SerializerRegistry();
+                DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 var settings = new BundleRecorderSettings
@@ -328,6 +333,7 @@ namespace Trecs.Tests
                 SpawnEntities(env);
 
                 var registry = new SerializerRegistry();
+                DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);
@@ -401,6 +407,7 @@ namespace Trecs.Tests
                 SpawnEntities(env);
 
                 var registry = new SerializerRegistry();
+                DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 var settings = new BundleRecorderSettings
@@ -456,6 +463,7 @@ namespace Trecs.Tests
                 SpawnEntities(env);
 
                 var registry = new SerializerRegistry();
+                DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);

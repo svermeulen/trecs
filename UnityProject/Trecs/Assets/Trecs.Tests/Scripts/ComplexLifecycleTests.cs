@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -55,8 +54,8 @@ namespace Trecs.Tests
             var ref2 = init2.Handle;
             a.SubmitEntities();
 
-            NAssert.IsFalse(a.EntityExists(ref1));
-            NAssert.IsTrue(a.EntityExists(ref2));
+            NAssert.IsFalse(ref1.Exists(a));
+            NAssert.IsTrue(ref2.Exists(a));
             NAssert.IsFalse(ref1.Equals(ref2));
         }
 
@@ -120,7 +119,7 @@ namespace Trecs.Tests
             // All refs should still be valid
             for (int i = 0; i < 5; i++)
             {
-                NAssert.IsTrue(a.EntityExists(refs[i]), "Entity {0} should exist", i);
+                NAssert.IsTrue(refs[i].Exists(a), "Entity {0} should exist", i);
             }
         }
 
@@ -152,9 +151,9 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             NAssert.AreEqual(4, a.CountEntitiesWithTags(TestTags.Alpha));
-            NAssert.IsFalse(a.EntityExists(refs[1]));
-            NAssert.IsTrue(a.EntityExists(refs[0]));
-            NAssert.IsTrue(a.EntityExists(refs[2]));
+            NAssert.IsFalse(refs[1].Exists(a));
+            NAssert.IsTrue(refs[0].Exists(a));
+            NAssert.IsTrue(refs[2].Exists(a));
         }
 
         [Test]
@@ -199,9 +198,9 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
-            NAssert.IsFalse(a.EntityExists(refs[0]));
-            NAssert.IsTrue(a.EntityExists(refs[1]));
-            NAssert.IsTrue(a.EntityExists(refs[2]));
+            NAssert.IsFalse(refs[0].Exists(a));
+            NAssert.IsTrue(refs[1].Exists(a));
+            NAssert.IsTrue(refs[2].Exists(a));
 
             // Verify component values
             var comp1 = a.Component<TestInt>(refs[1]);
@@ -236,7 +235,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // The new entity's ref should resolve correctly
-            NAssert.IsTrue(a.EntityExists(newRef));
+            NAssert.IsTrue(newRef.Exists(a));
             var newIndex = newRef.ToIndex(a);
             var comp = a.Component<TestInt>(newIndex);
             NAssert.AreEqual(
@@ -280,7 +279,7 @@ namespace Trecs.Tests
             // Verify surviving entities have correct values
             for (int i = 1; i < count; i += 2)
             {
-                NAssert.IsTrue(a.EntityExists(refs[i]), "Entity {0} should exist", i);
+                NAssert.IsTrue(refs[i].Exists(a), "Entity {0} should exist", i);
                 var comp = a.Component<TestInt>(refs[i]);
                 NAssert.AreEqual(i, comp.Read.Value, "Entity {0} should have value {0}", i);
             }
@@ -288,7 +287,7 @@ namespace Trecs.Tests
             // Verify removed entities don't exist
             for (int i = 0; i < count; i += 2)
             {
-                NAssert.IsFalse(a.EntityExists(refs[i]), "Entity {0} should be removed", i);
+                NAssert.IsFalse(refs[i].Exists(a), "Entity {0} should be removed", i);
             }
         }
 
@@ -575,7 +574,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Native accessor should be able to resolve the entity ref
-            bool found = nativeEcs.TryGetEntityIndex(entityHandle, out var entityIndex);
+            bool found = entityHandle.TryToIndex(nativeEcs, out var entityIndex);
             NAssert.IsTrue(found);
             NAssert.AreEqual(42, a.Component<TestInt>(entityIndex).Read.Value);
         }
@@ -722,17 +721,17 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Removed refs should be invalid
-            NAssert.IsFalse(a.EntityExists(refs[0]));
-            NAssert.IsFalse(a.EntityExists(refs[3]));
-            NAssert.IsFalse(a.EntityExists(refs[5]));
-            NAssert.IsFalse(a.EntityExists(refs[7]));
-            NAssert.IsFalse(a.EntityExists(refs[9]));
+            NAssert.IsFalse(refs[0].Exists(a));
+            NAssert.IsFalse(refs[3].Exists(a));
+            NAssert.IsFalse(refs[5].Exists(a));
+            NAssert.IsFalse(refs[7].Exists(a));
+            NAssert.IsFalse(refs[9].Exists(a));
 
             // Surviving refs should be valid with correct data
             int[] surviving = { 1, 2, 4, 6, 8 };
             foreach (var i in surviving)
             {
-                NAssert.IsTrue(a.EntityExists(refs[i]), "Entity {0} should exist", i);
+                NAssert.IsTrue(refs[i].Exists(a), "Entity {0} should exist", i);
                 var comp = a.Component<TestInt>(refs[i]);
                 NAssert.AreEqual(i, comp.Read.Value, "Entity {0} data mismatch", i);
             }
@@ -766,12 +765,12 @@ namespace Trecs.Tests
             a.SetTag<TestPartitionB>(refs[4].ToIndex(a));
             a.SubmitEntities();
 
-            NAssert.IsFalse(a.EntityExists(refs[0]));
-            NAssert.IsTrue(a.EntityExists(refs[1]));
-            NAssert.IsTrue(a.EntityExists(refs[2]));
-            NAssert.IsFalse(a.EntityExists(refs[3]));
-            NAssert.IsTrue(a.EntityExists(refs[4]));
-            NAssert.IsTrue(a.EntityExists(refs[5]));
+            NAssert.IsFalse(refs[0].Exists(a));
+            NAssert.IsTrue(refs[1].Exists(a));
+            NAssert.IsTrue(refs[2].Exists(a));
+            NAssert.IsFalse(refs[3].Exists(a));
+            NAssert.IsTrue(refs[4].Exists(a));
+            NAssert.IsTrue(refs[5].Exists(a));
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionB));
@@ -818,11 +817,11 @@ namespace Trecs.Tests
             {
                 if (i % 3 == 0)
                 {
-                    NAssert.IsFalse(a.EntityExists(refs[i]));
+                    NAssert.IsFalse(refs[i].Exists(a));
                     continue;
                 }
 
-                NAssert.IsTrue(a.EntityExists(refs[i]), "Entity {0} should exist", i);
+                NAssert.IsTrue(refs[i].Exists(a), "Entity {0} should exist", i);
                 var intComp = a.Component<TestInt>(refs[i]);
                 var vecComp = a.Component<TestVec>(refs[i]);
 
@@ -855,7 +854,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
 
             // Data should be preserved
-            NAssert.IsTrue(a.EntityExists(entityHandle));
+            NAssert.IsTrue(entityHandle.Exists(a));
             NAssert.AreEqual(55, a.Component<TestInt>(entityHandle).Read.Value);
             NAssert.AreEqual(3.0f, a.Component<TestVec>(entityHandle).Read.X, 0.001f);
             NAssert.AreEqual(4.0f, a.Component<TestVec>(entityHandle).Read.Y, 0.001f);

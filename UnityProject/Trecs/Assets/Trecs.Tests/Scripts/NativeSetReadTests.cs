@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Trecs.Internal;
 using Unity.Collections;
 using NAssert = NUnit.Framework.Assert;
 

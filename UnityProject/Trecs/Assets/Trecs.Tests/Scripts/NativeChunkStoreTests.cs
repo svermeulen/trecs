@@ -628,6 +628,7 @@ namespace Trecs.Tests
             using var store = BuildVariedStore(seed: 1);
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             using var buf1 = new SerializationBuffer(registry);
             using var buf2 = new SerializationBuffer(registry);
 
@@ -767,6 +768,7 @@ namespace Trecs.Tests
 
             // Serialize src for restoring later.
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             using var buf = new SerializationBuffer(registry);
             buf.StartWrite(version: 1, includeTypeChecks: true);
             src.Serialize(buf);
@@ -956,6 +958,7 @@ namespace Trecs.Tests
         static NativeChunkStore CloneViaSerialize(NativeChunkStore src)
         {
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             using var buf = new SerializationBuffer(registry);
             buf.StartWrite(version: 1, includeTypeChecks: true);
             src.Serialize(buf);

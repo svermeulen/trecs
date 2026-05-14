@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -66,7 +65,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             in Position position,
             in DestinationPosition destinationPosition,
             ref TargetMeal fishMeal,
-            EntityIndex entityIndex
+            EntityHandle entityHandle
         )
         {
             var distanceSqr = math.lengthsq(destinationPosition.Value - position.Value);
@@ -76,7 +75,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                 World.RemoveEntity(fishMeal.Value);
 
                 fishMeal.Value = EntityHandle.Null;
-                World.SetTag<FrenzyTags.NotEating>(entityIndex);
+                World.SetTag<FrenzyTags.NotEating>(entityHandle);
             }
         }
 
@@ -153,7 +152,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
         [WrapAsJob]
         static void RunWrapAsJobAspect(
             in Fish fish,
-            EntityIndex entityIndex,
+            EntityHandle entityHandle,
             in NativeWorldAccessor world
         )
         {
@@ -161,14 +160,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
             if (distanceSqr < EatDistanceSqr)
             {
-                if (!world.TryGetEntityIndex(fish.TargetMeal, out var mealIndex))
+                if (!fish.TargetMeal.TryToIndex(world, out var mealIndex))
                 {
                     return;
                 }
 
                 world.RemoveEntity(mealIndex);
                 fish.TargetMeal = EntityHandle.Null;
-                world.SetTag<FrenzyTags.NotEating>(entityIndex);
+                world.SetTag<FrenzyTags.NotEating>(entityHandle);
             }
         }
 
@@ -178,7 +177,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             in Position position,
             in DestinationPosition destinationPosition,
             ref TargetMeal fishMeal,
-            EntityIndex entityIndex,
+            EntityHandle entityHandle,
             in NativeWorldAccessor world
         )
         {
@@ -186,14 +185,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
             if (distanceSqr < EatDistanceSqr)
             {
-                if (!world.TryGetEntityIndex(fishMeal.Value, out var mealIndex))
+                if (!fishMeal.Value.TryToIndex(world, out var mealIndex))
                 {
                     return;
                 }
 
                 world.RemoveEntity(mealIndex);
                 fishMeal.Value = EntityHandle.Null;
-                world.SetTag<FrenzyTags.NotEating>(entityIndex);
+                world.SetTag<FrenzyTags.NotEating>(entityHandle);
             }
         }
 
@@ -204,20 +203,20 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
             public NativeWorldAccessor World;
 
             [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.Eating))]
-            public void Execute(in Fish fish, EntityIndex entityIndex)
+            public void Execute(in Fish fish, EntityHandle entityHandle)
             {
                 var distanceSqr = math.lengthsq(fish.DestinationPosition - fish.Position);
 
                 if (distanceSqr < EatDistanceSqr)
                 {
-                    if (!World.TryGetEntityIndex(fish.TargetMeal, out var mealIndex))
+                    if (!fish.TargetMeal.TryToIndex(World, out var mealIndex))
                     {
                         return;
                     }
 
                     World.RemoveEntity(mealIndex);
                     fish.TargetMeal = EntityHandle.Null;
-                    World.SetTag<FrenzyTags.NotEating>(entityIndex);
+                    World.SetTag<FrenzyTags.NotEating>(entityHandle);
                 }
             }
         }
@@ -233,21 +232,21 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                 in Position position,
                 in DestinationPosition destinationPosition,
                 ref TargetMeal fishMeal,
-                EntityIndex entityIndex
+                EntityHandle entityHandle
             )
             {
                 var distanceSqr = math.lengthsq(destinationPosition.Value - position.Value);
 
                 if (distanceSqr < EatDistanceSqr)
                 {
-                    if (!World.TryGetEntityIndex(fishMeal.Value, out var mealIndex))
+                    if (!fishMeal.Value.TryToIndex(World, out var mealIndex))
                     {
                         return;
                     }
 
                     World.RemoveEntity(mealIndex);
                     fishMeal.Value = EntityHandle.Null;
-                    World.SetTag<FrenzyTags.NotEating>(entityIndex);
+                    World.SetTag<FrenzyTags.NotEating>(entityHandle);
                 }
             }
         }
@@ -277,7 +276,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                 if (distanceSqr < EatDistanceSqr)
                 {
-                    if (!World.TryGetEntityIndex(Meals[i].Value, out var mealIndex))
+                    if (!Meals[i].Value.TryToIndex(World, out var mealIndex))
                     {
                         return;
                     }

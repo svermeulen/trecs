@@ -4,7 +4,7 @@ using Trecs.Internal;
 
 namespace Trecs
 {
-    public static class ComponentTypeIdSetRegistry
+    internal static class ComponentTypeIdSetRegistry
     {
         static readonly Dictionary<int, ComponentId[]> _sets = new();
         static readonly Dictionary<int, string> _debugStrings = new();

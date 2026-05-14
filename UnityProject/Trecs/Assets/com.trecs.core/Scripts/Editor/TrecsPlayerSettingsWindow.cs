@@ -11,7 +11,7 @@ namespace Trecs.Internal
     /// <see cref="TrecsPlayerSettingsStore"/> EditorPrefs so values persist
     /// across editor sessions and apply to all live recorders on Save.
     /// </summary>
-    public class TrecsPlayerSettingsWindow : EditorWindow
+    internal class TrecsPlayerSettingsWindow : EditorWindow
     {
         Toggle _autoRecordOnStartField;
         FloatField _anchorIntervalField;

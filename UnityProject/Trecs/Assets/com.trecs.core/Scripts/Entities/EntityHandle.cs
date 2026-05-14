@@ -10,7 +10,7 @@ namespace Trecs
     /// Convert to <see cref="EntityIndex"/> for direct component buffer access.
     /// </summary>
     [TypeId(847291053)]
-    public readonly struct EntityHandle : IEquatable<EntityHandle>, IStableHashProvider
+    public readonly struct EntityHandle : IEquatable<EntityHandle>
     {
         /// <summary>
         /// The slot identifier for this entity within the world. Combined with <see cref="Version"/>
@@ -38,18 +38,11 @@ namespace Trecs
             return obj1.Id != obj2.Id || obj1.Version != obj2.Version;
         }
 
+        // Stable hash across sessions.
         /// <inheritdoc/>
         public override readonly int GetHashCode()
         {
-            return GetStableHashCode();
-        }
-
-        /// <summary>
-        /// Returns a deterministic hash code that is stable across process restarts.
-        /// </summary>
-        public readonly int GetStableHashCode()
-        {
-            // we don't want to use HashCode.Combine or GetHashCode because
+            // we don't want to use HashCode.Combine because
             // it's not deterministic across restarts
             return unchecked((int)math.hash(new uint2((uint)Id, (uint)Version)));
         }

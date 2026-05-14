@@ -7,7 +7,7 @@ using Trecs.Collections;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class DefaultSystemMetadataProvider : ISystemMetadataProvider
+    internal sealed class DefaultSystemMetadataProvider : ISystemMetadataProvider
     {
         readonly TrecsLog _log;
 

@@ -28,7 +28,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool Exists(EntityIndex entityIndex)
+        public bool Exists(EntityIndex entityIndex)
         {
             var group = entityIndex.GroupIndex;
             if (group.IsNull)

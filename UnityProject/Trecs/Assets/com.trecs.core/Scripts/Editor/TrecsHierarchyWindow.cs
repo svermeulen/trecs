@@ -32,8 +32,8 @@ namespace Trecs
             TrecsEditorAccessorNames.Register("TrecsHierarchyWindow");
 
         // Persistent user toggles, surfaced via the EditorWindow ≡ menu.
-        const string PrefShowEmptyTemplates = "Svkj.Trecs.Hierarchy.ShowEmptyTemplates";
-        const string PrefShowAbstractTemplates = "Svkj.Trecs.Hierarchy.ShowAbstractTemplates";
+        const string PrefShowEmptyTemplates = "Trecs.Hierarchy.ShowEmptyTemplates";
+        const string PrefShowAbstractTemplates = "Trecs.Hierarchy.ShowAbstractTemplates";
         bool _showEmptyTemplates = true;
         bool _showAbstractTemplates = true;
 
@@ -103,7 +103,7 @@ namespace Trecs
         // recall + Esc-clear).
         bool _suppressSearchHistoryRecord;
         const int SearchHistoryMax = 20;
-        const string SearchHistoryPref = "Svkj.TrecsHierarchy.SearchHistory";
+        const string SearchHistoryPref = "Trecs.Hierarchy.SearchHistory";
 
         // Browser-style selection navigation. Each user-driven selection
         // append a new entry; Alt+Left/Right walks backward/forward. The
@@ -169,7 +169,7 @@ namespace Trecs
         // the user had just collapsed.
         bool _initialSectionExpansionApplied;
         const string InitialSectionExpansionAppliedSessionKey =
-            "Svkj.TrecsHierarchy.InitialSectionExpansionApplied";
+            "Trecs.Hierarchy.InitialSectionExpansionApplied";
 
         // Persistent set of stable string keys for rows the user has
         // expanded. Survives play-mode entry / domain reload via
@@ -181,7 +181,7 @@ namespace Trecs
         // edge so the user's edit-mode changes always reach storage.
         readonly HashSet<string> _expandedStableKeys = new();
 
-        const string ExpandedKeysSessionKey = "Svkj.TrecsHierarchy.ExpandedKeys";
+        const string ExpandedKeysSessionKey = "Trecs.Hierarchy.ExpandedKeys";
         const string ExpandedKeysSeparator = "\n";
 
         // Name-based identity of the currently-selected row, persisted to
@@ -190,7 +190,7 @@ namespace Trecs
         // world, leaving the proxy bound to a stale World reference).
         // The corresponding row in the new world is found by matching
         // against this identity and a fresh proxy is bound.
-        const string SelectedRowIdentitySessionKey = "Svkj.TrecsHierarchy.SelectedRowIdentity";
+        const string SelectedRowIdentitySessionKey = "Trecs.Hierarchy.SelectedRowIdentity";
 
         // Parallel id → stable-string-key map. Populated alongside _idByKey
         // in GetOrAssignId. Used by CaptureExpandedKeys /
@@ -1584,7 +1584,10 @@ namespace Trecs
                     switch (data.Kind)
                     {
                         case RowKind.Accessor:
-                            if (data.SystemIndex >= 0 && data.SystemIndex < world.SystemCount)
+                            if (
+                                data.SystemIndex >= 0
+                                && data.SystemIndex < world.GetSystems().Count
+                            )
                             {
                                 // Effective state — combines all enable
                                 // channels with the deterministic paused
@@ -2262,7 +2265,7 @@ namespace Trecs
                 EntityHandle handle;
                 try
                 {
-                    handle = accessor.GetEntityHandle(new EntityIndex(i, group));
+                    handle = new EntityIndex(i, group).ToHandle(accessor);
                 }
                 catch
                 {

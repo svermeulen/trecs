@@ -51,13 +51,16 @@ namespace Trecs.Tests
         public static SerializerRegistry CreateTestRegistry()
         {
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             RegisterTestCollectionSerializers(registry);
             return registry;
         }
 
         public static SerializerRegistry CreateJsonTestRegistry()
         {
-            return new SerializerRegistry();
+            var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
+            return registry;
         }
 
         public class TestClassSerializer : ISerializer<NullSerializationTests.TestClass>

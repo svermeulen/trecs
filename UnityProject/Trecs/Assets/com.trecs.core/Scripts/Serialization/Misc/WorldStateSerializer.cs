@@ -210,7 +210,9 @@ namespace Trecs.Internal
             var guard = reader.Read<int>("StreamGuard");
             TrecsAssert.IsEqual(guard, WorldStateStreamGuard);
 
-            using (TrecsProfiling.Start("Triggering OnEcsDeserializeCompleted listeners"))
+            _world.SystemRunner.OnEcsDeserializeCompleted();
+
+            using (TrecsProfiling.Start("Triggering DeserializeCompletedEvent listeners"))
             {
                 eventsManager.DeserializeCompletedEvent.Invoke();
             }

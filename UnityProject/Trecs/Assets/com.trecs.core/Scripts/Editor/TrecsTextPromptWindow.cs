@@ -9,7 +9,7 @@ namespace Trecs.Internal
     /// on OK. Used by the time-travel window for rename prompts where
     /// EditorUtility.DisplayDialog doesn't suffice (no text input).
     /// </summary>
-    public class TrecsTextPromptWindow : EditorWindow
+    internal class TrecsTextPromptWindow : EditorWindow
     {
         string _result;
         bool _confirmed;

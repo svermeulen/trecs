@@ -8,7 +8,7 @@ namespace Trecs.Internal
     /// Provides functionality to generate human-readable type names with proper generic
     /// and nested type formatting.
     /// </summary>
-    public static class PrettyTypeNameCache
+    internal static class PrettyTypeNameCache
     {
         // Cache to avoid redundant formatting operations
         private static readonly Dictionary<Type, string> _formattedTypeNames = new();

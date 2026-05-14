@@ -12,7 +12,7 @@ namespace Trecs
     /// (e.g. <c>TagSet&lt;Red, Fast&gt;.Value</c>) for zero-allocation access in hot paths.
     /// </summary>
     [TypeId(912438516)]
-    public readonly struct TagSet : IEquatable<TagSet>, IComparable<TagSet>, IStableHashProvider
+    public readonly struct TagSet : IEquatable<TagSet>, IComparable<TagSet>
     {
         public readonly int Id;
 
@@ -38,13 +38,9 @@ namespace Trecs
 
         public readonly bool IsNull => this == Null;
 
+        // Stable hash across sessions.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override readonly int GetHashCode()
-        {
-            return GetStableHashCode();
-        }
-
-        public readonly int GetStableHashCode()
         {
             return Id;
         }

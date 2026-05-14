@@ -23,7 +23,7 @@ namespace Trecs.Internal
     /// is showing; capturing a snapshot is available in both surfaces
     /// since it's a one-shot.
     /// </summary>
-    public class TrecsSavesWindow : EditorWindow
+    internal class TrecsSavesWindow : EditorWindow
     {
         DropdownField _worldDropdown;
         ToolbarSearchField _searchField;

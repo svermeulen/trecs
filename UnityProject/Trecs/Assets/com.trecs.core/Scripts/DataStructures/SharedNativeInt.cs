@@ -7,7 +7,7 @@ using Unity.Collections.LowLevel.Unsafe;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public struct SharedNativeInt : IDisposable
+    internal struct SharedNativeInt : IDisposable
     {
         [NativeDisableUnsafePtrRestriction]
         unsafe int* data;

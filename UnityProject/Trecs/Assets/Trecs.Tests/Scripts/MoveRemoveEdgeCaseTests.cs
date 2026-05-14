@@ -117,7 +117,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, movedEntity.Get<TestInt>().Read.Value);
 
             // Verify removed entity no longer exists
-            NAssert.IsFalse(a.EntityExists(handles[4]));
+            NAssert.IsFalse(handles[4].Exists(a));
         }
 
         [Test]
@@ -148,11 +148,11 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionBSet));
 
             // All surviving entities should still be accessible
-            NAssert.IsTrue(a.EntityExists(handles[0]));
-            NAssert.IsTrue(a.EntityExists(handles[1]));
-            NAssert.IsFalse(a.EntityExists(handles[2])); // removed
-            NAssert.IsTrue(a.EntityExists(handles[3]));
-            NAssert.IsTrue(a.EntityExists(handles[4])); // moved
+            NAssert.IsTrue(handles[0].Exists(a));
+            NAssert.IsTrue(handles[1].Exists(a));
+            NAssert.IsFalse(handles[2].Exists(a)); // removed
+            NAssert.IsTrue(handles[3].Exists(a));
+            NAssert.IsTrue(handles[4].Exists(a)); // moved
 
             // Data should be intact
             NAssert.AreEqual(0, a.Component<TestInt>(handles[0]).Read.Value);
@@ -195,11 +195,11 @@ namespace Trecs.Tests
             {
                 if (i == 7 || i == 8 || i == 9)
                 {
-                    NAssert.IsFalse(a.EntityExists(handles[i]), $"Entity {i} should be removed");
+                    NAssert.IsFalse(handles[i].Exists(a), $"Entity {i} should be removed");
                 }
                 else
                 {
-                    NAssert.IsTrue(a.EntityExists(handles[i]), $"Entity {i} should still exist");
+                    NAssert.IsTrue(handles[i].Exists(a), $"Entity {i} should still exist");
                     NAssert.AreEqual(
                         i,
                         a.Component<TestInt>(handles[i]).Read.Value,
@@ -237,7 +237,7 @@ namespace Trecs.Tests
                 .OnRemoved(
                     (group, indices) =>
                     {
-                        if (a.EntityExists(handleB))
+                        if (handleB.Exists(a))
                         {
                             a.RemoveEntity(handleB);
                         }
@@ -247,8 +247,8 @@ namespace Trecs.Tests
             a.RemoveEntity(handleA);
             a.SubmitEntities();
 
-            NAssert.IsFalse(a.EntityExists(handleA), "Entity A should be removed");
-            NAssert.IsFalse(a.EntityExists(handleB), "Entity B should be removed by callback");
+            NAssert.IsFalse(handleA.Exists(a), "Entity A should be removed");
+            NAssert.IsFalse(handleB.Exists(a), "Entity B should be removed by callback");
             NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
 
             subscription.Dispose();
@@ -278,7 +278,7 @@ namespace Trecs.Tests
                 .OnRemoved(
                     (group, indices) =>
                     {
-                        if (a.EntityExists(handles[6]))
+                        if (handles[6].Exists(a))
                         {
                             a.RemoveEntity(handles[6]);
                         }
@@ -292,9 +292,9 @@ namespace Trecs.Tests
 
             // 0, 3, and 6 should be removed (6 by callback)
             NAssert.AreEqual(5, a.CountEntitiesWithTags(TestTags.Alpha));
-            NAssert.IsFalse(a.EntityExists(handles[0]));
-            NAssert.IsFalse(a.EntityExists(handles[3]));
-            NAssert.IsFalse(a.EntityExists(handles[6]));
+            NAssert.IsFalse(handles[0].Exists(a));
+            NAssert.IsFalse(handles[3].Exists(a));
+            NAssert.IsFalse(handles[6].Exists(a));
 
             // Surviving entities should have correct data
             NAssert.AreEqual(100, a.Component<TestInt>(handles[1]).Read.Value);

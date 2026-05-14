@@ -426,6 +426,7 @@ namespace Trecs.Tests
             // buffer, mutate state, then read back and confirm restoration
             // overwrote the mutation.
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var serializer = new WorldStateSerializer(env.World);
             byte[] snapshotBytes;
             using (var writer = new BinarySerializationWriter(registry))
@@ -474,6 +475,7 @@ namespace Trecs.Tests
             using var env = new TestEnvironment(builder.BuildAndInitialize());
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var serializer = new WorldStateSerializer(env.World);
 
             byte[] checksumBytes;
@@ -529,6 +531,7 @@ namespace Trecs.Tests
             env.Accessor.SubmitEntities();
 
             var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var serializer = new WorldStateSerializer(env.World);
 
             int snapshotLength = WriteAndMeasure(serializer, registry, flags: 0);

@@ -1,5 +1,4 @@
 using System;
-using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Mathematics;
@@ -48,7 +47,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
         }
 
         [ForEachEntity(typeof(FrenzyTags.Fish), Set = typeof(FrenzySets.Eating))]
-        void RunForEachMethodAspect(in Fish fish, EntityIndex entityIndex)
+        void RunForEachMethodAspect(in Fish fish, EntityHandle entityHandle)
         {
             var distanceSqr = math.lengthsq(fish.DestinationPosition - fish.Position);
 
@@ -57,8 +56,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                 World.RemoveEntity(fish.TargetMeal);
                 fish.TargetMeal = EntityHandle.Null;
 
-                World.Set<FrenzySets.Eating>().Defer.Remove(entityIndex);
-                World.Set<FrenzySets.NotEating>().Defer.Add(entityIndex);
+                World.Set<FrenzySets.Eating>().Defer.Remove(entityHandle);
+                World.Set<FrenzySets.NotEating>().Defer.Add(entityHandle);
             }
         }
 
@@ -67,7 +66,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             in Position position,
             in DestinationPosition destinationPosition,
             ref TargetMeal fishMeal,
-            EntityIndex entityIndex
+            EntityHandle entityHandle
         )
         {
             var distanceSqr = math.lengthsq(destinationPosition.Value - position.Value);
@@ -77,8 +76,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                 World.RemoveEntity(fishMeal.Value);
                 fishMeal.Value = EntityHandle.Null;
 
-                World.Set<FrenzySets.Eating>().Defer.Remove(entityIndex);
-                World.Set<FrenzySets.NotEating>().Defer.Add(entityIndex);
+                World.Set<FrenzySets.Eating>().Defer.Remove(entityHandle);
+                World.Set<FrenzySets.NotEating>().Defer.Add(entityHandle);
             }
         }
 
@@ -103,7 +102,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             in Position position,
             in DestinationPosition destinationPosition,
             ref TargetMeal fishMeal,
-            EntityIndex entityIndex,
+            EntityHandle entityHandle,
             in NativeWorldAccessor world
         )
         {
@@ -113,8 +112,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
             {
                 world.RemoveEntity(fishMeal.Value);
                 fishMeal.Value = EntityHandle.Null;
-                world.SetRemove<FrenzySets.Eating>(entityIndex);
-                world.SetAdd<FrenzySets.NotEating>(entityIndex);
+                world.SetRemove<FrenzySets.Eating>(entityHandle);
+                world.SetAdd<FrenzySets.NotEating>(entityHandle);
             }
         }
 
@@ -233,7 +232,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                 in Position position,
                 in DestinationPosition destinationPosition,
                 ref TargetMeal fishMeal,
-                EntityIndex entityIndex
+                EntityHandle entityHandle
             )
             {
                 var distanceSqr = math.lengthsq(destinationPosition.Value - position.Value);
@@ -242,8 +241,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                 {
                     World.RemoveEntity(fishMeal.Value);
                     fishMeal.Value = EntityHandle.Null;
-                    World.SetRemove<FrenzySets.Eating>(entityIndex);
-                    World.SetAdd<FrenzySets.NotEating>(entityIndex);
+                    World.SetRemove<FrenzySets.Eating>(entityHandle);
+                    World.SetAdd<FrenzySets.NotEating>(entityHandle);
                 }
             }
         }

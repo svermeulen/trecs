@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Trecs.Internal
 {
-    public static class UnityThreadHelper
+    internal static class UnityThreadHelper
     {
         static UnityThreadHelper()
         {

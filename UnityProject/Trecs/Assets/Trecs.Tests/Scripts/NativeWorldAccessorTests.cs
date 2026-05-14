@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using Trecs.Internal;
 using Unity.Collections;
 using NAssert = NUnit.Framework.Assert;
 
@@ -69,7 +68,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
-            NAssert.IsFalse(a.EntityExists(handles[1]));
+            NAssert.IsFalse(handles[1].Exists(a));
         }
 
         [Test]

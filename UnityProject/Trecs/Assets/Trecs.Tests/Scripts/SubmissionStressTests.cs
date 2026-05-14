@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using NUnit.Framework;
-using Trecs.Internal;
 using Unity.Collections;
 using Debug = UnityEngine.Debug;
 using NAssert = NUnit.Framework.Assert;
@@ -58,7 +57,7 @@ namespace Trecs.Tests
             for (int i = 0; i < removeCount; i++)
             {
                 var oddRef = entityIds[i * 2 + 1];
-                NAssert.IsTrue(a.EntityExists(oddRef));
+                NAssert.IsTrue(oddRef.Exists(a));
                 NAssert.AreEqual(i * 2 + 1, a.Component<TestInt>(oddRef).Read.Value);
             }
 
@@ -113,7 +112,7 @@ namespace Trecs.Tests
             for (int i = 0; i < moveCount; i++)
             {
                 var movedRef = entityIds[i * 2];
-                NAssert.IsTrue(a.EntityExists(movedRef));
+                NAssert.IsTrue(movedRef.Exists(a));
                 NAssert.AreEqual(i * 2, a.Component<TestInt>(movedRef).Read.Value);
             }
 
@@ -121,7 +120,7 @@ namespace Trecs.Tests
             for (int i = 0; i < moveCount; i++)
             {
                 var stayedRef = entityIds[i * 2 + 1];
-                NAssert.IsTrue(a.EntityExists(stayedRef));
+                NAssert.IsTrue(stayedRef.Exists(a));
                 NAssert.AreEqual(i * 2 + 1, a.Component<TestInt>(stayedRef).Read.Value);
             }
 

@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using Trecs.Internal;
 
 namespace Trecs
 {

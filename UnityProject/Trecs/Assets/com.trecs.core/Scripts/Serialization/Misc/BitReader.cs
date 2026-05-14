@@ -5,7 +5,7 @@ using System.IO;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class BitReader
+    internal sealed class BitReader
     {
         byte[] _bytes;
         int _byteIndex = 0;

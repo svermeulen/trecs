@@ -107,7 +107,7 @@ namespace Trecs.SourceGen.Shared
         /// </summary>
         public static bool IsLoopManagedType(ITypeSymbol type)
         {
-            return IsExactType(type, "EntityIndex", TrecsNamespaces.TrecsInternal)
+            return IsExactType(type, "EntityIndex", TrecsNamespaces.Trecs)
                 || IsExactType(type, "EntityHandle", TrecsNamespaces.Trecs)
                 || IsExactType(type, "EntityAccessor", TrecsNamespaces.Trecs)
                 || IsExactType(type, "WorldAccessor", TrecsNamespaces.Trecs)
