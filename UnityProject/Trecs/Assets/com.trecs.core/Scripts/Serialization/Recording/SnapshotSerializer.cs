@@ -85,7 +85,7 @@ namespace Trecs.Internal
             {
                 _buffer.ClearMemoryStream();
                 _buffer.StartWrite(version: version, includeTypeChecks: includeTypeChecks);
-                _buffer.Write("metadata", metadata);
+                _buffer.Write("Metadata", metadata);
                 _worldStateSerializer.SerializeState(_buffer);
                 var numBytes = _buffer.EndWrite();
                 _log.Trace("Saved snapshot ({0:0.00} kb)", numBytes / 1024f);
@@ -145,7 +145,7 @@ namespace Trecs.Internal
             {
                 LoadStreamIntoBuffer(stream);
                 _buffer.StartRead();
-                var metadata = _buffer.Read<SnapshotMetadata>("metadata");
+                var metadata = _buffer.Read<SnapshotMetadata>("Metadata");
                 _worldStateSerializer.DeserializeState(_buffer);
                 _buffer.StopRead(verifySentinel: true);
                 return metadata;
@@ -194,7 +194,7 @@ namespace Trecs.Internal
             {
                 LoadStreamIntoBuffer(stream);
                 _buffer.StartRead();
-                var metadata = _buffer.Read<SnapshotMetadata>("metadata");
+                var metadata = _buffer.Read<SnapshotMetadata>("Metadata");
                 _buffer.StopRead(verifySentinel: false);
                 return metadata;
             }

@@ -128,7 +128,7 @@ namespace Trecs.Internal
                     flags: flags,
                     enableMemoryTracking: enableMemoryTracking
                 );
-                _writer.WriteDelta("value", value, baseValue);
+                _writer.WriteDelta("Value", value, baseValue);
                 _writer.Complete(_binaryWriter);
             }
             catch
@@ -149,7 +149,7 @@ namespace Trecs.Internal
             try
             {
                 _reader.Start(_binaryReader);
-                var result = _reader.ReadObjectDelta("value", baseValue);
+                var result = _reader.ReadObjectDelta("Value", baseValue);
                 _reader.Stop(verifySentinel: true);
 
                 return result;
@@ -310,7 +310,7 @@ namespace Trecs.Internal
                     flags: flags,
                     enableMemoryTracking: enableMemoryTracking
                 );
-                _writer.Write("value", value);
+                _writer.Write("Value", value);
                 _writer.Complete(_binaryWriter);
             }
             catch
@@ -331,7 +331,7 @@ namespace Trecs.Internal
             try
             {
                 _reader.Start(_binaryReader);
-                var result = _reader.ReadObject("value");
+                var result = _reader.ReadObject("Value");
                 _reader.Stop(verifySentinel: true);
                 return result;
             }
@@ -363,7 +363,7 @@ namespace Trecs.Internal
                     flags,
                     enableMemoryTracking: enableMemoryTracking
                 );
-                _writer.WriteObject("value", value);
+                _writer.WriteObject("Value", value);
                 _writer.Complete(_binaryWriter);
             }
             catch
@@ -413,7 +413,7 @@ namespace Trecs.Internal
             try
             {
                 _reader.Start(_binaryReader);
-                var result = _reader.Read<T>("value");
+                var result = _reader.Read<T>("Value");
                 _reader.Stop(verifySentinel: true);
 
                 return result;
@@ -434,7 +434,7 @@ namespace Trecs.Internal
             try
             {
                 _reader.Start(_binaryReader);
-                _reader.Read<T>("value", ref value);
+                _reader.Read<T>("Value", ref value);
                 _reader.Stop(verifySentinel: true);
             }
             catch
@@ -466,7 +466,7 @@ namespace Trecs.Internal
                     flags,
                     enableMemoryTracking: enableMemoryTracking
                 );
-                _writer.WriteObjectDelta("value", value, baseValue);
+                _writer.WriteObjectDelta("Value", value, baseValue);
                 _writer.Complete(_binaryWriter);
             }
             catch
@@ -529,7 +529,7 @@ namespace Trecs.Internal
             try
             {
                 _reader.Start(_binaryReader);
-                var result = _reader.ReadDelta<T>("value", baseValue);
+                var result = _reader.ReadDelta<T>("Value", baseValue);
                 _reader.Stop(verifySentinel: true);
                 return result;
             }

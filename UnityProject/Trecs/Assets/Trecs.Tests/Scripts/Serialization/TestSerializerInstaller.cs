@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Trecs.Internal;
+using Trecs.Serialization;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -21,8 +22,8 @@ namespace Trecs.Tests
             registry.RegisterSerializer<HashSetSerializer<string>>();
 
             // Array serializers for malformed collection tests
-            registry.RegisterSerializer<ArraySerializer<int[], int>>();
-            registry.RegisterSerializer<ArraySerializer<string[], string>>();
+            registry.RegisterSerializer<BlitArraySerializer<int>>();
+            registry.RegisterSerializer<ArraySerializer<string>>();
 
             // Nested collection serializers for malformed tests
             registry.RegisterSerializer<ListSerializer<List<int>>>();

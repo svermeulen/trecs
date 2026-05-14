@@ -47,13 +47,13 @@ namespace Trecs.Tests
             );
 
             // Write some test data
-            _writer.Write("playerPosition", new Vector3(1, 2, 3));
-            _writer.Write("playerHealth", 100);
-            _writer.WriteString("playerName", "TestPlayer");
+            _writer.Write("PlayerPosition", new Vector3(1, 2, 3));
+            _writer.Write("PlayerHealth", 100);
+            _writer.WriteString("PlayerName", "TestPlayer");
 
             // Create a list of items
             var items = new List<int> { 1, 2, 3, 4, 5 };
-            _writer.Write("inventory", items);
+            _writer.Write("Inventory", items);
 
             // Create a dictionary
             var stats = new Dictionary<string, float>
@@ -62,7 +62,7 @@ namespace Trecs.Tests
                 { "agility", 8.2f },
                 { "intelligence", 12.0f },
             };
-            _writer.Write("playerStats", stats);
+            _writer.Write("PlayerStats", stats);
 
             // Finalize the write
             _writer.Complete(_binaryWriter);
@@ -101,7 +101,7 @@ namespace Trecs.Tests
                 flags: 0L,
                 enableMemoryTracking: false
             );
-            _writer.Write("test", 42);
+            _writer.Write("Test", 42);
             _writer.Complete(_binaryWriter);
 
             var report = _writer.GetMemoryReport();
@@ -124,10 +124,10 @@ namespace Trecs.Tests
             var value = new Vector3(1, 2, 3);
             var baseValue = new Vector3(1, 2, 2); // Different Z value
 
-            _writer.WriteDelta("position", value, baseValue);
+            _writer.WriteDelta("Position", value, baseValue);
 
             // Write identical values (should be optimized)
-            _writer.WriteDelta("rotation", Vector3.zero, Vector3.zero);
+            _writer.WriteDelta("Rotation", Vector3.zero, Vector3.zero);
 
             // Finalize
             _writer.Complete(_binaryWriter);
@@ -158,8 +158,8 @@ namespace Trecs.Tests
             var value1 = new Vector3(1, 2, 3);
             var value2 = new Vector3(1, 2, 3); // Identical - should result in 0 bytes for delta
 
-            _writer.WriteDelta("unchangedField", value1, value2);
-            _writer.Write("normalField", 42);
+            _writer.WriteDelta("UnchangedField", value1, value2);
+            _writer.Write("NormalField", 42);
 
             // Finalize
             _writer.Complete(_binaryWriter);

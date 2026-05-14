@@ -57,18 +57,18 @@ namespace Trecs.Internal
             // This is why we directly use BlitWrite / BlitRead
 
             int count = Count;
-            writer.Write("count", count);
+            writer.Write("Count", count);
             if (count > 0)
             {
                 unsafe
                 {
                     writer.BlitWriteRawBytes(
-                        "keys",
+                        "Keys",
                         NativeListUnsafeUtility.GetUnsafeReadOnlyPtr(_keys),
                         count * UnsafeUtility.SizeOf<TKey>()
                     );
                     writer.BlitWriteRawBytes(
-                        "values",
+                        "Values",
                         NativeListUnsafeUtility.GetUnsafeReadOnlyPtr(_values),
                         count * UnsafeUtility.SizeOf<TValue>()
                     );
@@ -79,7 +79,7 @@ namespace Trecs.Internal
         internal void DeserializeValues(ISerializationReader reader)
         {
             int count = default;
-            reader.Read("count", ref count);
+            reader.Read("Count", ref count);
 
             _keyToIndex.Clear();
             _values.Clear();
@@ -94,12 +94,12 @@ namespace Trecs.Internal
                 unsafe
                 {
                     reader.BlitReadRawBytes(
-                        "keys",
+                        "Keys",
                         NativeListUnsafeUtility.GetUnsafePtr(_keys),
                         count * UnsafeUtility.SizeOf<TKey>()
                     );
                     reader.BlitReadRawBytes(
-                        "values",
+                        "Values",
                         NativeListUnsafeUtility.GetUnsafePtr(_values),
                         count * UnsafeUtility.SizeOf<TValue>()
                     );

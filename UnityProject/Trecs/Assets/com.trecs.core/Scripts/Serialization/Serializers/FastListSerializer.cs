@@ -1,6 +1,7 @@
 using Trecs.Collections;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for <see cref="FastList{T}"/> of unmanaged elements. Writes
@@ -13,7 +14,7 @@ namespace Trecs.Internal
 
         public void Deserialize(ref FastList<T> value, ISerializationReader reader)
         {
-            var numItems = reader.Read<int>("count");
+            var numItems = reader.Read<int>("Count");
             TrecsAssert.That(numItems >= 0);
 
             if (value == null)
@@ -22,6 +23,8 @@ namespace Trecs.Internal
             }
             else
             {
+                TrecsAssert.That(value.Count == 0);
+
                 value.Clear();
 
                 if (value.Capacity < numItems)
@@ -45,14 +48,14 @@ namespace Trecs.Internal
             {
                 fixed (T* ptr = buffer)
                 {
-                    reader.BlitReadArrayPtr("items", ptr, numItems);
+                    reader.BlitReadArrayPtr("Items", ptr, numItems);
                 }
             }
         }
 
         public void Serialize(in FastList<T> value, ISerializationWriter writer)
         {
-            writer.Write("count", value.Count);
+            writer.Write("Count", value.Count);
 
             if (value.Count == 0)
             {
@@ -65,7 +68,7 @@ namespace Trecs.Internal
             {
                 fixed (T* ptr = buffer)
                 {
-                    writer.BlitWriteArrayPtr("items", ptr, count);
+                    writer.BlitWriteArrayPtr("Items", ptr, count);
                 }
             }
         }

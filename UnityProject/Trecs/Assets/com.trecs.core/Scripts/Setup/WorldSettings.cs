@@ -39,11 +39,18 @@ namespace Trecs
         public bool StartPaused { get; init; }
 
         /// <summary>
-        /// When false, you must call World.TriggerAllRemoveEvents manually.
-        /// Useful when you need to run logic after all entities are removed
-        /// but before WorldAccessor is disposed.
+        /// When true (the default), <see cref="World.Dispose"/> calls <c>RemoveAllEntities</c>
+        /// before invoking system <c>OnShutdown</c> hooks. Reactive <c>OnRemoved</c> observers
+        /// fire for every non-global entity and per-group entity counts are zeroed out, so
+        /// queries from inside <c>OnShutdown</c> see an empty world. The global singleton
+        /// entity is intentionally left intact and remains queryable and mutable.
+        /// <para>
+        /// Set to false if you need to run logic after all entities are removed but before
+        /// <see cref="World.Dispose"/> tears down the accessor — in that case, call
+        /// <see cref="World.RemoveAllEntities"/> yourself at the right moment.
+        /// </para>
         /// </summary>
-        public bool TriggerRemoveEventsOnDispose { get; init; } = true;
+        public bool RemoveAllEntitiesOnDispose { get; init; } = true;
 
         /// <summary>
         /// When true, native operations (adds, removes, moves) are sorted before processing

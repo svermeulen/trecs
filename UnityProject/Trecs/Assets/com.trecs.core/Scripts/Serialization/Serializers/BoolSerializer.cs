@@ -1,4 +1,4 @@
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     public sealed class BoolSerializer : ISerializer<bool>, ISerializerDelta<bool>
     {

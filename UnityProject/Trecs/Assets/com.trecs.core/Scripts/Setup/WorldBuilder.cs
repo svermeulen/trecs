@@ -19,19 +19,21 @@ namespace Trecs
         readonly List<Template> _templates = new();
         readonly List<EntitySet> _sets = new();
         internal ISystemMetadataProvider _systemMetadataProvider;
+        readonly SerializerRegistry _serializerRegistry = new();
 
         bool _hasBuilt;
-        bool _registryWasTouched;
         BlobCacheSettings _blobCacheSettings;
         WorldSettings _settings;
         ITrecsPoolManager _poolManager;
-        SerializerRegistry _serializerRegistry;
         string _debugName;
 
         /// <summary>
         /// Creates a new empty WorldBuilder.
         /// </summary>
-        public WorldBuilder() { }
+        public WorldBuilder()
+        {
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
+        }
 
         /// <summary>
         /// Sets a human-readable debug name on the resulting <see cref="World.DebugName"/>.
@@ -216,33 +218,6 @@ namespace Trecs
             return this;
         }
 
-        SerializerRegistry GetOrCreateRegistry()
-        {
-            _registryWasTouched = true;
-            return _serializerRegistry ??= new SerializerRegistry();
-        }
-
-        /// <summary>
-        /// Supplies a pre-built <see cref="SerializerRegistry"/> for the
-        /// constructed world. Must be called before any
-        /// <see cref="RegisterSerializer{TSerializer}"/> calls on this
-        /// builder, since those calls otherwise lazily create a registry
-        /// that would be discarded. Intended for DI scenarios where the
-        /// registry needs to live in the container and be resolvable
-        /// before the world exists.
-        /// </summary>
-        public WorldBuilder SetSerializerRegistry(SerializerRegistry serializerRegistry)
-        {
-            TrecsRequire.That(serializerRegistry != null, "serializerRegistry must not be null");
-            TrecsRequire.That(
-                !_registryWasTouched,
-                "Cannot call SetSerializerRegistry after RegisterSerializer has already been used on this builder"
-            );
-            _serializerRegistry = serializerRegistry;
-            _registryWasTouched = true;
-            return this;
-        }
-
         /// <summary>
         /// Registers a custom serializer by its concrete type. The serializer
         /// must implement <see cref="ISerializer{T}"/> and have a
@@ -252,7 +227,7 @@ namespace Trecs
         public WorldBuilder RegisterSerializer<TSerializer>()
             where TSerializer : ISerializer, new()
         {
-            GetOrCreateRegistry().RegisterSerializer<TSerializer>();
+            _serializerRegistry.RegisterSerializer<TSerializer>();
             return this;
         }
 
@@ -263,7 +238,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder RegisterSerializer(Type serializerType)
         {
-            GetOrCreateRegistry().RegisterSerializer(serializerType);
+            _serializerRegistry.RegisterSerializer(serializerType);
             return this;
         }
 
@@ -441,7 +416,7 @@ namespace Trecs
                 interpolatedPreviousSaverManager: interpolatedPreviousSaverManager,
                 componentStore: componentStore,
                 systems: _systems,
-                serializerRegistry: _serializerRegistry ?? new SerializerRegistry()
+                serializerRegistry: _serializerRegistry
             );
             world.DebugName = _debugName;
 

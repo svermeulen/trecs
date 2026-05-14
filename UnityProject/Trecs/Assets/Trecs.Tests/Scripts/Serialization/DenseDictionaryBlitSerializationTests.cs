@@ -3,6 +3,7 @@ using System.Diagnostics;
 using NUnit.Framework;
 using Trecs.Collections;
 using Trecs.Internal;
+using Trecs.Serialization;
 using Unity.Mathematics;
 using UnityEngine;
 using Debug = UnityEngine.Debug;

@@ -1,7 +1,8 @@
 using System;
 using Trecs.Collections;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for <see cref="DenseDictionary{TKey,TValue}"/> — the
@@ -40,7 +41,7 @@ namespace Trecs.Internal
             else
             {
                 // Fallback to element-by-element serialization
-                var numItems = reader.Read<int>("count");
+                var numItems = reader.Read<int>("Count");
 
                 if (dict == null)
                 {
@@ -54,8 +55,8 @@ namespace Trecs.Internal
 
                 for (int i = 0; i < numItems; i++)
                 {
-                    var key = reader.Read<TKey>("key");
-                    var value = reader.Read<TValue>("value");
+                    var key = reader.Read<TKey>("Key");
+                    var value = reader.Read<TValue>("Value");
 
                     dict.Add(key, value);
                 }
@@ -76,12 +77,12 @@ namespace Trecs.Internal
             else
             {
                 // Fallback to element-by-element serialization
-                writer.Write<int>("count", value.Count);
+                writer.Write<int>("Count", value.Count);
 
                 foreach (var item in value)
                 {
-                    writer.Write("key", item.Key);
-                    writer.Write("value", item.Value);
+                    writer.Write("Key", item.Key);
+                    writer.Write("Value", item.Value);
                 }
             }
         }

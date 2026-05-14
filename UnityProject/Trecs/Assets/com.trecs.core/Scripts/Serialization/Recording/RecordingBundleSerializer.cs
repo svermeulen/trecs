@@ -47,33 +47,33 @@ namespace Trecs.Internal
                 _buffer.ClearMemoryStream();
                 _buffer.StartWrite(version: bundle.Header.Version, includeTypeChecks: true);
 
-                _buffer.Write("header", bundle.Header);
+                _buffer.Write("Header", bundle.Header);
                 _buffer.WriteBytes(
                     "initialSnapshot",
                     bundle.InitialSnapshot,
                     0,
                     bundle.InitialSnapshot.Length
                 );
-                _buffer.Write("initialSnapshotChecksum", bundle.InitialSnapshotChecksum);
+                _buffer.Write("InitialSnapshotChecksum", bundle.InitialSnapshotChecksum);
                 _buffer.WriteBytes("inputQueue", bundle.InputQueue, 0, bundle.InputQueue.Length);
-                _buffer.Write("checksums", bundle.Checksums);
+                _buffer.Write("Checksums", bundle.Checksums);
 
-                _buffer.Write("anchorCount", bundle.Anchors.Count);
+                _buffer.Write("AnchorCount", bundle.Anchors.Count);
                 for (int i = 0; i < bundle.Anchors.Count; i++)
                 {
                     var anchor = bundle.Anchors[i];
-                    _buffer.Write("anchorFrame", anchor.FixedFrame);
-                    _buffer.Write("anchorChecksum", anchor.Checksum);
+                    _buffer.Write("AnchorFrame", anchor.FixedFrame);
+                    _buffer.Write("AnchorChecksum", anchor.Checksum);
                     _buffer.WriteBytes("anchorPayload", anchor.Payload, 0, anchor.Payload.Length);
                 }
 
-                _buffer.Write("snapshotCount", bundle.Snapshots.Count);
+                _buffer.Write("SnapshotCount", bundle.Snapshots.Count);
                 for (int i = 0; i < bundle.Snapshots.Count; i++)
                 {
                     var snapshot = bundle.Snapshots[i];
-                    _buffer.Write("snapshotFrame", snapshot.FixedFrame);
-                    _buffer.Write("snapshotChecksum", snapshot.Checksum);
-                    _buffer.WriteString("snapshotLabel", snapshot.Label);
+                    _buffer.Write("SnapshotFrame", snapshot.FixedFrame);
+                    _buffer.Write("SnapshotChecksum", snapshot.Checksum);
+                    _buffer.WriteString("SnapshotLabel", snapshot.Label);
                     _buffer.WriteBytes(
                         "snapshotPayload",
                         snapshot.Payload,
@@ -82,7 +82,7 @@ namespace Trecs.Internal
                     );
                 }
 
-                _buffer.Write<int>("bundleSentinel", TrecsConstants.RecordingSentinelValue);
+                _buffer.Write<int>("BundleSentinel", TrecsConstants.RecordingSentinelValue);
                 totalBytes = _buffer.EndWrite();
             }
             catch
@@ -141,18 +141,18 @@ namespace Trecs.Internal
                 LoadStreamIntoBuffer(stream);
                 _buffer.StartRead();
 
-                var header = _buffer.Read<BundleHeader>("header");
+                var header = _buffer.Read<BundleHeader>("Header");
                 var initialSnapshot = ReadByteArray("initialSnapshot");
-                var initialSnapshotChecksum = _buffer.Read<uint>("initialSnapshotChecksum");
+                var initialSnapshotChecksum = _buffer.Read<uint>("InitialSnapshotChecksum");
                 var inputQueue = ReadByteArray("inputQueue");
                 var checksums = _buffer.Read<DenseDictionary<int, uint>>("checksums");
 
-                var anchorCount = _buffer.Read<int>("anchorCount");
+                var anchorCount = _buffer.Read<int>("AnchorCount");
                 var anchors = new List<BundleAnchor>(anchorCount);
                 for (int i = 0; i < anchorCount; i++)
                 {
-                    var frame = _buffer.Read<int>("anchorFrame");
-                    var checksum = _buffer.Read<uint>("anchorChecksum");
+                    var frame = _buffer.Read<int>("AnchorFrame");
+                    var checksum = _buffer.Read<uint>("AnchorChecksum");
                     anchors.Add(
                         new BundleAnchor
                         {
@@ -163,13 +163,13 @@ namespace Trecs.Internal
                     );
                 }
 
-                var snapshotCount = _buffer.Read<int>("snapshotCount");
+                var snapshotCount = _buffer.Read<int>("SnapshotCount");
                 var snapshots = new List<BundleSnapshot>(snapshotCount);
                 for (int i = 0; i < snapshotCount; i++)
                 {
-                    var frame = _buffer.Read<int>("snapshotFrame");
-                    var checksum = _buffer.Read<uint>("snapshotChecksum");
-                    var label = _buffer.ReadString("snapshotLabel");
+                    var frame = _buffer.Read<int>("SnapshotFrame");
+                    var checksum = _buffer.Read<uint>("SnapshotChecksum");
+                    var label = _buffer.ReadString("SnapshotLabel");
                     snapshots.Add(
                         new BundleSnapshot
                         {
@@ -181,7 +181,7 @@ namespace Trecs.Internal
                     );
                 }
 
-                var sentinel = _buffer.Read<int>("bundleSentinel");
+                var sentinel = _buffer.Read<int>("BundleSentinel");
                 TrecsAssert.IsEqual(sentinel, TrecsConstants.RecordingSentinelValue);
 
                 _buffer.StopRead(verifySentinel: true);
@@ -238,7 +238,7 @@ namespace Trecs.Internal
             {
                 LoadStreamIntoBuffer(stream);
                 _buffer.StartRead();
-                var header = _buffer.Read<BundleHeader>("header");
+                var header = _buffer.Read<BundleHeader>("Header");
                 // Header sits at the start of the payload, so the rest of the
                 // payload (sentinel included) is unread on purpose. Skip
                 // sentinel verification for the same reason

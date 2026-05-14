@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for <see cref="List{T}"/>. Writes the item count followed by
@@ -12,7 +13,7 @@ namespace Trecs.Internal
 
         public void Deserialize(ref List<T> value, ISerializationReader reader)
         {
-            var numItems = reader.Read<int>("numItems");
+            var numItems = reader.Read<int>("Count");
 
             if (value == null)
             {
@@ -33,18 +34,18 @@ namespace Trecs.Internal
             for (int i = 0; i < numItems; i++)
             {
                 T item = default;
-                reader.Read("item", ref item);
+                reader.Read("Item", ref item);
                 value.Add(item);
             }
         }
 
         public void Serialize(in List<T> value, ISerializationWriter writer)
         {
-            writer.Write("numItems", value.Count);
+            writer.Write("Count", value.Count);
 
             foreach (var item in value)
             {
-                writer.Write("item", item);
+                writer.Write("Item", item);
             }
         }
     }

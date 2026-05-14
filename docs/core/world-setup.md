@@ -72,7 +72,7 @@ var settings = new WorldSettings
     StartPaused = false,
 
     // Events
-    TriggerRemoveEventsOnDispose = true,
+    RemoveAllEntitiesOnDispose = true,
 
     // Debug warnings
     WarnOnFixedUpdateFallingBehind = true,

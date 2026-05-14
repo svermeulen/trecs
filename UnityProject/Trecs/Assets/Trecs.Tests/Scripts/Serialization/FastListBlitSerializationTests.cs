@@ -297,9 +297,10 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void SvList_PreInitializedList_DeserializesCorrectly()
+        public void SvList_PreAllocatedEmptyList_DeserializesCorrectly()
         {
-            // Arrange - Test deserializing into an existing list that gets cleared
+            // Arrange - Test deserializing into a pre-allocated (but empty) list,
+            // which the serializer reuses instead of allocating a new one.
             var originalList = new FastList<int> { 1, 2, 3, 4, 5 };
             var flags = 0L;
 
@@ -312,8 +313,7 @@ namespace Trecs.Tests
             );
             _cacheHelper.ResetMemoryPosition();
 
-            // Create a pre-existing list with different data
-            var deserializedList = new FastList<int> { 99, 88, 77 };
+            var deserializedList = new FastList<int>();
 
             // Act
             _cacheHelper.ReadAll(ref deserializedList);
@@ -325,7 +325,7 @@ namespace Trecs.Tests
             {
                 TrecsAssert.That(
                     deserializedList[i] == originalList[i],
-                    $"Element at index {i} should match after deserializing into existing list"
+                    $"Element at index {i} should match after deserializing into pre-allocated list"
                 );
             }
         }

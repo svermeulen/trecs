@@ -260,19 +260,19 @@ namespace Trecs.Tests
             public void Serialize(IComponentArray array, ISerializationWriter writer)
             {
                 SerializeCallCount++;
-                writer.Write("count", array.Count);
+                writer.Write("Count", array.Count);
                 var typed = (IComponentArray<SerTestInt>)array;
                 for (int i = 0; i < array.Count; i++)
                 {
                     var val = typed.GetValueAtIndexByRef(i).Value;
-                    writer.Write("v", val);
+                    writer.Write("V", val);
                 }
             }
 
             public void Deserialize(IComponentArray array, ISerializationReader reader)
             {
                 DeserializeCallCount++;
-                var count = reader.Read<int>("count");
+                var count = reader.Read<int>("Count");
                 array.Clear();
                 if (count > 0)
                 {
@@ -282,7 +282,7 @@ namespace Trecs.Tests
                 var typed = (IComponentArray<SerTestInt>)array;
                 for (int i = 0; i < count; i++)
                 {
-                    typed.GetValueAtIndexByRef(i).Value = reader.Read<int>("v");
+                    typed.GetValueAtIndexByRef(i).Value = reader.Read<int>("V");
                 }
             }
         }

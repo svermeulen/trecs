@@ -52,7 +52,7 @@ namespace Trecs
         readonly SystemEnableState _systemEnableState = new();
         readonly List<ISystem> _systems;
 
-        bool _hasTriggeredAllRemoveEvents;
+        bool _hasRemovedAllEntities;
         bool _initializeCompleted;
         bool _systemAddLocked;
         int _accessorIdCounter = 1; // Start at 1 because zero can be like null
@@ -479,27 +479,46 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Fires all registered remove-event observers for every existing entity without actually
-        /// removing them. Call this before <see cref="Dispose"/> when
-        /// <see cref="WorldSettings.TriggerRemoveEventsOnDispose"/> is <c>false</c> and you need
-        /// cleanup callbacks to run while accessors are still valid.
+        /// Fires reactive <c>OnRemoved</c> observers for every non-global entity and zeros
+        /// out the per-group entity counts so subsequent queries see an empty world.
+        /// The backing component storage is not freed — the heap allocator tears it down
+        /// during <see cref="Dispose"/>; this method only flips the logical view.
+        /// <para>
+        /// The global singleton entity is intentionally untouched: its lifecycle is
+        /// co-terminus with the <see cref="World"/>, not with normal entity removal, so
+        /// firing <c>OnRemoved</c> for it would lie to subscribers, and zeroing its
+        /// count would break the user contract that the global entity remains queryable
+        /// and mutable from <c>OnShutdown</c>.
+        /// </para>
+        /// <para>
+        /// Called automatically from <see cref="Dispose"/> when
+        /// <see cref="WorldSettings.RemoveAllEntitiesOnDispose"/> is true. Call it
+        /// manually when that setting is false and you need cleanup callbacks to run
+        /// while accessors are still valid.
+        /// </para>
         /// </summary>
-        public void TriggerAllRemoveEvents()
+        public void RemoveAllEntities()
         {
-            TrecsAssert.That(!_hasTriggeredAllRemoveEvents);
-            _hasTriggeredAllRemoveEvents = true;
+            TrecsAssert.That(!_hasRemovedAllEntities);
+            _hasRemovedAllEntities = true;
 
-            // Note here that we do not actually remove in this case -
-            // We just trigger the remove events
             TrecsAssert.That(
                 !_worldInfo.GlobalGroup.IsNull
                     && _worldInfo.GlobalGroup.Index < _componentStore.GroupEntityComponentsDB.Length
             );
 
+            var globalGroup = _worldInfo.GlobalGroup;
+
+            // Pass 1: fire OnRemoved for every observed non-global group.
             foreach (
                 var (group, groupRemovedObservers) in _eventsManager.ReactiveOnRemovedObservers
             )
             {
+                if (group == globalGroup)
+                {
+                    continue;
+                }
+
                 var count = _querier.CountEntitiesInGroup(group);
 
                 if (count > 0)
@@ -513,8 +532,29 @@ namespace Trecs
                 }
             }
 
+            // Pass 2: zero out per-component-array counts on every non-global group, so any
+            // Query() / Count() / [ForEachEntity] call from a later OnShutdown hook sees an
+            // empty world. Component storage is left allocated; the heap allocator frees it
+            // during the rest of Dispose. We must iterate ALL groups here (not just observed
+            // ones) — a group with zero OnRemoved observers still needs its count zeroed so
+            // non-reactive queries return empty too.
+            var groupComponentsDB = _componentStore.GroupEntityComponentsDB;
+            var globalGroupIndex = globalGroup.Index;
+            for (int g = 0; g < groupComponentsDB.Length; g++)
+            {
+                if (g == globalGroupIndex)
+                {
+                    continue;
+                }
+
+                foreach (var (_, componentArray) in groupComponentsDB[g])
+                {
+                    componentArray.SetCount(0);
+                }
+            }
+
             _log.Debug(
-                "Called all ECS remove callbacks for all {0} groups",
+                "Removed all non-global entities for all {0} groups",
                 _worldInfo.AllGroups.Count
             );
         }
@@ -532,18 +572,14 @@ namespace Trecs
             }
 #endif
 
-            // OnShutdown user hooks run while the world is still fully functional —
-            // queries and events still work. Mirrors OnReady's "world is fully built"
-            // contract on the teardown side. Skipped if Initialize never completed,
-            // because no system reached Ready().
+            if (_settings.RemoveAllEntitiesOnDispose && _initializeCompleted)
+            {
+                RemoveAllEntities();
+            }
+
             if (_initializeCompleted)
             {
                 CallSystemShutdownHooks();
-            }
-
-            if (_settings.TriggerRemoveEventsOnDispose && _initializeCompleted)
-            {
-                TriggerAllRemoveEvents();
             }
 
             _entityInputQueue.Dispose();

@@ -228,7 +228,7 @@ public partial class ScoreSystem : ISystem
 
 ## OnShutdown hook
 
-Declare `partial void OnShutdown()` on a system to run one-time teardown when the world is disposed. The hook fires from `World.Dispose()` while the world is still fully functional (queries, events, and component reads still work), so it's the right place to release native resources, unsubscribe from external events, or flush final state.
+Declare `partial void OnShutdown()` on a system to run one-time teardown when the world is disposed. It's the right place to release native resources, unsubscribe from external events, or flush final state.
 
 ```csharp
 public partial class RendererSystem : ISystem
@@ -251,7 +251,13 @@ public partial class RendererSystem : ISystem
 
 `OnShutdown` runs in the **reverse** of `OnReady` order: phases reversed (`LatePresentation` → `Presentation` → `Fixed` → `Input` → `EarlyPresentation`), and within each phase, sorted systems traversed in reverse. This last-in-first-out teardown means a system that depends on another at `OnReady` time can rely on its dependency still being alive at `OnShutdown` time.
 
-`OnShutdown` is **not** called if `World.Initialize()` was never reached or did not complete.
+### What the world looks like inside OnShutdown
+
+Just before the first `OnShutdown` hook runs, `World.Dispose()` calls `World.RemoveAllEntities`, which fires reactive `OnRemoved` observers one last time for every non-global entity and then zeros out the per-group entity counts. The practical consequences inside `OnShutdown`:
+
+- **Queries for non-global entities return empty.** `World.Query()…Count()`, `[ForEachEntity]` iteration, and direct count APIs all see zero entities.
+- **The global singleton entity is intentionally untouched.** It remains queryable and mutable — `World.GlobalComponent<T>().Read` / `.Write` work as usual.
+- **Subscriptions and resources you allocated in `OnReady`** should be released here. Reactive subscriptions disposed in `OnShutdown` still received their final batch of events from `RemoveAllEntities` a moment earlier.
 
 ## Registering systems
 

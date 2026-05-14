@@ -370,9 +370,9 @@ namespace Trecs.Tests
 
             // Act - Write multiple values consecutively without clearing the stream
             _cacheHelper.StartWrite(TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.Write("value1", data1);
-            _cacheHelper.Write("value2", data2);
-            _cacheHelper.Write("value3", data3);
+            _cacheHelper.Write("Value1", data1);
+            _cacheHelper.Write("Value2", data2);
+            _cacheHelper.Write("Value3", data3);
             var bytesWritten = _cacheHelper.EndWrite();
 
             // Reset position to read from beginning
@@ -380,8 +380,8 @@ namespace Trecs.Tests
 
             // Read back all values in the same order
             _cacheHelper.StartRead();
-            var result1 = _cacheHelper.Read<int>("value1");
-            var result2 = _cacheHelper.Read<string>("value2");
+            var result1 = _cacheHelper.Read<int>("Value1");
+            var result2 = _cacheHelper.Read<string>("Value2");
             var result3 = _cacheHelper.Read<List<int>>("value3");
             _cacheHelper.StopRead(verifySentinel: true);
 

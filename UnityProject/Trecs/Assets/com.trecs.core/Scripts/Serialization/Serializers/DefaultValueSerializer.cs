@@ -1,4 +1,4 @@
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     internal sealed class DefaultValueSerializer<T> : ISerializer<T>
         where T : unmanaged

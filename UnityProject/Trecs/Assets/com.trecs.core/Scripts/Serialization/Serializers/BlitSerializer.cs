@@ -1,4 +1,6 @@
-namespace Trecs.Internal
+using Trecs.Internal;
+
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for any unmanaged (blittable) type — writes the struct as
@@ -14,22 +16,22 @@ namespace Trecs.Internal
 
         public void Deserialize(ref T value, ISerializationReader reader)
         {
-            reader.BlitRead("value", ref value);
+            reader.BlitRead("Value", ref value);
         }
 
         public void Serialize(in T value, ISerializationWriter writer)
         {
-            writer.BlitWrite("value", value);
+            writer.BlitWrite("Value", value);
         }
 
         public void DeserializeDelta(ref T value, in T baseValue, ISerializationReader reader)
         {
-            reader.BlitReadDelta("value", ref value, baseValue);
+            reader.BlitReadDelta("Value", ref value, baseValue);
         }
 
         public void SerializeDelta(in T value, in T baseValue, ISerializationWriter writer)
         {
-            writer.BlitWriteDelta("value", value, baseValue);
+            writer.BlitWriteDelta("Value", value, baseValue);
         }
     }
 }

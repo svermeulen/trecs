@@ -125,13 +125,13 @@ namespace Trecs.Internal
             }
 
             writer.WriteBit(false);
-            writer.Write("count", array.Count);
+            writer.Write("Count", array.Count);
             if (array.Count > 0)
             {
                 unsafe
                 {
                     writer.BlitWriteRawBytes(
-                        "values",
+                        "Values",
                         array.GetUnsafePtr(),
                         array.ElementSize * array.Count
                     );
@@ -149,7 +149,7 @@ namespace Trecs.Internal
                 return;
             }
 
-            var count = reader.Read<int>("count");
+            var count = reader.Read<int>("Count");
             array.Clear();
             if (count > 0)
             {
@@ -157,7 +157,7 @@ namespace Trecs.Internal
                 unsafe
                 {
                     reader.BlitReadRawBytes(
-                        "values",
+                        "Values",
                         array.GetUnsafePtr(),
                         array.ElementSize * count
                     );
@@ -171,7 +171,7 @@ namespace Trecs.Internal
             using (TrecsProfiling.Start("Serializing game state"))
             {
                 SerializeImpl(writer);
-                writer.Write("stream_guard", WorldStateStreamGuard);
+                writer.Write("StreamGuard", WorldStateStreamGuard);
             }
         }
 
@@ -207,7 +207,7 @@ namespace Trecs.Internal
 
             DeserializeImpl(reader);
 
-            var guard = reader.Read<int>("stream_guard");
+            var guard = reader.Read<int>("StreamGuard");
             TrecsAssert.IsEqual(guard, WorldStateStreamGuard);
 
             using (TrecsProfiling.Start("Triggering OnEcsDeserializeCompleted listeners"))
@@ -230,28 +230,28 @@ namespace Trecs.Internal
         )
         {
             var numSets = sets.Count;
-            writer.Write("numSets", numSets);
+            writer.Write("NumSets", numSets);
 
             for (int i = 0; i < numSets; i++)
             {
-                writer.Write("setId", sets.UnsafeKeys[i]);
+                writer.Write("SetId", sets.UnsafeKeys[i]);
 
                 ref readonly var set = ref sets.UnsafeValues[i];
                 var registeredGroups = set._registeredGroups;
                 var entriesPerGroup = set._entriesPerGroup;
 
                 var numGroups = registeredGroups.Length;
-                writer.Write("numGroups", numGroups);
+                writer.Write("NumGroups", numGroups);
 
                 for (int k = 0; k < numGroups; k++)
                 {
                     var group = registeredGroups[k];
-                    writer.Write("group", _worldDef.ToTagSet(group));
+                    writer.Write("Group", _worldDef.ToTagSet(group));
 
                     var groupEntities = entriesPerGroup[group.Index];
 
                     // This one looks ok to blit
-                    writer.Write("entityIdToDenseIndex", groupEntities._entityIdToDenseIndex);
+                    writer.Write("EntityIdToDenseIndex", groupEntities._entityIdToDenseIndex);
                 }
             }
         }
@@ -261,10 +261,10 @@ namespace Trecs.Internal
             in NativeList<EntityHandleMapElement> entityIdMap
         )
         {
-            writer.Write("count", entityIdMap.Length);
+            writer.Write("Count", entityIdMap.Length);
 
             writer.BlitWriteArrayPtr(
-                "entityIdMap",
+                "EntityIdMap",
                 (EntityHandleMapElement*)entityIdMap.GetUnsafeReadOnlyPtr(),
                 entityIdMap.Length
             );
@@ -277,18 +277,18 @@ namespace Trecs.Internal
         {
             var count = entityIndexToReferenceMap.Length;
 
-            writer.Write("count", count);
+            writer.Write("Count", count);
 
             for (int i = 0; i < count; i++)
             {
                 var tagSet = _worldDef.ToTagSet(GroupIndex.FromIndex(i));
-                writer.Write("group", tagSet);
+                writer.Write("Group", tagSet);
 
                 var list = entityIndexToReferenceMap[i];
-                writer.Write("listLength", list.Length);
+                writer.Write("ListLength", list.Length);
                 for (int j = 0; j < list.Length; j++)
                 {
-                    writer.Write("ref", list[j]);
+                    writer.Write("Ref", list[j]);
                 }
             }
         }
@@ -301,7 +301,7 @@ namespace Trecs.Internal
             WriteEntityIndexToReferenceMap(writer, entityHandlesMap._entityIndexToReferenceMap);
 
             int nextFreeIndex = entityHandlesMap._nextFreeIndex;
-            writer.Write("nextFreeIndex", nextFreeIndex);
+            writer.Write("NextFreeIndex", nextFreeIndex);
         }
 
         /// <remarks>
@@ -335,25 +335,25 @@ namespace Trecs.Internal
 
             var numItems = groupEntityComponentsDB.Length;
 
-            writer.Write("numItems", numItems);
+            writer.Write("Count", numItems);
 
             for (int i = 0; i < numItems; i++)
             {
                 var bytesBefore = writer.NumBytesWritten;
 
                 var group = GroupIndex.FromIndex(i);
-                writer.Write("group", _worldDef.ToTagSet(group));
+                writer.Write("Group", _worldDef.ToTagSet(group));
 
                 var subMap = groupEntityComponentsDB[i];
 
                 var numComponents = subMap.Count;
 
-                writer.Write("numComponents", numComponents);
+                writer.Write("NumComponents", numComponents);
 
                 for (int k = 0; k < numComponents; k++)
                 {
                     ComponentId componentId = subMap.UnsafeKeys[k].key;
-                    writer.Write("componentId", componentId);
+                    writer.Write("ComponentId", componentId);
 
                     if (!ShouldSkip(group, componentId, writer))
                     {
@@ -372,9 +372,9 @@ namespace Trecs.Internal
 
         void SerializeImpl(ISerializationWriter writer)
         {
-            writer.Write("rngSeed", _world.FixedRng);
-            writer.Write("fixedFrameCount", _world.SystemRunner._currentFixedFrameCount);
-            writer.Write("fixedElapsedTime", _world.SystemRunner._elapsedFixedTime);
+            writer.Write("RngSeed", _world.FixedRng);
+            writer.Write("FixedFrameCount", _world.SystemRunner._currentFixedFrameCount);
+            writer.Write("FixedElapsedTime", _world.SystemRunner._elapsedFixedTime);
 
             var bytesBefore = writer.NumBytesWritten;
 
@@ -455,18 +455,18 @@ namespace Trecs.Internal
                 if (routingIndex[i].Length > 0)
                     nonEmptyCount++;
             }
-            writer.Write("numRoutingEntries", nonEmptyCount);
+            writer.Write("NumRoutingEntries", nonEmptyCount);
 
             for (int i = 0; i < routingIndex.Length; i++)
             {
                 var list = routingIndex[i];
                 if (list.Length == 0)
                     continue;
-                writer.Write("group", _worldDef.ToTagSet(GroupIndex.FromIndex(i)));
-                writer.Write("listLength", list.Length);
+                writer.Write("Group", _worldDef.ToTagSet(GroupIndex.FromIndex(i)));
+                writer.Write("ListLength", list.Length);
                 for (int j = 0; j < list.Length; j++)
                 {
-                    writer.Write("setId", list[j]);
+                    writer.Write("SetId", list[j]);
                 }
             }
         }
@@ -476,7 +476,7 @@ namespace Trecs.Internal
             ISerializationReader reader
         )
         {
-            var numEntries = reader.Read<int>("numRoutingEntries");
+            var numEntries = reader.Read<int>("NumRoutingEntries");
 
             // Clear existing contents of every slot (reset to empty).
             for (int i = 0; i < routingIndex.Length; i++)
@@ -486,14 +486,14 @@ namespace Trecs.Internal
 
             for (int i = 0; i < numEntries; i++)
             {
-                var tagSet = reader.Read<TagSet>("group");
+                var tagSet = reader.Read<TagSet>("Group");
                 var group = _worldDef.ToGroupIndex(tagSet);
-                var listLength = reader.Read<int>("listLength");
+                var listLength = reader.Read<int>("ListLength");
                 ref var list = ref routingIndex.ElementAt(group.Index);
                 list.Resize(listLength, NativeArrayOptions.UninitializedMemory);
                 for (int j = 0; j < listLength; j++)
                 {
-                    list[j] = reader.Read<SetId>("setId");
+                    list[j] = reader.Read<SetId>("SetId");
                 }
             }
         }
@@ -503,32 +503,32 @@ namespace Trecs.Internal
             ISerializationReader reader
         )
         {
-            var numSets = reader.Read<int>("numSets");
+            var numSets = reader.Read<int>("NumSets");
             TrecsAssert.That(numSets >= 0);
 
             TrecsAssert.IsEqual(sets.Count, numSets);
 
             for (int i = 0; i < numSets; i++)
             {
-                var setId = reader.Read<SetId>("setId");
+                var setId = reader.Read<SetId>("SetId");
 
                 var currentSetId = sets.UnsafeKeys[i];
                 TrecsAssert.IsEqual(setId, currentSetId);
 
                 ref readonly var groupMap = ref sets.GetValueByRef(setId);
 
-                var numGroups = reader.Read<int>("numGroups");
+                var numGroups = reader.Read<int>("NumGroups");
                 groupMap.Clear();
 
                 for (int k = 0; k < numGroups; k++)
                 {
-                    var tagSet = reader.Read<TagSet>("group");
+                    var tagSet = reader.Read<TagSet>("Group");
                     var group = _worldDef.ToGroupIndex(tagSet);
 
                     var groupEntry = groupMap.GetSetGroupEntry(group);
 
                     // This one looks ok to blit
-                    reader.Read("entityIdToDenseIndex", ref groupEntry._entityIdToDenseIndex);
+                    reader.Read("EntityIdToDenseIndex", ref groupEntry._entityIdToDenseIndex);
                 }
             }
         }
@@ -538,7 +538,7 @@ namespace Trecs.Internal
             ref NativeList<EntityHandleMapElement> entityIdMap
         )
         {
-            var size = reader.Read<int>("count");
+            var size = reader.Read<int>("Count");
             TrecsAssert.That(size >= 0);
 
             if (entityIdMap.Capacity < size)
@@ -549,7 +549,7 @@ namespace Trecs.Internal
             entityIdMap.ResizeUninitialized(size);
 
             reader.BlitReadArrayPtr(
-                "entityIdMap",
+                "EntityIdMap",
                 (EntityHandleMapElement*)entityIdMap.GetUnsafePtr(),
                 size
             );
@@ -560,24 +560,24 @@ namespace Trecs.Internal
             NativeList<UnsafeList<int>> entityIndexToReferenceMap
         )
         {
-            var count = reader.Read<int>("count");
+            var count = reader.Read<int>("Count");
             TrecsAssert.That(count >= 0);
 
             TrecsAssert.IsEqual(count, entityIndexToReferenceMap.Length);
 
             for (int i = 0; i < count; i++)
             {
-                var tagSet = reader.Read<TagSet>("group");
+                var tagSet = reader.Read<TagSet>("Group");
                 var group = _worldDef.ToGroupIndex(tagSet);
 
                 ref var groupList = ref entityIndexToReferenceMap.ElementAt(group.Index);
 
-                var listLength = reader.Read<int>("listLength");
+                var listLength = reader.Read<int>("ListLength");
                 groupList.Clear();
                 groupList.Resize(listLength, NativeArrayOptions.ClearMemory);
                 for (int j = 0; j < listLength; j++)
                 {
-                    groupList[j] = reader.Read<int>("ref");
+                    groupList[j] = reader.Read<int>("Ref");
                 }
             }
         }
@@ -589,7 +589,7 @@ namespace Trecs.Internal
             ReadEntityHandlesMapInternal(reader, ref entityHandlesMap._entityHandleMap);
             ReadEntityIndexToReferenceMap(reader, entityHandlesMap._entityIndexToReferenceMap);
 
-            var nextFreeIndex = reader.Read<int>("nextFreeIndex");
+            var nextFreeIndex = reader.Read<int>("NextFreeIndex");
             TrecsAssert.That(nextFreeIndex >= 0);
 
             entityHandlesMap._nextFreeIndex.Set(nextFreeIndex);
@@ -599,21 +599,21 @@ namespace Trecs.Internal
         {
             var groupEntityComponentsDB = _world.ComponentStore.GroupEntityComponentsDB;
 
-            var numItems = reader.Read<int>("numItems");
+            var numItems = reader.Read<int>("Count");
             TrecsAssert.That(numItems >= 0);
 
             TrecsAssert.IsEqual(groupEntityComponentsDB.Length, numItems);
 
             for (int i = 0; i < numItems; i++)
             {
-                var tagSet = reader.Read<TagSet>("group");
+                var tagSet = reader.Read<TagSet>("Group");
                 var group = _worldDef.ToGroupIndex(tagSet);
 
                 TrecsAssert.IsEqual(GroupIndex.FromIndex(i), group);
 
                 var subMap = groupEntityComponentsDB[i];
 
-                var numComponents = reader.Read<int>("numComponents");
+                var numComponents = reader.Read<int>("NumComponents");
 
                 // Per-group component slots are normally lazy (created on
                 // first entity). Snapshot/recording reads need them in place
@@ -625,18 +625,34 @@ namespace Trecs.Internal
                     var template = _worldDef.GetResolvedTemplateForGroup(group);
                     _world.ComponentStore.PreallocateDBGroup(group, 0, template.ComponentBuilders);
                 }
+                else if (numComponents == 0 && subMap.Count > 0)
+                {
+                    // Snapshot pre-dates this group's first entity, but the
+                    // live world has since materialized it. Empty the arrays
+                    // so the group is logically empty at the restored frame.
+                    // Slots themselves stay (queries iterate Count, so an
+                    // empty-arrays group is observationally identical to a
+                    // never-materialized one) and there's nothing more to
+                    // read for this group on the wire.
+                    for (int k = 0; k < subMap.Count; k++)
+                    {
+                        subMap.UnsafeValues[k].Clear();
+                        subMap.UnsafeValues[k].SetCount(0);
+                    }
+                    continue;
+                }
 
                 TrecsAssert.That(
                     subMap.Count == numComponents,
-                    "Unexpected number of components for group {0}. Expected {1}, got {2}",
+                    "Unexpected number of components for group {0}. Expected {1} (from snapshot), got {2} (in memory)",
                     group,
-                    subMap.Count,
-                    numComponents
+                    numComponents,
+                    subMap.Count
                 );
 
                 for (int k = 0; k < numComponents; k++)
                 {
-                    var componentId = reader.Read<ComponentId>("componentId");
+                    var componentId = reader.Read<ComponentId>("ComponentId");
                     TrecsAssert.IsEqual(subMap.UnsafeKeys[k].key, componentId);
                     ReadComponentArray(subMap.UnsafeValues[k], reader);
                 }
@@ -646,8 +662,8 @@ namespace Trecs.Internal
         void DeserializeImpl(ISerializationReader reader)
         {
             reader.ReadInPlace("rngSeed", _world.FixedRng);
-            _world.SystemRunner._currentFixedFrameCount = reader.Read<int>("fixedFrameCount");
-            _world.SystemRunner._elapsedFixedTime = reader.Read<float>("fixedElapsedTime");
+            _world.SystemRunner._currentFixedFrameCount = reader.Read<int>("FixedFrameCount");
+            _world.SystemRunner._elapsedFixedTime = reader.Read<float>("FixedElapsedTime");
 
             using (TrecsProfiling.Start("Reading component arrays"))
             {

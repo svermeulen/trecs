@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for enum types. Writes the value as its underlying primitive
@@ -72,28 +73,28 @@ namespace Trecs.Internal
             switch (_underlyingKind)
             {
                 case UnderlyingKind.Byte:
-                    writer.Write<byte>("value", Unsafe.As<T, byte>(ref Unsafe.AsRef(in value)));
+                    writer.Write<byte>("Value", Unsafe.As<T, byte>(ref Unsafe.AsRef(in value)));
                     return;
                 case UnderlyingKind.SByte:
-                    writer.Write<sbyte>("value", Unsafe.As<T, sbyte>(ref Unsafe.AsRef(in value)));
+                    writer.Write<sbyte>("Value", Unsafe.As<T, sbyte>(ref Unsafe.AsRef(in value)));
                     return;
                 case UnderlyingKind.Short:
-                    writer.Write<short>("value", Unsafe.As<T, short>(ref Unsafe.AsRef(in value)));
+                    writer.Write<short>("Value", Unsafe.As<T, short>(ref Unsafe.AsRef(in value)));
                     return;
                 case UnderlyingKind.UShort:
-                    writer.Write<ushort>("value", Unsafe.As<T, ushort>(ref Unsafe.AsRef(in value)));
+                    writer.Write<ushort>("Value", Unsafe.As<T, ushort>(ref Unsafe.AsRef(in value)));
                     return;
                 case UnderlyingKind.Int:
-                    writer.Write<int>("value", Unsafe.As<T, int>(ref Unsafe.AsRef(in value)));
+                    writer.Write<int>("Value", Unsafe.As<T, int>(ref Unsafe.AsRef(in value)));
                     return;
                 case UnderlyingKind.UInt:
-                    writer.Write<uint>("value", Unsafe.As<T, uint>(ref Unsafe.AsRef(in value)));
+                    writer.Write<uint>("Value", Unsafe.As<T, uint>(ref Unsafe.AsRef(in value)));
                     return;
                 case UnderlyingKind.Long:
-                    writer.Write<long>("value", Unsafe.As<T, long>(ref Unsafe.AsRef(in value)));
+                    writer.Write<long>("Value", Unsafe.As<T, long>(ref Unsafe.AsRef(in value)));
                     return;
                 case UnderlyingKind.ULong:
-                    writer.Write<ulong>("value", Unsafe.As<T, ulong>(ref Unsafe.AsRef(in value)));
+                    writer.Write<ulong>("Value", Unsafe.As<T, ulong>(ref Unsafe.AsRef(in value)));
                     return;
             }
             throw new NotImplementedException();
@@ -104,28 +105,28 @@ namespace Trecs.Internal
             switch (_underlyingKind)
             {
                 case UnderlyingKind.Byte:
-                    Unsafe.As<T, byte>(ref value) = reader.Read<byte>("value");
+                    Unsafe.As<T, byte>(ref value) = reader.Read<byte>("Value");
                     return;
                 case UnderlyingKind.SByte:
-                    Unsafe.As<T, sbyte>(ref value) = reader.Read<sbyte>("value");
+                    Unsafe.As<T, sbyte>(ref value) = reader.Read<sbyte>("Value");
                     return;
                 case UnderlyingKind.Short:
-                    Unsafe.As<T, short>(ref value) = reader.Read<short>("value");
+                    Unsafe.As<T, short>(ref value) = reader.Read<short>("Value");
                     return;
                 case UnderlyingKind.UShort:
-                    Unsafe.As<T, ushort>(ref value) = reader.Read<ushort>("value");
+                    Unsafe.As<T, ushort>(ref value) = reader.Read<ushort>("Value");
                     return;
                 case UnderlyingKind.Int:
-                    Unsafe.As<T, int>(ref value) = reader.Read<int>("value");
+                    Unsafe.As<T, int>(ref value) = reader.Read<int>("Value");
                     return;
                 case UnderlyingKind.UInt:
-                    Unsafe.As<T, uint>(ref value) = reader.Read<uint>("value");
+                    Unsafe.As<T, uint>(ref value) = reader.Read<uint>("Value");
                     return;
                 case UnderlyingKind.Long:
-                    Unsafe.As<T, long>(ref value) = reader.Read<long>("value");
+                    Unsafe.As<T, long>(ref value) = reader.Read<long>("Value");
                     return;
                 case UnderlyingKind.ULong:
-                    Unsafe.As<T, ulong>(ref value) = reader.Read<ulong>("value");
+                    Unsafe.As<T, ulong>(ref value) = reader.Read<ulong>("Value");
                     return;
             }
             throw new NotImplementedException();
@@ -149,7 +150,7 @@ namespace Trecs.Internal
                             + "— not a declared constant of the enum"
                     );
                 }
-                writer.WriteDelta<byte>("value", valueIndex, baseIndex);
+                writer.WriteDelta<byte>("Value", valueIndex, baseIndex);
                 return;
             }
 
@@ -162,56 +163,56 @@ namespace Trecs.Internal
             {
                 case UnderlyingKind.Byte:
                     writer.WriteDelta<byte>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, byte>(ref Unsafe.AsRef(in value)),
                         Unsafe.As<T, byte>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.SByte:
                     writer.WriteDelta<sbyte>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, sbyte>(ref Unsafe.AsRef(in value)),
                         Unsafe.As<T, sbyte>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.Short:
                     writer.WriteDelta<short>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, short>(ref Unsafe.AsRef(in value)),
                         Unsafe.As<T, short>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.UShort:
                     writer.WriteDelta<ushort>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, ushort>(ref Unsafe.AsRef(in value)),
                         Unsafe.As<T, ushort>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.Int:
                     writer.WriteDelta<int>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, int>(ref Unsafe.AsRef(in value)),
                         Unsafe.As<T, int>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.UInt:
                     writer.WriteDelta<uint>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, uint>(ref Unsafe.AsRef(in value)),
                         Unsafe.As<T, uint>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.Long:
                     writer.WriteDelta<long>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, long>(ref Unsafe.AsRef(in value)),
                         Unsafe.As<T, long>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.ULong:
                     writer.WriteDelta<ulong>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, ulong>(ref Unsafe.AsRef(in value)),
                         Unsafe.As<T, ulong>(ref Unsafe.AsRef(in baseValue))
                     );
@@ -231,7 +232,7 @@ namespace Trecs.Internal
                             + $"'{baseValue}' — not a declared constant of the enum"
                     );
                 }
-                var index = reader.ReadDelta<byte>("value", baseIndex);
+                var index = reader.ReadDelta<byte>("Value", baseIndex);
                 if (index >= _indexToValue.Length)
                 {
                     throw new SerializationException(
@@ -252,49 +253,49 @@ namespace Trecs.Internal
             {
                 case UnderlyingKind.Byte:
                     Unsafe.As<T, byte>(ref value) = reader.ReadDelta<byte>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, byte>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.SByte:
                     Unsafe.As<T, sbyte>(ref value) = reader.ReadDelta<sbyte>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, sbyte>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.Short:
                     Unsafe.As<T, short>(ref value) = reader.ReadDelta<short>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, short>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.UShort:
                     Unsafe.As<T, ushort>(ref value) = reader.ReadDelta<ushort>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, ushort>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.Int:
                     Unsafe.As<T, int>(ref value) = reader.ReadDelta<int>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, int>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.UInt:
                     Unsafe.As<T, uint>(ref value) = reader.ReadDelta<uint>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, uint>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.Long:
                     Unsafe.As<T, long>(ref value) = reader.ReadDelta<long>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, long>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;
                 case UnderlyingKind.ULong:
                     Unsafe.As<T, ulong>(ref value) = reader.ReadDelta<ulong>(
-                        "value",
+                        "Value",
                         Unsafe.As<T, ulong>(ref Unsafe.AsRef(in baseValue))
                     );
                     return;

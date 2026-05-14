@@ -318,7 +318,7 @@ namespace Trecs
             TrecsAssert.That(_activeBlobs.Count == 0);
             TrecsAssert.That(_activeHandles.Count == 0);
 
-            _idCounter.Value = reader.Read<uint>("_handleCounter");
+            _idCounter.Value = reader.Read<uint>("HandleCounter");
             reader.ReadInPlace<DenseDictionary<BlobId, BlobInfo>>("_activeBlobs", _activeBlobs);
             reader.ReadInPlace<DenseDictionary<PtrHandle, BlobId>>(
                 "_activeHandles",
@@ -333,7 +333,7 @@ namespace Trecs
 
         public void Serialize(ISerializationWriter writer)
         {
-            writer.Write<uint>("_handleCounter", _idCounter.Value);
+            writer.Write<uint>("HandleCounter", _idCounter.Value);
             writer.Write<DenseDictionary<BlobId, BlobInfo>>("_activeBlobs", _activeBlobs);
             writer.Write<DenseDictionary<PtrHandle, BlobId>>("_activeHandles", _activeHandles);
         }

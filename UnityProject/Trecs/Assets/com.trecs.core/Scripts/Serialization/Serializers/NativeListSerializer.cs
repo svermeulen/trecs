@@ -1,7 +1,8 @@
+using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for <see cref="NativeList{T}"/> of unmanaged elements.
@@ -25,7 +26,7 @@ namespace Trecs.Internal
 
         public void Deserialize(ref NativeList<T> value, ISerializationReader reader)
         {
-            var length = reader.Read<int>("length");
+            var length = reader.Read<int>("Count");
             TrecsAssert.That(length >= 0);
 
             // IsCreated is best-effort but sufficient to drive the alloc-or-reuse
@@ -45,7 +46,7 @@ namespace Trecs.Internal
             unsafe
             {
                 reader.BlitReadArrayPtr(
-                    "value",
+                    "Value",
                     NativeListUnsafeUtility.GetUnsafePtr(value),
                     length
                 );
@@ -56,12 +57,12 @@ namespace Trecs.Internal
         {
             TrecsAssert.That(value.IsCreated);
 
-            writer.Write("length", value.Length);
+            writer.Write("Count", value.Length);
 
             unsafe
             {
                 writer.BlitWriteArrayPtr(
-                    "value",
+                    "Value",
                     NativeListUnsafeUtility.GetUnsafeReadOnlyPtr(value),
                     value.Length
                 );

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for <see cref="Dictionary{TKey,TValue}"/>. Writes entry count
@@ -14,7 +15,7 @@ namespace Trecs.Internal
 
         public void Deserialize(ref Dictionary<TKey, TValue> dict, ISerializationReader reader)
         {
-            var numItems = reader.Read<int>("count");
+            var numItems = reader.Read<int>("Count");
             TrecsAssert.That(numItems >= 0);
 
             if (dict == null)
@@ -31,8 +32,8 @@ namespace Trecs.Internal
 
             for (int i = 0; i < numItems; i++)
             {
-                var key = reader.Read<TKey>("key");
-                var value = reader.Read<TValue>("value");
+                var key = reader.Read<TKey>("Key");
+                var value = reader.Read<TValue>("Value");
 
                 dict.Add(key, value);
             }
@@ -40,12 +41,12 @@ namespace Trecs.Internal
 
         public void Serialize(in Dictionary<TKey, TValue> value, ISerializationWriter writer)
         {
-            writer.Write<int>("count", value.Count);
+            writer.Write<int>("Count", value.Count);
 
             foreach (var item in value)
             {
-                writer.Write("key", item.Key);
-                writer.Write("value", item.Value);
+                writer.Write("Key", item.Key);
+                writer.Write("Value", item.Value);
             }
         }
     }

@@ -1,7 +1,8 @@
 using System;
 using Trecs.Collections;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for <see cref="DenseHashSet{T}"/> — the deterministic,
@@ -15,7 +16,7 @@ namespace Trecs.Internal
 
         public void Deserialize(ref DenseHashSet<T> dict, ISerializationReader reader)
         {
-            var numItems = reader.Read<int>("count");
+            var numItems = reader.Read<int>("Count");
 
             if (dict == null)
             {
@@ -31,7 +32,7 @@ namespace Trecs.Internal
 
             for (int i = 0; i < numItems; i++)
             {
-                var value = reader.Read<T>("value");
+                var value = reader.Read<T>("Value");
 
                 dict.Add(value);
             }
@@ -39,11 +40,11 @@ namespace Trecs.Internal
 
         public void Serialize(in DenseHashSet<T> value, ISerializationWriter writer)
         {
-            writer.Write<int>("count", value.Count);
+            writer.Write<int>("Count", value.Count);
 
             foreach (var item in value)
             {
-                writer.Write("value", item);
+                writer.Write("Value", item);
             }
         }
     }

@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Unity.Mathematics;
-using UnityEngine;
+using Trecs.Serialization;
 
 namespace Trecs.Internal
 {
@@ -33,12 +32,6 @@ namespace Trecs.Internal
 
         readonly Dictionary<Type, ISerializer> _objectTypeToSerializer = new();
         readonly Dictionary<Type, ISerializerDelta> _objectTypeToSerializerDelta = new();
-
-        public SerializerRegistry()
-        {
-            RegisterCoreSerializers();
-            RegisterTrecsSerializers();
-        }
 
         static Type ExtractObjectType(Type serializerType, Type genericBase)
         {
@@ -153,78 +146,6 @@ namespace Trecs.Internal
             where TSerializer : ISerializerDelta, new()
         {
             RegisterSerializerDelta(new TSerializer());
-        }
-
-        void RegisterCoreSerializers()
-        {
-            RegisterBlit<ComponentId>();
-
-            // Primitives — blit is preferred over BinaryReader to avoid allocs
-            RegisterBlit<float>();
-            RegisterBlit<byte>(includeDelta: true);
-            RegisterBlit<sbyte>(includeDelta: true);
-            RegisterBlit<short>(includeDelta: true);
-            RegisterBlit<ushort>(includeDelta: true);
-            RegisterBlit<int>(includeDelta: true);
-            RegisterBlit<uint>(includeDelta: true);
-            RegisterBlit<ulong>(includeDelta: true);
-            RegisterBlit<long>(includeDelta: true);
-            RegisterBlit<double>(includeDelta: true);
-            RegisterBlit<decimal>(includeDelta: true);
-
-            // Math types
-            RegisterBlit<float2>(includeDelta: true);
-            RegisterBlit<int2>(includeDelta: true);
-            RegisterBlit<float3>(includeDelta: true);
-            RegisterBlit<quaternion>(includeDelta: true);
-            RegisterBlit<Vector3>(includeDelta: true);
-            RegisterBlit<Vector4>(includeDelta: true);
-
-            RegisterSerializer<BoolSerializer>();
-            RegisterSerializer<TypeSerializer>();
-            RegisterSerializer<StringSerializer>();
-        }
-
-        void RegisterTrecsSerializers()
-        {
-            // Heap serializers
-            RegisterSerializer<DenseDictionarySerializer<BlobId, NativeSharedHeap.BlobInfo>>();
-            RegisterSerializer<DenseDictionarySerializer<PtrHandle, BlobId>>();
-            RegisterBlit<PtrHandle>();
-            RegisterBlit<NativeSharedHeap.BlobInfo>();
-
-            RegisterSerializer<DenseDictionarySerializer<BlobId, SharedHeap.BlobInfo>>();
-            RegisterBlit<SharedHeap.BlobInfo>();
-
-            RegisterSerializer<ListSerializer<object>>();
-            RegisterSerializer<BlobManifestSerializer>();
-            RegisterSerializer<DenseDictionarySerializer<BlobId, BlobMetadata>>();
-            RegisterSerializer<BlobMetadataSerializer>();
-            RegisterBlit<BlobId>();
-
-            // Entity serializers
-            RegisterBlit<EntityHandleMapElement>();
-            RegisterBlit<EntityHandle>();
-            RegisterBlit<TagSet>();
-            // SetId is written by WorldStateSerializer.WriteSets /
-            // WriteSetRoutingIndex unconditionally — register it here so
-            // any world serialization works without callers having to
-            // remember to register it themselves. Same for the per-set
-            // entity-id-to-dense-index dictionary, written for each
-            // group's entries.
-            RegisterBlit<SetId>();
-            RegisterSerializer<NativeDenseDictionarySerializer<int, int>>();
-
-            // For EntityInputQueue
-            RegisterSerializer<DenseHashSetSerializer<EntityHandle>>();
-
-            RegisterSerializer<RngSerializer>();
-
-            RegisterSerializer<NativeDenseDictionarySerializer<uint, uint>>();
-            RegisterSerializer<NativeArraySerializer<uint>>();
-
-            SnapshotMetadata.RegisterSerializers(this);
-            BundleHeader.RegisterSerializers(this);
         }
 
         public void WriteTypeId(Type objectType, BinaryWriter writer)

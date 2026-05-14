@@ -177,9 +177,9 @@ namespace Trecs.Tests
 
             // Act - Write multiple values
             _cacheHelper.StartWrite(TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.Write("vec", vec);
-            _cacheHelper.Write("int", intVal);
-            _cacheHelper.WriteString("str", strVal);
+            _cacheHelper.Write("Vec", vec);
+            _cacheHelper.Write("Int", intVal);
+            _cacheHelper.WriteString("Str", strVal);
             _cacheHelper.EndWrite();
 
             // Reset position for reading
@@ -187,9 +187,9 @@ namespace Trecs.Tests
 
             // Read back
             _cacheHelper.StartRead();
-            var readVec = _cacheHelper.Read<Vector3>("vec");
-            var readInt = _cacheHelper.Read<int>("int");
-            var readStr = _cacheHelper.ReadString("str");
+            var readVec = _cacheHelper.Read<Vector3>("Vec");
+            var readInt = _cacheHelper.Read<int>("Int");
+            var readStr = _cacheHelper.ReadString("Str");
             _cacheHelper.StopRead(verifySentinel: true);
 
             // Assert

@@ -1,4 +1,6 @@
-namespace Trecs.Internal
+using Trecs.Internal;
+
+namespace Trecs.Serialization
 {
     public sealed class RingDequeSerializer<T> : ISerializer<RingDeque<T>>
     {
@@ -6,7 +8,7 @@ namespace Trecs.Internal
 
         public void Deserialize(ref RingDeque<T> value, ISerializationReader reader)
         {
-            var numItems = reader.Read<int>("count");
+            var numItems = reader.Read<int>("Count");
             TrecsAssert.That(numItems >= 0);
             TrecsAssert.That(
                 numItems <= 1000000,
@@ -28,18 +30,18 @@ namespace Trecs.Internal
             for (int i = 0; i < numItems; i++)
             {
                 T item = default;
-                reader.Read("item", ref item);
+                reader.Read("Item", ref item);
                 value.PushBack(item);
             }
         }
 
         public void Serialize(in RingDeque<T> value, ISerializationWriter writer)
         {
-            writer.Write("count", value.Length);
+            writer.Write("Count", value.Length);
 
             foreach (var item in value)
             {
-                writer.Write("item", item);
+                writer.Write("Item", item);
             }
         }
     }

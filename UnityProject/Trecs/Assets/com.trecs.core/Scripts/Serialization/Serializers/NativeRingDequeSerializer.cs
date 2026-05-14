@@ -1,6 +1,7 @@
+using Trecs.Internal;
 using Unity.Collections;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     public sealed class NativeRingDequeSerializer<T> : ISerializer<NativeRingDeque<T>>
         where T : unmanaged
@@ -9,7 +10,7 @@ namespace Trecs.Internal
 
         public void Deserialize(ref NativeRingDeque<T> value, ISerializationReader reader)
         {
-            var numItems = reader.Read<int>("count");
+            var numItems = reader.Read<int>("Count");
             TrecsAssert.That(numItems >= 0);
 
             if (!value.IsCreated)
@@ -27,18 +28,18 @@ namespace Trecs.Internal
             for (int i = 0; i < numItems; i++)
             {
                 T item = default;
-                reader.Read("item", ref item);
+                reader.Read("Item", ref item);
                 value.PushBack(item);
             }
         }
 
         public void Serialize(in NativeRingDeque<T> value, ISerializationWriter writer)
         {
-            writer.Write("count", value.Length);
+            writer.Write("Count", value.Length);
 
             foreach (var item in value)
             {
-                writer.Write("item", item);
+                writer.Write("Item", item);
             }
         }
     }

@@ -33,14 +33,14 @@ namespace Trecs.Tests
                 );
 
                 // Write various types of data
-                writer.Write("playerPosition", new Vector3(10.5f, 20.3f, 30.1f));
-                writer.Write("playerHealth", 100);
-                writer.Write("playerLevel", 42);
-                writer.WriteString("playerName", "JohnDoe123");
+                writer.Write("PlayerPosition", new Vector3(10.5f, 20.3f, 30.1f));
+                writer.Write("PlayerHealth", 100);
+                writer.Write("PlayerLevel", 42);
+                writer.WriteString("PlayerName", "JohnDoe123");
 
                 // Write a collection
                 var inventory = new List<int> { 1001, 1002, 1003, 1004, 1005 };
-                writer.Write("inventory", inventory);
+                writer.Write("Inventory", inventory);
 
                 // Write a dictionary
                 var stats = new Dictionary<string, float>
@@ -50,7 +50,7 @@ namespace Trecs.Tests
                     { "intelligence", 18.7f },
                     { "stamina", 14.2f },
                 };
-                writer.Write("stats", stats);
+                writer.Write("Stats", stats);
 
                 // Finalize the write - this will output the memory report
                 writer.Complete(binaryWriter);
@@ -93,7 +93,7 @@ namespace Trecs.Tests
                 {
                     largeList.Add(i * 17);
                 }
-                writer.Write("largeDataSet", largeList);
+                writer.Write("LargeDataSet", largeList);
 
                 writer.Complete(binaryWriter);
 

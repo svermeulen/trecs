@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using NAssert = NUnit.Framework.Assert;
@@ -9,12 +10,25 @@ namespace Trecs.Tests
         public static readonly List<string> ReadyOrder = new();
         public static readonly List<string> ShutdownOrder = new();
         public static int WorldReadableInsideShutdown;
+        public static int NonGlobalTagCountInsideShutdown = -1;
+        public static int NonGlobalQueryCountInsideShutdown = -1;
+        public static int GlobalReadValueInsideShutdown = int.MinValue;
+        public static int GlobalReadBackAfterWriteInsideShutdown = int.MinValue;
+        public static int GlobalGroupOnRemovedCalls;
+        public static IDisposable GlobalGroupOnRemovedSubscription;
 
         public static void Clear()
         {
             ReadyOrder.Clear();
             ShutdownOrder.Clear();
             WorldReadableInsideShutdown = 0;
+            NonGlobalTagCountInsideShutdown = -1;
+            NonGlobalQueryCountInsideShutdown = -1;
+            GlobalReadValueInsideShutdown = int.MinValue;
+            GlobalReadBackAfterWriteInsideShutdown = int.MinValue;
+            GlobalGroupOnRemovedCalls = 0;
+            GlobalGroupOnRemovedSubscription?.Dispose();
+            GlobalGroupOnRemovedSubscription = null;
         }
     }
 
@@ -93,22 +107,75 @@ namespace Trecs.Tests
 
         partial void OnShutdown()
         {
-            // The world must still be functional inside OnShutdown — counts and
-            // queries must not throw. Record success so the test can assert it.
+            // World schema (groups, templates) is unaffected by RemoveAllEntities and
+            // remains readable inside OnShutdown. The global entity also remains live;
+            // only non-global entity queries return empty here.
             var allGroups = World.WorldInfo.AllGroups;
             var groupCount = allGroups.Count;
             TestShutdownLog.WorldReadableInsideShutdown = groupCount > 0 ? 1 : -1;
         }
     }
 
+    partial class ShutdownNonGlobalQueryCheckSystem : ISystem
+    {
+        public void Execute() { }
+
+        partial void OnShutdown()
+        {
+            // RemoveAllEntities ran just before this. Non-global queries must see an empty world.
+            TestShutdownLog.NonGlobalTagCountInsideShutdown = World.CountEntitiesWithTags(
+                TestTags.Alpha
+            );
+            TestShutdownLog.NonGlobalQueryCountInsideShutdown = World
+                .Query()
+                .WithTags(TestTags.Alpha)
+                .Count();
+        }
+    }
+
+    partial class ShutdownGlobalMutationSystem : ISystem
+    {
+        public void Execute() { }
+
+        partial void OnShutdown()
+        {
+            // Global entity remains queryable AND mutable in OnShutdown.
+            ref readonly var initial = ref World.GlobalComponent<TestGlobalInt>().Read;
+            TestShutdownLog.GlobalReadValueInsideShutdown = initial.Value;
+
+            ref var writable = ref World.GlobalComponent<TestGlobalInt>().Write;
+            writable.Value = 999;
+
+            ref readonly var readBack = ref World.GlobalComponent<TestGlobalInt>().Read;
+            TestShutdownLog.GlobalReadBackAfterWriteInsideShutdown = readBack.Value;
+        }
+    }
+
+    partial class ShutdownGlobalGroupOnRemovedSystem : ISystem
+    {
+        public void Execute() { }
+
+        partial void OnReady()
+        {
+            TestShutdownLog.GlobalGroupOnRemovedSubscription = World
+                .Events.InGroup(World.WorldInfo.GlobalGroup)
+                .OnRemoved(
+                    (GroupIndex _, EntityRange _) => TestShutdownLog.GlobalGroupOnRemovedCalls++
+                );
+        }
+    }
+
     [TestFixture]
     public class SystemShutdownTests
     {
-        TestEnvironment CreateEnvWithSystems(params ISystem[] systems)
+        TestEnvironment CreateEnvWithSystems(params ISystem[] systems) =>
+            CreateEnvWithSystems(TrecsTemplates.Globals.Template, systems);
+
+        TestEnvironment CreateEnvWithSystems(Template globalsTemplate, params ISystem[] systems)
         {
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(globalsTemplate)
                 .AddTemplate(TestTemplates.SimpleAlpha)
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
@@ -181,6 +248,71 @@ namespace Trecs.Tests
                 1,
                 TestShutdownLog.WorldReadableInsideShutdown,
                 "Expected World to be queryable inside OnShutdown."
+            );
+        }
+
+        [Test]
+        public void OnShutdown_NonGlobalQueries_ReturnEmpty()
+        {
+            var env = CreateEnvWithSystems(new ShutdownNonGlobalQueryCheckSystem());
+
+            // Spawn a non-global entity so queries would return >0 if RemoveAllEntities
+            // hadn't logically cleared the world before the shutdown hook ran.
+            var a = env.Accessor;
+            a.AddEntity(TestTags.Alpha).AssertComplete();
+            a.SubmitEntities();
+            NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
+
+            env.Dispose();
+
+            NAssert.AreEqual(
+                0,
+                TestShutdownLog.NonGlobalTagCountInsideShutdown,
+                "CountEntitiesWithTags should report 0 inside OnShutdown after RemoveAllEntities ran."
+            );
+            NAssert.AreEqual(
+                0,
+                TestShutdownLog.NonGlobalQueryCountInsideShutdown,
+                "Query()...Count() should report 0 inside OnShutdown after RemoveAllEntities ran."
+            );
+        }
+
+        [Test]
+        public void OnShutdown_GlobalEntity_RemainsQueryableAndMutable()
+        {
+            var env = CreateEnvWithSystems(
+                TestGlobalsTemplate.Template,
+                new ShutdownGlobalMutationSystem()
+            );
+
+            // Seed the global component so we can assert the OnShutdown read sees it.
+            env.Accessor.GlobalComponent<TestGlobalInt>().Write.Value = 7;
+
+            env.Dispose();
+
+            NAssert.AreEqual(
+                7,
+                TestShutdownLog.GlobalReadValueInsideShutdown,
+                "Global component read inside OnShutdown should see the value written before dispose."
+            );
+            NAssert.AreEqual(
+                999,
+                TestShutdownLog.GlobalReadBackAfterWriteInsideShutdown,
+                "Global component must remain mutable inside OnShutdown."
+            );
+        }
+
+        [Test]
+        public void OnShutdown_GlobalGroupOnRemoved_DoesNotFire()
+        {
+            var env = CreateEnvWithSystems(new ShutdownGlobalGroupOnRemovedSystem());
+
+            env.Dispose();
+
+            NAssert.AreEqual(
+                0,
+                TestShutdownLog.GlobalGroupOnRemovedCalls,
+                "OnRemoved registered against the global group must not fire during world disposal."
             );
         }
 

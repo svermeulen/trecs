@@ -1,50 +1,50 @@
-namespace Trecs.Internal
+using System;
+using Trecs.Internal;
+
+namespace Trecs.Serialization
 {
     /// <summary>
-    /// Serializer for typed arrays (<typeparamref name="T"/> is an array type,
-    /// <typeparamref name="TElem"/> its element type). Writes the length
+    /// Serializer for arrays of managed/custom elements. Writes the length
     /// followed by each element via the registered serializer for
-    /// <typeparamref name="TElem"/>. For arrays of unmanaged types prefer the
-    /// blit path — this serializer is for arrays of managed/custom elements.
+    /// <typeparamref name="TElem"/>. For arrays of unmanaged types use
+    /// <see cref="BlitArraySerializer{TElem}"/> instead, which writes the
+    /// elements as a single blit and avoids per-element framing.
     /// </summary>
-    public sealed class ArraySerializer<T, TElem> : ISerializer<T>
+    public sealed class ArraySerializer<TElem> : ISerializer<TElem[]>
+        where TElem : class
     {
         public ArraySerializer() { }
 
-        public void Serialize(in T value, ISerializationWriter writer)
+        public void Serialize(in TElem[] value, ISerializationWriter writer)
         {
-            var valueArray = (TElem[])(object)value;
+            TrecsAssert.IsNotNull(value);
 
-            TrecsAssert.IsNotNull(valueArray);
+            writer.Write("Count", value.Length);
 
-            writer.Write("length", valueArray.Length);
-
-            for (int i = 0; i < valueArray.Length; i++)
+            for (int i = 0; i < value.Length; i++)
             {
-                writer.Write("item", valueArray[i]);
+                writer.Write("Item", value[i]);
             }
         }
 
-        public void Deserialize(ref T value, ISerializationReader reader)
+        public void Deserialize(ref TElem[] value, ISerializationReader reader)
         {
-            var length = reader.Read<int>("length");
+            var length = reader.Read<int>("Count");
 
             if (length == 0)
             {
-                value = (T)(object)new TElem[0];
+                value = Array.Empty<TElem>();
                 return;
             }
 
-            var array = new TElem[length];
+            value = new TElem[length];
 
             for (int i = 0; i < length; i++)
             {
                 TElem item = default;
-                reader.Read("item", ref item);
-                array[i] = item;
+                reader.Read("Item", ref item);
+                value[i] = item;
             }
-
-            value = (T)(object)array;
         }
     }
 }

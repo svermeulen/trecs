@@ -1,7 +1,8 @@
+using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for <see cref="NativeArray{T}"/> of unmanaged elements.
@@ -29,7 +30,7 @@ namespace Trecs.Internal
             // deserializing" mistake which would otherwise leak the prior allocation.
             TrecsAssert.That(!value.IsCreated);
 
-            var length = reader.Read<int>("length");
+            var length = reader.Read<int>("Count");
             TrecsAssert.That(length >= 0);
 
             value = new NativeArray<T>(length, _allocator, NativeArrayOptions.UninitializedMemory);
@@ -37,7 +38,7 @@ namespace Trecs.Internal
             unsafe
             {
                 reader.BlitReadArrayPtr(
-                    "value",
+                    "Value",
                     (T*)NativeArrayUnsafeUtility.GetUnsafePtr(value),
                     length
                 );
@@ -48,12 +49,12 @@ namespace Trecs.Internal
         {
             TrecsAssert.That(value.IsCreated);
 
-            writer.Write("length", value.Length);
+            writer.Write("Count", value.Length);
 
             unsafe
             {
                 writer.BlitWriteArrayPtr(
-                    "value",
+                    "Value",
                     (T*)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(value),
                     value.Length
                 );

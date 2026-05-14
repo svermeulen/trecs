@@ -471,11 +471,11 @@ namespace Trecs.Internal
             TrecsAssert.That(!_isDisposed);
             TrecsAssert.That(UnityThreadHelper.IsMainThread);
 
-            writer.Write<int>("version", SerializationVersion);
-            writer.Write<int>("liveCount", _liveCount);
-            writer.Write<int>("sideTableLength", _sideTableLength);
-            writer.Write<int>("nextFreshSideTableSlot", _nextFreshSideTableSlot);
-            writer.Write<int>("numPages", _pages.Count);
+            writer.Write<int>("Version", SerializationVersion);
+            writer.Write<int>("LiveCount", _liveCount);
+            writer.Write<int>("SideTableLength", _sideTableLength);
+            writer.Write<int>("NextFreshSideTableSlot", _nextFreshSideTableSlot);
+            writer.Write<int>("NumPages", _pages.Count);
 
             // Pages: dense iteration over pageId so null slots round-trip and pageId
             // values stay stable across save/load.
@@ -484,25 +484,25 @@ namespace Trecs.Internal
                 var page = _pages[pageId];
                 if (page == null)
                 {
-                    writer.Write<byte>("kind", (byte)PageKind.Null);
+                    writer.Write<byte>("Kind", (byte)PageKind.Null);
                     continue;
                 }
 
                 var kind = page.BucketIdx >= 0 ? PageKind.Bucket : PageKind.SingleSlot;
-                writer.Write<byte>("kind", (byte)kind);
-                writer.Write<int>("slotSize", page.SlotSize);
-                writer.Write<int>("slotCount", page.SlotCount);
-                writer.Write<int>("freeCount", page.FreeCount);
-                writer.Write<int>("alignment", page.Alignment);
-                writer.Write<int>("bucketIdx", page.BucketIdx);
+                writer.Write<byte>("Kind", (byte)kind);
+                writer.Write<int>("SlotSize", page.SlotSize);
+                writer.Write<int>("SlotCount", page.SlotCount);
+                writer.Write<int>("FreeCount", page.FreeCount);
+                writer.Write<int>("Alignment", page.Alignment);
+                writer.Write<int>("BucketIdx", page.BucketIdx);
 
                 var pageBytes =
                     page.BucketIdx >= 0 ? page.SlotSize * page.SlotCount : page.SlotSize;
-                writer.BlitWriteRawBytes("data", page.Address.ToPointer(), pageBytes);
+                writer.BlitWriteRawBytes("Data", page.Address.ToPointer(), pageBytes);
             }
 
             // Sparse side-table entries: live entries only, indexed by slot.
-            writer.Write<int>("numLiveEntries", _liveCount);
+            writer.Write<int>("NumLiveEntries", _liveCount);
             int liveEmitted = 0;
             for (int i = 1; i < _sideTableLength; i++)
             {
@@ -510,10 +510,10 @@ namespace Trecs.Internal
                 if (entry.InUse != 1)
                     continue;
 
-                writer.Write<int>("slotIdx", i);
+                writer.Write<int>("SlotIdx", i);
                 var payload = ToPayload(entry);
                 writer.BlitWriteRawBytes(
-                    "entry",
+                    "Entry",
                     UnsafeUtility.AddressOf(ref payload),
                     UnsafeUtility.SizeOf<NativeChunkStoreEntryPayload>()
                 );
@@ -545,13 +545,13 @@ namespace Trecs.Internal
             for (int b = 0; b < _buckets.Length; b++)
             {
                 var bucket = _buckets[b];
-                writer.Write<int>("bucketFreeSlotsCount", bucket.FreeSlots.Count);
+                writer.Write<int>("BucketFreeSlotsCount", bucket.FreeSlots.Count);
                 var slots = bucket.FreeSlots.ToArray(); // top-to-bottom
                 // Write bottom-to-top so a reader can Push in stream order.
                 for (int j = slots.Length - 1; j >= 0; j--)
                 {
-                    writer.Write<int>("pageId", slots[j].PageId);
-                    writer.Write<int>("slotIdx", slots[j].SlotIdx);
+                    writer.Write<int>("PageId", slots[j].PageId);
+                    writer.Write<int>("SlotIdx", slots[j].SlotIdx);
                 }
             }
 
@@ -587,7 +587,7 @@ namespace Trecs.Internal
             // bucket pages and generation-bumped slots behind.
             ResetForDeserialize();
 
-            var version = reader.Read<int>("version");
+            var version = reader.Read<int>("Version");
             TrecsAssert.That(
                 version == SerializationVersion,
                 "Deserialize: chunk-store snapshot version {0} does not match expected {1}",
@@ -595,10 +595,10 @@ namespace Trecs.Internal
                 SerializationVersion
             );
 
-            var liveCount = reader.Read<int>("liveCount");
-            var sideTableLength = reader.Read<int>("sideTableLength");
-            var nextFreshSideTableSlot = reader.Read<int>("nextFreshSideTableSlot");
-            var numPages = reader.Read<int>("numPages");
+            var liveCount = reader.Read<int>("LiveCount");
+            var sideTableLength = reader.Read<int>("SideTableLength");
+            var nextFreshSideTableSlot = reader.Read<int>("NextFreshSideTableSlot");
+            var numPages = reader.Read<int>("NumPages");
 
             // Materialise side-table chunks up to the saved length. Chunks are zero-init
             // so unused slots read as default (InUse=0) without any extra work.
@@ -607,7 +607,7 @@ namespace Trecs.Internal
             // Pages: allocate fresh persistent memory, blit bytes in, rebuild Page objects.
             for (int pageId = 0; pageId < numPages; pageId++)
             {
-                var kind = (PageKind)reader.Read<byte>("kind");
+                var kind = (PageKind)reader.Read<byte>("Kind");
                 if (kind == PageKind.Null)
                 {
                     _pages.Add(null);
@@ -616,11 +616,11 @@ namespace Trecs.Internal
                     continue;
                 }
 
-                var slotSize = reader.Read<int>("slotSize");
-                var slotCount = reader.Read<int>("slotCount");
-                var freeCount = reader.Read<int>("freeCount");
-                var alignment = reader.Read<int>("alignment");
-                var bucketIdx = reader.Read<int>("bucketIdx");
+                var slotSize = reader.Read<int>("SlotSize");
+                var slotCount = reader.Read<int>("SlotCount");
+                var freeCount = reader.Read<int>("FreeCount");
+                var alignment = reader.Read<int>("Alignment");
+                var bucketIdx = reader.Read<int>("BucketIdx");
 
                 var pageBytes = bucketIdx >= 0 ? slotSize * slotCount : slotSize;
                 // Match the size/items convention used by AllocateNewPageForBucket and
@@ -638,7 +638,7 @@ namespace Trecs.Internal
                     pageId,
                     pageBytes
                 );
-                reader.BlitReadRawBytes("data", pagePtr, pageBytes);
+                reader.BlitReadRawBytes("Data", pagePtr, pageBytes);
 
                 var page = new Page
                 {
@@ -657,7 +657,7 @@ namespace Trecs.Internal
             }
 
             // Sparse side-table entries.
-            var numLiveEntries = reader.Read<int>("numLiveEntries");
+            var numLiveEntries = reader.Read<int>("NumLiveEntries");
             TrecsAssert.That(
                 numLiveEntries == liveCount,
                 "Deserialize: numLiveEntries {0} does not match liveCount {1}",
@@ -668,7 +668,7 @@ namespace Trecs.Internal
             var payloadSize = UnsafeUtility.SizeOf<NativeChunkStoreEntryPayload>();
             for (int n = 0; n < numLiveEntries; n++)
             {
-                var slotIdx = reader.Read<int>("slotIdx");
+                var slotIdx = reader.Read<int>("SlotIdx");
                 TrecsAssert.That(
                     slotIdx > 0 && slotIdx < sideTableLength,
                     "Deserialize: slotIdx {0} out of range [1, {1})",
@@ -677,7 +677,7 @@ namespace Trecs.Internal
                 );
 
                 NativeChunkStoreEntryPayload payload = default;
-                reader.BlitReadRawBytes("entry", UnsafeUtility.AddressOf(ref payload), payloadSize);
+                reader.BlitReadRawBytes("Entry", UnsafeUtility.AddressOf(ref payload), payloadSize);
 
                 var entry = FromPayload(payload);
                 // Patch the Address to the freshly-allocated page memory. The saved
@@ -712,11 +712,11 @@ namespace Trecs.Internal
             for (int b = 0; b < _buckets.Length; b++)
             {
                 var bucket = _buckets[b];
-                var count = reader.Read<int>("bucketFreeSlotsCount");
+                var count = reader.Read<int>("BucketFreeSlotsCount");
                 for (int j = 0; j < count; j++)
                 {
-                    var pageId = reader.Read<int>("pageId");
-                    var slotIdx = reader.Read<int>("slotIdx");
+                    var pageId = reader.Read<int>("PageId");
+                    var slotIdx = reader.Read<int>("SlotIdx");
                     bucket.FreeSlots.Push((pageId, slotIdx));
                 }
             }
@@ -827,7 +827,7 @@ namespace Trecs.Internal
             var arr = stack.ToArray();
             for (int i = arr.Length - 1; i >= 0; i--)
             {
-                writer.Write<int>("item", arr[i]);
+                writer.Write<int>("Item", arr[i]);
             }
         }
 
@@ -836,29 +836,29 @@ namespace Trecs.Internal
             var count = reader.Read<int>(name + "Count");
             for (int i = 0; i < count; i++)
             {
-                stack.Push(reader.Read<int>("item"));
+                stack.Push(reader.Read<int>("Item"));
             }
         }
 
         void WriteSideTableFreeSlots(ISerializationWriter writer)
         {
-            writer.Write<int>("freeSideTableSlotsCount", _freeSideTableSlots.Count);
+            writer.Write<int>("FreeSideTableSlotsCount", _freeSideTableSlots.Count);
             var arr = _freeSideTableSlots.ToArray();
             for (int i = arr.Length - 1; i >= 0; i--)
             {
                 var slotIdx = arr[i];
-                writer.Write<int>("slotIdx", slotIdx);
-                writer.Write<byte>("generation", GetEntry(slotIdx).Generation);
+                writer.Write<int>("SlotIdx", slotIdx);
+                writer.Write<byte>("Generation", GetEntry(slotIdx).Generation);
             }
         }
 
         void ReadSideTableFreeSlots(ISerializationReader reader)
         {
-            var count = reader.Read<int>("freeSideTableSlotsCount");
+            var count = reader.Read<int>("FreeSideTableSlotsCount");
             for (int i = 0; i < count; i++)
             {
-                var slotIdx = reader.Read<int>("slotIdx");
-                var generation = reader.Read<byte>("generation");
+                var slotIdx = reader.Read<int>("SlotIdx");
+                var generation = reader.Read<byte>("Generation");
                 _freeSideTableSlots.Push(slotIdx);
                 // Patch the slot's Generation byte so the next Alloc that recycles this
                 // slot mints generation+1, matching the no-save-and-load behaviour.

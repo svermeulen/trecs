@@ -1,7 +1,8 @@
 using System;
 using Trecs.Collections;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Interface for blit serialization of DenseDictionary without unmanaged constraint.
@@ -33,8 +34,8 @@ namespace Trecs.Internal
             var bucketsCapacity = dict.UnsafeBucketsCapacity;
 
             // Write sizes first so deserialize can allocate before reading arrays
-            writer.BlitWrite("_freeValueCellIndex", dict.UnsafeFreeValueCellIndex);
-            writer.BlitWrite("_bucketsCapacity", bucketsCapacity);
+            writer.BlitWrite("FreeValueCellIndex", dict.UnsafeFreeValueCellIndex);
+            writer.BlitWrite("BucketsCapacity", bucketsCapacity);
 
             // Blit the Node array (contains hashcode, previous, key)
             var nodesBuffer = dict.UnsafeKeys;
@@ -42,7 +43,7 @@ namespace Trecs.Internal
             {
                 fixed (DenseDictionary<TKey, TValue>.Node* ptr = nodesBuffer)
                 {
-                    writer.BlitWriteArrayPtr("_valuesInfo", ptr, count);
+                    writer.BlitWriteArrayPtr("ValuesInfo", ptr, count);
                 }
             }
 
@@ -52,7 +53,7 @@ namespace Trecs.Internal
             {
                 fixed (TValue* ptr = valuesBuffer)
                 {
-                    writer.BlitWriteArrayPtr("_values", ptr, count);
+                    writer.BlitWriteArrayPtr("Values", ptr, count);
                 }
             }
 
@@ -62,12 +63,12 @@ namespace Trecs.Internal
             {
                 fixed (int* ptr = bucketsBuffer)
                 {
-                    writer.BlitWriteArrayPtr("_buckets", ptr, bucketsCapacity);
+                    writer.BlitWriteArrayPtr("Buckets", ptr, bucketsCapacity);
                 }
             }
 
-            writer.BlitWrite("_collisions", dict.UnsafeCollisions);
-            writer.BlitWrite("_fastModBucketsMultiplier", dict.UnsafeFastModBucketsMultiplier);
+            writer.BlitWrite("Collisions", dict.UnsafeCollisions);
+            writer.BlitWrite("FastModBucketsMultiplier", dict.UnsafeFastModBucketsMultiplier);
         }
 
         public void DeserializeBlit(
@@ -76,10 +77,10 @@ namespace Trecs.Internal
         )
         {
             // Read sizes first
-            reader.BlitRead("_freeValueCellIndex", ref dict.UnsafeFreeValueCellIndex);
+            reader.BlitRead("FreeValueCellIndex", ref dict.UnsafeFreeValueCellIndex);
 
             int bucketsCapacity = 0;
-            reader.BlitRead("_bucketsCapacity", ref bucketsCapacity);
+            reader.BlitRead("BucketsCapacity", ref bucketsCapacity);
             TrecsAssert.That(bucketsCapacity >= 0);
 
             var count = dict.UnsafeFreeValueCellIndex;
@@ -93,7 +94,7 @@ namespace Trecs.Internal
             {
                 fixed (DenseDictionary<TKey, TValue>.Node* ptr = dict.UnsafeKeys)
                 {
-                    reader.BlitReadArrayPtr("_valuesInfo", ptr, count);
+                    reader.BlitReadArrayPtr("ValuesInfo", ptr, count);
                 }
             }
 
@@ -101,7 +102,7 @@ namespace Trecs.Internal
             {
                 fixed (TValue* ptr = dict.UnsafeValues)
                 {
-                    reader.BlitReadArrayPtr("_values", ptr, count);
+                    reader.BlitReadArrayPtr("Values", ptr, count);
                 }
             }
 
@@ -109,12 +110,12 @@ namespace Trecs.Internal
             {
                 fixed (int* ptr = dict.UnsafeBuckets)
                 {
-                    reader.BlitReadArrayPtr("_buckets", ptr, bucketsCapacity);
+                    reader.BlitReadArrayPtr("Buckets", ptr, bucketsCapacity);
                 }
             }
 
-            reader.BlitRead("_collisions", ref dict.UnsafeCollisions);
-            reader.BlitRead("_fastModBucketsMultiplier", ref dict.UnsafeFastModBucketsMultiplier);
+            reader.BlitRead("Collisions", ref dict.UnsafeCollisions);
+            reader.BlitRead("FastModBucketsMultiplier", ref dict.UnsafeFastModBucketsMultiplier);
         }
     }
 

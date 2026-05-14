@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for <see cref="HashSet{T}"/>. Writes element count followed
@@ -13,7 +14,7 @@ namespace Trecs.Internal
 
         public void Deserialize(ref HashSet<T> value, ISerializationReader reader)
         {
-            var numItems = reader.Read<int>("count");
+            var numItems = reader.Read<int>("Count");
             TrecsAssert.That(numItems >= 0);
 
             if (value == null)
@@ -31,18 +32,18 @@ namespace Trecs.Internal
             for (int i = 0; i < numItems; i++)
             {
                 T item = default;
-                reader.Read("item", ref item);
+                reader.Read("Item", ref item);
                 value.Add(item);
             }
         }
 
         public void Serialize(in HashSet<T> value, ISerializationWriter writer)
         {
-            writer.Write("count", value.Count);
+            writer.Write("Count", value.Count);
 
             foreach (var item in value)
             {
-                writer.Write("item", item);
+                writer.Write("Item", item);
             }
         }
     }

@@ -21,24 +21,24 @@ namespace Trecs.Samples.Pointers
     {
         public void Serialize(in TrailHistory value, ISerializationWriter writer)
         {
-            writer.Write("positionCount", value.Positions.Count);
+            writer.Write("PositionCount", value.Positions.Count);
             foreach (var position in value.Positions)
-                writer.Write("position", position);
+                writer.Write("Position", position);
 
-            writer.Write("maxLength", value.MaxLength);
+            writer.Write("MaxLength", value.MaxLength);
         }
 
         public void Deserialize(ref TrailHistory value, ISerializationReader reader)
         {
             value ??= new TrailHistory();
 
-            var count = reader.Read<int>("positionCount");
+            var count = reader.Read<int>("PositionCount");
             value.Positions ??= new List<Vector3>(count);
             value.Positions.Clear();
             for (int i = 0; i < count; i++)
-                value.Positions.Add(reader.Read<Vector3>("position"));
+                value.Positions.Add(reader.Read<Vector3>("Position"));
 
-            value.MaxLength = reader.Read<int>("maxLength");
+            value.MaxLength = reader.Read<int>("MaxLength");
         }
     }
 }

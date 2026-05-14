@@ -134,22 +134,22 @@ namespace Trecs.Tests
 
             public void Serialize(in BaseTestClass value, ISerializationWriter writer)
             {
-                writer.WriteTypeId("type", value.GetType());
-                writer.Write("baseValue", value.BaseValue);
-                writer.WriteString("baseData", value.BaseData);
+                writer.WriteTypeId("Type", value.GetType());
+                writer.Write("BaseValue", value.BaseValue);
+                writer.WriteString("BaseData", value.BaseData);
 
                 if (value is DerivedTestClass derived)
                 {
-                    writer.Write("derivedValue", derived.DerivedValue);
-                    writer.WriteString("extraData", derived.ExtraData);
+                    writer.Write("DerivedValue", derived.DerivedValue);
+                    writer.WriteString("ExtraData", derived.ExtraData);
                 }
             }
 
             public void Deserialize(ref BaseTestClass value, ISerializationReader reader)
             {
-                var type = reader.ReadTypeId("type");
-                var baseValue = reader.Read<int>("baseValue");
-                var baseData = reader.ReadString("baseData");
+                var type = reader.ReadTypeId("Type");
+                var baseValue = reader.Read<int>("BaseValue");
+                var baseData = reader.ReadString("BaseData");
 
                 if (type == typeof(BaseTestClass))
                 {
@@ -157,8 +157,8 @@ namespace Trecs.Tests
                 }
                 else if (type == typeof(DerivedTestClass))
                 {
-                    var derivedValue = reader.Read<int>("derivedValue");
-                    var extraData = reader.ReadString("extraData");
+                    var derivedValue = reader.Read<int>("DerivedValue");
+                    var extraData = reader.ReadString("ExtraData");
 
                     value = new DerivedTestClass
                     {
@@ -181,20 +181,20 @@ namespace Trecs.Tests
 
             public void Serialize(in DerivedTestClass value, ISerializationWriter writer)
             {
-                writer.Write("baseValue", value.BaseValue);
-                writer.WriteString("baseData", value.BaseData);
-                writer.Write("derivedValue", value.DerivedValue);
-                writer.WriteString("extraData", value.ExtraData);
+                writer.Write("BaseValue", value.BaseValue);
+                writer.WriteString("BaseData", value.BaseData);
+                writer.Write("DerivedValue", value.DerivedValue);
+                writer.WriteString("ExtraData", value.ExtraData);
             }
 
             public void Deserialize(ref DerivedTestClass value, ISerializationReader reader)
             {
                 value = new DerivedTestClass
                 {
-                    BaseValue = reader.Read<int>("baseValue"),
-                    BaseData = reader.ReadString("baseData"),
-                    DerivedValue = reader.Read<int>("derivedValue"),
-                    ExtraData = reader.ReadString("extraData"),
+                    BaseValue = reader.Read<int>("BaseValue"),
+                    BaseData = reader.ReadString("BaseData"),
+                    DerivedValue = reader.Read<int>("DerivedValue"),
+                    ExtraData = reader.ReadString("ExtraData"),
                 };
             }
         }

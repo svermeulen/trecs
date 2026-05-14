@@ -1,6 +1,6 @@
 using System;
 
-namespace Trecs.Internal
+namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for <see cref="Type"/> references. Round-trips via
@@ -13,12 +13,12 @@ namespace Trecs.Internal
 
         public void Deserialize(ref Type value, ISerializationReader reader)
         {
-            value = reader.ReadTypeId("value");
+            value = reader.ReadTypeId("Value");
         }
 
         public void Serialize(in Type value, ISerializationWriter writer)
         {
-            writer.WriteTypeId("value", value);
+            writer.WriteTypeId("Value", value);
         }
     }
 }
