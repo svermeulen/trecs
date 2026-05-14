@@ -14,8 +14,8 @@ namespace Trecs.Internal
         void ClearFutureInputsAfterOrAt(int frame);
         void ClearInputsBeforeOrAt(int frame);
         void ClearAllInputs();
-        void Serialize(ITrecsSerializationWriter writer);
-        void Deserialize(ITrecsSerializationReader reader);
+        void Serialize(ISerializationWriter writer);
+        void Deserialize(ISerializationReader reader);
         void AddHistoryLocker(IInputHistoryLocker locker);
         void RemoveHistoryLocker(IInputHistoryLocker locker);
         bool HasInputFrame<T>(int frame, EntityHandle entityHandle)

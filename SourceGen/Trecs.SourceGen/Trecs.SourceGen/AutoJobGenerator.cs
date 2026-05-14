@@ -1570,7 +1570,7 @@ namespace Trecs.SourceGen
                 sb.AppendLine($"{body}{GenPrefix}builder = {GenPrefix}builder{chain};");
 
             sb.AppendLine(
-                $"{body}Assert.That({GenPrefix}builder.HasAnyCriteria, \"_{info.MethodName}_AutoJob.ScheduleParallel requires query criteria.\");"
+                $"{body}TrecsAssert.That({GenPrefix}builder.HasAnyCriteria, \"_{info.MethodName}_AutoJob.ScheduleParallel requires query criteria.\");"
             );
 
             sb.AppendLine($"{body}var {GenPrefix}world = {GenPrefix}builder.World;");

@@ -14,7 +14,7 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            Assert.That(!_hasDisposed);
+            TrecsAssert.That(!_hasDisposed);
             _hasDisposed = true;
             _action();
         }

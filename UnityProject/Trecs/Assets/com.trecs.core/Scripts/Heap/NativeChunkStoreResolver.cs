@@ -32,8 +32,12 @@ namespace Trecs.Internal
         /// <summary>1 if this slot currently backs a live allocation; 0 otherwise.</summary>
         public byte InUse;
 
-        /// <summary>1 if this allocation was routed through the huge-alloc path (dedicated single-slot page).</summary>
-        public byte IsHuge;
+        /// <summary>
+        /// 1 if this allocation owns its backing page outright (a single-slot huge-alloc page
+        /// or an externally-supplied page registered via <c>AllocExternal</c>). On Free, the page
+        /// is released wholesale rather than returning the slot to a bucket freelist.
+        /// </summary>
+        public byte OwnsWholePage;
 
         public byte _padding;
 
@@ -51,6 +55,27 @@ namespace Trecs.Internal
         /// </summary>
         public AtomicSafetyHandle Safety;
 #endif
+    }
+
+    /// <summary>
+    /// Wire-format twin of <see cref="NativeChunkStoreEntry"/> with the process-local
+    /// <c>AtomicSafetyHandle</c> field stripped. Used as the on-disk shape for each live
+    /// side-table entry in <see cref="NativeChunkStore"/>'s direct serialization path —
+    /// keeping the layout independent of <c>ENABLE_UNITY_COLLECTIONS_CHECKS</c> means
+    /// the byte stream is identical between editor and release builds, and avoids leaking
+    /// non-deterministic safety-handle byte patterns into snapshots.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeChunkStoreEntryPayload
+    {
+        public IntPtr Address;
+        public int TypeHash;
+        public byte Generation;
+        public byte InUse;
+        public byte OwnsWholePage;
+        public byte _padding;
+        public int PageId;
+        public int SlotIndex;
     }
 
     /// <summary>
@@ -153,10 +178,14 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static uint EncodeHandleValue(uint generation, uint index)
         {
-            Assert.That(index >= 1 && index <= MaxIndex, "Side-table index {} out of range", index);
-            Assert.That(
+            TrecsAssert.That(
+                index >= 1 && index <= MaxIndex,
+                "Side-table index {0} out of range",
+                index
+            );
+            TrecsAssert.That(
                 generation >= 1 && generation <= 0xFF,
-                "Generation {} out of range",
+                "Generation {0} out of range",
                 generation
             );
             return (generation << GenerationShift) | (index & IndexMask);

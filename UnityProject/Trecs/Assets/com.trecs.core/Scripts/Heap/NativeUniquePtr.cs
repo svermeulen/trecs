@@ -5,6 +5,89 @@ using Trecs.Internal;
 namespace Trecs
 {
     /// <summary>
+    /// Static factories for <see cref="NativeUniquePtr{T}"/>. Per-instance operations
+    /// (<c>Read</c>, <c>Write</c>, <c>Dispose</c>) live on the struct itself.
+    /// </summary>
+    public static class NativeUniquePtr
+    {
+        public static NativeUniquePtr<T> Alloc<T>(HeapAccessor heap, in T value)
+            where T : unmanaged
+        {
+            heap.AssertCanAllocatePersistent();
+            return heap.NativeUniqueHeap.Alloc<T>(in value);
+        }
+
+        public static NativeUniquePtr<T> Alloc<T>(HeapAccessor heap)
+            where T : unmanaged
+        {
+            heap.AssertCanAllocatePersistent();
+            return heap.NativeUniqueHeap.Alloc<T>();
+        }
+
+        public static NativeUniquePtr<T> Alloc<T>(WorldAccessor world, in T value)
+            where T : unmanaged => Alloc<T>(world.Heap, in value);
+
+        public static NativeUniquePtr<T> Alloc<T>(WorldAccessor world)
+            where T : unmanaged => Alloc<T>(world.Heap);
+
+        /// <summary>
+        /// Takes ownership of an existing native allocation without copying.
+        /// See <see cref="NativeUniquePtr{T}"/> docs for the ownership contract.
+        /// </summary>
+        public static NativeUniquePtr<T> AllocTakingOwnership<T>(
+            HeapAccessor heap,
+            NativeBlobAllocation alloc
+        )
+            where T : unmanaged
+        {
+            heap.AssertCanAllocatePersistent();
+            return heap.NativeUniqueHeap.AllocTakingOwnership<T>(alloc);
+        }
+
+        public static NativeUniquePtr<T> AllocTakingOwnership<T>(
+            WorldAccessor world,
+            NativeBlobAllocation alloc
+        )
+            where T : unmanaged => AllocTakingOwnership<T>(world.Heap, alloc);
+
+        public static NativeUniquePtr<T> AllocFrameScoped<T>(HeapAccessor heap, in T value)
+            where T : unmanaged
+        {
+            heap.AssertCanAddInputsSystem();
+            return heap.FrameScopedNativeUniqueHeap.Alloc<T>(heap.FixedFrame, in value);
+        }
+
+        public static NativeUniquePtr<T> AllocFrameScoped<T>(HeapAccessor heap)
+            where T : unmanaged
+        {
+            heap.AssertCanAddInputsSystem();
+            return heap.FrameScopedNativeUniqueHeap.Alloc<T>(heap.FixedFrame);
+        }
+
+        public static NativeUniquePtr<T> AllocFrameScoped<T>(WorldAccessor world, in T value)
+            where T : unmanaged => AllocFrameScoped<T>(world.Heap, in value);
+
+        public static NativeUniquePtr<T> AllocFrameScoped<T>(WorldAccessor world)
+            where T : unmanaged => AllocFrameScoped<T>(world.Heap);
+
+        public static NativeUniquePtr<T> AllocFrameScopedTakingOwnership<T>(
+            HeapAccessor heap,
+            NativeBlobAllocation alloc
+        )
+            where T : unmanaged
+        {
+            heap.AssertCanAddInputsSystem();
+            return heap.FrameScopedNativeUniqueHeap.AllocTakingOwnership<T>(heap.FixedFrame, alloc);
+        }
+
+        public static NativeUniquePtr<T> AllocFrameScopedTakingOwnership<T>(
+            WorldAccessor world,
+            NativeBlobAllocation alloc
+        )
+            where T : unmanaged => AllocFrameScopedTakingOwnership<T>(world.Heap, alloc);
+    }
+
+    /// <summary>
     /// Exclusive-ownership pointer to a native (unmanaged) heap allocation. Burst-compatible.
     /// <para>
     /// Allocate via <see cref="HeapAccessor.AllocNativeUnique{T}"/>. Open a safety-checked view
@@ -37,7 +120,7 @@ namespace Trecs
 
         public readonly void Dispose(HeapAccessor heap)
         {
-            Assert.That(
+            TrecsAssert.That(
                 !heap.FrameScopedNativeUniqueHeap.ContainsEntry(Handle.Value),
                 "Frame-scoped NativeUniquePtr must not be manually disposed"
             );
@@ -45,6 +128,83 @@ namespace Trecs
         }
 
         public readonly void Dispose(WorldAccessor world) => Dispose(world.Heap);
+
+        /// <summary>
+        /// Opens a safety-checked read view. Main-thread only; for in-job access use the
+        /// <see cref="NativeUniquePtrResolver"/> overload. Checks both persistent and
+        /// frame-scoped storage transparently.
+        /// </summary>
+        public readonly NativeUniqueRead<T> Read(HeapAccessor heap)
+        {
+            if (heap.FrameScopedNativeUniqueHeap.ContainsEntry(Handle.Value))
+            {
+                var entry = heap.FrameScopedNativeUniqueHeap.ResolveEntry<T>(
+                    Handle.Value,
+                    heap.FixedFrame
+                );
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                return new NativeUniqueRead<T>(entry.Address.ToPointer(), entry.Safety);
+#else
+                return new NativeUniqueRead<T>(entry.Address.ToPointer());
+#endif
+            }
+            return heap.NativeUniqueHeap.Read(in this);
+        }
+
+        public readonly NativeUniqueRead<T> Read(WorldAccessor world) => Read(world.Heap);
+
+        /// <summary>
+        /// Opens a safety-checked write view. Main-thread only; for in-job access use the
+        /// <see cref="NativeUniquePtrResolver"/> overload. Checks both persistent and
+        /// frame-scoped storage transparently.
+        /// </summary>
+        public readonly NativeUniqueWrite<T> Write(HeapAccessor heap)
+        {
+            if (heap.FrameScopedNativeUniqueHeap.ContainsEntry(Handle.Value))
+            {
+                var entry = heap.FrameScopedNativeUniqueHeap.ResolveEntry<T>(
+                    Handle.Value,
+                    heap.FixedFrame
+                );
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                return new NativeUniqueWrite<T>(entry.Address.ToPointer(), entry.Safety);
+#else
+                return new NativeUniqueWrite<T>(entry.Address.ToPointer());
+#endif
+            }
+            return heap.NativeUniqueHeap.Write(in this);
+        }
+
+        public readonly NativeUniqueWrite<T> Write(WorldAccessor world) => Write(world.Heap);
+
+        /// <summary>
+        /// Burst-compatible read view. Pass a resolver obtained via
+        /// <see cref="HeapAccessor.NativeUniquePtrResolver"/> or
+        /// <see cref="NativeWorldAccessor.UniquePtrResolver"/>. Persistent and frame-scoped
+        /// allocations share the same resolver path.
+        /// </summary>
+        public readonly NativeUniqueRead<T> Read(in NativeUniquePtrResolver resolver)
+        {
+            var entry = resolver.ResolveEntry<T>(Handle.Value);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            return new NativeUniqueRead<T>(entry.Address.ToPointer(), entry.Safety);
+#else
+            return new NativeUniqueRead<T>(entry.Address.ToPointer());
+#endif
+        }
+
+        /// <summary>
+        /// Burst-compatible write view. See <see cref="Read(in NativeUniquePtrResolver)"/>.
+        /// </summary>
+        public readonly NativeUniqueWrite<T> Write(in NativeUniquePtrResolver resolver)
+        {
+            var entry = resolver.ResolveEntry<T>(Handle.Value);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            return new NativeUniqueWrite<T>(entry.Address.ToPointer(), entry.Safety);
+#else
+            return new NativeUniqueWrite<T>(entry.Address.ToPointer());
+#endif
+        }
 
         public readonly bool IsNull
         {

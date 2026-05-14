@@ -4,12 +4,12 @@
     "references": [
         "GUID:281cd1989f6948c4aeefd4731e3a1aec",
         "GUID:d8b63aba1907145bea998dd612889d6b",
-        "GUID:cf43fa3ec7554c93ac1dc7bbbcb6c323",
         "GUID:2665a8d13d1b3f18800f46e256720795",
         "GUID:8d76a8f0a7b6f674bb91f72517b4a087",
         "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:76a9879f957c4510908f4305e5d030be",
-        "GUID:62a1e11e0db14c4a908e4f81e834b1fd"
+        "GUID:6e0e15eeb677a3747b25050b1869012d",
+        "GUID:d0e812a907bd4500b0e18ce4952a4e43"
     ],
     "includePlatforms": [
         "Editor"

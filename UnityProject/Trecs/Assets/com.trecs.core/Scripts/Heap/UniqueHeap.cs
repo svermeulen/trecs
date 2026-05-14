@@ -32,7 +32,7 @@ namespace Trecs.Internal
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _entries.Count;
             }
         }
@@ -40,7 +40,7 @@ namespace Trecs.Internal
         internal UniquePtr<T> AllocUnique<T>(T value)
             where T : class
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             var id = _idCounter.Alloc();
             var entry = new HeapEntry(value, typeof(T));
@@ -52,7 +52,7 @@ namespace Trecs.Internal
         internal UniquePtr<T> AllocUnique<T>()
             where T : class
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (_poolManager != null)
             {
@@ -64,14 +64,14 @@ namespace Trecs.Internal
 
         internal void SetEntry<T>(uint address, T value)
         {
-            Assert.That(!_isDisposed);
-            Assert.That(address != 0);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(address != 0);
 
             if (_entries.TryGetValue(address, out var entry))
             {
-                Assert.That(
+                TrecsAssert.That(
                     entry.Type == typeof(T),
-                    "Attempted to set heap memory address ({}) of type {} with value of incompatible type {}",
+                    "Attempted to set heap memory address ({0}) of type {1} with value of incompatible type {2}",
                     address,
                     entry.Type,
                     typeof(T)
@@ -90,8 +90,8 @@ namespace Trecs.Internal
             }
             else
             {
-                throw Assert.CreateException(
-                    "Attempted to set invalid heap memory address ({}) for type {}",
+                throw TrecsAssert.CreateException(
+                    "Attempted to set invalid heap memory address ({0}) for type {1}",
                     address,
                     typeof(T)
                 );
@@ -102,9 +102,9 @@ namespace Trecs.Internal
         {
             if (TryGetEntry(address, out var entry))
             {
-                Assert.That(
+                TrecsAssert.That(
                     entry.Type == typeof(T),
-                    "Expected heap memory address ({}) to be of type {}, but found type {}",
+                    "Expected heap memory address ({0}) to be of type {1}, but found type {2}",
                     address,
                     typeof(T),
                     entry.Type
@@ -112,8 +112,8 @@ namespace Trecs.Internal
                 return (T)entry.Value;
             }
 
-            throw Assert.CreateException(
-                "Attempted to resolve invalid heap memory address ({}) for type {}",
+            throw TrecsAssert.CreateException(
+                "Attempted to resolve invalid heap memory address ({0}) for type {1}",
                 address,
                 typeof(T)
             );
@@ -121,13 +121,13 @@ namespace Trecs.Internal
 
         internal bool TryGetEntry(uint address, out HeapEntry entry)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             return _entries.TryGetValue(address, out entry);
         }
 
         public object TryGetPtrValue(uint address)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (TryGetEntry(address, out var entry))
             {
@@ -139,16 +139,16 @@ namespace Trecs.Internal
 
         public object GetPtrValue(uint address)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             var result = TryGetPtrValue(address);
-            Assert.IsNotNull(result, "Invalid address provided: {}", address);
+            TrecsAssert.IsNotNull(result, "Invalid address provided: {0}", address);
             return result;
         }
 
         internal void Dispose()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             // Explicit dispose on world shutdown catches leaked heap pointers (warns about undisposed entries).
             // Serialization/rollback paths handle cleanup automatically as bulk operations.
             ClearAll(warnUndisposed: true);
@@ -157,7 +157,7 @@ namespace Trecs.Internal
 
         internal void ClearAll(bool warnUndisposed)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (warnUndisposed && _entries.Count > 0 && _log.IsWarningEnabled())
             {
@@ -179,9 +179,9 @@ namespace Trecs.Internal
                 {
                     if (entry.Value != null)
                     {
-                        Assert.That(
+                        TrecsAssert.That(
                             _poolManager.HasPool(entry.Type),
-                            "Found non-null pointer value for type {} with no associated memory pool",
+                            "Found non-null pointer value for type {0} with no associated memory pool",
                             entry.Type
                         );
 
@@ -196,9 +196,9 @@ namespace Trecs.Internal
         internal void DisposeEntry<T>(uint address)
             where T : class
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            Assert.That(address != 0);
+            TrecsAssert.That(address != 0);
 
             if (_entries.TryRemove(address, out var entry))
             {
@@ -215,15 +215,15 @@ namespace Trecs.Internal
             }
             else
             {
-                throw Assert.CreateException(
-                    "Attempted to dispose invalid heap memory address ({}) for type {}",
+                throw TrecsAssert.CreateException(
+                    "Attempted to dispose invalid heap memory address ({0}) for type {1}",
                     address,
                     typeof(T)
                 );
             }
         }
 
-        internal void Serialize(ITrecsSerializationWriter writer)
+        internal void Serialize(ISerializationWriter writer)
         {
             writer.Write<uint>("IdCounter", _idCounter.Value);
             writer.Write<int>("NumEntries", _entries.Count);
@@ -232,14 +232,14 @@ namespace Trecs.Internal
             {
                 writer.Write<uint>("Address", address);
 
-                Assert.That(entry.Type == entry.Value.GetType());
+                TrecsAssert.That(entry.Type == entry.Value.GetType());
                 writer.WriteObject("Obj", entry.Value);
             }
         }
 
-        internal void Deserialize(ITrecsSerializationReader reader)
+        internal void Deserialize(ISerializationReader reader)
         {
-            Assert.That(_entries.Count == 0);
+            TrecsAssert.That(_entries.Count == 0);
 
             _idCounter.Value = reader.Read<uint>("IdCounter");
 

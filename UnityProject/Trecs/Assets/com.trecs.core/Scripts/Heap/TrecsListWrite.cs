@@ -1,4 +1,3 @@
-using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
@@ -9,9 +8,14 @@ using Unity.Collections.LowLevel.Unsafe;
 namespace Trecs
 {
     /// <summary>
-    /// Writable safety-checked view over a <see cref="TrecsList{T}"/>. Add / Remove
-    /// operations may reallocate the backing data buffer when <c>Count == Capacity</c>;
-    /// the header pointer is stable across grows, so the wrapper itself never goes stale.
+    /// Writable safety-checked view over a <see cref="TrecsList{T}"/>. Supports indexed
+    /// writes, <c>Add</c> up to capacity, <c>RemoveAt</c>, and <c>Clear</c>.
+    ///
+    /// <para><b>No auto-grow.</b> <see cref="Add"/> throws if <c>Count == Capacity</c>;
+    /// callers must pre-size with
+    /// <see cref="TrecsList{T}.EnsureCapacity(HeapAccessor, int)"/> on the main thread
+    /// before scheduling a job that appends. The chunk-store-backed data buffer can only
+    /// be reallocated from the main thread.</para>
     ///
     /// <para>The wrapper is exclusive: scheduling a second <see cref="TrecsListWrite{T}"/>
     /// (or a <see cref="TrecsListRead{T}"/>) over the same list while one is in flight is
@@ -83,9 +87,9 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-                Assert.That(
+                TrecsAssert.That(
                     (uint)index < (uint)_header->Count,
-                    "TrecsListWrite index {} out of range (Count={})",
+                    "TrecsListWrite index {0} out of range (Count={1})",
                     index,
                     _header->Count
                 );
@@ -94,8 +98,9 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Appends <paramref name="value"/>, growing the backing buffer if needed.
-        /// The first byte of the appended slot becomes <c>Count - 1</c>.
+        /// Appends <paramref name="value"/>. Throws if <c>Count == Capacity</c> — grow the
+        /// list with <see cref="TrecsList{T}.EnsureCapacity(HeapAccessor, int)"/> on the
+        /// main thread before calling from a job.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(in T value)
@@ -103,10 +108,13 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-            if (_header->Count == _header->Capacity)
-            {
-                Grow(_header->Capacity == 0 ? 4 : _header->Capacity * 2);
-            }
+            TrecsAssert.That(
+                _header->Count < _header->Capacity,
+                "TrecsListWrite.Add: capacity exceeded (count={0}, capacity={1}). "
+                    + "Call TrecsList.EnsureCapacity on the main thread before scheduling.",
+                _header->Count,
+                _header->Capacity
+            );
             ((T*)_header->Data)[_header->Count] = value;
             _header->Count += 1;
         }
@@ -127,9 +135,9 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-            Assert.That(
+            TrecsAssert.That(
                 (uint)index < (uint)_header->Count,
-                "TrecsListWrite.RemoveAt index {} out of range (Count={})",
+                "TrecsListWrite.RemoveAt index {0} out of range (Count={1})",
                 index,
                 _header->Count
             );
@@ -152,9 +160,9 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-            Assert.That(
+            TrecsAssert.That(
                 (uint)index < (uint)_header->Count,
-                "TrecsListWrite.RemoveAtSwapBack index {} out of range (Count={})",
+                "TrecsListWrite.RemoveAtSwapBack index {0} out of range (Count={1})",
                 index,
                 _header->Count
             );
@@ -165,58 +173,6 @@ namespace Trecs
                 data[index] = data[last];
             }
             _header->Count -= 1;
-        }
-
-        /// <summary>
-        /// Grows the backing buffer so that it can hold at least <paramref name="minCapacity"/>
-        /// elements. No-op if already at or above. Doubles geometrically beyond <paramref name="minCapacity"/>
-        /// to amortize.
-        /// </summary>
-        public void EnsureCapacity(int minCapacity)
-        {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
-#endif
-            if (minCapacity > _header->Capacity)
-            {
-                var newCap = _header->Capacity == 0 ? 4 : _header->Capacity;
-                while (newCap < minCapacity)
-                {
-                    newCap *= 2;
-                }
-                Grow(newCap);
-            }
-        }
-
-        void Grow(int newCapacity)
-        {
-            Assert.That(newCapacity > _header->Capacity);
-            var newData = AllocatorManager.Allocate(
-                Allocator.Persistent,
-                _header->ElementSize,
-                _header->ElementAlign,
-                newCapacity
-            );
-            if (_header->Count > 0)
-            {
-                UnsafeUtility.MemCpy(
-                    newData,
-                    _header->Data.ToPointer(),
-                    (long)_header->Count * _header->ElementSize
-                );
-            }
-            if (_header->Data != IntPtr.Zero)
-            {
-                AllocatorManager.Free(
-                    Allocator.Persistent,
-                    _header->Data.ToPointer(),
-                    _header->ElementSize,
-                    _header->ElementAlign,
-                    _header->Capacity
-                );
-            }
-            _header->Data = new IntPtr(newData);
-            _header->Capacity = newCapacity;
         }
     }
 }

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Trecs.Collections;
 using Trecs.Internal;
-using Unity.Burst;
 using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
@@ -19,13 +18,18 @@ namespace Trecs
         readonly TrecsLog _log;
 
         readonly NativeChunkStore _chunkStore;
-        readonly DenseDictionary<uint, FrameEntry> _activeEntries = new();
+
+        // Handle → Type via the shared registry (same Serialize/Deserialize loop as the
+        // other chunk-store heaps); the per-entry frame number lives in a parallel
+        // dictionary kept in sync. Both use DenseDictionary for deterministic iteration.
+        readonly HandleTypeRegistry _registry = new();
+        readonly DenseDictionary<uint, int> _framesByHandle = new();
         readonly List<uint> _removeBuffer = new();
         bool _isDisposed;
 
         internal FrameScopedNativeUniqueHeap(TrecsLog log, NativeChunkStore chunkStore)
         {
-            Assert.IsNotNull(chunkStore);
+            TrecsAssert.IsNotNull(chunkStore);
             _log = log;
             _chunkStore = chunkStore;
         }
@@ -34,16 +38,16 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
-                return _activeEntries.Count;
+                TrecsAssert.That(!_isDisposed);
+                return _registry.Count;
             }
         }
 
         internal NativeUniquePtr<T> Alloc<T>(int frame, in T value)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
-            Assert.That(frame >= 0);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(frame >= 0);
 
             // Plain Alloc — under the unified immediate-write model, new entries are
             // visible to Burst jobs as soon as Alloc returns. Frame-scoped allocations
@@ -60,7 +64,8 @@ namespace Trecs
                 UnsafeUtility.WriteArrayElement(address.ToPointer(), 0, value);
             }
 
-            _activeEntries.Add(handle.Value, new FrameEntry(typeof(T), frame));
+            _registry.Add(handle.Value, typeof(T));
+            _framesByHandle.Add(handle.Value, frame);
 
             _log.Trace(
                 "Allocated frame-scoped NativeUniquePtr<{0}> with handle {1} for frame {2}",
@@ -85,9 +90,9 @@ namespace Trecs
         internal NativeUniquePtr<T> AllocTakingOwnership<T>(int frame, NativeBlobAllocation alloc)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
-            Assert.That(frame >= 0);
-            Assert.That(alloc.Ptr != IntPtr.Zero, "AllocTakingOwnership: null pointer");
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(frame >= 0);
+            TrecsAssert.That(alloc.Ptr != IntPtr.Zero, "AllocTakingOwnership: null pointer");
 
             var handle = _chunkStore.AllocExternal(
                 alloc.Ptr,
@@ -95,44 +100,47 @@ namespace Trecs
                 alloc.Alignment,
                 TypeHash<T>.Value
             );
-            _activeEntries.Add(handle.Value, new FrameEntry(typeof(T), frame));
+            _registry.Add(handle.Value, typeof(T));
+            _framesByHandle.Add(handle.Value, frame);
             return new NativeUniquePtr<T>(handle);
         }
 
         internal bool ContainsEntry(uint address)
         {
-            Assert.That(!_isDisposed);
-            return _activeEntries.ContainsKey(address);
+            TrecsAssert.That(!_isDisposed);
+            return _registry.ContainsKey(address);
         }
 
         internal NativeChunkStoreEntry ResolveEntry<T>(uint address, int frame)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
-            Assert.That(
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "ResolveEntry must be called from the main thread; jobs use NativeUniquePtrResolver"
             );
-            Assert.That(address != 0, "Attempted to resolve null address");
+            TrecsAssert.That(address != 0, "Attempted to resolve null address");
 
-            if (!_activeEntries.TryGetValue(address, out var frameEntry))
+            if (!_framesByHandle.TryGetValue(address, out var storedFrame))
             {
-                throw Assert.CreateException(
-                    "Attempted to resolve invalid frame-scoped native unique heap address ({}) for frame {}",
+                throw TrecsAssert.CreateException(
+                    "Attempted to resolve invalid frame-scoped native unique heap address ({0}) for frame {1}",
                     address,
                     frame
                 );
             }
 
-            Assert.IsEqual(
-                frameEntry.Frame,
+            TrecsAssert.IsEqual(
+                storedFrame,
                 frame,
                 "Attempted to get input memory for different frame than it was allocated for"
             );
-            Assert.That(
-                frameEntry.Type == typeof(T),
-                "Type mismatch resolving frame-scoped NativeUniquePtr: stored {}, requested {}",
-                frameEntry.Type,
+            // Registry lookup must succeed if the frame lookup did (kept in sync).
+            _registry.TryGetType(address, out var storedType);
+            TrecsAssert.That(
+                storedType == typeof(T),
+                "Type mismatch resolving frame-scoped NativeUniquePtr: stored {0}, requested {1}",
+                storedType,
                 typeof(T)
             );
 
@@ -147,12 +155,12 @@ namespace Trecs
 
         internal void ClearAtOrAfterFrame(int frame)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            Assert.That(_removeBuffer.IsEmpty());
-            foreach (var (key, entry) in _activeEntries)
+            TrecsAssert.That(_removeBuffer.IsEmpty());
+            foreach (var (key, entryFrame) in _framesByHandle)
             {
-                if (entry.Frame >= frame)
+                if (entryFrame >= frame)
                 {
                     _removeBuffer.Add(key);
                 }
@@ -168,12 +176,12 @@ namespace Trecs
 
         internal void ClearAtOrBeforeFrame(int frame)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            Assert.That(_removeBuffer.IsEmpty());
-            foreach (var (key, entry) in _activeEntries)
+            TrecsAssert.That(_removeBuffer.IsEmpty());
+            foreach (var (key, entryFrame) in _framesByHandle)
             {
-                if (entry.Frame <= frame)
+                if (entryFrame <= frame)
                 {
                     _removeBuffer.Add(key);
                 }
@@ -189,11 +197,11 @@ namespace Trecs
 
         void DisposeEntry(uint address)
         {
-            Assert.That(!_isDisposed);
-            if (!_activeEntries.ContainsKey(address))
+            TrecsAssert.That(!_isDisposed);
+            if (!_registry.ContainsKey(address))
             {
-                throw Assert.CreateException(
-                    "Attempted to dispose invalid frame-scoped native unique heap address ({})",
+                throw TrecsAssert.CreateException(
+                    "Attempted to dispose invalid frame-scoped native unique heap address ({0})",
                     address
                 );
             }
@@ -201,89 +209,74 @@ namespace Trecs
             // managed-side bookkeeping stays intact so the caller can retry after
             // completing the job.
             _chunkStore.Free(new PtrHandle(address));
-            _activeEntries.TryRemove(address, out _);
+            _registry.TryRemove(address);
+            _framesByHandle.TryRemove(address);
         }
 
         internal void ClearAll()
         {
-            Assert.That(!_isDisposed);
-            foreach (var (address, _) in _activeEntries)
+            TrecsAssert.That(!_isDisposed);
+            foreach (var address in _registry.Handles)
             {
                 _chunkStore.Free(new PtrHandle(address));
             }
-            _activeEntries.Clear();
+            _registry.Clear();
+            _framesByHandle.Clear();
         }
 
         internal void Dispose()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             ClearAll();
             _isDisposed = true;
         }
 
-        internal unsafe void Serialize(ITrecsSerializationWriter writer)
+        /// <summary>
+        /// Writes the managed-side (handle → type, frame) bookkeeping. Per-entry layout:
+        /// <c>Address: uint, Frame: int, InnerTypeId: int</c>. Slot memory and side-table
+        /// state are dumped in bulk by <c>NativeChunkStore.Serialize</c> which must run
+        /// before this.
+        /// </summary>
+        internal void Serialize(ISerializationWriter writer)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            writer.Write<int>("NumEntries", _activeEntries.Count);
+            writer.Write<int>("NumEntries", _registry.Count);
 
-            foreach (var (address, frameEntry) in _activeEntries)
+            // Custom layout (with Frame) — can't delegate to _registry.Serialize since
+            // that doesn't know about the per-entry frame metadata. Iteration order
+            // matches the registry's DenseDictionary, so it's deterministic.
+            foreach (var (address, type) in _registry.All)
             {
-                var entry = _chunkStore.ResolveEntry(new PtrHandle(address));
-                var size = UnsafeUtility.SizeOf(frameEntry.Type);
-
                 writer.Write<uint>("Address", address);
-                writer.Write<int>("Frame", frameEntry.Frame);
-                writer.Write<int>("InnerTypeId", TypeIdProvider.GetTypeId(frameEntry.Type));
-                writer.Write<int>("DataSize", size);
-                writer.Write<int>("Alignment", 16);
-                writer.BlitWriteRawBytes("Data", entry.Address.ToPointer(), size);
+                writer.Write<int>("Frame", _framesByHandle[address]);
+                writer.Write<int>("InnerTypeId", TypeIdProvider.GetTypeId(type));
             }
         }
 
-        internal unsafe void Deserialize(ITrecsSerializationReader reader)
+        /// <summary>
+        /// Restores managed-side bookkeeping. Assumes <c>NativeChunkStore.Deserialize</c>
+        /// already ran so every restored handle is live.
+        /// </summary>
+        internal void Deserialize(ISerializationReader reader)
         {
-            Assert.That(!_isDisposed);
-            Assert.That(_activeEntries.Count == 0);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(_registry.Count == 0);
+            TrecsAssert.That(_framesByHandle.Count == 0);
 
             var numEntries = reader.Read<int>("NumEntries");
-            _activeEntries.EnsureCapacity(numEntries);
+            _framesByHandle.EnsureCapacity(numEntries);
 
             for (int i = 0; i < numEntries; i++)
             {
-                var savedAddress = reader.Read<uint>("Address");
+                var address = reader.Read<uint>("Address");
                 var frame = reader.Read<int>("Frame");
                 var innerTypeId = reader.Read<int>("InnerTypeId");
-                var dataSize = reader.Read<int>("DataSize");
-                var alignment = reader.Read<int>("Alignment");
-                var innerType = TypeIdProvider.GetTypeFromId(innerTypeId);
-
-                // Preserve the saved handle value so components storing it still resolve.
-                var handle = _chunkStore.AllocAtSlot(
-                    savedAddress,
-                    dataSize,
-                    alignment,
-                    BurstRuntime.GetHashCode32(innerType),
-                    out var address
-                );
-                reader.BlitReadRawBytes("Data", address.ToPointer(), dataSize);
-                _activeEntries.Add(handle.Value, new FrameEntry(innerType, frame));
+                _registry.Add(address, TypeIdProvider.GetTypeFromId(innerTypeId));
+                _framesByHandle.Add(address, frame);
             }
 
-            _chunkStore.OnDeserializeComplete();
-            _log.Debug("Deserialized {0} frame-scoped native unique entries", _activeEntries.Count);
-        }
-
-        readonly struct FrameEntry
-        {
-            public readonly Type Type;
-            public readonly int Frame;
-
-            public FrameEntry(Type type, int frame)
-            {
-                Type = type;
-                Frame = frame;
-            }
+            _log.Debug("Deserialized {0} frame-scoped native unique entries", _registry.Count);
         }
     }
 }

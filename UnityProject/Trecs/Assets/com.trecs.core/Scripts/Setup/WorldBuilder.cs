@@ -21,9 +21,11 @@ namespace Trecs
         internal ISystemMetadataProvider _systemMetadataProvider;
 
         bool _hasBuilt;
+        bool _registryWasTouched;
         BlobCacheSettings _blobCacheSettings;
         WorldSettings _settings;
         ITrecsPoolManager _poolManager;
+        SerializerRegistry _serializerRegistry;
         string _debugName;
 
         /// <summary>
@@ -37,8 +39,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetDebugName(string debugName)
         {
-            Require.That(debugName != null, "debugName must not be null");
-            Require.That(_debugName == null, "DebugName has already been set");
+            TrecsRequire.That(debugName != null, "debugName must not be null");
+            TrecsRequire.That(_debugName == null, "DebugName has already been set");
             _debugName = debugName;
             return this;
         }
@@ -48,8 +50,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetSettings(WorldSettings settings)
         {
-            Require.That(settings != null, "settings must not be null");
-            Require.That(_settings == null, "Settings have already been set");
+            TrecsRequire.That(settings != null, "settings must not be null");
+            TrecsRequire.That(_settings == null, "Settings have already been set");
             _settings = settings;
             return this;
         }
@@ -63,10 +65,10 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddTemplate(Template template)
         {
-            Require.That(template != null, "template must not be null");
-            Require.That(
+            TrecsRequire.That(template != null, "template must not be null");
+            TrecsRequire.That(
                 !template.IsAbstract,
-                "Template '{}' is marked abstract — abstract templates may only be used as IExtends<> bases. Remove the 'abstract' keyword or register a concrete derived template instead.",
+                "Template '{0}' is marked abstract — abstract templates may only be used as IExtends<> bases. Remove the 'abstract' keyword or register a concrete derived template instead.",
                 template.DebugName
             );
             _templates.Add(template);
@@ -87,9 +89,9 @@ namespace Trecs
             // when the static constructor first runs inside a Burst-compiled job.
             _ = EntitySetId<T>.Value;
 
-            Require.That(
+            TrecsRequire.That(
                 !_sets.Any(f => f.Id == entitySet.Id),
-                "Set '{}' is already added to the WorldBuilder",
+                "Set '{0}' is already added to the WorldBuilder",
                 entitySet.DebugName
             );
             _sets.Add(entitySet);
@@ -102,7 +104,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddTemplates(IEnumerable<Template> templates)
         {
-            Require.That(templates != null, "templates must not be null");
+            TrecsRequire.That(templates != null, "templates must not be null");
             foreach (var template in templates)
             {
                 AddTemplate(template);
@@ -115,8 +117,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetPoolManager(ITrecsPoolManager poolManager)
         {
-            Require.That(poolManager != null, "poolManager must not be null");
-            Require.That(_poolManager == null, "PoolManager has already been set");
+            TrecsRequire.That(poolManager != null, "poolManager must not be null");
+            TrecsRequire.That(_poolManager == null, "PoolManager has already been set");
             _poolManager = poolManager;
             return this;
         }
@@ -126,7 +128,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddSystem(ISystem system)
         {
-            Require.That(system != null, "system must not be null");
+            TrecsRequire.That(system != null, "system must not be null");
             _systems.Add(system);
             return this;
         }
@@ -136,7 +138,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddSystems(IEnumerable<ISystem> systems)
         {
-            Require.That(systems != null, "systems must not be null");
+            TrecsRequire.That(systems != null, "systems must not be null");
             foreach (var system in systems)
             {
                 AddSystem(system);
@@ -149,7 +151,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddBlobStore(IBlobStore store)
         {
-            Require.That(store != null, "store must not be null");
+            TrecsRequire.That(store != null, "store must not be null");
             _blobStores.Add(store);
             return this;
         }
@@ -159,7 +161,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddBlobStores(IEnumerable<IBlobStore> stores)
         {
-            Require.That(stores != null, "stores must not be null");
+            TrecsRequire.That(stores != null, "stores must not be null");
             foreach (var store in stores)
             {
                 AddBlobStore(store);
@@ -172,8 +174,11 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetBlobCacheSettings(BlobCacheSettings settings)
         {
-            Require.That(settings != null, "settings must not be null");
-            Require.That(_blobCacheSettings == null, "BlobCacheSettings have already been set");
+            TrecsRequire.That(settings != null, "settings must not be null");
+            TrecsRequire.That(
+                _blobCacheSettings == null,
+                "BlobCacheSettings have already been set"
+            );
             _blobCacheSettings = settings;
             return this;
         }
@@ -203,11 +208,62 @@ namespace Trecs
             IEnumerable<SystemOrderConstraint> constraints
         )
         {
-            Require.That(constraints != null, "constraints must not be null");
+            TrecsRequire.That(constraints != null, "constraints must not be null");
             foreach (var constraint in constraints)
             {
                 AddSystemOrderConstraint(constraint);
             }
+            return this;
+        }
+
+        SerializerRegistry GetOrCreateRegistry()
+        {
+            _registryWasTouched = true;
+            return _serializerRegistry ??= new SerializerRegistry();
+        }
+
+        /// <summary>
+        /// Supplies a pre-built <see cref="SerializerRegistry"/> for the
+        /// constructed world. Must be called before any
+        /// <see cref="RegisterSerializer{TSerializer}"/> calls on this
+        /// builder, since those calls otherwise lazily create a registry
+        /// that would be discarded. Intended for DI scenarios where the
+        /// registry needs to live in the container and be resolvable
+        /// before the world exists.
+        /// </summary>
+        public WorldBuilder SetSerializerRegistry(SerializerRegistry serializerRegistry)
+        {
+            TrecsRequire.That(serializerRegistry != null, "serializerRegistry must not be null");
+            TrecsRequire.That(
+                !_registryWasTouched,
+                "Cannot call SetSerializerRegistry after RegisterSerializer has already been used on this builder"
+            );
+            _serializerRegistry = serializerRegistry;
+            _registryWasTouched = true;
+            return this;
+        }
+
+        /// <summary>
+        /// Registers a custom serializer by its concrete type. The serializer
+        /// must implement <see cref="ISerializer{T}"/> and have a
+        /// parameterless constructor. The handled object type is inferred
+        /// from the <c>ISerializer&lt;T&gt;</c> interface.
+        /// </summary>
+        public WorldBuilder RegisterSerializer<TSerializer>()
+            where TSerializer : ISerializer, new()
+        {
+            GetOrCreateRegistry().RegisterSerializer<TSerializer>();
+            return this;
+        }
+
+        /// <summary>
+        /// Registers a custom serializer by runtime <see cref="Type"/>. The
+        /// type must implement <see cref="ISerializer"/> and have a
+        /// parameterless constructor.
+        /// </summary>
+        public WorldBuilder RegisterSerializer(Type serializerType)
+        {
+            GetOrCreateRegistry().RegisterSerializer(serializerType);
             return this;
         }
 
@@ -218,9 +274,9 @@ namespace Trecs
             var seenTemplates = new HashSet<Template>();
             foreach (var template in _templates)
             {
-                Assert.That(
+                TrecsAssert.That(
                     seenTemplates.Add(template),
-                    "Duplicate template '{}' added to WorldBuilder",
+                    "Duplicate template '{0}' added to WorldBuilder",
                     template.DebugName
                 );
             }
@@ -255,7 +311,7 @@ namespace Trecs
         /// </summary>
         public World Build()
         {
-            Require.That(!_hasBuilt, "Build() has already been called");
+            TrecsRequire.That(!_hasBuilt, "Build() has already been called");
             _hasBuilt = true;
 
 #if DEBUG && !TRECS_IS_PROFILING
@@ -384,9 +440,11 @@ namespace Trecs
                 nativeBlobBoxPool: nativeBlobBoxPool,
                 interpolatedPreviousSaverManager: interpolatedPreviousSaverManager,
                 componentStore: componentStore,
-                systems: _systems
+                systems: _systems,
+                serializerRegistry: _serializerRegistry ?? new SerializerRegistry()
             );
             world.DebugName = _debugName;
+
             return world;
         }
     }
@@ -421,7 +479,10 @@ namespace Trecs.Internal
             ISystemMetadataProvider systemMetadataProvider
         )
         {
-            Require.That(systemMetadataProvider != null, "systemMetadataProvider must not be null");
+            TrecsRequire.That(
+                systemMetadataProvider != null,
+                "systemMetadataProvider must not be null"
+            );
             builder._systemMetadataProvider = systemMetadataProvider;
             return builder;
         }

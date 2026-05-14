@@ -67,7 +67,7 @@ namespace Trecs.Internal
         // Return the first item when the list is of length one and otherwise returns default
         public static TSource OnlyOrDefault<TSource>(this IEnumerable<TSource> source)
         {
-            Assert.IsNotNull(source);
+            TrecsAssert.IsNotNull(source);
 
             if (source.Count() > 1)
             {
@@ -100,7 +100,7 @@ namespace Trecs.Internal
         public static void RemoveWithConfirm<T>(this IList<T> list, T item)
         {
             bool removed = list.Remove(item);
-            Assert.That(removed);
+            TrecsAssert.That(removed);
         }
 
         /// <summary>
@@ -120,7 +120,7 @@ namespace Trecs.Internal
         public static void RemoveWithConfirm<T>(this LinkedList<T> list, T item)
         {
             bool removed = list.Remove(item);
-            Assert.That(removed);
+            TrecsAssert.That(removed);
         }
 
         public static void RemoveWithConfirm<TKey, TVal>(
@@ -129,13 +129,13 @@ namespace Trecs.Internal
         )
         {
             bool removed = dictionary.Remove(key);
-            Assert.That(removed);
+            TrecsAssert.That(removed);
         }
 
         public static void RemoveWithConfirm<T>(this HashSet<T> set, T item)
         {
             bool removed = set.Remove(item);
-            Assert.That(removed);
+            TrecsAssert.That(removed);
         }
 
         public static TVal GetValueAndRemove<TKey, TVal>(
@@ -144,7 +144,7 @@ namespace Trecs.Internal
         )
         {
             var removed = dictionary.Remove(key, out TVal val);
-            Assert.That(removed);
+            TrecsAssert.That(removed);
             return val;
         }
 
@@ -205,7 +205,7 @@ namespace Trecs.Internal
 
         public static IEnumerable<(T item, int index)> Enumerate<T>(this IEnumerable<T> source)
         {
-            Assert.IsNotNull(source);
+            TrecsAssert.IsNotNull(source);
 
             int index = 0;
             foreach (T item in source)

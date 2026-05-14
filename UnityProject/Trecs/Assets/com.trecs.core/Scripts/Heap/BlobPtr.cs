@@ -9,7 +9,7 @@ namespace Trecs.Internal
     /// Pointer to a managed (class) blob stored in the <see cref="BlobCache"/>.
     /// Lives in <see cref="Trecs.Internal"/> because the supported public path
     /// for shared managed data is <see cref="SharedPtr{T}"/> via
-    /// <see cref="HeapAccessor.AllocShared{T}(BlobId, T)"/>; <see cref="BlobPtr{T}"/>
+    /// <see cref="SharedPtr.Alloc{T}(HeapAccessor, BlobId, T)"/>; <see cref="BlobPtr{T}"/>
     /// is only used by callers writing custom <see cref="IBlobStore"/> backends.
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -35,8 +35,8 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Get(BlobCache blobCache)
         {
-            Assert.That(!IsNull);
-            Assert.That(
+            TrecsAssert.That(!IsNull);
+            TrecsAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to Get from a disposed BlobPtr"
             );
@@ -72,8 +72,8 @@ namespace Trecs.Internal
 
         public void WarmUp(BlobCache blobCache)
         {
-            Assert.That(!IsNull);
-            Assert.That(
+            TrecsAssert.That(!IsNull);
+            TrecsAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to WarmUp from a disposed BlobPtr"
             );
@@ -82,8 +82,8 @@ namespace Trecs.Internal
 
         public BlobLoadingState GetLoadingState(BlobCache blobCache)
         {
-            Assert.That(!IsNull);
-            Assert.That(
+            TrecsAssert.That(!IsNull);
+            TrecsAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to GetLoadingState from a disposed BlobPtr"
             );
@@ -98,13 +98,16 @@ namespace Trecs.Internal
                 return BlobPtr<TTarget>.Null;
             }
 
-            Assert.That(blobCache.ContainsHandle(Handle), "Attempted to Cast a disposed BlobPtr");
+            TrecsAssert.That(
+                blobCache.ContainsHandle(Handle),
+                "Attempted to Cast a disposed BlobPtr"
+            );
 
 #if DEBUG
             var actualType = blobCache.GetManagedBlobType(BlobId);
-            Assert.That(
+            TrecsAssert.That(
                 typeof(TTarget).IsAssignableFrom(actualType),
-                "BlobPtr cast failed: expected blob assignable to type {} but found type {}",
+                "BlobPtr cast failed: expected blob assignable to type {0} but found type {1}",
                 typeof(TTarget),
                 actualType
             );
@@ -114,7 +117,7 @@ namespace Trecs.Internal
 
         public readonly void Dispose(BlobCache blobCache)
         {
-            Assert.That(!IsNull);
+            TrecsAssert.That(!IsNull);
             blobCache.DisposeHandle(Handle);
         }
 

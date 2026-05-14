@@ -24,7 +24,7 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            Assert.That(!_hasDisposed);
+            TrecsAssert.That(!_hasDisposed);
             _hasDisposed = true;
 
             // Dispose in reverse order from when they were added
@@ -41,8 +41,8 @@ namespace Trecs.Internal
         public T Add<T>(T disposable)
             where T : IDisposable
         {
-            Assert.That(!_hasDisposed);
-            Assert.That(!_disposables.Contains(disposable), "Disposable added multiple times");
+            TrecsAssert.That(!_hasDisposed);
+            TrecsAssert.That(!_disposables.Contains(disposable), "Disposable added multiple times");
 
             _disposables.Add(disposable);
             return disposable;

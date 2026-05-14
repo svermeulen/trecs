@@ -942,7 +942,7 @@ namespace Trecs.Tests
             // NativeSharedHeap has its own pending model (independent of the
             // chunk-store-backed heaps); resolver still needs flush.
             heap.FlushPendingOperations();
-            ref readonly int value = ref heap.Resolver.Read(in ptr).Value;
+            ref readonly int value = ref ptr.Read(heap.Resolver).Value;
             NAssert.AreEqual(42, value);
 
             heap.Dispose();
@@ -978,7 +978,7 @@ namespace Trecs.Tests
             heap.DisposeHandle(ptr.Handle);
 
             heap.FlushPendingOperations();
-            ref readonly int value = ref heap.Resolver.Read(in clone).Value;
+            ref readonly int value = ref clone.Read(heap.Resolver).Value;
             NAssert.AreEqual(42, value);
 
             heap.Dispose();
@@ -1090,7 +1090,7 @@ namespace Trecs.Tests
             var ptr = heap.Alloc<int>(42);
 
             // Resolver requires flush first
-            ref readonly int value = ref heap.Resolver.Read(in ptr).Value;
+            ref readonly int value = ref ptr.Read(heap.Resolver).Value;
             NAssert.AreEqual(42, value);
 
             heap.Dispose();
@@ -1105,11 +1105,11 @@ namespace Trecs.Tests
 
             var ptr = heap.Alloc<int>(42);
 
-            ref int value = ref heap.Resolver.Write(in ptr).Value;
+            ref int value = ref ptr.Write(heap.Resolver).Value;
             NAssert.AreEqual(42, value);
 
             value = 99;
-            ref readonly int readBack = ref heap.Resolver.Read(in ptr).Value;
+            ref readonly int readBack = ref ptr.Read(heap.Resolver).Value;
             NAssert.AreEqual(99, readBack);
 
             heap.Dispose();
@@ -1124,9 +1124,9 @@ namespace Trecs.Tests
 
             var ptr = heap.Alloc<int>(42);
 
-            heap.Resolver.Write(in ptr).Set(123);
+            ptr.Write(heap.Resolver).Set(123);
 
-            ref readonly int readBack = ref heap.Resolver.Read(in ptr).Value;
+            ref readonly int readBack = ref ptr.Read(heap.Resolver).Value;
             NAssert.AreEqual(123, readBack);
 
             heap.Dispose();
@@ -1159,7 +1159,7 @@ namespace Trecs.Tests
 
             // Under the immediate-write model, the new entry is in the side table
             // before Alloc returns — resolver can see it without any flush.
-            ref readonly int readValue = ref heap.Resolver.Read(in ptr).Value;
+            ref readonly int readValue = ref ptr.Read(heap.Resolver).Value;
             NAssert.AreEqual(42, readValue);
 
             heap.Dispose();
@@ -1237,7 +1237,7 @@ namespace Trecs.Tests
             var ptr = frameScopedHeap.Alloc<int>(1, 42);
 
             // Frame-scoped entries go directly into NativeDenseDictionary, no flush needed
-            ref readonly int value = ref heap.Resolver.Read(in ptr).Value;
+            ref readonly int value = ref ptr.Read(heap.Resolver).Value;
             NAssert.AreEqual(42, value);
 
             heap.Dispose();

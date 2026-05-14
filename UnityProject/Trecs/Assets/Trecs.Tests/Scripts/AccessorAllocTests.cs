@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using NUnit.Framework;
-using Trecs.Serialization;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -16,7 +15,7 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
 
-            var ptr = a.Heap.AllocUnique<List<string>>();
+            var ptr = UniquePtr.Alloc<List<string>>(a.Heap);
 
             NAssert.IsFalse(ptr.IsNull);
 
@@ -30,7 +29,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var original = new List<string> { "hello", "world" };
-            var ptr = a.Heap.AllocUnique(original);
+            var ptr = UniquePtr.Alloc(a.Heap, original);
 
             var retrieved = ptr.Get(a);
             NAssert.AreSame(original, retrieved);
@@ -45,7 +44,7 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
 
-            var ptr = a.Heap.AllocUnique(new List<string> { "first" });
+            var ptr = UniquePtr.Alloc(a.Heap, new List<string> { "first" });
             var updated = new List<string> { "second" };
             ptr.Set(a, updated);
 
@@ -60,7 +59,7 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
 
-            var ptr = a.Heap.AllocUnique(new List<string> { "test" });
+            var ptr = UniquePtr.Alloc(a.Heap, new List<string> { "test" });
             NAssert.IsFalse(ptr.IsNull);
 
             ptr.Dispose(a);
@@ -80,7 +79,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var blob = new List<string> { "shared" };
-            var ptr = a.Heap.AllocShared(BlobIdGenerator.FromKey(1), blob);
+            var ptr = SharedPtr.Alloc(a.Heap, BlobIdGenerator.FromKey(1), blob);
 
             NAssert.IsFalse(ptr.IsNull);
 
@@ -97,7 +96,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var blob = new List<string> { "cloneable" };
-            var ptr = a.Heap.AllocShared(BlobIdGenerator.FromKey(1), blob);
+            var ptr = SharedPtr.Alloc(a.Heap, BlobIdGenerator.FromKey(1), blob);
             var clone = ptr.Clone(a);
 
             NAssert.IsFalse(clone.IsNull);

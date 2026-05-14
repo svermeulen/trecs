@@ -64,9 +64,9 @@ namespace Trecs.Internal
 
         public void Initialize(int systemCount)
         {
-            Assert.That(!_isInitialized);
-            Assert.That(!_isDisposed);
-            Assert.That(systemCount >= 0);
+            TrecsAssert.That(!_isInitialized);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(systemCount >= 0);
 
             _systemCount = systemCount;
             _channelMasks = new int[systemCount];
@@ -85,7 +85,7 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (_pausedWords.IsCreated)
             {
@@ -99,21 +99,21 @@ namespace Trecs.Internal
         {
             get
             {
-                Assert.That(_isInitialized);
+                TrecsAssert.That(_isInitialized);
                 return _systemCount;
             }
         }
 
         public bool IsSystemEnabled(int systemIndex, EnableChannel channel)
         {
-            Assert.That(_isInitialized);
+            TrecsAssert.That(_isInitialized);
             AssertValidIndex(systemIndex);
             return (_channelMasks[systemIndex] & (int)channel) == 0;
         }
 
         public void SetSystemEnabled(int systemIndex, EnableChannel channel, bool enabled)
         {
-            Assert.That(_isInitialized);
+            TrecsAssert.That(_isInitialized);
             AssertValidIndex(systemIndex);
 
             if (enabled)
@@ -128,7 +128,7 @@ namespace Trecs.Internal
 
         public bool IsSystemPaused(int systemIndex)
         {
-            Assert.That(_isInitialized);
+            TrecsAssert.That(_isInitialized);
             AssertValidIndex(systemIndex);
 
             var wordIndex = systemIndex / BitsPerWord;
@@ -138,7 +138,7 @@ namespace Trecs.Internal
 
         public void SetSystemPaused(int systemIndex, bool paused)
         {
-            Assert.That(_isInitialized);
+            TrecsAssert.That(_isInitialized);
             AssertValidIndex(systemIndex);
 
             var wordIndex = systemIndex / BitsPerWord;
@@ -175,14 +175,14 @@ namespace Trecs.Internal
         // without manually combining channel checks and IsSystemPaused.
         public bool IsSystemEffectivelyEnabled(int systemIndex)
         {
-            Assert.That(_isInitialized);
+            TrecsAssert.That(_isInitialized);
             AssertValidIndex(systemIndex);
             return !ShouldSkipSystem(systemIndex);
         }
 
-        public unsafe void Serialize(ITrecsSerializationWriter writer)
+        public unsafe void Serialize(ISerializationWriter writer)
         {
-            Assert.That(_isInitialized);
+            TrecsAssert.That(_isInitialized);
 
             // Channels are intentionally NOT serialized — they're ephemeral
             // and reapplied by their respective owners (BundlePlayer for
@@ -201,15 +201,15 @@ namespace Trecs.Internal
             }
         }
 
-        public unsafe void Deserialize(ITrecsSerializationReader reader)
+        public unsafe void Deserialize(ISerializationReader reader)
         {
-            Assert.That(_isInitialized);
+            TrecsAssert.That(_isInitialized);
 
             var serializedSystemCount = reader.Read<int>("SystemCount");
             var serializedWordCount = reader.Read<int>("WordCount");
 
-            Assert.IsEqual(serializedSystemCount, _systemCount);
-            Assert.IsEqual(serializedWordCount, _wordCount);
+            TrecsAssert.IsEqual(serializedSystemCount, _systemCount);
+            TrecsAssert.IsEqual(serializedWordCount, _wordCount);
 
             if (_wordCount > 0)
             {
@@ -223,9 +223,9 @@ namespace Trecs.Internal
 
         void AssertValidIndex(int systemIndex)
         {
-            Assert.That(
+            TrecsAssert.That(
                 systemIndex >= 0 && systemIndex < _systemCount,
-                "System index {} out of range [0, {})",
+                "System index {0} out of range [0, {1})",
                 systemIndex,
                 _systemCount
             );

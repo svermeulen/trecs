@@ -589,7 +589,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                "Assert.That(!_hasSet, \"Only one set per query is supported.\");"
+                "TrecsAssert.That(!_hasSet, \"Only one set per query is supported.\");"
             );
             sb.AppendLine(indentLevel + 2, "_set = EntitySet<T>.Value.Id;");
             sb.AppendLine(indentLevel + 2, "_hasSet = true;");
@@ -601,7 +601,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                "Assert.That(!_hasSet, \"Only one set per query is supported.\");"
+                "TrecsAssert.That(!_hasSet, \"Only one set per query is supported.\");"
             );
             sb.AppendLine(indentLevel + 2, "_set = entitySet.Id;");
             sb.AppendLine(indentLevel + 2, "_hasSet = true;");
@@ -613,7 +613,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                "Assert.That(!_hasSet, \"Only one set per query is supported.\");"
+                "TrecsAssert.That(!_hasSet, \"Only one set per query is supported.\");"
             );
             sb.AppendLine(indentLevel + 2, "_set = setId;");
             sb.AppendLine(indentLevel + 2, "_hasSet = true;");
@@ -638,7 +638,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                $"Assert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling Single().\");"
+                $"TrecsAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling Single().\");"
             );
             sb.AppendLine(indentLevel + 2, "EntityIndex __ei;");
             sb.AppendLine(indentLevel + 2, "if (_hasSet)");
@@ -682,7 +682,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                $"Assert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling TrySingle().\");"
+                $"TrecsAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling TrySingle().\");"
             );
             sb.AppendLine(indentLevel + 2, "bool found;");
             sb.AppendLine(indentLevel + 2, "EntityIndex __ei;");
@@ -721,7 +721,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                $"Assert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling Count().\");"
+                $"TrecsAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling Count().\");"
             );
             sb.AppendLine(indentLevel + 2, "if (_hasSet)");
             sb.AppendLine(indentLevel + 2, "{");
@@ -737,7 +737,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                $"Assert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before iterating.\");"
+                $"TrecsAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before iterating.\");"
             );
             sb.AppendLine(indentLevel + 2, "if (_hasSet)");
             sb.AppendLine(indentLevel + 3, "return new Enumerator(_builder.InSet(_set));");

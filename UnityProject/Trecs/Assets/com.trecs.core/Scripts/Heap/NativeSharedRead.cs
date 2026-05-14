@@ -8,8 +8,8 @@ namespace Trecs
 {
     /// <summary>
     /// Read-only safety-checked view over a <see cref="NativeSharedPtr{T}"/> allocation.
-    /// Obtain via <see cref="HeapAccessor.Read{T}(in NativeSharedPtr{T})"/> on the main thread,
-    /// or <see cref="NativeSharedPtrResolver.Read{T}"/> in Burst jobs. Shared native data is
+    /// Obtain via <see cref="NativeSharedPtr{T}.Read(HeapAccessor)"/> on the main thread,
+    /// or <see cref="NativeSharedPtr{T}.Read(in NativeSharedPtrResolver)"/> in Burst jobs. Shared native data is
     /// immutable by design — there is no <c>Write</c> counterpart; multiple jobs may concurrently
     /// hold readers over the same blob without conflict, since the per-blob
     /// <c>AtomicSafetyHandle</c> is marked read-only.

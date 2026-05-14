@@ -27,7 +27,7 @@ namespace Trecs.Internal
 
         public IDisposable Subscribe(Action handler, int priority)
         {
-            Assert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, handler);
             _priorities.Insert(index, priority);
@@ -41,7 +41,7 @@ namespace Trecs.Internal
 
         public IDisposable Subscribe(SimpleReactiveBuffer buffer, Action handler, int priority)
         {
-            Assert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             Action bufferedHandler = () => buffer.AddAction(handler);
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, bufferedHandler);
@@ -67,7 +67,7 @@ namespace Trecs.Internal
             }
             else
             {
-                Assert.That(_removeQueue.Count == 0);
+                TrecsAssert.That(_removeQueue.Count == 0);
                 int index = _observers.IndexOf(handler);
                 if (index >= 0)
                 {
@@ -130,7 +130,7 @@ namespace Trecs.Internal
 
         public IDisposable Subscribe(Action<T1> handler, int priority)
         {
-            Assert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, handler);
             _priorities.Insert(index, priority);
@@ -144,7 +144,7 @@ namespace Trecs.Internal
 
         public IDisposable Subscribe(SimpleReactiveBuffer buffer, Action<T1> handler, int priority)
         {
-            Assert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             Action<T1> bufferedHandler = arg1 => buffer.AddAction(() => handler(arg1));
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, bufferedHandler);
@@ -170,7 +170,7 @@ namespace Trecs.Internal
             }
             else
             {
-                Assert.That(_removeQueue.Count == 0);
+                TrecsAssert.That(_removeQueue.Count == 0);
                 int index = _observers.IndexOf(handler);
                 if (index >= 0)
                 {
@@ -233,7 +233,7 @@ namespace Trecs.Internal
 
         public IDisposable Subscribe(Action<T1, T2> handler, int priority)
         {
-            Assert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, handler);
             _priorities.Insert(index, priority);
@@ -251,7 +251,7 @@ namespace Trecs.Internal
             int priority
         )
         {
-            Assert.That(!_isInvoking, "Cannot subscribe during invocation");
+            TrecsAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             Action<T1, T2> bufferedHandler = (arg1, arg2) =>
                 buffer.AddAction(() => handler(arg1, arg2));
             int index = FindInsertionIndex(priority);
@@ -278,7 +278,7 @@ namespace Trecs.Internal
             }
             else
             {
-                Assert.That(_removeQueue.Count == 0);
+                TrecsAssert.That(_removeQueue.Count == 0);
                 int index = _observers.IndexOf(handler);
                 if (index >= 0)
                 {

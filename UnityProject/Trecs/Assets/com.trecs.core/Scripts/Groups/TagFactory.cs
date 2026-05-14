@@ -21,8 +21,8 @@ namespace Trecs
 
         public static Tag CreateTag(Type tagType)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
-            Assert.That(tagType.DerivesFrom(typeof(ITag)));
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(tagType.DerivesFrom(typeof(ITag)));
 
             int tagId;
 
@@ -38,14 +38,14 @@ namespace Trecs
                 tagId = TypeToId(tagType);
             }
 
-            Assert.That(tagId != 0);
+            TrecsAssert.That(tagId != 0);
 
 #if DEBUG && !TRECS_IS_PROFILING
             if (_registeredTagIds.TryGetValue(tagId, out var existingType))
             {
-                Assert.That(
+                TrecsAssert.That(
                     existingType == tagType,
-                    "Tag ID collision: {} and {} both resolve to ID {}. Use [TagId] to assign explicit IDs.",
+                    "Tag ID collision: {0} and {1} both resolve to ID {2}. Use [TagId] to assign explicit IDs.",
                     tagType.FullName,
                     existingType.FullName,
                     tagId

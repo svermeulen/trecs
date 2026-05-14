@@ -36,10 +36,10 @@ namespace Trecs.Internal
 
         public void RegisterExecute(ISystem system, WorldAccessor accessor, string debugName)
         {
-            Assert.That(!_isClosed);
-            Assert.That(
+            TrecsAssert.That(!_isClosed);
+            TrecsAssert.That(
                 !_executeAccessors.ContainsKey(system),
-                "System {} already has registered execute accessor - secondary accessors should use isSecondary flag",
+                "System {0} already has registered execute accessor - secondary accessors should use isSecondary flag",
                 debugName
             );
 
@@ -55,7 +55,7 @@ namespace Trecs.Internal
 
         public void Close()
         {
-            Assert.That(!_isClosed);
+            TrecsAssert.That(!_isClosed);
             _isClosed = true;
         }
     }

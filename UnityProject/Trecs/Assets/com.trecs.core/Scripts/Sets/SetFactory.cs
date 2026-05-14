@@ -21,27 +21,31 @@ namespace Trecs
 
         public static EntitySet CreateSet(Type setType)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
-            Assert.That(
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(
                 typeof(IEntitySet).IsAssignableFrom(setType),
-                "Set type {} must implement IEntitySet",
+                "Set type {0} must implement IEntitySet",
                 setType.FullName
             );
 
-            Assert.That(
+            TrecsAssert.That(
                 setType.IsValueType,
-                "Set type {} must be a struct, not a class",
+                "Set type {0} must be a struct, not a class",
                 setType.FullName
             );
 
             var setId = new SetId(ComputeSetId(setType));
-            Assert.That(setId.Id != 0, "Set ID must not be zero for type {}", setType.FullName);
+            TrecsAssert.That(
+                setId.Id != 0,
+                "Set ID must not be zero for type {0}",
+                setType.FullName
+            );
 
             if (_registeredSetIds.TryGetValue(setId, out var existingType))
             {
-                Assert.That(
+                TrecsAssert.That(
                     existingType == setType,
-                    "Set ID collision: {} and {} both resolve to ID {}. Use [SetId] to assign explicit IDs.",
+                    "Set ID collision: {0} and {1} both resolve to ID {2}. Use [SetId] to assign explicit IDs.",
                     setType.FullName,
                     existingType.FullName,
                     setId
@@ -114,9 +118,9 @@ namespace Trecs
                         BindingFlags.Public | BindingFlags.Static
                     );
 
-                    Assert.That(
+                    TrecsAssert.That(
                         valueProperty != null,
-                        "Tag type {} does not have a static Value property",
+                        "Tag type {0} does not have a static Value property",
                         tagTypes[i].FullName
                     );
 

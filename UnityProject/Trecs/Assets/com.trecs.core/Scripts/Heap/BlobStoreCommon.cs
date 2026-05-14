@@ -106,7 +106,7 @@ namespace Trecs.Internal
                 bytesToRemove -= info.NumBytes;
 
                 var wasRemoved = cache.TryRemove(info.BlobId, out var blobValue);
-                Assert.That(wasRemoved);
+                TrecsAssert.That(wasRemoved);
 
                 _log?.Trace("Disposing blob {0}", info.BlobId);
                 DisposeBlob(blobValue, info.IsNative);

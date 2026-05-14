@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
 using Trecs.Collections;
-using Trecs.Serialization.Internal;
+using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -32,7 +32,7 @@ namespace Trecs.Tests
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
             env.Accessor.SubmitEntities();
 
-            var registry = SerializationFactory.CreateRegistry();
+            var registry = new SerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new BundleRecorderSettings
@@ -93,7 +93,7 @@ namespace Trecs.Tests
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
             env.Accessor.SubmitEntities();
 
-            var registry = SerializationFactory.CreateRegistry();
+            var registry = new SerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new BundleRecorderSettings
@@ -138,7 +138,7 @@ namespace Trecs.Tests
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
             env.Accessor.SubmitEntities();
 
-            var registry = SerializationFactory.CreateRegistry();
+            var registry = new SerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             var settings = new BundleRecorderSettings
@@ -204,7 +204,7 @@ namespace Trecs.Tests
             env.Accessor.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
             env.Accessor.SubmitEntities();
 
-            var registry = SerializationFactory.CreateRegistry();
+            var registry = new SerializerRegistry();
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
             using var player = new BundlePlayer(env.World, worldStateSer, registry, snapshots);
@@ -259,7 +259,7 @@ namespace Trecs.Tests
             {
                 SpawnEntities(env);
 
-                var registry = SerializationFactory.CreateRegistry();
+                var registry = new SerializerRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 var settings = new BundleRecorderSettings
@@ -327,7 +327,7 @@ namespace Trecs.Tests
             {
                 SpawnEntities(env);
 
-                var registry = SerializationFactory.CreateRegistry();
+                var registry = new SerializerRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);
@@ -400,7 +400,7 @@ namespace Trecs.Tests
             {
                 SpawnEntities(env);
 
-                var registry = SerializationFactory.CreateRegistry();
+                var registry = new SerializerRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 var settings = new BundleRecorderSettings
@@ -455,7 +455,7 @@ namespace Trecs.Tests
             {
                 SpawnEntities(env);
 
-                var registry = SerializationFactory.CreateRegistry();
+                var registry = new SerializerRegistry();
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);

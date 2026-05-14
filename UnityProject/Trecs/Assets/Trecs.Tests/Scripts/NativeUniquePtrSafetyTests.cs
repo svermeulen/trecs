@@ -69,8 +69,8 @@ namespace Trecs.Tests
             using var sinkA = new NativeReference<int>(Allocator.TempJob);
             using var sinkB = new NativeReference<int>(Allocator.TempJob);
 
-            var a = new ReadJob { Read = heap.Resolver.Read(in ptr), Sink = sinkA }.Schedule();
-            var b = new ReadJob { Read = heap.Resolver.Read(in ptr), Sink = sinkB }.Schedule();
+            var a = new ReadJob { Read = ptr.Read(heap.Resolver), Sink = sinkA }.Schedule();
+            var b = new ReadJob { Read = ptr.Read(heap.Resolver), Sink = sinkB }.Schedule();
             JobHandle.CombineDependencies(a, b).Complete();
 
             NAssert.AreEqual(7, sinkA.Value);
@@ -89,17 +89,13 @@ namespace Trecs.Tests
 
             var ptr = heap.Alloc<int>(0);
 
-            var first = new WriteJob
-            {
-                Write = heap.Resolver.Write(in ptr),
-                NewValue = 1,
-            }.Schedule();
+            var first = new WriteJob { Write = ptr.Write(heap.Resolver), NewValue = 1 }.Schedule();
 
             try
             {
                 NAssert.Throws<InvalidOperationException>(() =>
                 {
-                    new WriteJob { Write = heap.Resolver.Write(in ptr), NewValue = 2 }.Schedule();
+                    new WriteJob { Write = ptr.Write(heap.Resolver), NewValue = 2 }.Schedule();
                 });
             }
             finally
@@ -120,13 +116,13 @@ namespace Trecs.Tests
             var ptr = heap.Alloc<int>(0);
 
             using var sink = new NativeReference<int>(Allocator.TempJob);
-            var reader = new ReadJob { Read = heap.Resolver.Read(in ptr), Sink = sink }.Schedule();
+            var reader = new ReadJob { Read = ptr.Read(heap.Resolver), Sink = sink }.Schedule();
 
             try
             {
                 NAssert.Throws<InvalidOperationException>(() =>
                 {
-                    new WriteJob { Write = heap.Resolver.Write(in ptr), NewValue = 9 }.Schedule();
+                    new WriteJob { Write = ptr.Write(heap.Resolver), NewValue = 9 }.Schedule();
                 });
             }
             finally
@@ -152,11 +148,7 @@ namespace Trecs.Tests
             var ptr = heap.Alloc<int>(0);
             var aliasOfPtr = ptr;
 
-            var first = new WriteJob
-            {
-                Write = heap.Resolver.Write(in ptr),
-                NewValue = 1,
-            }.Schedule();
+            var first = new WriteJob { Write = ptr.Write(heap.Resolver), NewValue = 1 }.Schedule();
 
             try
             {
@@ -164,7 +156,7 @@ namespace Trecs.Tests
                 {
                     new WriteJob
                     {
-                        Write = heap.Resolver.Write(in aliasOfPtr),
+                        Write = aliasOfPtr.Write(heap.Resolver),
                         NewValue = 2,
                     }.Schedule();
                 });
@@ -180,22 +172,21 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void FrameScoped_HandleReleasedAfterClearAndFlush()
+        public void FrameScoped_HandleReleasedAfterClear()
         {
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
 
             var ptr = frameScopedHeap.Alloc<int>(frame: 0, value: 5);
             using var sink = new NativeReference<int>(Allocator.TempJob);
-            new ReadJob { Read = heap.Resolver.Read(in ptr), Sink = sink }
+            new ReadJob { Read = ptr.Read(heap.Resolver), Sink = sink }
                 .Schedule()
                 .Complete();
             NAssert.AreEqual(5, sink.Value);
 
+            // ClearAtOrBeforeFrame calls chunk-store Free, which Release()s the
+            // safety handle synchronously (after CheckDeallocateAndThrow). Any
+            // job still using the handle would have surfaced as a throw.
             frameScopedHeap.ClearAtOrBeforeFrame(0);
-            // The box and its safety handle are released at flush time, not at
-            // ClearAtOrBeforeFrame — jobs scheduled before the flush may still
-            // be reading. After flush, the handle's Release call drains any
-            // outstanding jobs first.
 
             heap.Dispose();
             frameScopedHeap.Dispose();
@@ -210,7 +201,7 @@ namespace Trecs.Tests
             var ptr = heap.Alloc<int>(42);
             heap.DisposeEntry(ptr.Handle.Value);
 
-            NAssert.Throws<TrecsException>(() => heap.Resolver.Read(in ptr));
+            NAssert.Throws<TrecsException>(() => ptr.Read(heap.Resolver));
 
             heap.Dispose();
             frameScopedHeap.Dispose();
@@ -230,7 +221,7 @@ namespace Trecs.Tests
             NAssert.Throws<TrecsException>(() =>
             {
                 var bad = new NativeUniquePtr<float>(ptr.Handle);
-                heap.Resolver.Read(in bad);
+                bad.Read(heap.Resolver);
             });
 
             heap.DisposeEntry(ptr.Handle.Value);
@@ -249,7 +240,7 @@ namespace Trecs.Tests
             NAssert.Throws<TrecsException>(() =>
             {
                 var bad = new NativeUniquePtr<float>(ptr.Handle);
-                heap.Resolver.Write(in bad);
+                bad.Write(heap.Resolver);
             });
 
             heap.DisposeEntry(ptr.Handle.Value);
@@ -266,7 +257,7 @@ namespace Trecs.Tests
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
             var ptr = heap.Alloc<int>(7);
 
-            var read = heap.Resolver.Read(in ptr);
+            var read = ptr.Read(heap.Resolver);
             NAssert.AreEqual(7, read.Value); // works while alive
 
             heap.Dispose();
@@ -289,19 +280,14 @@ namespace Trecs.Tests
             var (heap, frameScopedHeap, chunkStore) = CreateHeap();
 
             var ptr = frameScopedHeap.Alloc<int>(frame: 0, value: 0);
-            // Frame-scoped Alloc adds directly to _allEntries (no flush needed).
 
-            var first = new WriteJob
-            {
-                Write = heap.Resolver.Write(in ptr),
-                NewValue = 1,
-            }.Schedule();
+            var first = new WriteJob { Write = ptr.Write(heap.Resolver), NewValue = 1 }.Schedule();
 
             try
             {
                 NAssert.Throws<InvalidOperationException>(() =>
                 {
-                    new WriteJob { Write = heap.Resolver.Write(in ptr), NewValue = 2 }.Schedule();
+                    new WriteJob { Write = ptr.Write(heap.Resolver), NewValue = 2 }.Schedule();
                 });
             }
             finally
@@ -322,9 +308,9 @@ namespace Trecs.Tests
 
             frameScopedHeap.ClearAtOrBeforeFrame(0);
 
-            // The frame-scoped entry's safety handle was released at flush; the
-            // resolver no longer has the entry, so Read throws TrecsException.
-            NAssert.Throws<TrecsException>(() => heap.Resolver.Read(in ptr));
+            // The frame-scoped entry's safety handle was released by ClearAtOrBeforeFrame;
+            // the resolver no longer has the entry, so Read throws TrecsException.
+            NAssert.Throws<TrecsException>(() => ptr.Read(heap.Resolver));
 
             heap.Dispose();
             frameScopedHeap.Dispose();

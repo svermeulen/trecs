@@ -120,9 +120,9 @@ namespace Trecs
         void AssertValidGroup(GroupIndex group)
         {
 #if DEBUG
-            Assert.That(
+            TrecsAssert.That(
                 !group.IsNull && _entriesPerGroup[group.Index].IsValid,
-                "GroupIndex {} does not belong to this set's template",
+                "GroupIndex {0} does not belong to this set's template",
                 group
             );
 #endif

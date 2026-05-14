@@ -31,7 +31,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _entries.Count;
             }
         }
@@ -39,7 +39,7 @@ namespace Trecs
         NativeSharedPtr<T> CreateBlobImpl<T>(int frame, BlobId blobId, PtrHandle blobCacheHandleId)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             var id = _idCounter.Alloc();
             _entries.Add(id, new HeapEntry(frame, blobId));
@@ -51,7 +51,7 @@ namespace Trecs
         internal bool TryGetBlob<T>(int frame, BlobId blobId, out NativeSharedPtr<T> ptr)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (!_store.HasNativeBlob<T>(blobId, updateAccessTime: true))
             {
@@ -67,8 +67,8 @@ namespace Trecs
         internal NativeSharedPtr<T> CreateBlob<T>(int frame, BlobId blobId)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
-            Assert.That(_store.HasNativeBlob<T>(blobId, updateAccessTime: false));
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(_store.HasNativeBlob<T>(blobId, updateAccessTime: false));
             var blobCacheHandleId = _store.CreateHandle(blobId);
             return CreateBlobImpl<T>(frame, blobId, blobCacheHandleId);
         }
@@ -76,7 +76,7 @@ namespace Trecs
         internal NativeSharedPtr<T> CreateBlob<T>(int frame, BlobId blobId, in T blob)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             var handle = _store.CreateNativeBlobPtr(blobId, in blob);
             return CreateBlobImpl<T>(frame, handle.BlobId, handle.Handle);
         }
@@ -92,16 +92,16 @@ namespace Trecs
         )
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             var handle = _store.CreateNativeBlobPtrTakingOwnership<T>(blobId, alloc);
             return CreateBlobImpl<T>(frame, handle.BlobId, handle.Handle);
         }
 
         internal void ClearAtOrAfterFrame(int frame)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            Assert.That(_removeBuffer.IsEmpty());
+            TrecsAssert.That(_removeBuffer.IsEmpty());
             _removeBuffer.Clear();
 
             foreach (var (key, value) in _entries)
@@ -128,7 +128,7 @@ namespace Trecs
 
         internal bool ContainsEntry(uint handle)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             return _entries.ContainsKey(handle);
         }
 
@@ -137,9 +137,9 @@ namespace Trecs
         // complexity without measurable benefit in practice.
         internal void ClearAtOrBeforeFrame(int frame)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            Assert.That(_removeBuffer.IsEmpty());
+            TrecsAssert.That(_removeBuffer.IsEmpty());
             _removeBuffer.Clear();
 
             foreach (var (key, value) in _entries)
@@ -160,11 +160,11 @@ namespace Trecs
 
         HeapEntry GetEntry(int frame, uint address)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (_entries.TryGetValue(address, out var entry))
             {
-                Assert.IsEqual(
+                TrecsAssert.IsEqual(
                     entry.Frame,
                     frame,
                     "Attempted to get input memory for different frame than it was allocated for"
@@ -172,8 +172,8 @@ namespace Trecs
                 return entry;
             }
 
-            throw Assert.CreateException(
-                "Attempted to get invalid heap memory address ({}) for frame {}",
+            throw TrecsAssert.CreateException(
+                "Attempted to get invalid heap memory address ({0}) for frame {1}",
                 address,
                 frame
             );
@@ -181,14 +181,14 @@ namespace Trecs
 
         internal void Dispose()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             ClearAll();
             _isDisposed = true;
         }
 
         internal void ClearAll()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             foreach (var (_, handleId) in _blobCacheHandles)
             {
@@ -201,12 +201,12 @@ namespace Trecs
 
         internal void DisposeEntry(uint address)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (!_entries.TryRemove(address, out var entry))
             {
-                throw Assert.CreateException(
-                    "Attempted to dispose invalid heap memory address ({})",
+                throw TrecsAssert.CreateException(
+                    "Attempted to dispose invalid heap memory address ({0})",
                     address
                 );
             }
@@ -216,9 +216,9 @@ namespace Trecs
             _log.Trace("Disposed input ptr with address {0}", address);
         }
 
-        internal void Serialize(ITrecsSerializationWriter writer)
+        internal void Serialize(ISerializationWriter writer)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             writer.Write<uint>("IdCounter", _idCounter.Value);
             writer.Write<int>("NumEntries", _entries.Count);
@@ -231,11 +231,11 @@ namespace Trecs
             }
         }
 
-        internal void Deserialize(ITrecsSerializationReader reader)
+        internal void Deserialize(ISerializationReader reader)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            Assert.That(_entries.Count == 0);
+            TrecsAssert.That(_entries.Count == 0);
 
             // See FrameScopedSharedHeap.Deserialize for the rationale behind EnsureAtLeast.
             _idCounter.EnsureAtLeast(reader.Read<uint>("IdCounter"));

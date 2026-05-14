@@ -61,7 +61,7 @@ namespace Trecs
         [Conditional("DEBUG")]
         readonly void AssertNotMutatedDuringIteration()
         {
-            Assert.That(
+            TrecsAssert.That(
                 _sourceDict.Count == _count,
                 "Set entry mutated during iteration. Add / Remove / "
                     + "Clear on the same set + same group is not allowed while iterating that "
@@ -112,7 +112,7 @@ namespace Trecs
             [Conditional("DEBUG")]
             readonly void AssertNotMutatedDuringIteration()
             {
-                Assert.That(
+                TrecsAssert.That(
                     _sourceDict.Count == _count,
                     "Set entry mutated during iteration. Add / Remove / "
                         + "Clear on the same set + same group is not allowed while iterating "

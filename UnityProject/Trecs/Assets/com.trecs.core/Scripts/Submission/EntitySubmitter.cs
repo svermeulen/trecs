@@ -216,7 +216,7 @@ namespace Trecs.Internal
             // jobs may have been reading from via the resolver. Catch misuse
             // (flush called mid-job) loudly in DEBUG rather than producing
             // corrupted reads.
-            Assert.That(
+            TrecsAssert.That(
                 !_jobScheduler.HasOutstandingJobs,
                 "FlushAllDeferredOps called while jobs are still outstanding. "
                     + "Call scheduler.CompleteAllOutstanding() first."
@@ -266,7 +266,7 @@ namespace Trecs.Internal
         {
             _eventsManager.NotifyOnSubmissionStarted();
 
-            Assert.That(
+            TrecsAssert.That(
                 !_isRunningSubmit,
                 "A submission started while the previous one was still flushing"
             );
@@ -308,7 +308,7 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             _isDisposed = true;
 
             using (TrecsProfiling.Start("Final Dispose"))
@@ -335,8 +335,8 @@ namespace Trecs.Internal
                 if (_swapsScratch.IsCreated)
                     _swapsScratch.Dispose();
 
-                Assert.That(_submitCompleteEvent.NumObservers == 0);
-                Assert.That(_submitStartedEvent.NumObservers == 0);
+                TrecsAssert.That(_submitCompleteEvent.NumObservers == 0);
+                TrecsAssert.That(_submitStartedEvent.NumObservers == 0);
 
 #if DEBUG && !TRECS_IS_PROFILING
                 _initTracker.Clear();
@@ -783,7 +783,7 @@ namespace Trecs.Internal
                     }
 
                     var advanced = rangeEnumerator.MoveNext();
-                    Assert.That(advanced);
+                    TrecsAssert.That(advanced);
 
                     if (
                         ecsRoot._eventsManager.ReactiveOnRemovedObservers.TryGetValue(
@@ -963,7 +963,7 @@ namespace Trecs.Internal
         {
             var numEntities = fromEntityToEntityIDs.Count;
 #if DEBUG && TRECS_INTERNAL_CHECKS
-            Assert.That(numEntities > 0, "something went wrong, no entities to swap");
+            TrecsAssert.That(numEntities > 0, "something went wrong, no entities to swap");
 #endif
 
             var toGroupDB = ecsRoot.GetDBGroup(toGroup);
@@ -993,7 +993,7 @@ namespace Trecs.Internal
                         fromComponentsDictionaryDB
                     );
 
-                    Assert.That(
+                    TrecsAssert.That(
                         toComponentsDictionaryDB != null,
                         "something went wrong with the creation of dictionaries"
                     );
@@ -1008,7 +1008,7 @@ namespace Trecs.Internal
 
                     if (toGroupIndexRange.HasValue)
                     {
-                        Assert.That(toGroupIndexRange.Value == componentIndexRange);
+                        TrecsAssert.That(toGroupIndexRange.Value == componentIndexRange);
                     }
                     else
                     {
@@ -1095,7 +1095,7 @@ namespace Trecs.Internal
                     ecsRoot._cachedDstArrays[ci].SetCount(dstBaseCounts[ci] + numEntities);
                 }
 
-                Assert.That(toGroupIndexRange.HasValue);
+                TrecsAssert.That(toGroupIndexRange.HasValue);
                 ecsRoot._cachedRangeOfSubmittedIndices.Add(toGroupIndexRange.Value);
 
                 srcPtrs.Dispose();
@@ -1147,7 +1147,7 @@ namespace Trecs.Internal
                         continue;
 
                     var advanced = rangeEnumerator.MoveNext();
-                    Assert.That(advanced);
+                    TrecsAssert.That(advanced);
 
                     if (
                         ecsRoot._eventsManager.ReactiveOnMovedObservers.TryGetValue(
@@ -1216,7 +1216,7 @@ namespace Trecs.Internal
 
                                     if (addedIndices.HasValue)
                                     {
-                                        Assert.That(addedIndices == componentAddedIndices);
+                                        TrecsAssert.That(addedIndices == componentAddedIndices);
                                     }
                                     else
                                     {
@@ -1227,7 +1227,7 @@ namespace Trecs.Internal
                                     fromDictionary.AddEntitiesToDictionary(toDictionary, groupId);
                                 }
 
-                                Assert.That(addedIndices.HasValue);
+                                TrecsAssert.That(addedIndices.HasValue);
 
                                 // Now that entities are in the DB, set up EntityHandleMap with correct DB indices
                                 if (
@@ -1271,7 +1271,7 @@ namespace Trecs.Internal
                                 var groupDB = GetDBGroup(groupId);
 
                                 var advanced = enumerator.MoveNext();
-                                Assert.That(advanced);
+                                TrecsAssert.That(advanced);
 
                                 if (
                                     _eventsManager.ReactiveOnAddedObservers.TryGetValue(
@@ -1524,9 +1524,9 @@ namespace Trecs.Internal
                             ? _extraContribListPool.Pop()
                             : new FastList<int>();
 #if DEBUG && TRECS_INTERNAL_CHECKS
-                    Assert.That(
+                    TrecsAssert.That(
                         extras.Count == 0,
-                        "Pooled FastList<int> popped with stale Count={} — recycle path failed to Clear()",
+                        "Pooled FastList<int> popped with stale Count={0} — recycle path failed to Clear()",
                         extras.Count
                     );
 #endif
@@ -1536,8 +1536,8 @@ namespace Trecs.Internal
             }
 
             if (!p.Template.TryGetDimForTag(tag, out var dimIdx, out var dim))
-                throw Assert.CreateException(
-                    "Tag {} is not part of any partition dimension on template {}",
+                throw TrecsAssert.CreateException(
+                    "Tag {0} is not part of any partition dimension on template {1}",
                     tag,
                     p.Template.DebugName
                 );
@@ -1546,8 +1546,8 @@ namespace Trecs.Internal
             // ResolvedTemplate.BuildDimensionCaches — no runtime check needed.
             ulong bit = 1UL << dimIdx;
             if ((p.TouchedDimsMask & bit) != 0)
-                throw Assert.CreateException(
-                    "Multiple SetTag/UnsetTag calls on the same partition dimension for entity in group {} (last tag: {}). Within one submission an entity can have at most one structural change per dimension — combine them into a single op or coordinate across systems.",
+                throw TrecsAssert.CreateException(
+                    "Multiple SetTag/UnsetTag calls on the same partition dimension for entity in group {0} (last tag: {1}). Within one submission an entity can have at most one structural change per dimension — combine them into a single op or coordinate across systems.",
                     from.GroupIndex,
                     tag
                 );
@@ -1562,8 +1562,8 @@ namespace Trecs.Internal
             else
             {
                 if (dim.Tags.Count != 1)
-                    throw Assert.CreateException(
-                        "Cannot UnsetTag<{}>: it is a variant in a multi-variant dimension on template {}. Use SetTag to switch variants.",
+                    throw TrecsAssert.CreateException(
+                        "Cannot UnsetTag<{0}>: it is a variant in a multi-variant dimension on template {1}. Use SetTag to switch variants.",
                         tag,
                         p.Template.DebugName
                     );
@@ -1573,9 +1573,9 @@ namespace Trecs.Internal
 #if DEBUG && TRECS_INTERNAL_CHECKS
             // Catch XOR-math bugs and tag-guid collisions at the source rather
             // than as a downstream miss in GetSingleGroupWithTags.
-            Assert.That(
+            TrecsAssert.That(
                 p.Template.IsRegisteredGroupTagSet(p.FinalTagSet),
-                "Coalesced FinalTagSet {} is not a registered GroupTagSet of template {} — XOR-direct dim math produced an unregistered id",
+                "Coalesced FinalTagSet {0} is not a registered GroupTagSet of template {1} — XOR-direct dim math produced an unregistered id",
                 p.FinalTagSet,
                 p.Template.DebugName
             );
@@ -1757,9 +1757,9 @@ namespace Trecs.Internal
 #if DEBUG && TRECS_INTERNAL_CHECKS
                 // No-recorder path should never deposit extras; if it did, the
                 // dict would silently leak entries across submissions.
-                Assert.That(
+                TrecsAssert.That(
                     _accessRecorder != null || _pendingExtraContributors.Count == 0,
-                    "_pendingExtraContributors has {} entries but _accessRecorder is null — extras leaked into the no-recorder path",
+                    "_pendingExtraContributors has {0} entries but _accessRecorder is null — extras leaked into the no-recorder path",
                     _pendingExtraContributors.Count
                 );
 #endif

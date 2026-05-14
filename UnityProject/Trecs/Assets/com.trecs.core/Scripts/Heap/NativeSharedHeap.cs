@@ -2,11 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Trecs.Collections;
-using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
-namespace Trecs
+namespace Trecs.Internal
 {
     /// <summary>
     /// Manages reference-counted native (unmanaged) allocations backing <see cref="NativeSharedPtr{T}"/>.
@@ -71,7 +70,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _activeBlobs.Count;
             }
         }
@@ -80,7 +79,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return ref _resolver;
             }
         }
@@ -117,13 +116,13 @@ namespace Trecs
         internal NativeSharedHeapEntry ResolveEntry<T>(BlobId address)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
-            Assert.That(
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "NativeSharedHeap.ResolveEntry is main-thread only. "
                     + "Burst jobs must use NativeSharedPtrResolver instead."
             );
-            Assert.That(!address.IsNull, "Attempted to resolve null blob address");
+            TrecsAssert.That(!address.IsNull, "Attempted to resolve null blob address");
 
             if (_pendingAdds.TryGetValue(address, out var entry))
             {
@@ -190,7 +189,7 @@ namespace Trecs
         public NativeSharedPtr<T> CreateBlob<T>(BlobId blobId, in T blob)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             var handle = _store.CreateNativeBlobPtr(blobId, in blob);
             return AddBlobEntry<T>(blobId, handle.Handle);
         }
@@ -205,7 +204,7 @@ namespace Trecs
         )
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             var handle = _store.CreateNativeBlobPtrTakingOwnership<T>(blobId, alloc);
             return AddBlobEntry<T>(blobId, handle.Handle);
         }
@@ -219,7 +218,7 @@ namespace Trecs
         public bool TryGetBlob<T>(BlobId blobId, out NativeSharedPtr<T> ptr)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             _log.Trace("Looking up native blob with id {0}", blobId);
 
@@ -245,7 +244,10 @@ namespace Trecs
         {
             if (!TryGetBlob<T>(blobId, out var ptr))
             {
-                throw Assert.CreateException("Attempted to get an unrecognized blob {}", blobId);
+                throw TrecsAssert.CreateException(
+                    "Attempted to get an unrecognized blob {0}",
+                    blobId
+                );
             }
 
             return ptr;
@@ -255,8 +257,8 @@ namespace Trecs
             where T : unmanaged
         {
             ref var info = ref _activeBlobs.GetValueByRef(blobId);
-            Assert.That(info.InnerTypeId == TypeIdProvider.GetTypeId<T>());
-            Assert.That(info.BurstTypeHash == TypeHash<T>.Value);
+            TrecsAssert.That(info.InnerTypeId == TypeIdProvider.GetTypeId<T>());
+            TrecsAssert.That(info.BurstTypeHash == TypeHash<T>.Value);
             info.RefCount += 1;
 
             var newHandle = new PtrHandle(_idCounter.Alloc());
@@ -269,7 +271,7 @@ namespace Trecs
         public bool TryClone<T>(PtrHandle handle, out NativeSharedPtr<T> result)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (!_activeHandles.TryGetValue(handle, out var blobId))
             {
@@ -283,7 +285,7 @@ namespace Trecs
 
         public void ClearAll(bool warnUndisposed)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             if (_activeHandles.Count > 0)
             {
                 if (warnUndisposed)
@@ -338,10 +340,10 @@ namespace Trecs
             _safetyHandles.Clear();
 #endif
 
-            Assert.That(_activeBlobs.Count == 0);
-            Assert.That(_activeHandles.Count == 0);
-            Assert.That(_blobCacheHandles.Count == 0);
-            Assert.That(_allEntries.Count == 0);
+            TrecsAssert.That(_activeBlobs.Count == 0);
+            TrecsAssert.That(_activeHandles.Count == 0);
+            TrecsAssert.That(_blobCacheHandles.Count == 0);
+            TrecsAssert.That(_allEntries.Count == 0);
         }
 
         /// <summary>
@@ -376,7 +378,7 @@ namespace Trecs
 
         internal void Dispose()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             ClearAll(warnUndisposed: true);
 
             _allEntries.Dispose();
@@ -386,12 +388,12 @@ namespace Trecs
 
         public void DisposeHandle(in PtrHandle id)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (!_activeHandles.TryGetValue(id, out var blobId))
             {
-                throw Assert.CreateException(
-                    "Attempted to dispose unrecognized native shared blob handle {} "
+                throw TrecsAssert.CreateException(
+                    "Attempted to dispose unrecognized native shared blob handle {0} "
                         + "(double-dispose or handle from a different heap?)",
                     id
                 );
@@ -403,7 +405,7 @@ namespace Trecs
             ref var info = ref _activeBlobs.GetValueByRef(blobId);
             info.RefCount -= 1;
 
-            Assert.That(info.RefCount >= 0);
+            TrecsAssert.That(info.RefCount >= 0);
 
             if (info.RefCount == 0)
             {
@@ -418,10 +420,10 @@ namespace Trecs
             }
         }
 
-        public void Serialize(ITrecsSerializationWriter writer)
+        public void Serialize(ISerializationWriter writer)
         {
             FlushPendingOperations();
-            Assert.That(_allEntries.Count == _activeBlobs.Count);
+            TrecsAssert.That(_allEntries.Count == _activeBlobs.Count);
 
             writer.Write<int>("NumEntries", _allEntries.Count);
             writer.Write<uint>("HandleCounter", _idCounter.Value);
@@ -431,13 +433,13 @@ namespace Trecs
             _log.Trace("Serialized {0} native blob handles", _activeHandles.Count);
         }
 
-        public void Deserialize(ITrecsSerializationReader reader)
+        public void Deserialize(ISerializationReader reader)
         {
-            Assert.That(_allEntries.Count == 0);
-            Assert.That(_pendingAdds.Count == 0);
-            Assert.That(_pendingRemoves.Count == 0);
-            Assert.That(_activeBlobs.Count == 0);
-            Assert.That(_activeHandles.Count == 0);
+            TrecsAssert.That(_allEntries.Count == 0);
+            TrecsAssert.That(_pendingAdds.Count == 0);
+            TrecsAssert.That(_pendingRemoves.Count == 0);
+            TrecsAssert.That(_activeBlobs.Count == 0);
+            TrecsAssert.That(_activeHandles.Count == 0);
 
             var numEntries = reader.Read<int>("NumEntries");
 
@@ -447,7 +449,7 @@ namespace Trecs
 
             _log.Debug("Deserialized {0} native blob handles", _activeHandles.Count);
 
-            Assert.IsEqual(_activeBlobs.Count, numEntries);
+            TrecsAssert.IsEqual(_activeBlobs.Count, numEntries);
 
             foreach (var (blobId, info) in _activeBlobs)
             {

@@ -20,7 +20,7 @@ namespace Trecs.Internal
 
         public static TagSet TagsToTagSet(IReadOnlyList<Tag> tags)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
 
             if (tags.Count == 0)
             {
@@ -64,7 +64,7 @@ namespace Trecs.Internal
 
         public static TagSet TagsToTagSet(Tag t1)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
 
             int id = t1.Guid;
 
@@ -88,7 +88,7 @@ namespace Trecs.Internal
 
         public static TagSet TagsToTagSet(Tag t1, Tag t2)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
 
             int id = t1.Guid ^ t2.Guid;
 
@@ -114,7 +114,7 @@ namespace Trecs.Internal
 
         public static TagSet TagsToTagSet(Tag t1, Tag t2, Tag t3)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
 
             int id = t1.Guid ^ t2.Guid ^ t3.Guid;
 
@@ -148,7 +148,7 @@ namespace Trecs.Internal
 
         public static TagSet TagsToTagSet(Tag t1, Tag t2, Tag t3, Tag t4)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             int id = t1.Guid ^ t2.Guid ^ t3.Guid ^ t4.Guid;
 
             if (id == 0)
@@ -189,7 +189,7 @@ namespace Trecs.Internal
 
         public static TagSet CombineTagSets(TagSet a, TagSet b)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
 
             var tagsA = TagSetToTags(a);
             var tagsB = TagSetToTags(b);
@@ -368,9 +368,9 @@ namespace Trecs.Internal
         {
             for (int i = 1; i < sortedTags.Count; i++)
             {
-                Assert.That(
+                TrecsAssert.That(
                     sortedTags[i].Guid != sortedTags[i - 1].Guid,
-                    "Duplicate tag in given tag set: {}",
+                    "Duplicate tag in given tag set: {0}",
                     sortedTags[i]
                 );
             }

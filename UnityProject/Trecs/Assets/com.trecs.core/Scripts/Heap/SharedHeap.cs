@@ -33,14 +33,14 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _activeBlobs.Count;
             }
         }
 
         public bool CanGetBlob(PtrHandle handle)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (!_activeHandles.TryGetValue(handle, out var blobId))
             {
@@ -55,15 +55,15 @@ namespace Trecs
         {
             var containsBlob = _activeBlobs.ContainsKey(blobId);
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            Assert.That(
+            TrecsAssert.That(
                 _activeHandles.TryGetValue(handle, out var debugBlobId) == containsBlob,
-                "SharedPtr Handle/BlobId mismatch for handle {} and blobId {}",
+                "SharedPtr Handle/BlobId mismatch for handle {0} and blobId {1}",
                 handle,
                 blobId
             );
-            Assert.That(
+            TrecsAssert.That(
                 !containsBlob || debugBlobId == blobId,
-                "SharedPtr Handle maps to different BlobId: expected {}, got {}",
+                "SharedPtr Handle maps to different BlobId: expected {0}, got {1}",
                 blobId,
                 debugBlobId
             );
@@ -81,15 +81,15 @@ namespace Trecs
         {
             var containsBlob = _activeBlobs.ContainsKey(blobId);
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            Assert.That(
+            TrecsAssert.That(
                 _activeHandles.TryGetValue(handle, out var debugBlobId) == containsBlob,
-                "SharedPtr Handle/BlobId mismatch for handle {} and blobId {}",
+                "SharedPtr Handle/BlobId mismatch for handle {0} and blobId {1}",
                 handle,
                 blobId
             );
-            Assert.That(
+            TrecsAssert.That(
                 !containsBlob || debugBlobId == blobId,
-                "SharedPtr Handle maps to different BlobId: expected {}, got {}",
+                "SharedPtr Handle maps to different BlobId: expected {0}, got {1}",
                 blobId,
                 debugBlobId
             );
@@ -100,8 +100,8 @@ namespace Trecs
         public bool TryGetBlob<T>(PtrHandle handle, out T blob)
             where T : class
         {
-            Assert.That(!_isDisposed);
-            Assert.That(!handle.IsNull);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(!handle.IsNull);
 
             if (!_activeHandles.TryGetValue(handle, out var blobId))
             {
@@ -111,7 +111,7 @@ namespace Trecs
 
             if (_activeBlobs.TryGetValue(blobId, out var info))
             {
-                Assert.That(info.TypeHash == TypeIdProvider.GetTypeId<T>());
+                TrecsAssert.That(info.TypeHash == TypeIdProvider.GetTypeId<T>());
                 return _store.TryGetManagedBlob<T>(blobId, out blob, updateAccessTime: true);
             }
 
@@ -122,25 +122,25 @@ namespace Trecs
         public T GetBlob<T>(PtrHandle handle)
             where T : class
         {
-            Assert.That(!_isDisposed);
-            Assert.That(!handle.IsNull);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(!handle.IsNull);
 
             if (!_activeHandles.TryGetValue(handle, out var blobId))
             {
-                throw Assert.CreateException(
-                    "Attempted to get an unrecognized blob handle with id {}",
+                throw TrecsAssert.CreateException(
+                    "Attempted to get an unrecognized blob handle with id {0}",
                     handle.Value
                 );
             }
 
             if (_activeBlobs.TryGetValue(blobId, out var info))
             {
-                Assert.That(info.TypeHash == TypeIdProvider.GetTypeId<T>());
+                TrecsAssert.That(info.TypeHash == TypeIdProvider.GetTypeId<T>());
                 return _store.GetManagedBlob<T>(blobId, updateAccessTime: true);
             }
 
-            throw Assert.CreateException(
-                "Attempted to get a disposed blob handle with id {}",
+            throw TrecsAssert.CreateException(
+                "Attempted to get a disposed blob handle with id {0}",
                 blobId
             );
         }
@@ -160,7 +160,7 @@ namespace Trecs
         public SharedPtr<T> CreateBlob<T>(BlobId blobId, T blob)
             where T : class
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             var handle = _store.CreateBlobPtr<T>(blobId, blob);
             return AddBlobEntry<T>(blobId, handle.Handle);
         }
@@ -168,7 +168,7 @@ namespace Trecs
         public bool TryGetBlob<T>(BlobId blobId, out SharedPtr<T> ptr)
             where T : class
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (_activeBlobs.ContainsKey(blobId))
             {
@@ -192,7 +192,10 @@ namespace Trecs
         {
             if (!TryGetBlob<T>(blobId, out var ptr))
             {
-                throw Assert.CreateException("Attempted to get an unrecognized blob {}", blobId);
+                throw TrecsAssert.CreateException(
+                    "Attempted to get an unrecognized blob {0}",
+                    blobId
+                );
             }
 
             return ptr;
@@ -202,7 +205,7 @@ namespace Trecs
             where T : class
         {
             ref var info = ref _activeBlobs.GetValueByRef(blobId);
-            Assert.That(info.TypeHash == TypeIdProvider.GetTypeId<T>());
+            TrecsAssert.That(info.TypeHash == TypeIdProvider.GetTypeId<T>());
             info.RefCount += 1;
 
             var newHandle = new PtrHandle(_idCounter.Alloc());
@@ -215,7 +218,7 @@ namespace Trecs
         public bool TryClone<T>(PtrHandle handle, out SharedPtr<T> result)
             where T : class
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (!_activeHandles.TryGetValue(handle, out var blobId))
             {
@@ -229,7 +232,7 @@ namespace Trecs
 
         public void ClearAll(bool warnUndisposed)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (_activeHandles.Count > 0)
             {
@@ -270,25 +273,27 @@ namespace Trecs
                 _tempBuffer1.Clear();
             }
 
-            Assert.That(_activeBlobs.Count == 0);
-            Assert.That(_activeHandles.Count == 0);
-            Assert.That(_blobCacheHandles.Count == 0);
+            TrecsAssert.That(_activeBlobs.Count == 0);
+            TrecsAssert.That(_activeHandles.Count == 0);
+            TrecsAssert.That(_blobCacheHandles.Count == 0);
         }
 
         public void Dispose()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             ClearAll(warnUndisposed: true);
             _isDisposed = true;
         }
 
         public void DisposeHandle(PtrHandle id)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (!_activeHandles.TryGetValue(id, out var blobId))
             {
-                throw Assert.CreateException("Attempted to dispose an unrecognized blob handle");
+                throw TrecsAssert.CreateException(
+                    "Attempted to dispose an unrecognized blob handle"
+                );
             }
 
             _activeHandles.RemoveMustExist(id);
@@ -297,7 +302,7 @@ namespace Trecs
             ref var info = ref _activeBlobs.GetValueByRef(blobId);
             info.RefCount -= 1;
 
-            Assert.That(info.RefCount >= 0);
+            TrecsAssert.That(info.RefCount >= 0);
 
             if (info.RefCount == 0)
             {
@@ -308,10 +313,10 @@ namespace Trecs
             }
         }
 
-        public void Deserialize(ITrecsSerializationReader reader)
+        public void Deserialize(ISerializationReader reader)
         {
-            Assert.That(_activeBlobs.Count == 0);
-            Assert.That(_activeHandles.Count == 0);
+            TrecsAssert.That(_activeBlobs.Count == 0);
+            TrecsAssert.That(_activeHandles.Count == 0);
 
             _idCounter.Value = reader.Read<uint>("_handleCounter");
             reader.ReadInPlace<DenseDictionary<BlobId, BlobInfo>>("_activeBlobs", _activeBlobs);
@@ -326,7 +331,7 @@ namespace Trecs
             }
         }
 
-        public void Serialize(ITrecsSerializationWriter writer)
+        public void Serialize(ISerializationWriter writer)
         {
             writer.Write<uint>("_handleCounter", _idCounter.Value);
             writer.Write<DenseDictionary<BlobId, BlobInfo>>("_activeBlobs", _activeBlobs);

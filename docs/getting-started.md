@@ -12,9 +12,6 @@ With the [openupm-cli](https://openupm.com/):
 
 ```bash
 openupm add com.trecs.core
-
-# Optional: snapshots, recording / playback, save / load
-openupm add com.trecs.serialization
 ```
 
 Or add the scoped registry to `Packages/manifest.json` manually:
@@ -29,8 +26,7 @@ Or add the scoped registry to `Packages/manifest.json` manually:
     }
   ],
   "dependencies": {
-    "com.trecs.core": "0.2.0",
-    "com.trecs.serialization": "0.2.0"
+    "com.trecs.core": "0.2.0"
   }
 }
 ```
@@ -43,13 +39,7 @@ In **Window → Package Manager**, click **+ → Add package from git URL** and 
 https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.core
 ```
 
-For the optional serialization package:
-
-```
-https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.serialization
-```
-
-Add `com.trecs.core` first — Unity can't resolve versioned dependencies from git URLs, so order matters.
+`com.trecs.core` ships everything: the ECS runtime, deterministic binary serialization, snapshot / recording / playback, and the Trecs Player editor window. No separate serialization package to install.
 
 ## Your first entity
 

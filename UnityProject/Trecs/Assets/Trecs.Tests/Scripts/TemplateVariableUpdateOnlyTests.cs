@@ -2,8 +2,6 @@ using System;
 using System.IO;
 using NUnit.Framework;
 using Trecs.Internal;
-using Trecs.Serialization;
-using Trecs.Serialization.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -427,7 +425,7 @@ namespace Trecs.Tests
             // pattern in WorldStateSerializerTests — write to a memory
             // buffer, mutate state, then read back and confirm restoration
             // overwrote the mutation.
-            var registry = SerializationFactory.CreateRegistry();
+            var registry = new SerializerRegistry();
             var serializer = new WorldStateSerializer(env.World);
             byte[] snapshotBytes;
             using (var writer = new BinarySerializationWriter(registry))
@@ -475,7 +473,7 @@ namespace Trecs.Tests
 
             using var env = new TestEnvironment(builder.BuildAndInitialize());
 
-            var registry = SerializationFactory.CreateRegistry();
+            var registry = new SerializerRegistry();
             var serializer = new WorldStateSerializer(env.World);
 
             byte[] checksumBytes;
@@ -530,7 +528,7 @@ namespace Trecs.Tests
             }
             env.Accessor.SubmitEntities();
 
-            var registry = SerializationFactory.CreateRegistry();
+            var registry = new SerializerRegistry();
             var serializer = new WorldStateSerializer(env.World);
 
             int snapshotLength = WriteAndMeasure(serializer, registry, flags: 0);

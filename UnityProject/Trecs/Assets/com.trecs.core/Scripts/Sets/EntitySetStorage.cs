@@ -83,14 +83,14 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void AddUnchecked(EntityIndex entityIndex)
         {
-            Assert.That(!entityIndex.GroupIndex.IsNull);
+            TrecsAssert.That(!entityIndex.GroupIndex.IsNull);
             _entriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void RemoveUnchecked(EntityIndex entityIndex)
         {
-            Assert.That(!entityIndex.GroupIndex.IsNull);
+            TrecsAssert.That(!entityIndex.GroupIndex.IsNull);
             var entry = _entriesPerGroup[entityIndex.GroupIndex.Index];
             if (entry.IsValid)
             {
@@ -151,7 +151,7 @@ namespace Trecs.Internal
         /// </summary>
         internal void FlushJobWrites()
         {
-            Assert.That(
+            TrecsAssert.That(
                 *_jobClearRequested == 0,
                 "FlushJobWrites called with a pending clear flag — a code path filled "
                     + "the job bags without going through a SetFlushJob, leaving the flag "

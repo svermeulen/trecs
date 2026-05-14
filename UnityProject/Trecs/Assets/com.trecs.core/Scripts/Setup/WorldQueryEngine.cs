@@ -70,7 +70,7 @@ namespace Trecs
 
         int GetComponentsListHash(List<Type> componentTypes)
         {
-            Assert.That(componentTypes.Count > 0);
+            TrecsAssert.That(componentTypes.Count > 0);
 
             var componentsHash = TypeIdProvider.GetTypeId(componentTypes[0]);
 
@@ -171,17 +171,17 @@ namespace Trecs
                 }
                 else
                 {
-                    Assert.That(
+                    TrecsAssert.That(
                         uniqueTemplate == resolvedTemplate.Template,
-                        "Ambiguous templates found for tags {} but expected exactly one",
+                        "Ambiguous templates found for tags {0} but expected exactly one",
                         tags
                     );
                 }
             }
 
-            Assert.IsNotNull(
+            TrecsAssert.IsNotNull(
                 uniqueTemplate,
-                "No templates found for tags {}.  Expected exactly one",
+                "No templates found for tags {0}.  Expected exactly one",
                 tags
             );
             return uniqueTemplate;
@@ -205,17 +205,17 @@ namespace Trecs
                 }
                 else
                 {
-                    Assert.That(
+                    TrecsAssert.That(
                         result == resolvedTemplate,
-                        "Ambiguous templates found for tags {} but expected exactly one",
+                        "Ambiguous templates found for tags {0} but expected exactly one",
                         tags
                     );
                 }
             }
 
-            Assert.IsNotNull(
+            TrecsAssert.IsNotNull(
                 result,
-                "No concrete template found for tags {}.  Expected exactly one",
+                "No concrete template found for tags {0}.  Expected exactly one",
                 tags
             );
             return result;
@@ -255,7 +255,7 @@ namespace Trecs
             }
 
             var groups = tagsetInfo.Groups;
-            Assert.That(groups.Count > 0, "No groups found for tags {}", tagset);
+            TrecsAssert.That(groups.Count > 0, "No groups found for tags {0}", tagset);
 
             if (groups.Count == 1)
             {
@@ -276,8 +276,8 @@ namespace Trecs
             {
                 if (_groupInfos[groups[i].Index].ResolvedTemplate.Template != firstTemplate)
                 {
-                    throw Assert.CreateException(
-                        "Ambiguous groups found for tags {}.  Matches span multiple templates: {}.  "
+                    throw TrecsAssert.CreateException(
+                        "Ambiguous groups found for tags {0}.  Matches span multiple templates: {1}.  "
                             + "The resolver only picks a smallest match within one template.  "
                             + "Add a discriminator tag to make the desired template's tag set unique.",
                         tagset,
@@ -311,9 +311,9 @@ namespace Trecs
 
             if (!smallestUnique)
             {
-                throw Assert.CreateException(
-                    "Ambiguous groups found for tags {}.  Multiple matching groups share the "
-                        + "smallest tag-set size: {}.  Narrow the query with an additional tag.",
+                throw TrecsAssert.CreateException(
+                    "Ambiguous groups found for tags {0}.  Multiple matching groups share the "
+                        + "smallest tag-set size: {1}.  Narrow the query with an additional tag.",
                     tagset,
                     FormatMatches(groups)
                 );
@@ -338,10 +338,10 @@ namespace Trecs
                 {
                     if (!otherTags.Contains(tag))
                     {
-                        throw Assert.CreateException(
-                            "Ambiguous groups found for tags {}.  The smallest match isn't a "
+                        throw TrecsAssert.CreateException(
+                            "Ambiguous groups found for tags {0}.  The smallest match isn't a "
                                 + "subset of every other match — matches form siblings rather "
-                                + "than a chain: {}.  Narrow the query with an additional tag.",
+                                + "than a chain: {1}.  Narrow the query with an additional tag.",
                             tagset,
                             FormatMatches(groups)
                         );

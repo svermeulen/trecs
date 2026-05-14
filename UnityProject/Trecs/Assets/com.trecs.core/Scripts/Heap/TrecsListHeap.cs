@@ -1,41 +1,30 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using Trecs.Internal;
-using Unity.Burst;
-using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
     /// <summary>
-    /// Manages the storage backing <see cref="TrecsList{T}"/>. The stable
-    /// <see cref="TrecsListHeader"/> for each list is allocated through the shared
-    /// <see cref="NativeChunkStore"/> (so wrappers can cache the header pointer across grows
-    /// and the safety handle is minted alongside every other native-heap allocation).
-    /// The resizable data buffer stays as a direct <c>AllocatorManager.Persistent</c>
-    /// allocation owned by the header — necessary because the wrapper's <c>Grow</c> path runs
-    /// inside Burst jobs and needs allocator calls that Burst can compile.
+    /// Manages the storage backing <see cref="TrecsList{T}"/>. Both the stable
+    /// <see cref="TrecsListHeader"/> and the variable-sized data buffer it points at live
+    /// in the shared <see cref="NativeChunkStore"/>. Grow operations are main-thread-only —
+    /// jobs cannot grow lists because the chunk store's allocator path isn't Burst-callable.
+    /// Pre-size with <see cref="TrecsList{T}.EnsureCapacity(HeapAccessor, int)"/> before
+    /// scheduling jobs that <c>Add</c> elements.
     /// </summary>
     public sealed class TrecsListHeap
     {
         readonly TrecsLog _log;
 
         readonly NativeChunkStore _chunkStore;
-        readonly Dictionary<uint, Type> _typesByHandle = new();
+        readonly HandleTypeRegistry _registry = new();
         bool _isDisposed;
 
         NativeTrecsListResolver _resolver;
 
-        // Static delegate so chunk_store.Free's onDrained callback doesn't allocate a
-        // closure per DisposeEntry call. Reads the data buffer info out of the header
-        // via the entry's still-valid Address.
-        static readonly Action<NativeChunkStoreEntry> s_freeDataBufferOnDrained =
-            FreeDataBufferOnDrained;
-
         internal TrecsListHeap(TrecsLog log, NativeChunkStore chunkStore)
         {
-            Assert.IsNotNull(chunkStore);
+            TrecsAssert.IsNotNull(chunkStore);
             _log = log;
             _chunkStore = chunkStore;
             _resolver = new NativeTrecsListResolver(_chunkStore.Resolver);
@@ -45,8 +34,8 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
-                return _typesByHandle.Count;
+                TrecsAssert.That(!_isDisposed);
+                return _registry.Count;
             }
         }
 
@@ -54,7 +43,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return ref _resolver;
             }
         }
@@ -62,14 +51,16 @@ namespace Trecs
         public unsafe TrecsList<T> Alloc<T>(int initialCapacity = 0)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
-            Assert.That(initialCapacity >= 0, "initialCapacity must be non-negative");
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(initialCapacity >= 0, "initialCapacity must be non-negative");
 
             var elementSize = UnsafeUtility.SizeOf<T>();
             var elementAlign = UnsafeUtility.AlignOf<T>();
 
             // Header in the chunk store — small, stable allocation. The data buffer is
-            // owned by the header (header.Data) and managed by AllocatorManager directly.
+            // also in the chunk store (see AllocDataSlot); the header caches its address
+            // in Data for one-indirection job access and stores the owning PtrHandle in
+            // DataHandle for grow/free bookkeeping.
             var handle = _chunkStore.Alloc(
                 UnsafeUtility.SizeOf<TrecsListHeader>(),
                 UnsafeUtility.AlignOf<TrecsListHeader>(),
@@ -81,26 +72,100 @@ namespace Trecs
             headerPtr->Count = 0;
             headerPtr->Capacity = 0;
             headerPtr->Data = IntPtr.Zero;
+            headerPtr->DataHandle = default;
             headerPtr->ElementSize = elementSize;
             headerPtr->ElementAlign = elementAlign;
 
             if (initialCapacity > 0)
             {
-                var data = AllocatorManager.Allocate(
-                    Allocator.Persistent,
-                    elementSize,
-                    elementAlign,
-                    initialCapacity
-                );
-                headerPtr->Data = new IntPtr(data);
-                headerPtr->Capacity = initialCapacity;
+                AllocDataSlot(headerPtr, initialCapacity, TypeHash<T>.Value);
             }
 
-            _typesByHandle.Add(handle.Value, typeof(T));
+            _registry.Add(handle.Value, typeof(T));
 
             _log.Trace("Allocated TrecsList<{0}> with handle {1}", typeof(T), handle.Value);
 
             return new TrecsList<T>(handle);
+        }
+
+        /// <summary>
+        /// Grows the list's data buffer to hold at least <paramref name="minCapacity"/>
+        /// elements. Doubles geometrically past the existing capacity to amortise.
+        /// No-op if already at or above <paramref name="minCapacity"/>.
+        ///
+        /// <para>Main-thread only. Any in-flight job that holds a
+        /// <see cref="TrecsListRead{T}"/> or <see cref="TrecsListWrite{T}"/> over this
+        /// list must be completed first — verified via the header's
+        /// <c>AtomicSafetyHandle</c>.</para>
+        /// </summary>
+        public unsafe void EnsureCapacity<T>(in TrecsList<T> list, int minCapacity)
+            where T : unmanaged
+        {
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(minCapacity >= 0, "minCapacity must be non-negative");
+
+            var entry = ResolveEntry<T>(list.Handle.Value);
+            var headerPtr = (TrecsListHeader*)entry.Address.ToPointer();
+
+            if (minCapacity <= headerPtr->Capacity)
+            {
+                return;
+            }
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            // Reject the grow if any job is still using the list. The cached header->Data
+            // is about to change; jobs would otherwise read a dangling pointer.
+            AtomicSafetyHandle.CheckDeallocateAndThrow(entry.Safety);
+#endif
+
+            var newCapacity = headerPtr->Capacity == 0 ? 4 : headerPtr->Capacity;
+            while (newCapacity < minCapacity)
+            {
+                newCapacity *= 2;
+            }
+
+            var oldDataHandle = headerPtr->DataHandle;
+            var oldData = headerPtr->Data;
+            var elementSize = headerPtr->ElementSize;
+            var liveBytes = (long)headerPtr->Count * elementSize;
+
+            var newByteSize = newCapacity * elementSize;
+            var newDataHandle = _chunkStore.Alloc(
+                newByteSize,
+                headerPtr->ElementAlign,
+                TypeHash<T>.Value,
+                out var newDataAddress
+            );
+
+            if (liveBytes > 0)
+            {
+                UnsafeUtility.MemCpy(newDataAddress.ToPointer(), oldData.ToPointer(), liveBytes);
+            }
+            // No tail MemClear needed — _chunkStore.Alloc already zeroed the slot.
+
+            headerPtr->Data = newDataAddress;
+            headerPtr->DataHandle = newDataHandle;
+            headerPtr->Capacity = newCapacity;
+
+            if (!oldDataHandle.IsNull)
+            {
+                _chunkStore.Free(oldDataHandle);
+            }
+        }
+
+        unsafe void AllocDataSlot(TrecsListHeader* headerPtr, int capacity, int typeHash)
+        {
+            // _chunkStore.Alloc returns a zeroed slot, so the unused tail past
+            // Count*ElementSize is deterministic for snapshots.
+            var dataHandle = _chunkStore.Alloc(
+                capacity * headerPtr->ElementSize,
+                headerPtr->ElementAlign,
+                typeHash,
+                out var dataAddress
+            );
+            headerPtr->Data = dataAddress;
+            headerPtr->DataHandle = dataHandle;
+            headerPtr->Capacity = capacity;
         }
 
         public unsafe TrecsListRead<T> Read<T>(in TrecsList<T> list)
@@ -128,12 +193,12 @@ namespace Trecs
         internal NativeChunkStoreEntry ResolveEntry<T>(uint address)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
-            Assert.That(
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "TrecsListHeap.ResolveEntry is main-thread only; jobs use NativeTrecsListResolver"
             );
-            Assert.That(address != 0, "Attempted to resolve null TrecsList handle");
+            TrecsAssert.That(address != 0, "Attempted to resolve null TrecsList handle");
 
             var entry = _chunkStore.ResolveEntry(new PtrHandle(address));
             if (entry.TypeHash != TypeHash<T>.Value)
@@ -146,163 +211,111 @@ namespace Trecs
             return entry;
         }
 
-        public void DisposeEntry(uint address)
+        public unsafe void DisposeEntry(uint address)
         {
-            Assert.That(!_isDisposed);
-            Assert.That(address != 0);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(address != 0);
 
-            if (!_typesByHandle.ContainsKey(address))
+            if (!_registry.ContainsKey(address))
             {
-                throw Assert.CreateException(
-                    "Attempted to dispose invalid TrecsList handle ({})",
+                throw TrecsAssert.CreateException(
+                    "Attempted to dispose invalid TrecsList handle ({0})",
                     address
                 );
             }
 
-            // Free the chunk-store header AND the AllocatorManager-owned data buffer.
-            // s_freeDataBufferOnDrained reads the data pointer out of the header — it runs
-            // after the safety handle has been released but before the header slot is
-            // returned to its bucket, so no Burst job can be reading header->Data when we
-            // free it. Call chunk-store Free first; if it throws (job still using), our
-            // managed-side bookkeeping stays intact and the caller can retry.
-            _chunkStore.Free(new PtrHandle(address), s_freeDataBufferOnDrained);
-            _typesByHandle.Remove(address);
+            FreeListBackingSlots(new PtrHandle(address));
+            _registry.TryRemove(address);
             _log.Trace("Disposed TrecsList {0}", address);
         }
 
-        static unsafe void FreeDataBufferOnDrained(NativeChunkStoreEntry entry)
+        /// <summary>
+        /// Frees the chunk-store header slot first (its safety handle is the one users
+        /// see, so its <c>CheckDeallocateAndThrow</c> catches in-flight jobs), then the
+        /// data slot (which has no user-facing safety, so its check passes vacuously).
+        /// </summary>
+        unsafe void FreeListBackingSlots(PtrHandle headerHandle)
         {
-            var headerPtr = (TrecsListHeader*)entry.Address.ToPointer();
-            if (headerPtr->Data != IntPtr.Zero)
+            var headerEntry = _chunkStore.ResolveEntry(headerHandle);
+            var dataHandle = ((TrecsListHeader*)headerEntry.Address.ToPointer())->DataHandle;
+            _chunkStore.Free(headerHandle);
+            if (!dataHandle.IsNull)
             {
-                AllocatorManager.Free(
-                    Allocator.Persistent,
-                    headerPtr->Data.ToPointer(),
-                    headerPtr->ElementSize,
-                    headerPtr->ElementAlign,
-                    headerPtr->Capacity
-                );
+                _chunkStore.Free(dataHandle);
             }
         }
 
-        public void ClearAll(bool warnUndisposed)
+        public unsafe void ClearAll(bool warnUndisposed)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            if (warnUndisposed && _typesByHandle.Count > 0 && _log.IsWarningEnabled())
+            if (warnUndisposed && _registry.Count > 0 && _log.IsWarningEnabled())
             {
-                var typeNames = _typesByHandle
-                    .Values.Select(t => t.GetPrettyName())
-                    .Distinct()
-                    .Join(", ");
                 _log.Warning(
                     "Found {0} undisposed TrecsLists with element types: {1}",
-                    _typesByHandle.Count,
-                    typeNames
+                    _registry.Count,
+                    _registry.DescribeRegisteredTypes()
                 );
             }
 
-            foreach (var address in _typesByHandle.Keys.ToArray())
+            // _chunkStore.Free doesn't touch the registry; safe to iterate directly.
+            foreach (var address in _registry.Handles)
             {
-                _chunkStore.Free(new PtrHandle(address), s_freeDataBufferOnDrained);
+                FreeListBackingSlots(new PtrHandle(address));
             }
-            _typesByHandle.Clear();
+            _registry.Clear();
         }
 
         internal void Dispose()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             ClearAll(warnUndisposed: true);
             _isDisposed = true;
         }
 
-        public unsafe void Serialize(ITrecsSerializationWriter writer)
+        /// <summary>
+        /// Writes managed-side bookkeeping (handle → type) only. The header struct, the
+        /// data buffer, and the DataHandle linking them are all dumped by
+        /// <c>NativeChunkStore.Serialize</c> which must run before this.
+        /// </summary>
+        public void Serialize(ISerializationWriter writer)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
+            _registry.Serialize(writer);
+            _log.Trace("Serialized {0} TrecsList entries", _registry.Count);
+        }
 
-            writer.Write<int>("NumEntries", _typesByHandle.Count);
+        /// <summary>
+        /// Restores managed-side bookkeeping and re-caches each header's <c>Data</c>
+        /// pointer from its (restored) <c>DataHandle</c>. Assumes
+        /// <c>NativeChunkStore.Deserialize</c> already ran, so both the header and its
+        /// data slot are resolvable.
+        /// </summary>
+        public unsafe void Deserialize(ISerializationReader reader)
+        {
+            TrecsAssert.That(!_isDisposed);
 
-            foreach (var (address, type) in _typesByHandle)
+            _registry.Deserialize(reader);
+
+            // Re-cache header->Data from each restored DataHandle.
+            // (Count/Capacity/ElementSize/ElementAlign round-trip via the chunk-store
+            // header dump; only the cached data pointer is stale.)
+            foreach (var address in _registry.Handles)
             {
                 var entry = _chunkStore.ResolveEntry(new PtrHandle(address));
                 var headerPtr = (TrecsListHeader*)entry.Address.ToPointer();
-
-                writer.Write<uint>("Address", address);
-                writer.Write<int>("InnerTypeId", TypeIdProvider.GetTypeId(type));
-                writer.Write<int>("Count", headerPtr->Count);
-                writer.Write<int>("Capacity", headerPtr->Capacity);
-                writer.Write<int>("ElementSize", headerPtr->ElementSize);
-                writer.Write<int>("ElementAlign", headerPtr->ElementAlign);
-
-                // Only the live portion (Count * ElementSize) is meaningful; the rest of the
-                // buffer (up to Capacity) is uninitialised tail space.
-                var liveBytes = headerPtr->Count * headerPtr->ElementSize;
-                if (liveBytes > 0)
+                if (!headerPtr->DataHandle.IsNull)
                 {
-                    writer.BlitWriteRawBytes("Data", headerPtr->Data.ToPointer(), liveBytes);
+                    var dataEntry = _chunkStore.ResolveEntry(headerPtr->DataHandle);
+                    headerPtr->Data = dataEntry.Address;
+                }
+                else
+                {
+                    headerPtr->Data = IntPtr.Zero;
                 }
             }
 
-            _log.Trace("Serialized {0} TrecsList entries", _typesByHandle.Count);
-        }
-
-        public unsafe void Deserialize(ITrecsSerializationReader reader)
-        {
-            Assert.That(!_isDisposed);
-            Assert.That(_typesByHandle.Count == 0);
-
-            var numEntries = reader.Read<int>("NumEntries");
-
-            for (int i = 0; i < numEntries; i++)
-            {
-                var savedAddress = reader.Read<uint>("Address");
-                var innerTypeId = reader.Read<int>("InnerTypeId");
-                var count = reader.Read<int>("Count");
-                var capacity = reader.Read<int>("Capacity");
-                var elementSize = reader.Read<int>("ElementSize");
-                var elementAlign = reader.Read<int>("ElementAlign");
-                var innerType = TypeIdProvider.GetTypeFromId(innerTypeId);
-
-                // Restore the header slot at its original handle so component-stored
-                // TrecsList handles still resolve.
-                var handle = _chunkStore.AllocAtSlot(
-                    savedAddress,
-                    UnsafeUtility.SizeOf<TrecsListHeader>(),
-                    UnsafeUtility.AlignOf<TrecsListHeader>(),
-                    BurstRuntime.GetHashCode32(innerType),
-                    out var headerAddress
-                );
-                var headerPtr = (TrecsListHeader*)headerAddress.ToPointer();
-
-                IntPtr dataPtr = IntPtr.Zero;
-                if (capacity > 0)
-                {
-                    dataPtr = new IntPtr(
-                        AllocatorManager.Allocate(
-                            Allocator.Persistent,
-                            elementSize,
-                            elementAlign,
-                            capacity
-                        )
-                    );
-                    var liveBytes = count * elementSize;
-                    if (liveBytes > 0)
-                    {
-                        reader.BlitReadRawBytes("Data", dataPtr.ToPointer(), liveBytes);
-                    }
-                }
-
-                headerPtr->Count = count;
-                headerPtr->Capacity = capacity;
-                headerPtr->ElementSize = elementSize;
-                headerPtr->ElementAlign = elementAlign;
-                headerPtr->Data = dataPtr;
-
-                _typesByHandle.Add(handle.Value, innerType);
-            }
-
-            _chunkStore.OnDeserializeComplete();
-            _log.Debug("Deserialized {0} TrecsList entries", numEntries);
+            _log.Debug("Deserialized {0} TrecsList entries", _registry.Count);
         }
     }
 }

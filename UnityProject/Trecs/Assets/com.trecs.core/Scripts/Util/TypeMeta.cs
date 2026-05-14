@@ -50,7 +50,7 @@ namespace Trecs.Internal
                 return type;
             }
 
-            throw Assert.CreateException("Unable to find type for given hash");
+            throw TrecsAssert.CreateException("Unable to find type for given hash");
         }
 
         static CachedTypeInfo GetInfo(Type type)

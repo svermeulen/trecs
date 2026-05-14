@@ -8,11 +8,18 @@ namespace Trecs.Internal
     /// In-memory header for a single <see cref="TrecsList{T}"/> allocation. Lives at a stable
     /// address on the heap for the lifetime of the list; the data pointer changes on grow but
     /// the header pointer does not. Wrapper structs cache the header pointer at Open time.
+    ///
+    /// <para><c>DataHandle</c> owns the variable-sized data slot in the same
+    /// <see cref="NativeChunkStore"/> as the header. <c>Data</c> is a fast-access cache of
+    /// that slot's address, refreshed on every grow and on deserialize. Jobs read
+    /// <c>Data</c> directly without touching the chunk-store resolver, so element access
+    /// stays a single indirection.</para>
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
     public struct TrecsListHeader
     {
         public IntPtr Data;
+        public PtrHandle DataHandle;
         public int Count;
         public int Capacity;
         public int ElementSize;
@@ -27,8 +34,9 @@ namespace Trecs
     /// <see cref="TrecsListHeader"/> pointers. Backed by the shared
     /// <see cref="NativeChunkStoreResolver"/> with an extra type-hash check on the way out.
     /// Obtain via <see cref="HeapAccessor.NativeTrecsListResolver"/> or
-    /// <see cref="NativeWorldAccessor.TrecsListResolver"/>. Open a typed view with
-    /// <see cref="Read{T}"/> or <see cref="Write{T}"/>.
+    /// <see cref="NativeWorldAccessor.TrecsListResolver"/>. Pass to
+    /// <see cref="TrecsList{T}.Read(in NativeTrecsListResolver)"/> or
+    /// <see cref="TrecsList{T}.Write(in NativeTrecsListResolver)"/>.
     /// </summary>
     public readonly unsafe struct NativeTrecsListResolver
     {
@@ -37,28 +45,6 @@ namespace Trecs
         public NativeTrecsListResolver(NativeChunkStoreResolver chunkResolver)
         {
             _chunkResolver = chunkResolver;
-        }
-
-        public TrecsListRead<T> Read<T>(in TrecsList<T> list)
-            where T : unmanaged
-        {
-            var entry = ResolveEntry<T>(list.Handle.Value);
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            return new TrecsListRead<T>((TrecsListHeader*)entry.Address.ToPointer(), entry.Safety);
-#else
-            return new TrecsListRead<T>((TrecsListHeader*)entry.Address.ToPointer());
-#endif
-        }
-
-        public TrecsListWrite<T> Write<T>(in TrecsList<T> list)
-            where T : unmanaged
-        {
-            var entry = ResolveEntry<T>(list.Handle.Value);
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            return new TrecsListWrite<T>((TrecsListHeader*)entry.Address.ToPointer(), entry.Safety);
-#else
-            return new TrecsListWrite<T>((TrecsListHeader*)entry.Address.ToPointer());
-#endif
         }
 
         internal NativeChunkStoreEntry ResolveEntry<T>(uint address)

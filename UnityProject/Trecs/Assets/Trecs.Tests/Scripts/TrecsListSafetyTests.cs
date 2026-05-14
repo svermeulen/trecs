@@ -51,13 +51,6 @@ namespace Trecs.Tests
             }
         }
 
-        // Vestigial helper from the deferred-flush era; immediate-write model no longer
-        // needs a flush boundary. Kept as a no-op to avoid touching every call site.
-        static void Flush(TrecsListHeap heap)
-        {
-            _ = heap;
-        }
-
         [Test]
         public void TwoReaders_OnSameList_NoConflict()
         {
@@ -65,20 +58,18 @@ namespace Trecs.Tests
             var list = heap.Alloc<int>(8);
             var w = heap.Write(in list);
             w.Add(42);
-            Flush(heap);
 
             using var sinkA = new NativeReference<int>(Allocator.TempJob);
             using var sinkB = new NativeReference<int>(Allocator.TempJob);
 
-            var a = new ReadJob { Read = heap.Resolver.Read(in list), Sink = sinkA }.Schedule();
-            var b = new ReadJob { Read = heap.Resolver.Read(in list), Sink = sinkB }.Schedule();
+            var a = new ReadJob { Read = list.Read(heap.Resolver), Sink = sinkA }.Schedule();
+            var b = new ReadJob { Read = list.Read(heap.Resolver), Sink = sinkB }.Schedule();
             JobHandle.CombineDependencies(a, b).Complete();
 
             NAssert.AreEqual(42, sinkA.Value);
             NAssert.AreEqual(42, sinkB.Value);
 
             heap.DisposeEntry(list.Handle.Value);
-            Flush(heap);
             heap.Dispose();
             chunkStore.Dispose();
         }
@@ -88,22 +79,20 @@ namespace Trecs.Tests
         {
             var (heap, chunkStore) = CreateHeap();
             var list = heap.Alloc<int>(16);
-            Flush(heap);
 
-            var first = new WriteJob { Write = heap.Resolver.Write(in list), Value = 1 }.Schedule();
+            var first = new WriteJob { Write = list.Write(heap.Resolver), Value = 1 }.Schedule();
 
             try
             {
                 NAssert.Throws<InvalidOperationException>(() =>
                 {
-                    new WriteJob { Write = heap.Resolver.Write(in list), Value = 2 }.Schedule();
+                    new WriteJob { Write = list.Write(heap.Resolver), Value = 2 }.Schedule();
                 });
             }
             finally
             {
                 first.Complete();
                 heap.DisposeEntry(list.Handle.Value);
-                Flush(heap);
                 heap.Dispose();
             }
         }
@@ -115,23 +104,21 @@ namespace Trecs.Tests
             var list = heap.Alloc<int>(8);
             var w = heap.Write(in list);
             w.Add(0);
-            Flush(heap);
 
             using var sink = new NativeReference<int>(Allocator.TempJob);
-            var reader = new ReadJob { Read = heap.Resolver.Read(in list), Sink = sink }.Schedule();
+            var reader = new ReadJob { Read = list.Read(heap.Resolver), Sink = sink }.Schedule();
 
             try
             {
                 NAssert.Throws<InvalidOperationException>(() =>
                 {
-                    new WriteJob { Write = heap.Resolver.Write(in list), Value = 99 }.Schedule();
+                    new WriteJob { Write = list.Write(heap.Resolver), Value = 99 }.Schedule();
                 });
             }
             finally
             {
                 reader.Complete();
                 heap.DisposeEntry(list.Handle.Value);
-                Flush(heap);
                 heap.Dispose();
             }
         }
@@ -146,26 +133,20 @@ namespace Trecs.Tests
             var (heap, chunkStore) = CreateHeap();
             var list = heap.Alloc<int>(16);
             var aliasOfList = list;
-            Flush(heap);
 
-            var first = new WriteJob { Write = heap.Resolver.Write(in list), Value = 1 }.Schedule();
+            var first = new WriteJob { Write = list.Write(heap.Resolver), Value = 1 }.Schedule();
 
             try
             {
                 NAssert.Throws<InvalidOperationException>(() =>
                 {
-                    new WriteJob
-                    {
-                        Write = heap.Resolver.Write(in aliasOfList),
-                        Value = 2,
-                    }.Schedule();
+                    new WriteJob { Write = aliasOfList.Write(heap.Resolver), Value = 2 }.Schedule();
                 });
             }
             finally
             {
                 first.Complete();
                 heap.DisposeEntry(list.Handle.Value);
-                Flush(heap);
                 heap.Dispose();
             }
         }
@@ -175,11 +156,9 @@ namespace Trecs.Tests
         {
             var (heap, chunkStore) = CreateHeap();
             var list = heap.Alloc<int>(8);
-            Flush(heap);
             heap.DisposeEntry(list.Handle.Value);
-            Flush(heap);
 
-            NAssert.Throws<TrecsException>(() => heap.Resolver.Read(in list));
+            NAssert.Throws<TrecsException>(() => list.Read(heap.Resolver));
 
             heap.Dispose();
             chunkStore.Dispose();
@@ -194,16 +173,14 @@ namespace Trecs.Tests
             w.Add(11);
             w.Add(22);
             w.Add(33);
-            Flush(heap);
 
             using var sink = new NativeReference<int>(Allocator.TempJob);
-            new ReadJob { Read = heap.Resolver.Read(in list), Sink = sink }
+            new ReadJob { Read = list.Read(heap.Resolver), Sink = sink }
                 .Schedule()
                 .Complete();
             NAssert.AreEqual(11, sink.Value);
 
             heap.DisposeEntry(list.Handle.Value);
-            Flush(heap);
             heap.Dispose();
             chunkStore.Dispose();
         }
@@ -236,13 +213,43 @@ namespace Trecs.Tests
         }
 
         [Test]
+        public void EnsureCapacity_WithInFlightJob_ThrowsInEditor()
+        {
+            // EnsureCapacity reallocates the chunk-store-backed data slot and rewrites
+            // header->Data. If we let it run while a Burst job is still resolving the
+            // list, the job would dereference the freed slot. CheckDeallocateAndThrow on
+            // the header's safety handle catches that.
+            var (heap, chunkStore) = CreateHeap();
+            var list = heap.Alloc<int>(4);
+            var w = heap.Write(in list);
+            w.Add(1);
+
+            using var sink = new NativeReference<int>(Allocator.TempJob);
+            var read = heap.Read(in list);
+            var job = new ReadJob { Read = read, Sink = sink }.Schedule();
+
+            // Job is still running with read's safety handle scheduled. EnsureCapacity
+            // must throw before it can free the old data slot underfoot.
+            NAssert.Throws<InvalidOperationException>(() => heap.EnsureCapacity(in list, 64));
+
+            // Correct pattern: complete the job first, then grow.
+            job.Complete();
+            NAssert.AreEqual(1, sink.Value);
+            heap.EnsureCapacity(in list, 64);
+            NAssert.GreaterOrEqual(heap.Read(in list).Capacity, 64);
+
+            heap.DisposeEntry(list.Handle.Value);
+            heap.Dispose();
+            chunkStore.Dispose();
+        }
+
+        [Test]
         public void WriteFromBurstJob_PersistsToList()
         {
             var (heap, chunkStore) = CreateHeap();
             var list = heap.Alloc<int>(16);
-            Flush(heap);
 
-            new WriteJob { Write = heap.Resolver.Write(in list), Value = 777 }
+            new WriteJob { Write = list.Write(heap.Resolver), Value = 777 }
                 .Schedule()
                 .Complete();
 
@@ -251,7 +258,6 @@ namespace Trecs.Tests
             NAssert.AreEqual(777, read[0]);
 
             heap.DisposeEntry(list.Handle.Value);
-            Flush(heap);
             heap.Dispose();
             chunkStore.Dispose();
         }
@@ -272,19 +278,20 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void AddInBurstJob_TriggersGrowAcrossCapacity()
+        public void AddInBurstJob_FillsPreSizedList()
         {
-            // The wrapper caches a stable header pointer; Add re-reads
-            // Data/Count/Capacity on every call and reallocates the data buffer
-            // when Count==Capacity. Verifies the grow path runs end-to-end under
-            // Burst (AllocatorManager.Allocate / MemCpy / Free), not just on
-            // the main thread.
+            // The wrapper caches a stable header pointer + cached data pointer set by
+            // the main-thread EnsureCapacity (which reallocates the chunk-store-backed
+            // data slot). The Burst job then fills it without ever touching the
+            // allocator. Verifies the cached pointer remains valid across the schedule
+            // boundary.
             var (heap, chunkStore) = CreateHeap();
-            var list = heap.Alloc<int>(4); // small initial cap → multiple grows
-            Flush(heap);
+            var list = heap.Alloc<int>(4);
 
             const int n = 1000;
-            new GrowJob { Write = heap.Resolver.Write(in list), AddCount = n }
+            heap.EnsureCapacity(in list, n);
+
+            new GrowJob { Write = list.Write(heap.Resolver), AddCount = n }
                 .Schedule()
                 .Complete();
 
@@ -297,7 +304,6 @@ namespace Trecs.Tests
             }
 
             heap.DisposeEntry(list.Handle.Value);
-            Flush(heap);
             heap.Dispose();
             chunkStore.Dispose();
         }
@@ -310,16 +316,14 @@ namespace Trecs.Tests
             // NativeDenseDictionary lookup.
             var (heap, chunkStore) = CreateHeap();
             var list = heap.Alloc<int>(4);
-            Flush(heap);
 
             NAssert.Throws<TrecsException>(() =>
             {
                 var bad = new TrecsList<float>(list.Handle);
-                heap.Resolver.Read(in bad);
+                bad.Read(heap.Resolver);
             });
 
             heap.DisposeEntry(list.Handle.Value);
-            Flush(heap);
             heap.Dispose();
             chunkStore.Dispose();
         }
@@ -329,16 +333,14 @@ namespace Trecs.Tests
         {
             var (heap, chunkStore) = CreateHeap();
             var list = heap.Alloc<int>(4);
-            Flush(heap);
 
             NAssert.Throws<TrecsException>(() =>
             {
                 var bad = new TrecsList<float>(list.Handle);
-                heap.Resolver.Write(in bad);
+                bad.Write(heap.Resolver);
             });
 
             heap.DisposeEntry(list.Handle.Value);
-            Flush(heap);
             heap.Dispose();
             chunkStore.Dispose();
         }

@@ -11,7 +11,7 @@ namespace Trecs
 
         public static ComponentTypeIdSet FromSingle(ComponentId componentId)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             int id = componentId.Value;
 
             if (id == 0)
@@ -38,7 +38,7 @@ namespace Trecs
             ComponentId componentId
         )
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             var existingComponents = _sets[existing.Id];
 
             // Check if already present
@@ -84,8 +84,8 @@ namespace Trecs
 
         public static IReadOnlyList<ComponentId> GetComponents(ComponentTypeIdSet set)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
-            Assert.That(!set.IsNull, "Cannot get components from null ComponentTypeIdSet");
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(!set.IsNull, "Cannot get components from null ComponentTypeIdSet");
 
             if (_sets.TryGetValue(set.Id, out var existing))
             {
@@ -97,7 +97,7 @@ namespace Trecs
 
         public static string SetToString(ComponentTypeIdSet set)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             if (set.IsNull)
             {
                 return "Null";
@@ -132,9 +132,9 @@ namespace Trecs
             IReadOnlyList<ComponentId> components
         )
         {
-            Assert.That(
+            TrecsAssert.That(
                 existing.Count == components.Count,
-                "ComponentTypeIdSet XOR hash collision detected! ID {} maps to sets of different sizes ({} vs {})",
+                "ComponentTypeIdSet XOR hash collision detected! ID {0} maps to sets of different sizes ({1} vs {2})",
                 id,
                 existing.Count,
                 components.Count
@@ -153,9 +153,9 @@ namespace Trecs
                     }
                 }
 
-                Assert.That(
+                TrecsAssert.That(
                     found,
-                    "ComponentTypeIdSet XOR hash collision detected! ID {} has mismatched components",
+                    "ComponentTypeIdSet XOR hash collision detected! ID {0} has mismatched components",
                     id
                 );
             }

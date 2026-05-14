@@ -62,7 +62,7 @@ namespace Trecs
             NativeBlobBoxPool nativeBlobBoxPool
         )
         {
-            Assert.IsNotNull(nativeBlobBoxPool);
+            TrecsAssert.IsNotNull(nativeBlobBoxPool);
             _log = log;
             _stores = stores;
             _settings = settings ?? BlobCacheSettings.Default;
@@ -76,7 +76,7 @@ namespace Trecs
 
                 if (!store.IsReadOnly)
                 {
-                    Assert.IsNull(_writableStore);
+                    TrecsAssert.IsNull(_writableStore);
                     _writableStore = store;
                 }
             }
@@ -89,7 +89,7 @@ namespace Trecs
 
         IBlobStore RequireWritableStore()
         {
-            Assert.IsNotNull(_writableStore, "No writable blob store found");
+            TrecsAssert.IsNotNull(_writableStore, "No writable blob store found");
             return _writableStore;
         }
 
@@ -98,8 +98,8 @@ namespace Trecs
         // misuse from a job surfaces immediately instead of corrupting state.
         void AssertMainThreadAndNotDisposed()
         {
-            Assert.That(!_hasDisposed);
-            Assert.That(UnityThreadHelper.IsMainThread, "BlobCache is main-thread only");
+            TrecsAssert.That(!_hasDisposed);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread, "BlobCache is main-thread only");
         }
 
         /// <summary>
@@ -152,8 +152,8 @@ namespace Trecs
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime))
             {
-                Assert.That(!manifestEntry.IsNative);
-                Assert.That(manifestEntry.Type.IsClass);
+                TrecsAssert.That(!manifestEntry.IsNative);
+                TrecsAssert.That(manifestEntry.Type.IsClass);
                 return manifestEntry.Type;
             }
 
@@ -163,7 +163,7 @@ namespace Trecs
         internal Type GetManagedBlobType(BlobId id, bool updateAccessTime = true)
         {
             var result = TryGetManagedBlobType(id, updateAccessTime);
-            Assert.IsNotNull(result);
+            TrecsAssert.IsNotNull(result);
             return result;
         }
 
@@ -173,7 +173,7 @@ namespace Trecs
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime))
             {
-                Assert.That(manifestEntry.IsNative);
+                TrecsAssert.That(manifestEntry.IsNative);
                 return manifestEntry.Type;
             }
 
@@ -183,7 +183,7 @@ namespace Trecs
         internal Type GetNativeBlobType(BlobId id, bool updateAccessTime = true)
         {
             var result = TryGetNativeBlobType(id, updateAccessTime);
-            Assert.IsNotNull(result);
+            TrecsAssert.IsNotNull(result);
             return result;
         }
 
@@ -227,7 +227,7 @@ namespace Trecs
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime: updateAccessTime))
             {
-                Assert.That(!manifestEntry.IsNative);
+                TrecsAssert.That(!manifestEntry.IsNative);
                 return true;
             }
 
@@ -281,10 +281,10 @@ namespace Trecs
                 return false;
             }
 
-            Assert.That(!metadata.IsNative);
-            Assert.That(
+            TrecsAssert.That(!metadata.IsNative);
+            TrecsAssert.That(
                 typeof(T).IsAssignableFrom(metadata.Type),
-                "Expected blob assignable to type {}, but found type {}",
+                "Expected blob assignable to type {0}, but found type {1}",
                 typeof(T),
                 metadata.Type
             );
@@ -300,8 +300,8 @@ namespace Trecs
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
-            Assert.That(!metadata.IsNative);
-            Assert.That(typeof(T).IsAssignableFrom(metadata.Type));
+            TrecsAssert.That(!metadata.IsNative);
+            TrecsAssert.That(typeof(T).IsAssignableFrom(metadata.Type));
 
             return (T)blob;
         }
@@ -349,8 +349,8 @@ namespace Trecs
         {
             if (!TryCreateBlobPtr<T>(blobId, out var ptr))
             {
-                throw Assert.CreateException(
-                    "Attempted to get ptr for unrecognized managed blob {}",
+                throw TrecsAssert.CreateException(
+                    "Attempted to get ptr for unrecognized managed blob {0}",
                     blobId
                 );
             }
@@ -362,8 +362,8 @@ namespace Trecs
         {
             if (!TryCreateNativeBlobPtr<T>(blobId, out var ptr))
             {
-                throw Assert.CreateException(
-                    "Attempted to get ptr for unrecognized native blob {}",
+                throw TrecsAssert.CreateException(
+                    "Attempted to get ptr for unrecognized native blob {0}",
                     blobId
                 );
             }
@@ -382,8 +382,8 @@ namespace Trecs
                 )
             )
             {
-                throw Assert.CreateException(
-                    "Attempted to get blob anchor for unrecognized native blob {}",
+                throw TrecsAssert.CreateException(
+                    "Attempted to get blob anchor for unrecognized native blob {0}",
                     blobId
                 );
             }
@@ -412,10 +412,10 @@ namespace Trecs
                 return false;
             }
 
-            Assert.That(metadata.IsNative);
-            Assert.That(
+            TrecsAssert.That(metadata.IsNative);
+            TrecsAssert.That(
                 metadata.Type == typeof(T),
-                "Type mismatch retrieving native blob: stored {}, requested {}",
+                "Type mismatch retrieving native blob: stored {0}, requested {1}",
                 metadata.Type,
                 typeof(T)
             );
@@ -432,8 +432,8 @@ namespace Trecs
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
-            Assert.That(TypeIdProvider.GetTypeId(metadata.Type) == innerTypeId);
-            Assert.That(metadata.IsNative);
+            TrecsAssert.That(TypeIdProvider.GetTypeId(metadata.Type) == innerTypeId);
+            TrecsAssert.That(metadata.IsNative);
 
             return ((NativeBlobBox)blob).Ptr;
         }
@@ -445,8 +445,8 @@ namespace Trecs
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
-            Assert.That(metadata.Type == typeof(T));
-            Assert.That(metadata.IsNative);
+            TrecsAssert.That(metadata.Type == typeof(T));
+            TrecsAssert.That(metadata.IsNative);
 
             return ref UnsafeUtility.AsRef<T>(((NativeBlobBox)blob).Ptr.ToPointer());
         }
@@ -469,7 +469,7 @@ namespace Trecs
         )
         {
             var result = TryGetBlobAndMetadata(id, out var blob, out metadata, updateAccessTime);
-            Assert.That(result, "Attempted to get unrecognized blob id {}", id);
+            TrecsAssert.That(result, "Attempted to get unrecognized blob id {0}", id);
             return blob;
         }
 
@@ -493,7 +493,7 @@ namespace Trecs
                 }
             }
 
-            throw Assert.CreateException("No blob store found for id {}", id);
+            throw TrecsAssert.CreateException("No blob store found for id {0}", id);
         }
 
         public BlobLoadingState GetBlobLoadingState(BlobId id)
@@ -508,7 +508,7 @@ namespace Trecs
                 }
             }
 
-            throw Assert.CreateException("No blob store found for id {}", id);
+            throw TrecsAssert.CreateException("No blob store found for id {0}", id);
         }
 
         internal PtrHandle CreateHandle(BlobId blobId)

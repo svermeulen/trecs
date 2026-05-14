@@ -33,6 +33,7 @@ namespace Trecs
         readonly SystemRunner _systemRunner;
         readonly EntitySubmitter _entitySubmitter;
         readonly WorldAccessorRegistry _accessorRegistry;
+        readonly SerializerRegistry _serializerRegistry;
         IAccessRecorder _accessRecorder;
         readonly WorldSettings _settings;
         readonly Rng _fixedRng;
@@ -86,7 +87,8 @@ namespace Trecs
             NativeBlobBoxPool nativeBlobBoxPool,
             InterpolatedPreviousSaverManager interpolatedPreviousSaverManager,
             ComponentStore componentStore,
-            List<ISystem> systems
+            List<ISystem> systems,
+            SerializerRegistry serializerRegistry
         )
         {
             _log = log;
@@ -100,7 +102,7 @@ namespace Trecs
             _querier = entitiesDb;
             _componentStore = componentStore;
             _eventsManager = eventsManager;
-            Assert.IsNotNull(nativeBlobBoxPool);
+            TrecsAssert.IsNotNull(nativeBlobBoxPool);
             _settings = settings ?? new WorldSettings();
             _blobCache = blobCache;
             _nativeBlobBoxPool = nativeBlobBoxPool;
@@ -132,7 +134,24 @@ namespace Trecs
                 entitiesDb.GetSets(),
                 setStore
             );
+
+            TrecsAssert.IsNotNull(serializerRegistry);
+            _serializerRegistry = serializerRegistry;
         }
+
+        /// <summary>
+        /// The <see cref="SerializerRegistry"/> backing all save / load,
+        /// snapshot, and recording workflows on this world. Pre-populated
+        /// with the built-in primitive, math, ECS, and recording-metadata
+        /// serializers. Register additional <c>ISerializer&lt;T&gt;</c>
+        /// implementations for any managed type stored on the heap
+        /// (<c>SharedPtr&lt;T&gt;</c>, <c>UniquePtr&lt;T&gt;</c>, etc.);
+        /// blittable types can use <see cref="SerializerRegistry.RegisterBlit{T}"/>.
+        /// Registrations made before <see cref="Initialize"/> are picked up
+        /// by all editor tooling; registering later is still fine for
+        /// runtime save / load.
+        /// </summary>
+        public SerializerRegistry SerializerRegistry => _serializerRegistry;
 
         public bool IsDisposed
         {
@@ -195,7 +214,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _systemRunner;
             }
         }
@@ -205,7 +224,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _systemEnableState;
             }
         }
@@ -220,7 +239,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _systemRunner.Systems.Count;
             }
         }
@@ -233,11 +252,11 @@ namespace Trecs
         /// </summary>
         public SystemMetadata GetSystemMetadata(int systemIndex)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             var systems = _systemRunner.Systems;
-            Assert.That(
+            TrecsAssert.That(
                 systemIndex >= 0 && systemIndex < systems.Count,
-                "System index {} out of range [0, {})",
+                "System index {0} out of range [0, {1})",
                 systemIndex,
                 systems.Count
             );
@@ -252,7 +271,7 @@ namespace Trecs
         /// </summary>
         public bool IsSystemEffectivelyEnabled(int systemIndex)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             return _systemEnableState.IsSystemEffectivelyEnabled(systemIndex);
         }
 
@@ -261,7 +280,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _entitySubmitter;
             }
         }
@@ -271,7 +290,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _querier;
             }
         }
@@ -281,7 +300,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _eventsManager;
             }
         }
@@ -294,7 +313,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _fixedRng;
             }
         }
@@ -307,7 +326,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _variableUpdateRng;
             }
         }
@@ -316,7 +335,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
 
                 if (!_globalEntityHandle.HasValue)
                 {
@@ -332,7 +351,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _heapAllocator.UniqueHeap;
             }
         }
@@ -341,7 +360,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _heapAllocator.FrameScopedUniqueHeap;
             }
         }
@@ -350,7 +369,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _heapAllocator.NativeSharedHeap;
             }
         }
@@ -359,7 +378,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _heapAllocator.FrameScopedNativeSharedHeap;
             }
         }
@@ -368,7 +387,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _heapAllocator.SharedHeap;
             }
         }
@@ -377,7 +396,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _heapAllocator.FrameScopedSharedHeap;
             }
         }
@@ -386,7 +405,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _heapAllocator.NativeUniqueHeap;
             }
         }
@@ -395,8 +414,17 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _heapAllocator.FrameScopedNativeUniqueHeap;
+            }
+        }
+
+        internal NativeChunkStore NativeUniqueChunkStore
+        {
+            get
+            {
+                TrecsAssert.That(!_isDisposed);
+                return _heapAllocator.NativeUniqueChunkStore;
             }
         }
 
@@ -404,7 +432,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _heapAllocator.TrecsListHeap;
             }
         }
@@ -413,7 +441,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _systemRunner.FixedFrame;
             }
         }
@@ -422,7 +450,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _heapAllocator;
             }
         }
@@ -431,7 +459,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _structuralOps;
             }
         }
@@ -458,12 +486,12 @@ namespace Trecs
         /// </summary>
         public void TriggerAllRemoveEvents()
         {
-            Assert.That(!_hasTriggeredAllRemoveEvents);
+            TrecsAssert.That(!_hasTriggeredAllRemoveEvents);
             _hasTriggeredAllRemoveEvents = true;
 
             // Note here that we do not actually remove in this case -
             // We just trigger the remove events
-            Assert.That(
+            TrecsAssert.That(
                 !_worldInfo.GlobalGroup.IsNull
                     && _worldInfo.GlobalGroup.Index < _componentStore.GroupEntityComponentsDB.Length
             );
@@ -493,7 +521,7 @@ namespace Trecs
 
         public void Dispose()
         {
-            Assert.That(!_isDisposed, "Attempted to dispose World multiple times");
+            TrecsAssert.That(!_isDisposed, "Attempted to dispose World multiple times");
 
             WorldRegistry.Unregister(this);
 
@@ -597,8 +625,8 @@ namespace Trecs
         // NOTE: Usually should not need to call this
         public void SubmitEntities()
         {
-            Assert.That(!_isDisposed);
-            Assert.That(!_systemRunner.IsExecutingSystems);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(!_systemRunner.IsExecutingSystems);
             _entitySubmitter.SubmitEntities();
         }
 
@@ -638,9 +666,9 @@ namespace Trecs
             foreach (var system in _systems)
             {
 #if DEBUG
-                Assert.That(
+                TrecsAssert.That(
                     seen.Add(system),
-                    "System {} was added multiple times to the world",
+                    "System {0} was added multiple times to the world",
                     system.GetType()
                 );
 #endif
@@ -717,13 +745,13 @@ namespace Trecs
         /// </summary>
         public void AddSystem(ISystem system)
         {
-            Assert.That(!_systemAddLocked);
+            TrecsAssert.That(!_systemAddLocked);
             _systems.Add(system);
         }
 
         public void AddSystems(IEnumerable<ISystem> systems)
         {
-            Assert.That(!_systemAddLocked);
+            TrecsAssert.That(!_systemAddLocked);
             _systems.AddRange(systems);
         }
 
@@ -733,8 +761,8 @@ namespace Trecs
         /// </summary>
         public void Initialize()
         {
-            Assert.That(!_isDisposed);
-            Assert.That(!_hasInitialized);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(!_hasInitialized);
             _hasInitialized = true;
 
             _entityInputQueue.Accessor = CreateAccessor(
@@ -798,7 +826,7 @@ namespace Trecs
         /// </summary>
         public void Tick()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             using (TrecsProfiling.Start("SystemRunner.Tick"))
             {
                 _systemRunner.Tick();
@@ -812,7 +840,7 @@ namespace Trecs
         /// </summary>
         public void LateTick()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             using (TrecsProfiling.Start("SystemRunner.LateTick"))
             {
                 _systemRunner.LateTick();
@@ -899,7 +927,7 @@ namespace Trecs
             int createdAtLine
         )
         {
-            Assert.IsNotNull(debugName);
+            TrecsAssert.IsNotNull(debugName);
 
             var accessor = new WorldAccessor(
                 ClaimAccessorIdInternal(),
@@ -1013,6 +1041,12 @@ namespace Trecs.Internal
         public static FrameScopedNativeUniqueHeap GetFrameScopedNativeUniqueHeap(this World world)
         {
             return world.FrameScopedNativeUniqueHeap;
+        }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        internal static NativeChunkStore GetNativeUniqueChunkStore(this World world)
+        {
+            return world.NativeUniqueChunkStore;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]

@@ -338,9 +338,9 @@ namespace Trecs.Internal
                 var group = GroupIndex.FromIndex(gi);
                 var count = keys.Count;
                 var startIndex = _currentNativeAddStartIndices[gi];
-                Assert.That(
+                TrecsAssert.That(
                     startIndex >= 0,
-                    "Native add start index not set for group {} despite non-empty sort keys. "
+                    "Native add start index not set for group {0} despite non-empty sort keys. "
                         + "MarkNativeAddStartIfNeeded must be called before AddPendingNativeAddSortKey.",
                     group
                 );
@@ -358,9 +358,9 @@ namespace Trecs.Internal
                 // Check for duplicates (adjacent after sort)
                 for (int i = 1; i < count; i++)
                 {
-                    Assert.That(
+                    TrecsAssert.That(
                         _cachedSortBuffer[i].Key != _cachedSortBuffer[i - 1].Key,
-                        "Duplicate native add sort key detected in group {} (composite key {}). "
+                        "Duplicate native add sort key detected in group {0} (composite key {1}). "
                             + "Each system must use unique sort keys for adds to the same group.",
                         group,
                         _cachedSortBuffer[i].Key

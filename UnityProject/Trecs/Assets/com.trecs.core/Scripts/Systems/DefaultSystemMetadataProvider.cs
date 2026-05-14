@@ -92,7 +92,7 @@ namespace Trecs.Internal
             {
                 var systemOrder = constraint.FlattenSystemOrder();
 
-                Assert.That(systemOrder.Count > 1);
+                TrecsAssert.That(systemOrder.Count > 1);
 
                 var previousType = systemOrder[0];
 
@@ -144,10 +144,10 @@ namespace Trecs.Internal
                 // system in a given constraint list
                 // Support base class / interface matching: a constraint referencing a base type
                 // is satisfied if any registered system is assignable to that type
-                Assert.That(
+                TrecsAssert.That(
                     typeToIndexMap.ContainsKey(systemType)
                         || typeToIndexMap.Keys.Any(t => systemType.IsAssignableFrom(t)),
-                    "Added system constraint for system {} which is not in the system list",
+                    "Added system constraint for system {0} which is not in the system list",
                     systemType
                 );
             }

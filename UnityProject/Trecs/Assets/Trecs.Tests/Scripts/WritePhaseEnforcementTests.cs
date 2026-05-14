@@ -1,7 +1,6 @@
 using System;
 using NUnit.Framework;
 using Trecs.Internal;
-using Trecs.Serialization;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -36,7 +35,7 @@ namespace Trecs.Tests
     public struct WritePhaseTestSet : IEntitySet<WritePhaseSetTag> { }
 
     /// <summary>
-    /// Class payload for the <see cref="HeapAccessor.AllocSharedFrameScoped{T}(T)"/>
+    /// Class payload for the <see cref="SharedPtr.AllocFrameScoped{T}(HeapAccessor, BlobId, T)"/>
     /// positive-case test. Only needed because that overload constrains <c>T</c> to
     /// <c>class</c>; the body is empty.
     /// </summary>
@@ -349,8 +348,8 @@ namespace Trecs.Tests
     //
     // Input role permissions exercised below:
     //   - AddInput<T>             → allowed (positive); from Fixed/Variable → rejected
-    //   - Heap.Alloc*FrameScoped  → allowed
-    //   - Heap.AllocShared        → rejected (must use FrameScoped variant)
+    //   - *Ptr.AllocFrameScoped   → allowed
+    //   - SharedPtr.Alloc         → rejected (must use FrameScoped variant)
     //   - Write [VariableUpdateOnly] component → allowed
     //   - Write non-VUO component → rejected
     //   - Read any component      → allowed
@@ -393,7 +392,8 @@ namespace Trecs.Tests
                 return;
             }
             _hasAllocated = true;
-            var _ = World.Heap.AllocSharedFrameScoped<WritePhaseHeapPayload>(
+            var _ = SharedPtr.AllocFrameScoped<WritePhaseHeapPayload>(
+                World.Heap,
                 BlobIdGenerator.FromKey(1),
                 new WritePhaseHeapPayload()
             );
@@ -407,7 +407,8 @@ namespace Trecs.Tests
         {
             // Persistent (non-frame-scoped) allocation must be rejected from
             // the Input role with the "use the FrameScoped variant" message.
-            var _ = World.Heap.AllocShared<WritePhaseHeapPayload>(
+            var _ = SharedPtr.Alloc<WritePhaseHeapPayload>(
+                World.Heap,
                 BlobIdGenerator.FromKey(1),
                 new WritePhaseHeapPayload()
             );

@@ -10,7 +10,7 @@ namespace Trecs.Internal
 
         public static void StoreName(int guid, string debugName)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             if (_names.TryGetValue(guid, out var existingName))
             {
                 if (existingName != debugName)
@@ -27,7 +27,7 @@ namespace Trecs.Internal
 
         public static string GetName(int guid)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             return _names[guid];
         }
     }

@@ -45,18 +45,18 @@ namespace Trecs.Internal
         )
         {
             int magic = reader.ReadInt32();
-            Assert.That(
+            TrecsAssert.That(
                 magic == Magic,
-                "Invalid native blob {}: bad magic {x} (expected {x})",
+                "Invalid native blob {0}: bad magic {x} (expected {x})",
                 sourceDescription,
                 magic,
                 Magic
             );
 
             int version = reader.ReadInt32();
-            Assert.That(
+            TrecsAssert.That(
                 version == expectedSerializationVersion,
-                "Native blob serialization version mismatch in {}: file is {}, current is {}",
+                "Native blob serialization version mismatch in {0}: file is {1}, current is {2}",
                 sourceDescription,
                 version,
                 expectedSerializationVersion
@@ -65,23 +65,23 @@ namespace Trecs.Internal
             int size = reader.ReadInt32();
             int alignment = reader.ReadInt32();
 
-            Assert.That(
+            TrecsAssert.That(
                 size > 0 && size <= MaxBlobSize,
-                "Invalid native blob size {} in {}",
+                "Invalid native blob size {0} in {1}",
                 size,
                 sourceDescription
             );
-            Assert.That(
+            TrecsAssert.That(
                 alignment > 0 && (alignment & (alignment - 1)) == 0,
-                "Invalid native blob alignment {} in {}",
+                "Invalid native blob alignment {0} in {1}",
                 alignment,
                 sourceDescription
             );
 
             var remaining = stream.Length - stream.Position;
-            Assert.That(
+            TrecsAssert.That(
                 remaining >= size,
-                "Native blob {} truncated: expected {} bytes, only {} available",
+                "Native blob {0} truncated: expected {1} bytes, only {2} available",
                 sourceDescription,
                 size,
                 remaining
@@ -101,8 +101,8 @@ namespace Trecs.Internal
                     int bytesRead = stream.Read(span.Slice(totalRead));
                     if (bytesRead == 0)
                     {
-                        throw Assert.CreateException(
-                            "Short read on native blob {}: expected {} bytes, got {}",
+                        throw TrecsAssert.CreateException(
+                            "Short read on native blob {0}: expected {1} bytes, got {2}",
                             sourceDescription,
                             size,
                             totalRead

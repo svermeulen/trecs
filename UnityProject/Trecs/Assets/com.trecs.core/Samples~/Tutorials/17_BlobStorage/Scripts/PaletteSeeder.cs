@@ -26,11 +26,11 @@ namespace Trecs.Samples.BlobStorage
         {
             var world = _world.CreateAccessor(AccessorRole.Unrestricted);
 
-            // AllocShared(stableId, blob) seeds the blob under a caller-chosen
-            // BlobId. Subsequent AllocShared(stableId) calls (without data)
+            // SharedPtr.Alloc(heap, stableId, blob) seeds the blob under a caller-chosen
+            // BlobId. Subsequent SharedPtr.Alloc(heap, stableId) calls (without data)
             // look up the seeded blob and return new handles to it.
-            _warm = world.Heap.AllocShared(PaletteIds.Warm, BuildWarm());
-            _cool = world.Heap.AllocShared(PaletteIds.Cool, BuildCool());
+            _warm = SharedPtr.Alloc(world.Heap, PaletteIds.Warm, BuildWarm());
+            _cool = SharedPtr.Alloc(world.Heap, PaletteIds.Cool, BuildCool());
         }
 
         public void Dispose()

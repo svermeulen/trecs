@@ -31,7 +31,7 @@ namespace Trecs.Internal
         public NativeDenseDictionary(int size, AllocatorManager.AllocatorHandle allocator)
             : this()
         {
-            Assert.That(size >= 0, "NativeDenseDictionary size must be non-negative");
+            TrecsAssert.That(size >= 0, "NativeDenseDictionary size must be non-negative");
 
             _keyToIndex = new NativeHashMap<TKey, int>(size, allocator);
             _values = new NativeList<TValue>(size, allocator);
@@ -50,7 +50,7 @@ namespace Trecs.Internal
             get => Count == 0;
         }
 
-        internal readonly void SerializeValues(ITrecsSerializationWriter writer)
+        internal readonly void SerializeValues(ISerializationWriter writer)
         {
             // Note that this method can be very hot
             // eg. can be called per frame in some multiplayer enrivonments
@@ -76,7 +76,7 @@ namespace Trecs.Internal
             }
         }
 
-        internal void DeserializeValues(ITrecsSerializationReader reader)
+        internal void DeserializeValues(ISerializationReader reader)
         {
             int count = default;
             reader.Read("count", ref count);
@@ -145,7 +145,7 @@ namespace Trecs.Internal
             var itemAdded = AddValue(key, out var index);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            Assert.That(itemAdded, "Key {} already present", key);
+            TrecsAssert.That(itemAdded, "Key {0} already present", key);
 #endif
             _values[index] = value;
         }
@@ -412,8 +412,8 @@ namespace Trecs.Internal
         [BurstDiscard]
         readonly void ThrowManagedKeyNotFoundException(TKey key)
         {
-            throw Assert.CreateException(
-                "Key {} not found in NativeDenseDictionary for type {}",
+            throw TrecsAssert.CreateException(
+                "Key {0} not found in NativeDenseDictionary for type {1}",
                 key,
                 typeof(TValue)
             );

@@ -145,9 +145,9 @@ namespace Trecs.Internal
 
         public int CountEntitiesInGroup(GroupIndex group)
         {
-            Assert.That(
+            TrecsAssert.That(
                 !group.IsNull && group.Index < _componentStore.GroupEntityComponentsDB.Length,
-                "Attempted to get count for unrecognized group {}",
+                "Attempted to get count for unrecognized group {0}",
                 group
             );
             var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
@@ -173,7 +173,7 @@ namespace Trecs.Internal
                 }
                 else
                 {
-                    Assert.IsEqual(count, value.Count);
+                    TrecsAssert.IsEqual(count, value.Count);
                 }
             }
 
@@ -432,7 +432,7 @@ namespace Trecs.Internal
 
             if (!entitiesInGroupPerType.TryGetValue(componentId, out typeSafeDictionary))
             {
-                Assert.That(!_componentStore.ConfigurationFrozen);
+                TrecsAssert.That(!_componentStore.ConfigurationFrozen);
 
                 typeSafeDictionary = new ComponentArray<T>(0);
                 entitiesInGroupPerType.Add(componentId, typeSafeDictionary);

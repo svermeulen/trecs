@@ -50,7 +50,7 @@ namespace Trecs.Internal
                 var localDeps = new HashSet<int>();
                 localDepsList.Add(localDeps);
 
-                Assert.That(systemInfo.Metadata.Phase == phaseToSort);
+                TrecsAssert.That(systemInfo.Metadata.Phase == phaseToSort);
 
                 foreach (var otherGlobalIndex in systemDepsMap[systemGlobalIndex])
                 {
@@ -59,7 +59,7 @@ namespace Trecs.Internal
                     if (otherInfo.Metadata.Phase == phaseToSort)
                     {
                         var otherLocalIndex = globalToLocalIndexMap[otherGlobalIndex];
-                        Assert.IsEqual(phaseSystems[otherLocalIndex], otherGlobalIndex);
+                        TrecsAssert.IsEqual(phaseSystems[otherLocalIndex], otherGlobalIndex);
                         localDeps.Add(otherLocalIndex);
                     }
                 }
@@ -76,7 +76,7 @@ namespace Trecs.Internal
                 globalIndex => allSystems[globalIndex].Metadata.DebugName
             );
 
-            Assert.IsEqual(sortedLocal.Count, phaseSystems.Count);
+            TrecsAssert.IsEqual(sortedLocal.Count, phaseSystems.Count);
 
             var sortedGlobal = new List<int>(phaseSystems.Count);
 
@@ -85,7 +85,7 @@ namespace Trecs.Internal
                 var localIndex = sortedLocal[i];
                 var globalIndex = phaseSystems[localIndex];
                 var info = allSystems[globalIndex];
-                Assert.That(info.Metadata.Phase == phaseToSort);
+                TrecsAssert.That(info.Metadata.Phase == phaseToSort);
                 sortedGlobal.Add(globalIndex);
             }
 
@@ -130,7 +130,7 @@ namespace Trecs.Internal
 
         public LoadInfo LoadSystems(World world, IReadOnlyList<ISystem> systems)
         {
-            Assert.That(!_isLocked);
+            TrecsAssert.That(!_isLocked);
             _isLocked = true;
 
             var metadatas = _metadataProvider.GetSystemMetadata(world, systems);
@@ -176,9 +176,9 @@ namespace Trecs.Internal
                 );
 
                 var depsSet = metadata.SystemDependencies.ToHashSet();
-                Assert.That(
+                TrecsAssert.That(
                     !depsSet.Contains(i),
-                    "System {} found to depend on itself",
+                    "System {0} found to depend on itself",
                     metadata.DebugName
                 );
                 systemDepsMap.Add(depsSet);

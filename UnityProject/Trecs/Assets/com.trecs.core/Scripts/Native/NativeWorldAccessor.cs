@@ -73,13 +73,11 @@ namespace Trecs
 
         /// <summary>
         /// Provides native unique pointer resolution for use in Burst jobs.
-        /// Only resolves entries flushed to the native heap (not pending adds from the current frame).
         /// </summary>
         public NativeUniquePtrResolver UniquePtrResolver => _uniquePtrResolver;
 
         /// <summary>
         /// Provides <see cref="TrecsList{T}"/> resolution for use in Burst jobs.
-        /// Only resolves entries flushed to the heap (not pending adds from the current frame).
         /// </summary>
         public NativeTrecsListResolver TrecsListResolver => _trecsListResolver;
 
@@ -276,7 +274,7 @@ namespace Trecs
         [Conditional("DEBUG")]
         readonly void AssertStructuralChangesAllowed()
         {
-            Assert.That(
+            TrecsAssert.That(
                 (_flags & NativeWorldAccessorFlags.AllowStructuralChanges) != 0,
                 "Attempted structural change (add/remove/move) from a non-fixed context. "
                     + "Structural changes are only allowed from fixed systems."
@@ -286,7 +284,7 @@ namespace Trecs
         [Conditional("DEBUG")]
         readonly void AssertNonDeterministicAddAllowed()
         {
-            Assert.That(
+            TrecsAssert.That(
                 (_flags & NativeWorldAccessorFlags.RequireDeterministicIds) == 0,
                 "In deterministic mode, use the AddEntity overload with a pre-reserved EntityHandle. "
                     + "Call ReserveEntityHandles() on the main thread before the job."
@@ -299,7 +297,7 @@ namespace Trecs
         internal readonly void RemoveEntity(EntityIndex entityIndex)
         {
             AssertStructuralChangesAllowed();
-            Assert.That(entityIndex != EntityIndex.Null);
+            TrecsAssert.That(entityIndex != EntityIndex.Null);
 
             var simpleNativeBag = _removeQueue.GetBag(_threadIndex);
             simpleNativeBag.Enqueue(_accessorId);

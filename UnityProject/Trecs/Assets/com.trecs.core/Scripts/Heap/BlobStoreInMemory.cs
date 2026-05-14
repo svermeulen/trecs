@@ -74,9 +74,9 @@ namespace Trecs
 
         public void ForcePurgeBlob(BlobId id)
         {
-            Assert.That(!_hasDisposed);
+            TrecsAssert.That(!_hasDisposed);
 
-            Assert.That(_manifest.Values.ContainsKey(id));
+            TrecsAssert.That(_manifest.Values.ContainsKey(id));
 
             if (_memoryCache.TryRemove(id, out var blob))
             {
@@ -93,8 +93,8 @@ namespace Trecs
 
         public void CreateBlobImpl(BlobId id, object blob, bool isNative)
         {
-            Assert.That(!_hasDisposed);
-            Assert.That(!_memoryCache.ContainsKey(id) && !_manifest.Values.ContainsKey(id));
+            TrecsAssert.That(!_hasDisposed);
+            TrecsAssert.That(!_memoryCache.ContainsKey(id) && !_manifest.Values.ContainsKey(id));
 
             _memoryCache.Add(id, blob);
 
@@ -110,7 +110,7 @@ namespace Trecs
             else
             {
                 metadataType = blob.GetType();
-                Assert.That(metadataType.IsClass);
+                TrecsAssert.That(metadataType.IsClass);
                 numBytes = 0;
             }
 
@@ -138,7 +138,7 @@ namespace Trecs
 
         public void Dispose()
         {
-            Assert.That(!_hasDisposed);
+            TrecsAssert.That(!_hasDisposed);
             _hasDisposed = true;
 
             int numDisposed = 0;
@@ -160,7 +160,7 @@ namespace Trecs
             bool updateAccessTime
         )
         {
-            Assert.That(!_hasDisposed);
+            TrecsAssert.That(!_hasDisposed);
 
             if (_manifest.Values.TryGetIndex(id, out var index))
             {
@@ -186,7 +186,7 @@ namespace Trecs
             bool updateAccessTime
         )
         {
-            Assert.That(!_hasDisposed);
+            TrecsAssert.That(!_hasDisposed);
 
             _log?.Trace("Attempting to look up blob with id {0}", id);
 
@@ -201,7 +201,7 @@ namespace Trecs
             ref var entry = ref _manifest.Values.GetValueAtIndexByRef(index);
 
             blob = _memoryCache[id];
-            Assert.IsNotNull(blob);
+            TrecsAssert.IsNotNull(blob);
 
             _log?.Trace("Found blob {0} of type {1} already in memory cache", id, entry.Type);
             entry.LastAccessTime = BlobManifest.GetTimeForAccessTime();
@@ -211,18 +211,18 @@ namespace Trecs
 
         public bool HasBlob(BlobId id)
         {
-            Assert.That(!_hasDisposed);
+            TrecsAssert.That(!_hasDisposed);
             return _manifest.Values.ContainsKey(id);
         }
 
         public void WarmUpBlob(BlobId id)
         {
-            Assert.That(_manifest.Values.ContainsKey(id));
+            TrecsAssert.That(_manifest.Values.ContainsKey(id));
         }
 
         public BlobLoadingState GetBlobLoadingState(BlobId id)
         {
-            Assert.That(_manifest.Values.ContainsKey(id));
+            TrecsAssert.That(_manifest.Values.ContainsKey(id));
             return BlobLoadingState.Loaded;
         }
     }

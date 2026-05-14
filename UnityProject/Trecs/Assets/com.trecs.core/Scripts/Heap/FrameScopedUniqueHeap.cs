@@ -30,7 +30,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return _entries.Count;
             }
         }
@@ -38,12 +38,12 @@ namespace Trecs
         internal UniquePtr<T> Alloc<T>(int frame, T value)
             where T : class
         {
-            Assert.That(!_isDisposed);
-            Assert.IsNotNull(value);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.IsNotNull(value);
 
-            Assert.That(_poolManager.HasPool<T>());
+            TrecsAssert.That(_poolManager.HasPool<T>());
 
-            Assert.That(value.GetType() == typeof(T));
+            TrecsAssert.That(value.GetType() == typeof(T));
 
             var typeId = TypeIdProvider.GetTypeId<T>();
             var id = _idCounter.Alloc();
@@ -55,15 +55,15 @@ namespace Trecs
         internal UniquePtr<T> Alloc<T>(int frame)
             where T : class
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             return Alloc<T>(frame, _poolManager.Spawn<T>());
         }
 
         internal void ClearAtOrAfterFrame(int frame)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            Assert.That(_removeBuffer.IsEmpty());
+            TrecsAssert.That(_removeBuffer.IsEmpty());
             _removeBuffer.Clear();
 
             foreach (var (key, value) in _entries)
@@ -87,9 +87,9 @@ namespace Trecs
         // complexity without measurable benefit in practice.
         internal void ClearAtOrBeforeFrame(int frame)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            Assert.That(_removeBuffer.IsEmpty());
+            TrecsAssert.That(_removeBuffer.IsEmpty());
             _removeBuffer.Clear();
 
             foreach (var (key, value) in _entries)
@@ -110,11 +110,11 @@ namespace Trecs
 
         HeapEntry GetEntry(int frame, uint address)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (_entries.TryGetValue(address, out var entry))
             {
-                Assert.IsEqual(
+                TrecsAssert.IsEqual(
                     entry.Frame,
                     frame,
                     "Attempted to get input memory for different frame than it was allocated for"
@@ -122,8 +122,8 @@ namespace Trecs
                 return entry;
             }
 
-            throw Assert.CreateException(
-                "Attempted to get invalid heap memory address ({}) for frame {}",
+            throw TrecsAssert.CreateException(
+                "Attempted to get invalid heap memory address ({0}) for frame {1}",
                 address,
                 frame
             );
@@ -133,25 +133,25 @@ namespace Trecs
             where T : class
         {
             var entry = GetEntry(frame, address);
-            Assert.That(entry.TypeId == TypeIdProvider.GetTypeId<T>());
-            Assert.IsNotNull(entry.Value);
+            TrecsAssert.That(entry.TypeId == TypeIdProvider.GetTypeId<T>());
+            TrecsAssert.IsNotNull(entry.Value);
             return (T)entry.Value;
         }
 
         internal bool TryResolveValue<T>(uint address, int frame, out T value)
             where T : class
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             if (_entries.TryGetValue(address, out var entry))
             {
-                Assert.IsEqual(
+                TrecsAssert.IsEqual(
                     entry.Frame,
                     frame,
                     "Attempted to get input memory for different frame than it was allocated for"
                 );
-                Assert.That(entry.TypeId == TypeIdProvider.GetTypeId<T>());
-                Assert.IsNotNull(entry.Value);
+                TrecsAssert.That(entry.TypeId == TypeIdProvider.GetTypeId<T>());
+                TrecsAssert.IsNotNull(entry.Value);
                 value = (T)entry.Value;
                 return true;
             }
@@ -162,23 +162,23 @@ namespace Trecs
 
         internal bool ContainsEntry(uint address)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             return _entries.ContainsKey(address);
         }
 
         internal void Dispose()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             ClearAll();
             _isDisposed = true;
         }
 
         internal void ClearAll()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             foreach (var (_, entry) in _entries)
             {
-                Assert.IsNotNull(entry.Value);
+                TrecsAssert.IsNotNull(entry.Value);
                 _poolManager.Despawn(entry.Value.GetType(), entry.Value);
             }
             _entries.Clear();
@@ -186,25 +186,25 @@ namespace Trecs
 
         internal void DisposeEntry(uint address)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             if (!_entries.TryRemove(address, out var entry))
             {
-                throw Assert.CreateException(
-                    "Attempted to dispose invalid heap memory address ({})",
+                throw TrecsAssert.CreateException(
+                    "Attempted to dispose invalid heap memory address ({0})",
                     address
                 );
             }
 
-            Assert.IsNotNull(entry.Value);
+            TrecsAssert.IsNotNull(entry.Value);
             var entryType = entry.Value.GetType();
             _poolManager.Despawn(entryType, entry.Value);
 
             _log.Trace("Disposed input ptr with address {0} and type {1}", address, entryType);
         }
 
-        internal void Serialize(ITrecsSerializationWriter writer)
+        internal void Serialize(ISerializationWriter writer)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             writer.Write<uint>("IdCounter", _idCounter.Value);
             writer.Write<int>("NumEntries", _entries.Count);
@@ -215,16 +215,16 @@ namespace Trecs
                 writer.Write<int>("Frame", entry.Frame);
                 writer.Write<int>("TypeId", entry.TypeId);
 
-                Assert.IsNotNull(entry.Value);
+                TrecsAssert.IsNotNull(entry.Value);
                 writer.WriteObject("Value", entry.Value);
             }
         }
 
-        internal void Deserialize(ITrecsSerializationReader reader)
+        internal void Deserialize(ISerializationReader reader)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            Assert.That(_entries.Count == 0);
+            TrecsAssert.That(_entries.Count == 0);
 
             // See FrameScopedSharedHeap.Deserialize for the rationale behind EnsureAtLeast.
             _idCounter.EnsureAtLeast(reader.Read<uint>("IdCounter"));
@@ -249,7 +249,7 @@ namespace Trecs
                 reader.ReadObject("Value", ref obj);
 
                 var objType = obj.GetType();
-                Assert.That(TypeIdProvider.GetTypeId(objType) == typeId);
+                TrecsAssert.That(TypeIdProvider.GetTypeId(objType) == typeId);
 
                 _entries.Add(address, new HeapEntry(obj, typeId, frame));
 

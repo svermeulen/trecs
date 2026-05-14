@@ -73,9 +73,9 @@ namespace Trecs
                         // GroupIndex is 1-based; 0 is Null. Real groups occupy
                         // raw values 1..ushort.MaxValue, so at most 65535 real
                         // groups can exist (0-based indices 0..65534).
-                        Assert.That(
+                        TrecsAssert.That(
                             indexToTagSet.Count < ushort.MaxValue,
-                            "GroupIndex exhausted — world cannot have more than {} groups",
+                            "GroupIndex exhausted — world cannot have more than {0} groups",
                             ushort.MaxValue
                         );
                         var idx = GroupIndex.FromIndex(indexToTagSet.Count);
@@ -119,9 +119,9 @@ namespace Trecs
 
             foreach (var resolvedTemplate in resolvedTemplatesList)
             {
-                Assert.That(
+                TrecsAssert.That(
                     resolvedTemplate.AllTags.Tags.Count > 0,
-                    "Template {} must have at least one tag",
+                    "Template {0} must have at least one tag",
                     resolvedTemplate.DebugName
                 );
 
@@ -130,17 +130,17 @@ namespace Trecs
                     || resolvedTemplate.AllBaseTemplates.Contains(TrecsTemplates.Globals.Template)
                 )
                 {
-                    Assert.That(
+                    TrecsAssert.That(
                         globalTemplate == null,
                         "Found multiple global templates.  There can only be one."
                     );
                     globalTemplate = resolvedTemplate;
 
-                    Assert.That(
+                    TrecsAssert.That(
                         resolvedTemplate.Groups.Count == 1,
                         "Global template must only be in one group"
                     );
-                    Assert.That(!globalGroup.HasValue);
+                    TrecsAssert.That(!globalGroup.HasValue);
                     globalGroup = resolvedTemplate.Groups[0];
                 }
 
@@ -151,9 +151,9 @@ namespace Trecs
                     var group = resolvedTemplate.Groups[i];
                     var groupTagSet = resolvedTemplate.GroupTagSets[i];
 
-                    Assert.That(
+                    TrecsAssert.That(
                         groupInfos[group.Index] == null,
-                        "Found same group {} added multiple times.  Groups must be unique.",
+                        "Found same group {0} added multiple times.  Groups must be unique.",
                         group
                     );
 
@@ -171,7 +171,7 @@ namespace Trecs
                 }
 
                 var wasAdded = _resolvedTemplateSet.Add(resolvedTemplate.Template);
-                Assert.That(wasAdded);
+                TrecsAssert.That(wasAdded);
             }
 
             foreach (var resolvedTemplate in resolvedTemplatesList)
@@ -222,9 +222,9 @@ namespace Trecs
                     //    boundaries (subset-order regardless of template).
                     //    Silently resolves real ambiguity, hiding
                     //    misconfigurations behind plausible-looking spawns.
-                    Assert.That(
+                    TrecsAssert.That(
                         !_resolvedTemplateSet.Contains(baseType),
-                        "Registered templates must not be base templates of other registered templates.  Found {} as a base template of {}",
+                        "Registered templates must not be base templates of other registered templates.  Found {0} as a base template of {1}",
                         baseType,
                         resolvedTemplate
                     );
@@ -236,7 +236,7 @@ namespace Trecs
                 }
             }
 
-            Assert.IsNotNull(globalTemplate);
+            TrecsAssert.IsNotNull(globalTemplate);
 
             _globalTemplate = globalTemplate;
             _globalGroup = globalGroup.Value;
@@ -266,7 +266,7 @@ namespace Trecs
                 return index;
             }
 
-            throw Assert.CreateException("No group registered for tag set {}", tagSet);
+            throw TrecsAssert.CreateException("No group registered for tag set {0}", tagSet);
         }
 
         /// <summary>
@@ -274,10 +274,10 @@ namespace Trecs
         /// </summary>
         public TagSet ToTagSet(GroupIndex groupIndex)
         {
-            Assert.That(!groupIndex.IsNull, "Cannot resolve Null GroupIndex to a TagSet");
-            Assert.That(
+            TrecsAssert.That(!groupIndex.IsNull, "Cannot resolve Null GroupIndex to a TagSet");
+            TrecsAssert.That(
                 groupIndex.Index < _indexToTagSet.Length,
-                "GroupIndex {} out of range [0, {})",
+                "GroupIndex {0} out of range [0, {1})",
                 groupIndex.Index,
                 _indexToTagSet.Length
             );
@@ -346,7 +346,7 @@ namespace Trecs
             while (!baseTypeProcessQueue.IsEmpty())
             {
                 var baseType = baseTypeProcessQueue.Dequeue();
-                Assert.That(enqueuedBaseTypes.Contains(baseType));
+                TrecsAssert.That(enqueuedBaseTypes.Contains(baseType));
                 allBaseTypesList.Add(baseType);
                 _log.Trace(
                     "Added base type {0} to entity {1}",
@@ -398,7 +398,7 @@ namespace Trecs
 
             foreach (var (componentType, componentDecs) in allComponentDecMap)
             {
-                Assert.That(componentDecs.Count > 0);
+                TrecsAssert.That(componentDecs.Count > 0);
 
                 var resolvedDecs = componentDecs[0]
                     .MergeAsConcrete(componentDecs, template.DebugName);
@@ -413,7 +413,7 @@ namespace Trecs
 
             foreach (var baseType in template.LocalBaseTemplates)
             {
-                Assert.That(
+                TrecsAssert.That(
                     baseType.Partitions.IsEmpty(),
                     "Partitions must only be specified on the concrete template, not on a base template"
                 );
@@ -531,7 +531,7 @@ namespace Trecs
                 return groups;
             }
 
-            throw Assert.CreateException("No groups found for template {}", template);
+            throw TrecsAssert.CreateException("No groups found for template {0}", template);
         }
 
         public ReadOnlyDenseHashSet<Tag> GetGroupTags(GroupIndex group)
@@ -541,7 +541,7 @@ namespace Trecs
                 return _groupInfos[group.Index].Tags;
             }
 
-            throw Assert.CreateException("Unrecognized group {}", group);
+            throw TrecsAssert.CreateException("Unrecognized group {0}", group);
         }
 
         public Template GetSingleTemplateForTags(TagSet tags) =>
@@ -554,7 +554,7 @@ namespace Trecs
                 return _groupInfos[group.Index].ResolvedTemplate;
             }
 
-            throw Assert.CreateException("No template found for group {}", group);
+            throw TrecsAssert.CreateException("No template found for group {0}", group);
         }
 
         public ResolvedTemplate GetResolvedTemplateForTags(TagSet tags) =>
@@ -612,8 +612,8 @@ namespace Trecs
                 if (tags[i].Guid == activeVariant.Guid)
                     return;
             }
-            throw Assert.CreateException(
-                "ReplaceDimensionTags / RemoveDimensionTags called with activeVariant {} that is not in current TagSet {} — XOR math would produce an unregistered TagSet id",
+            throw TrecsAssert.CreateException(
+                "ReplaceDimensionTags / RemoveDimensionTags called with activeVariant {0} that is not in current TagSet {1} — XOR math would produce an unregistered TagSet id",
                 activeVariant,
                 current
             );

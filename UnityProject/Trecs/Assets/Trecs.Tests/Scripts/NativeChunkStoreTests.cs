@@ -12,8 +12,9 @@ namespace Trecs.Tests
 {
     /// <summary>
     /// Standalone tests for <see cref="NativeChunkStore"/>: allocation/free roundtrips,
-    /// bucket selection, side-table generation, pre-flush vs deferred free paths, huge-alloc
-    /// path, page reclamation, and stale-handle detection.
+    /// bucket selection, side-table generation, Free preconditions, huge-alloc path,
+    /// page reclamation, stale-handle detection, Serialize/Deserialize round-trip,
+    /// AllocExternal, and concurrent resolve-vs-alloc.
     /// </summary>
     [TestFixture]
     public class NativeChunkStoreTests
@@ -21,7 +22,7 @@ namespace Trecs.Tests
         // ─── Basic alloc/resolve ────────────────────────────────
 
         [Test]
-        public void Alloc_ReturnsResolvableHandle_PreFlush()
+        public void Alloc_ReturnsResolvableHandle()
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var handle = store.Alloc(64, 8, typeHash: 42);
@@ -36,7 +37,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Alloc_ReturnsResolvableHandle_PostFlush()
+        public void Alloc_MainThreadResolverAndBurstResolverAgree()
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var handle = store.Alloc(64, 8, typeHash: 7);
@@ -45,10 +46,63 @@ namespace Trecs.Tests
             NAssert.AreNotEqual(IntPtr.Zero, entry.Address);
             NAssert.AreEqual(7, entry.TypeHash);
 
-            // Burst-side resolver should agree.
             var resolverEntry = store.Resolver.ResolveEntry(handle);
             NAssert.AreEqual(entry.Address, resolverEntry.Address);
             NAssert.AreEqual(entry.TypeHash, resolverEntry.TypeHash);
+        }
+
+        [Test]
+        public void Alloc_RecycledSlot_HasZeroedBytes()
+        {
+            // The store zeros every slot at Alloc time so a recycled slot doesn't leak
+            // the previous tenant's bytes into snapshots. Without this guarantee,
+            // cross-world snapshot byte determinism breaks: same logical state, different
+            // recycle history → different bytes.
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            var first = store.Alloc(64, 8, typeHash: 1);
+            var firstAddr = store.ResolveEntry(first).Address;
+
+            // Fill the slot with a sentinel pattern.
+            for (int i = 0; i < 64; i++)
+            {
+                Marshal.WriteByte(firstAddr, i, 0xAB);
+            }
+
+            store.Free(first);
+
+            // Next Alloc of the same size lands in the same bucket and the same slot
+            // (bucket freelist is LIFO). Verify the slot has been zeroed.
+            var second = store.Alloc(64, 8, typeHash: 2);
+            var secondAddr = store.ResolveEntry(second).Address;
+            NAssert.AreEqual(firstAddr, secondAddr, "Expected recycled slot");
+
+            for (int i = 0; i < 64; i++)
+            {
+                NAssert.AreEqual(
+                    (byte)0,
+                    Marshal.ReadByte(secondAddr, i),
+                    $"byte at {i} should be zero, not the previous tenant's 0xAB"
+                );
+            }
+        }
+
+        [Test]
+        public void Alloc_TailPastRequestedSize_IsZeroed()
+        {
+            // When the caller asks for fewer bytes than the slot size (e.g., a 17-byte
+            // request lands in the 32-byte bucket), the padding tail must also be zeroed.
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            var handle = store.Alloc(17, 1, typeHash: 0);
+            var addr = store.ResolveEntry(handle).Address;
+            // 32-byte bucket; check bytes 17..31 are zero.
+            for (int i = 17; i < 32; i++)
+            {
+                NAssert.AreEqual(
+                    (byte)0,
+                    Marshal.ReadByte(addr, i),
+                    $"tail byte at {i} should be zero"
+                );
+            }
         }
 
         [Test]
@@ -105,6 +159,64 @@ namespace Trecs.Tests
             store.Free(handle);
 
             NAssert.Throws<TrecsException>(() => store.ResolveEntry(handle));
+        }
+
+        [Test]
+        public void Free_DoubleFree_Throws()
+        {
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            var h = store.Alloc(32, 8, typeHash: 0);
+            store.Free(h);
+            NAssert.Throws<TrecsException>(
+                () => store.Free(h),
+                "Freeing an already-freed handle must throw on the InUse=0 assert"
+            );
+        }
+
+        [Test]
+        public void Free_StaleGeneration_Throws()
+        {
+            // After free + reuse, the original handle encodes the previous generation
+            // while the slot now carries a bumped one. Free must reject it rather than
+            // silently corrupting the live allocation at the reused slot.
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            var stale = store.Alloc(32, 8, typeHash: 0);
+            store.Free(stale);
+            var fresh = store.Alloc(32, 8, typeHash: 0);
+
+            NAssert.Throws<TrecsException>(() => store.Free(stale));
+            NAssert.DoesNotThrow(() => store.Free(fresh));
+        }
+
+        [Test]
+        public void Free_IndexOutOfRange_Throws()
+        {
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            // Synthesised handle whose index points past anything ever materialised.
+            var bogus = new PtrHandle(
+                NativeChunkStoreResolver.EncodeHandleValue(1u, NativeChunkStoreResolver.MaxIndex)
+            );
+            NAssert.Throws<TrecsException>(() => store.Free(bogus));
+        }
+
+        [Test]
+        public void Free_OnDrained_RunsForBucketPath()
+        {
+            // Parity with HugeAlloc_Free_OnDrainedRunsBeforePageRelease — the callback
+            // contract is the same on the bucket Free path (slot's still-live address
+            // visible to the callback before the slot is returned to its bucket).
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            var h = store.Alloc(64, 8, typeHash: 0);
+            var allocAddress = store.ResolveEntry(h).Address;
+
+            IntPtr observedAddress = IntPtr.Zero;
+            store.Free(h, entry => observedAddress = entry.Address);
+
+            NAssert.AreEqual(
+                allocAddress,
+                observedAddress,
+                "onDrained must see the slot's live address before it's returned to the bucket"
+            );
         }
 
         // ─── Bucket reuse ───────────────────────────────────────
@@ -183,6 +295,31 @@ namespace Trecs.Tests
         // ─── Huge allocation path ───────────────────────────────
 
         [Test]
+        public void Alloc_AtMaxBucketSize_GoesToBucketNotHuge()
+        {
+            // 64KB == MaxBucketSlotSize → still fits in the largest bucket.
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            var h = store.Alloc(NativeChunkStore.MaxBucketSlotSize, 16, typeHash: 0);
+            NAssert.AreEqual(
+                0,
+                store.ResolveEntry(h).OwnsWholePage,
+                "Alloc at exactly MaxBucketSlotSize must use the bucket path"
+            );
+        }
+
+        [Test]
+        public void Alloc_OneByteAboveMaxBucket_TakesHugePath()
+        {
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            var h = store.Alloc(NativeChunkStore.MaxBucketSlotSize + 1, 16, typeHash: 0);
+            NAssert.AreEqual(
+                1,
+                store.ResolveEntry(h).OwnsWholePage,
+                "Alloc above MaxBucketSlotSize must take the huge path"
+            );
+        }
+
+        [Test]
         public void HugeAlloc_AboveMaxBucket_GetsDedicatedPage()
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
@@ -190,7 +327,7 @@ namespace Trecs.Tests
             var huge = store.Alloc(200 * 1024, 16, typeHash: 0); // 200 KB > 64 KB max bucket
 
             var entry = store.ResolveEntry(huge);
-            NAssert.AreEqual(1, entry.IsHuge, "Huge alloc must be marked IsHuge=1");
+            NAssert.AreEqual(1, entry.OwnsWholePage, "Huge alloc must own its whole page");
             NAssert.AreEqual(0, entry.SlotIndex, "Huge alloc occupies a single-slot page");
             NAssert.AreEqual(1, store.NumPages);
         }
@@ -245,18 +382,18 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void StaleHandle_PreFlushFreeThenAlloc_NoCollision()
+        public void StaleHandle_FreeThenAlloc_NoCollision()
         {
-            // Regression for the pre-flush release path: AcquireSideTableSlot materialises
-            // the side-table slot eagerly so the pre-flush free can persist the generation
-            // bump even though the slot was never promoted to the side table.
+            // AcquireSideTableSlot materialises the side-table slot eagerly so Free's
+            // generation bump persists into the slot even when the slot has just been
+            // recycled to the free-slot stack.
             using var store = new NativeChunkStore(TrecsLog.Default);
 
             var h1 = store.Alloc(32, 8, typeHash: 0);
-            store.Free(h1); // pre-flush path
+            store.Free(h1);
 
             var h2 = store.Alloc(32, 8, typeHash: 0);
-            NAssert.AreNotEqual(h1.Value, h2.Value, "Pre-flush reuse must still bump generation");
+            NAssert.AreNotEqual(h1.Value, h2.Value, "Slot reuse must bump generation");
 
             NAssert.Throws<TrecsException>(() => store.ResolveEntry(h1));
             NAssert.DoesNotThrow(() => store.ResolveEntry(h2));
@@ -304,7 +441,7 @@ namespace Trecs.Tests
         // ─── Side-table reuse ──────────────────────────────────
 
         [Test]
-        public void SideTableSlot_ReusedAfterFreeAndFlush()
+        public void SideTableSlot_RecycledAfterFree()
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
             var h1 = store.Alloc(32, 8, typeHash: 0);
@@ -316,7 +453,7 @@ namespace Trecs.Tests
             var h2 = store.Alloc(32, 8, typeHash: 0);
             NativeChunkStoreResolver.DecodeHandle(h2, out var idx2, out _);
 
-            NAssert.AreEqual(idx1, idx2, "Side-table index should recycle after flush");
+            NAssert.AreEqual(idx1, idx2, "Side-table index should recycle after Free");
         }
 
         // ─── Page reclamation ──────────────────────────────────
@@ -400,6 +537,27 @@ namespace Trecs.Tests
             }
         }
 
+        [Test]
+        public void Alloc_AlignmentExceedsSize_PicksBucketBasedOnAlignment()
+        {
+            // size=8 alone would route to the 16-byte bucket (stride 16).
+            // With align=64 the effective slot size is max(size, align)=64, so
+            // adjacent slots from the 64-byte bucket are 64 bytes apart.
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            var a = store.Alloc(8, 64, typeHash: 0);
+            var b = store.Alloc(8, 64, typeHash: 0);
+
+            var addrA = store.ResolveEntry(a).Address.ToInt64();
+            var addrB = store.ResolveEntry(b).Address.ToInt64();
+            NAssert.AreEqual(
+                64,
+                Math.Abs(addrA - addrB),
+                "Bucket selection must respect alignment when alignment > size"
+            );
+            NAssert.AreEqual(0, addrA & 63, "Address must be 64-byte aligned");
+            NAssert.AreEqual(0, addrB & 63, "Address must be 64-byte aligned");
+        }
+
         // ─── Type-hash storage ─────────────────────────────────
 
         [Test]
@@ -459,138 +617,431 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, genSink.Value);
         }
 
-        // ─── Restore (AllocAtSlot / OnDeserializeComplete) ──────
+        // ─── Serialize / Deserialize round-trip ──────────────────
 
         [Test]
-        public void AllocAtSlot_RestoresExactHandleValue()
+        public void Serialize_Twice_ProducesIdenticalBytes()
         {
-            using var store = new NativeChunkStore(TrecsLog.Default);
+            // Byte-determinism: identical chunk-store state must produce identical
+            // bytes across runs. Required for rollback checksum-based desync detection
+            // and any other byte-equality comparisons.
+            using var store = BuildVariedStore(seed: 1);
 
-            // Synthesize a "saved" handle: encode (gen=7, idx=42).
-            var savedHandleValue = NativeChunkStoreResolver.EncodeHandleValue(7, 42);
+            var registry = new SerializerRegistry();
+            using var buf1 = new SerializationBuffer(registry);
+            using var buf2 = new SerializationBuffer(registry);
 
-            var handle = store.AllocAtSlot(savedHandleValue, 32, 8, typeHash: 123);
-            NAssert.AreEqual(
-                savedHandleValue,
-                handle.Value,
-                "Restored handle must preserve saved value"
+            buf1.StartWrite(version: 1, includeTypeChecks: true);
+            store.Serialize(buf1);
+            buf1.EndWrite();
+            var bytes1 = buf1.MemoryStream.ToArray();
+
+            buf2.StartWrite(version: 1, includeTypeChecks: true);
+            store.Serialize(buf2);
+            buf2.EndWrite();
+            var bytes2 = buf2.MemoryStream.ToArray();
+
+            CollectionAssert.AreEqual(
+                bytes1,
+                bytes2,
+                "Identical chunk-store state must produce identical serialized bytes"
             );
-
-            var entry = store.ResolveEntry(handle);
-            NAssert.AreEqual(123, entry.TypeHash);
-            NAssert.AreEqual(7, entry.Generation);
-            NAssert.AreEqual(1, entry.InUse);
         }
 
         [Test]
-        public void AllocAtSlot_TwoEntries_RoundTrip()
+        public void Serialize_Deserialize_RoundTripsLiveData()
         {
-            // Imitate the heap-level save/load: snapshot the handle values, dispose the store,
-            // create a fresh one, restore at the saved handle values. The new handles must
-            // resolve to fresh storage that's still reachable through those exact handle values.
-            uint h1Value,
-                h2Value;
+            // Build a chunk store with varied content, capture handle→data mapping,
+            // serialize to a fresh chunk store, and verify all data still resolves.
+            using var src = new NativeChunkStore(TrecsLog.Default);
+            var live = new List<(PtrHandle Handle, int Size, int TypeHash)>();
+            int[] sizes = { 16, 64, 256, 1024, 4096, 8192, 80 * 1024 };
+            var rng = new Random(2);
+            for (int i = 0; i < 25; i++)
             {
-                using var src = new NativeChunkStore(TrecsLog.Default);
-                var h1 = src.Alloc(64, 8, typeHash: 111);
-                var h2 = src.Alloc(64, 8, typeHash: 222);
-                h1Value = h1.Value;
-                h2Value = h2.Value;
-                NAssert.AreNotEqual(h1Value, h2Value);
+                var size = sizes[rng.Next(sizes.Length)];
+                var typeHash = rng.Next(1000);
+                var h = src.Alloc(size, 8, typeHash, out var addr);
+                unsafe
+                {
+                    var p = (byte*)addr.ToPointer();
+                    for (int b = 0; b < size; b++)
+                        p[b] = (byte)((h.Value + (uint)b) & 0xFF);
+                }
+                live.Add((h, size, typeHash));
             }
 
+            using var dst = CloneViaSerialize(src);
+            NAssert.AreEqual(src.NumLiveAllocations, dst.NumLiveAllocations);
+
+            foreach (var (handle, size, typeHash) in live)
+            {
+                var entry = dst.ResolveEntry(handle);
+                NAssert.AreEqual(1, entry.InUse, "Restored entry must be InUse=1");
+                NAssert.AreEqual(typeHash, entry.TypeHash, "TypeHash must round-trip");
+
+                unsafe
+                {
+                    var p = (byte*)entry.Address.ToPointer();
+                    for (int b = 0; b < size; b++)
+                    {
+                        var expected = (byte)((handle.Value + (uint)b) & 0xFF);
+                        NAssert.AreEqual(
+                            expected,
+                            p[b],
+                            $"Data byte {b} for handle {handle.Value:X} did not round-trip"
+                        );
+                    }
+                }
+            }
+        }
+
+        [Test]
+        public void Serialize_Deserialize_PreservesAllocOrder()
+        {
+            // After save/load, a sequence of fresh Allocs must produce the same handle
+            // values as the same sequence without the save/load. Verifies that
+            // free-slot stacks (side-table + per-bucket) round-trip in original order.
+            using var src = BuildVariedStore(seed: 3);
+
+            // Capture the next 5 handle values without save/load.
+            var withoutRoundTrip = new uint[5];
+            using (var probe = CloneViaSerialize(src))
+            {
+                for (int i = 0; i < withoutRoundTrip.Length; i++)
+                {
+                    withoutRoundTrip[i] = probe.Alloc(48, 8, typeHash: 0).Value;
+                }
+            }
+
+            // Now do the same sequence after a save/load.
+            using var dst = CloneViaSerialize(src);
+            var withRoundTrip = new uint[5];
+            for (int i = 0; i < withRoundTrip.Length; i++)
+            {
+                withRoundTrip[i] = dst.Alloc(48, 8, typeHash: 0).Value;
+            }
+
+            CollectionAssert.AreEqual(
+                withoutRoundTrip,
+                withRoundTrip,
+                "Allocs after save/load must produce the same handle sequence as without"
+            );
+        }
+
+        [Test]
+        public void Serialize_Deserialize_PreservesHugeAndExternalPages()
+        {
+            using var src = new NativeChunkStore(TrecsLog.Default);
+            var hugeHandle = src.Alloc(200 * 1024, 16, typeHash: 7);
+            unsafe
+            {
+                var raw = AllocatorManager.Allocate(Allocator.Persistent, 256, 16, 1);
+                var addr = new IntPtr(raw);
+                var extHandle = src.AllocExternal(addr, 256, 16, typeHash: 9);
+                Marshal.WriteInt32(addr, 0xCAFE);
+
+                using var dst = CloneViaSerialize(src);
+
+                NAssert.AreEqual(2, dst.NumLiveAllocations);
+                var hugeEntry = dst.ResolveEntry(hugeHandle);
+                NAssert.AreEqual(1, hugeEntry.OwnsWholePage);
+                NAssert.AreEqual(7, hugeEntry.TypeHash);
+
+                var extEntry = dst.ResolveEntry(extHandle);
+                NAssert.AreEqual(1, extEntry.OwnsWholePage);
+                NAssert.AreEqual(9, extEntry.TypeHash);
+                NAssert.AreEqual(0xCAFE, Marshal.ReadInt32(extEntry.Address));
+            }
+        }
+
+        [Test]
+        public void Deserialize_OverDirtyStore_RestoresCorrectly()
+        {
+            // Production callers (WorldStateSerializer) call Deserialize on a chunk store
+            // that's been used: heap.ClearAll frees entries (so _liveCount goes to 0) but
+            // bucket pages, side-table chunks, and _nextFreshSideTableSlot are still
+            // populated. Verify ResetForDeserialize wipes that state cleanly and the
+            // restored store matches a fresh-construction Deserialize.
+            using var src = BuildVariedStore(seed: 4);
+
+            // Serialize src for restoring later.
+            var registry = new SerializerRegistry();
+            using var buf = new SerializationBuffer(registry);
+            buf.StartWrite(version: 1, includeTypeChecks: true);
+            src.Serialize(buf);
+            buf.EndWrite();
+
+            // Build a DIFFERENT chunk store (different shape, different size) then free
+            // everything so it ends up at _liveCount=0 but with residual pages and
+            // bumped generations.
             using var dst = new NativeChunkStore(TrecsLog.Default);
-            var r1 = dst.AllocAtSlot(h1Value, 64, 8, typeHash: 111);
-            var r2 = dst.AllocAtSlot(h2Value, 64, 8, typeHash: 222);
-            dst.OnDeserializeComplete();
+            var residual = new List<PtrHandle>();
+            for (int i = 0; i < 20; i++)
+                residual.Add(dst.Alloc(128, 8, typeHash: i));
+            foreach (var h in residual)
+                dst.Free(h);
+            NAssert.AreEqual(0, dst.NumLiveAllocations);
+            NAssert.Greater(dst.NumPages, 0, "Pre-Deserialize dst should have residual pages");
 
-            NAssert.AreEqual(h1Value, r1.Value);
-            NAssert.AreEqual(h2Value, r2.Value);
-            NAssert.AreEqual(111, dst.ResolveEntry(r1).TypeHash);
-            NAssert.AreEqual(222, dst.ResolveEntry(r2).TypeHash);
+            // Deserialize over it.
+            buf.MemoryStream.Position = 0;
+            buf.StartRead();
+            dst.Deserialize(buf);
+            buf.StopRead(verifySentinel: false);
+
+            NAssert.AreEqual(src.NumLiveAllocations, dst.NumLiveAllocations);
+            NAssert.AreEqual(src.NumPages, dst.NumPages);
         }
 
         [Test]
-        public void AllocAtSlot_PreservesData_AfterBlitCopy()
+        public void Generation_PreservedAcrossSaveLoad()
         {
-            // Saved + restored slots get fresh memory; the heap layer is responsible for
-            // copying contents. Verify the restored slot is at least writable and round-trips
-            // a value, since the save/load contract is "the heap blits the data into the
-            // restored slot's address."
-            using var store = new NativeChunkStore(TrecsLog.Default);
-            var savedHandleValue = NativeChunkStoreResolver.EncodeHandleValue(3, 10);
-            var handle = store.AllocAtSlot(savedHandleValue, sizeof(int), 4, typeHash: 0);
-            store.OnDeserializeComplete();
+            // Allocate a slot, free it, save+load, then Alloc into that same slot.
+            // The new handle's generation must match what it would have been without
+            // the save/load round-trip — proving that the free-slot generation byte
+            // is preserved in the snapshot.
+            using var src = new NativeChunkStore(TrecsLog.Default);
 
-            var addr = store.ResolveEntry(handle).Address;
-            Marshal.WriteInt32(addr, 12345);
-            NAssert.AreEqual(12345, Marshal.ReadInt32(addr));
-        }
+            // Bump slot 1's generation through a few alloc/free cycles.
+            for (int i = 0; i < 3; i++)
+            {
+                var h = src.Alloc(32, 8, typeHash: 0);
+                src.Free(h);
+            }
+            // Predict what the next Alloc *without* save/load would return.
+            uint expectedNextHandle;
+            using (var probe = CloneViaSerialize(src))
+            {
+                expectedNextHandle = probe.Alloc(32, 8, typeHash: 0).Value;
+            }
 
-        [Test]
-        public void OnDeserializeComplete_PreventsCollisionWithFreshAllocs()
-        {
-            // Without OnDeserializeComplete, _nextFreshSideTableSlot would still be 1 even
-            // after restoring slots 10 and 20, and the next normal Alloc would collide.
-            using var store = new NativeChunkStore(TrecsLog.Default);
-            store.AllocAtSlot(NativeChunkStoreResolver.EncodeHandleValue(1, 10), 32, 8, 0);
-            store.AllocAtSlot(NativeChunkStoreResolver.EncodeHandleValue(1, 20), 32, 8, 0);
-            store.OnDeserializeComplete();
-
-            // Subsequent fresh Allocs must avoid slots 10 and 20.
-            var fresh = store.Alloc(32, 8, typeHash: 0);
-            NativeChunkStoreResolver.DecodeHandle(fresh, out var idx, out _);
-            NAssert.AreNotEqual(10u, idx);
-            NAssert.AreNotEqual(20u, idx);
-        }
-
-        [Test]
-        public void OnDeserializeComplete_FreeSlotsAreRecycled()
-        {
-            // OnDeserializeComplete should expose unused slots in [1, maxRestoredSlot] to the
-            // free-slot pool so they're reused on subsequent allocs rather than leaked.
-            using var store = new NativeChunkStore(TrecsLog.Default);
-            store.AllocAtSlot(NativeChunkStoreResolver.EncodeHandleValue(1, 5), 32, 8, 0);
-            store.OnDeserializeComplete();
-
-            // Slots 1..4 are unused; one of them should come back from the next fresh Alloc.
-            var fresh = store.Alloc(32, 8, typeHash: 0);
-            NativeChunkStoreResolver.DecodeHandle(fresh, out var idx, out _);
-            NAssert.LessOrEqual(
-                idx,
-                5u,
-                "Expected fresh alloc to reuse a slot below the restored max"
+            // Now save/load and Alloc — same handle?
+            using var dst = CloneViaSerialize(src);
+            var actual = dst.Alloc(32, 8, typeHash: 0).Value;
+            NAssert.AreEqual(
+                expectedNextHandle,
+                actual,
+                "Free-slot generation must round-trip so post-restore handle bumps match"
             );
+            // Sanity: generation should not be 1 (which is what a fresh slot would mint).
+            NativeChunkStoreResolver.DecodeHandle(new PtrHandle(actual), out _, out var gen);
+            NAssert.Greater(gen, 1, "Generation should reflect the pre-save alloc history");
         }
 
         [Test]
-        public void AcquireSideTableSlot_SkipsStaleFreeListEntries()
+        public void EmptyStore_RoundTripsCleanly()
         {
-            // Regression for B3 — between heap A's OnDeserializeComplete and heap B's
-            // AllocAtSlot, _freeSideTableSlots can hold indices that heap B then claims.
-            // The next plain Alloc must skip those stale entries and pick a genuinely
-            // free slot. The fix lives in AcquireSideTableSlot's pop-and-filter loop.
+            // Edge case: serialize a freshly-constructed chunk store with no allocations.
+            using var src = new NativeChunkStore(TrecsLog.Default);
+            NAssert.AreEqual(0, src.NumLiveAllocations);
+            NAssert.AreEqual(0, src.NumPages);
+
+            using var dst = CloneViaSerialize(src);
+            NAssert.AreEqual(0, dst.NumLiveAllocations);
+            NAssert.AreEqual(0, dst.NumPages);
+
+            // Should still be usable for fresh allocations.
+            var h = dst.Alloc(64, 8, typeHash: 7);
+            NAssert.IsFalse(h.IsNull);
+            NAssert.AreEqual(7, dst.ResolveEntry(h).TypeHash);
+        }
+
+        [Test]
+        public void Reclaim_ThenSnapshot_PreservesNullPages()
+        {
+            // ReclaimEmptyPages produces null entries in _pages. The wire format writes
+            // those as PageKind.Null and _freePageIds restores the recycled pageIds in
+            // order. After load, allocing must reuse those pageIds in the same order.
+            using var src = new NativeChunkStore(TrecsLog.Default);
+
+            // Force a few pages to exist, then free them all so they're empty.
+            var handles = new List<PtrHandle>();
+            for (int i = 0; i < 200; i++)
+                handles.Add(src.Alloc(16, 8, typeHash: 0));
+            var pagesBefore = src.NumPages;
+            foreach (var h in handles)
+                src.Free(h);
+            var reclaimed = src.ReclaimEmptyPages();
+            NAssert.Greater(reclaimed, 0, "Test setup requires at least one reclaimable page");
+
+            using var dst = CloneViaSerialize(src);
+            NAssert.AreEqual(src.NumPages, dst.NumPages);
+
+            // Fresh allocs should pull pageIds from the recycled stack in the same order
+            // pre- and post-restore. Easiest check: both halves grow the same number of
+            // pages on the next batch of allocs.
+            var srcPagesGrew = 0;
+            var dstPagesGrew = 0;
+            using (var srcClone = CloneViaSerialize(src))
+            {
+                var baseSrc = srcClone.NumPages;
+                for (int i = 0; i < 100; i++)
+                    srcClone.Alloc(16, 8, typeHash: 0);
+                srcPagesGrew = srcClone.NumPages - baseSrc;
+            }
+            var baseDst = dst.NumPages;
+            for (int i = 0; i < 100; i++)
+                dst.Alloc(16, 8, typeHash: 0);
+            dstPagesGrew = dst.NumPages - baseDst;
+
+            NAssert.AreEqual(srcPagesGrew, dstPagesGrew, "Page-growth shape must match");
+        }
+
+        [Test]
+        public void DisposeEntry_AfterRoundTrip_FreeSlotIsRecycled()
+        {
+            // After save/load, the bucket free-slot stack and side-table free-slot stack
+            // are restored. Verify that Freeing a restored handle correctly returns its
+            // slot/bucket-slot to the freelists by checking that a subsequent Alloc gets
+            // back to the same slot index (since the bucket stack is LIFO).
+            using var src = new NativeChunkStore(TrecsLog.Default);
+            var h = src.Alloc(64, 8, typeHash: 42);
+
+            using var dst = CloneViaSerialize(src);
+            NAssert.AreEqual(1, dst.NumLiveAllocations);
+
+            // Free the restored handle. Bucket slot returns to the bucket's free stack.
+            dst.Free(new PtrHandle(h.Value));
+            NAssert.AreEqual(0, dst.NumLiveAllocations);
+
+            // Next Alloc of the same size should reuse the freed slot — the side-table
+            // index will differ (it's a new slot in the stack), but the underlying bucket
+            // slot must be the one we just freed. Easiest proxy: NumPages stays at 1
+            // (no new bucket page was allocated).
+            var pagesBefore = dst.NumPages;
+            var h2 = dst.Alloc(64, 8, typeHash: 99);
+            NAssert.AreEqual(
+                pagesBefore,
+                dst.NumPages,
+                "Freed bucket slot should be reused without growing pages"
+            );
+            NAssert.AreEqual(99, dst.ResolveEntry(h2).TypeHash);
+        }
+
+        // ─── Helpers ───────────────────────────────────────────
+
+        static NativeChunkStore BuildVariedStore(int seed)
+        {
+            var rng = new Random(seed);
+            var store = new NativeChunkStore(TrecsLog.Default);
+            var live = new List<PtrHandle>();
+
+            // Mix of bucket and huge sizes, with some intermediate frees.
+            int[] sizes = { 16, 64, 256, 1024, 4096, 8192, 80 * 1024 };
+            for (int i = 0; i < 30; i++)
+            {
+                var size = sizes[rng.Next(sizes.Length)];
+                var h = store.Alloc(size, 8, typeHash: rng.Next(1000));
+                unsafe
+                {
+                    var addr = store.ResolveEntry(h).Address;
+                    Marshal.WriteInt32(addr, (int)h.Value);
+                }
+                live.Add(h);
+                if (live.Count > 5 && rng.Next(3) == 0)
+                {
+                    var idx = rng.Next(live.Count);
+                    store.Free(live[idx]);
+                    live.RemoveAt(idx);
+                }
+            }
+            return store;
+        }
+
+        /// <summary>
+        /// Serializes <paramref name="src"/> and deserializes into a fresh store. Caller
+        /// must Dispose the returned store.
+        /// </summary>
+        static NativeChunkStore CloneViaSerialize(NativeChunkStore src)
+        {
+            var registry = new SerializerRegistry();
+            using var buf = new SerializationBuffer(registry);
+            buf.StartWrite(version: 1, includeTypeChecks: true);
+            src.Serialize(buf);
+            buf.EndWrite();
+            buf.MemoryStream.Position = 0;
+            buf.StartRead();
+            var dst = new NativeChunkStore(TrecsLog.Default);
+            dst.Deserialize(buf);
+            buf.StopRead(verifySentinel: false);
+            return dst;
+        }
+
+        // ─── AllocExternal ─────────────────────────────────────
+
+        [Test]
+        public void AllocExternal_RoundTrip()
+        {
             using var store = new NativeChunkStore(TrecsLog.Default);
 
-            // Imitate heap A's restore: a single entry at slot 10.
-            store.AllocAtSlot(NativeChunkStoreResolver.EncodeHandleValue(1, 10), 32, 8, 0);
-            store.OnDeserializeComplete();
-            // Free list now contains slots 1..9 (all currently InUse=0).
+            unsafe
+            {
+                var size = 64;
+                var alignment = 8;
+                var raw = AllocatorManager.Allocate(Allocator.Persistent, size, alignment, 1);
+                var addr = new IntPtr(raw);
 
-            // Imitate heap B's restore claiming slot 5 — the slot is now InUse=1 but
-            // still on the free-list stack (OnDeserializeComplete hasn't been called
-            // again to rebuild it).
-            store.AllocAtSlot(NativeChunkStoreResolver.EncodeHandleValue(1, 5), 32, 8, 0);
+                var h = store.AllocExternal(addr, size, alignment, typeHash: 7);
+                NAssert.AreEqual(1, store.NumLiveAllocations);
+                NAssert.AreEqual(1, store.NumPages);
 
-            // A plain Alloc must NOT hand out slot 5. The stale free-list entry should
-            // be popped and discarded, with the next genuinely-free slot returned instead.
-            var fresh = store.Alloc(32, 8, typeHash: 0);
-            NativeChunkStoreResolver.DecodeHandle(fresh, out var idx, out _);
-            NAssert.AreNotEqual(
-                5u,
-                idx,
-                "Plain Alloc must not collide with the AllocAtSlot-claimed slot 5"
-            );
+                var entry = store.ResolveEntry(h);
+                NAssert.AreEqual(
+                    addr,
+                    entry.Address,
+                    "AllocExternal must register the supplied pointer verbatim"
+                );
+                NAssert.AreEqual(7, entry.TypeHash);
+                NAssert.AreEqual(
+                    1,
+                    entry.OwnsWholePage,
+                    "External allocations occupy a dedicated single-slot page"
+                );
+                NAssert.AreEqual(0, entry.SlotIndex);
+
+                // Free releases the page (calls AllocatorManager.Free on the registered pointer)
+                // and removes the slot from the live-allocations count.
+                store.Free(h);
+                NAssert.AreEqual(0, store.NumLiveAllocations);
+                NAssert.AreEqual(0, store.NumPages);
+            }
+        }
+
+        [Test]
+        public void AllocExternal_ResolverWorksFromBurstJob()
+        {
+            using var store = new NativeChunkStore(TrecsLog.Default);
+
+            unsafe
+            {
+                var size = 32;
+                var alignment = 8;
+                var raw = AllocatorManager.Allocate(Allocator.Persistent, size, alignment, 1);
+                var addr = new IntPtr(raw);
+
+                var h = store.AllocExternal(addr, size, alignment, typeHash: 555);
+
+                using var addrSink = new NativeReference<long>(Allocator.TempJob);
+                using var hashSink = new NativeReference<int>(Allocator.TempJob);
+                using var genSink = new NativeReference<byte>(Allocator.TempJob);
+
+                new ResolveJob
+                {
+                    Resolver = store.Resolver,
+                    Handle = h,
+                    AddressSink = addrSink,
+                    TypeHashSink = hashSink,
+                    GenerationSink = genSink,
+                }
+                    .Schedule()
+                    .Complete();
+
+                NAssert.AreEqual(addr.ToInt64(), addrSink.Value);
+                NAssert.AreEqual(555, hashSink.Value);
+
+                store.Free(h);
+            }
         }
 
         // ─── B5: double-register external pointer detection ───
@@ -663,33 +1114,6 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void AllocAtSlot_AddressOutOverload_MatchesResolveEntry()
-        {
-            using var store = new NativeChunkStore(TrecsLog.Default);
-            var handle = store.AllocAtSlot(
-                NativeChunkStoreResolver.EncodeHandleValue(1, 7),
-                64,
-                8,
-                typeHash: 0,
-                out var address
-            );
-            NAssert.AreEqual(address, store.ResolveEntry(handle).Address);
-        }
-
-        [Test]
-        public void AllocAtSlot_OnInUseSlot_Throws()
-        {
-            using var store = new NativeChunkStore(TrecsLog.Default);
-            var h1 = store.AllocAtSlot(NativeChunkStoreResolver.EncodeHandleValue(2, 7), 32, 8, 0);
-            // Same slot index, different generation — should still reject (slot is in use).
-            NAssert.Throws<TrecsException>(() =>
-            {
-                store.AllocAtSlot(NativeChunkStoreResolver.EncodeHandleValue(5, 7), 32, 8, 0);
-            });
-            _ = h1;
-        }
-
-        [Test]
         public void Resolver_FromBurstJob_AfterReuseSeesNewGeneration()
         {
             using var store = new NativeChunkStore(TrecsLog.Default);
@@ -748,7 +1172,7 @@ namespace Trecs.Tests
                     {
                         if (Resolver.TryResolveEntry(Handles[i], out var entry))
                         {
-                            // Each pre-flushed handle was allocated with TypeHash =
+                            // Each stable handle was allocated with TypeHash =
                             // (slot index + 1) and Generation = 1. Anything else means
                             // a torn struct read or wrong-slot resolve.
                             if (
@@ -808,31 +1232,30 @@ namespace Trecs.Tests
             }.Schedule();
 
             // Concurrent main-thread churn while the job is resolving:
-            //  - Pre-flush Alloc + Free cycles (exercises the fast-path Free that
-            //    writes the side-table slot's generation).
-            //  - Mixed deferred frees (Alloc, Flush, hold, then Free → _pendingFrees).
+            //  - Tight Alloc + Free cycles (exercises the Free path that bumps the
+            //    side-table slot's generation while a job is reading other slots).
+            //  - A rolling held-then-freed set (slots stay live for many iterations
+            //    before being freed, so the job sees them resolve and then disappear).
             //  - Enough fresh allocs to cross a chunk boundary (>1024 slots) so the
             //    new-chunk publish path runs while the job is reading.
             var rng = new Random(12345);
-            var deferredHandles = new List<PtrHandle>(64);
+            var rollingHandles = new List<PtrHandle>(64);
             for (int i = 0; i < 2000; i++)
             {
                 var h = store.Alloc(rng.Next(8, 200), 8, typeHash: 0);
                 if ((i & 7) == 0)
                 {
-                    // Promote to side-table, free later through deferred path.
-                    deferredHandles.Add(h);
+                    rollingHandles.Add(h);
                 }
                 else
                 {
-                    // Pre-flush fast-path free.
                     store.Free(h);
                 }
 
-                if (deferredHandles.Count > 50)
+                if (rollingHandles.Count > 50)
                 {
-                    store.Free(deferredHandles[0]);
-                    deferredHandles.RemoveAt(0);
+                    store.Free(rollingHandles[0]);
+                    rollingHandles.RemoveAt(0);
                 }
             }
 
@@ -850,15 +1273,11 @@ namespace Trecs.Tests
                 tornCount.Value,
                 "No torn reads of stable handles should ever be observed"
             );
-            NAssert.AreEqual(
-                0,
-                failureCount.Value,
-                "Stable pre-flushed handles should always resolve"
-            );
+            NAssert.AreEqual(0, failureCount.Value, "Stable handles should always resolve");
             NAssert.AreEqual(PreallocCount * JobIterations, successCount.Value);
 
             // Cleanup so Dispose doesn't warn about leaks.
-            foreach (var h in deferredHandles)
+            foreach (var h in rollingHandles)
             {
                 store.Free(h);
             }

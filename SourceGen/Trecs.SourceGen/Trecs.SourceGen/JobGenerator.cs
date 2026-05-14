@@ -1914,7 +1914,7 @@ namespace Trecs.SourceGen
             // only the criteria the job actually supports today (Sets are rejected up-front
             // by the validator with a separate diagnostic, so we don't suggest them here).
             sb.AppendLine(
-                $"{body}Assert.That({FromWorldEmitter.GenPrefix}builder.HasAnyCriteria, \"{info.Symbol.Name}.ScheduleParallel requires query criteria — pass a builder with at least one tag or component constraint, or specify Tags/MatchByComponents on the [{info.IterationAttributeShortName}] attribute.\");"
+                $"{body}TrecsAssert.That({FromWorldEmitter.GenPrefix}builder.HasAnyCriteria, \"{info.Symbol.Name}.ScheduleParallel requires query criteria — pass a builder with at least one tag or component constraint, or specify Tags/MatchByComponents on the [{info.IterationAttributeShortName}] attribute.\");"
             );
 
             sb.AppendLine(

@@ -36,8 +36,8 @@ namespace Trecs
     /// Burst-compatible resolver that maps <see cref="BlobId"/> values to native memory
     /// for <see cref="NativeSharedPtr{T}"/> lookups inside jobs. Obtain via
     /// <see cref="HeapAccessor.NativeSharedPtrResolver"/> or
-    /// <see cref="NativeWorldAccessor.SharedPtrResolver"/>. Open a typed view with
-    /// <see cref="Read{T}"/>.
+    /// <see cref="NativeWorldAccessor.SharedPtrResolver"/>. Open a typed view via
+    /// <see cref="NativeSharedPtr{T}.Read(in NativeSharedPtrResolver)"/>.
     /// </summary>
     public readonly unsafe struct NativeSharedPtrResolver
     {
@@ -48,21 +48,10 @@ namespace Trecs
             _entries = entries;
         }
 
-        public NativeSharedRead<T> Read<T>(in NativeSharedPtr<T> ptr)
-            where T : unmanaged
-        {
-            var entry = ResolveEntry<T>(ptr.BlobId);
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            return new NativeSharedRead<T>(entry.Ptr.ToPointer(), entry.Safety);
-#else
-            return new NativeSharedRead<T>(entry.Ptr.ToPointer());
-#endif
-        }
-
         internal NativeSharedHeapEntry ResolveEntry<T>(BlobId address)
             where T : unmanaged
         {
-            Assert.That(!address.IsNull, "Attempted to resolve null blob address");
+            TrecsAssert.That(!address.IsNull, "Attempted to resolve null blob address");
 
             if (!_entries.TryGetValue(address, out var entry))
             {

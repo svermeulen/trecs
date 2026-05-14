@@ -62,7 +62,7 @@ namespace Trecs.Tests
         public void Add_AppendsValues_AndUpdatesCount()
         {
             var (heap, chunkStore) = CreateHeap();
-            var list = heap.Alloc<int>();
+            var list = heap.Alloc<int>(4);
             var write = heap.Write(in list);
 
             write.Add(10);
@@ -80,13 +80,13 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Add_GrowsBeyondInitialCapacity()
+        public void EnsureCapacity_ThenAdd_FillsAcrossGrowBoundary()
         {
             var (heap, chunkStore) = CreateHeap();
             var list = heap.Alloc<int>(2);
-            var write = heap.Write(in list);
 
-            // Initial capacity 2, add 100 — should grow geometrically.
+            heap.EnsureCapacity(in list, 100);
+            var write = heap.Write(in list);
             for (int i = 0; i < 100; i++)
             {
                 write.Add(i);
@@ -105,17 +105,34 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Add_FromZeroCapacity_AllocatesInitialBuffer()
+        public void EnsureCapacity_FromZeroCapacity_AllocatesInitialBuffer()
         {
             var (heap, chunkStore) = CreateHeap();
             var list = heap.Alloc<int>();
-            var write = heap.Write(in list);
+            NAssert.AreEqual(0, heap.Read(in list).Capacity);
 
-            NAssert.AreEqual(0, write.Capacity);
+            heap.EnsureCapacity(in list, 1);
+            var write = heap.Write(in list);
             write.Add(42);
             NAssert.AreEqual(1, write.Count);
             NAssert.AreEqual(42, write[0]);
             NAssert.GreaterOrEqual(write.Capacity, 1);
+
+            heap.DisposeEntry(list.Handle.Value);
+            heap.Dispose();
+            chunkStore.Dispose();
+        }
+
+        [Test]
+        public void Add_PastCapacity_Throws()
+        {
+            var (heap, chunkStore) = CreateHeap();
+            var list = heap.Alloc<int>(2);
+            var write = heap.Write(in list);
+            write.Add(1);
+            write.Add(2);
+
+            NAssert.Throws<TrecsException>(() => write.Add(3));
 
             heap.DisposeEntry(list.Handle.Value);
             heap.Dispose();
@@ -215,13 +232,12 @@ namespace Trecs.Tests
         {
             var (heap, chunkStore) = CreateHeap();
             var list = heap.Alloc<int>(4);
-            var write = heap.Write(in list);
 
-            write.EnsureCapacity(64);
-            NAssert.GreaterOrEqual(write.Capacity, 64);
+            heap.EnsureCapacity(in list, 64);
+            NAssert.GreaterOrEqual(heap.Read(in list).Capacity, 64);
 
-            write.EnsureCapacity(16); // no-op
-            NAssert.GreaterOrEqual(write.Capacity, 64);
+            heap.EnsureCapacity(in list, 16); // no-op
+            NAssert.GreaterOrEqual(heap.Read(in list).Capacity, 64);
 
             heap.DisposeEntry(list.Handle.Value);
             heap.Dispose();
@@ -302,16 +318,14 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Read_OnPendingAdd_ResolvesBeforeFlush()
+        public void Read_OnFreshlyAllocated_RoundTrips()
         {
             var (heap, chunkStore) = CreateHeap();
 
-            // Brand new entry — _pendingAdds has it, _allEntries does not yet.
-            var list = heap.Alloc<int>();
+            var list = heap.Alloc<int>(4);
             var write = heap.Write(in list);
             write.Add(7);
 
-            // Main-thread reads should succeed via _pendingAdds.
             var read = heap.Read(in list);
             NAssert.AreEqual(1, read.Count);
             NAssert.AreEqual(7, read[0]);
@@ -322,20 +336,53 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Read_OnFlushedEntry_ResolvesViaResolverPath()
+        public void Read_AfterMultipleAdds_RoundTrips()
         {
             var (heap, chunkStore) = CreateHeap();
-            var list = heap.Alloc<int>();
+            var list = heap.Alloc<int>(4);
             var w = heap.Write(in list);
             w.Add(11);
             w.Add(22);
-
-            // Force the entry into _allEntries; main-thread Read should still work.
 
             var read = heap.Read(in list);
             NAssert.AreEqual(2, read.Count);
             NAssert.AreEqual(11, read[0]);
             NAssert.AreEqual(22, read[1]);
+
+            heap.DisposeEntry(list.Handle.Value);
+            heap.Dispose();
+            chunkStore.Dispose();
+        }
+
+        [Test]
+        public void EnsureCapacity_AcrossBucketBoundaries_PreservesContents()
+        {
+            // Crosses several chunk-store bucket boundaries (16→32→64→…→2048) to
+            // exercise the data-slot reallocation path. Each grow performs a
+            // _chunkStore.Alloc + MemCpy + _chunkStore.Free; the contents must survive
+            // intact even though the underlying slot can land in a different bucket each
+            // time.
+            var (heap, chunkStore) = CreateHeap();
+            var list = heap.Alloc<int>(2);
+            var write = heap.Write(in list);
+            write.Add(11);
+            write.Add(22);
+
+            heap.EnsureCapacity(in list, 500);
+            write = heap.Write(in list);
+            for (int i = 2; i < 500; i++)
+            {
+                write.Add(i * 7);
+            }
+
+            var read = heap.Read(in list);
+            NAssert.AreEqual(500, read.Count);
+            NAssert.AreEqual(11, read[0]);
+            NAssert.AreEqual(22, read[1]);
+            for (int i = 2; i < 500; i++)
+            {
+                NAssert.AreEqual(i * 7, read[i], $"value at index {i}");
+            }
 
             heap.DisposeEntry(list.Handle.Value);
             heap.Dispose();
@@ -361,16 +408,16 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var heap = env.Accessor.Heap;
 
-            var list = heap.AllocTrecsList<int>(8);
+            var list = TrecsList.Alloc<int>(heap, 8);
             NAssert.IsFalse(list.IsNull);
             NAssert.AreEqual(1, heap.TrecsListHeap.NumEntries);
 
-            var write = heap.Write(in list);
+            var write = list.Write(heap);
             write.Add(1);
             write.Add(2);
             write.Add(3);
 
-            var read = heap.Read(in list);
+            var read = list.Read(heap);
             NAssert.AreEqual(3, read.Count);
             NAssert.AreEqual(1, read[0]);
             NAssert.AreEqual(2, read[1]);
@@ -386,8 +433,8 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var heap = env.Accessor.Heap;
 
-            var list = heap.AllocTrecsList<int>();
-            var read = heap.Read(in list);
+            var list = TrecsList.Alloc<int>(heap);
+            var read = list.Read(heap);
             NAssert.AreEqual(0, read.Count);
             NAssert.AreEqual(0, read.Capacity);
 

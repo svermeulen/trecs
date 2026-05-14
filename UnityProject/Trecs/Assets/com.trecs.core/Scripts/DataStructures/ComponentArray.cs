@@ -212,7 +212,7 @@ namespace Trecs.Internal
             {
                 var indexToRemove = sortedDescendingIndices[i];
 
-                Assert.That(
+                TrecsAssert.That(
                     indexToRemove < _count,
                     "Removing an entity at an index that is out of range"
                 );
@@ -276,7 +276,7 @@ namespace Trecs.Internal
                     ref MoveInfo swapInfo = ref entitiesToSwapInfo[i];
                     var indexToRemove = swapInfo.ResolvedFromIndex;
 
-                    Assert.That(
+                    TrecsAssert.That(
                         indexToRemove < _count,
                         "Swapping an entity at an index that is out of range"
                     );

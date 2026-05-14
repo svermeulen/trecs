@@ -120,7 +120,7 @@ namespace Trecs.Collections
         public void RemoveMustExist(T item)
         {
             var wasRemoved = _dictionary.TryRemove(item);
-            Assert.That(wasRemoved);
+            TrecsAssert.That(wasRemoved);
         }
 
         /// <summary>

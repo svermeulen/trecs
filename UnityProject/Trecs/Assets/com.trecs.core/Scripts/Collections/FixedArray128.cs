@@ -22,7 +22,7 @@ namespace Trecs.Collections
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                Require.That(index >= 0 && index < _length, "out of bound index");
+                TrecsRequire.That(index >= 0 && index < _length, "out of bound index");
                 unsafe
                 {
                     return ref *((T*)Unsafe.AsPointer(ref Unsafe.AsRef(in this)) + index);
@@ -61,7 +61,7 @@ namespace Trecs.Collections
         public static ref T Mut<T>(this ref FixedArray128<T> arr, int index)
             where T : unmanaged
         {
-            Require.That(index >= 0 && index < 128, "out of bound index");
+            TrecsRequire.That(index >= 0 && index < 128, "out of bound index");
             unsafe
             {
                 return ref *((T*)Unsafe.AsPointer(ref arr) + index);

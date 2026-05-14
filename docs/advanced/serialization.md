@@ -6,17 +6,31 @@ For those types you register an `ISerializer<T>` against the world's [`Serialize
 
 ## Registering the registry
 
-Call `TrecsSerialization.CreateSerializerRegistry` once during world setup, after the world is built. The returned registry is associated with the world automatically — the Trecs Player window finds it through that association.
+Every `World` owns a `SerializerRegistry`, pre-populated with all built-in primitive, math, ECS, and recording-metadata serializers. Add your own via `world.SerializerRegistry` after `WorldBuilder.Build()` and before `world.Initialize()`:
 
 ```csharp
-var registry = TrecsSerialization.CreateSerializerRegistry(world);
+var world = new WorldBuilder()
+    .AddTemplate(myTemplate)
+    .Build();
 
 // Register one ISerializer<T> per managed type you store on the heap:
-registry.RegisterSerializer<PatrolRouteSerializer>();
-registry.RegisterSerializer<TrailHistorySerializer>();
+world.SerializerRegistry.RegisterSerializer<PatrolRouteSerializer>();
+world.SerializerRegistry.RegisterSerializer<TrailHistorySerializer>();
+
+world.Initialize();
 ```
 
-If the type happens to be blittable (no managed fields), you can skip the custom serializer entirely with `registry.RegisterBlit<T>()`. Enums use `registry.RegisterEnum<T>()`. The common primitives (`int`, `float`, `string`, `Vector3`, `quaternion`, …) are pre-registered.
+You can also register them up front on the builder:
+
+```csharp
+var world = new WorldBuilder()
+    .AddTemplate(myTemplate)
+    .RegisterSerializer<PatrolRouteSerializer>()
+    .RegisterSerializer<TrailHistorySerializer>()
+    .BuildAndInitialize();
+```
+
+If the type happens to be blittable (no managed fields), you can skip the custom serializer entirely — register a `BlitSerializer<T>` against the registry directly (`world.SerializerRegistry.RegisterBlit<T>()`). Enums use `RegisterEnum<T>()`. The common primitives (`int`, `float`, `string`, `Vector3`, `quaternion`, …) are pre-registered.
 
 ## Authoring a custom serializer
 

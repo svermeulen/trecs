@@ -288,9 +288,9 @@ namespace Trecs
 
                 var id = fromGroupList[fromIndex];
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                Assert.That(
+                TrecsAssert.That(
                     id != 0,
-                    "BatchUpdateEntityHandles: null EntityHandle at fromIndex {} in group {}",
+                    "BatchUpdateEntityHandles: null EntityHandle at fromIndex {0} in group {1}",
                     fromIndex,
                     fromGroup
                 );
@@ -321,9 +321,9 @@ namespace Trecs
                 var entityArrayIndex = entityHandlesToRemove[i];
 
                 var id = groupList[entityArrayIndex];
-                Assert.That(
+                TrecsAssert.That(
                     id != 0,
-                    "BatchRemoveEntityHandles: null EntityHandle at index {} in group {}",
+                    "BatchRemoveEntityHandles: null EntityHandle at index {0} in group {1}",
                     entityArrayIndex,
                     fromGroup
                 );
@@ -381,25 +381,25 @@ namespace Trecs
             for (int i = 0; i < entityCount; i++)
             {
                 var id = groupList[i];
-                Assert.That(
+                TrecsAssert.That(
                     id != 0,
-                    "ValidateGroupConsistency: null handle at index {} in group {} (entityCount={})",
+                    "ValidateGroupConsistency: null handle at index {0} in group {1} (entityCount={2})",
                     i,
                     group,
                     entityCount
                 );
 
                 ref var element = ref _entityHandleMap.ElementAt(id - 1);
-                Assert.That(
+                TrecsAssert.That(
                     element.GroupIndex == group,
-                    "ValidateGroupConsistency: group mismatch at index {} in group {}: element points to group {}",
+                    "ValidateGroupConsistency: group mismatch at index {0} in group {1}: element points to group {2}",
                     i,
                     group,
                     element.GroupIndex
                 );
-                Assert.That(
+                TrecsAssert.That(
                     element.Index == i,
-                    "ValidateGroupConsistency: index mismatch at index {} in group {}: element points to index {}",
+                    "ValidateGroupConsistency: index mismatch at index {0} in group {1}: element points to index {2}",
                     i,
                     group,
                     element.Index
@@ -461,7 +461,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly EntityHandle GetEntityHandle(EntityIndex entityIndex)
         {
-            Assert.That(!entityIndex.IsNull);
+            TrecsAssert.That(!entityIndex.IsNull);
 
             var groupList = _entityIndexToReferenceMap[entityIndex.GroupIndex.Index];
 
@@ -510,18 +510,18 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public EntityIndex GetEntityIndex(EntityHandle reference)
         {
-            Assert.That(
+            TrecsAssert.That(
                 reference != EntityHandle.Null,
                 "Attempting to get EntityIndex from null EntityHandle"
             );
-            Assert.That(
+            TrecsAssert.That(
                 reference.index < _entityHandleMap.Length,
                 "Attempting to get EntityIndex from EntityHandle with index out of bounds"
             );
             // Make sure we are querying for the current version of the locator.
             // Otherwise the locator is pointing to a removed entity.
             ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(reference.index);
-            Assert.That(
+            TrecsAssert.That(
                 entityHandleMapElement.Version == reference.Version,
                 "Attempting to get EntityIndex from an EntityHandle that has been invalidated"
             );

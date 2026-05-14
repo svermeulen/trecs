@@ -152,7 +152,7 @@ namespace {nameSpace}
         WorldAccessor Trecs.Internal.ISystemInternal.World
         {{
             get => _world;
-            set {{ Assert.That(_world == null, ""World has already been set""); _world = value; }}
+            set {{ TrecsAssert.That(_world == null, ""World has already been set""); _world = value; }}
         }}
 
         public {className}()

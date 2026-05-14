@@ -44,18 +44,18 @@ namespace Trecs.Internal
         /// </summary>
         public void RegisterSet(EntitySet entitySet, WorldInfo worldInfo)
         {
-            Assert.That(
+            TrecsAssert.That(
                 !EntitySets.ContainsKey(entitySet.Id),
-                "Set '{}' is already registered",
+                "Set '{0}' is already registered",
                 entitySet.DebugName
             );
 
             var groups = entitySet.Tags.IsNull
                 ? worldInfo.AllGroups
                 : worldInfo.GetGroupsWithTags(entitySet.Tags);
-            Assert.That(
+            TrecsAssert.That(
                 groups.Count > 0,
-                "Set '{}' matched no groups. Are the tags used by a template added to the WorldBuilder?",
+                "Set '{0}' matched no groups. Are the tags used by a template added to the WorldBuilder?",
                 entitySet.DebugName
             );
 
@@ -88,9 +88,9 @@ namespace Trecs.Internal
         internal ref EntitySetStorage GetSet(SetId setId)
         {
             var success = EntitySets.TryGetIndex(setId, out var index);
-            Assert.That(
+            TrecsAssert.That(
                 success,
-                "Set with ID '{}' not registered. Add it to the WorldBuilder via AddSet<T>().",
+                "Set with ID '{0}' not registered. Add it to the WorldBuilder via AddSet<T>().",
                 setId
             );
             return ref EntitySets.GetValueAtIndexByRef(index);

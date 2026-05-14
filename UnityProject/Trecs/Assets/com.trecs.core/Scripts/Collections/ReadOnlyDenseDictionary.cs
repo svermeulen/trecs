@@ -12,7 +12,7 @@ namespace Trecs.Collections
 
         public ReadOnlyDenseDictionary(DenseDictionary<TKey, TValue> dictionary)
         {
-            Assert.IsNotNull(dictionary);
+            TrecsAssert.IsNotNull(dictionary);
             _dictionary = dictionary;
         }
 

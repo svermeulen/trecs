@@ -663,7 +663,7 @@ namespace Trecs.SourceGen
             sb.AppendLine(3, "get => _world;");
             sb.AppendLine(
                 3,
-                "set { Assert.That(_world == null, \"World has already been set\"); _world = value; }"
+                "set { TrecsAssert.That(_world == null, \"World has already been set\"); _world = value; }"
             );
             sb.AppendLine(2, "}");
             sb.AppendLine();

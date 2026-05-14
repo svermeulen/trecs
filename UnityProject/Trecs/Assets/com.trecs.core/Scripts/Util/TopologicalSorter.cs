@@ -135,7 +135,7 @@ namespace Trecs.Internal
             }
 
             var poppedValue = recursionStack.Pop();
-            Assert.IsEqual(node, poppedValue);
+            TrecsAssert.IsEqual(node, poppedValue);
             return false;
         }
 

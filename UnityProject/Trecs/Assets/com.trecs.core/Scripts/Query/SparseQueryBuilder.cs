@@ -237,10 +237,10 @@ namespace Trecs
             var iter = CreateIterator();
 
             var movedFirst = iter.MoveNext();
-            Assert.That(movedFirst, "Query matched no entities");
+            TrecsAssert.That(movedFirst, "Query matched no entities");
             var result = iter.Current;
             var movedSecond = iter.MoveNext();
-            Assert.That(!movedSecond, "Query matched multiple entities, expected exactly one");
+            TrecsAssert.That(!movedSecond, "Query matched multiple entities, expected exactly one");
 
             return result;
         }
@@ -313,7 +313,7 @@ namespace Trecs
 
         static TagSet MergeTags(TagSet existing, TagSet addition)
         {
-            Assert.That(!addition.IsNull);
+            TrecsAssert.That(!addition.IsNull);
             return existing.IsNull ? addition : existing.CombineWith(addition);
         }
     }

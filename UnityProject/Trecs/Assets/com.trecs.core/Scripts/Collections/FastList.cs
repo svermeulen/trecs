@@ -30,7 +30,7 @@ namespace Trecs.Collections
 
         public FastList(int initialCapacity)
         {
-            Assert.That(initialCapacity >= 0);
+            TrecsAssert.That(initialCapacity >= 0);
 
             _count = 0;
             _buffer = new T[initialCapacity];
@@ -65,7 +65,7 @@ namespace Trecs.Collections
 
         public FastList(params T[] collection)
         {
-            Assert.IsNotNull(collection);
+            TrecsAssert.IsNotNull(collection);
             _buffer = new T[collection.Length];
 
             Array.Copy(collection, _buffer, collection.Length);
@@ -93,7 +93,7 @@ namespace Trecs.Collections
 
         public FastList(ICollection<T> collection)
         {
-            Assert.IsNotNull(collection);
+            TrecsAssert.IsNotNull(collection);
             _buffer = new T[collection.Count];
 
             collection.CopyTo(_buffer, 0);
@@ -103,8 +103,8 @@ namespace Trecs.Collections
 
         public FastList(ICollection<T> collection, int extraSize)
         {
-            Assert.IsNotNull(collection);
-            Assert.That(extraSize >= 0, "Extra size cannot be negative");
+            TrecsAssert.IsNotNull(collection);
+            TrecsAssert.That(extraSize >= 0, "Extra size cannot be negative");
             _buffer = new T[collection.Count + extraSize];
 
             collection.CopyTo(_buffer, 0);
@@ -138,9 +138,9 @@ namespace Trecs.Collections
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                Assert.That(
+                TrecsAssert.That(
                     index < _count,
-                    "Fasterlist - out of bound access: index {} - count {}",
+                    "Fasterlist - out of bound access: index {0} - count {1}",
                     index,
                     _count
                 );
@@ -246,7 +246,7 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public FastList<T> AddRange(IEnumerable<T> items)
         {
-            Assert.IsNotNull(items);
+            TrecsAssert.IsNotNull(items);
 
             // Pre-allocate if we know the count
             if (items is ICollection<T> collection)
@@ -308,7 +308,7 @@ namespace Trecs.Collections
 
         public void IncreaseCapacityTo(int newCapacity)
         {
-            Assert.That(newCapacity > _buffer.Length);
+            TrecsAssert.That(newCapacity > _buffer.Length);
 
             var newList = new T[newCapacity];
 
@@ -361,7 +361,7 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void InsertAt(int index, in T item)
         {
-            Assert.That(index <= _count, "out of bound index");
+            TrecsAssert.That(index <= _count, "out of bound index");
 
             if (_count == _buffer.Length)
             {
@@ -382,14 +382,14 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref readonly T Peek()
         {
-            Assert.That(_count > 0, "Cannot peek from empty list");
+            TrecsAssert.That(_count > 0, "Cannot peek from empty list");
             return ref _buffer[_count - 1];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref readonly T Pop()
         {
-            Assert.That(_count > 0, "Cannot pop from empty list");
+            TrecsAssert.That(_count > 0, "Cannot pop from empty list");
             --_count;
             return ref _buffer[_count];
         }
@@ -435,7 +435,7 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveAt(int index)
         {
-            Assert.That(index < _count, "out of bound index");
+            TrecsAssert.That(index < _count, "out of bound index");
 
             if (index == --_count)
             {
@@ -587,14 +587,17 @@ namespace Trecs.Collections
             }
             else
             {
-                Assert.That(_count == _buffer.Length);
+                TrecsAssert.That(_count == _buffer.Length);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TrimCount(int newCount)
         {
-            Assert.That(_count >= newCount, "the new length must be less than the current one");
+            TrecsAssert.That(
+                _count >= newCount,
+                "the new length must be less than the current one"
+            );
 
             _count = newCount;
         }
@@ -602,7 +605,7 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool UnorderedRemoveAt(int index)
         {
-            Assert.That(index < _count && _count > 0, "out of bound index");
+            TrecsAssert.That(index < _count && _count > 0, "out of bound index");
 
             if (index == --_count)
             {
@@ -634,7 +637,7 @@ namespace Trecs.Collections
         //Note: maybe I should be sure that the count is always multiple of 4
         void AllocateMore(int newSize)
         {
-            Assert.That(newSize > _buffer.Length);
+            TrecsAssert.That(newSize > _buffer.Length);
             var newLength = (int)(newSize * 1.5f);
 
             var newList = new T[newLength];
@@ -650,7 +653,7 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void AllocateTo(int newSize)
         {
-            Assert.That(newSize > _buffer.Length);
+            TrecsAssert.That(newSize > _buffer.Length);
 
             var newList = new T[newSize];
 
@@ -691,14 +694,14 @@ namespace Trecs.Collections
         {
             get
             {
-                Assert.That(_counter > 0 && _counter <= _size, "Invalid enumerator state");
+                TrecsAssert.That(_counter > 0 && _counter <= _size, "Invalid enumerator state");
                 return ref _buffer[_counter - 1];
             }
         }
 
         public bool MoveNext()
         {
-            Assert.That(
+            TrecsAssert.That(
                 _size == _buffer.Count,
                 "SvListEnumerator: the list has been modified during the iteration"
             );
@@ -734,7 +737,7 @@ namespace Trecs.Collections
         {
             get
             {
-                Assert.That(_counter > 0 && _counter <= _size, "Invalid enumerator state");
+                TrecsAssert.That(_counter > 0 && _counter <= _size, "Invalid enumerator state");
                 return _buffer[_counter - 1];
             }
         }
@@ -743,14 +746,14 @@ namespace Trecs.Collections
         {
             get
             {
-                Assert.That(_counter > 0 && _counter <= _size, "Invalid enumerator state");
+                TrecsAssert.That(_counter > 0 && _counter <= _size, "Invalid enumerator state");
                 return _buffer[_counter - 1];
             }
         }
 
         public bool MoveNext()
         {
-            Assert.That(
+            TrecsAssert.That(
                 _size == _buffer.Count,
                 "SvListEnumerator: the list has been modified during the iteration"
             );

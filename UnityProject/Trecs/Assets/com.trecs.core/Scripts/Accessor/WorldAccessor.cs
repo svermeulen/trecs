@@ -180,8 +180,8 @@ namespace Trecs
                     return _systemRunner.VariableDeltaTime;
                 }
 
-                throw Assert.CreateException(
-                    "Cannot access DeltaTime in context {} - use FixedDeltaTime or VariableDeltaTime explicitly instead",
+                throw TrecsAssert.CreateException(
+                    "Cannot access DeltaTime in context {0} - use FixedDeltaTime or VariableDeltaTime explicitly instead",
                     DebugName
                 );
             }
@@ -209,8 +209,8 @@ namespace Trecs
                     return _systemRunner.VariableElapsedTime;
                 }
 
-                throw Assert.CreateException(
-                    "Cannot access ElapsedTime in context {} - use FixedElapsedTime or VariableElapsedTime explicitly instead",
+                throw TrecsAssert.CreateException(
+                    "Cannot access ElapsedTime in context {0} - use FixedElapsedTime or VariableElapsedTime explicitly instead",
                     DebugName
                 );
             }
@@ -239,8 +239,8 @@ namespace Trecs
                     return _variableRng;
                 }
 
-                throw Assert.CreateException(
-                    "Cannot access Rng in context {} - use FixedRng or VariableRng explicitly instead",
+                throw TrecsAssert.CreateException(
+                    "Cannot access Rng in context {0} - use FixedRng or VariableRng explicitly instead",
                     DebugName
                 );
             }
@@ -263,8 +263,8 @@ namespace Trecs
                     return _systemRunner.VariableFrame;
                 }
 
-                throw Assert.CreateException(
-                    "Cannot access Frame in context {} - use FixedFrame or VariableFrame explicitly instead",
+                throw TrecsAssert.CreateException(
+                    "Cannot access Frame in context {0} - use FixedFrame or VariableFrame explicitly instead",
                     DebugName
                 );
             }
@@ -434,9 +434,9 @@ namespace Trecs
         /// </summary>
         public void SubmitEntities()
         {
-            Assert.That(
+            TrecsAssert.That(
                 !_systemRunner.IsExecutingSystems,
-                "WorldAccessor accessor {} cannot submit entities during system execution",
+                "WorldAccessor accessor {0} cannot submit entities during system execution",
                 DebugName
             );
             _world.SubmitEntities();
@@ -650,8 +650,8 @@ namespace Trecs
         /// </summary>
         public void Warmup(GroupIndex group, int initialCapacity = 1)
         {
-            Assert.That(!group.IsNull, "Cannot warm up null group");
-            Assert.That(initialCapacity >= 0, "initialCapacity must be non-negative");
+            TrecsAssert.That(!group.IsNull, "Cannot warm up null group");
+            TrecsAssert.That(initialCapacity >= 0, "initialCapacity must be non-negative");
             var template = _worldInfo.GetResolvedTemplateForGroup(group);
             _structuralOps.WarmupGroup(group, initialCapacity, template.ComponentBuilders);
         }
@@ -665,7 +665,7 @@ namespace Trecs
         public void Warmup(TagSet tags, int initialCapacity = 1)
         {
             var groups = _worldInfo.GetGroupsWithTags(tags);
-            Assert.That(groups.Count > 0, "No groups found for tags {}", tags);
+            TrecsAssert.That(groups.Count > 0, "No groups found for tags {0}", tags);
             for (int i = 0; i < groups.Count; i++)
             {
                 Warmup(groups[i], initialCapacity);
@@ -962,9 +962,9 @@ namespace Trecs
         void AssertGroupHasComponent<T1>(GroupIndex group)
             where T1 : unmanaged, IEntityComponent
         {
-            Assert.That(
+            TrecsAssert.That(
                 _worldInfo.GroupHasComponent<T1>(group),
-                "GroupIndex {} does not contain component {} (system {}). The query that resolved this group is missing a constraint that ensures every matched group contains {}. Add .WithComponents<{}>() to the query, narrow it via tags/sets, or set MatchByComponents = true on the iteration attribute.",
+                "GroupIndex {0} does not contain component {1} (system {2}). The query that resolved this group is missing a constraint that ensures every matched group contains {3}. Add .WithComponents<{4}>() to the query, narrow it via tags/sets, or set MatchByComponents = true on the iteration attribute.",
                 group,
                 typeof(T1),
                 DebugName,
@@ -1000,9 +1000,9 @@ namespace Trecs
                 return;
             }
 
-            Assert.That(
+            TrecsAssert.That(
                 !dec.IsConstant,
-                "Cannot write [Constant] component {} (context {}). Constant components are immutable after entity creation — set them via the EntityInitializer at AddEntity time instead.",
+                "Cannot write [Constant] component {0} (context {1}). Constant components are immutable after entity creation — set them via the EntityInitializer at AddEntity time instead.",
                 typeof(T),
                 DebugName
             );
@@ -1012,9 +1012,9 @@ namespace Trecs
                 return;
             }
 
-            Assert.That(
+            TrecsAssert.That(
                 !dec.IsInput,
-                "Cannot write [Input] component {} from {}-role accessor {}. Input components are externally driven — values must be supplied via World.AddInput<T>(...) inside an [ExecuteIn(SystemPhase.Input)] system so that recording / playback can replay them deterministically.",
+                "Cannot write [Input] component {0} from {1}-role accessor {2}. Input components are externally driven — values must be supplied via World.AddInput<T>(...) inside an [ExecuteIn(SystemPhase.Input)] system so that recording / playback can replay them deterministically.",
                 typeof(T),
                 _role,
                 DebugName
@@ -1022,9 +1022,9 @@ namespace Trecs
 
             if (IsFixed)
             {
-                Assert.That(
+                TrecsAssert.That(
                     !template.IsVariableUpdateOnly(dec),
-                    "Cannot write [VariableUpdateOnly] component {} from Fixed-role accessor {} (template {}{}). [VariableUpdateOnly] components are render-rate state and can only be touched by Variable-role / Input-system / Unrestricted-role accessors.",
+                    "Cannot write [VariableUpdateOnly] component {0} from Fixed-role accessor {1} (template {2}{3}). [VariableUpdateOnly] components are render-rate state and can only be touched by Variable-role / Input-system / Unrestricted-role accessors.",
                     typeof(T),
                     DebugName,
                     template.DebugName,
@@ -1033,9 +1033,9 @@ namespace Trecs
             }
             else
             {
-                Assert.That(
+                TrecsAssert.That(
                     template.IsVariableUpdateOnly(dec),
-                    "Cannot write component {} from {}-role accessor {}. Components written outside the Fixed role must be declared [VariableUpdateOnly] on the field or template — they are otherwise treated as simulation state and writing them at render cadence breaks determinism for snapshots and replay.",
+                    "Cannot write component {0} from {1}-role accessor {2}. Components written outside the Fixed role must be declared [VariableUpdateOnly] on the field or template — they are otherwise treated as simulation state and writing them at render cadence breaks determinism for snapshots and replay.",
                     typeof(T),
                     _role,
                     DebugName
@@ -1061,9 +1061,9 @@ namespace Trecs
                 return;
             }
 
-            Assert.That(
+            TrecsAssert.That(
                 Id == currentId,
-                "Accessor {} cannot be used during Fixed-role system execute. Only the currently-executing system's own accessor may touch ECS state — pass the system's WorldAccessor down rather than holding a separate accessor on a service or capturing one from another system.",
+                "Accessor {0} cannot be used during Fixed-role system execute. Only the currently-executing system's own accessor may touch ECS state — pass the system's WorldAccessor down rather than holding a separate accessor on a service or capturing one from another system.",
                 DebugName
             );
         }
@@ -1088,9 +1088,9 @@ namespace Trecs
                 return;
             }
 
-            Assert.That(
+            TrecsAssert.That(
                 !template.IsVariableUpdateOnly(dec),
-                "Cannot read [VariableUpdateOnly] component {} from Fixed-role accessor {} (template {}{}). [VariableUpdateOnly] components carry non-deterministic render-rate state, so reading them from Fixed would let that non-determinism leak into the simulation.",
+                "Cannot read [VariableUpdateOnly] component {0} from Fixed-role accessor {1} (template {2}{3}). [VariableUpdateOnly] components carry non-deterministic render-rate state, so reading them from Fixed would let that non-determinism leak into the simulation.",
                 typeof(T),
                 DebugName,
                 template.DebugName,
@@ -1402,9 +1402,9 @@ namespace Trecs
         public SystemMetadata GetSystemMetadata(int systemIndex)
         {
             var systems = _systemRunner.Systems;
-            Assert.That(
+            TrecsAssert.That(
                 systemIndex >= 0 && systemIndex < systems.Count,
-                "System index {} out of range [0, {})",
+                "System index {0} out of range [0, {1})",
                 systemIndex,
                 systems.Count
             );
@@ -1484,9 +1484,9 @@ namespace Trecs
         [Conditional("DEBUG")]
         void AssertCanAddInputsSystem()
         {
-            Assert.That(
+            TrecsAssert.That(
                 IsUnrestricted || IsInput,
-                "Attempted to use input-only functionality from a non-Input accessor {}",
+                "Attempted to use input-only functionality from a non-Input accessor {0}",
                 DebugName
             );
         }
@@ -1506,9 +1506,9 @@ namespace Trecs
             // and input-system service accessors don't get a "we're
             // between frames" loophole — that's a footgun. Init-time
             // setup that touches mixed state should use AccessorRole.Unrestricted.
-            Assert.That(
+            TrecsAssert.That(
                 CanMakeStructuralChanges,
-                "Attempted to modify fixed state from {} (role {}). Structural changes require a Fixed-role or Unrestricted-role accessor.",
+                "Attempted to modify fixed state from {0} (role {1}). Structural changes require a Fixed-role or Unrestricted-role accessor.",
                 DebugName,
                 _role
             );
@@ -1534,9 +1534,9 @@ namespace Trecs
             {
                 var group = groups[i];
                 var template = _worldInfo.GetResolvedTemplateForGroup(group);
-                Assert.That(
+                TrecsAssert.That(
                     !template.VariableUpdateOnly,
-                    "Query from Fixed-role accessor {} resolved to [VariableUpdateOnly] template {} (group {}). VUO templates are render-cadence state and must not be queried from Fixed — narrow the predicate (e.g. add a WithoutTags constraint) or move the query to a Variable / Input system.",
+                    "Query from Fixed-role accessor {0} resolved to [VariableUpdateOnly] template {1} (group {2}). VUO templates are render-cadence state and must not be queried from Fixed — narrow the predicate (e.g. add a WithoutTags constraint) or move the query to a Variable / Input system.",
                     DebugName,
                     template.DebugName,
                     group
@@ -1565,18 +1565,18 @@ namespace Trecs
 
             if (template.VariableUpdateOnly)
             {
-                Assert.That(
+                TrecsAssert.That(
                     !IsFixed,
-                    "Cannot modify VUO template {} from Fixed-role accessor {}. The template is declared [VariableUpdateOnly], so structural changes (add/remove/move) must come from Variable-role / input-system / Unrestricted-role accessors.",
+                    "Cannot modify VUO template {0} from Fixed-role accessor {1}. The template is declared [VariableUpdateOnly], so structural changes (add/remove/move) must come from Variable-role / input-system / Unrestricted-role accessors.",
                     template.DebugName,
                     DebugName
                 );
                 return;
             }
 
-            Assert.That(
+            TrecsAssert.That(
                 IsFixed,
-                "Attempted to modify fixed-template state from {} (role {}, template {}). Structural changes on non-VUO templates require a Fixed-role or Unrestricted-role accessor.",
+                "Attempted to modify fixed-template state from {0} (role {1}, template {2}). Structural changes on non-VUO templates require a Fixed-role or Unrestricted-role accessor.",
                 DebugName,
                 _role,
                 template.DebugName
@@ -1589,9 +1589,9 @@ namespace Trecs
             // Don't allow subscribing to events during execute since this creates
             // unserializable state
             // Subscribes should always occur during initialize
-            Assert.That(
+            TrecsAssert.That(
                 !_systemRunner.IsExecutingSystems,
-                "Attempted to use event functionality from system execute method {}",
+                "Attempted to use event functionality from system execute method {0}",
                 DebugName
             );
         }
@@ -1599,19 +1599,19 @@ namespace Trecs
         [Conditional("DEBUG")]
         void AssertCanAccessVariableData()
         {
-            Assert.That(
+            TrecsAssert.That(
                 IsUnrestricted || !IsFixed,
-                "Attempted to use variable-update functionality from Fixed-role accessor {}",
+                "Attempted to use variable-update functionality from Fixed-role accessor {0}",
                 DebugName
             );
         }
 
         void AssertTimeAccessAllowedInFixedPhase(string memberName)
         {
-            Assert.That(
+            TrecsAssert.That(
                 !_systemRunner.AssertNoTimeInFixedPhase,
-                "Cannot access {} in the fixed-update phase when WorldSettings.AssertNoTimeInFixedPhase is enabled. "
-                    + "Wall-time values are not part of the deterministic simulation contract - use FixedFrame as a tick counter instead. (Context: {})",
+                "Cannot access {0} in the fixed-update phase when WorldSettings.AssertNoTimeInFixedPhase is enabled. "
+                    + "Wall-time values are not part of the deterministic simulation contract - use FixedFrame as a tick counter instead. (Context: {1})",
                 memberName,
                 DebugName
             );

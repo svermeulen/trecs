@@ -48,12 +48,12 @@ namespace Trecs.Samples.BlobStorage
                         .Set(
                             new PaletteRef
                             {
-                                // AllocShared(stableId) looks up the blob the
-                                // PaletteSeeder put under this ID and returns
+                                // SharedPtr.Alloc(heap, stableId) looks up the blob
+                                // the PaletteSeeder put under this ID and returns
                                 // a fresh handle. Each entity holds its own
                                 // handle so the blob lives until all entities
                                 // (and the seeder) are disposed.
-                                Value = world.Heap.AllocShared<ColorPalette>(paletteId),
+                                Value = SharedPtr.Alloc<ColorPalette>(world.Heap, paletteId),
                                 CycleSpeed = useWarm ? 0.3f : 0.2f,
                             }
                         )

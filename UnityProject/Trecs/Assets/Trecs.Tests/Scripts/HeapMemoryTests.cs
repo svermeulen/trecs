@@ -1,6 +1,5 @@
 using NUnit.Framework;
 using Trecs.Internal;
-using Trecs.Serialization;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -95,7 +94,8 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var heap = env.Accessor.Heap;
 
-            var ptr = heap.AllocShared(
+            var ptr = SharedPtr.Alloc(
+                heap,
                 BlobIdGenerator.FromKey(1),
                 new TestHeapObject { Value = 55 }
             );
@@ -112,7 +112,8 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var heap = env.Accessor.Heap;
 
-            var ptr = heap.AllocShared(
+            var ptr = SharedPtr.Alloc(
+                heap,
                 BlobIdGenerator.FromKey(1),
                 new TestHeapObject { Value = 33 }
             );
@@ -131,11 +132,13 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var heap = env.Accessor.Heap;
 
-            var ptr1 = heap.AllocShared(
+            var ptr1 = SharedPtr.Alloc(
+                heap,
                 BlobIdGenerator.FromKey(1),
                 new TestHeapObject { Value = 10 }
             );
-            var ptr2 = heap.AllocShared(
+            var ptr2 = SharedPtr.Alloc(
+                heap,
                 BlobIdGenerator.FromKey(2),
                 new TestHeapObject { Value = 20 }
             );
@@ -165,7 +168,7 @@ namespace Trecs.Tests
             var heap = env.Accessor.Heap;
 
             var data = 42;
-            var ptr = heap.AllocNativeShared(BlobIdGenerator.FromKey(1), in data);
+            var ptr = NativeSharedPtr.Alloc(heap, BlobIdGenerator.FromKey(1), in data);
 
             NAssert.IsFalse(ptr.BlobId.IsNull, "NativeSharedPtr should have a valid BlobId");
         }
@@ -178,7 +181,7 @@ namespace Trecs.Tests
 
             var blobId = new BlobId(99999);
             var data = 123;
-            var ptr = heap.AllocNativeShared(blobId, in data);
+            var ptr = NativeSharedPtr.Alloc(heap, blobId, in data);
 
             NAssert.AreEqual(blobId, ptr.BlobId);
         }

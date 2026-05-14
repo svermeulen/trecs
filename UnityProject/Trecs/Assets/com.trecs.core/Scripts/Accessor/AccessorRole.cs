@@ -47,7 +47,7 @@ namespace Trecs
                 or SystemPhase.Presentation
                 or SystemPhase.LatePresentation => AccessorRole.Variable,
                 SystemPhase.Fixed => AccessorRole.Fixed,
-                _ => throw Assert.CreateException("Unknown SystemPhase {}", phase),
+                _ => throw TrecsAssert.CreateException("Unknown SystemPhase {0}", phase),
             };
         }
     }

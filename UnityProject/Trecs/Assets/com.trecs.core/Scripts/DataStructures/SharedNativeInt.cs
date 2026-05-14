@@ -36,7 +36,7 @@ namespace Trecs.Internal
         {
             unsafe
             {
-                Require.That(t.data != null, "using disposed SharedNativeInt");
+                TrecsRequire.That(t.data != null, "using disposed SharedNativeInt");
                 return Volatile.Read(ref *t.data);
             }
         }
@@ -57,7 +57,7 @@ namespace Trecs.Internal
         {
             unsafe
             {
-                Require.That(data != null, "using disposed SharedNativeInt");
+                TrecsRequire.That(data != null, "using disposed SharedNativeInt");
                 return Interlocked.Decrement(ref *data);
             }
         }
@@ -66,7 +66,7 @@ namespace Trecs.Internal
         {
             unsafe
             {
-                Require.That(data != null, "using disposed SharedNativeInt");
+                TrecsRequire.That(data != null, "using disposed SharedNativeInt");
                 return Interlocked.Increment(ref *data);
             }
         }
@@ -75,7 +75,7 @@ namespace Trecs.Internal
         {
             unsafe
             {
-                Require.That(data != null, "using disposed SharedNativeInt");
+                TrecsRequire.That(data != null, "using disposed SharedNativeInt");
                 return Interlocked.Add(ref *data, val);
             }
         }
@@ -84,7 +84,7 @@ namespace Trecs.Internal
         {
             unsafe
             {
-                Require.That(data != null, "using disposed SharedNativeInt");
+                TrecsRequire.That(data != null, "using disposed SharedNativeInt");
                 return Interlocked.CompareExchange(ref *data, value, compare);
             }
         }
@@ -93,7 +93,7 @@ namespace Trecs.Internal
         {
             unsafe
             {
-                Require.That(data != null, "using disposed SharedNativeInt");
+                TrecsRequire.That(data != null, "using disposed SharedNativeInt");
                 Volatile.Write(ref *data, val);
             }
         }

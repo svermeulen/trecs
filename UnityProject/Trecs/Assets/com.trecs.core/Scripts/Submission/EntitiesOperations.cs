@@ -205,7 +205,7 @@ namespace Trecs.Internal
                 {
                     idx = newIndex;
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                    Assert.That(++hops <= maxHops, "Cycle detected in swap-back mapping");
+                    TrecsAssert.That(++hops <= maxHops, "Cycle detected in swap-back mapping");
 #endif
                 }
                 removeList[i] = idx;

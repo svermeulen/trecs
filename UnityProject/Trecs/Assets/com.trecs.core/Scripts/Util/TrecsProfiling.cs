@@ -48,7 +48,7 @@ namespace Trecs.Internal
                 return NullDisposable.Instance;
             }
 
-            Profiler.BeginSample(CustomFormatter.CustomFormat(messageTemplate, propertyValue));
+            Profiler.BeginSample(string.Format(messageTemplate, propertyValue));
             return _sharedScope;
         }
 #else

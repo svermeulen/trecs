@@ -82,9 +82,9 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-                Assert.That(
+                TrecsAssert.That(
                     (uint)index < (uint)_header->Count,
-                    "TrecsListRead index {} out of range (Count={})",
+                    "TrecsListRead index {0} out of range (Count={1})",
                     index,
                     _header->Count
                 );

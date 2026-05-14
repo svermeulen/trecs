@@ -41,7 +41,7 @@ namespace Trecs
             IComponentBuilder[] componentBuilders
         )
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             _entitySubmitter.Preallocate(group, initialCapacity, componentBuilders);
         }
 
@@ -51,7 +51,7 @@ namespace Trecs
             int callerLine = 0
         )
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             var resolvedTemplate = _worldInfo.GetResolvedTemplateForGroup(group);
 
@@ -81,32 +81,32 @@ namespace Trecs
 
         internal void QueueSetTag(int accessorId, EntityIndex from, Tag tag)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             _entitySubmitter.QueueManagedSetTag(accessorId, from, tag);
         }
 
         internal void QueueUnsetTag(int accessorId, EntityIndex from, Tag tag)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             _entitySubmitter.QueueManagedUnsetTag(accessorId, from, tag);
         }
 
         internal bool IsScheduledForRemove(EntityIndex entityIndex)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             return _entitySubmitter.IsScheduledForRemove(entityIndex);
         }
 
         internal bool IsScheduledForMove(EntityIndex entityIndex)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             return _entitySubmitter.IsScheduledForMove(entityIndex);
         }
 
         internal void RemoveEntity(EntityIndex entityIndex)
         {
-            Assert.That(!_isDisposed);
-            Assert.That(!entityIndex.IsNull);
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(!entityIndex.IsNull);
 
             var template = _worldInfo.GetResolvedTemplateForGroup(entityIndex.GroupIndex);
 
@@ -116,7 +116,7 @@ namespace Trecs
 
         internal void RemoveAllEntitiesInGroup(GroupIndex group, int entityCount)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             _entitySubmitter.QueueRemoveAllInGroup(group, entityCount);
         }
@@ -128,14 +128,14 @@ namespace Trecs
 
         internal ref EntitySetStorage GetSet(SetId setId)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
             var sets = _sets.EntitySets;
 
             var success = sets.TryGetIndex(setId, out var index);
-            Assert.That(
+            TrecsAssert.That(
                 success,
-                "Set with ID '{}' not registered. Add it to the WorldBuilder via AddSet<T>().",
+                "Set with ID '{0}' not registered. Add it to the WorldBuilder via AddSet<T>().",
                 setId
             );
 
@@ -154,7 +154,7 @@ namespace Trecs
             float elapsedTime
         )
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             return _entitySubmitter.ProvideNativeWorldAccessor(
                 accessorId,
                 canMakeStructuralChanges,
@@ -165,7 +165,7 @@ namespace Trecs
 
         internal NativeArray<EntityHandle> BatchClaimIds(int count, Allocator allocator)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             return _entitySubmitter.BatchClaimIds(count, allocator);
         }
     }

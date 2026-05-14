@@ -16,7 +16,7 @@ namespace Trecs.Internal
     {
         static Filler()
         {
-            Assert.That(TypeMeta<T>.IsUnmanaged, "invalid type used");
+            TrecsAssert.That(TypeMeta<T>.IsUnmanaged, "invalid type used");
         }
 
         public void FillFromByteArray(
@@ -43,14 +43,14 @@ namespace Trecs.Internal
         internal static void Register<T>(IFiller entityBuilder)
             where T : unmanaged, IEntityComponent
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             ComponentId location = ComponentTypeId<T>.Value;
             _map.Add(location, entityBuilder);
         }
 
         internal static IFiller GetBuilderFromId(ComponentId typeId)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             return _map[typeId];
         }
     }

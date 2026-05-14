@@ -59,9 +59,9 @@ namespace Trecs
             // Structural cap: coalescer's TouchedDimsMask is a ulong, so 64 dims
             // is the hard upper bound. Always-on, once-at-build — replaces what
             // used to be a runtime per-op assertion in EntitySubmitter.
-            Assert.That(
+            TrecsAssert.That(
                 Dimensions.Count <= 64,
-                "Template {} has {} partition dimensions, exceeding the 64-dim cap (TouchedDimsMask is a ulong)",
+                "Template {0} has {1} partition dimensions, exceeding the 64-dim cap (TouchedDimsMask is a ulong)",
                 DebugName,
                 Dimensions.Count
             );
@@ -75,9 +75,9 @@ namespace Trecs
                 {
                     var t = dimTags[i];
 #if DEBUG && TRECS_INTERNAL_CHECKS
-                    Assert.That(
+                    TrecsAssert.That(
                         !_tagToDim.ContainsKey(t.Guid),
-                        "Tag {} appears in two partition dimensions of template {} (existing dim {}, new dim {}). Each tag must belong to at most one dim.",
+                        "Tag {0} appears in two partition dimensions of template {1} (existing dim {2}, new dim {3}). Each tag must belong to at most one dim.",
                         t,
                         DebugName,
                         _tagToDim.TryGetValue(t.Guid, out var existing) ? existing.Index : -1,
@@ -103,9 +103,9 @@ namespace Trecs
                     }
                 }
 #if DEBUG && TRECS_INTERNAL_CHECKS
-                Assert.That(
+                TrecsAssert.That(
                     !_activeVariantsByGroupTagSetId.ContainsKey(groupTagSet.Id),
-                    "Two GroupTagSets of template {} resolve to id {} — TagSet content-hash collision broke partition-variant uniqueness",
+                    "Two GroupTagSets of template {0} resolve to id {1} — TagSet content-hash collision broke partition-variant uniqueness",
                     DebugName,
                     groupTagSet.Id
                 );
@@ -148,8 +148,8 @@ namespace Trecs
         {
 #if DEBUG && TRECS_INTERNAL_CHECKS
             if (!_activeVariantsByGroupTagSetId.TryGetValue(groupTagSet.Id, out var arr))
-                throw Assert.CreateException(
-                    "TagSet {} is not a registered group of template {} — coalescer invariant broken",
+                throw TrecsAssert.CreateException(
+                    "TagSet {0} is not a registered group of template {1} — coalescer invariant broken",
                     groupTagSet,
                     DebugName
                 );
@@ -196,7 +196,7 @@ namespace Trecs
         {
             get
             {
-                Assert.IsNotNull(
+                TrecsAssert.IsNotNull(
                     _groups,
                     "ResolvedTemplate.Groups accessed before WorldBuilder.Build finished populating it"
                 );
@@ -208,11 +208,11 @@ namespace Trecs
 
         internal void SetGroups(IReadOnlyList<GroupIndex> groups)
         {
-            Assert.IsNull(
+            TrecsAssert.IsNull(
                 _groups,
                 "ResolvedTemplate.Groups already initialized; SetGroups must be called exactly once per resolved template"
             );
-            Assert.IsNotNull(groups);
+            TrecsAssert.IsNotNull(groups);
             _groups = groups;
         }
 
@@ -299,8 +299,8 @@ namespace Trecs
                 return dec;
             }
 
-            throw Assert.CreateException(
-                "Expected to find component declaration for type {} on entity {} but was not found",
+            throw TrecsAssert.CreateException(
+                "Expected to find component declaration for type {0} on entity {1} but was not found",
                 componentType,
                 Template.DebugName
             );

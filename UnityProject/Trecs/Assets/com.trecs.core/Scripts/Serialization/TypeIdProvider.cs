@@ -64,7 +64,7 @@ namespace Trecs.Internal
 
         public static int GetTypeId(Type type)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             if (_cache.TryGetValue(type, out var cachedId))
             {
                 return cachedId;
@@ -96,8 +96,8 @@ namespace Trecs.Internal
             // And any data changes can have custom logic in custom serializers to do the upgrade during load
 #if TRECS_REQUIRE_EXPLICIT_TYPE_IDS
             // Throw instead of warning to avoid corrupting save files
-            throw Assert.CreateException(
-                "Type {} does not have an explicit ID, but TRECS_REQUIRE_EXPLICIT_TYPE_IDS is defined. Either add a [SerializationId] attribute to the type, or remove the TRECS_REQUIRE_EXPLICIT_TYPE_IDS define.",
+            throw TrecsAssert.CreateException(
+                "Type {0} does not have an explicit ID, but TRECS_REQUIRE_EXPLICIT_TYPE_IDS is defined. Either add a [SerializationId] attribute to the type, or remove the TRECS_REQUIRE_EXPLICIT_TYPE_IDS define.",
                 type
             );
 #else
@@ -126,26 +126,26 @@ namespace Trecs.Internal
 
         public static void Register(Type type, int id)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             if (_cache.TryGetValue(type, out var existingId))
             {
-                Assert.That(
+                TrecsAssert.That(
                     existingId == id,
-                    "Attempted to register type {} with ID {}, but it is already registered with ID {}.",
+                    "Attempted to register type {0} with ID {1}, but it is already registered with ID {2}.",
                     type,
                     id,
                     existingId
                 );
 
-                Assert.That(_reverseCache[existingId] == type);
+                TrecsAssert.That(_reverseCache[existingId] == type);
                 return;
             }
 
             if (_reverseCache.TryGetValue(id, out var existingType))
             {
-                Assert.That(
+                TrecsAssert.That(
                     existingType == type,
-                    "TypeId collision: {} and {} both resolve to ID {}. Use [TypeId] to assign explicit IDs.",
+                    "TypeId collision: {0} and {1} both resolve to ID {2}. Use [TypeId] to assign explicit IDs.",
                     type.FullName,
                     existingType.FullName,
                     id
@@ -173,13 +173,13 @@ namespace Trecs.Internal
 
         public static Type GetTypeFromId(int id)
         {
-            Assert.That(UnityThreadHelper.IsMainThread);
+            TrecsAssert.That(UnityThreadHelper.IsMainThread);
             if (_reverseCache.TryGetValue(id, out var type))
             {
                 return type;
             }
 
-            throw Assert.CreateException("Unrecognized type ID {}", id);
+            throw TrecsAssert.CreateException("Unrecognized type ID {0}", id);
         }
     }
 }

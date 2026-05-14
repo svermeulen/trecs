@@ -1,8 +1,27 @@
 using System;
 using System.Runtime.InteropServices;
+using Trecs.Internal;
 
 namespace Trecs
 {
+    /// <summary>
+    /// Static factories for <see cref="TrecsList{T}"/>. Allocation goes through here;
+    /// per-instance operations (<c>Read</c>, <c>Write</c>, <c>EnsureCapacity</c>,
+    /// <c>Dispose</c>) live on the struct itself.
+    /// </summary>
+    public static class TrecsList
+    {
+        public static TrecsList<T> Alloc<T>(HeapAccessor heap, int initialCapacity = 0)
+            where T : unmanaged
+        {
+            heap.AssertCanAllocatePersistent();
+            return heap.TrecsListHeap.Alloc<T>(initialCapacity);
+        }
+
+        public static TrecsList<T> Alloc<T>(WorldAccessor world, int initialCapacity = 0)
+            where T : unmanaged => Alloc<T>(world.Heap, initialCapacity);
+    }
+
     /// <summary>
     /// A growable list of unmanaged values whose storage is owned by the
     /// world's <see cref="TrecsListHeap"/>. Designed to live as a 4-byte
@@ -58,6 +77,69 @@ namespace Trecs
         }
 
         public readonly void Dispose(WorldAccessor world) => Dispose(world.Heap);
+
+        /// <summary>
+        /// Grows this list's backing data buffer so it can hold at least
+        /// <paramref name="minCapacity"/> elements without further reallocation. Doubles
+        /// geometrically past the existing capacity. Main-thread only — call this before
+        /// scheduling any job that appends to the list, since
+        /// <see cref="TrecsListWrite{T}.Add"/> cannot grow.
+        /// </summary>
+        public readonly void EnsureCapacity(HeapAccessor heap, int minCapacity)
+        {
+            heap.TrecsListHeap.EnsureCapacity(in this, minCapacity);
+        }
+
+        public readonly void EnsureCapacity(WorldAccessor world, int minCapacity) =>
+            EnsureCapacity(world.Heap, minCapacity);
+
+        /// <summary>
+        /// Opens a safety-checked read view. Main-thread only; for in-job access use the
+        /// <see cref="NativeTrecsListResolver"/> overload.
+        /// </summary>
+        public readonly TrecsListRead<T> Read(HeapAccessor heap) =>
+            heap.TrecsListHeap.Read(in this);
+
+        public readonly TrecsListRead<T> Read(WorldAccessor world) => Read(world.Heap);
+
+        /// <summary>
+        /// Opens a safety-checked write view. Main-thread only; for in-job access use the
+        /// <see cref="NativeTrecsListResolver"/> overload.
+        /// </summary>
+        public readonly TrecsListWrite<T> Write(HeapAccessor heap) =>
+            heap.TrecsListHeap.Write(in this);
+
+        public readonly TrecsListWrite<T> Write(WorldAccessor world) => Write(world.Heap);
+
+        /// <summary>
+        /// Burst-compatible read view. Pass a resolver obtained via
+        /// <see cref="HeapAccessor.NativeTrecsListResolver"/> or
+        /// <see cref="NativeWorldAccessor.TrecsListResolver"/>.
+        /// </summary>
+        public readonly unsafe TrecsListRead<T> Read(in NativeTrecsListResolver resolver)
+        {
+            var entry = resolver.ResolveEntry<T>(Handle.Value);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            return new TrecsListRead<T>((TrecsListHeader*)entry.Address.ToPointer(), entry.Safety);
+#else
+            return new TrecsListRead<T>((TrecsListHeader*)entry.Address.ToPointer());
+#endif
+        }
+
+        /// <summary>
+        /// Burst-compatible write view. Pass a resolver obtained via
+        /// <see cref="HeapAccessor.NativeTrecsListResolver"/> or
+        /// <see cref="NativeWorldAccessor.TrecsListResolver"/>.
+        /// </summary>
+        public readonly unsafe TrecsListWrite<T> Write(in NativeTrecsListResolver resolver)
+        {
+            var entry = resolver.ResolveEntry<T>(Handle.Value);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            return new TrecsListWrite<T>((TrecsListHeader*)entry.Address.ToPointer(), entry.Safety);
+#else
+            return new TrecsListWrite<T>((TrecsListHeader*)entry.Address.ToPointer());
+#endif
+        }
 
         public readonly bool Equals(TrecsList<T> other) => Handle.Equals(other.Handle);
 

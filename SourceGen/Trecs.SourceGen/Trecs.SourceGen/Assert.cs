@@ -2,7 +2,7 @@ using System;
 
 namespace Trecs.SourceGen.Internal
 {
-    internal class AssertException(string message) : Exception(message) { }
+    internal class TrecsException(string message) : Exception(message) { }
 
     internal static class Assert
     {
@@ -31,14 +31,14 @@ namespace Trecs.SourceGen.Internal
             }
         }
 
-        public static AssertException CreateException()
+        public static TrecsException CreateException()
         {
-            return new AssertException("Assert hit!");
+            return new TrecsException("Assert hit!");
         }
 
-        public static AssertException CreateException(string message)
+        public static TrecsException CreateException(string message)
         {
-            return new AssertException("Assert hit! " + message);
+            return new TrecsException("Assert hit! " + message);
         }
     }
 }

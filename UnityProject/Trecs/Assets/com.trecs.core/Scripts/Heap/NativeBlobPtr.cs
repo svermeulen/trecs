@@ -11,7 +11,7 @@ namespace Trecs.Internal
     /// Resolves to a <c>ref T</c> for direct access. Lives in
     /// <see cref="Trecs.Internal"/> because the supported public path for shared
     /// native data is <see cref="NativeSharedPtr{T}"/> via
-    /// <see cref="HeapAccessor.AllocNativeShared{T}(BlobId, in T)"/>;
+    /// <see cref="NativeSharedPtr.Alloc{T}(HeapAccessor, BlobId, in T)"/>;
     /// <see cref="NativeBlobPtr{T}"/> is only used by callers writing custom
     /// <see cref="IBlobStore"/> backends.
     /// </summary>
@@ -39,8 +39,8 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get(BlobCache blobCache)
         {
-            Assert.That(!IsNull);
-            Assert.That(
+            TrecsAssert.That(!IsNull);
+            TrecsAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to Get from a disposed NativeBlobPtr"
             );
@@ -76,8 +76,8 @@ namespace Trecs.Internal
 
         public void WarmUp(BlobCache blobCache)
         {
-            Assert.That(!IsNull);
-            Assert.That(
+            TrecsAssert.That(!IsNull);
+            TrecsAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to WarmUp from a disposed NativeBlobPtr"
             );
@@ -86,8 +86,8 @@ namespace Trecs.Internal
 
         public BlobLoadingState GetLoadingState(BlobCache blobCache)
         {
-            Assert.That(!IsNull);
-            Assert.That(
+            TrecsAssert.That(!IsNull);
+            TrecsAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to GetLoadingState from a disposed NativeBlobPtr"
             );
@@ -96,7 +96,7 @@ namespace Trecs.Internal
 
         public readonly void Dispose(BlobCache blobCache)
         {
-            Assert.That(!IsNull);
+            TrecsAssert.That(!IsNull);
             blobCache.DisposeHandle(Handle);
         }
 

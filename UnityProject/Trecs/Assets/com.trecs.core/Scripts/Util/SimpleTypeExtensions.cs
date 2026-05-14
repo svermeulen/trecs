@@ -15,7 +15,7 @@ namespace Trecs.Internal
 
         public static bool HasAttribute(this ICustomAttributeProvider provider, Type attributeType)
         {
-            Assert.That(attributeType.IsSubclassOf(typeof(Attribute)));
+            TrecsAssert.That(attributeType.IsSubclassOf(typeof(Attribute)));
             return provider.GetCustomAttributes(attributeType, true).Length > 0;
         }
 

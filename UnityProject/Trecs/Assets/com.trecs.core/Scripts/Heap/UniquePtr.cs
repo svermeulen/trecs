@@ -5,9 +5,57 @@ using Trecs.Internal;
 namespace Trecs
 {
     /// <summary>
+    /// Static factories for <see cref="UniquePtr{T}"/>. Per-instance operations
+    /// (<c>Get</c>, <c>TryGet</c>, <c>CanGet</c>, <c>Set</c>, <c>Dispose</c>) live on
+    /// the struct itself.
+    /// </summary>
+    public static class UniquePtr
+    {
+        public static UniquePtr<T> Alloc<T>(HeapAccessor heap)
+            where T : class
+        {
+            heap.AssertCanAllocatePersistent();
+            return heap.UniqueHeap.AllocUnique<T>();
+        }
+
+        public static UniquePtr<T> Alloc<T>(HeapAccessor heap, T value)
+            where T : class
+        {
+            heap.AssertCanAllocatePersistent();
+            return heap.UniqueHeap.AllocUnique<T>(value);
+        }
+
+        public static UniquePtr<T> Alloc<T>(WorldAccessor world)
+            where T : class => Alloc<T>(world.Heap);
+
+        public static UniquePtr<T> Alloc<T>(WorldAccessor world, T value)
+            where T : class => Alloc<T>(world.Heap, value);
+
+        public static UniquePtr<T> AllocFrameScoped<T>(HeapAccessor heap)
+            where T : class
+        {
+            heap.AssertCanAddInputsSystem();
+            return heap.FrameScopedUniqueHeap.Alloc<T>(heap.FixedFrame);
+        }
+
+        public static UniquePtr<T> AllocFrameScoped<T>(HeapAccessor heap, T value)
+            where T : class
+        {
+            heap.AssertCanAddInputsSystem();
+            return heap.FrameScopedUniqueHeap.Alloc<T>(heap.FixedFrame, value);
+        }
+
+        public static UniquePtr<T> AllocFrameScoped<T>(WorldAccessor world)
+            where T : class => AllocFrameScoped<T>(world.Heap);
+
+        public static UniquePtr<T> AllocFrameScoped<T>(WorldAccessor world, T value)
+            where T : class => AllocFrameScoped<T>(world.Heap, value);
+    }
+
+    /// <summary>
     /// Exclusive-ownership pointer to a managed (class) heap allocation. Each entity
     /// that holds a <see cref="UniquePtr{T}"/> owns its own independent copy. Allocate via
-    /// <see cref="HeapAccessor.AllocUnique{T}"/> or the frame-scoped variant.
+    /// <see cref="UniquePtr.Alloc{T}(HeapAccessor)"/> or the frame-scoped variant.
     /// <para>
     /// Resolve the value with <see cref="Get(HeapAccessor)"/> or <see cref="Get(WorldAccessor)"/>.
     /// Frame-scoped pointers are automatically cleaned up; persistent pointers must be
@@ -47,9 +95,9 @@ namespace Trecs
         {
             if (world.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
             {
-                Assert.That(
+                TrecsAssert.That(
                     entry.Type == typeof(T),
-                    "Expected heap memory address ({}) to be of type {}, but found type {}",
+                    "Expected heap memory address ({0}) to be of type {1}, but found type {2}",
                     Handle.Value,
                     typeof(T),
                     entry.Type
@@ -65,9 +113,9 @@ namespace Trecs
         {
             if (heap.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
             {
-                Assert.That(
+                TrecsAssert.That(
                     entry.Type == typeof(T),
-                    "Expected heap memory address ({}) to be of type {}, but found type {}",
+                    "Expected heap memory address ({0}) to be of type {1}, but found type {2}",
                     Handle.Value,
                     typeof(T),
                     entry.Type
@@ -105,9 +153,9 @@ namespace Trecs
 
             if (world.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
             {
-                Assert.That(
+                TrecsAssert.That(
                     entry.Type == typeof(T),
-                    "Expected heap memory address ({}) to be of type {}, but found type {}",
+                    "Expected heap memory address ({0}) to be of type {1}, but found type {2}",
                     Handle.Value,
                     typeof(T),
                     entry.Type
@@ -142,9 +190,9 @@ namespace Trecs
 
             if (heap.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
             {
-                Assert.That(
+                TrecsAssert.That(
                     entry.Type == typeof(T),
-                    "Expected heap memory address ({}) to be of type {}, but found type {}",
+                    "Expected heap memory address ({0}) to be of type {1}, but found type {2}",
                     Handle.Value,
                     typeof(T),
                     entry.Type
@@ -222,13 +270,13 @@ namespace Trecs
 
         internal readonly void Dispose(UniqueHeap heap)
         {
-            Assert.That(!IsNull);
+            TrecsAssert.That(!IsNull);
             heap.DisposeEntry<T>(Handle.Value);
         }
 
         internal readonly void Dispose(World world)
         {
-            Assert.That(
+            TrecsAssert.That(
                 !world.FrameScopedUniqueHeap.ContainsEntry(Handle.Value),
                 "Frame-scoped UniquePtr must not be manually disposed"
             );
@@ -237,7 +285,7 @@ namespace Trecs
 
         public readonly void Dispose(HeapAccessor heap)
         {
-            Assert.That(
+            TrecsAssert.That(
                 !heap.FrameScopedUniqueHeap.ContainsEntry(Handle.Value),
                 "Frame-scoped UniquePtr must not be manually disposed"
             );

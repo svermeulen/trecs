@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
-using UnityEngine;
 
 namespace Trecs.Collections
 {
@@ -34,7 +33,7 @@ namespace Trecs.Collections
 
         public DenseDictionary(int size)
         {
-            Assert.That(size >= 0, "DenseDictionary size must be non-negative");
+            TrecsAssert.That(size >= 0, "DenseDictionary size must be non-negative");
 
             _valuesInfo = new Node[size];
             _values = new TValue[size];
@@ -63,8 +62,8 @@ namespace Trecs.Collections
                         BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly
                     ) == null
                 )
-                    Debug.LogWarningFormat(
-                        "[Trecs] {0} does not implement GetHashCode -> This will cause unwanted allocations (boxing)",
+                    TrecsLog.Default.Warning(
+                        "{0} does not implement GetHashCode -> This will cause unwanted allocations (boxing)",
                         keyType.Name
                     );
             }
@@ -136,9 +135,9 @@ namespace Trecs.Collections
         public void Add(TKey key, in TValue value)
         {
             var itemAdded = AddValue(key, out var index);
-            Assert.That(
+            TrecsAssert.That(
                 itemAdded,
-                "Key {} already present in DenseDictionary<{}, {}>",
+                "Key {0} already present in DenseDictionary<{1}, {2}>",
                 key,
                 typeof(TKey),
                 typeof(TValue)
@@ -163,7 +162,7 @@ namespace Trecs.Collections
         public void Set(TKey key, in TValue value)
         {
             var itemAdded = AddValue(key, out var index);
-            Assert.That(!itemAdded, "trying to set a value on a not existing key");
+            TrecsAssert.That(!itemAdded, "trying to set a value on a not existing key");
             _values[index] = value;
         }
 
@@ -373,7 +372,7 @@ namespace Trecs.Collections
             if (TryGetIndex(key, out var findIndex))
                 return ref _values[findIndex];
 
-            throw Assert.CreateException("Key not found");
+            throw TrecsAssert.CreateException("Key not found");
 #else
             //Burst is not able to vectorise code if throw is found, regardless if it's actually ever thrown
             TryGetIndex(key, out var findIndex);
@@ -419,7 +418,7 @@ namespace Trecs.Collections
         public void RemoveMustExist(in TKey key)
         {
             var wasRemoved = TryRemove(key);
-            Assert.That(wasRemoved);
+            TrecsAssert.That(wasRemoved);
         }
 
         public TValue RemoveAndGet(in TKey key)
@@ -429,7 +428,7 @@ namespace Trecs.Collections
                 return value;
             }
 
-            throw Assert.CreateException("Dictionary key {} not found", key);
+            throw TrecsAssert.CreateException("Dictionary key {0} not found", key);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -464,7 +463,7 @@ namespace Trecs.Collections
                     }
                     else //we need to update the previous pointer if it's not the last element that is removed
                     {
-                        Assert.That(itemAfterCurrentOne != -1, "this should never happen");
+                        TrecsAssert.That(itemAfterCurrentOne != -1, "this should never happen");
                         //update the previous pointer of the item after the one to remove with the previous pointer of the item to remove
                         _valuesInfo[itemAfterCurrentOne].previous = dictionaryNode.previous;
                     }
@@ -564,7 +563,7 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGetIndex(TKey key, out int findIndex)
         {
-            Assert.That(
+            TrecsAssert.That(
                 _buckets.Length > 0,
                 "Dictionary arrays are not correctly initialized (0 size)"
             );
@@ -600,7 +599,7 @@ namespace Trecs.Collections
             if (TryGetIndex(key, out var findIndex) == true)
                 return findIndex;
 
-            throw Assert.CreateException("Key {} not found in DenseDictionary", key);
+            throw TrecsAssert.CreateException("Key {0} not found in DenseDictionary", key);
 #else
             //Burst is not able to vectorise code if throw is found, regardless if it's actually ever thrown
             TryGetIndex(key, out var findIndex);
@@ -814,7 +813,10 @@ namespace Trecs.Collections
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
             {
-                Assert.That(_count == _dic.Count, "can't modify a dictionary during its iteration");
+                TrecsAssert.That(
+                    _count == _dic.Count,
+                    "can't modify a dictionary during its iteration"
+                );
 
                 if (_index < _count - 1)
                 {
@@ -888,7 +890,7 @@ namespace Trecs.Collections
             public bool MoveNext()
             {
 #if DEBUG
-                Assert.That(
+                TrecsAssert.That(
                     _count == _startCount,
                     "can't modify a dictionary while it is iterated"
                 );
@@ -918,7 +920,7 @@ namespace Trecs.Collections
                 _index = startIndex - 1;
                 _count = count;
 #if DEBUG
-                Assert.That(
+                TrecsAssert.That(
                     _count <= _startCount,
                     "can't set a count greater than the starting one"
                 );

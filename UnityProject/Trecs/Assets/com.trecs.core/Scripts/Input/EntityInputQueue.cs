@@ -75,15 +75,15 @@ namespace Trecs.Internal
         {
             set
             {
-                Assert.IsNull(_accessor);
-                Assert.IsNotNull(value);
+                TrecsAssert.IsNull(_accessor);
+                TrecsAssert.IsNotNull(value);
                 _accessor = value;
             }
         }
 
         internal void SetInputsAppliedSubject(SimpleSubject systemRegistrySubject)
         {
-            Assert.IsNull(_systemRegistryInputsAppliedEvent);
+            TrecsAssert.IsNull(_systemRegistryInputsAppliedEvent);
             _systemRegistryInputsAppliedEvent = systemRegistrySubject;
         }
 
@@ -121,8 +121,8 @@ namespace Trecs.Internal
                 }
             }
 
-            throw Assert.CreateException(
-                "Input not found for frame {} and entity {}",
+            throw TrecsAssert.CreateException(
+                "Input not found for frame {0} and entity {1}",
                 frame,
                 entityHandle
             );
@@ -166,9 +166,9 @@ namespace Trecs.Internal
 
             if (!existsOk)
             {
-                Assert.That(
+                TrecsAssert.That(
                     !values.ContainsKey(key),
-                    "Input already exists for frame {} and entity {}",
+                    "Input already exists for frame {0} and entity {1}",
                     frame,
                     entityHandle
                 );
@@ -214,7 +214,7 @@ namespace Trecs.Internal
                 foreach (var key in _frameTempRemoveBuffer)
                 {
                     var wasRemoved = info.FrameEntries.TryRemove(key, out var entityHandleSet);
-                    Assert.That(wasRemoved);
+                    TrecsAssert.That(wasRemoved);
 
                     foreach (var entityHandle in entityHandleSet)
                     {
@@ -263,7 +263,7 @@ namespace Trecs.Internal
             if (info.EntityHandleSetPool.Count > 0)
             {
                 var result = info.EntityHandleSetPool.Pop();
-                Assert.That(result.IsEmpty);
+                TrecsAssert.That(result.IsEmpty);
                 return result;
             }
 
@@ -278,7 +278,7 @@ namespace Trecs.Internal
             DenseHashSet<EntityHandle> entityHandleSet
         )
         {
-            Assert.That(entityHandleSet.IsEmpty);
+            TrecsAssert.That(entityHandleSet.IsEmpty);
             info.EntityHandleSetPool.Push(entityHandleSet);
         }
 
@@ -301,7 +301,7 @@ namespace Trecs.Internal
                 foreach (var key in _frameTempRemoveBuffer)
                 {
                     var wasRemoved = info.FrameEntries.TryRemove(key, out var entityHandleSet);
-                    Assert.That(wasRemoved);
+                    TrecsAssert.That(wasRemoved);
 
                     foreach (var entityHandle in entityHandleSet)
                     {
@@ -324,7 +324,7 @@ namespace Trecs.Internal
         // input queue state because the component values themselves (which include the
         // last-applied input for Retain components) are already captured in the
         // WorldStateSerializer snapshot.
-        public void Serialize(ITrecsSerializationWriter writer)
+        public void Serialize(ISerializationWriter writer)
         {
             writer.Write("NumHelpers", _componentTypeHelpers.Count);
             long bytesStart;
@@ -333,7 +333,7 @@ namespace Trecs.Internal
             {
                 bytesStart = writer.NumBytesWritten;
                 writer.Write("ComponentType", info.Helper.ComponentType);
-                Assert.IsNotNull(info.Helper);
+                TrecsAssert.IsNotNull(info.Helper);
                 info.Helper.SerializeValues(writer);
 
                 writer.Write("NumFrameEntries", info.FrameEntries.Count);
@@ -381,7 +381,7 @@ namespace Trecs.Internal
             );
         }
 
-        public void Deserialize(ITrecsSerializationReader reader)
+        public void Deserialize(ISerializationReader reader)
         {
             _log.Trace("Deserializing EntityInputQueue");
 
@@ -413,7 +413,7 @@ namespace Trecs.Internal
                     info.Helper = CreateHelperForType(componentType);
                 }
                 info.Helper.DeserializeValues(reader);
-                Assert.IsNotNull(info.Helper);
+                TrecsAssert.IsNotNull(info.Helper);
 
                 var numFrameEntries = reader.Read<int>("NumFrameEntries");
 
@@ -511,14 +511,14 @@ namespace Trecs.Internal
 
         public void AddHistoryLocker(IInputHistoryLocker locker)
         {
-            Assert.That(!_historyLockers.Contains(locker));
+            TrecsAssert.That(!_historyLockers.Contains(locker));
             _historyLockers.Add(locker);
         }
 
         public void RemoveHistoryLocker(IInputHistoryLocker locker)
         {
             var wasRemoved = _historyLockers.Remove(locker);
-            Assert.That(wasRemoved);
+            TrecsAssert.That(wasRemoved);
         }
 
         public int GetMaxClearFrame()
@@ -663,8 +663,8 @@ namespace Trecs.Internal
                 int frame
             );
 
-            void SerializeValues(ITrecsSerializationWriter writer);
-            void DeserializeValues(ITrecsSerializationReader reader);
+            void SerializeValues(ISerializationWriter writer);
+            void DeserializeValues(ISerializationReader reader);
         }
 
         internal class ComponentTypeHelper<T> : IComponentTypeHelper
@@ -693,7 +693,7 @@ namespace Trecs.Internal
             public void Remove(FrameEntityHandlePair key)
             {
                 var wasRemoved = Values.Remove(key);
-                Assert.That(wasRemoved);
+                TrecsAssert.That(wasRemoved);
             }
 
             public void ApplyInputs(
@@ -710,12 +710,12 @@ namespace Trecs.Internal
                 Values.Clear();
             }
 
-            public void SerializeValues(ITrecsSerializationWriter writer)
+            public void SerializeValues(ISerializationWriter writer)
             {
                 Values.SerializeValues(writer);
             }
 
-            public void DeserializeValues(ITrecsSerializationReader reader)
+            public void DeserializeValues(ISerializationReader reader)
             {
                 Values.DeserializeValues(reader);
             }

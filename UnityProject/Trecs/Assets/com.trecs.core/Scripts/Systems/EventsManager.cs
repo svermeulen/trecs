@@ -106,7 +106,7 @@ namespace Trecs.Internal
             if (_reactiveOnAddedObservers.TryGetValue(group, out var list))
             {
                 bool wasRemoved = RemoveByObserver(list, observer);
-                Assert.That(wasRemoved);
+                TrecsAssert.That(wasRemoved);
             }
         }
 
@@ -134,7 +134,7 @@ namespace Trecs.Internal
             if (_reactiveOnMovedObservers.TryGetValue(group, out var list))
             {
                 bool wasRemoved = RemoveByObserver(list, observer);
-                Assert.That(wasRemoved);
+                TrecsAssert.That(wasRemoved);
             }
         }
 
@@ -167,7 +167,7 @@ namespace Trecs.Internal
             if (_reactiveOnRemovedObservers.TryGetValue(group, out var list))
             {
                 bool wasRemoved = RemoveByObserver(list, observer);
-                Assert.That(wasRemoved);
+                TrecsAssert.That(wasRemoved);
             }
         }
 

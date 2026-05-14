@@ -257,9 +257,9 @@ namespace Trecs
             {
                 var group = _groups[i];
                 var template = worldInfo.GetResolvedTemplateForGroup(group);
-                Assert.That(
+                TrecsAssert.That(
                     !template.VariableUpdateOnly,
-                    "Entity-event subscription from Fixed-role accessor {} resolved to [VariableUpdateOnly] template {} (group {}). VUO templates are render-cadence — only Variable-role / input-system / Unrestricted-role accessors drive structural changes there, so a Fixed-role observer would either never fire or leak render-rate state into the simulation. Narrow the predicate (e.g. add a WithoutTags constraint) or move the subscription to a Variable-role or input-system service.",
+                    "Entity-event subscription from Fixed-role accessor {0} resolved to [VariableUpdateOnly] template {1} (group {2}). VUO templates are render-cadence — only Variable-role / input-system / Unrestricted-role accessors drive structural changes there, so a Fixed-role observer would either never fire or leak render-rate state into the simulation. Narrow the predicate (e.g. add a WithoutTags constraint) or move the subscription to a Variable-role or input-system service.",
                     _debugName,
                     template.DebugName,
                     group
@@ -269,7 +269,7 @@ namespace Trecs
 
         public EntityEventsSubscription WithPriority(int priority)
         {
-            Assert.That(
+            TrecsAssert.That(
                 _addedObserver == null && _removedObserver == null && _movedObserver == null,
                 "WithPriority must be called before OnAdded/OnRemoved/OnMoved"
             );
@@ -279,7 +279,7 @@ namespace Trecs
 
         public EntityEventsSubscription OnAdded(EntitiesAddedObserver observer)
         {
-            Assert.That(_addedObserver == null, "OnAdded already subscribed");
+            TrecsAssert.That(_addedObserver == null, "OnAdded already subscribed");
             _addedObserver = observer;
 
             foreach (var group in _groups)
@@ -292,7 +292,7 @@ namespace Trecs
 
         public EntityEventsSubscription OnRemoved(EntitiesRemovedObserver observer)
         {
-            Assert.That(_removedObserver == null, "OnRemoved already subscribed");
+            TrecsAssert.That(_removedObserver == null, "OnRemoved already subscribed");
             _removedObserver = observer;
 
             foreach (var group in _groups)
@@ -305,7 +305,7 @@ namespace Trecs
 
         public EntityEventsSubscription OnMoved(EntitiesMovedObserver observer)
         {
-            Assert.That(_movedObserver == null, "OnMoved already subscribed");
+            TrecsAssert.That(_movedObserver == null, "OnMoved already subscribed");
             _movedObserver = observer;
 
             foreach (var group in _groups)

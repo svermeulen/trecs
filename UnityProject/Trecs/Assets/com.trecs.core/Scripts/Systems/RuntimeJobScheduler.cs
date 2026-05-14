@@ -61,7 +61,10 @@ namespace Trecs.Internal
         [Conditional("DEBUG")]
         static void AssertMainThread()
         {
-            Assert.That(UnityThreadHelper.IsMainThread, "RuntimeJobScheduler is main-thread only");
+            TrecsAssert.That(
+                UnityThreadHelper.IsMainThread,
+                "RuntimeJobScheduler is main-thread only"
+            );
         }
 
         /// <summary>

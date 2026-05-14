@@ -51,7 +51,11 @@ namespace Trecs.Internal
         )
         {
 #if DEBUG
-            Assert.That(componentBuilders != null, "Invalid Entity Descriptor {}", descriptorName);
+            TrecsAssert.That(
+                componentBuilders != null,
+                "Invalid Entity Descriptor {0}",
+                descriptorName
+            );
 #endif
             var numberOfComponents = componentBuilders.Length;
 
@@ -64,9 +68,9 @@ namespace Trecs.Internal
                     componentBuilders[index].ComponentType
                 );
 
-                Assert.That(
+                TrecsAssert.That(
                     !types.Contains(entityComponentType),
-                    "EntityBuilders must be unique inside a Template. Descriptor Type {} Component Type: {}",
+                    "EntityBuilders must be unique inside a Template. Descriptor Type {0} Component Type: {1}",
                     descriptorName,
                     entityComponentType
                 );

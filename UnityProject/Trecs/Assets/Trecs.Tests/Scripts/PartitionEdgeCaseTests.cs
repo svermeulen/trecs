@@ -584,7 +584,7 @@ namespace Trecs.Tests
         public void Coalescer_AfterWarmup_DoesNotAllocateGCMemory()
         {
 #if TRECS_INTERNAL_CHECKS
-            // TRECS_INTERNAL_CHECKS adds diagnostic Assert.That calls with
+            // TRECS_INTERNAL_CHECKS adds diagnostic TrecsAssert.That calls with
             // boxed-arg formatting on the coalescing hot path. Those allocs
             // are the whole point of the symbol — skip the zero-GC guarantee.
             NAssert.Ignore(

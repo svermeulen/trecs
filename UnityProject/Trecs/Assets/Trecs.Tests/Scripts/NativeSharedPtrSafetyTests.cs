@@ -65,8 +65,8 @@ namespace Trecs.Tests
             using var sinkA = new NativeReference<int>(Allocator.TempJob);
             using var sinkB = new NativeReference<int>(Allocator.TempJob);
 
-            var a = new ReadJob { Read = heap.Resolver.Read(in ptr), Sink = sinkA }.Schedule();
-            var b = new ReadJob { Read = heap.Resolver.Read(in ptr), Sink = sinkB }.Schedule();
+            var a = new ReadJob { Read = ptr.Read(heap.Resolver), Sink = sinkA }.Schedule();
+            var b = new ReadJob { Read = ptr.Read(heap.Resolver), Sink = sinkB }.Schedule();
             JobHandle.CombineDependencies(a, b).Complete();
 
             NAssert.AreEqual(42, sinkA.Value);
@@ -92,8 +92,8 @@ namespace Trecs.Tests
             using var sinkA = new NativeReference<int>(Allocator.TempJob);
             using var sinkB = new NativeReference<int>(Allocator.TempJob);
 
-            var a = new ReadJob { Read = heap.Resolver.Read(in ptr), Sink = sinkA }.Schedule();
-            var b = new ReadJob { Read = heap.Resolver.Read(in clone), Sink = sinkB }.Schedule();
+            var a = new ReadJob { Read = ptr.Read(heap.Resolver), Sink = sinkA }.Schedule();
+            var b = new ReadJob { Read = clone.Read(heap.Resolver), Sink = sinkB }.Schedule();
             JobHandle.CombineDependencies(a, b).Complete();
 
             NAssert.AreEqual(7, sinkA.Value);
@@ -117,7 +117,7 @@ namespace Trecs.Tests
             // releases the safety handle (via EnforceAllBufferJobsHaveCompletedAndRelease).
             heap.FlushPendingOperations();
 
-            NAssert.Throws<TrecsException>(() => heap.Resolver.Read(in ptr));
+            NAssert.Throws<TrecsException>(() => ptr.Read(heap.Resolver));
 
             heap.Dispose();
             cache.Dispose();
@@ -136,7 +136,7 @@ namespace Trecs.Tests
             NAssert.Throws<TrecsException>(() =>
             {
                 var bad = new NativeSharedPtr<float>(ptr.Handle, ptr.BlobId);
-                heap.Resolver.Read(in bad);
+                bad.Read(heap.Resolver);
             });
 
             heap.DisposeHandle(ptr.Handle);
@@ -155,7 +155,7 @@ namespace Trecs.Tests
             var ptr = heap.CreateBlob<int>(new BlobId(5), 17);
             heap.FlushPendingOperations();
 
-            var read = heap.Resolver.Read(in ptr);
+            var read = ptr.Read(heap.Resolver);
             NAssert.AreEqual(17, read.Value); // works while alive
 
             heap.Dispose();

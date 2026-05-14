@@ -8,7 +8,7 @@ namespace Trecs
     /// <see cref="NativeSharedPtr{T}"/> heaps. Callers always supply an explicit
     /// <see cref="BlobId"/> for persistent allocations — use one of the factories
     /// (<see cref="FromKey"/>, <see cref="FromGuid"/>, <see cref="FromBytes"/>,
-    /// or the content-hash extension from Trecs.Serialization) to obtain one with
+    /// or the content-hash extension from Trecs) to obtain one with
     /// the semantics you want. A zero value represents a null (unallocated) blob.
     /// </summary>
     [TypeId(283746019)]

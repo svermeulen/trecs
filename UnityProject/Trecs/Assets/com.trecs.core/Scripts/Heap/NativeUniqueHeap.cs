@@ -1,8 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using Trecs.Internal;
-using Unity.Burst;
 using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
@@ -19,14 +16,14 @@ namespace Trecs
         readonly TrecsLog _log;
 
         readonly NativeChunkStore _chunkStore;
-        readonly Dictionary<uint, Type> _typesByHandle = new();
+        readonly HandleTypeRegistry _registry = new();
         bool _isDisposed;
 
         NativeUniquePtrResolver _resolver;
 
         internal NativeUniqueHeap(TrecsLog log, NativeChunkStore chunkStore)
         {
-            Assert.IsNotNull(chunkStore);
+            TrecsAssert.IsNotNull(chunkStore);
             _log = log;
             _chunkStore = chunkStore;
             _resolver = new NativeUniquePtrResolver(_chunkStore.Resolver);
@@ -36,8 +33,8 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
-                return _typesByHandle.Count;
+                TrecsAssert.That(!_isDisposed);
+                return _registry.Count;
             }
         }
 
@@ -45,7 +42,7 @@ namespace Trecs
         {
             get
             {
-                Assert.That(!_isDisposed);
+                TrecsAssert.That(!_isDisposed);
                 return ref _resolver;
             }
         }
@@ -58,8 +55,8 @@ namespace Trecs
         /// </summary>
         internal bool ContainsEntry(uint address)
         {
-            Assert.That(!_isDisposed);
-            return _typesByHandle.ContainsKey(address);
+            TrecsAssert.That(!_isDisposed);
+            return _registry.ContainsKey(address);
         }
 
         public unsafe NativeUniqueRead<T> Read<T>(in NativeUniquePtr<T> ptr)
@@ -91,12 +88,12 @@ namespace Trecs
         internal NativeChunkStoreEntry ResolveEntry<T>(uint address)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
-            Assert.That(
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "NativeUniqueHeap.ResolveEntry must be called from the main thread; jobs use NativeUniquePtrResolver"
             );
-            Assert.That(address != 0, "Attempted to resolve null address");
+            TrecsAssert.That(address != 0, "Attempted to resolve null address");
 
             var entry = _chunkStore.ResolveEntry(new PtrHandle(address));
             AssertTypeHashMatches<T>(entry.TypeHash);
@@ -112,7 +109,7 @@ namespace Trecs
         public unsafe NativeUniquePtr<T> Alloc<T>(in T value)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             var handle = _chunkStore.Alloc(
                 UnsafeUtility.SizeOf<T>(),
                 UnsafeUtility.AlignOf<T>(),
@@ -120,7 +117,7 @@ namespace Trecs
                 out var address
             );
             UnsafeUtility.WriteArrayElement(address.ToPointer(), 0, value);
-            _typesByHandle.Add(handle.Value, typeof(T));
+            _registry.Add(handle.Value, typeof(T));
             _log.Trace("Allocated NativeUniquePtr<{0}> with handle {1}", typeof(T), handle.Value);
             return new NativeUniquePtr<T>(handle);
         }
@@ -147,15 +144,15 @@ namespace Trecs
         public NativeUniquePtr<T> AllocTakingOwnership<T>(NativeBlobAllocation alloc)
             where T : unmanaged
         {
-            Assert.That(!_isDisposed);
-            Assert.That(alloc.Ptr != IntPtr.Zero, "AllocTakingOwnership: null pointer");
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(alloc.Ptr != IntPtr.Zero, "AllocTakingOwnership: null pointer");
             var handle = _chunkStore.AllocExternal(
                 alloc.Ptr,
                 alloc.AllocSize,
                 alloc.Alignment,
                 TypeHash<T>.Value
             );
-            _typesByHandle.Add(handle.Value, typeof(T));
+            _registry.Add(handle.Value, typeof(T));
             _log.Trace(
                 "Allocated external NativeUniquePtr<{0}> with handle {1}",
                 typeof(T),
@@ -166,104 +163,72 @@ namespace Trecs
 
         public void DisposeEntry(uint address)
         {
-            Assert.That(!_isDisposed);
-            Assert.That(address != 0);
-            if (!_typesByHandle.ContainsKey(address))
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(address != 0);
+            if (!_registry.ContainsKey(address))
             {
-                throw Assert.CreateException(
-                    "Attempted to dispose invalid native unique heap address ({}) — handle is not owned by NativeUniqueHeap",
+                throw TrecsAssert.CreateException(
+                    "Attempted to dispose invalid native unique heap address ({0}) — handle is not owned by NativeUniqueHeap",
                     address
                 );
             }
             // Call chunk-store Free first; it may throw via CheckDeallocateAndThrow
-            // if a Burst job is still using the handle. If we removed from
-            // _typesByHandle first, that throw would leave the heap in an
-            // inconsistent state with a leaked side-table slot.
+            // if a Burst job is still using the handle. If we removed from the
+            // registry first, that throw would leave the heap in an inconsistent
+            // state with a leaked side-table slot.
             _chunkStore.Free(new PtrHandle(address));
-            _typesByHandle.Remove(address);
+            _registry.TryRemove(address);
             _log.Trace("Disposed NativeUniquePtr with handle {0}", address);
         }
 
         public void ClearAll(bool warnUndisposed)
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
 
-            if (warnUndisposed && _typesByHandle.Count > 0 && _log.IsWarningEnabled())
+            if (warnUndisposed && _registry.Count > 0 && _log.IsWarningEnabled())
             {
-                var typeNames = _typesByHandle
-                    .Values.Select(t => t.GetPrettyName())
-                    .Distinct()
-                    .Join(", ");
                 _log.Warning(
                     "Found {0} undisposed entries in NativeUniqueHeap with types: {1}",
-                    _typesByHandle.Count,
-                    typeNames
+                    _registry.Count,
+                    _registry.DescribeRegisteredTypes()
                 );
             }
 
-            foreach (var address in _typesByHandle.Keys.ToArray())
+            // _chunkStore.Free doesn't touch the registry; safe to iterate directly.
+            foreach (var address in _registry.Handles)
             {
                 _chunkStore.Free(new PtrHandle(address));
             }
-            _typesByHandle.Clear();
+            _registry.Clear();
         }
 
         internal void Dispose()
         {
-            Assert.That(!_isDisposed);
+            TrecsAssert.That(!_isDisposed);
             ClearAll(warnUndisposed: true);
             _isDisposed = true;
         }
 
-        public unsafe void Serialize(ITrecsSerializationWriter writer)
+        /// <summary>
+        /// Writes only the managed-side (handle → type) bookkeeping. The actual entry
+        /// memory + side-table state are dumped in bulk by <c>NativeChunkStore.Serialize</c>
+        /// which must run before this.
+        /// </summary>
+        public void Serialize(ISerializationWriter writer)
         {
-            writer.Write<int>("NumEntries", _typesByHandle.Count);
-
-            foreach (var (address, type) in _typesByHandle)
-            {
-                var entry = _chunkStore.ResolveEntry(new PtrHandle(address));
-                var size = UnsafeSizeOfRuntimeType(type);
-                var alignment = UnsafeAlignOfRuntimeType(type);
-
-                writer.Write<uint>("Address", address);
-                writer.Write<int>("InnerTypeId", TypeIdProvider.GetTypeId(type));
-                writer.Write<int>("DataSize", size);
-                writer.Write<int>("Alignment", alignment);
-                writer.BlitWriteRawBytes("Data", entry.Address.ToPointer(), size);
-            }
-
-            _log.Trace("Serialized {0} native unique entries", _typesByHandle.Count);
+            _registry.Serialize(writer);
+            _log.Trace("Serialized {0} native unique entries", _registry.Count);
         }
 
-        public unsafe void Deserialize(ITrecsSerializationReader reader)
+        /// <summary>
+        /// Restores only the managed-side (handle → type) bookkeeping. Assumes
+        /// <c>NativeChunkStore.Deserialize</c> already ran so every restored handle's
+        /// data and safety handle is live.
+        /// </summary>
+        public void Deserialize(ISerializationReader reader)
         {
-            Assert.That(_typesByHandle.Count == 0);
-
-            var numEntries = reader.Read<int>("NumEntries");
-
-            for (int i = 0; i < numEntries; i++)
-            {
-                var savedAddress = reader.Read<uint>("Address");
-                var innerTypeId = reader.Read<int>("InnerTypeId");
-                var dataSize = reader.Read<int>("DataSize");
-                var alignment = reader.Read<int>("Alignment");
-                var innerType = TypeIdProvider.GetTypeFromId(innerTypeId);
-
-                // Restore at the exact slot/generation encoded in the saved handle so that
-                // components storing this handle can be blit through save/load without remap.
-                var handle = _chunkStore.AllocAtSlot(
-                    savedAddress,
-                    dataSize,
-                    alignment,
-                    BurstRuntime.GetHashCode32(innerType),
-                    out var address
-                );
-                reader.BlitReadRawBytes("Data", address.ToPointer(), dataSize);
-                _typesByHandle.Add(handle.Value, innerType);
-            }
-
-            _chunkStore.OnDeserializeComplete();
-            _log.Debug("Deserialized {0} native unique entries", numEntries);
+            _registry.Deserialize(reader);
+            _log.Debug("Deserialized {0} native unique entries", _registry.Count);
         }
 
         // ─── Helpers ──────────────────────────────────────────────
@@ -278,23 +243,6 @@ namespace Trecs
                         + $"stored {storedHash}, requested {TypeHash<T>.Value}"
                 );
             }
-        }
-
-        // UnsafeUtility.SizeOf<T> and AlignOf<T> are generic; for serialization the type is
-        // only known at runtime. We bounce through reflection to get the equivalent values.
-        static int UnsafeSizeOfRuntimeType(Type t)
-        {
-            return UnsafeUtility.SizeOf(t);
-        }
-
-        static int UnsafeAlignOfRuntimeType(Type t)
-        {
-            // Unity's UnsafeUtility doesn't expose AlignOf(Type) directly, but
-            // Marshal.SizeOf is structurally equivalent for blittable structs. For simplicity
-            // we fall back to the platform's max useful alignment (16) — chunk store rounds up
-            // to a power of two ≥ alignment anyway. Replace with a proper Type-aware AlignOf
-            // if it becomes important.
-            return 16;
         }
     }
 }

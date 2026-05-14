@@ -30,7 +30,7 @@ namespace Trecs
             Type componentType
         )
         {
-            Require.That(componentType != null, "componentType must not be null");
+            TrecsRequire.That(componentType != null, "componentType must not be null");
             var generic = _readBoxedMethodCache.GetOrAdd(
                 componentType,
                 static t =>
@@ -57,11 +57,11 @@ namespace Trecs
             object value
         )
         {
-            Require.That(componentType != null, "componentType must not be null");
-            Require.That(value != null, "value must not be null");
-            Require.That(
+            TrecsRequire.That(componentType != null, "componentType must not be null");
+            TrecsRequire.That(value != null, "value must not be null");
+            TrecsRequire.That(
                 componentType.IsInstanceOfType(value),
-                "value type {} does not match componentType {}",
+                "value type {0} does not match componentType {1}",
                 value.GetType().Name,
                 componentType.Name
             );
