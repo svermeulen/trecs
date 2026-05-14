@@ -91,6 +91,12 @@ internal static class TrecsStubs
 
         namespace Trecs
         {
+            // EntityIndex lives in Trecs.Internal in the real runtime, but the bulk of
+            // the stubbed surface in this Trecs block (aspects, queries, accessors) takes
+            // EntityIndex as a parameter type — a namespace-scoped using brings it in here
+            // so we don't have to fully-qualify every signature.
+            using Trecs.Internal;
+
             // Marker interfaces consumed by EntityComponentGenerator and
             // AspectGenerator base-list scanning.
             public interface IEntityComponent { }
@@ -106,20 +112,6 @@ internal static class TrecsStubs
                 public int Index => 0;
                 public bool IsNull => true;
                 public static GroupIndex Null => default;
-            }
-
-            public readonly struct EntityIndex
-            {
-                public readonly int Index;
-                public readonly GroupIndex GroupIndex;
-                public static EntityIndex Null => default;
-                public bool IsNull => false;
-
-                public EntityIndex(int index, GroupIndex group) { Index = index; GroupIndex = group; }
-
-                // Aspect ctors call `_entityIndex.WithIndex(...)` to advance the index field
-                // during iteration without rebuilding the GroupIndex.
-                public EntityIndex WithIndex(int index) => new EntityIndex(index, GroupIndex);
             }
 
             public readonly struct EntityHandle
@@ -542,6 +534,24 @@ internal static class TrecsStubs
                 public void SetAdd<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
                 public void SetRemove<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
 
+                // Aspect-emitted SetTag/UnsetTag verbs route through EntityIndex-based overloads.
+                // Real implementations live as extension methods in
+                // com.trecs.core/Scripts/Internal/WorldAccessorInternalExtensions.cs.
+                public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
+                public void UnsetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
+
+                // Entity / EntityHandle materialization from an EntityIndex — emitted by
+                // EntityRefEmitter when an iteration callback declares an EntityHandle or
+                // EntityAccessor parameter. Real impls live in WorldAccessor.cs and
+                // WorldAccessorInternalExtensions.cs.
+                public EntityHandle GetEntityHandle(EntityIndex entityIndex) => default;
+                public EntityAccessor Entity(EntityIndex entityIndex) => default;
+
+                // Per-group EntityHandle buffer fetched by jobs that declare a
+                // `NativeEntityHandleBuffer` [FromWorld] field. Real impl lives in
+                // com.trecs.core/Scripts/Internal/JobGenSchedulingExtensions.cs.
+                public NativeEntityHandleBuffer GetEntityHandleBufferForJob(GroupIndex group) => default;
+
                 // Job-scheduling surface (real impls live in com.trecs.core/Scripts/Jobs).
                 public Trecs.Internal.JobScheduler GetJobSchedulerForJob() => default!;
                 public (NativeComponentBufferRead<T>, int) GetBufferReadForJob<T>(GroupIndex group)
@@ -601,6 +611,23 @@ internal static class TrecsStubs
                 public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
                 public void SetAdd<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
                 public void SetRemove<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
+                public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
+                public void UnsetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
+            }
+
+            // EntityAccessor — main-thread iteration param type bound to a WorldAccessor.
+            // Real type lives in com.trecs.core/Scripts/Accessor/. Source-gen only needs
+            // the type name to resolve so the emitted `var __entityAccessor = world.Entity(...)`
+            // and forwarding `Execute(__entityAccessor)` parses.
+            public readonly ref struct EntityAccessor { }
+
+            // NativeEntityHandleBuffer — per-group handle buffer materialized from
+            // GetEntityHandleBufferForJob. Real type lives at
+            // com.trecs.core/Scripts/DataStructures/EntityHandleBuffer.cs.
+            public readonly struct NativeEntityHandleBuffer
+            {
+                public EntityHandle this[int index] => default;
+                public int Length => 0;
             }
 
             // ----- Template generator surface -----
@@ -618,14 +645,12 @@ internal static class TrecsStubs
                 where T : unmanaged, IEntityComponent
             {
                 public ComponentDeclaration(
-                    bool? fixedUpdateOnly,
                     bool? variableUpdateOnly,
                     bool? isInput,
-                    object? inputFrameBehaviour,
-                    bool? warnOnMissingInput,
+                    MissingInputBehavior? inputFrameBehaviour,
                     bool? isConstant,
                     bool? isInterpolated,
-                    object? defaultValue
+                    T? defaultValue
                 ) { }
             }
 
@@ -637,7 +662,9 @@ internal static class TrecsStubs
                     TagSet[] partitions,
                     IComponentDeclaration[] localComponentDeclarations,
                     Tag[] localTags,
-                    bool localVariableUpdateOnly = false
+                    bool localVariableUpdateOnly = false,
+                    TagSet[]? dimensions = null,
+                    bool isAbstract = false
                 ) { }
             }
 
@@ -712,17 +739,43 @@ internal static class TrecsStubs
                 public WorldBuilder AddInterpolatedPreviousSaver<T>(InterpolatedPreviousSaver<T> saver)
                     where T : unmanaged, IEntityComponent => this;
                 public WorldBuilder AddSystem(ISystem system) => this;
+
+                // AddTemplate / AddTemplates — call sites the AddAbstractTemplateAnalyzer
+                // inspects to fire TRECS039. The analyzer matches by method name + the
+                // `Trecs.WorldBuilder` containing type, so both overloads must exist for
+                // it to recognize the call.
+                public WorldBuilder AddTemplate(Template template) => this;
+                public WorldBuilder AddTemplates(System.Collections.Generic.IEnumerable<Template> templates) => this;
             }
         }
 
         namespace Trecs.Internal
         {
+            // EntityIndex — internal-only handle used by aspect / iteration plumbing.
+            // Real type lives at com.trecs.core/Scripts/Entities/EntityIndex.cs (also in
+            // the Trecs.Internal namespace). Tests reference it as Trecs.Internal.EntityIndex,
+            // so the namespace matters.
+            public readonly struct EntityIndex
+            {
+                public readonly int Index;
+                public readonly Trecs.GroupIndex GroupIndex;
+                public static EntityIndex Null => default;
+                public bool IsNull => false;
+
+                public EntityIndex(int index, Trecs.GroupIndex group) { Index = index; GroupIndex = group; }
+
+                // Aspect ctors call `_entityIndex.WithIndex(...)` to advance the index field
+                // during iteration without rebuilding the GroupIndex.
+                public EntityIndex WithIndex(int index) => new EntityIndex(index, GroupIndex);
+            }
+
             // Real signature lives at Packages/com.trecs.core/Scripts/Util/UnmanagedUtil.cs.
             // Generated equality / operator overloads in EntityComponentGenerator
-            // call BlittableEquals; the body doesn't matter for compile-cleanliness tests.
+            // call BlittableEquals / BlittableHashCode; bodies don't matter for compile-cleanliness tests.
             public static class UnmanagedUtil
             {
                 public static bool BlittableEquals<T>(in T lhs, in T rhs) where T : unmanaged => false;
+                public static int BlittableHashCode<T>(in T value) where T : unmanaged => 0;
             }
 
             // ISystemInternal — internal extension point that AutoSystemGenerator emits an
@@ -732,13 +785,13 @@ internal static class TrecsStubs
             {
                 Trecs.WorldAccessor World { get; set; }
                 void Ready();
+                void Shutdown();
             }
 
-            // Assert.That — generated code (e.g. AutoSystemGenerator's World setter, aspect
-            // Query DSLs) uses this for runtime invariants. Public-repo signature lives at
-            // com.trecs.core/Scripts/Util/Assert.cs (sourced from sv-unity-core, renamespaced
-            // by the exporter from `Svkj` to `Trecs.Internal`).
-            public static class Assert
+            // TrecsAssert.That — generated code (e.g. AutoSystemGenerator's World setter, aspect
+            // Query DSLs) uses this for runtime invariants. Real signature lives at
+            // com.trecs.core/Scripts/Util/TrecsAssert.cs.
+            public static class TrecsAssert
             {
                 public static void That(bool condition) { }
                 public static void That(bool condition, string message) { }

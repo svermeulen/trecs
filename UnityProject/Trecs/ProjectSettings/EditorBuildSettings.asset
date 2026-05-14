@@ -36,7 +36,7 @@ EditorBuildSettings:
     path: Assets/Samples/Core/09_Interpolation/Interpolation.unity
     guid: d616b3352ebc045879133f1266f8d28d
   - enabled: 1
-    path: Assets/Samples/Serialization/10_Pointers/Pointers.unity
+    path: Assets/Samples/Core/10_Pointers/Pointers.unity
     guid: a614f2e093d6747edb3e97ada24037aa
   - enabled: 1
     path: Assets/Samples/Core/11_Snake/Snake.unity
@@ -48,7 +48,7 @@ EditorBuildSettings:
     path: Assets/Samples/Serialization/13_SaveGame/SaveGame.unity
     guid: 1d5a33dbe6384099a166c1941b4c7571
   - enabled: 1
-    path: Assets/Samples/Serialization/14_NativePointers/NativePointers.unity
+    path: Assets/Samples/Core/14_NativePointers/NativePointers.unity
     guid: 1680bd4fdbe6495cb6c1e6bd9ba26664
   - enabled: 1
     path: Assets/Samples/Core/15_AspectInterfaces/AspectInterfaces.unity
