@@ -20,9 +20,9 @@ A high-performance Entity Component System framework for Unity, designed for **d
 ## Features
 
 - **Cache-friendly storage.** Components live in contiguous structure-of-arrays buffers grouped by tag set.
-- **Small surface, lots of leverage.** Aspects bundle component access; sets give sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; `SharedPtr` / `UniquePtr` let components reference heap data.
-- **Burst & Jobs out of the box.** A source generator emits job structs and chains `JobHandle` dependencies from the components you read and write — no manual wiring.
-- **Designed for determinism.** Fixed-timestep simulation, deterministic RNG, isolated input, and built-in snapshot / record / replay with desync detection.
+- **Composable building blocks.** Aspects bundle component access; sets give sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; `SharedPtr` / `UniquePtr` let components reference heap data.
+- **Burst and Jobs out of the box.** A source generator emits job structs and chains `JobHandle` dependencies from the components you read and write — no manual wiring.
+- **Deterministic by construction.** Fixed-timestep simulation, seeded RNG, isolated input, and built-in snapshot / record / replay with desync detection.
 - **Editor tooling.** A live entity inspector and a record / scrub / fork timeline window for diagnosing transient bugs.
 
 ## Quick Start
@@ -75,9 +75,6 @@ With the [openupm-cli](https://openupm.com/):
 
 ```bash
 openupm add com.trecs.core
-
-# Optional: snapshots, recording / playback, save / load
-openupm add com.trecs.serialization
 ```
 
 Or add the scoped registry to `Packages/manifest.json` manually:
@@ -92,11 +89,12 @@ Or add the scoped registry to `Packages/manifest.json` manually:
     }
   ],
   "dependencies": {
-    "com.trecs.core": "0.2.0",
-    "com.trecs.serialization": "0.2.0"
+    "com.trecs.core": "0.2.0"
   }
 }
 ```
+
+`com.trecs.core` includes the ECS runtime, deterministic binary serialization, snapshot / recording / playback, and the Trecs Player editor window — no separate serialization package is required.
 
 ### Via Git URL
 
@@ -106,17 +104,9 @@ In **Window → Package Manager**, click **+ → Add package from git URL** and 
 https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.core
 ```
 
-For the optional serialization package:
-
-```
-https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.serialization
-```
-
-Add `com.trecs.core` first — Unity can't resolve versioned dependencies from git URLs, so order matters.
-
 ## Samples
 
-The project includes 18 samples covering everything from basic entity creation to complex simulations with Burst jobs. To try them, clone the repo, open `UnityProject/Trecs` in Unity 6000.3+, and run `Assets/Samples/Main.unity`.
+The project includes 17 samples covering everything from basic entity creation to complex simulations with Burst jobs. To try them, clone the repo, open `UnityProject/Trecs` in Unity 6000.3+, and run `Assets/Samples/Main.unity`.
 
 | Sample | Concepts |
 |--------|----------|
@@ -132,12 +122,11 @@ The project includes 18 samples covering everything from basic entity creation t
 | 10 Pointers | Storing memory outside of components |
 | 11 Snake | Complete game with recording/playback |
 | 12 Feeding Frenzy Benchmark | Exhaustive examples of the many Trecs patterns available |
-| 13 Save Game | Snapshot-based save/load slots with the serialization package |
-| 14 Native Pointers | `NativeSharedPtr` and `NativeUniquePtr` read and mutated inside a Burst job |
-| 15 Aspect Interfaces | Reusing aspect logic across templates via interface composition |
-| 17 Blob Storage | `BlobStore` for sharing immutable data across many entities |
-| 18 Reactive Events | Subscribing to entity add / remove / move events |
-| 19 Multiple Worlds | Running multiple `World` instances side by side in one scene |
+| 13 Native Pointers | `NativeSharedPtr` and `NativeUniquePtr` read and mutated inside a Burst job |
+| 14 Aspect Interfaces | Reusing aspect logic across templates via interface composition |
+| 15 Blob Storage | `BlobStore` for sharing immutable data across many entities |
+| 16 Reactive Events | Subscribing to entity add / remove / move events |
+| 17 Multiple Worlds | Running multiple `World` instances side by side in one scene |
 
 ## Acknowledgments
 
