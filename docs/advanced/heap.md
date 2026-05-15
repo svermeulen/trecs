@@ -70,18 +70,21 @@ ref readonly CMeshReference meshRef = ref World.Component<CMeshReference>(entity
 Mesh mesh = meshRef.Mesh.Get(World);
 ```
 
-## Wrapping native collections
+## Storing native collections
 
-Native collection types (`NativeList<T>`, `NativeHashMap<K,V>`, `NativeQueue<T>`, etc.) hold an internal pointer to externally-allocated storage, so they can't sit directly inside a component. Trecs serializes a component as raw memory and expects it to be self-contained — a bare `NativeList` field would write its pointer bytes, not the elements behind them, and snapshots/recordings would silently drop the contents.
+Native collection types (`NativeList<T>`, `NativeHashMap<K,V>`, `NativeQueue<T>`, etc.) hold a direct pointer to a memory address, so they can't sit directly inside a component. Trecs serializes a component as raw memory and expects it to be self-contained — a bare `NativeList` field would write its pointer bytes, not the elements behind them, and snapshots/recordings would silently drop the contents.
 
 ```csharp
 public partial struct CCollisionPairBuffer : IEntityComponent
 {
-    public NativeUniquePtr<NativeList<CollisionPair>> Value;
+    // Don't do this
+    public NativeList<CollisionPair> Value;
 }
 ```
 
 For collections with known bounds, [`FixedList<N>`](fixed-collections.md) is usually simpler — it stores data inline in the component and needs no manual disposal.
+
+If you can't use fixed collections because the data does not have a clear upper bound, or because you want to reduce memory usage, you can use one of the [Trecs collection types](#todo).  These exist specifically to be compatible with serialization, and store the memory in the same location that the native ptr memory is stored, which gets serialized alongside components automatically.
 
 ## Shared pointers and reference counting
 
