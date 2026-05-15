@@ -115,6 +115,8 @@ world.Dispose();
 
 `BuildAndInitialize()` combines steps 1 and 3. Use it when no systems need to be added post-`Build()`.
 
+For the per-frame breakdown of what `Tick()` and `LateTick()` run, see [the phase diagram](systems.md#phase-diagram).
+
 ## WorldAccessor
 
 `WorldAccessor` is the primary runtime API. Systems get one via source generation. For non-system code (init, lifecycle hooks, debug tooling, event callbacks) create one manually:

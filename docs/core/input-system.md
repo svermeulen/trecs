@@ -7,7 +7,7 @@ Despite the name, "input" isn't limited to user input — it covers **any non-de
 The mechanics:
 
 - Mark template fields with `[Input]`.
-- Inside an `[ExecuteIn(SystemPhase.Input)]` system, call `World.AddInput<T>(entity, value)`. Input systems run just before each fixed step, in lockstep with the simulation.
+- Inside an `[ExecuteIn(SystemPhase.Input)]` system, call `World.AddInput<T>(entity, value)`. Input systems run just before each fixed step, in lockstep with the simulation — see the [phase diagram](../core/systems.md#phase-diagram).
 - The queued value is applied to the target entity at the start of the upcoming fixed step.
 
 When the [Trecs Player window](../editor-windows/player.md) records, every `AddInput` call is captured alongside its target frame. During scrub or replay, Input-phase systems are disabled and recorded inputs are replayed onto the exact frames they originally targeted, so the simulation sees byte-identical input on every run regardless of live keyboard / network / clock activity.

@@ -4,6 +4,8 @@ Simulation runs at a fixed timestep (default 1/60s); rendering runs at the varia
 
 ## How it works
 
+The four steps below map onto the [per-frame phase order](../core/systems.md#phase-diagram):
+
 1. **Before each fixed update:** the previous component value is saved (`InterpolatedPrevious<T>`).
 2. **During fixed update:** systems update the component normally.
 3. **During variable update:** `Interpolated<T>` is computed by blending previous → current based on progress through the fixed frame.

@@ -51,7 +51,7 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 | Term | What it is |
 |---|---|
 | **[System](core/systems.md)** | Class implementing `ISystem` whose `Execute()` runs each frame. |
-| **[Phase](core/systems.md#update-phases)** | One of `EarlyPresentation` / `Input` / `Fixed` / `Presentation` / `LatePresentation` — controls when a system runs and what role it gets. |
+| **[Phase](core/systems.md#phase-diagram)** | One of `EarlyPresentation` / `Input` / `Fixed` / `Presentation` / `LatePresentation` — controls when a system runs and what role it gets. |
 | **[`[ForEachEntity]`](core/systems.md#foreachentity)** | Marks a method for source-generated entity iteration. |
 | **[`[WrapAsJob]`](performance/jobs-and-burst.md)** | Turns a `[ForEachEntity]` method into a Burst-compiled parallel job. |
 | **[`[FromWorld]`](advanced/advanced-jobs.md#fromworld-auto-wiring-job-fields)** | Auto-populates fields on a hand-written job struct. |

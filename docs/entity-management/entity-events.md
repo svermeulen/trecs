@@ -130,7 +130,7 @@ A callback can itself queue structural changes — e.g. an `OnRemoved` handler t
 
 ## Frame events
 
-Separate from the per-entity events, `World.Events` exposes lifecycle hooks for the simulation loop and for snapshot / recording loads:
+Separate from the per-entity events, `World.Events` exposes lifecycle hooks for the simulation loop and for snapshot / recording loads. The trigger times below align with the [per-frame phase diagram](../core/systems.md#phase-diagram):
 
 | Event | Fires when |
 |---|---|

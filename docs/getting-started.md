@@ -148,6 +148,6 @@ Two things to notice:
 ## Where to next
 
 - **[World Setup](core/world-setup.md)** — `WorldBuilder`, `WorldSettings`, lifecycle, `WorldAccessor`. Read this next.
-- **[Systems](core/systems.md)** — defining systems, iteration, update phases.
+- **[Systems](core/systems.md)** — defining systems, iteration, and the [per-frame phase order](core/systems.md#phase-diagram).
 - **[Aspects](data-access/aspects.md)** and **[Queries & Iteration](data-access/queries-and-iteration.md)** once you have multiple components per entity.
 - **[Samples](samples/index.md)** — one feature each, with a companion doc. The runnable version of this walkthrough lives in `Samples~/Tutorials/01_HelloEntity` (install via the Package Manager *Samples* tab).

@@ -6,7 +6,7 @@ In the examples below, `World` is the [`WorldAccessor`](../advanced/accessor-rol
 
 ## When submission happens
 
-Submission drains the queued operations. The system runner calls it automatically at the end of every fixed update and at the end of `World.Tick()`.
+Submission drains the queued operations. The system runner calls it automatically at the end of every fixed update and at the end of `World.LateTick()` — see the [per-frame phase diagram](../core/systems.md#phase-diagram).
 
 Call it manually via `World.SubmitEntities()`.
 

@@ -61,7 +61,7 @@ That lazy sync is why you never call `JobHandle.Complete()` yourself — touchin
 
 ## Phase boundaries
 
-Each of the five [update phases](../core/systems.md#update-phases) — `Input`, `Fixed`, `EarlyPresentation`, `Presentation`, `LatePresentation` — ends with a full job fence: every outstanding job completes before the next phase begins. So:
+Each of the five [update phases](../core/systems.md#phase-diagram) — `Input`, `Fixed`, `EarlyPresentation`, `Presentation`, `LatePresentation` — ends with a full job fence: every outstanding job completes before the next phase begins. So:
 
 - Fixed-phase jobs finish before any presentation system runs.
 - Within a phase, mix job and main-thread systems freely — the tracker orders them.

@@ -56,7 +56,7 @@ System-owned accessors map their `SystemPhase` to a role automatically:
 | `Fixed` | `Fixed` |
 | `Input` / `EarlyPresentation` / `Presentation` / `LatePresentation` | `Variable` |
 
-The presentation and input phases collapse into the single `Variable` role because they share the same access rules — only their execution-order positions differ.
+The presentation and input phases collapse into the single `Variable` role because they share the same access rules — only their [execution-order positions](../core/systems.md#phase-diagram) differ.
 
 System code never calls `world.CreateAccessor(AccessorRole.X)` — it gets the role from its `[ExecuteIn(...)]` attribute. Use `CreateAccessor` only for the standalone cases listed above.
 

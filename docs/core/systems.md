@@ -135,6 +135,8 @@ Systems run in one of five phases, controlled by `[ExecuteIn(...)]`. Each render
 
 The fixed phase runs at a fixed timestep (default 1/60s) and may run multiple times per rendered frame to catch up — or zero times if rendering is faster than the fixed rate. Each fixed step is preceded by the input phase. Presentation and LatePresentation run once per rendered frame.
 
+### Per-frame execution order { #phase-diagram }
+
 ```text
 Unity Update()  ──▶  World.Tick()
 
