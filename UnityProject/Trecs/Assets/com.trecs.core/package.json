@@ -1,8 +1,35 @@
 {
   "name": "com.trecs.core",
   "version": "0.2.0",
-  "description": "Trecs (Template-based Reproducible ECS) — Deterministic, template-first Entity Component System for Unity with native memory, Burst-compatible jobs, source-generated aspects, and group-based state management.",
+  "displayName": "Trecs",
+  "description": "A high-performance, deterministic Entity Component System framework for Unity",
+  "unity": "6000.3",
+  "unityRelease": "10f1",
+  "keywords": [
+    "ecs",
+    "entity-component-system",
+    "data-oriented",
+    "burst",
+    "jobs",
+    "performance",
+    "deterministic"
+  ],
+  "author": {
+    "name": "Steve Vermeulen",
+    "url": "https://github.com/svermeulen"
+  },
+  "documentationUrl": "https://svermeulen.github.io/trecs/",
+  "changelogUrl": "https://svermeulen.github.io/trecs/changelog/",
   "dependencies": {
-    "com.svkj.unity.core": "<local>"
-  }
+    "com.unity.mathematics": "1.3.3",
+    "com.unity.burst": "1.8.28",
+    "com.unity.collections": "2.6.2"
+  },
+  "samples": [
+    {
+      "displayName": "Tutorials",
+      "description": "Numbered tutorials covering core ECS features (entities, components, jobs, partitions, sets, interpolation, pointers).",
+      "path": "Samples~/Tutorials"
+    }
+  ]
 }
