@@ -200,10 +200,14 @@ Declare `partial void OnReady()` on a system to run one-time setup once the worl
 ```csharp
 public partial class EnemyTracker : ISystem
 {
+    IDisposable _enemyAddedSub;
+
     partial void OnReady()
     {
-        World.Events.EntitiesWithTags<GameTags.Enemy>().OnAdded(OnEnemyAdded);
+        _enemyAddedSub = World.Events.EntitiesWithTags<GameTags.Enemy>().OnAdded(OnEnemyAdded);
     }
+
+    partial void OnShutdown() => _enemyAddedSub?.Dispose();
 
     [ForEachEntity]
     void OnEnemyAdded(in Health hp) { /* ... */ }

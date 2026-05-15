@@ -63,7 +63,7 @@ public partial class Renderable : ITemplate, ITagged<CommonTags.Renderable>
     Position Position;
     Rotation Rotation;
     UniformScale Scale;
-    ColorComponent Color = new(Color.white);
+    ColorComponent Color = new(UnityEngine.Color.white);
 }
 
 // Extended — inherits everything from Renderable

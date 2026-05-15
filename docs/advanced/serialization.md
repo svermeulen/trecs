@@ -30,7 +30,7 @@ var world = new WorldBuilder()
     .BuildAndInitialize();
 ```
 
-If the type happens to be blittable (no managed fields), you can skip the custom serializer entirely — register a `BlitSerializer<T>` against the registry directly (`world.SerializerRegistry.RegisterBlit<T>()`). Enums use `RegisterEnum<T>()`. The common primitives (`int`, `float`, `string`, `Vector3`, `quaternion`, …) are pre-registered.
+If the type happens to be blittable (no managed fields), you can skip the custom serializer entirely — register the built-in `BlitSerializer<T>` against the registry directly (`world.SerializerRegistry.RegisterSerializer<BlitSerializer<T>>()`). For enums, register `EnumSerializer<T>` the same way. The common primitives (`int`, `float`, `string`, `Vector3`, `quaternion`, …) are pre-registered.
 
 ## Authoring a custom serializer
 

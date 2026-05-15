@@ -6,7 +6,7 @@ Parallel entity processing with Unity's job system and Burst, shown side-by-side
 
 ## What it does
 
-Particles spawn, move, and bounce off boundaries. A toggle switches between main-thread and Burst-compiled parallel execution to compare performance (Burst + jobs is often 10x faster). Arrow keys adjust particle count.
+Particles spawn, move, and bounce off boundaries. A toggle switches between main-thread and Burst-compiled parallel execution to compare performance side by side. Arrow keys adjust particle count.
 
 ## Schema
 

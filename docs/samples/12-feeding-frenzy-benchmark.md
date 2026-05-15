@@ -6,7 +6,7 @@ A performance benchmark — the same gameplay implemented across three ECS archi
 
 ## What it does
 
-The fish-eating-meals simulation from [07 — Feeding Frenzy](07-feeding-frenzy.md), implemented three ways. Switch approaches and iteration styles at runtime to compare performance with up to 200,000+ entities.
+The fish-eating-meals simulation from [07 — Feeding Frenzy](07-feeding-frenzy.md), implemented three ways. Switch approaches and iteration styles at runtime to compare performance. Default presets span 5,000 to 1,000,000 fish plus a configurable ratio of meals.
 
 ## Three approaches
 
@@ -78,7 +78,7 @@ The display shows simulation Hz, FPS, entity count, and memory usage in real tim
 
 ## Fish count presets
 
-Logarithmically spaced from 5,000 to 1,000,000 entities for testing at different scales.
+Logarithmically spaced from 5,000 to 1,000,000 fish (with proportional meals) for testing at different scales. The min/max are configurable in the scene's `SampleSettings.Common`.
 
 ## Key implementation details
 
