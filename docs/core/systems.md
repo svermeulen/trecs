@@ -135,6 +135,46 @@ Systems run in one of five phases, controlled by `[ExecuteIn(...)]`. Each render
 
 The fixed phase runs at a fixed timestep (default 1/60s) and may run multiple times per rendered frame to catch up — or zero times if rendering is faster than the fixed rate. Each fixed step is preceded by the input phase. Presentation and LatePresentation run once per rendered frame.
 
+```text
+Unity Update()  ──▶  World.Tick()
+
+      ┌───────────────────────┐
+      │   EarlyPresentation   │   once per Tick
+      └───────────┬───────────┘
+                  │
+      ┌───────────▼───────────────────────┐
+      │  Fixed catch-up loop              │   0..N iterations,
+      │                                   │   based on accumulated
+      │       ┌─────────────────┐         │   variable time
+      │       │      Input      │         │
+      │       └────────┬────────┘         │
+      │                ▼                  │
+      │       ┌─────────────────┐         │
+      │       │      Fixed      │         │
+      │       └────────┬────────┘         │
+      │                ▼                  │
+      │       ┌─────────────────┐         │
+      │       │   submission    │         │
+      │       └─────────────────┘         │
+      └───────────┬───────────────────────┘
+                  │
+      ┌───────────▼───────────┐
+      │     Presentation      │   once per Tick
+      └───────────────────────┘
+
+
+Unity LateUpdate()  ──▶  World.LateTick()
+
+      ┌───────────────────────┐
+      │    LatePresentation   │   once per LateTick
+      └───────────┬───────────┘
+                  │
+                  ▼
+          ┌───────────────┐
+          │  submission   │   final flush
+          └───────────────┘
+```
+
 Trecs doesn't hook into Unity's update loop. Drive it from a `MonoBehaviour`:
 
 ```csharp

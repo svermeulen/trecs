@@ -1,0 +1,6 @@
+# False-positive list for scripts/spellcheck_docs.sh
+#
+# One term per line, all lowercase. Codespell only flags terms that are
+# in its dictionary, so adding a Trecs-specific identifier here means
+# "treat this as correct" — typically project-specific jargon, public
+# API names, or short identifiers that collide with English typos.
