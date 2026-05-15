@@ -39,7 +39,7 @@ In **Window → Package Manager**, click **+ → Add package from git URL** and 
 https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.core
 ```
 
-`com.trecs.core` ships everything: the ECS runtime, deterministic binary serialization, snapshot / recording / playback, and the Trecs Player editor window. No separate serialization package to install.
+`com.trecs.core` includes the ECS runtime, deterministic binary serialization, snapshot / recording / playback, and the Trecs Player editor window. No separate serialization package is required.
 
 ## Your first entity
 

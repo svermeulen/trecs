@@ -15,9 +15,9 @@ A high-performance Entity Component System for Unity, built for **deterministic 
 ## Features
 
 - **Cache-friendly storage.** Components live in contiguous structure-of-arrays buffers grouped by tag set.
-- **Small surface, lots of leverage.** Aspects bundle component access; sets give sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; `SharedPtr` / `UniquePtr` let components reference heap data.
-- **Burst & Jobs out of the box.** A source generator emits job structs and chains `JobHandle` dependencies from the components you read and write — no manual wiring.
-- **Designed for determinism.** Fixed-timestep simulation, deterministic RNG, isolated input, and built-in snapshot / record / replay with desync detection.
+- **Composable building blocks.** Aspects bundle component access; sets give sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; `SharedPtr` / `UniquePtr` let components reference heap data.
+- **Burst and Jobs out of the box.** A source generator emits job structs and chains `JobHandle` dependencies from the components you read and write — no manual wiring.
+- **Deterministic by construction.** Fixed-timestep simulation, seeded RNG, isolated input, and built-in snapshot / record / replay with desync detection.
 - **Editor tooling.** A live entity inspector and a record / scrub / fork timeline window for diagnosing transient bugs.
 
 ## Quick Start
