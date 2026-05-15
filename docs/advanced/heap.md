@@ -2,7 +2,7 @@
 
 Components are unmanaged structs, so they can't hold classes, arrays, or other managed references directly. The **heap** system provides pointer types that let components reference data stored outside the component buffer.
 
-This page covers pointer mechanics. For sharing patterns, stable identity, and which role can allocate which heap, see [Shared Heap Data](shared-heap-data.md).
+This page covers pointer mechanics. For sharing patterns and which role can allocate which heap, see [Shared Heap Data](shared-heap-data.md).
 
 ## Pointer types
 
@@ -13,8 +13,6 @@ This page covers pointer mechanics. For sharing patterns, stable identity, and w
 | `NativeUniquePtr<T>` | Single owner | Mutable | Unmanaged (`struct`) | Yes |
 | `NativeSharedPtr<T>` | Reference counted | Immutable | Unmanaged (`struct`) | Yes |
 
-Allocation and access are static factories / instance methods on each pointer type — they take a `WorldAccessor` (or its `Heap` accessor). There are no `world.Heap.Alloc*` shortcuts.
-
 ## Allocating
 
 ```csharp
@@ -23,15 +21,13 @@ UniquePtr<MyData> unique = UniquePtr.Alloc(World, new MyData());
 SharedPtr<MyData> shared = SharedPtr.Alloc(World, MyBlobs.Foo, new MyData());
 
 // Unmanaged payloads (Burst-safe)
-NativeUniquePtr<NativeData> nativeUnique = NativeUniquePtr.Alloc(World, new NativeData());
+NativeUniquePtr<NativeData> nativeUnique = NativeUniquePtr.Alloc<NativeData>(World);
 NativeSharedPtr<NativeData> nativeShared = NativeSharedPtr.Alloc(World, MyBlobs.Bar, new NativeData());
 ```
 
 `SharedPtr` / `NativeSharedPtr` require a caller-supplied `BlobId` — shared blobs are addressed by stable ID so multiple call sites can resolve to the same allocation and so snapshots can round-trip the reference. See [Shared Heap Data](shared-heap-data.md) for the seeder / lookup patterns.
 
 `UniquePtr` / `NativeUniquePtr` are single-owner so no ID is needed — the handle itself is the only reference.
-
-Every `Alloc(world, …)` overload also has a `(world.Heap, …)` form for callers that already hold a `HeapAccessor`.
 
 ## Reading and writing
 
@@ -76,7 +72,7 @@ Mesh mesh = meshRef.Mesh.Get(World);
 
 ## Wrapping native collections
 
-Native collection types (`NativeList<T>`, `NativeHashMap<K,V>`, `NativeQueue<T>`, etc.) hold an internal pointer to externally-allocated storage, so they can't sit directly inside a component. Trecs serializes a component as raw memory and expects it to be self-contained — a bare `NativeList` field would write its pointer bytes, not the elements behind them, and snapshots/recordings would silently drop the contents. Wrap them in a `NativeUniquePtr` to put the collection on Trecs's heap, where serialization knows to walk the inner data:
+Native collection types (`NativeList<T>`, `NativeHashMap<K,V>`, `NativeQueue<T>`, etc.) hold an internal pointer to externally-allocated storage, so they can't sit directly inside a component. Trecs serializes a component as raw memory and expects it to be self-contained — a bare `NativeList` field would write its pointer bytes, not the elements behind them, and snapshots/recordings would silently drop the contents.
 
 ```csharp
 public partial struct CCollisionPairBuffer : IEntityComponent

@@ -4,6 +4,10 @@
 
 Yes — they're completely independent.  You could run both in the same project and then sync Trecs with UECS using an approach similar to [OOP Integration](guides/oop-integration.md).
 
+## Do I have to maintain determinism and serialization support to use Trecs?
+
+No.  
+
 ## What's the practical entity ceiling?
 
 The included samples are exercised up to ~1M entities ([Sample 12 — Feeding Frenzy Benchmark](samples/12-feeding-frenzy-benchmark.md) defaults to a max of 1M fish; [Sample 05 — Job System](samples/05-job-system.md) defaults to 100k particles). Beyond that the bottleneck is usually rendering, not the ECS. Structure-of-arrays storage and per-group iteration scale well past 100k with Burst-compiled jobs.
