@@ -226,42 +226,33 @@ public partial class ScoreSystem : ISystem
 }
 ```
 
-`OnReady` is wired by source generation — declare it as a `partial void` and leave the implementation in the system's main partial. Don't declare it if you don't need it.
-
-`OnReady` runs in the same order systems will execute: by phase (`EarlyPresentation` → `Input` → `Fixed` → `Presentation` → `LatePresentation`), then within each phase by `[ExecuteAfter]` / `[ExecuteBefore]` edges, then `[ExecutePriority]`, then `AddSystem` / `AddSystems` registration order as the tie-breaker. If you need one system's `OnReady` to run after another's, prefer `[ExecuteAfter]` over relying on registration order — the same constraint controls runtime order.
+`OnReady` runs in execution order: by phase, then by `[ExecuteAfter]` / `[ExecuteBefore]`, then `[ExecutePriority]`, then registration order as the tie-breaker. To make one system's `OnReady` run after another's, use `[ExecuteAfter]` — the same constraint controls runtime order.
 
 ## OnShutdown hook
 
-Declare `partial void OnShutdown()` on a system to run one-time teardown when the world is disposed. It's the right place to release native resources, unsubscribe from external events, or flush final state.
+Declare `partial void OnShutdown()` on a system to run one-time teardown when the world is disposed — releasing native resources, unsubscribing from external events, flushing final state.
 
 ```csharp
 public partial class RendererSystem : ISystem
 {
     GraphicsBuffer _instanceBuffer;
 
-    partial void OnReady()
-    {
-        _instanceBuffer = new GraphicsBuffer(/* ... */);
-    }
-
-    partial void OnShutdown()
-    {
-        _instanceBuffer?.Release();
-    }
+    partial void OnReady() => _instanceBuffer = new GraphicsBuffer(/* ... */);
+    partial void OnShutdown() => _instanceBuffer?.Release();
 }
 ```
 
-`OnShutdown` is wired by source generation — declare it as a `partial void` and leave the implementation in the system's main partial. Don't declare it if you don't need it.
+`OnShutdown` runs in **reverse** `OnReady` order, so a system can rely on its `[ExecuteAfter]` dependencies still being alive when it tears down.
 
-`OnShutdown` runs in the **reverse** of `OnReady` order: phases reversed (`LatePresentation` → `Presentation` → `Fixed` → `Input` → `EarlyPresentation`), and within each phase, sorted systems traversed in reverse. This last-in-first-out teardown means a system that depends on another at `OnReady` time can rely on its dependency still being alive at `OnShutdown` time.
+Both hooks are source-generated. Declare them as `partial void` when you need them and omit them when you don't.
 
 ### What the world looks like inside OnShutdown
 
-Just before the first `OnShutdown` hook runs, `World.Dispose()` calls `World.RemoveAllEntities`, which fires reactive `OnRemoved` observers one last time for every non-global entity and then zeros out the per-group entity counts. The practical consequences inside `OnShutdown`:
+Just before the first `OnShutdown` hook runs, the world removes every non-global entity (firing `OnRemoved` observers one last time). So inside `OnShutdown`:
 
-- **Queries for non-global entities return empty.** `World.Query()…Count()`, `[ForEachEntity]` iteration, and direct count APIs all see zero entities.
-- **The global singleton entity is intentionally untouched.** It remains queryable and mutable — `World.GlobalComponent<T>().Read` / `.Write` work as usual.
-- **Subscriptions and resources you allocated in `OnReady`** should be released here. Reactive subscriptions disposed in `OnShutdown` still received their final batch of events from `RemoveAllEntities` a moment earlier.
+- **Non-global queries are empty** — `Count()`, `[ForEachEntity]`, etc. see zero entities.
+- **The global entity is still alive** — `World.GlobalComponent<T>()` still works.
+- **`OnRemoved` observers already fired** for everything else, so cleanup keyed off entity removal has happened. Release any resources you allocated in `OnReady` here.
 
 ## Registering systems
 

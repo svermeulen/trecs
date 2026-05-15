@@ -20,7 +20,7 @@ A template is a `partial class` that:
 
 Fields with default values supply fallback initialization. Fields without defaults must be set explicitly via `EntityInitializer.Set()` at creation.
 
-> **Field visibility:** template fields must have **no access modifier** — write `Rotation Rotation;`, not `public Rotation Rotation;`. Template fields are a compile-time config DSL read by the source generator, not an API surface. Diagnostic `TRECS034` enforces this.
+> **No access modifier on fields.** Write `Rotation Rotation;`, not `public Rotation Rotation;`. Template fields configure the source generator at compile time; they aren't a runtime API surface. Diagnostic `TRECS034` flags violations.
 
 ## Tags
 
@@ -78,10 +78,7 @@ public partial class FishEntity : ITemplate,
 
 ### Abstract templates
 
-Mark a base-only template with the C# `abstract` keyword to declare it exists only as an `IExtends<>` target. Abstract templates have every other template feature — fields with defaults, `ITagged<>`, `IPartitionedBy<>`, `IExtends<>` chains — but `WorldBuilder.AddTemplate(SomeAbstract.Template)` is rejected:
-
-- **At authoring time:** source analyzer `TRECS039` flags the call site with a red squiggle.
-- **At runtime:** `WorldBuilder.AddTemplate` throws if it's ever reached (covers locals, conditionals, and reflection paths the analyzer can't statically resolve).
+A template marked `abstract` exists only to be extended — `WorldBuilder.AddTemplate` refuses to register it. Use this when a template is a role or mixin, not a concrete entity shape.
 
 ```csharp
 public abstract partial class Renderable : ITemplate, ITagged<CommonTags.Renderable>
@@ -93,15 +90,13 @@ public abstract partial class Renderable : ITemplate, ITagged<CommonTags.Rendera
 
 public partial class FishEntity : ITemplate, IExtends<Renderable>, ITagged<FrenzyTags.Fish> { /* ... */ }
 
-// At World setup:
 builder.AddTemplate(FishEntity.Template);     // OK
 builder.AddTemplate(Renderable.Template);     // TRECS039: abstract template
 ```
 
-Use it whenever a template is conceptually a "role" or "mixin" rather than a concrete entity shape. Concrete derived templates are still registered as usual.
+Analyzer `TRECS039` catches static call sites; the runtime check catches anything the analyzer can't see (locals, reflection, conditionals).
 
-
-Multiple bases work too:
+### Multiple bases
 
 ```csharp
 public partial class ComplexEntity : ITemplate,
@@ -187,7 +182,7 @@ The source generator emits one partition per variant.
 
 ### Multiple dimensions (cross product)
 
-Each `IPartitionedBy<...>` is one independent dimension. Stack them and the source generator emits the cross product as concrete partitions — **O(N·k)** declarations yield **O(k^N)** partitions.
+Each `IPartitionedBy<...>` is one independent dimension. Stack them and the generator emits one partition per combination — three binary dims, for example, gives **2 × 2 × 2 = 8** partitions.
 
 ```csharp
 public partial class Enemy : ITemplate,

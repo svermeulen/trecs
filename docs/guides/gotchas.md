@@ -24,9 +24,9 @@ new WorldBuilder()
     .BuildAndInitialize();
 ```
 
-Every group of `BallEntity` contains `ShapeEntity`'s tag set as a subset. If both templates were registered, single-group APIs (`AddEntity<...>()`, `[FromWorld(typeof(Tag))] GroupIndex` / `NativeEntitySetIndices<TSet>`) couldn't disambiguate a query expressed only in `ShapeEntity`'s tags — it would match groups from both. Trecs catches the configuration at build instead of failing later at every affected call site.
+`BallEntity`'s tag set contains `ShapeEntity`'s as a subset. Single-group APIs that filter by `ShapeEntity`'s tags alone would match groups from both, with no way to pick one — so Trecs rejects the configuration at build instead of failing at every affected call site.
 
-**Fix.** Register only the derived templates — base templates referenced via `IExtends` are discovered automatically and their components are folded into the derived groups. If your game truly needs both a `Shape` group and `Ball` groups concretely (e.g. `Orc` + `FlyingOrc`), give each a distinct discriminator tag (`ITagged<Grounded>` on the base, `ITagged<Flying>` on the derived) so their tag sets are siblings rather than strict subsets. See [Groups: `AddEntity` resolution](../advanced/groups-and-tagsets.md#addentity-which-group-does-the-entity-land-in).
+**Fix.** Register only the derived templates; the base is discovered automatically via `IExtends`. If you genuinely need both a base and a derived concrete group (e.g. `Orc` + `FlyingOrc`), give each a distinct discriminator tag so their tag sets are siblings, not strict subsets. See [Groups: `AddEntity` resolution](../advanced/groups-and-tagsets.md#addentity-which-group-does-the-entity-land-in).
 
 ## Mutating a set while iterating it
 
@@ -69,7 +69,7 @@ ref var buf = ref World.Component<CScratchBuffer>(entity).Write;
 buf.List.Write(World).Value.Add(42);
 ```
 
-This is intentional: it lets mutations to the pointed-to native data piggy-back on the framework's existing component resource tracking. The scheduler already knows which systems read and write each component, so requiring write access on the component in order to mutate the native allocation behind the pointer means cross-system contention on that allocation is automatically serialized — no separate per-pointer bookkeeping is needed. Read-only access (`Read`) has no such requirement and works through a `ref readonly` component, which similarly composes with the read-side of component tracking.
+This is intentional: it lets the framework's component-level read/write tracking double as locking for the native data behind the pointer. Two systems writing the same component are already serialized; making `Write` on the pointer require component write access gets that serialization for free, with no per-pointer bookkeeping.
 
 **Fix.** Get `.Write` on the owning component (or copy the pointer to a local) before calling `Write` on the pointer.
 
