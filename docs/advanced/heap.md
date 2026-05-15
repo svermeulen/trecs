@@ -13,40 +13,51 @@ This page covers pointer mechanics. For sharing patterns, stable identity, and w
 | `NativeUniquePtr<T>` | Single owner | Mutable | Unmanaged (`struct`) | Yes |
 | `NativeSharedPtr<T>` | Reference counted | Immutable | Unmanaged (`struct`) | Yes |
 
+Allocation and access are static factories / instance methods on each pointer type — they take a `WorldAccessor` (or its `Heap` accessor). There are no `world.Heap.Alloc*` shortcuts.
+
 ## Allocating
 
-`Heap` is a property on `WorldAccessor` (the source-generated `World` property inside an `ISystem` works directly):
-
 ```csharp
-UniquePtr<MyData> unique = World.Heap.AllocUnique(new MyData());
-SharedPtr<MyData> shared = World.Heap.AllocShared(new MyData());
+// Managed payloads
+UniquePtr<MyData> unique = UniquePtr.Alloc(World, new MyData());
+SharedPtr<MyData> shared = SharedPtr.Alloc(World, MyBlobs.Foo, new MyData());
 
-NativeUniquePtr<NativeData> nativeUnique = World.Heap.AllocNativeUnique(new NativeData());
-NativeSharedPtr<NativeData> nativeShared = World.Heap.AllocNativeShared(new NativeData());
+// Unmanaged payloads (Burst-safe)
+NativeUniquePtr<NativeData> nativeUnique = NativeUniquePtr.Alloc(World, new NativeData());
+NativeSharedPtr<NativeData> nativeShared = NativeSharedPtr.Alloc(World, MyBlobs.Bar, new NativeData());
 ```
 
-For shared allocations that need a stable identity across runs (so clones from disk resolve to the same heap entry), use the `BlobId` overloads — see [Pattern B — look up by stable `BlobId`](shared-heap-data.md#pattern-b-look-up-by-stable-blobid).
+`SharedPtr` / `NativeSharedPtr` require a caller-supplied `BlobId` — shared blobs are addressed by stable ID so multiple call sites can resolve to the same allocation and so snapshots can round-trip the reference. See [Shared Heap Data](shared-heap-data.md) for the seeder / lookup patterns.
 
-## Reading
+`UniquePtr` / `NativeUniquePtr` are single-owner so no ID is needed — the handle itself is the only reference.
 
-`Get` / `TryGet` / `Dispose` / `Clone` accept either a `HeapAccessor` or a `WorldAccessor` directly:
+Every `Alloc(world, …)` overload also has a `(world.Heap, …)` form for callers that already hold a `HeapAccessor`.
+
+## Reading and writing
+
+Managed pointers expose `Get(...)` directly; native pointers go through typed `Read(...)` / `Write(...)` wrappers so Unity's job-safety system can track conflicts:
 
 ```csharp
-// Managed
+// Managed — Get returns the object reference
 MyData data = unique.Get(World);
-MyData data2 = shared.Get(World);
+MyData shared_data = shared.Get(World);
 
-// Native (return refs)
-ref readonly NativeData d1 = ref nativeUnique.Get(World);
-ref readonly NativeData d2 = ref nativeShared.Get(World);
+if (shared.TryGet(World, out MyData maybe)) { /* … */ }
 
-// Safe access
-if (shared.TryGet(World, out MyData data3)) { ... }
+// Native — Read / Write hand back a safety-checked wrapper exposing .Value
+ref readonly NativeData rd = ref nativeUnique.Read(World).Value;
+ref NativeData wd = ref nativeUnique.Write(World).Value;
+wd.HitCount++;
+
+// NativeSharedPtr is read-only (immutable shared data) — no Write wrapper.
+ref readonly NativeData sd = ref nativeShared.Read(World).Value;
 ```
+
+To swap out the payload of a managed `UniquePtr` wholesale (replace the referenced object), call `Set(World, newValue)`.
 
 ## Storing pointers in components
 
-Pointer structs are unmanaged, so they can be stored as component fields:
+Pointer structs are unmanaged, so they live directly in component fields:
 
 ```csharp
 public struct CMeshReference : IEntityComponent
@@ -54,11 +65,11 @@ public struct CMeshReference : IEntityComponent
     public SharedPtr<Mesh> Mesh;
 }
 
-// Set during entity creation
+// At entity creation
 World.AddEntity<MyTag>()
-    .Set(new CMeshReference { Mesh = World.Heap.AllocShared(mesh) });
+    .Set(new CMeshReference { Mesh = SharedPtr.Alloc(World, MeshIds.Bullet, mesh) });
 
-// Read in a system
+// At a system call site
 ref readonly CMeshReference meshRef = ref World.Component<CMeshReference>(entity).Read;
 Mesh mesh = meshRef.Mesh.Get(World);
 ```
@@ -74,16 +85,18 @@ public partial struct CCollisionPairBuffer : IEntityComponent
 }
 ```
 
-For collections with known bounds, [`FixedList<N>`](fixed-collections.md) can be easier, since it stores data inline with component and therefore doesn't require manual disposal.
+For collections with known bounds, [`FixedList<N>`](fixed-collections.md) is usually simpler — it stores data inline in the component and needs no manual disposal.
 
 ## Shared pointers and reference counting
 
-`SharedPtr<T>` and `NativeSharedPtr<T>` use reference counting. Multiple components can reference the same data:
+`SharedPtr<T>` and `NativeSharedPtr<T>` use reference counting. `Clone` returns a new handle to the same blob and bumps the refcount:
 
 ```csharp
-SharedPtr<MyData> original = World.Heap.AllocShared(new MyData());
-SharedPtr<MyData> clone = original.Clone(World);  // Increments ref count
+SharedPtr<MyData> first  = SharedPtr.Alloc(World, MyBlobs.Foo, new MyData());
+SharedPtr<MyData> second = first.Clone(World);  // same blob; refcount = 2
 ```
+
+Calling `SharedPtr.Alloc(World, sameId)` (the lookup-only overload — no value argument) is equivalent to `Clone` addressed by ID instead of by reference: it finds the existing blob, bumps the refcount, and returns a fresh handle. See [Shared Heap Data — Pattern B](shared-heap-data.md#pattern-b-look-up-by-stable-blobid).
 
 ## Disposing
 
@@ -91,54 +104,63 @@ Pointers must be manually disposed when no longer needed:
 
 ```csharp
 unique.Dispose(World);
-shared.Dispose(World);  // Decrements ref count; frees if zero
+shared.Dispose(World);   // decrements ref count; frees when it hits zero
 ```
 
 ### Cleanup is manual for entity-owned pointers
 
-Pointers stored on components must be disposed when the entity is removed — Trecs does **not** auto-dispose. The standard pattern is an `OnRemoved` observer on the relevant tag, with a `[ForEachEntity]` handler that receives the component(s) to dispose:
+Pointers stored on components must be disposed when the entity is removed — Trecs does **not** auto-dispose. The standard pattern is an `OnRemoved` observer with a `[ForEachEntity]` handler that receives the component(s) to dispose:
 
 ```csharp
-public partial class PaletteRefCleanup : IDisposable
+public partial class TrailCleanup : IDisposable
 {
     readonly DisposeCollection _disposables = new();
 
-    public PaletteRefCleanup(World world)
+    public TrailCleanup(World world)
     {
         World = world.CreateAccessor(AccessorRole.Fixed);
 
         World.Events
-            .EntitiesWithTags<MyTag>()
-            .OnRemoved(OnRemoved)
+            .EntitiesWithTags<PatrolTags.Follower>()
+            .OnRemoved(OnFollowerRemoved)
             .AddTo(_disposables);
     }
 
     WorldAccessor World { get; }
 
     [ForEachEntity]
-    void OnRemoved(in PaletteRef paletteRef)
+    void OnFollowerRemoved(in Trail trail)
     {
-        paletteRef.Value.Dispose(World);
+        trail.Value.Dispose(World);
     }
 
     public void Dispose() => _disposables.Dispose();
 }
 ```
 
-See [Sample 10 — Pointers](../samples/10-pointers.md) for a reference implementation and [Entity Events](../entity-management/entity-events.md) for the full observer API.
+See [Sample 10 — Pointers](../samples/10-pointers.md) for a runnable example and [Entity Events](../entity-management/entity-events.md) for the full observer API.
 
 !!! warning
-    Forgetting to dispose pointers causes memory leaks. Trecs detects leaks at world shutdown in debug builds.
+    Forgetting to dispose pointers causes memory leaks. Trecs reports leaks at world shutdown in debug builds.
 
 ## Pointers in jobs
 
-Use native pointer types (`NativeUniquePtr<T>` / `NativeSharedPtr<T>`) in jobs and call `Get` with a `NativeWorldAccessor`:
+Only the **native** variants (`NativeUniquePtr<T>` / `NativeSharedPtr<T>`) work inside Burst jobs. Inside a job, resolve through the matching resolver wired in via the `NativeWorldAccessor`:
 
 ```csharp
-ref readonly NativeData data = ref nativeShared.Get(in nativeWorld);
+[ForEachEntity(typeof(MyTag))]
+[WrapAsJob]
+static void Execute(ref Trail trail, in NativeWorldAccessor world)
+{
+    ref var trailData = ref trail.Value.Write(world.UniquePtrResolver).Value;
+    // ... mutate trailData ...
+}
 ```
+
+`Write` on a `ref` component requires a writable reference to the pointer struct itself — see the [Gotchas entry](../guides/gotchas.md#mutating-a-nativeuniqueptrt-needs-write-access-to-the-owning-component).
 
 ## See also
 
-- [Sample 10 — Pointers](../samples/10-pointers.md): unique and shared managed pointers stored on entities.
+- [Sample 10 — Pointers](../samples/10-pointers.md): managed `UniquePtr` per entity.
+- [Sample 13 — Native Pointers](../samples/13-native-pointers.md): the Burst-compatible equivalent inside a `[WrapAsJob]` job.
 - [Sample 15 — Blob Storage](../samples/15-blob-storage.md): the seeder pattern with stable `BlobId` for shared assets.

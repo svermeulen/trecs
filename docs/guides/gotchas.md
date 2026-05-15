@@ -56,22 +56,22 @@ The wrapped collection's storage is allocated in Unity's allocator, not Trecs's 
 
 ## Mutating a `NativeUniquePtr<T>` needs write access to the owning component
 
-`GetMut` and `Set` on `NativeUniquePtr<T>` are defined as `ref this` extension methods, so the call site needs a writeable reference to the pointer struct itself — typically a `Write`-accessed component field. Calling them through a `ref readonly` (e.g. what `Component<T>(entity).Read` hands back) doesn't compile, because a `ref readonly` field isn't addressable as `ref`.
+`Write(...)` on `NativeUniquePtr<T>` is a `ref this` instance method, so the call site needs a writeable reference to the pointer struct itself — typically a `.Write`-accessed component field. Calling it through a `ref readonly` (e.g. what `Component<T>(entity).Read` hands back) doesn't compile, because a `ref readonly` field isn't addressable as `ref`.
 
 ```csharp
 // ❌ Won't compile: Read returns ref readonly, so the inner
 //    NativeUniquePtr field isn't addressable as `ref this`.
 ref readonly var buf = ref World.Component<CScratchBuffer>(entity).Read;
-buf.List.GetMut(World).Add(42);
+buf.List.Write(World).Value.Add(42);
 
 // ✅ Take write access on the component.
 ref var buf = ref World.Component<CScratchBuffer>(entity).Write;
-buf.List.GetMut(World).Add(42);
+buf.List.Write(World).Value.Add(42);
 ```
 
-This is intentional: it lets mutations to the pointed-to native data piggy-back on the framework's existing component resource tracking. The scheduler already knows which systems read and write each component, so requiring write access on the component in order to mutate the native allocation behind the pointer means cross-system contention on that allocation is automatically serialized — no separate per-pointer bookkeeping is needed. Read-only access (`Get`) has no such requirement and works through a `ref readonly` component, which similarly composes with the read-side of component tracking.
+This is intentional: it lets mutations to the pointed-to native data piggy-back on the framework's existing component resource tracking. The scheduler already knows which systems read and write each component, so requiring write access on the component in order to mutate the native allocation behind the pointer means cross-system contention on that allocation is automatically serialized — no separate per-pointer bookkeeping is needed. Read-only access (`Read`) has no such requirement and works through a `ref readonly` component, which similarly composes with the read-side of component tracking.
 
-**Fix.** Get `.Write` on the owning component (or copy the pointer to a local) before calling `GetMut` / `Set`.
+**Fix.** Get `.Write` on the owning component (or copy the pointer to a local) before calling `Write` on the pointer.
 
 ## Looking up a fresh `EntityHandle` in the same fixed step
 
@@ -120,14 +120,15 @@ class PaletteService
         _world = world.CreateAccessor(AccessorRole.Fixed);
     }
 
-    public SharedPtr<ColorPalette> GetWarm() => _world.Heap.AllocShared<ColorPalette>(AssetIds.WarmPalette);
+    public SharedPtr<ColorPalette> GetWarm() =>
+        SharedPtr.Alloc<ColorPalette>(_world.Heap, AssetIds.WarmPalette);
 }
 
 // ✅ Service takes the accessor in; the calling Fixed system passes its own.
 class PaletteService
 {
     public SharedPtr<ColorPalette> GetWarm(WorldAccessor world) =>
-        world.Heap.AllocShared<ColorPalette>(AssetIds.WarmPalette);
+        SharedPtr.Alloc<ColorPalette>(world.Heap, AssetIds.WarmPalette);
 }
 ```
 

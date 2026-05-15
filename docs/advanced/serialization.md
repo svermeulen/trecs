@@ -36,7 +36,7 @@ If the type happens to be blittable (no managed fields), you can skip the custom
 
 Implement `ISerializer<T>` with paired `Serialize` and `Deserialize` methods. The binary format is purely positional — `Deserialize` must call the same readers in the same order as `Serialize` calls writers.
 
-Take the `PatrolRoute` shape from [Sample 10 — Pointers](../samples/10-pointers.md): a managed class holding a `List<Vector3>` and a speed, allocated via `World.Heap.AllocShared` and stored on a component as `SharedPtr<PatrolRoute>`.
+As a concrete example, take a managed class holding a list of waypoints, allocated via `SharedPtr.Alloc(world.Heap, blobId, value)` and stored on a component as `SharedPtr<PatrolRoute>`:
 
 ```csharp
 public class PatrolRoute
@@ -103,4 +103,5 @@ public void Deserialize(ref PatrolRoute value, ISerializationReader reader)
 
 - [Heap](heap.md) — pointer types and which kinds of data need to live on the heap.
 - [Trecs Player Window](../editor-windows/player.md) — uses the registered serializers to record, scrub, and replay world state.
-- [Sample 10 — Pointers](../samples/10-pointers.md) — full example of `SharedPtr` / `UniquePtr` over managed types.
+- [Sample 10 — Pointers](../samples/10-pointers.md) — `UniquePtr` over a managed type.
+- [Sample 15 — Blob Storage](../samples/15-blob-storage.md) — `SharedPtr` over a managed type with stable `BlobId`s and a custom `ISerializer<T>`.

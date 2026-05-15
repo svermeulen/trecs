@@ -6,139 +6,136 @@ Heap pointers for managed data (classes, lists, arrays) that can't live in unman
 
 ## What it does
 
-Entities follow shared patrol routes (waypoints). Each has its own trail history (a LineRenderer). Multiple entities share route data via `SharedPtr`; each has a unique trail via `UniquePtr`.
+A handful of follower entities trace a figure-8 path, each leaving a fading trail behind it (rendered with a Unity `LineRenderer`). Per-entity trail history is a `List<Vector3>` — managed data that can't live in a component — held on the heap behind a `UniquePtr<TrailHistory>`.
 
 ## Schema
 
-### Managed classes (heap data)
+### Managed payload
 
 ```csharp
-public class PatrolRoute
-{
-    public List<Vector3> Waypoints;
-    public Color Color;
-    public float Speed;
-}
-
 public class TrailHistory
 {
-    public List<Vector3> Positions;
+    public List<Vector3> Positions = new();
     public int MaxLength;
 }
 ```
 
-These hold `List<T>` — managed types that can't live directly in components.
+`TrailHistory` is a class with a `List<T>`, so it can't be a component. It lives on the heap.
 
 ### Components
 
 ```csharp
-public partial struct Route : IEntityComponent
-{
-    public SharedPtr<PatrolRoute> Value;  // Shared across entities
-    public float Progress;
-}
-
+// 4-byte handle, stored inline in the component
 public partial struct Trail : IEntityComponent
 {
-    public UniquePtr<TrailHistory> Value;  // Unique per entity
+    public UniquePtr<TrailHistory> Value;
+}
+
+[Unwrap]
+public partial struct PathPhase : IEntityComponent
+{
+    public float Value;  // current position along the figure-8, in radians
+}
+```
+
+### Template
+
+```csharp
+public partial class PatrolFollowerEntity
+    : ITemplate,
+        IExtends<CommonTemplates.RenderableGameObject>,
+        ITagged<PatrolTags.Follower>
+{
+    Position Position;
+    PathPhase PathPhase;
+    Trail Trail;
+    PrefabId PrefabId = new(PointersPrefabs.Follower);
 }
 ```
 
 ## Allocation
 
-`SharedPtr` and `UniquePtr` need a blob store. The sample uses the in-memory store; a disk-backed store is also available — see [Heap](../advanced/heap.md):
+The scene initializer creates each follower and allocates its own `TrailHistory` blob. `UniquePtr.Alloc` returns a 4-byte handle that goes straight onto the component:
 
 ```csharp
-.AddBlobStore(new BlobStoreInMemory(
-    new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 }, null))
-```
-
-### SharedPtr — shared route data
-
-`AllocShared` returns a handle with refcount 1. `Clone` increments the count; each entity stores its own clone. After spawning, the original is disposed — the entity clones keep the object alive:
-
-```csharp
-var routePtr = world.Heap.AllocShared(new PatrolRoute { /* ... */ });
-
-for (int i = 0; i < count; i++)
+for (int i = 0; i < _followerCount; i++)
 {
-    world.AddEntity<PatrolTags.Follower>()
-        .Set(new Route { Value = routePtr.Clone(world), Progress = i })
-        .Set(new Trail { Value = world.Heap.AllocUnique(new TrailHistory { MaxLength = 50 }) });
-}
+    float phase = (float)i / _followerCount * 2f * math.PI;
+    var trailPtr = UniquePtr.Alloc(_world.Heap, new TrailHistory { MaxLength = 60 });
 
-// Each entity holds its own clone — the original is no longer needed.
-routePtr.Dispose(world);
-```
-
-### UniquePtr — per-entity trail
-
-```csharp
-var trailPtr = world.Heap.AllocUnique(new TrailHistory { MaxLength = 50 });
-```
-
-Each entity owns its `UniquePtr` — not shared, mutated freely by the owner.
-
-## Systems
-
-### PatrolMovementSystem
-
-Reads the shared route and the unique trail:
-
-```csharp
-[ForEachEntity(MatchByComponents = true)]
-void Execute(ref Position position, in Route route, in Trail trail)
-{
-    // Read shared route — same waypoint list for all followers of this route
-    var patrolRoute = route.Value.Get(World);
-    var waypoints = patrolRoute.Waypoints;
-
-    // Compute position from elapsed time + initial offset
-    float totalProgress = route.Progress + World.ElapsedTime * patrolRoute.Speed;
-    float wrappedProgress = totalProgress % waypoints.Count;
-
-    int indexA = (int)wrappedProgress;
-    int indexB = (indexA + 1) % waypoints.Count;
-    float t = wrappedProgress - indexA;
-
-    position.Value = math.lerp((float3)waypoints[indexA], (float3)waypoints[indexB], t);
-
-    // Record position in unique trail — each entity has its own list
-    var trailHistory = trail.Value.Get(World);
-    trailHistory.Positions.Add((Vector3)position.Value);
-    while (trailHistory.Positions.Count > trailHistory.MaxLength)
-        trailHistory.Positions.RemoveAt(0);
+    _world.AddEntity<PatrolTags.Follower>()
+        .Set(new Position(PatrolMovementSystem.FigureEightAt(phase)))
+        .Set(new PathPhase(phase))
+        .Set(new Trail { Value = trailPtr });
 }
 ```
+
+Each entity owns its own trail, so `UniquePtr<T>` is the right type — no refcounting, single owner.
+
+## Movement system
+
+The system advances each follower along the figure-8 and appends to its trail. `trail.Value.Get(World)` returns the live `TrailHistory` instance — mutating it sticks because we're holding the object reference:
+
+```csharp
+public partial class PatrolMovementSystem : ISystem
+{
+    const float Speed = 1.5f;
+
+    [ForEachEntity(MatchByComponents = true)]
+    void Execute(ref Position position, ref PathPhase phase, in Trail trail)
+    {
+        phase.Value = (phase.Value + Speed * World.DeltaTime) % (2f * math.PI);
+        position.Value = FigureEightAt(phase.Value);
+
+        var trailHistory = trail.Value.Get(World);
+        trailHistory.Positions.Add((Vector3)position.Value);
+
+        while (trailHistory.Positions.Count > trailHistory.MaxLength)
+            trailHistory.Positions.RemoveAt(0);
+    }
+}
+```
+
+Note `in Trail trail` is enough — we're not replacing the pointer, just dereferencing it to mutate the managed object behind it.
 
 ## Cleanup
 
-Pointers must be disposed when entities are removed. Range-based `OnRemoved` provides a `GroupIndex` and an index range; reconstructing the per-entity index reads each component before storage is freed:
+Pointers stored on components must be disposed when the entity is removed — Trecs does **not** auto-dispose. The standard pattern is an `OnRemoved` observer with a `[ForEachEntity]` handler that receives the component to dispose:
 
 ```csharp
-world.Events.EntitiesWithTags<PatrolTags.Follower>()
-    .OnRemoved((GroupIndex group, EntityRange indices) =>
+public partial class PatrolFollowerCleanup : IDisposable
+{
+    readonly DisposeCollection _disposables = new();
+
+    public PatrolFollowerCleanup(World world)
     {
-        for (int i = indices.Start; i < indices.End; i++)
-        {
-            var entityIndex = new EntityIndex(i, group);
+        World = world.CreateAccessor(AccessorRole.Fixed);
 
-            var route = world.Component<Route>(entityIndex).Read;
-            route.Value.Dispose(world);
+        World.Events.EntitiesWithTags<PatrolTags.Follower>()
+            .OnRemoved(OnFollowerRemoved)
+            .AddTo(_disposables);
+    }
 
-            var trail = world.Component<Trail>(entityIndex).Read;
-            trail.Value.Dispose(world);
-        }
-    })
-    .AddTo(_eventDisposables);
+    WorldAccessor World { get; }
+
+    [ForEachEntity]
+    void OnFollowerRemoved(in Trail trail)
+    {
+        trail.Value.Dispose(World);
+    }
+
+    public void Dispose() => _disposables.Dispose();
+}
 ```
+
+In DEBUG builds Trecs reports any pointers still alive at world shutdown — handy for catching missed cleanup paths.
 
 ## Concepts introduced
 
-- **`SharedPtr<T>`** — reference-counted pointer for shared managed data. See [Heap](../advanced/heap.md).
-- **`UniquePtr<T>`** — single-owner pointer for per-entity managed data.
-- **`Clone()`** — increments the `SharedPtr` ref count.
-- **`Dispose()`** — decrements the ref count (shared) or returns to the pool (unique).
-- **`Get(world)`** — dereferences a pointer.
-- **Cleanup handlers** — dispose pointers on entity removal to prevent leaks. See [Heap — cleanup is manual](../advanced/heap.md#cleanup-is-manual-for-entity-owned-pointers) and [Entity Events](../entity-management/entity-events.md).
+- **`UniquePtr<T>`** — single-owner managed pointer. Stored inline as a 4-byte handle on the component. See [Heap](../advanced/heap.md).
+- **`UniquePtr.Alloc(World.Heap, value)`** — static factory; mirrors `UniquePtr.Alloc(World, value)` if you have the `WorldAccessor` handy.
+- **`ptr.Get(World)`** — dereferences to the managed object reference.
+- **`ptr.Dispose(World)`** — returns the slot to the pool.
+- **`OnRemoved` cleanup observer** — the canonical way to release pointers when entities disappear. See [Heap — cleanup is manual](../advanced/heap.md#cleanup-is-manual-for-entity-owned-pointers) and [Entity Events](../entity-management/entity-events.md).
+- For sharing the same managed data across many entities, see `SharedPtr<T>` in [Sample 15 — Blob Storage](15-blob-storage.md).
 - For Burst-compatible variants used inside jobs, see [Native Pointers](13-native-pointers.md).

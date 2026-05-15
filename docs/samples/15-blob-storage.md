@@ -10,7 +10,7 @@ A 6×6 grid of cubes cycles through one of two colour palettes. Each palette is 
 
 ## Why stable BlobIds?
 
-`HeapAccessor.AllocShared(T blob)` (no ID argument) auto-mints a `BlobId` from the world's deterministic RNG. That works when your init code is itself deterministic, but breaks when startup ordering varies — assets discovered on disk in non-deterministic order, or content loaded in parallel. Hand-authored IDs side-step that:
+Every `SharedPtr.Alloc` / `NativeSharedPtr.Alloc` requires a caller-supplied `BlobId`. Shared blobs are addressed by stable identifier so independent call sites resolve to the same allocation, and so the same identity survives snapshots, recordings, and re-load. Hand-author the IDs as named constants:
 
 ```csharp
 public static class PaletteIds
@@ -38,9 +38,10 @@ public class PaletteSeeder
     public void Initialize()
     {
         var world = _world.CreateAccessor(AccessorRole.Unrestricted);
-        // AllocShared(stableId, blob) seeds the blob under a caller-chosen BlobId.
-        _warm = world.Heap.AllocShared(PaletteIds.Warm, BuildWarm());
-        _cool = world.Heap.AllocShared(PaletteIds.Cool, BuildCool());
+        // SharedPtr.Alloc(heap, stableId, blob) seeds the blob under a caller-chosen BlobId.
+        // Subsequent SharedPtr.Alloc(heap, stableId) calls (no value) return new handles to it.
+        _warm = SharedPtr.Alloc(world.Heap, PaletteIds.Warm, BuildWarm());
+        _cool = SharedPtr.Alloc(world.Heap, PaletteIds.Cool, BuildCool());
     }
 
     public void Dispose()
@@ -54,7 +55,7 @@ public class PaletteSeeder
 
 ## Entity-side lookup
 
-Entity spawners call `AllocShared(stableId)` — the **lookup-only** overload (no blob argument). It finds the existing blob by ID, bumps its refcount, and returns a fresh handle:
+Entity spawners call `SharedPtr.Alloc<T>(world.Heap, stableId)` — the **lookup-only** overload (no value argument). It finds the existing blob by ID, bumps its refcount, and returns a fresh handle:
 
 ```csharp
 world
@@ -62,7 +63,7 @@ world
     .Set(new Position(pos))
     .Set(new PaletteRef
     {
-        Value = world.Heap.AllocShared<ColorPalette>(paletteId),
+        Value = SharedPtr.Alloc<ColorPalette>(world.Heap, paletteId),
         CycleSpeed = 0.3f,
     });
 ```
@@ -113,5 +114,5 @@ For per-entity managed data that isn't shared, use `UniquePtr<T>` instead ([Samp
 
 - **Stable `BlobId`** — caller-authored identifiers that keep the same identity across runs, independent of init-time ordering
 - **Seeder pattern** — a long-lived object allocates shared blobs at startup and anchors their lifetime
-- **`AllocShared(id, blob)` vs `AllocShared(id)`** — seeding (two-arg) vs lookup (one-arg) on the same stable ID
+- **`SharedPtr.Alloc(heap, id, value)` vs `SharedPtr.Alloc(heap, id)`** — seeding (three-arg) vs lookup (two-arg) on the same stable ID
 - **Cleanup ownership** — pointers on components must be disposed explicitly; an `OnRemoved` observer is the canonical place
