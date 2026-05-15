@@ -71,11 +71,11 @@ public class MyCompositionRoot : CompositionRootBase
 
 `Common/` contains helpers shared across samples (sample code — not part of Trecs itself):
 
-- **`GameObjectRegistry`** — maps `GameObjectId` components to Unity GameObjects
-- **`RendererSystem`** — GPU-instanced indirect rendering for high entity counts
+- **`RenderableGameObjectManager`** — pools and spawns Unity GameObjects for entities carrying `PrefabId` + `GameObjectId`, driven by `OnAdded` / `OnRemoved` observers
+- **`IndirectRenderer`** — GPU-instanced indirect rendering for high entity counts (samples using `IndirectRenderable`)
 - **`Bootstrap`** / **`CompositionRootBase`** — the lifecycle wiring above
-- **`SampleUtil`** — primitive/material helpers
+- **`SampleUtil`** — primitive / material helpers
 - **`DisposeCollection`** — `IDisposable` aggregator
-- Common components and templates (`Position`, `Rotation`, `UniformScale`, `ColorComponent`, `CommonTemplates.Renderable`, etc.)
+- Common components and templates (`Position`, `Rotation`, `UniformScale`, `ColorComponent`, `PrefabId`, `GameObjectId`, `CommonTemplates.IndirectRenderable`, `CommonTemplates.RenderableGameObject`, etc.)
 
 If you copy code from a sample, also copy its `Common/` dependencies.

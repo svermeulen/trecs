@@ -23,7 +23,7 @@ public struct IsJobsEnabled : IEntityComponent { public bool Value; }
 
 ```csharp
 public partial class ParticleEntity : ITemplate,
-    IExtends<CommonTemplates.Renderable>,
+    IExtends<CommonTemplates.IndirectRenderable>,
     ITagged<SampleTags.Particle>
 {
     Velocity Velocity;
@@ -31,10 +31,12 @@ public partial class ParticleEntity : ITemplate,
 
 public partial class Globals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
-    DesiredNumParticles DesiredNumParticles;
-    IsJobsEnabled IsJobsEnabled;
+    DesiredNumParticles DesiredNumParticles = new() { Value = 5000 };
+    IsJobsEnabled IsJobsEnabled = new() { Value = true };
 }
 ```
+
+`IndirectRenderable` is the no-GameObject base — it adds `Position`, `Rotation`, `UniformScale`, `ColorComponent`. The sample uses GPU-instanced indirect rendering so particles never get a companion GameObject.
 
 ## Systems
 

@@ -28,7 +28,10 @@ public partial struct OrbitParams : IEntityComponent
 
 ```csharp
 // Interpolated — smooth
-public partial class SmoothOrbitEntity : ITemplate, ITagged<OrbitTags.Smooth>
+public partial class SmoothOrbitEntity
+    : ITemplate,
+        IExtends<CommonTemplates.RenderableGameObject>,
+        ITagged<OrbitTags.Smooth>
 {
     [Interpolated]
     Position Position = default;
@@ -36,16 +39,19 @@ public partial class SmoothOrbitEntity : ITemplate, ITagged<OrbitTags.Smooth>
     [Interpolated]
     Rotation Rotation = default;
     OrbitParams OrbitParams;
-    GameObjectId GameObjectId;
+    PrefabId PrefabId = new(InterpolationPrefabs.SmoothCube);
 }
 
 // Not interpolated — jittery
-public partial class RawOrbitEntity : ITemplate, ITagged<OrbitTags.Raw>
+public partial class RawOrbitEntity
+    : ITemplate,
+        IExtends<CommonTemplates.RenderableGameObject>,
+        ITagged<OrbitTags.Raw>
 {
     Position Position = default;
     Rotation Rotation = default;
     OrbitParams OrbitParams;
-    GameObjectId GameObjectId;
+    PrefabId PrefabId = new(InterpolationPrefabs.RawCube);
 }
 ```
 

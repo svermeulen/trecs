@@ -6,25 +6,20 @@ Subscribe to entity add / remove / move events via `WorldAccessor.Events` so sid
 
 ## What it does
 
-A spawner adds a new `Bubble` entity every 0.3s. Each entity has a companion `GameObject` registered in the `GameObjectRegistry`. A lifetime system removes bubbles whose timer runs out. A **stats updater** subscribes to `OnAdded` and `OnRemoved` for the `Bubble` tag:
+A spawner adds a new `Bubble` entity every 0.3s. Each entity has a companion `GameObject` spawned reactively by `RenderableGameObjectManager` (in `Common/`). A lifetime system removes bubbles whose timer runs out. A **stats updater** subscribes to `OnAdded` and `OnRemoved` for the `Bubble` tag and bumps live-count / total-spawned / total-removed counters on a global component.
 
-- **OnAdded** increments live-count and total-spawned counters on a global component.
-- **OnRemoved** destroys the associated `GameObject`, unregisters it, and updates the counters.
-
-This is the canonical pattern for managing external, non-ECS resources tied to entities — one place owns the cleanup side of destruction.
+This sample focuses on the observer side: how application code subscribes to entity lifecycle events to drive its own state. The GameObject pool sitting alongside it (in `Common/`) is a real-world example of the same pattern at the framework-helper level.
 
 ## The three pieces
 
 ```csharp
 public partial class GameStatsUpdater : IDisposable
 {
-    readonly GameObjectRegistry _registry;
     readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container
 
-    public GameStatsUpdater(World world, GameObjectRegistry registry)
+    public GameStatsUpdater(World world)
     {
         World = world.CreateAccessor(AccessorRole.Fixed);
-        _registry = registry;
 
         World
             .Events.EntitiesWithTags<SampleTags.Bubble>()   // 1. scope
@@ -44,12 +39,8 @@ public partial class GameStatsUpdater : IDisposable
     }
 
     [ForEachEntity]
-    void OnBubbleRemoved(in GameObjectId id)
+    void OnBubbleRemoved(in Position position)
     {
-        var go = _registry.Resolve(id);
-        _registry.Unregister(id);
-        Object.Destroy(go);
-
         ref var stats = ref World.GlobalComponent<GameStats>().Write;
         stats.AliveCount--;
         stats.TotalRemoved++;
@@ -58,6 +49,8 @@ public partial class GameStatsUpdater : IDisposable
     public void Dispose() => _disposables.Dispose();
 }
 ```
+
+GameObject destruction is handled separately by `RenderableGameObjectManager` (in `Common/`), which subscribes to its own `OnAdded` / `OnRemoved` for entities carrying `PrefabId` + `GameObjectId` and spawns/pools the GO behind the scenes. This sample's observer is only concerned with the stats counters.
 
 **1. Scope** — `Events.EntitiesWithTags<T>()` picks which entities to observe. Also available: `EntitiesWithComponents<T>()`, `EntitiesWithTagsAndComponents<T>(TagSet)`, `InGroup(group)`, and `AllEntities()`.
 

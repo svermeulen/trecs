@@ -20,14 +20,16 @@ public struct Active : ITag { }
 ### Template with partitions
 
 ```csharp
-public partial class BallEntity : ITemplate,
-    ITagged<BallTags.Ball>,
-    IPartitionedBy<BallTags.Active>
+public partial class BallEntity
+    : ITemplate,
+        IExtends<CommonTemplates.RenderableGameObject>,
+        ITagged<BallTags.Ball>,
+        IPartitionedBy<BallTags.Active>
 {
     Position Position;
     Velocity Velocity;
     RestTimer RestTimer;
-    GameObjectId GameObjectId;
+    PrefabId PrefabId = new(PartitionsPrefabs.Ball);
 }
 ```
 

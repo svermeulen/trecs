@@ -33,15 +33,18 @@ public partial struct Lifetime : IEntityComponent
     public float Value;
 }
 
-public partial class CritterEntity : ITemplate, ITagged<SampleTags.Critter>
+public partial class CritterEntity
+    : ITemplate,
+        IExtends<CommonTemplates.RenderableGameObject>,
+        ITagged<SampleTags.Critter>
 {
     Position Position = default;
     Lifetime Lifetime;
-    GameObjectId GameObjectId;
+    PrefabId PrefabId = new(MultipleWorldsPrefabs.Critter);
 }
 ```
 
-`Position` and `GameObjectId` come from `Common/`.
+`Position` comes from `Common/`; `PrefabId` / `GameObjectId` come in via the `RenderableGameObject` base.
 
 ## Composition root
 
@@ -53,13 +56,14 @@ _worldA = new WorldBuilder()
     .AddTemplate(SampleTemplates.CritterEntity.Template)
     .Build();
 
+var goManagerA = new RenderableGameObjectManager(_worldA);
+
 _worldA.AddSystems(new ISystem[]
 {
     new SpawnSystem(SpawnIntervalA, Lifetime, SpawnRadius,
-                    new Vector3(-WorldSeparation, 0, 0),
-                    Color.red, PrimitiveType.Sphere, gameObjectRegistry),
-    new LifetimeSystem(gameObjectRegistry),
-    new PrimitiveRendererSystem(gameObjectRegistry),
+                    new Vector3(-WorldSeparation, 0, 0)),
+    new LifetimeSystem(),
+    new PrimitivePresenter(goManagerA),
 });
 
 _worldB = new WorldBuilder()
@@ -67,17 +71,18 @@ _worldB = new WorldBuilder()
     .AddTemplate(SampleTemplates.CritterEntity.Template)
     .Build();
 
+var goManagerB = new RenderableGameObjectManager(_worldB);
+
 _worldB.AddSystems(new ISystem[]
 {
     new SpawnSystem(SpawnIntervalB, Lifetime, SpawnRadius,
-                    new Vector3(WorldSeparation, 0, 0),
-                    Color.blue, PrimitiveType.Cube, gameObjectRegistry),
-    new LifetimeSystem(gameObjectRegistry),
-    new PrimitiveRendererSystem(gameObjectRegistry),
+                    new Vector3(WorldSeparation, 0, 0)),
+    new LifetimeSystem(),
+    new PrimitivePresenter(goManagerB),
 });
 ```
 
-Each world gets its own `SpawnSystem`/`LifetimeSystem`/`PrimitiveRendererSystem` instance — system instances are not shared across worlds. `SetDebugName` labels each world for editor tooling (e.g. the World dropdown in `TrecsPlayerWindow`).
+Each world gets its own `SpawnSystem`/`LifetimeSystem`/`PrimitivePresenter` instance — system instances are not shared across worlds. `SetDebugName` labels each world for editor tooling (e.g. the World dropdown in `TrecsPlayerWindow`).
 
 Both worlds register the *same template type* (`CritterEntity`) — allowed and common. Templates describe a shape; each world independently allocates per-group component arrays for that shape. An entity created in World A is invisible to queries in World B.
 
@@ -106,9 +111,9 @@ disposables = new() { _worldA.Dispose, _worldB.Dispose };
 
 Pausing one world while the other ticks is "skip the call." Worlds maintain independent fixed-update accumulators, so a paused world resumes where it left off — it doesn't try to catch up missed simulation time.
 
-## Shared GameObjectRegistry
+## Per-world GameObject managers
 
-Both worlds share one `GameObjectRegistry`. Deliberate: `GameObjectId` is a process-wide integer handle into Unity's scene, and the registry has nothing to do with ECS isolation. Each world still has its own entity store, system instances, and accessors. Splitting the registry per-world would also work — the registry is application code, not Trecs.
+Each world gets its own `RenderableGameObjectManager`. The manager subscribes to `OnAdded` / `OnRemoved` on its world's accessor, so its lifetime — and the `GameObjectId` counter it allocates from the world's heap — is 1:1 with a single `World`. `GameObjectId` values are world-local; either world can be snapshotted independently and its GameObjects will be rebuilt deterministically from its entity set.
 
 ## What's process-global vs per-world
 
@@ -123,4 +128,4 @@ This split is what lets the same template type register in multiple worlds witho
 - **`WorldBuilder.SetDebugName`** for editor disambiguation.
 - **`WorldRegistry.ActiveWorlds`** for discovering all live worlds (useful for editor tooling).
 - **Per-world pause** — the application chooses when to call `Tick()`; skipping the call is all "pause" means.
-- **Shared application-side services** (here: `GameObjectRegistry`) across worlds, when the service has no ECS-level isolation requirement.
+- **Per-world application services** (here: `RenderableGameObjectManager`) — when a service holds per-world state (an id counter on the world's heap, in this case), instantiate one per world rather than sharing.

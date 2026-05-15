@@ -1,16 +1,14 @@
 # 02 — Spawn & Destroy
 
-Spheres spawn at random positions, live for a set duration, then are removed along with their GameObjects.
+Spheres spawn at random positions, live for a set duration, then are removed. GameObject lifetime is managed by a sample-side helper, not by the lifetime system itself.
 
 **Source:** `com.trecs.core/Samples~/Tutorials/02_SpawnAndDestroy/`
 
 ## What it does
 
-Colored spheres appear at random positions around the origin. Each has a countdown timer — when it expires, the entity and its GameObject are destroyed.
+Coloured spheres appear at random positions around the origin. Each has a countdown timer — when it expires, the entity is removed. The companion GameObject is destroyed automatically via the shared `RenderableGameObjectManager` (in `Common/`) that watches for entities with `PrefabId` + `GameObjectId`.
 
 ## Schema
-
-### Components
 
 ```csharp
 [Unwrap]
@@ -18,76 +16,66 @@ public partial struct Lifetime : IEntityComponent
 {
     public float Value;
 }
-```
 
-Plus `Position` and `GameObjectId` from Common.
-
-### Tags & template
-
-```csharp
 public struct Sphere : ITag { }
 
-public partial class SphereEntity : ITemplate, ITagged<SampleTags.Sphere>
+public partial class SphereEntity
+    : ITemplate,
+        IExtends<CommonTemplates.RenderableGameObject>,
+        ITagged<SampleTags.Sphere>
 {
     Position Position = default;
     Lifetime Lifetime;
-    GameObjectId GameObjectId;
+    ColorComponent Color = new(UnityEngine.Color.white);
+    PrefabId PrefabId = new(SpawnAndDestroyPrefabs.Sphere);
 }
 ```
+
+`RenderableGameObject` is an abstract base template from `Common/` that adds the `PrefabId` and `GameObjectId` component fields. Concrete templates extend it and set `PrefabId` to a constant identifying the factory they registered with the manager.
 
 ## Systems
 
 ### SpawnSystem
 
-Spawns a new sphere every 0.5 seconds with a random position and color:
+Spawns a new sphere every 0.5 seconds with a random position and colour:
 
 ```csharp
 World.AddEntity<SampleTags.Sphere>()
     .Set(new Position(position))
     .Set(new Lifetime(_lifetime))
-    .Set(_gameObjectRegistry.Register(go));
+    .Set(new ColorComponent(color));
 ```
 
-Uses `World.Rng` for deterministic random placement.
+Uses `World.Rng` for deterministic random placement. Notice the spawner never touches a GameObject — that's the manager's job once the entity submits.
 
 ### LifetimeSystem
 
-Counts down the lifetime and removes expired entities, cleaning up GameObjects inline:
+Counts down the lifetime and removes expired entities:
 
 ```csharp
 public partial class LifetimeSystem : ISystem
 {
-    readonly GameObjectRegistry _gameObjectRegistry;
-
-    public LifetimeSystem(GameObjectRegistry gameObjectRegistry)
-    {
-        _gameObjectRegistry = gameObjectRegistry;
-    }
-
     [ForEachEntity(typeof(SampleTags.Sphere))]
-    void Execute(in GameObjectId gameObjectId, ref Lifetime lifetime, EntityAccessor entity)
+    void Execute(ref Lifetime lifetime, EntityAccessor entity)
     {
         lifetime.Value -= World.DeltaTime;
 
         if (lifetime.Value <= 0)
-        {
-            var go = _gameObjectRegistry.Resolve(gameObjectId);
-            Object.Destroy(go);
-            _gameObjectRegistry.Unregister(gameObjectId);
             entity.Remove();
-        }
     }
 }
 ```
 
-### SphereRendererSystem (variable update)
+GameObject destruction is decoupled — the manager's `OnRemoved` observer (registered in `Common/RenderableGameObjectManager.cs`) tears the GO down at submission time.
 
-Syncs position to GameObjects each visual frame.
+### SpherePresenter (variable update)
+
+Syncs `Position` and `ColorComponent` onto the GameObject each visual frame.
 
 ## Concepts introduced
 
 - **Dynamic entity creation** with `AddEntity` and component initialization
-- **Entity removal** with `RemoveEntity` (deferred until submission)
+- **Entity removal** with `entity.Remove()` (deferred until submission)
 - **`World.Rng`** for deterministic random numbers — see [Time & RNG](../advanced/time-and-rng.md)
+- **`PrefabId` + `GameObjectId` template pattern** — sample-side `RenderableGameObjectManager` handles GameObject lifecycle reactively via [Entity Events](../entity-management/entity-events.md). For an explicit `OnRemoved`-handler example doing the same thing in user code, see [Predator Prey](04-predator-prey.md).
 - **Individual component parameters** — `[ForEachEntity]` receives components directly. See [Queries & Iteration](../data-access/queries-and-iteration.md).
-- **Inline cleanup** — destroying GameObjects inside the system at removal time. See [Entity Events](../entity-management/entity-events.md) for centralized cleanup via `OnRemoved`, demonstrated in [Predator Prey](04-predator-prey.md).

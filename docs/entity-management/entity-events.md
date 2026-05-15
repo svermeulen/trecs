@@ -68,13 +68,13 @@ All `[ForEachEntity]` features are supported on event handlers, including aspect
 ```csharp
 public partial class CleanupHandlers : IDisposable
 {
-    readonly GameObjectRegistry _gameObjectRegistry;
+    readonly RenderableGameObjectManager _goManager;
     readonly DisposeCollection _disposables = new();
 
-    public CleanupHandlers(World world, GameObjectRegistry gameObjectRegistry)
+    public CleanupHandlers(World world, RenderableGameObjectManager goManager)
     {
         World = world.CreateAccessor(AccessorRole.Fixed);
-        _gameObjectRegistry = gameObjectRegistry;
+        _goManager = goManager;
 
         World.Events
             .EntitiesWithTags<SampleTags.Prey>()
@@ -87,9 +87,8 @@ public partial class CleanupHandlers : IDisposable
     [ForEachEntity]
     void OnPreyRemoved(in Prey prey)
     {
-        var go = _gameObjectRegistry.Resolve(prey.GameObjectId);
-        GameObject.Destroy(go);
-        _gameObjectRegistry.Unregister(prey.GameObjectId);
+        var go = _goManager.Resolve(prey.GameObjectId);
+        UnityEngine.Object.Destroy(go);
     }
 
     public void Dispose() => _disposables.Dispose();

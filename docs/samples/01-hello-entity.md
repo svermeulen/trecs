@@ -6,7 +6,7 @@ A spinning cube. Introduces components, tags, templates, systems, and world setu
 
 ## What it does
 
-A single entity with a `Rotation` component is rotated each fixed update by a system. Its `GameObject` is synced to the rotation each rendered frame.
+A single entity holds a `Rotation` component. A fixed-update system advances the rotation each tick; a presentation system applies it to a Unity `Transform`.
 
 ## Schema
 
@@ -23,15 +23,11 @@ public static partial class SampleTemplates
     public partial class SpinnerEntity : ITemplate, ITagged<SampleTags.Spinner>
     {
         Rotation Rotation = new(quaternion.identity);
-
-        // Components must be unmanaged, so we store an int id that maps
-        // to a GameObject via GameObjectRegistry instead of a reference.
-        GameObjectId GameObjectId;
     }
 }
 ```
 
-`Rotation` and `GameObjectId` come from `Common/`, reused across tutorials.
+`Rotation` comes from `Common/` and is reused across tutorials.
 
 See [Components](../core/components.md), [Tags](../core/tags.md), and [Templates](../core/templates.md).
 
@@ -62,35 +58,31 @@ public partial class SpinnerSystem : ISystem
 
 `MatchByComponents = true` iterates every entity with a `Rotation` component, regardless of tags. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 
-### SpinnerGameObjectUpdater (variable update)
+### SpinnerGameObjectUpdater (presentation)
 
-Syncs the simulation rotation onto the Unity transform:
+Syncs the simulation rotation onto a Unity `Transform`. The sample wires a single transform in by constructor; later samples introduce the `RenderableGameObjectManager` pattern for per-entity GameObjects:
 
 ```csharp
 [ExecuteIn(SystemPhase.Presentation)]
 public partial class SpinnerGameObjectUpdater : ISystem
 {
-    readonly GameObjectRegistry _gameObjectRegistry;
+    readonly Transform _spinnerCube;
 
-    public SpinnerGameObjectUpdater(GameObjectRegistry gameObjectRegistry)
-    {
-        _gameObjectRegistry = gameObjectRegistry;
-    }
+    public SpinnerGameObjectUpdater(Transform spinnerCube) => _spinnerCube = spinnerCube;
 
     [ForEachEntity(MatchByComponents = true)]
-    void Execute(in GameObjectId id, in Rotation rotation)
+    void Execute(in Rotation rotation)
     {
-        var go = _gameObjectRegistry.Resolve(id);
-        go.transform.rotation = rotation.Value;
+        _spinnerCube.rotation = rotation.Value;
     }
 }
 ```
 
-`[ExecuteIn(SystemPhase.Presentation)]` runs at the variable (display) frame rate rather than the fixed timestep — appropriate for anything touching Unity GameObjects. See [Systems](../core/systems.md) and [Accessor Roles](../advanced/accessor-roles.md).
+`[ExecuteIn(SystemPhase.Presentation)]` runs at the variable (display) frame rate rather than the fixed timestep — the right place for anything touching Unity GameObjects. See [Systems](../core/systems.md) and [Accessor Roles](../advanced/accessor-roles.md).
 
 ## Wiring it up
 
-The composition root builds the world, registers the systems, and hands callbacks back to `Bootstrap`:
+The composition root builds the world, registers the systems, and hands lifecycle callbacks back to `Bootstrap`:
 
 ```csharp
 var world = new WorldBuilder()
@@ -100,23 +92,17 @@ var world = new WorldBuilder()
 world.AddSystems(new ISystem[]
 {
     new SpinnerSystem(RotationSpeed),
-    new SpinnerGameObjectUpdater(gameObjectRegistry),
+    new SpinnerGameObjectUpdater(spinnerCubeTransform),
 });
 ```
 
-A separate `SceneInitializer` creates the entity once during the init phase. Init code lives outside any system, so it uses `AccessorRole.Unrestricted`:
+A separate scene initializer creates the entity once during the init phase. Init code lives outside any system, so it uses `AccessorRole.Unrestricted`:
 
 ```csharp
 public void Initialize()
 {
     var world = _world.CreateAccessor(AccessorRole.Unrestricted);
-
-    var cube = SampleUtil.CreatePrimitive(PrimitiveType.Cube);
-    cube.name = "SpinnerCube";
-
-    world
-        .AddEntity<SampleTags.Spinner>()
-        .Set(_gameObjectRegistry.Register(cube.gameObject));
+    world.AddEntity<SampleTags.Spinner>();
 }
 ```
 

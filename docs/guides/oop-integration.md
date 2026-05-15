@@ -71,36 +71,37 @@ Variable-update systems sync ECS state out to GameObjects:
 [ExecuteIn(SystemPhase.Presentation)]
 public partial class GameObjectSyncSystem : ISystem
 {
-    readonly GameObjectRegistry _registry;
+    readonly RenderableGameObjectManager _goManager;
 
-    public GameObjectSyncSystem(GameObjectRegistry registry) => _registry = registry;
+    public GameObjectSyncSystem(RenderableGameObjectManager goManager) =>
+        _goManager = goManager;
 
     [ForEachEntity(MatchByComponents = true)]
     void Execute(in Position pos, in Rotation rot, in GameObjectId id)
     {
-        var go = _registry.Resolve(id);
+        var go = _goManager.Resolve(id);
         go.transform.position = (Vector3)pos.Value;
         go.transform.rotation = rot.Value;
     }
 }
 ```
 
-`GameObjectRegistry` and `GameObjectId` are not part of Trecs. See Sample projects for example implementations.
+`RenderableGameObjectManager` and `GameObjectId` aren't part of Trecs — they're sample-side helpers under `Common/`. Use them, copy them, or roll your own; Trecs only cares that components are unmanaged.
 
 ### Spawning and despawning GameObjects
 
-Use [entity events](../entity-management/entity-events.md) with `[ForEachEntity]` to manage GameObject lifecycle:
+Use [entity events](../entity-management/entity-events.md) with `[ForEachEntity]` to manage GameObject lifecycle reactively:
 
 ```csharp
 public partial class EnemyGameObjectManager : IDisposable
 {
-    readonly GameObjectRegistry _registry;
+    readonly RenderableGameObjectManager _goManager;
     readonly DisposeCollection _disposables = new();
 
-    public EnemyGameObjectManager(World world, GameObjectRegistry registry)
+    public EnemyGameObjectManager(World world, RenderableGameObjectManager goManager)
     {
         World = world.CreateAccessor(AccessorRole.Fixed);
-        _registry = registry;
+        _goManager = goManager;
 
         World.Events.EntitiesWithTags<GameTags.Enemy>()
             .OnRemoved(OnEnemyRemoved)
@@ -112,14 +113,15 @@ public partial class EnemyGameObjectManager : IDisposable
     [ForEachEntity]
     void OnEnemyRemoved(in GameObjectId id)
     {
-        var go = _registry.Resolve(id);
-        GameObject.Destroy(go);
-        _registry.Unregister(id);
+        var go = _goManager.Resolve(id);
+        UnityEngine.Object.Destroy(go);
     }
 
     public void Dispose() => _disposables.Dispose();
 }
 ```
+
+The `Common/RenderableGameObjectManager.cs` in the samples is exactly this pattern, generalized over `PrefabId` so a single observer can spawn and pool GameObjects for every template that adds the `RenderableGameObject` base — no per-entity wiring required.
 
 ## Why this separation matters
 

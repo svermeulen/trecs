@@ -12,19 +12,23 @@ Boids move in straight lines and wrap around a bounded area, rotated to face the
 
 ### Components
 
-`Position`, `Velocity`, `Speed`, `GameObjectId` from Common.
+`Position` from `Common/`, plus `Velocity` and `Speed` defined in this sample. The template also pulls in `PrefabId` / `GameObjectId` via the `RenderableGameObject` base.
 
 ### Tags & template
 
 ```csharp
 public struct Boid : ITag { }
 
-public partial class BoidEntity : ITemplate, ITagged<SampleTags.Boid>
+public partial class BoidEntity
+    : ITemplate,
+        IExtends<CommonTemplates.RenderableGameObject>,
+        ITagged<SampleTags.Boid>
 {
     Position Position = default;
     Velocity Velocity;
     Speed Speed;
-    GameObjectId GameObjectId;
+    ColorComponent Color = new(UnityEngine.Color.white);
+    PrefabId PrefabId = new(AspectsPrefabs.Boid);
 }
 ```
 

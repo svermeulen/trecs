@@ -26,7 +26,7 @@ public partial struct ApproachingPredator : IEntityComponent
 }
 ```
 
-Plus `Speed` and `MoveDirection` from this sample, and `Position` / `GameObjectId` from `Common/`.
+Plus `Speed` and `MoveDirection` from this sample, and `Position` from `Common/`.
 
 ### Tags & templates
 
@@ -36,32 +36,35 @@ public struct Prey : ITag { }
 public struct Movable : ITag { }
 ```
 
-Template inheritance shares common movement components:
+Template inheritance shares common movement components. `Movable` is abstract — it exists only as an `IExtends` base, so registering it directly would trip `TRECS039`. Concrete templates extend it and set their own `PrefabId`:
 
 ```csharp
-// Base template
-public partial class Movable : ITemplate, ITagged<SampleTags.Movable>
+public abstract partial class Movable
+    : ITemplate,
+        IExtends<CommonTemplates.RenderableGameObject>,
+        ITagged<SampleTags.Movable>
 {
     Position Position = default;
     MoveDirection MoveDirection = default;
     Speed Speed;
-    GameObjectId GameObjectId;
 }
 
-// Predator extends Movable
-public partial class PredatorEntity : ITemplate,
-    ITagged<SampleTags.Predator>,
-    IExtends<Movable>
+public partial class PredatorEntity
+    : ITemplate,
+        ITagged<SampleTags.Predator>,
+        IExtends<Movable>
 {
     ChosenPrey ChosenPrey = default;
+    PrefabId PrefabId = new(PredatorPreyPrefabs.Predator);
 }
 
-// Prey extends Movable
-public partial class PreyEntity : ITemplate,
-    ITagged<SampleTags.Prey>,
-    IExtends<Movable>
+public partial class PreyEntity
+    : ITemplate,
+        ITagged<SampleTags.Prey>,
+        IExtends<Movable>
 {
     ApproachingPredator ApproachingPredator = default;
+    PrefabId PrefabId = new(PredatorPreyPrefabs.Prey);
 }
 ```
 
@@ -113,43 +116,12 @@ Steers predators toward their target prey and removes prey on contact.
 
 Maintains the prey population by spawning replacements.
 
-### Cleanup handler
+### GameObject cleanup
 
-When prey are removed, an `OnRemoved` event handler cleans up GameObjects. Events are preferred for cleanup because:
+When prey are removed, the shared `RenderableGameObjectManager` (from `Common/`) automatically tears down the companion GameObject. It subscribes once to `OnAdded` / `OnRemoved` for every entity carrying `PrefabId` + `GameObjectId`, so concrete samples don't write their own cleanup observer — see [Sample 16 — Reactive Events](16-reactive-events.md) for the same `OnRemoved` pattern in user code, and [Entity Events](../entity-management/entity-events.md) for the API. Events are preferred over inline destruction in the lifetime system because:
 
 - **Consistency** — entity removal is deferred, so the entity still exists until submission. Without an event, later systems could read stale data on an about-to-be-removed entity.
 - **Centralized cleanup** — if entities can be removed from multiple places (caught, starved, despawned), the same handler runs regardless of source.
-
-```csharp
-public partial class CleanupHandlers
-{
-    readonly GameObjectRegistry _gameObjectRegistry;
-    readonly DisposeCollection _disposables = new(); // sample helper — supply your own IDisposable container
-
-    public CleanupHandlers(World world, GameObjectRegistry gameObjectRegistry)
-    {
-        World = world.CreateAccessor(AccessorRole.Fixed);
-        _gameObjectRegistry = gameObjectRegistry;
-
-        World.Events
-            .EntitiesWithTags<SampleTags.Prey>()
-            .OnRemoved(OnPreyRemoved)
-            .AddTo(_disposables);
-    }
-
-    WorldAccessor World { get; }
-
-    [ForEachEntity]
-    void OnPreyRemoved(in Prey prey)
-    {
-        var go = _gameObjectRegistry.Resolve(prey.GameObjectId);
-        GameObject.Destroy(go);
-        _gameObjectRegistry.Unregister(prey.GameObjectId);
-    }
-
-    partial struct Prey : IAspect, IRead<GameObjectId, ApproachingPredator> { }
-}
-```
 
 ## Concepts introduced
 

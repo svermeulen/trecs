@@ -26,21 +26,30 @@ Plus `Position`, `Rotation`, `Velocity`, `Speed`, `UniformScale`, `ColorComponen
 ### Templates with partitions
 
 ```csharp
-public partial class FishEntity : ITemplate,
-    IExtends<CommonTemplates.Renderable>,
-    ITagged<FrenzyTags.Fish>,
-    IPartitionedBy<FrenzyTags.NotEating, FrenzyTags.Eating>
+public partial class FishEntity
+    : ITemplate,
+        IExtends<CommonTemplates.IndirectRenderable>,
+        ITagged<FrenzyTags.Fish>,
+        IPartitionedBy<FrenzyTags.NotEating, FrenzyTags.Eating>
 {
-    Velocity Velocity;
+    // Position/Rotation are render-only — VisualSmoothingSystem chases
+    // SimPosition/SimRotation each variable frame.
+    [VariableUpdateOnly]
+    Position Position;
+
+    [VariableUpdateOnly]
+    Rotation Rotation = new(quaternion.identity);
+
+    SimPosition SimPosition = default;
+    SimRotation SimRotation = new() { Value = quaternion.identity };
+    Velocity Velocity = default;
     Speed Speed;
-    SimPosition SimPosition;
-    SimRotation SimRotation;
-    TargetMeal TargetMeal;
-    DestinationPosition DestinationPosition;
+    TargetMeal TargetMeal = default;
+    DestinationPosition DestinationPosition = default;
 }
 ```
 
-Fish have two partitions: **NotEating** (idle, bobbing) and **Eating** (moving toward a meal).
+Fish have two partitions: **NotEating** (idle, bobbing) and **Eating** (moving toward a meal). `IndirectRenderable` is the GPU-instanced base (no per-entity GameObject); `[VariableUpdateOnly]` keeps the fixed phase from touching the smoothed display values — see [Accessor Roles](../advanced/accessor-roles.md).
 
 ## Key systems
 
