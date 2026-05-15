@@ -82,7 +82,7 @@ The trailing **+ Save current recording as new…** row prompts for a name and w
 
 ## On-disk locations
 
-Recordings and snapshots live under the project's `Library/` folder, namespaced by Trecs.
+Recordings live in `Library/com.trecs/recordings/` and snapshots in `Library/com.trecs/snapshots/`. Both are gitignored by Unity's default `.gitignore` and safe to delete — Trecs regenerates caches on the next run.
 
 ## Multi-world
 

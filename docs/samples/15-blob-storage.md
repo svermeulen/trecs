@@ -1,4 +1,4 @@
-# 15 — Shared Assets with Stable BlobIds
+# 15 — Blob Storage
 
 Store large immutable assets on the shared heap under caller-authored `BlobId`s so many entities can reference the same data by a content-pipeline-stable ID.
 

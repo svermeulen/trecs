@@ -1,4 +1,4 @@
-# Shared heap data
+# Shared Heap Data
 
 Some heap data — palettes, loot tables, animation curves, baked navmeshes — is referenced by many entities and needs to live once, shared, and be released when the last reference disappears. This article covers the patterns for managing that data: how to keep a shared blob alive, how spawners reference it, and how stable identity interacts with snapshots and replay.
 

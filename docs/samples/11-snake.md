@@ -13,13 +13,13 @@ Classic Snake — a head moves on a grid, eats food to grow, and leaves body seg
 ### Components
 
 ```csharp
-public struct GridPos : IEntityComponent { public int2 Value; }
-public struct Direction : IEntityComponent { public int2 Value; }
-public struct MoveInput : IEntityComponent { public int2 RequestedDirection; }
-public struct SegmentAge : IEntityComponent { public int Value; }
-public struct SnakeLength : IEntityComponent { public int Value; }
-public struct Score : IEntityComponent { public int Value; }
-public struct MoveTickCounter : IEntityComponent { public int FramesUntilNextMove; }
+[Unwrap] public partial struct GridPos          : IEntityComponent { public int2 Value; }
+[Unwrap] public partial struct Direction        : IEntityComponent { public int2 Value; }
+[Unwrap] public partial struct MoveInput        : IEntityComponent { public int2 RequestedDirection; }
+[Unwrap] public partial struct SegmentAge       : IEntityComponent { public int Value; }
+[Unwrap] public partial struct SnakeLength      : IEntityComponent { public int Value; }
+[Unwrap] public partial struct Score            : IEntityComponent { public int Value; }
+[Unwrap] public partial struct MoveTickCounter  : IEntityComponent { public int FramesUntilNextMove; }
 ```
 
 ### Tags

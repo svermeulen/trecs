@@ -39,7 +39,7 @@ The toolbar hosts:
 
 When at least one Trecs world is alive, the dropdown lists each by name. Picking one binds the tree to that world.
 
-With no live world, the dropdown falls back to **cached snapshots** from `Library/`. Cached entries are suffixed with `(cached)`. Cache mode is read-only — toggles like the system-enable switch are disabled, since there's no running world to mutate.
+With no live world, the dropdown falls back to **cached snapshots** from `Library/com.trecs/inspector_schema/`. Cached entries are suffixed with `(cached)`. Cache mode is read-only — toggles like the system-enable switch are disabled, since there's no running world to mutate.
 
 Selecting a live world while a cached snapshot is showing switches into live mode (and vice-versa when the live world stops).
 
@@ -183,11 +183,11 @@ Selection and link navigation persist across domain reloads and the live ↔ cac
 
 ## Live vs cache mode
 
-Trecs writes a schema snapshot to `Library/` whenever a world runs in the editor, so the hierarchy has something to show after Play mode ends or between domain reloads.
+Trecs writes a schema snapshot to `Library/com.trecs/inspector_schema/` whenever a world runs in the editor, so the hierarchy has something to show after Play mode ends or between domain reloads.
 
 | | Live mode | Cache mode |
 |---|---|---|
-| Source | A live `World` instance | Schema snapshot from `Library/` |
+| Source | A live `World` instance | Schema snapshot from `Library/com.trecs/inspector_schema/` |
 | Refresh cadence | Periodic refresh of counts and system-enabled state | Static — snapshot is read once |
 | System-enable toggle | Active | Disabled |
 | Entity counts on rows | Live counts | Hidden (cache holds no entity instances) |
