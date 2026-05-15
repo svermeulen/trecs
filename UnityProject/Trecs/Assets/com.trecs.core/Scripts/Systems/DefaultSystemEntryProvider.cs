@@ -7,14 +7,14 @@ using Trecs.Collections;
 namespace Trecs.Internal
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    internal sealed class DefaultSystemMetadataProvider : ISystemMetadataProvider
+    internal sealed class DefaultSystemEntryProvider : ISystemEntryProvider
     {
         readonly TrecsLog _log;
 
         readonly List<SystemOrderConstraint> _constraints;
         readonly WorldAccessorRegistry _accessorRegistry;
 
-        public DefaultSystemMetadataProvider(
+        public DefaultSystemEntryProvider(
             TrecsLog log,
             List<SystemOrderConstraint> constraints,
             WorldAccessorRegistry accessorRegistry
@@ -112,14 +112,11 @@ namespace Trecs.Internal
             return directDeps;
         }
 
-        public IReadOnlyList<SystemMetadata> GetSystemMetadata(
-            World _,
-            IReadOnlyList<ISystem> systems
-        )
+        public IReadOnlyList<SystemEntry> GetSystemEntries(World _, IReadOnlyList<ISystem> systems)
         {
             var directDeps = InitializeSystemConstraints(systems);
 
-            var result = new List<SystemMetadata>();
+            var result = new List<SystemEntry>();
 
             var typeToIndexMap = new Dictionary<Type, List<int>>();
 
@@ -217,7 +214,7 @@ namespace Trecs.Internal
                 var accessor = ((ISystemInternal)system).World;
 
                 result.Add(
-                    new SystemMetadata(
+                    new SystemEntry(
                         system,
                         directDepsIndices,
                         phase: phase,

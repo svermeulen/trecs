@@ -18,7 +18,7 @@ namespace Trecs
         internal readonly List<IInterpolatedPreviousSaver> _interpolatedPreviousSavers = new();
         readonly List<Template> _templates = new();
         readonly List<EntitySet> _sets = new();
-        internal ISystemMetadataProvider _systemMetadataProvider;
+        internal ISystemEntryProvider _systemEntryProvider;
         readonly SerializerRegistry _serializerRegistry;
 
         bool _hasBuilt;
@@ -334,13 +334,13 @@ namespace Trecs
 
             var accessorRegistry = new WorldAccessorRegistry(log);
 
-            _systemMetadataProvider ??= new DefaultSystemMetadataProvider(
+            _systemEntryProvider ??= new DefaultSystemEntryProvider(
                 log,
                 _systemOrderConstraints,
                 accessorRegistry
             );
 
-            var systemLoader = new SystemLoader(log, _systemMetadataProvider);
+            var systemLoader = new SystemLoader(log, _systemEntryProvider);
 
             var eventsManager = new EventsManager(log);
 
@@ -457,19 +457,16 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// Overrides the default system metadata provider used for system ordering and accessor resolution.
+        /// Overrides the default system entry provider used for system ordering and accessor resolution.
         /// </summary>
         // This isn't officially in api yet
-        public static WorldBuilder SetSystemMetadataProvider(
+        public static WorldBuilder SetSystemEntryProvider(
             this WorldBuilder builder,
-            ISystemMetadataProvider systemMetadataProvider
+            ISystemEntryProvider systemEntryProvider
         )
         {
-            TrecsRequire.That(
-                systemMetadataProvider != null,
-                "systemMetadataProvider must not be null"
-            );
-            builder._systemMetadataProvider = systemMetadataProvider;
+            TrecsRequire.That(systemEntryProvider != null, "systemEntryProvider must not be null");
+            builder._systemEntryProvider = systemEntryProvider;
             return builder;
         }
     }

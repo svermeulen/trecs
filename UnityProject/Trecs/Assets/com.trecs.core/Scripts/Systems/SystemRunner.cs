@@ -33,7 +33,7 @@ namespace Trecs.Internal
         SimpleSubject _variableUpdateCompleted;
 
         SystemEnableState _enableState;
-        List<SystemMetadata> _systems;
+        List<SystemEntry> _systems;
         List<SystemRuntimeInfo> _systemRuntimeInfos;
         List<int> _sortedInputSystems;
         List<int> _sortedFixedSystems;
@@ -347,7 +347,7 @@ namespace Trecs.Internal
             }
         }
 
-        public IReadOnlyList<SystemMetadata> Systems
+        public IReadOnlyList<SystemEntry> Systems
         {
             get
             {
@@ -458,7 +458,7 @@ namespace Trecs.Internal
 
             _enableState = enableState;
             TrecsAssert.IsNull(_systems);
-            _systems = new List<SystemMetadata>(loadInfo.Systems.Count);
+            _systems = new List<SystemEntry>(loadInfo.Systems.Count);
             TrecsAssert.IsNull(_systemRuntimeInfos);
             _systemRuntimeInfos = new List<SystemRuntimeInfo>(loadInfo.Systems.Count);
             TrecsAssert.IsNull(_sortedInputSystems);

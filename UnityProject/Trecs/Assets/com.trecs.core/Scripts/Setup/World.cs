@@ -229,15 +229,15 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Returns metadata for every system registered in this world, in registration
+        /// Returns the registry entry for every system in this world, in registration
         /// order. The returned list is stable for the lifetime of the world; indices
-        /// match <see cref="SystemMetadata.DeclarationIndex"/> and can be used with
+        /// match <see cref="SystemEntry.DeclarationIndex"/> and can be used with
         /// <see cref="WorldAccessor.SetSystemEnabled"/> /
         /// <see cref="WorldAccessor.SetSystemPaused"/>. Use this to build custom
         /// groupings (e.g. "all systems matching some game tag") that drive enable /
         /// pause calls.
         /// </summary>
-        public IReadOnlyList<SystemMetadata> GetSystems()
+        public IReadOnlyList<SystemEntry> GetSystems()
         {
             TrecsAssert.That(!_isDisposed);
             return _systemRunner.Systems;

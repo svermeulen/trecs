@@ -351,7 +351,7 @@ namespace Trecs
             if (_accessor == null || _world == null)
                 return phases;
 
-            IReadOnlyList<SystemMetadata> systems;
+            IReadOnlyList<SystemEntry> systems;
             IReadOnlyList<int> sortedEarly;
             IReadOnlyList<int> sortedInput;
             IReadOnlyList<int> sortedFixed;

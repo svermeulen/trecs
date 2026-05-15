@@ -479,7 +479,11 @@ namespace Trecs.SourceGen
                 // Check for EntityIndex.
                 if (
                     !paramHasSingleEntity
-                    && SymbolAnalyzer.IsExactType(paramType, "EntityIndex", TrecsNamespaces.Trecs)
+                    && SymbolAnalyzer.IsExactType(
+                        paramType,
+                        "EntityIndex",
+                        TrecsNamespaces.Trecs
+                    )
                 )
                 {
                     if (param.RefKind != RefKind.None)

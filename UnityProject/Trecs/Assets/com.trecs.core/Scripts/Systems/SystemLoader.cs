@@ -10,18 +10,18 @@ namespace Trecs.Internal
     {
         readonly TrecsLog _log;
 
-        readonly ISystemMetadataProvider _metadataProvider;
+        readonly ISystemEntryProvider _entryProvider;
 
         bool _isLocked;
 
-        public SystemLoader(TrecsLog log, ISystemMetadataProvider metadataProvider)
+        public SystemLoader(TrecsLog log, ISystemEntryProvider entryProvider)
         {
             _log = log;
-            _metadataProvider = metadataProvider;
+            _entryProvider = entryProvider;
         }
 
         List<int> SortPhaseSystems(
-            IReadOnlyList<SystemMetadata> allSystems,
+            IReadOnlyList<SystemEntry> allSystems,
             List<int> phaseSystems,
             List<int> globalToLocalIndexMap,
             List<HashSet<int>> systemDepsMap,
@@ -63,7 +63,7 @@ namespace Trecs.Internal
                 globalIndex =>
                     localDepsList[globalToLocalIndexMap[globalIndex]]
                         .OrderBy(x => allSystems[globalIndex].DeclarationIndex),
-                globalIndex => GetSystemAndMetaDataOrderBy(allSystems[globalIndex]),
+                globalIndex => GetSystemEntryOrderBy(allSystems[globalIndex]),
                 globalIndex => allSystems[globalIndex].DebugName
             );
 
@@ -83,7 +83,7 @@ namespace Trecs.Internal
             return sortedGlobal;
         }
 
-        int[] GetSystemAndMetaDataOrderBy(SystemMetadata info)
+        int[] GetSystemEntryOrderBy(SystemEntry info)
         {
             return new int[] { info.ExecutionPriority ?? 0, info.DeclarationIndex };
         }
@@ -124,7 +124,7 @@ namespace Trecs.Internal
             TrecsAssert.That(!_isLocked);
             _isLocked = true;
 
-            var metadatas = _metadataProvider.GetSystemMetadata(world, systems);
+            var entries = _entryProvider.GetSystemEntries(world, systems);
 
             var phaseBuckets = new Dictionary<SystemPhase, List<int>>
             {
@@ -135,38 +135,38 @@ namespace Trecs.Internal
                 [SystemPhase.LatePresentation] = new(),
             };
 
-            var globalToLocalIndexMap = new List<int>(metadatas.Count);
-            var systemDepsMap = new List<HashSet<int>>(metadatas.Count);
+            var globalToLocalIndexMap = new List<int>(entries.Count);
+            var systemDepsMap = new List<HashSet<int>>(entries.Count);
 
             if (_log.IsDebugEnabled())
             {
                 _log.Debug(
                     "{0} systems provided to trecs:\n  {1}",
-                    metadatas.Count,
-                    metadatas.Select(x => x.DebugName).Join("\n  ")
+                    entries.Count,
+                    entries.Select(x => x.DebugName).Join("\n  ")
                 );
             }
 
             // Note here that we distinguish between system dependencies and job dependencies
             // System dependencies are just used to determine execution order and do not affect job dependencies
-            // After we choose the final order for based on the system dependencies from the metadatas,
+            // After we choose the final order for based on the system dependencies from the entries,
             // then we calculate job dependencies by iterating through the sorted systems and calculating
             // whether each previous system has conflicting access to the same components
 
-            for (int i = 0; i < metadatas.Count; i++)
+            for (int i = 0; i < entries.Count; i++)
             {
-                var metadata = metadatas[i];
-                metadata.DeclarationIndex = i;
+                var entry = entries[i];
+                entry.DeclarationIndex = i;
 
-                var depsSet = metadata.SystemDependencies.ToHashSet();
+                var depsSet = entry.SystemDependencies.ToHashSet();
                 TrecsAssert.That(
                     !depsSet.Contains(i),
                     "System {0} found to depend on itself",
-                    metadata.DebugName
+                    entry.DebugName
                 );
                 systemDepsMap.Add(depsSet);
 
-                var bucket = phaseBuckets[metadata.Phase];
+                var bucket = phaseBuckets[entry.Phase];
                 globalToLocalIndexMap.Add(bucket.Count);
                 bucket.Add(i);
             }
@@ -182,7 +182,7 @@ namespace Trecs.Internal
 
             List<int> Sort(SystemPhase phase) =>
                 SortPhaseSystems(
-                    metadatas,
+                    entries,
                     phaseBuckets[phase],
                     globalToLocalIndexMap,
                     systemDepsMap,
@@ -191,7 +191,7 @@ namespace Trecs.Internal
 
             var loadInfo = new LoadInfo
             {
-                Systems = metadatas,
+                Systems = entries,
                 SortedInputSystems = Sort(SystemPhase.Input),
                 SortedFixedSystems = Sort(SystemPhase.Fixed),
                 SortedEarlyPresentationSystems = Sort(SystemPhase.EarlyPresentation),
@@ -212,7 +212,7 @@ namespace Trecs.Internal
         [EditorBrowsable(EditorBrowsableState.Never)]
         public sealed class LoadInfo
         {
-            public IReadOnlyList<SystemMetadata> Systems;
+            public IReadOnlyList<SystemEntry> Systems;
 
             // indices into Systems list, in execution order within each phase
             public List<int> SortedInputSystems;

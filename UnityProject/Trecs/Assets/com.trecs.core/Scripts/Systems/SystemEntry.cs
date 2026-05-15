@@ -23,12 +23,12 @@ namespace Trecs
     }
 
     /// <summary>
-    /// Runtime descriptor for a registered system, holding its <see cref="ISystem"/> instance,
+    /// Runtime registry entry for a registered system, holding its <see cref="ISystem"/> instance,
     /// dependency graph edges, <see cref="SystemPhase"/>, and associated <see cref="WorldAccessor"/>.
     /// </summary>
-    public sealed class SystemMetadata
+    public sealed class SystemEntry
     {
-        public SystemMetadata(
+        public SystemEntry(
             ISystem system,
             IReadOnlyCollection<int> systemDependencies,
             SystemPhase phase,
@@ -65,7 +65,7 @@ namespace Trecs
         /// Position of this system in the original registration order. Stable for the
         /// lifetime of the world; matches the index returned by
         /// <see cref="WorldAccessor.GetSystems"/>. Populated by Trecs during loading,
-        /// not by <see cref="ISystemMetadataProvider"/> implementations.
+        /// not by <see cref="ISystemEntryProvider"/> implementations.
         /// </summary>
         public int DeclarationIndex { get; internal set; }
 

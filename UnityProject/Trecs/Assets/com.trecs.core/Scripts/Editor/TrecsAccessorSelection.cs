@@ -399,11 +399,11 @@ namespace Trecs
                 return;
             }
 
-            // Live mode also needs the runtime SystemMetadata to render
+            // Live mode also needs the runtime SystemEntry to render
             // system info (type, dependencies). Resolve it via the live
             // world's system list.
-            SystemMetadata liveSystem = null;
-            IReadOnlyList<SystemMetadata> liveSystems = null;
+            SystemEntry liveSystem = null;
+            IReadOnlyList<SystemEntry> liveSystems = null;
             SystemRunner liveRunner = null;
             World liveWorld = null;
             if (src is LiveSchemaSource live)
@@ -451,8 +451,8 @@ namespace Trecs
 
         static AccessorEntry BuildEntryFromRef(
             AccessorRef aref,
-            SystemMetadata liveSystem,
-            IReadOnlyList<SystemMetadata> liveSystems
+            SystemEntry liveSystem,
+            IReadOnlyList<SystemEntry> liveSystems
         )
         {
             AccessorEntry entry;
@@ -521,8 +521,8 @@ namespace Trecs
 
         static AccessorEntry BuildEntryFromLive(
             string debugName,
-            SystemMetadata systemInfo,
-            IReadOnlyList<SystemMetadata> allSystems,
+            SystemEntry systemInfo,
+            IReadOnlyList<SystemEntry> allSystems,
             int systemIndex
         )
         {
@@ -656,7 +656,7 @@ namespace Trecs
         void UpdateRuntimeFields(
             ITrecsSchemaSource src,
             AccessorRef aref,
-            SystemMetadata liveSystem,
+            SystemEntry liveSystem,
             SystemRunner liveRunner
         )
         {
