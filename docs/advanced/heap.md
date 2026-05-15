@@ -25,7 +25,7 @@ NativeUniquePtr<NativeData> nativeUnique = World.Heap.AllocNativeUnique(new Nati
 NativeSharedPtr<NativeData> nativeShared = World.Heap.AllocNativeShared(new NativeData());
 ```
 
-For shared allocations that need a stable identity across runs (so clones from disk resolve to the same heap entry), use the `BlobId` overloads — see [Pattern B — look up by stable `BlobId`](shared-heap-data.md#pattern-b--look-up-by-stable-blobid).
+For shared allocations that need a stable identity across runs (so clones from disk resolve to the same heap entry), use the `BlobId` overloads — see [Pattern B — look up by stable `BlobId`](shared-heap-data.md#pattern-b-look-up-by-stable-blobid).
 
 ## Reading
 

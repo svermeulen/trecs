@@ -54,7 +54,7 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 | **[Phase](core/systems.md#update-phases)** | One of `EarlyPresentation` / `Input` / `Fixed` / `Presentation` / `LatePresentation` — controls when a system runs and what role it gets. |
 | **[`[ForEachEntity]`](core/systems.md#foreachentity)** | Marks a method for source-generated entity iteration. |
 | **[`[WrapAsJob]`](performance/jobs-and-burst.md)** | Turns a `[ForEachEntity]` method into a Burst-compiled parallel job. |
-| **[`[FromWorld]`](advanced/advanced-jobs.md#fromworld--auto-wiring-job-fields)** | Auto-populates fields on a hand-written job struct. |
+| **[`[FromWorld]`](advanced/advanced-jobs.md#fromworld-auto-wiring-job-fields)** | Auto-populates fields on a hand-written job struct. |
 
 ## Lifetime mechanics
 
@@ -62,7 +62,7 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 |---|---|
 | **[Submission](entity-management/structural-changes.md)** | The point in the frame where queued structural ops are applied. Add / remove / partition transitions are deferred until submission. |
 | **[Heap](advanced/heap.md)** | Storage for managed or unmanaged data outside the component buffer, accessed via `SharedPtr` / `UniquePtr` / native variants. |
-| **[`BlobId`](advanced/shared-heap-data.md#pattern-b--look-up-by-stable-blobid)** | Stable identifier for a heap blob. Auto-minted from a deterministic RNG, or supplied explicitly when init isn't deterministic. |
+| **[`BlobId`](advanced/shared-heap-data.md#pattern-b-look-up-by-stable-blobid)** | Stable identifier for a heap blob. Auto-minted from a deterministic RNG, or supplied explicitly when init isn't deterministic. |
 
 ## Quick mental model
 

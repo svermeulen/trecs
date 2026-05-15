@@ -29,7 +29,7 @@ Trecs has a deliberately small API surface — a handful of high-level concepts,
 | **Components shared across many entities** | `ISharedComponentData` | No equivalent; share by reference via a heap pointer |
 | **Cleanup-after-destroy components** | `ICleanupComponentData` — persists past entity destruction so a system can finalize and explicitly remove them | None — use [`OnRemoved`](../entity-management/entity-events.md) observer events for finalization |
 | **Per-chunk shared data** | Chunk components — one value attached per chunk (a 16 KB block of entities in the same archetype) | None — Trecs uses flat per-group buffers without sub-chunks; share via a [heap pointer](../advanced/heap.md) or a `Globals` component |
-| **Shared immutable blob assets** | `BlobAssetReference<T>` — structured immutable blobs shared across entities, baked into subscenes by a stable hash | [`SharedPtr<T>` / `NativeSharedPtr<T>`](../advanced/heap.md) with [stable `BlobId`s](../advanced/shared-heap-data.md#pattern-b--look-up-by-stable-blobid) for cross-run identity |
+| **Shared immutable blob assets** | `BlobAssetReference<T>` — structured immutable blobs shared across entities, baked into subscenes by a stable hash | [`SharedPtr<T>` / `NativeSharedPtr<T>`](../advanced/heap.md) with [stable `BlobId`s](../advanced/shared-heap-data.md#pattern-b-look-up-by-stable-blobid) for cross-run identity |
 
 ## Systems
 
@@ -63,7 +63,7 @@ Trecs has a deliberately small API surface — a handful of high-level concepts,
 | | Unity ECS | Trecs |
 |---|---|---|
 | **Entity-iterating job** | `IJobEntity` | [`[WrapAsJob]`](../performance/jobs-and-burst.md) / `IJobFor` + `[ForEachEntity]` |
-| **Component lookup wiring** | Manual `GetComponentLookup` | [`[FromWorld]`](../advanced/advanced-jobs.md#fromworld--auto-wiring-job-fields) auto-wiring |
+| **Component lookup wiring** | Manual `GetComponentLookup` | [`[FromWorld]`](../advanced/advanced-jobs.md#fromworld-auto-wiring-job-fields) auto-wiring |
 | **`JobHandle` dependency wiring** | Auto-tracked per-system via `state.Dependency` (framework threads input/output based on declared component access). Within a single system, multiple schedules are still hand-threaded through `state.Dependency`, and fan-in across handles uses `JobHandle.CombineDependencies`. Granularity is per component type globally. | Auto-wired per-job from declared component access — the [dependency tracker](../performance/dependency-tracking.md) infers the right input handle at every `ScheduleParallel`, including across multiple schedules in one system. Granularity is per `(component, group)`, so jobs touching the same component on different groups run in parallel. |
 | **Structural ops from a job** | `EntityCommandBuffer.ParallelWriter` | [`NativeWorldAccessor`](../performance/jobs-and-burst.md#nativeworldaccessor) for structural ops |
 | **Deterministic ordering of parallel ops** | `sortKey` on `EntityCommandBuffer` | [Sort keys](../entity-management/structural-changes.md#deterministic-submission) for deterministic ordering |

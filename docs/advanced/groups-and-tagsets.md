@@ -29,7 +29,7 @@ Groups come from **templates** registered with the world at build time. Each uni
 // → Two groups exist: {Player, Character} and {Enemy, Character}.
 ```
 
-Each group is named by two handles — a stable `TagSet` and a runtime `GroupIndex`. See [TagSet vs GroupIndex](#tagset-vs-groupindex) below.
+Each group is named by two handles — a stable `TagSet` and a runtime `GroupIndex`. See [TagSet](#tagset) and [GroupIndex](#groupindex) below.
 
 ### Why groups matter
 
