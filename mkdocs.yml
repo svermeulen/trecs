@@ -37,12 +37,12 @@ nav:
   - Getting Started: getting-started.md
   - Glossary: glossary.md
   - Core:
-      - World Setup: core/world-setup.md
       - Components: core/components.md
       - Tags: core/tags.md
       - Templates: core/templates.md
       - Entities: core/entities.md
       - Systems: core/systems.md
+      - World Setup: core/world-setup.md
       - Input System: core/input-system.md
   - Data Access:
       - Queries & Iteration: data-access/queries-and-iteration.md
@@ -55,23 +55,23 @@ nav:
       - Jobs & Burst: performance/jobs-and-burst.md
       - Dependency Tracking: performance/dependency-tracking.md
   - Guides:
-      - OOP Integration: guides/oop-integration.md
-      - Trecs vs Unity ECS: guides/trecs-vs-unity-ecs.md
       - Best Practices: guides/best-practices.md
       - Gotchas: guides/gotchas.md
+      - OOP Integration: guides/oop-integration.md
       - Entity Subset Patterns: guides/entity-subset-patterns.md
+      - Trecs vs Unity ECS: guides/trecs-vs-unity-ecs.md
   - Advanced:
       - Accessor Roles: advanced/accessor-roles.md
       - Time & RNG: advanced/time-and-rng.md
       - Interpolation: advanced/interpolation.md
-      - Pausing & Disabling Systems: advanced/pausing-and-disabling-systems.md
       - Heap: advanced/heap.md
       - Shared Heap Data: advanced/shared-heap-data.md
-      - Aspect Interfaces: advanced/aspect-interfaces.md
-      - Advanced Job Features: advanced/advanced-jobs.md
       - Fixed Collections: advanced/fixed-collections.md
       - Trecs Collections: advanced/trecs-collections.md
+      - Aspect Interfaces: advanced/aspect-interfaces.md
+      - Pausing & Disabling Systems: advanced/pausing-and-disabling-systems.md
       - Groups, GroupIndex & TagSets: advanced/groups-and-tagsets.md
+      - Advanced Job Features: advanced/advanced-jobs.md
       - Serialization: advanced/serialization.md
   - Editor Windows:
       - Overview: editor-windows/index.md
