@@ -6,7 +6,17 @@ Yes — they're completely independent.  You could run both in the same project 
 
 ## Do I have to maintain determinism and serialization support to use Trecs?
 
-No.  
+No. Both are opt-in.
+
+You can use `UnityEngine.Random`, `Time.deltaTime`, system-level mutable state, and managed heap data with no registered `ISerializer<T>` — the simulation will run fine. What you lose is reproducibility across runs and the ability to record / scrub / replay or take snapshots without those parts desyncing.
+
+Concretely:
+
+- **Determinism** — leave `WorldSettings.RequireDeterministicSubmission` off (the default) and ignore `World.Rng` / `World.DeltaTime` if you don't care. The framework still ticks.
+- **Recording / playback** — the [Trecs Player window](editor-windows/player.md) requires a deterministic simulation to replay correctly. If you skip the discipline, recordings still capture but playback will diverge from live.
+- **Snapshots** — pure unmanaged components round-trip automatically. Managed heap data (via `SharedPtr<T>` / `UniquePtr<T>` over a class) only needs an `ISerializer<T>` if you want it to survive a snapshot or recording. If you never take one, no serializer is needed.
+
+Treat the determinism and serialization features as a buffet — adopt what your project actually needs.
 
 ## What's the practical entity ceiling?
 
