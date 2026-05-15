@@ -94,7 +94,7 @@ nativeWorld.UnsetTag<BallTags.Active>(entityHandle);    // partition transition 
 |-----------|-------------|------|
 | Read a single component | `world.Component<T>(idx).Read` | `NativeComponentRead<T>` (single entity), `NativeComponentBufferRead<T>` (one group), `NativeComponentLookupRead<T>` (across groups) |
 | Write a single component | `world.Component<T>(idx).Write` | `NativeComponentWrite<T>`, `NativeComponentBufferWrite<T>`, `NativeComponentLookupWrite<T>` |
-| Add / remove / move entity | `world.Set<T>().Deferred` (deferred until next frame) | `NativeWorldAccessor` (deferred until next frame + sort key) |
+| Add / remove / partition-transition entity | `world.AddEntity<T>` / `RemoveEntity` / `SetTag<T>` / `UnsetTag<T>` (queued until next submission) | `NativeWorldAccessor` (queued until next submission; pass `sortKey` for deterministic ordering) |
 | Read a set | `world.Set<T>().Read` | `NativeSetRead<T>` |
 | Mutate a set | `world.Set<T>().Write` | `NativeSetCommandBuffer<T>` (deferred but only until job completion) |
 
