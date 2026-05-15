@@ -109,7 +109,7 @@ public partial class PatrolRendererSystem : ISystem
     [ForEachEntity(MatchByComponents = true)]
     void Execute(in Position position, in Trail trail, in GameObjectId goId)
     {
-        var go = _registry.Resolve(goId);
+        var go = _goManager.Resolve(goId);
         go.transform.position = (Vector3)position.Value;
 
         ref readonly var trailData = ref trail.Value.Read(World).Value;

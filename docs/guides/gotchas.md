@@ -90,9 +90,9 @@ ref readonly var pos = ref World.Component<Position>(parent.ChildRef).Read;  // 
 
 ## Native heap allocations aren't visible to jobs in the same step
 
-Native heap allocations (`NativeUniquePtr` / `NativeSharedPtr`) queue into a pending collection rather than the resolver lookup table Burst jobs read. The queue drains at submission (end of fixed step). A Burst job scheduled in the same step that calls `.Get(NativeWorldAccessor)` on a freshly-allocated native ptr won't find it.
+Native heap allocations (`NativeUniquePtr` / `NativeSharedPtr`) queue into a pending collection rather than the resolver lookup table Burst jobs read. The queue drains at submission (end of fixed step). A Burst job scheduled in the same step that calls `.Read(...)` / `.Write(...)` on a freshly-allocated native ptr through a resolver won't find it.
 
-Main-thread `.Get(WorldAccessor)` / `.Set(WorldAccessor, ...)` **do** work on freshly-allocated native ptrs — the main-thread path checks the pending queue before the resolver. Managed pointers (`UniquePtr<T>` / `SharedPtr<T>`) aren't deferred either; they have no resolver layer and are main-thread-only by design.
+Main-thread `.Read(WorldAccessor)` / `.Write(WorldAccessor)` **do** work on freshly-allocated native ptrs — the main-thread path checks the pending queue before the resolver. Managed pointers (`UniquePtr<T>` / `SharedPtr<T>`) aren't deferred either; they have no resolver layer and are main-thread-only by design.
 
 The deferral exists because Burst jobs hold a snapshot of the resolver's allocation table; mutating it mid-job would corrupt in-flight reads.
 

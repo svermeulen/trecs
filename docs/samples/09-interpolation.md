@@ -131,7 +131,7 @@ public partial class OrbitRendererSystem : ISystem
     [ForEachEntity(typeof(OrbitTags.Smooth))]
     void RenderSmooth(in SmoothOrbitView view)
     {
-        var go = _registry.Resolve(view.GameObjectId);
+        var go = _goManager.Resolve(view.GameObjectId);
         go.transform.position = (Vector3)view.InterpolatedPosition;
         go.transform.rotation = view.InterpolatedRotation;
     }
@@ -139,7 +139,7 @@ public partial class OrbitRendererSystem : ISystem
     [ForEachEntity(typeof(OrbitTags.Raw))]
     void RenderRaw(in RawOrbitView view)
     {
-        var go = _registry.Resolve(view.GameObjectId);
+        var go = _goManager.Resolve(view.GameObjectId);
         go.transform.position = (Vector3)view.Position;
         go.transform.rotation = view.Rotation;
     }

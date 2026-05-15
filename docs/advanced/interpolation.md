@@ -93,7 +93,7 @@ public partial class RenderSystem : ISystem
     [ForEachEntity(typeof(MyTags.Smooth))]
     void Execute(in Interpolated<Position> pos, in Interpolated<Rotation> rot, in GameObjectId id)
     {
-        var go = _registry.Resolve(id);
+        var go = _goManager.Resolve(id);
         go.transform.position = (Vector3)pos.Value.Value;
         go.transform.rotation = rot.Value.Value;
     }
