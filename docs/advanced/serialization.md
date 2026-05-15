@@ -103,5 +103,5 @@ public void Deserialize(ref PatrolRoute value, ISerializationReader reader)
 
 - [Heap](heap.md) — pointer types and which kinds of data need to live on the heap.
 - [Trecs Player Window](../editor-windows/player.md) — uses the registered serializers to record, scrub, and replay world state.
-- [Sample 10 — Pointers](../samples/10-pointers.md) — `UniquePtr` over a managed type.
-- [Sample 15 — Blob Storage](../samples/15-blob-storage.md) — `SharedPtr` over a managed type with stable `BlobId`s and a custom `ISerializer<T>`.
+- [Sample 10 — Pointers](../samples/10-pointers.md) — `UniquePtr<TrailHistory>` plus a registered `TrailHistorySerializer` so the trail round-trips through snapshots / recording.
+- [Sample 15 — Blob Storage](../samples/15-blob-storage.md) — `SharedPtr<ColorPalette>` with stable `BlobId`s (the sample itself doesn't take snapshots, but the same `ISerializer<T>` pattern from Sample 10 would apply).

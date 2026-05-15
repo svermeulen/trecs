@@ -101,7 +101,7 @@ public partial class ProcessInputSystem : ISystem
 }
 ```
 
-`[Input]` components are read-only outside Input systems. Writing one from a fixed-update (or any other) system throws in DEBUG builds — values must enter through `World.AddInput<T>(...)` so recording and playback can replay them. If you need a sim-state field that fixed-update systems can mutate, use a regular (non-`[Input]`) component.
+`[Input]` components are read-only everywhere — including inside Input systems themselves. The only way a value reaches an `[Input]` field is via `World.AddInput<T>(...)`, which is gated to `[ExecuteIn(SystemPhase.Input)]` systems. A direct `.Write` on the component throws in DEBUG builds regardless of which phase the caller is in. If you need a sim-state field that fixed-update systems can mutate directly, use a regular (non-`[Input]`) component.
 
 ## See also
 

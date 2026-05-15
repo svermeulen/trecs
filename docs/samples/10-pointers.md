@@ -130,6 +130,10 @@ public partial class PatrolFollowerCleanup : IDisposable
 
 In DEBUG builds Trecs reports any pointers still alive at world shutdown — handy for catching missed cleanup paths.
 
+## Snapshot round-trip
+
+`TrailHistory` is a managed class with a `List<Vector3>`, so Trecs's blit serializer can't round-trip it through the Trecs Player. The sample registers a tiny `TrailHistorySerializer : ISerializer<TrailHistory>` against `world.SerializerRegistry` at composition time so the snapshot writer / reader knows how to walk the inner fields. See [Serialization](../advanced/serialization.md) for the authoring pattern.
+
 ## Concepts introduced
 
 - **`UniquePtr<T>`** — single-owner managed pointer. Stored inline as a 4-byte handle on the component. See [Heap](../advanced/heap.md).
