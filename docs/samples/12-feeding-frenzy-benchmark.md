@@ -2,7 +2,7 @@
 
 A performance benchmark — the same gameplay implemented across three ECS architectures and nine iteration styles.
 
-**Source:** `Samples/12_FeedingFrenzyBenchmark/`
+**Source:** `com.trecs.core/Samples~/Tutorials/12_FeedingFrenzyBenchmark/`
 
 ## What it does
 

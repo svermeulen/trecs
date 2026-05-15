@@ -1,8 +1,8 @@
-# 19 — Multiple Worlds
+# 17 — Multiple Worlds
 
 Two independent Trecs `World` instances running side-by-side in one Unity scene. Worlds are isolated entity stores with their own systems, RNG, and lifecycle, while sharing the process-wide type ID registry.
 
-**Source:** `Samples/19_MultipleWorlds/`
+**Source:** `com.trecs.core/Samples~/Tutorials/17_MultipleWorlds/`
 
 ## What it does
 

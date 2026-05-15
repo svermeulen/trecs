@@ -1,8 +1,8 @@
-# 15 — Aspect Interfaces
+# 14 — Aspect Interfaces
 
 Composable, reusable aspect contracts so different templates can share the same helper logic without duplication.
 
-**Source:** `Samples/15_AspectInterfaces/`
+**Source:** `com.trecs.core/Samples~/Tutorials/14_AspectInterfaces/`
 
 ## What it does
 

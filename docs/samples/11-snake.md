@@ -2,7 +2,7 @@
 
 A grid-based game with deterministic input and entity lifecycle management.
 
-**Source:** `Samples/11_Snake/`
+**Source:** `com.trecs.core/Samples~/Tutorials/11_Snake/`
 
 ## What it does
 

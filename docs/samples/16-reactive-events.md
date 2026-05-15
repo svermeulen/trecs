@@ -1,8 +1,8 @@
-# 18 — Reactive Events
+# 16 — Reactive Events
 
 Subscribe to entity add / remove / move events via `WorldAccessor.Events` so side-effects (logging, VFX, GameObject cleanup, stat counters) run reactively instead of by polling.
 
-**Source:** `Samples/18_ReactiveEvents/`
+**Source:** `com.trecs.core/Samples~/Tutorials/16_ReactiveEvents/`
 
 ## What it does
 

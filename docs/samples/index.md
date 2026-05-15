@@ -16,11 +16,11 @@ A progressive tutorial series plus full game samples. Each builds on the previou
 | 08 | [Sets](08-sets.md) | Dynamic entity subsets, overlapping membership |
 | 09 | [Interpolation](09-interpolation.md) | Fixed-to-variable timestep interpolation |
 | 10 | [Pointers](10-pointers.md) | SharedPtr, UniquePtr, managed data on the heap |
-| 14 | [Native Pointers](14-native-pointers.md) | NativeSharedPtr / NativeUniquePtr accessed from a Burst job |
-| 15 | [Aspect Interfaces](15-aspect-interfaces.md) | Shared aspect contracts via `partial interface` for reusable cross-species helpers |
-| 17 | [Blob Storage](17-blob-storage.md) | Content-pipeline-stable `BlobId`s for shared immutable assets on the heap |
-| 18 | [Reactive Events](18-reactive-events.md) | `OnAdded` / `OnRemoved` observers for cleanup and stat tracking |
-| 19 | [Multiple Worlds](19-multiple-worlds.md) | Two independent `World` instances ticking side-by-side |
+| 13 | [Native Pointers](13-native-pointers.md) | NativeSharedPtr / NativeUniquePtr accessed from a Burst job |
+| 14 | [Aspect Interfaces](14-aspect-interfaces.md) | Shared aspect contracts via `partial interface` for reusable cross-species helpers |
+| 15 | [Blob Storage](15-blob-storage.md) | Content-pipeline-stable `BlobId`s for shared immutable assets on the heap |
+| 16 | [Reactive Events](16-reactive-events.md) | `OnAdded` / `OnRemoved` observers for cleanup and stat tracking |
+| 17 | [Multiple Worlds](17-multiple-worlds.md) | Two independent `World` instances ticking side-by-side |
 
 ## Game samples
 

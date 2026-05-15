@@ -43,7 +43,7 @@ See the [Components attribute reference](../core/components.md#component-field-a
 
 Non-system code (services, scene initializers, editor inspectors, tests) creates its own accessor via `world.CreateAccessor(AccessorRole)`. Pick the role that matches the work:
 
-- **`Fixed`** — Service classes for the deterministic simulation. For example, a stats service that subscribes to `OnAdded` / `OnRemoved` for a tag and bumps a global score component — see [Sample 18 — Reactive Events](../samples/18-reactive-events.md).
+- **`Fixed`** — Service classes for the deterministic simulation. For example, a stats service that subscribes to `OnAdded` / `OnRemoved` for a tag and bumps a global score component — see [Sample 16 — Reactive Events](../samples/16-reactive-events.md).
 - **`Variable`** — UI, camera controllers, rendering services that read both sim and render state.
 - **`Unrestricted`** — Scene initialization, debug menus, editor tooling.
 

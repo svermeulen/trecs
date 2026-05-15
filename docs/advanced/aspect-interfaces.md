@@ -32,4 +32,4 @@ Rules:
 - Aspect interfaces compose: one can extend another, and all `IRead<>` / `IWrite<>` types merge into the concrete aspect.
 - Iteration entry points (`[ForEachEntity]`, `[SingleEntity]`) still require a concrete aspect struct. Aspect interfaces are for polymorphic helpers called *from* iteration, not the iteration parameter itself.
 
-See [sample 15 — Aspect Interfaces](../samples/15-aspect-interfaces.md) for a complete example.
+See [sample 14 — Aspect Interfaces](../samples/14-aspect-interfaces.md) for a complete example.

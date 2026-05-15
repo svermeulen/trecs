@@ -96,4 +96,4 @@ A system can declare multiple aspects — typically one per query.
 
 - [Sample 03 — Aspects](../samples/03-aspects.md): a minimal aspect with `IRead` / `IWrite` parameters.
 - [Aspect Interfaces](../advanced/aspect-interfaces.md): polymorphic helpers across multiple aspects sharing the same access surface.
-- [Sample 15 — Aspect Interfaces](../samples/15-aspect-interfaces.md): complete example.
+- [Sample 14 — Aspect Interfaces](../samples/14-aspect-interfaces.md): complete example.

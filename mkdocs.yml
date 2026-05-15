@@ -72,7 +72,6 @@ nav:
       - Fixed Collections: advanced/fixed-collections.md
       - Groups, GroupIndex & TagSets: advanced/groups-and-tagsets.md
       - Serialization: advanced/serialization.md
-      - Recording & Playback: advanced/recording-and-playback.md
   - Editor Windows:
       - Overview: editor-windows/index.md
       - Hierarchy: editor-windows/hierarchy.md
@@ -92,12 +91,11 @@ nav:
       - 10 - Pointers: samples/10-pointers.md
       - 11 - Snake: samples/11-snake.md
       - 12 - Feeding Frenzy Benchmark: samples/12-feeding-frenzy-benchmark.md
-      - 13 - Save Game: samples/13-save-game.md
-      - 14 - Native Pointers: samples/14-native-pointers.md
-      - 15 - Aspect Interfaces: samples/15-aspect-interfaces.md
-      - 17 - Blob Storage: samples/17-blob-storage.md
-      - 18 - Reactive Events: samples/18-reactive-events.md
-      - 19 - Multiple Worlds: samples/19-multiple-worlds.md
+      - 13 - Native Pointers: samples/13-native-pointers.md
+      - 14 - Aspect Interfaces: samples/14-aspect-interfaces.md
+      - 15 - Blob Storage: samples/15-blob-storage.md
+      - 16 - Reactive Events: samples/16-reactive-events.md
+      - 17 - Multiple Worlds: samples/17-multiple-worlds.md
   - FAQ: faq.md
   - Changelog: changelog.md
 
@@ -131,9 +129,6 @@ markdown_extensions:
 
 plugins:
   - search
-
-extra_css:
-  - stylesheets/extra.css
 
 extra_css:
   - stylesheets/extra.css

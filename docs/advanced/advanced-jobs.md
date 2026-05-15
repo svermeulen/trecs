@@ -142,4 +142,4 @@ Note that this is very low level operation that shouldn't be necessary in most c
 
 - [Sample 05 — Job System](../samples/05-job-system.md): the basic `[WrapAsJob]` pattern with structural changes.
 - [Sample 07 — Feeding Frenzy](../samples/07-feeding-frenzy.md): multiple iteration styles compared side by side, all using jobs.
-- [Sample 14 — Native Pointers](../samples/14-native-pointers.md): unique/shared native pointers consumed inside Burst jobs.
+- [Sample 13 — Native Pointers](../samples/13-native-pointers.md): unique/shared native pointers consumed inside Burst jobs.

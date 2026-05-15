@@ -141,4 +141,4 @@ ref readonly NativeData data = ref nativeShared.Get(in nativeWorld);
 ## See also
 
 - [Sample 10 — Pointers](../samples/10-pointers.md): unique and shared managed pointers stored on entities.
-- [Sample 17 — Blob Storage](../samples/17-blob-storage.md): the seeder pattern with stable `BlobId` for shared assets.
+- [Sample 15 — Blob Storage](../samples/15-blob-storage.md): the seeder pattern with stable `BlobId` for shared assets.

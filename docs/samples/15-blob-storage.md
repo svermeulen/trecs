@@ -1,8 +1,8 @@
-# 17 — Shared Assets with Stable BlobIds
+# 15 — Shared Assets with Stable BlobIds
 
 Store large immutable assets on the shared heap under caller-authored `BlobId`s so many entities can reference the same data by a content-pipeline-stable ID.
 
-**Source:** `Samples/17_BlobStorage/`
+**Source:** `com.trecs.core/Samples~/Tutorials/15_BlobStorage/`
 
 ## What it does
 

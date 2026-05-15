@@ -1,8 +1,8 @@
-# 14 — Native Pointers
+# 13 — Native Pointers
 
 Using Burst-compatible heap pointers to store unmanaged data that a parallel job can read and mutate.
 
-**Source:** `Samples/14_NativePointers/`
+**Source:** `com.trecs.core/Samples~/Tutorials/13_NativePointers/`
 
 ## What it does
 
