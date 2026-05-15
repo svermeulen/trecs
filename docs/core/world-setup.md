@@ -134,5 +134,5 @@ var accessor = world.CreateAccessor(AccessorRole.Unrestricted);
 - **[Events](../entity-management/entity-events.md)** — `Events` builder for entity lifecycle subscriptions
 - **[Time](../advanced/time-and-rng.md)** — `DeltaTime`, `ElapsedTime`, `Frame` (phase-aware)
 - **[RNG](../advanced/time-and-rng.md)** — `Rng`, `FixedRng`, `VariableRng`
-- **[Heap](../advanced/heap.md)** — `Heap` accessor for pointer allocation
+- **[Heap](../advanced/heap.md)** — `Heap` property (a `HeapAccessor`) for use with `SharedPtr.Alloc` / `UniquePtr.Alloc` / native variants
 - **[Jobs](../performance/jobs-and-burst.md)** — `ToNative()` for job-safe access

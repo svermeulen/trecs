@@ -170,6 +170,8 @@ void UpdateActive(in ActiveBall ball) { /* ... */ }
 void UpdateResting(in RestingBall ball) { /* ... */ }
 ```
 
+Use `Withouts = new[] { typeof(A), typeof(B) }` for multiple exclusions.
+
 ### Multi-variant
 
 For three or more mutually exclusive states, list every variant:

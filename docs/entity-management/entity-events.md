@@ -136,7 +136,7 @@ Separate from the per-entity events, `World.Events` exposes lifecycle hooks for 
 |---|---|
 | `OnVariableUpdateStarted` | At the start of every `World.Tick()`. |
 | `OnFixedUpdateStarted` | At the start of each fixed-update step (zero or more times per `Tick()`, depending on catch-up). |
-| `OnInputsApplied` | Inside each fixed step, after inputs have been applied to the global entity. |
+| `OnInputsApplied` | Inside each fixed step, after queued `AddInput<T>` values have been written onto their target entities (typically the global entity, but any entity is valid). |
 | `OnSubmissionStarted` | Submission is about to run (end of each fixed step). |
 | `OnSubmissionCompleted` | Submission finished — all queued structural changes applied. |
 | `OnFixedUpdateCompleted` | At the end of each fixed-update step. |
