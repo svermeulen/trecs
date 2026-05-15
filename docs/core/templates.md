@@ -214,7 +214,7 @@ public partial class Enemy : ITemplate,
 
     The cross product is worth it when dimensions are *intrinsic to the entity's storage shape* — e.g. an `Active` partition iterated every frame in a hot system. It's the wrong tool for states the design wants to name but the simulation rarely iterates by — those are cheaper as sets.
 
-    **Lazy buffers.** Component arrays are allocated on first use per group, not at world-build time, so declaring partitions you rarely populate is cheap at startup. For the pre-0.x eager behavior, call `World.WarmupAllGroups()` after initialization, or `World.Warmup<TTag1, TTag2>(initialCapacity: N)` for a specific group about to be heavily populated.
+    **Lazy buffers.** Component arrays are allocated on first use per group, not at world-build time, so declaring partitions you rarely populate is cheap at startup. To pre-allocate eagerly, call `accessor.WarmupAllGroups()` after initialization, or `accessor.Warmup<TTag1, TTag2>(initialCapacity: N)` for a specific group about to be heavily populated.
 
 ### Transitions
 

@@ -79,6 +79,7 @@ static void Execute(
     var meal = mealFactory.Create(fish.TargetMeal.ToIndex(world));
     fish.UniformScale = fish.UniformScale + 0.05f * meal.MealNutrition;
 
+    meal.ApproachingFish = EntityHandle.Null;
     meal.Remove(world);
     fish.TargetMeal = EntityHandle.Null;
     fish.SetTag<FrenzyTags.NotEating>(world);
@@ -91,14 +92,14 @@ Moves eating fish toward their destination position.
 
 ### IdleBobSystem (`[WrapAsJob]`)
 
-Applies sinusoidal bobbing to idle fish. `EntityIndex` provides a phase offset so fish bob out of sync:
+Applies sinusoidal bobbing to idle fish. The per-iteration `EntityHandle` gives each fish a stable phase offset so they bob out of sync — `Id` survives recycling, unlike a buffer index:
 
 ```csharp
 [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
 [WrapAsJob]
-static void Execute(in Fish fish, EntityIndex entityIndex, in NativeWorldAccessor world)
+static void Execute(in Fish fish, EntityHandle handle, in NativeWorldAccessor world)
 {
-    float phaseOffset = entityIndex.Index * GoldenRatio;
+    float phaseOffset = handle.Id * GoldenRatio;
     float y = 0.3f * fish.UniformScale * math.sin(3f * world.ElapsedTime + phaseOffset);
     var pos = fish.SimPosition;
     pos.y = y;
@@ -118,7 +119,7 @@ Shows `[PassThroughArgument]` for passing configuration into a job, and entity r
 static void ExecuteImpl(
     ref UniformScale scale,
     ref ColorComponent color,
-    EntityIndex entityIndex,
+    EntityHandle handle,
     in NativeWorldAccessor world,
     [PassThroughArgument] Settings settings
 )
@@ -127,7 +128,7 @@ static void ExecuteImpl(
 
     if (scale.Value <= settings.MinScale)
     {
-        world.RemoveEntity(entityIndex);
+        world.RemoveEntity(handle);
         return;
     }
 

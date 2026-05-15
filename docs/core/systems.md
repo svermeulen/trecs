@@ -69,7 +69,7 @@ See [Sets](../entity-management/sets.md) for set-scoped iteration.
 - **`[PassThroughArgument]`** — a value the caller forwards in. See [PassThroughArgument](#passthroughargument).
 - **`[SingleEntity]`** — a singleton entity hoisted out of the loop. See [SingleEntity](#singleentity).
 
-> An internal `EntityIndex` parameter is also accepted for advanced cases — a transient pointer into the underlying buffers that skips the per-call handle lookup. Prefer `EntityAccessor` / `EntityHandle` unless you have a specific perf reason.
+> A low-level `EntityIndex` parameter is also accepted for advanced cases — a transient index into the underlying buffers that skips the per-call handle lookup. Only stable until the next submission. Prefer `EntityAccessor` / `EntityHandle` unless you have a specific perf reason.
 
 ### The Execute method
 
