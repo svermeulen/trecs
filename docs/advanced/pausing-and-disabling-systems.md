@@ -58,18 +58,14 @@ bool willRun = world.IsSystemEffectivelyEnabled(systemIndex);
 
 ## Building your own grouping
 
-Trecs has no built-in `[SystemGroup]` for bulk pause/unpause. The framework exposes per-system metadata so you can build whatever grouping fits your game (on `World` and `WorldAccessor`):
+Trecs has no built-in `[SystemGroup]` for bulk pause/unpause. The framework exposes the per-system registry entries so you can build whatever grouping fits your game (on `World` and `WorldAccessor`):
 
 ```csharp
-IReadOnlyList<SystemMetadata> systems = world.GetSystems();
-foreach (var meta in systems)
-{
-    //   meta.System            — the ISystem instance
-    //   meta.Phase             — Input / Fixed / Presentation / etc.
-    //   meta.DebugName         — human-readable name
-    //   meta.DeclarationIndex  — pass this as the systemIndex to
-    //                            SetSystemPaused / SetSystemEnabled
-}
+IReadOnlyList<SystemEntry> systems = world.GetSystems();
+SystemEntry entry = systems[systemIndex];
+//   entry.System        — the ISystem instance
+//   entry.Phase         — Input / Fixed / Presentation / etc.
+//   entry.DebugName     — human-readable name
 ```
 
 ## Related
