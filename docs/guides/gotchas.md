@@ -46,13 +46,13 @@ Component serialization copies the raw struct bytes (the blit fast-path). A `Nat
 
 `NativeUniquePtr<NativeList<T>>` avoids the trap: the unique ptr is a heap-key, not a raw memory pointer, and Trecs's serializer walks the inner collection's contents through the heap rather than blitting the struct.
 
-**Fix.** Wrap any native collection that needs to survive serialization in a `NativeUniquePtr` (or `NativeSharedPtr`). See [Wrapping native collections](../advanced/heap.md#wrapping-native-collections).
+**Fix.** Wrap any native collection that needs to survive serialization in a `NativeUniquePtr` (or `NativeSharedPtr`). See [Storing native collections](../advanced/heap.md#storing-native-collections).
 
 ## `NativeUniquePtr<NativeList<T>>` — inner storage must be disposed first
 
 The wrapped collection's storage is allocated in Unity's allocator, not Trecs's heap. Disposing the `NativeUniquePtr` only frees the heap slot holding the `NativeList` header — the underlying allocation leaks.
 
-**Fix.** Dispose the inner collection, then the unique ptr. See [Wrapping native collections](../advanced/heap.md#wrapping-native-collections).
+**Fix.** Dispose the inner collection, then the unique ptr. See [Storing native collections](../advanced/heap.md#storing-native-collections).
 
 ## Mutating a `NativeUniquePtr<T>` needs write access to the owning component
 

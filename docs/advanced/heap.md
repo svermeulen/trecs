@@ -84,7 +84,7 @@ public partial struct CCollisionPairBuffer : IEntityComponent
 
 For collections with known bounds, [`FixedList<N>`](fixed-collections.md) is usually simpler — it stores data inline in the component and needs no manual disposal.
 
-If you can't use fixed collections because the data does not have a clear upper bound, or because you want to reduce memory usage, you can use one of the [Trecs collection types](#todo).  These exist specifically to be compatible with serialization, and store the memory in the same location that the native ptr memory is stored, which gets serialized alongside components automatically.
+If you can't use fixed collections because the data has no clear upper bound, or because the worst-case bound wastes too much memory, reach for a [Trecs collection type](trecs-collections.md) (currently just `TrecsList<T>`). These store their backing data on a Trecs-owned heap that snapshots / recordings walk automatically, so the contents round-trip with the component bytes — no `NativeUniquePtr` wrapper or custom serializer needed.
 
 ## Shared pointers and reference counting
 
