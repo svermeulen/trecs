@@ -30,6 +30,23 @@ namespace Trecs.SourceGen
         public const string TrecsInternal = "Trecs.Internal";
     }
 
+    /// <summary>
+    /// Centralized <c>[GeneratedCode]</c> attribute text emitted into every
+    /// generator-produced type declaration. Updating <c>Version</c> here
+    /// updates every generated file.
+    /// </summary>
+    internal static class GeneratedCodeAttributes
+    {
+        public const string Tool = "Trecs.SourceGen";
+        public const string Version = "0.2.0";
+        public const string Line =
+            "[global::System.CodeDom.Compiler.GeneratedCode(\""
+            + Tool
+            + "\", \""
+            + Version
+            + "\")]";
+    }
+
     internal static class TrecsCodeGenConstants
     {
         /// <summary>

@@ -143,6 +143,7 @@ namespace {nameSpace}
     [ExecuteIn(SystemPhase.Presentation)]
     [ExecutePriority(-1000)]
     [AllowMultiple]
+    {GeneratedCodeAttributes.Line}
     public class {className} : ISystem, Trecs.Internal.ISystemInternal
     {{
         WorldAccessor _world;
@@ -207,6 +208,7 @@ namespace {nameSpace}
         }}
 
         [BurstCompile]
+        {GeneratedCodeAttributes.Line}
         internal struct InterpolateJob : IJobFor
         {{
             public NativeComponentBufferRead<{componentName}> CurrentValues;

@@ -178,6 +178,7 @@ namespace Trecs.SourceGen
 
 namespace {nameSpace}
 {{
+    {GeneratedCodeAttributes.Line}
     public static class {groupName}WorldBuilderExtensions
     {{
         public static WorldBuilder Add{groupName}(this WorldBuilder builder)

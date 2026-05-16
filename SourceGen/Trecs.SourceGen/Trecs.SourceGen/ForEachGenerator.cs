@@ -251,6 +251,7 @@ namespace Trecs.SourceGen
                             0,
                             (b, indent) =>
                             {
+                                b.AppendLine(indent, GeneratedCodeAttributes.Line);
                                 b.AppendLine(indent, $"partial class {className}");
                                 b.AppendLine(indent, "{");
                                 GenerateForEachOverloads(

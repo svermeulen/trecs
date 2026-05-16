@@ -1174,6 +1174,7 @@ namespace Trecs.SourceGen
             }
 
             string ind = new(' ', indent * 4);
+            sb.AppendLine($"{ind}{GeneratedCodeAttributes.Line}");
             sb.AppendLine($"{ind}partial class {info.ClassSymbol.Name}");
             sb.AppendLine($"{ind}{{");
             indent++;
@@ -1216,6 +1217,7 @@ namespace Trecs.SourceGen
             var jobStructName = $"_{info.MethodName}_AutoJob";
 
             sb.AppendLine($"{ind}[Unity.Burst.BurstCompile]");
+            sb.AppendLine($"{ind}{GeneratedCodeAttributes.Line}");
             sb.AppendLine($"{ind}private partial struct {jobStructName} : IJobFor");
             sb.AppendLine($"{ind}{{");
 

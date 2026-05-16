@@ -630,6 +630,7 @@ namespace Trecs.SourceGen
                     namespaceName,
                     (builder) =>
                     {
+                        builder.AppendLine(1, GeneratedCodeAttributes.Line);
                         builder.AppendLine(
                             1,
                             $"partial class {className}{typeParams} : Trecs.Internal.ISystemInternal{constraints}"

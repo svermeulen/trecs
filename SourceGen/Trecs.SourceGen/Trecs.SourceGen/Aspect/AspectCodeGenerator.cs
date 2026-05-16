@@ -133,6 +133,7 @@ namespace Trecs.SourceGen.Aspect
                 indentLevel,
                 "[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Advanced)]"
             );
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
             sb.AppendLine(indentLevel, "public struct NativeFactory : System.IDisposable");
             sb.AppendLine(indentLevel, "{");
 
@@ -1055,6 +1056,7 @@ namespace Trecs.SourceGen.Aspect
                 0,
                 (b, indentLevel) =>
                 {
+                    b.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
                     b.AppendLine(
                         indentLevel,
                         $"{effectiveAccessibility} partial interface {symbol.Name}"
