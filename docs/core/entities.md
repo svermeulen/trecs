@@ -81,7 +81,7 @@ partial struct FishView : IAspect, IRead<Velocity>, IWrite<Position> { }
 [ForEachEntity(typeof(FrenzyTags.Fish))]
 void Execute(in FishView fish)
 {
-    fish.Position.Write.Value += fish.Velocity.Read.Value * World.DeltaTime;
+    fish.Position.Value += fish.Velocity.Value * World.DeltaTime;
 }
 ```
 

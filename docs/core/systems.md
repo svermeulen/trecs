@@ -33,7 +33,7 @@ public partial class SpinnerSystem : ISystem
 [ForEachEntity(typeof(GameTags.Enemy))]
 void Execute(in EnemyView enemy)
 {
-    enemy.Position.Write.Value += enemy.Velocity.Read.Value * World.DeltaTime;
+    enemy.Position.Value += enemy.Velocity.Value * World.DeltaTime;
 }
 
 // Using component refs directly
