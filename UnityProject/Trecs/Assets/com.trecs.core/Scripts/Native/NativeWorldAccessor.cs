@@ -294,7 +294,7 @@ namespace Trecs
         // ── Entity Remove ───────────────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void RemoveEntity(EntityIndex entityIndex)
+        internal readonly void RemoveEntity(EntityIndex entityIndex)
         {
             AssertStructuralChangesAllowed();
             TrecsAssert.That(entityIndex != EntityIndex.Null);
@@ -305,7 +305,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void RemoveEntity(EntityHandle entityHandle)
+        internal readonly void RemoveEntity(EntityHandle entityHandle)
         {
             RemoveEntity(GetEntityIndex(entityHandle));
         }
@@ -313,13 +313,13 @@ namespace Trecs
         // ── Entity Tag Changes ──────────────────────────────────────
 
         /// <summary>
-        /// Burst-side equivalent of <see cref="WorldAccessor.SetTag{T}(EntityIndex)"/>.
+        /// Burst-side equivalent of <see cref="EntityIndex.SetTag{T}(in NativeWorldAccessor)"/>.
         /// Enqueues a tag-set with sentinel <c>-2</c>; the submitter resolves the
         /// destination partition (using the source group's template dimensions) on the
         /// main thread.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void SetTag<T>(EntityIndex entityIndex)
+        internal readonly void SetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertStructuralChangesAllowed();
@@ -331,15 +331,15 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void SetTag<T>(EntityHandle entityHandle)
+        internal readonly void SetTag<T>(EntityHandle entityHandle)
             where T : struct, ITag => SetTag<T>(GetEntityIndex(entityHandle));
 
         /// <summary>
-        /// Burst-side equivalent of <see cref="WorldAccessor.UnsetTag{T}(EntityIndex)"/>.
+        /// Burst-side equivalent of <see cref="EntityIndex.UnsetTag{T}(in NativeWorldAccessor)"/>.
         /// Sentinel <c>-3</c>; resolved at submit time.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void UnsetTag<T>(EntityIndex entityIndex)
+        internal readonly void UnsetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertStructuralChangesAllowed();
@@ -351,7 +351,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void UnsetTag<T>(EntityHandle entityHandle)
+        internal readonly void UnsetTag<T>(EntityHandle entityHandle)
             where T : struct, ITag => UnsetTag<T>(GetEntityIndex(entityHandle));
 
         // ── Entity Reference Resolution ─────────────────────────────
@@ -376,11 +376,33 @@ namespace Trecs
 
         // ── Deferred Set Operations ─────────────────────────────────
 
+        /// <summary>
+        /// Returns a Burst-compatible gateway for an entity set. Only
+        /// <c>DeferredAdd</c> / <c>DeferredRemove</c> / <c>DeferredClear</c>
+        /// are exposed — Burst can't sync, so there's no <c>.Read</c> /
+        /// <c>.Write</c> counterpart to <see cref="SetAccessor{T}"/>.
+        /// Operations are buffered and applied at the next
+        /// <c>SubmitEntities()</c> call on the main thread.
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetAdd<TSet>(EntityIndex entityIndex)
+        public NativeSetAccessor<TSet> Set<TSet>()
+            where TSet : struct, IEntitySet
+        {
+            return new NativeSetAccessor<TSet>(this);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void DeferredSetAdd<TSet>(EntityIndex entityIndex)
             where TSet : struct, IEntitySet
         {
             AssertStructuralChangesAllowed();
+            // Writes to slot `_threadIndex`; for worker threads this is always
+            // non-zero, so it never aliases the main-thread slot 0 used by
+            // SetAccessor<T>.DeferredAdd. When this runs via .Run() or inlined
+            // on the main thread, `_threadIndex == 0` — but then the main
+            // thread is blocked inside the job, so the write is sequenced with
+            // surrounding main-thread DeferredAdd calls. See
+            // NativeSetDeferredQueues for the full slot-layout invariant.
             _deferredQueues
                 .GetValueByRef(EntitySetId<TSet>.Value)
                 .AddQueue.GetBag(_threadIndex)
@@ -388,17 +410,19 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetAdd<TSet>(EntityHandle entityHandle)
+        internal void DeferredSetAdd<TSet>(EntityHandle entityHandle)
             where TSet : struct, IEntitySet
         {
-            SetAdd<TSet>(GetEntityIndex(entityHandle));
+            DeferredSetAdd<TSet>(GetEntityIndex(entityHandle));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetRemove<TSet>(EntityIndex entityIndex)
+        internal void DeferredSetRemove<TSet>(EntityIndex entityIndex)
             where TSet : struct, IEntitySet
         {
             AssertStructuralChangesAllowed();
+            // See DeferredSetAdd above and NativeSetDeferredQueues for the
+            // slot-layout invariant that makes shared use of slot 0 safe.
             _deferredQueues
                 .GetValueByRef(EntitySetId<TSet>.Value)
                 .RemoveQueue.GetBag(_threadIndex)
@@ -406,20 +430,14 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetRemove<TSet>(EntityHandle entityHandle)
+        internal void DeferredSetRemove<TSet>(EntityHandle entityHandle)
             where TSet : struct, IEntitySet
         {
-            SetRemove<TSet>(GetEntityIndex(entityHandle));
+            DeferredSetRemove<TSet>(GetEntityIndex(entityHandle));
         }
 
-        /// <summary>
-        /// Defer a clear of an entity set until the next submission. The clear
-        /// supersedes any pending <see cref="SetAdd{TSet}"/> /
-        /// <see cref="SetRemove{TSet}"/> for the same set, regardless of call
-        /// order or originating thread.
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetClear<TSet>()
+        internal void DeferredSetClear<TSet>()
             where TSet : struct, IEntitySet
         {
             AssertStructuralChangesAllowed();

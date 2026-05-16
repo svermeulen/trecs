@@ -33,8 +33,8 @@ namespace Trecs.Samples.Snake
             var direction = World
                 .Query()
                 .WithTags<SnakeTags.SnakeHead>()
-                .Single()
-                .Get<Direction>()
+                .SingleHandle()
+                .Component<Direction>(World)
                 .Read.Value;
 
             _sb.Clear();

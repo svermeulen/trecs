@@ -191,31 +191,6 @@ public class Diagnostics_TRECS025_to_029_ComponentTests
     }
 
     [Test]
-    public void TRECS025_DuplicateEntityAccessorParameter()
-    {
-        // Same duplicate-check applies to EntityAccessor parameters.
-        const string source = """
-            namespace Sample
-            {
-                public partial struct CPos : Trecs.IEntityComponent { public float X; }
-                public struct PlayerTag : Trecs.ITag { }
-
-                public partial class MySystem
-                {
-                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
-                    void Process(in CPos pos, Trecs.EntityAccessor a, Trecs.EntityAccessor b) { }
-                }
-            }
-            """;
-
-        AssertDiagnostic(
-            source,
-            "TRECS025",
-            new IIncrementalGenerator[] { new ForEachGenerator(), new EntityComponentGenerator() }
-        );
-    }
-
-    [Test]
     public void TRECS028_EntityHandleParameterUsesRefModifier()
     {
         // EntityHandle must be passed by value — `ref` is rejected.
@@ -229,31 +204,6 @@ public class Diagnostics_TRECS025_to_029_ComponentTests
                 {
                     [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
                     void Process(in CPos pos, ref Trecs.EntityHandle handle) { }
-                }
-            }
-            """;
-
-        AssertDiagnostic(
-            source,
-            "TRECS028",
-            new IIncrementalGenerator[] { new ForEachGenerator(), new EntityComponentGenerator() }
-        );
-    }
-
-    [Test]
-    public void TRECS028_EntityAccessorParameterUsesInModifier()
-    {
-        // EntityAccessor must be passed by value — `in` is rejected.
-        const string source = """
-            namespace Sample
-            {
-                public partial struct CPos : Trecs.IEntityComponent { public float X; }
-                public struct PlayerTag : Trecs.ITag { }
-
-                public partial class MySystem
-                {
-                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
-                    void Process(in CPos pos, in Trecs.EntityAccessor entity) { }
                 }
             }
             """;
@@ -323,41 +273,6 @@ public class Diagnostics_TRECS025_to_029_ComponentTests
         AssertDiagnostic(
             source,
             "TRECS028",
-            new IIncrementalGenerator[]
-            {
-                new AutoJobGenerator(),
-                new AutoSystemGenerator(),
-                new EntityComponentGenerator(),
-            }
-        );
-    }
-
-    [Test]
-    public void TRECS005_EntityAccessorOnAutoJobIsRejected()
-    {
-        // EntityAccessor is a managed-bound ref struct — it's main-thread-only even
-        // though EntityHandle now works in jobs. AutoJobGenerator emits a targeted
-        // InvalidParameterList (TRECS005) message pointing the user at EntityHandle.
-        const string source = """
-            namespace Sample
-            {
-                public partial struct CPos : Trecs.IEntityComponent { public float X; }
-                public struct PlayerTag : Trecs.ITag { }
-
-                public partial class MySystem : Trecs.ISystem
-                {
-                    public void Execute() { }
-
-                    [Trecs.ForEachEntity(Tag = typeof(PlayerTag))]
-                    [Trecs.WrapAsJob]
-                    static void Process(in CPos a, Trecs.EntityAccessor entity) { }
-                }
-            }
-            """;
-
-        AssertDiagnostic(
-            source,
-            "TRECS005",
             new IIncrementalGenerator[]
             {
                 new AutoJobGenerator(),

@@ -15,14 +15,8 @@ namespace Trecs
     /// - The default constructor auto-populates the built-in primitive, math,
     ///   ECS, and recording-metadata serializers; register additional
     ///   <see cref="ISerializer{T}"/> implementations via
-    ///   <see cref="WorldBuilder.RegisterSerializer{TSerializer}"/> or directly
+    ///   <see cref="WorldBuilder.RegisterSerializer(ISerializer)"/> or directly
     ///   on <see cref="World.SerializerRegistry"/>.
-    ///
-    /// Implementation notes:
-    ///
-    /// - Note that there is a reason we don't construct generic serializer types via
-    ///   reflection, since this causes problems with IL2CPP (requires that we manually
-    ///   specify all these generic instantiations of the serializers which is annoying).
     ///
     /// </summary>
     public sealed class SerializerRegistry
@@ -66,23 +60,6 @@ namespace Trecs
 
             TypeIdProvider.Register(objectType);
             _objectTypeToSerializerDelta.Add(objectType, serializer);
-        }
-
-        public void RegisterSerializer<TSerializer>()
-            where TSerializer : ISerializer, new()
-        {
-            RegisterSerializer(new TSerializer());
-        }
-
-        public void RegisterSerializer(Type serializerType)
-        {
-            TrecsRequire.That(serializerType != null, "serializerType must not be null");
-            TrecsRequire.That(
-                typeof(ISerializer).IsAssignableFrom(serializerType),
-                "Type '{0}' does not implement ISerializer",
-                serializerType
-            );
-            RegisterSerializer((ISerializer)Activator.CreateInstance(serializerType));
         }
 
         public void RegisterSerializerDelta<TSerializer>()

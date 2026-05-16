@@ -16,7 +16,7 @@ namespace Trecs
     /// A queued <see cref="Clear"/> supersedes any <see cref="Add"/> / <see cref="Remove"/>
     /// from the same writer-job-cycle, and also wipes the set's pre-existing contents,
     /// regardless of call order — analogous to the deferred-clear semantics on
-    /// <see cref="SetDefer{T}.Clear"/> / <see cref="SetWrite{T}.Clear"/>.
+    /// <see cref="SetAccessor{T}.DeferredClear"/> / <see cref="SetWrite{T}.Clear"/>.
     /// </para>
     /// Tracked as a <b>write dependency</b> by the job scheduler.
     /// </summary>

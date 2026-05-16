@@ -28,7 +28,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         {
             if (targetMeal.Value.Exists(World))
             {
-                World.RemoveEntity(targetMeal.Value);
+                targetMeal.Value.Remove(World);
             }
         }
 
@@ -37,7 +37,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         {
             if (fish.Value.Exists(World))
             {
-                World.RemoveEntity(fish.Value);
+                fish.Value.Remove(World);
             }
         }
 

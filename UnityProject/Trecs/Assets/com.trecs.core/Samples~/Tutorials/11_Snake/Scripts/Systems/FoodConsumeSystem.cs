@@ -13,8 +13,8 @@ namespace Trecs.Samples.Snake
             var headPos = World
                 .Query()
                 .WithTags<SnakeTags.SnakeHead>()
-                .Single()
-                .Get<GridPos>()
+                .SingleHandle()
+                .Component<GridPos>(World)
                 .Read.Value;
 
             foreach (var food in Food.Query(World).WithTags<SnakeTags.SnakeFood>())

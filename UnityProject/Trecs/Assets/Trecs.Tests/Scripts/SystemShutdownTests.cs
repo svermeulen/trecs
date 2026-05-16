@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -16,6 +17,7 @@ namespace Trecs.Tests
         public static int GlobalReadBackAfterWriteInsideShutdown = int.MinValue;
         public static int GlobalGroupOnRemovedCalls;
         public static IDisposable GlobalGroupOnRemovedSubscription;
+        public static bool AddInputFromShutdownCompleted;
 
         public static void Clear()
         {
@@ -29,6 +31,7 @@ namespace Trecs.Tests
             GlobalGroupOnRemovedCalls = 0;
             GlobalGroupOnRemovedSubscription?.Dispose();
             GlobalGroupOnRemovedSubscription = null;
+            AddInputFromShutdownCompleted = false;
         }
     }
 
@@ -162,6 +165,38 @@ namespace Trecs.Tests
                 .OnRemoved(
                     (GroupIndex _, EntityRange _) => TestShutdownLog.GlobalGroupOnRemovedCalls++
                 );
+        }
+    }
+
+    /// <summary>
+    /// Input-phase system whose <c>OnShutdown</c> exercises the input queue via
+    /// <see cref="WorldAccessor.AddInput{T}"/>. Regression coverage for the
+    /// World.Dispose() teardown order: the queue must outlive system shutdown
+    /// hooks so any input-write call from OnShutdown doesn't hit a disposed queue.
+    /// Uses the entity handle captured in OnReady so the test doesn't depend on
+    /// any entity remaining queryable after RemoveAllEntities runs — the queue
+    /// itself is what we're exercising.
+    /// </summary>
+    [ExecuteIn(SystemPhase.Input)]
+    partial class ShutdownInputAddInputSystem : ISystem
+    {
+        EntityHandle _target;
+
+        public void Execute() { }
+
+        partial void OnReady()
+        {
+            foreach (var handle in World.Query().WithTags(TestTags.Alpha).Handles())
+            {
+                _target = handle;
+                return;
+            }
+        }
+
+        partial void OnShutdown()
+        {
+            World.AddInput(_target, new WritePhaseInputComp { Value = 42 });
+            TestShutdownLog.AddInputFromShutdownCompleted = true;
         }
     }
 
@@ -334,6 +369,59 @@ namespace Trecs.Tests
 
             CollectionAssert.IsEmpty(TestShutdownLog.ReadyOrder);
             CollectionAssert.IsEmpty(TestShutdownLog.ShutdownOrder);
+        }
+
+        // Template carrying an [Input] component so an Input-phase system can
+        // call AddInput<T> against an Alpha entity. Mirrors the input wiring
+        // in WritePhaseEnforcementTests.MakeTemplate.
+        static Template MakeAlphaInputTemplate()
+        {
+            return new Template(
+                debugName: "ShutdownInputTemplate",
+                localBaseTemplates: Array.Empty<Template>(),
+                partitions: Array.Empty<TagSet>(),
+                localComponentDeclarations: new IComponentDeclaration[]
+                {
+                    new ComponentDeclaration<WritePhaseInputComp>(
+                        null,
+                        isInput: true,
+                        inputFrameBehaviour: MissingInputBehavior.Retain,
+                        null,
+                        null,
+                        default(WritePhaseInputComp)
+                    ),
+                },
+                localTags: new Tag[] { TestTags.Alpha }
+            );
+        }
+
+        [Test]
+        public void OnShutdown_InputPhase_CanCallAddInput()
+        {
+            // Regression: the input queue must outlive system OnShutdown hooks
+            // so an Input-phase system can still enqueue values during teardown.
+            // Disable RemoveAllEntitiesOnDispose so the captured EntityHandle is
+            // still valid in OnShutdown — we're exercising the queue, not entity
+            // lifecycle.
+            var builder = new WorldBuilder()
+                .SetSettings(new WorldSettings { RemoveAllEntitiesOnDispose = false })
+                .AddTemplate(TrecsTemplates.Globals.Template)
+                .AddTemplate(MakeAlphaInputTemplate())
+                .AddBlobStore(EcsTestHelper.CreateBlobStore());
+
+            var world = builder.Build();
+            world.AddSystem(new ShutdownInputAddInputSystem());
+            world.Initialize();
+
+            var env = new TestEnvironment(world);
+            env.Accessor.AddEntity(TestTags.Alpha).AssertComplete();
+            env.Accessor.SubmitEntities();
+
+            NAssert.DoesNotThrow(() => env.Dispose());
+            NAssert.IsTrue(
+                TestShutdownLog.AddInputFromShutdownCompleted,
+                "Expected AddInput to succeed from inside an Input-phase OnShutdown hook."
+            );
         }
     }
 }

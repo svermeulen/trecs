@@ -160,8 +160,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
                     rotations[fi].Value = quaternion.LookRotationSafe(dir, math.up());
                     velocities[fi].Value = dir * speeds[fi].Value;
 
-                    World.SetTag<FrenzyTags.Eating>(fishEntityIndex);
-                    World.SetTag<FrenzyTags.Eating>(mealEntityIndex);
+                    fishEntityIndex.SetTag<FrenzyTags.Eating>(World);
+                    mealEntityIndex.SetTag<FrenzyTags.Eating>(World);
 
                     mi++;
                 }
@@ -236,8 +236,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Partitions
 
                 var mealEntityIndex = new EntityIndex(i, MealGroup);
                 var fishEntityIndex = new EntityIndex(i, FishGroup);
-                World.SetTag<FrenzyTags.Eating>(fishEntityIndex);
-                World.SetTag<FrenzyTags.Eating>(mealEntityIndex);
+                fishEntityIndex.SetTag<FrenzyTags.Eating>(World);
+                mealEntityIndex.SetTag<FrenzyTags.Eating>(World);
             }
         }
 

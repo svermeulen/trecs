@@ -35,7 +35,13 @@ namespace Trecs.Samples.MultipleWorlds
             // and its GameObjects will be rebuilt from its entity set.
             _worldA = new WorldBuilder()
                 .SetDebugName("World A — Red Spheres")
-                .AddTemplate(SampleTemplates.CritterEntity.Template)
+                .AddTemplates(
+                    new[]
+                    {
+                        SampleTemplates.SampleGlobals.Template,
+                        SampleTemplates.CritterEntity.Template,
+                    }
+                )
                 .Build();
 
             var goManagerA = new RenderableGameObjectManager(_worldA);
@@ -56,7 +62,13 @@ namespace Trecs.Samples.MultipleWorlds
 
             _worldB = new WorldBuilder()
                 .SetDebugName("World B — Blue Cubes")
-                .AddTemplate(SampleTemplates.CritterEntity.Template)
+                .AddTemplates(
+                    new[]
+                    {
+                        SampleTemplates.SampleGlobals.Template,
+                        SampleTemplates.CritterEntity.Template,
+                    }
+                )
                 .Build();
 
             var goManagerB = new RenderableGameObjectManager(_worldB);

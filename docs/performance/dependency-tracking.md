@@ -48,10 +48,10 @@ Main-thread access through `WorldAccessor` lazily completes only the conflicting
 ```csharp
 // Completes jobs currently writing Position for this group;
 // jobs that only read Position keep running.
-ref readonly var pos = ref world.Component<Position>(entityIndex).Read;
+ref readonly var pos = ref entityIndex.Component<Position>(world).Read;
 
 // Completes jobs reading OR writing Position for this group.
-ref var posMut = ref world.Component<Position>(entityIndex).Write;
+ref var posMut = ref entityIndex.Component<Position>(world).Write;
 ```
 
 That lazy sync is why you never call `JobHandle.Complete()` yourself — touching the data is the sync point.

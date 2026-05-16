@@ -32,9 +32,9 @@ namespace Trecs.Internal
             RegisterBlit<Vector3>(registry, includeDelta: true);
             RegisterBlit<Vector4>(registry, includeDelta: true);
 
-            registry.RegisterSerializer<BoolSerializer>();
-            registry.RegisterSerializer<TypeSerializer>();
-            registry.RegisterSerializer<StringSerializer>();
+            registry.RegisterSerializer(new BoolSerializer());
+            registry.RegisterSerializer(new TypeSerializer());
+            registry.RegisterSerializer(new StringSerializer());
         }
 
         static void RegisterTrecsSerializers(SerializerRegistry registry)
@@ -42,20 +42,22 @@ namespace Trecs.Internal
             RegisterBlit<ComponentId>(registry);
 
             // Heap serializers
-            registry.RegisterSerializer<
-                DenseDictionarySerializer<BlobId, NativeSharedHeap.BlobInfo>
-            >();
-            registry.RegisterSerializer<DenseDictionarySerializer<PtrHandle, BlobId>>();
+            registry.RegisterSerializer(
+                new DenseDictionarySerializer<BlobId, NativeSharedHeap.BlobInfo>()
+            );
+            registry.RegisterSerializer(new DenseDictionarySerializer<PtrHandle, BlobId>());
             RegisterBlit<PtrHandle>(registry);
             RegisterBlit<NativeSharedHeap.BlobInfo>(registry);
 
-            registry.RegisterSerializer<DenseDictionarySerializer<BlobId, SharedHeap.BlobInfo>>();
+            registry.RegisterSerializer(
+                new DenseDictionarySerializer<BlobId, SharedHeap.BlobInfo>()
+            );
             RegisterBlit<SharedHeap.BlobInfo>(registry);
 
-            registry.RegisterSerializer<ListSerializer<object>>();
-            registry.RegisterSerializer<BlobManifest.Serializer>();
-            registry.RegisterSerializer<DenseDictionarySerializer<BlobId, BlobMetadata>>();
-            registry.RegisterSerializer<BlobMetadata.Serializer>();
+            registry.RegisterSerializer(new ListSerializer<object>());
+            registry.RegisterSerializer(new BlobManifest.Serializer());
+            registry.RegisterSerializer(new DenseDictionarySerializer<BlobId, BlobMetadata>());
+            registry.RegisterSerializer(new BlobMetadata.Serializer());
             RegisterBlit<BlobId>(registry);
 
             // Entity serializers
@@ -69,15 +71,15 @@ namespace Trecs.Internal
             // entity-id-to-dense-index dictionary, written for each
             // group's entries.
             RegisterBlit<SetId>(registry);
-            registry.RegisterSerializer<NativeDenseDictionarySerializer<int, int>>();
+            registry.RegisterSerializer(new NativeDenseDictionarySerializer<int, int>());
 
             // For EntityInputQueue
-            registry.RegisterSerializer<DenseHashSetSerializer<EntityHandle>>();
+            registry.RegisterSerializer(new DenseHashSetSerializer<EntityHandle>());
 
-            registry.RegisterSerializer<RngSerializer>();
+            registry.RegisterSerializer(new RngSerializer());
 
-            registry.RegisterSerializer<NativeDenseDictionarySerializer<uint, uint>>();
-            registry.RegisterSerializer<NativeArraySerializer<uint>>();
+            registry.RegisterSerializer(new NativeDenseDictionarySerializer<uint, uint>());
+            registry.RegisterSerializer(new NativeArraySerializer<uint>());
 
             SnapshotMetadata.RegisterSerializers(registry);
             BundleHeader.RegisterSerializers(registry);

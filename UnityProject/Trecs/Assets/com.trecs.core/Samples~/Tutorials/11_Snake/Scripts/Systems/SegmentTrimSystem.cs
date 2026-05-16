@@ -31,7 +31,7 @@ namespace Trecs.Samples.Snake
                 }
             }
 
-            World.RemoveEntity(oldestSegment.Value);
+            oldestSegment.Value.Remove(World);
         }
 
         partial struct SnakeSegment : IAspect, IRead<SegmentAge> { }

@@ -213,7 +213,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 999 }).AssertComplete();
             a.SubmitEntities();
 
-            var comp = a.Query().WithTags(TestTags.Alpha).Single().Get<TestInt>();
+            var comp = a.Query().WithTags(TestTags.Alpha).SingleHandle().Component<TestInt>(a);
 
             NAssert.AreEqual(999, comp.Read.Value);
         }
@@ -224,7 +224,7 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
 
-            var found = a.Query().WithTags(TestTags.Alpha).TrySingle(out _);
+            var found = a.Query().WithTags(TestTags.Alpha).TrySingleHandle(out _);
 
             NAssert.IsFalse(found);
         }

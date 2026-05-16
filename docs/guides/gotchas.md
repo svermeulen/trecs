@@ -40,6 +40,26 @@ Pointers must be manually disposed. DEBUG builds catch leaks at world shutdown a
 
 **Fix.** Dispose entity-owned pointers in an `OnRemoved` handler. See [Cleanup is manual for entity-owned pointers](../advanced/heap.md#cleanup-is-manual-for-entity-owned-pointers).
 
+## Cleaning up an entity inline at the `Remove` call site
+
+`Remove` is deferred — the entity stays in its groups until submission at end of fixed step. Any cleanup performed inline beside the `Remove` call (disposing pointers, releasing handles, zeroing fields) happens *before* the entity is actually gone. Systems ordered later in the same step still iterate the entity and read the torn state: disposed pointers, freed native memory, stale references.
+
+```csharp
+// ❌ Cleanup inline, then Remove.
+[ForEachEntity(typeof(PatrolTags.Follower))]
+void Execute(in Trail trail, EntityHandle entity)
+{
+    if (!ShouldRemove(entity)) return;
+    trail.Value.Dispose(World);   // freed now
+    entity.Remove(World);         // ...but entity stays in its group until submission
+}
+
+// A system ordered later in the same step still matches the entity
+// and reads through the freed Trail pointer → crash or garbage.
+```
+
+**Fix.** Move the cleanup into an `OnRemoved` handler. Observer callbacks fire during submission, after every system's `Execute` for the step, so no system observes the half-cleaned entity. See [Entity Events](../entity-management/entity-events.md).
+
 ## Raw native collections in components don't round-trip through save/load
 
 Component serialization copies the raw struct bytes (the blit fast-path). A `NativeList<T>` / `NativeHashMap<K,V>` value is a pointer to externally-allocated storage plus a length. Round-tripping such a component copies the bytes verbatim — the pointer that comes back on load is the previous session's memory address: no longer mapped, freed, or reassigned. Reading the deserialized collection crashes or returns garbage.
@@ -61,11 +81,11 @@ The wrapped collection's storage is allocated in Unity's allocator, not Trecs's 
 ```csharp
 // ❌ Won't compile: Read returns ref readonly, so the inner
 //    NativeUniquePtr field isn't addressable as `ref this`.
-ref readonly var buf = ref World.Component<CScratchBuffer>(entity).Read;
+ref readonly var buf = ref entity.Component<CScratchBuffer>(World).Read;
 buf.List.Write(World).Value.Add(42);
 
 // ✅ Take write access on the component.
-ref var buf = ref World.Component<CScratchBuffer>(entity).Write;
+ref var buf = ref entity.Component<CScratchBuffer>(World).Write;
 buf.List.Write(World).Value.Add(42);
 ```
 
@@ -83,7 +103,7 @@ var childHandle = World.AddEntity<Child>().Set(...).Handle;
 parent.ChildRef = childHandle;
 
 // Fixed system B (same step, ordered later)
-ref readonly var pos = ref World.Component<Position>(parent.ChildRef).Read;  // throws
+ref readonly var pos = ref parent.ChildRef.Component<Position>(World).Read;  // throws
 ```
 
 **Fix.** Check `handle.Exists(World)` before dereferencing and skip if false — the handle becomes dereferenceable on the next step, once submission has run.

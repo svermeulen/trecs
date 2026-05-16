@@ -425,8 +425,8 @@ namespace Trecs.Tests
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
 
             // Verify the surviving entity has correct data
-            var intComp = a.Query().WithTags(PartitionA).Single().Get<TestInt>();
-            var vecComp = a.Query().WithTags(PartitionA).Single().Get<TestVec>();
+            var intComp = a.Query().WithTags(PartitionA).SingleHandle().Component<TestInt>(a);
+            var vecComp = a.Query().WithTags(PartitionA).SingleHandle().Component<TestVec>(a);
             NAssert.AreEqual(200, intComp.Read.Value);
             NAssert.AreEqual(3.0f, vecComp.Read.X, 0.001f);
             NAssert.AreEqual(4.0f, vecComp.Read.Y, 0.001f);

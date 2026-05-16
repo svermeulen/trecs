@@ -120,17 +120,29 @@ namespace Trecs.Tests
                 snapshots.SaveSnapshot(version: 1, filePath: path);
                 NAssert.IsTrue(File.Exists(path));
 
-                a.Query().WithTags(TestTags.Alpha).Single().Get<TestInt>().Write.Value = 0;
+                a.Query()
+                    .WithTags(TestTags.Alpha)
+                    .SingleHandle()
+                    .Component<TestInt>(a)
+                    .Write.Value = 0;
                 NAssert.AreEqual(
                     0,
-                    a.Query().WithTags(TestTags.Alpha).Single().Get<TestInt>().Read.Value
+                    a.Query()
+                        .WithTags(TestTags.Alpha)
+                        .SingleHandle()
+                        .Component<TestInt>(a)
+                        .Read.Value
                 );
 
                 snapshots.LoadSnapshot(path);
 
                 NAssert.AreEqual(
                     13,
-                    a.Query().WithTags(TestTags.Alpha).Single().Get<TestInt>().Read.Value
+                    a.Query()
+                        .WithTags(TestTags.Alpha)
+                        .SingleHandle()
+                        .Component<TestInt>(a)
+                        .Read.Value
                 );
             }
             finally
@@ -153,7 +165,7 @@ namespace Trecs.Tests
 
             // CustomMarker is not a Trecs component; we just round-trip an instance
             // through SerializationBuffer to prove the registration path works.
-            registry.RegisterSerializer<CustomMarkerSerializer>();
+            registry.RegisterSerializer(new CustomMarkerSerializer());
 
             using var buffer = new SerializationBuffer(registry);
 

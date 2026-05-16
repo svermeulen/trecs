@@ -41,6 +41,8 @@ namespace Trecs.Internal
             get => _count;
         }
 
+        public Type ComponentType => typeof(TValue);
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public NativeBuffer<TValue> GetValues(out int count)
         {

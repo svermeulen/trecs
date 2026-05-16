@@ -7,10 +7,10 @@ Despite the name, "input" isn't limited to user input — it covers **any non-de
 The mechanics:
 
 - Mark template fields with `[Input]`.
-- Inside an `[ExecuteIn(SystemPhase.Input)]` system, call `World.AddInput<T>(entity, value)`. Input systems run just before each fixed step, in lockstep with the simulation — see the [phase diagram](../core/systems.md#phase-diagram).
+- Inside an `[ExecuteIn(SystemPhase.Input)]` system, call `entity.AddInput<T>(World, value)`. Input systems run just before each fixed step, in lockstep with the simulation — see the [phase diagram](../core/systems.md#phase-diagram).
 - The queued value is applied to the target entity at the start of the upcoming fixed step.
 
-When the [Trecs Player window](../editor-windows/player.md) records, every `AddInput` call is captured alongside its target frame. During scrub or replay, Input-phase systems are disabled and recorded inputs are replayed onto the exact frames they originally targeted, so the simulation sees byte-identical input on every run regardless of live keyboard / network / clock activity.
+When the [Trecs Player window](../editor-windows/player.md) records, every `AddInput` call is captured alongside its target frame. During scrub or replay, Input-phase systems are disabled and recorded inputs are replayed onto the exact frames they originally targeted, so the simulation sees byte-identical input on every playback.
 
 ## Marking input fields
 
@@ -37,7 +37,7 @@ The choice also affects recording size. `Retain` lets the recorder prune success
 
 ## Queuing input
 
-`World.AddInput<T>(...)` is only callable from an `[ExecuteIn(SystemPhase.Input)]` system. Its `Execute()` runs once per fixed step (zero or more times per Unity `Update`, depending on catch-up).
+`AddInput<T>(world, value)` is only callable from an `[ExecuteIn(SystemPhase.Input)]` system. Its `Execute()` runs once per fixed step (zero or more times per Unity `Update`, depending on catch-up — see [Per-frame execution order](systems.md#phase-diagram)).
 
 For **sustained** inputs (held keys, analog axes), read directly in `Execute()`:
 
@@ -48,7 +48,7 @@ public partial class PlayerInputSystem : ISystem
     public void Execute()
     {
         var dir = new float2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-        World.AddInput(World.GlobalEntityHandle, new MoveInput { Direction = dir });
+        World.GlobalEntityHandle.AddInput(World, new MoveInput { Direction = dir });
     }
 }
 ```
@@ -75,8 +75,8 @@ public partial class SnakeInputSystem : ISystem
     {
         if (_pendingDirection.x != 0 || _pendingDirection.y != 0)
         {
-            World.AddInput(
-                World.GlobalEntityHandle,
+            World.GlobalEntityHandle.AddInput(
+                World,
                 new MoveInput { RequestedDirection = _pendingDirection });
             _pendingDirection = int2.zero;
         }
@@ -84,7 +84,7 @@ public partial class SnakeInputSystem : ISystem
 }
 ```
 
-Use `World.AddInput<T>(EntityHandle, in T)` to target a specific entity, or `entity.AddInput(value)` from inside an `[ForEachEntity]` callback that takes an `EntityAccessor`.
+Call `handle.AddInput<T>(World, value)` (or the matching method on `EntityIndex` / aspect) to target a specific entity. The same method exists inside an `[ForEachEntity]` callback that takes an `EntityHandle` parameter.
 
 ## Reading input
 
@@ -101,7 +101,7 @@ public partial class ProcessInputSystem : ISystem
 }
 ```
 
-`[Input]` components are read-only everywhere — including inside Input systems themselves. The only way a value reaches an `[Input]` field is via `World.AddInput<T>(...)`, which is gated to `[ExecuteIn(SystemPhase.Input)]` systems. A direct `.Write` on the component throws in DEBUG builds regardless of which phase the caller is in. If you need a sim-state field that fixed-update systems can mutate directly, use a regular (non-`[Input]`) component.
+`[Input]` components are read-only everywhere — including inside Input systems themselves. The only way a value reaches an `[Input]` field is via `entity.AddInput<T>(world, value)`, which is gated to `[ExecuteIn(SystemPhase.Input)]` systems. A direct `.Write` on the component throws in DEBUG builds regardless of which phase the caller is in.
 
 ## See also
 

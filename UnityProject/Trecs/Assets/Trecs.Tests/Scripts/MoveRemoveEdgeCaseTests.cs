@@ -113,8 +113,8 @@ namespace Trecs.Tests
             );
 
             // Verify the moved entity has correct data
-            var movedEntity = a.Query().WithTags(PartitionBSet).Single();
-            NAssert.AreEqual(1, movedEntity.Get<TestInt>().Read.Value);
+            var movedEntity = a.Query().WithTags(PartitionBSet).SingleHandle();
+            NAssert.AreEqual(1, movedEntity.Component<TestInt>(a).Read.Value);
 
             // Verify removed entity no longer exists
             NAssert.IsFalse(handles[4].Exists(a));

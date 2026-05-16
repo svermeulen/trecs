@@ -39,8 +39,8 @@ namespace Trecs.Samples.Snake
         {
             if (_pendingDirection.x != 0 || _pendingDirection.y != 0)
             {
-                World.AddInput(
-                    World.GlobalEntityHandle,
+                World.GlobalEntityHandle.AddInput(
+                    World,
                     new MoveInput { RequestedDirection = _pendingDirection }
                 );
                 _pendingDirection = int2.zero;

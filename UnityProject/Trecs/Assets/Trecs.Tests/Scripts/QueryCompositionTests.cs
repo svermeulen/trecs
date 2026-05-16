@@ -463,7 +463,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var results = new List<int>();
-            foreach (var ei in a.Query().WithTags<QCatA, QCatB>().EntityIndices())
+            foreach (var ei in a.Query().WithTags<QCatA, QCatB>().Indices())
             {
                 results.Add(a.Component<TestInt>(ei).Read.Value);
             }
@@ -529,7 +529,7 @@ namespace Trecs.Tests
 
             // QCatA without QCatB => only EntityA (has QCatA but not QCatB)
             var results = new List<int>();
-            foreach (var ei in a.Query().WithTags<QCatA>().WithoutTags<QCatB>().EntityIndices())
+            foreach (var ei in a.Query().WithTags<QCatA>().WithoutTags<QCatB>().Indices())
             {
                 results.Add(a.Component<TestInt>(ei).Read.Value);
             }
@@ -558,7 +558,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             var results = new List<int>();
-            foreach (var ei in a.Query().WithComponents<TestInt, TestFloat>().EntityIndices())
+            foreach (var ei in a.Query().WithComponents<TestInt, TestFloat>().Indices())
             {
                 results.Add(a.Component<TestInt>(ei).Read.Value);
             }
@@ -586,7 +586,7 @@ namespace Trecs.Tests
                 var ei in a.Query()
                     .WithComponents<TestInt>()
                     .WithoutComponents<TestFloat>()
-                    .EntityIndices()
+                    .Indices()
             )
             {
                 results.Add(a.Component<TestInt>(ei).Read.Value);
@@ -622,7 +622,7 @@ namespace Trecs.Tests
             a.SubmitEntities(); // Flush deferred set ops
 
             var results = new List<int>();
-            foreach (var ei in a.Query().InSet<QTestSetA>().EntityIndices())
+            foreach (var ei in a.Query().InSet<QTestSetA>().Indices())
             {
                 results.Add(a.Component<TestInt>(ei).Read.Value);
             }
@@ -653,7 +653,7 @@ namespace Trecs.Tests
             a.SubmitEntities(); // Flush deferred set ops
 
             var results = new List<int>();
-            foreach (var ei in a.Query().WithTags<QCatA>().InSet<QTestSetA>().EntityIndices())
+            foreach (var ei in a.Query().WithTags<QCatA>().InSet<QTestSetA>().Indices())
             {
                 results.Add(a.Component<TestInt>(ei).Read.Value);
             }
@@ -678,8 +678,8 @@ namespace Trecs.Tests
                 .AssertComplete();
             a.SubmitEntities();
 
-            var entity = a.Query().WithTags<QCatA, QCatB>().Single();
-            NAssert.AreEqual(42, entity.Get<TestInt>().Read.Value);
+            var entity = a.Query().WithTags<QCatA, QCatB>().SingleHandle();
+            NAssert.AreEqual(42, entity.Component<TestInt>(a).Read.Value);
         }
 
         [Test]
@@ -689,7 +689,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
             // No entities added
 
-            bool found = a.Query().WithTags<QCatA, QCatB>().TrySingle(out _);
+            bool found = a.Query().WithTags<QCatA, QCatB>().TrySingleHandle(out _);
             NAssert.IsFalse(found);
         }
 
@@ -705,9 +705,9 @@ namespace Trecs.Tests
                 .AssertComplete();
             a.SubmitEntities();
 
-            bool found = a.Query().WithTags<QCatA, QCatB>().TrySingle(out var entity);
+            bool found = a.Query().WithTags<QCatA, QCatB>().TrySingleHandle(out var entity);
             NAssert.IsTrue(found);
-            NAssert.AreEqual(99, entity.Get<TestInt>().Read.Value);
+            NAssert.AreEqual(99, entity.Component<TestInt>(a).Read.Value);
         }
 
         #endregion
@@ -750,13 +750,13 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void FluentQuery_WithTags_NoMatches_EntityIndicesEmpty()
+        public void FluentQuery_WithTags_NoMatches_IndicesEmpty()
         {
             using var env = CreateMultiTagEnv();
             var a = env.Accessor;
 
             int count = 0;
-            foreach (var _ in a.Query().WithTags<QCatA>().EntityIndices())
+            foreach (var _ in a.Query().WithTags<QCatA>().Indices())
             {
                 count++;
             }
@@ -793,7 +793,7 @@ namespace Trecs.Tests
             // Query for QCatA without QCatA - should return nothing (contradictory but exercises code path)
             // Actually query for QCatB without QCatA should exclude EntityAB
             var results = new List<int>();
-            foreach (var ei in a.Query().WithTags<QCatB>().WithoutTags<QCatA>().EntityIndices())
+            foreach (var ei in a.Query().WithTags<QCatB>().WithoutTags<QCatA>().Indices())
             {
                 results.Add(a.Component<TestInt>(ei).Read.Value);
             }
@@ -855,9 +855,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             int count = 0;
-            foreach (
-                var ei in a.Query().WithTags<QCatB>().WithoutComponents<TestFloat>().EntityIndices()
-            )
+            foreach (var ei in a.Query().WithTags<QCatB>().WithoutComponents<TestFloat>().Indices())
             {
                 var view = new QWithoutCompView(a, ei);
                 NAssert.AreEqual(30, view.TestInt.Value);

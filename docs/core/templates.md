@@ -94,7 +94,7 @@ builder.AddTemplate(FishEntity.Template);     // OK
 builder.AddTemplate(Renderable.Template);     // TRECS039: abstract template
 ```
 
-Analyzer `TRECS039` catches static call sites; the runtime check catches anything the analyzer can't see (locals, reflection, conditionals).
+Note that you can still extend non-abstract templates.  This keyword is just used to communicate to reader that it is abstract and also to prevent use inside `WorldBuilder.AddTemplate`.
 
 ### Multiple bases
 
@@ -137,7 +137,7 @@ public partial class Player : ITemplate,
 
 ## Partitions
 
-Partitions are mutually exclusive tag combinations a template can move between at runtime. Entities in different partitions are stored in separate contiguous arrays — useful when hot iteration over one state needs cache locality. Declare them with `IPartitionedBy<...>`.
+Partitions are mutually exclusive tag combinations an entity can move between at runtime. Entities in different partitions are stored in separate contiguous arrays — useful when hot iteration over one state needs cache locality. Declare them with `IPartitionedBy<...>`.
 
 ### Presence/absence (binary)
 
@@ -169,7 +169,7 @@ Use `Withouts = new[] { typeof(A), typeof(B) }` for multiple exclusions.
 
 ### Multi-variant
 
-For three or more mutually exclusive states, list every variant:
+For two or more named variants (no implicit "absent" partition), list each one:
 
 ```csharp
 public partial class Enemy : ITemplate,
@@ -207,11 +207,9 @@ public partial class Enemy : ITemplate,
     | 6 × binary  | 64         |
     | 4-way + 3 × binary | 32  |
 
-    **Rule of thumb: past 16 partitions, prefer [sets](../entity-management/sets.md).** Sets are presence/absence too but don't multiply — five "poisoned / stunned / burning / selected / targeted" sets are five sparse data structures, not 32 groups. The source generator emits `TRECS038` when a template crosses the 16-partition threshold.
+    **Rule of thumb: Before reaching for partitions, consider using the more lightweight [sets](../entity-management/sets.md).** Sets are presence/absence too but don't multiply — five "poisoned / stunned / burning / selected / targeted" sets are five sparse data structures, not 32 groups.
 
-    The cross product is worth it when dimensions are *intrinsic to the entity's storage shape* — e.g. an `Active` partition iterated every frame in a hot system. It's the wrong tool for states the design wants to name but the simulation rarely iterates by — those are cheaper as sets.
-
-    **Lazy buffers.** Component arrays are allocated on first use per group, not at world-build time, so declaring partitions you rarely populate is cheap at startup. To pre-allocate eagerly, call `accessor.WarmupAllGroups()` after initialization, or `accessor.Warmup<TTag1, TTag2>(initialCapacity: N)` for a specific group about to be heavily populated.
+    Partitions are a cache-locality optimization: use them when a hot system iterates one variant every frame and benefits from those entities being packed contiguously — e.g. physics over `Active` balls. States the design wants to *name* but rarely *iterates by* are cheaper as sets.
 
 ### Transitions
 
@@ -226,7 +224,10 @@ ball.UnsetTag<BallTags.Active>(World); // ground → idle
 enemy.SetTag<MoveState.Running>(World); // switch the active variant in MoveState's dim
 ```
 
-`SetTag<T>` works for both shapes: in a presence/absence dim it turns the tag on; in a multi-variant dim it switches the active variant (other dimensions are preserved). `UnsetTag<T>` is only valid for presence/absence dims — multi-variant dims have no defined "absent" partition, so use `SetTag` to switch variants.
+`SetTag<T>` works on both partition kinds:
+
+- **Binary (presence/absence)** — turns the tag on. `UnsetTag<T>` turns it off.
+- **Multi-variant** — switches the entity to that variant of the dimension, leaving other dimensions unchanged. `UnsetTag<T>` doesn't apply (there's no "off" state) — switch variants with another `SetTag<T>` call.
 
 Multiple `SetTag` / `UnsetTag` calls on the same entity in one frame **coalesce**: changes on different dims merge into a single move at submission. Two ops on the *same* dim throw — this is a deliberate "no silent ordering" policy. To move an entity across several dims at once, just call `SetTag` for each:
 
@@ -263,4 +264,4 @@ public partial class MyGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 }
 ```
 
-The global entity is created automatically during world initialization — there is no `AddEntity` or `EntityInitializer`. **All fields in a global template must have explicit default values.**
+The global entity is created automatically during world initialization — there is no `AddEntity` or `EntityInitializer`. For this reason, **all fields in a global template must have explicit default values.**

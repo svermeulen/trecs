@@ -438,7 +438,7 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<FiltStructSet>();
 
-            a.Set<FiltStructSet>().Defer.Add(new EntityIndex(0, group));
+            a.Set<FiltStructSet>().DeferredAdd(new EntityIndex(0, group));
             a.SubmitEntities();
 
             // Expected behavior: entity should be in set after one submit
@@ -472,7 +472,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
             NAssert.AreEqual(1, set.Read.Count);
 
-            a.Set<FiltStructSet>().Defer.Remove(new EntityIndex(0, group));
+            a.Set<FiltStructSet>().DeferredRemove(new EntityIndex(0, group));
             a.SubmitEntities();
 
             // Expected behavior: entity should be removed after one submit

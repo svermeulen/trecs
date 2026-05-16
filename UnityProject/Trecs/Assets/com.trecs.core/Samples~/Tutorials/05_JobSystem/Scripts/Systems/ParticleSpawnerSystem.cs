@@ -109,9 +109,9 @@ namespace Trecs.Samples.JobSystem
         {
             int removed = 0;
 
-            foreach (var entity in World.Query().WithTags<SampleTags.Particle>().Entities())
+            foreach (var entity in World.Query().WithTags<SampleTags.Particle>().Handles())
             {
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
                 if (removed >= count)
                     return;

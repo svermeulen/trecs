@@ -46,7 +46,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref World.Component<WritePhaseSimComp>(idx).Write;
                 v.Value = 1;
@@ -59,7 +59,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref World.Component<WritePhaseRenderComp>(idx).Write;
                 v.Value = 1;
@@ -71,7 +71,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref World.Component<WritePhaseSimComp>(idx).Write;
                 v.Value = 1;
@@ -83,7 +83,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref World.Component<WritePhaseRenderComp>(idx).Write;
                 v.Value = 1;
@@ -95,7 +95,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref readonly var _ = ref World.Component<WritePhaseRenderComp>(idx).Read;
             }
@@ -107,7 +107,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref readonly var _ = ref World.Component<WritePhaseSimComp>(idx).Read;
             }
@@ -118,7 +118,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref World.Component<WritePhaseConstantComp>(idx).Write;
                 v.Value = 1;
@@ -132,7 +132,7 @@ namespace Trecs.Tests
 
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref readonly var v = ref World.Component<WritePhaseConstantComp>(idx).Read;
                 LastReadValue = v.Value;
@@ -147,7 +147,7 @@ namespace Trecs.Tests
 
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref readonly var v = ref World.Component<WritePhaseConstantComp>(idx).Read;
                 LastReadValue = v.Value;
@@ -250,9 +250,9 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
-                World.Set<WritePhaseTestSet>().Defer.Add(idx);
+                World.Set<WritePhaseTestSet>().DeferredAdd(idx);
             }
         }
     }
@@ -262,9 +262,9 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
-                World.Set<WritePhaseTestSet>().Defer.Remove(idx);
+                World.Set<WritePhaseTestSet>().DeferredRemove(idx);
             }
         }
     }
@@ -323,7 +323,7 @@ namespace Trecs.Tests
 
         public void Execute()
         {
-            foreach (var idx in AlienAccessor.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in AlienAccessor.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref readonly var _ = ref AlienAccessor.Component<WritePhaseSimComp>(idx).Read;
             }
@@ -337,7 +337,7 @@ namespace Trecs.Tests
 
         public void Execute()
         {
-            foreach (var idx in AlienAccessor.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in AlienAccessor.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref readonly var _ = ref AlienAccessor.Component<WritePhaseSimComp>(idx).Read;
             }
@@ -369,7 +369,7 @@ namespace Trecs.Tests
             // rather than World.GlobalEntityHandle — the GlobalEntityHandle
             // path resolves through EntityHandleMap and isn't populated for
             // the standalone Globals template that this test fixture builds.
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 World.AddInput(idx, new WritePhaseInputComp { Value = 7 });
                 return;
@@ -420,7 +420,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref World.Component<WritePhaseRenderComp>(idx).Write;
                 v.Value = 9;
@@ -433,7 +433,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref World.Component<WritePhaseSimComp>(idx).Write;
                 v.Value = 1;
@@ -448,7 +448,7 @@ namespace Trecs.Tests
 
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref readonly var v = ref World.Component<WritePhaseSimComp>(idx).Read;
                 LastReadValue = v.Value;
@@ -463,7 +463,7 @@ namespace Trecs.Tests
 
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref readonly var v = ref World.Component<WritePhaseRenderComp>(idx).Read;
                 LastReadValue = v.Value;
@@ -487,7 +487,7 @@ namespace Trecs.Tests
         {
             // Pick any existing entity — the role check fires before the
             // entity-resolution path so we don't need a particular target.
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 World.RemoveEntity(idx);
                 return;
@@ -500,7 +500,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 // Target tag is irrelevant — AssertCanMakeStructuralChanges
                 // throws before the dim is resolved.
@@ -515,9 +515,9 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
-                World.Set<WritePhaseTestSet>().Defer.Add(idx);
+                World.Set<WritePhaseTestSet>().DeferredAdd(idx);
                 return;
             }
         }
@@ -541,7 +541,7 @@ namespace Trecs.Tests
         {
             // See InputAddInputter for why this targets the Alpha entity
             // rather than GlobalEntityHandle.
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 World.AddInput(idx, new WritePhaseInputComp { Value = 1 });
                 return;
@@ -554,7 +554,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 World.AddInput(idx, new WritePhaseInputComp { Value = 2 });
                 return;
@@ -566,7 +566,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref World.Component<WritePhaseInputComp>(idx).Write;
                 v.Value = 1;
@@ -579,7 +579,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref World.Component<WritePhaseInputComp>(idx).Write;
                 v.Value = 1;
@@ -592,7 +592,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in World.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref World.Component<WritePhaseInputComp>(idx).Write;
                 v.Value = 1;
@@ -686,8 +686,8 @@ namespace Trecs.Tests
             var comp = env
                 .Accessor.Query()
                 .WithTags(TestTags.Alpha)
-                .Single()
-                .Get<WritePhaseRenderComp>();
+                .SingleHandle()
+                .Component<WritePhaseRenderComp>(env.Accessor);
             NAssert.AreEqual(1, comp.Read.Value);
         }
 
@@ -700,8 +700,8 @@ namespace Trecs.Tests
             var comp = env
                 .Accessor.Query()
                 .WithTags(TestTags.Alpha)
-                .Single()
-                .Get<WritePhaseSimComp>();
+                .SingleHandle()
+                .Component<WritePhaseSimComp>(env.Accessor);
             NAssert.AreEqual(1, comp.Read.Value);
         }
 
@@ -771,8 +771,8 @@ namespace Trecs.Tests
             var comp = env
                 .Accessor.Query()
                 .WithTags(TestTags.Alpha)
-                .Single()
-                .Get<WritePhaseSimComp>();
+                .SingleHandle()
+                .Component<WritePhaseSimComp>(env.Accessor);
             NAssert.AreEqual(1, comp.Read.Value);
         }
 
@@ -892,7 +892,7 @@ namespace Trecs.Tests
             var alien = env.World.CreateAccessor(AccessorRole.Unrestricted, "ServiceLikeAccessor");
             NAssert.DoesNotThrow(() =>
             {
-                foreach (var idx in alien.Query().WithTags(TestTags.Alpha).EntityIndices())
+                foreach (var idx in alien.Query().WithTags(TestTags.Alpha).Indices())
                 {
                     ref readonly var _ = ref alien.Component<WritePhaseSimComp>(idx).Read;
                 }
@@ -1086,7 +1086,7 @@ namespace Trecs.Tests
             // guard must sit *after* the IsUnrestricted early-return in
             // AssertCanWriteComponent. This test pins that ordering.
             using var env = CreateEnvWithSystem(new FixedSimWriter());
-            foreach (var idx in env.Accessor.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var idx in env.Accessor.Query().WithTags(TestTags.Alpha).Indices())
             {
                 ref var v = ref env.Accessor.Component<WritePhaseInputComp>(idx).Write;
                 v.Value = 7;

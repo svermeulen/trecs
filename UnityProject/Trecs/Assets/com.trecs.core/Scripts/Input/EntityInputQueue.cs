@@ -469,7 +469,7 @@ namespace Trecs.Internal
 
                 var entityIndex = entityHandle.ToIndex(world);
 
-                if (!world.TryComponent<T>(entityIndex, out var component))
+                if (!entityIndex.TryComponent<T>(world, out var component))
                 {
                     _removeQueueBuffer.Add(entityHandle);
                     values.Remove(valuesKey);

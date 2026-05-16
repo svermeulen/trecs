@@ -20,6 +20,7 @@ namespace Trecs
         readonly List<EntitySet> _sets = new();
         internal ISystemEntryProvider _systemEntryProvider;
         readonly SerializerRegistry _serializerRegistry;
+        readonly ComponentArraySerializerRegistry _componentArraySerializerRegistry = new();
 
         bool _hasBuilt;
         BlobCacheSettings _blobCacheSettings;
@@ -234,26 +235,29 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Registers a custom serializer by its concrete type. The serializer
-        /// must implement <see cref="ISerializer{T}"/> and have a
-        /// parameterless constructor. The handled object type is inferred
-        /// from the <c>ISerializer&lt;T&gt;</c> interface.
+        /// Registers a custom serializer instance. The serializer must
+        /// implement <see cref="ISerializer{T}"/>; the handled object type
+        /// is inferred from that interface.
         /// </summary>
-        public WorldBuilder RegisterSerializer<TSerializer>()
-            where TSerializer : ISerializer, new()
+        public WorldBuilder RegisterSerializer(ISerializer serializer)
         {
-            _serializerRegistry.RegisterSerializer<TSerializer>();
+            _serializerRegistry.RegisterSerializer(serializer);
             return this;
         }
 
         /// <summary>
-        /// Registers a custom serializer by runtime <see cref="Type"/>. The
-        /// type must implement <see cref="ISerializer"/> and have a
-        /// parameterless constructor.
+        /// Registers an <see cref="IComponentArraySerializer{T}"/> for component
+        /// type <typeparamref name="T"/>. Equivalent to calling
+        /// <c>world.ComponentArraySerializerRegistry.Register(serializer)</c>
+        /// post-build, but available up front for callers that pre-configure
+        /// everything via the builder.
         /// </summary>
-        public WorldBuilder RegisterSerializer(Type serializerType)
+        public WorldBuilder RegisterComponentArraySerializer<T>(
+            IComponentArraySerializer<T> serializer
+        )
+            where T : unmanaged, IEntityComponent
         {
-            _serializerRegistry.RegisterSerializer(serializerType);
+            _componentArraySerializerRegistry.Register(serializer);
             return this;
         }
 
@@ -426,7 +430,8 @@ namespace Trecs
                 interpolatedPreviousSaverManager: interpolatedPreviousSaverManager,
                 componentStore: componentStore,
                 systems: _systems,
-                serializerRegistry: _serializerRegistry
+                serializerRegistry: _serializerRegistry,
+                componentArraySerializerRegistry: _componentArraySerializerRegistry
             );
             world.DebugName = _debugName;
 

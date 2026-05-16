@@ -7,27 +7,26 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 | Term | What it is |
 |---|---|
 | **[Entity](core/entities.md)** | An identifier that groups components. Has no data of its own. |
-| **[`EntityHandle`](core/entities.md#entityhandle)** | A *stable* reference to an entity that survives structural changes. Use whenever you store a reference to another entity. |
-| **[`EntityAccessor`](core/entities.md#accessing-entity-data)** | A live single-entity view bound to a `WorldAccessor`. Exposes `Get<T>()` plus no-arg `Remove()` / `SetTag<T>()` / `UnsetTag<T>()` / set / input ops on the bound entity. |
+| **[EntityHandle](core/entities.md#entityhandle)** | A *stable* reference to an entity that survives structural changes. Primary user-facing identifier. Carries `Component<T>(world)` / `Remove(world)` / `SetTag<T>(world)` / `AddInput<T>(world, v)` and the matching `Burst` overloads. |
+| **[EntityIndex](core/entities.md#entityindex-hot-loop-variant)** | A *transient* reference (buffer position within a group). Only valid within the current submission cycle. Same method surface as `EntityHandle` but skips the handle-to-index lookup — use it in hot loops. |
 
 ## Classifying entities
 
 | Term | What it is |
 |---|---|
 | **[Tag](core/tags.md)** | A zero-cost marker struct (`ITag`) that classifies entities. Used in template definitions and as a query filter. |
-| **[`Tag<T>`](advanced/groups-and-tagsets.md#tagt)** | Runtime value/handle for a single tag type. |
-| **[`TagSet`](advanced/groups-and-tagsets.md#tagset)** | Stable identity for a tag combination — a 32-bit hash of the tag GUIDs. Portable across runs and serializable. |
+| **[TagSet](advanced/groups-and-tagsets.md#tagset)** | Stable identity for a tag combination — a 32-bit hash of the tag GUIDs. Portable across runs and serializable. |
 | **[Template](core/templates.md)** | Compile-time blueprint declaring an entity's tags, components, partitions, and inheritance. |
-| **[Abstract template](core/templates.md#abstract-templates)** | A template marked with the C# `abstract` keyword. Usable as an `IExtends<>` base but cannot be passed to `WorldBuilder.AddTemplate` — enforced by analyzer `TRECS039` and a runtime guard. |
+| **[Abstract template](core/templates.md#abstract-templates)** | A template marked with the C# `abstract` keyword. Usable as an `IExtends<>` base but cannot be passed to `WorldBuilder.AddTemplate` |
 
 ## Where entities live in memory
 
 | Term | What it is |
 |---|---|
-| **[Group](advanced/groups-and-tagsets.md#groups)** | A unique tag combination plus the contiguous memory block holding entities that carry it. Created implicitly. |
-| **[`GroupIndex`](advanced/groups-and-tagsets.md#groupindex)** | `ushort` runtime handle for a group, valid only for one `World`'s lifetime. |
+| **[Group](advanced/groups-and-tagsets.md#groups)** | The contiguous memory block holding some number of entities. Created implicitly based on a unique tag combination. |
+| **[GroupIndex](advanced/groups-and-tagsets.md#groupindex)** | `ushort` runtime handle for a group, valid only for one `World`'s lifetime. |
 | **[Partition](core/templates.md#partitions)** | A group an entity *moves between* at runtime via `SetTag<T>()` / `UnsetTag<T>()`, for cache locality across entities sharing dynamic state. Partitions an entity moves between share the same template and component types. |
-| **[Set](entity-management/sets.md)** | A dynamic membership flag on entities (`IEntitySet`), independent of tags and groups. Iteration visits only members — efficient sparse iteration across groups. |
+| **[Set](entity-management/sets.md)** | A dynamic membership flag on entities, independent of tags and groups. Iteration visits only members. Allows efficient sparse iteration across groups. |
 
 ## Bundling component access
 
@@ -41,10 +40,10 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 
 | Term | What it is |
 |---|---|
-| **[`World`](core/world-setup.md)** | Container that owns all entities, components, and systems. Drives the per-frame update. |
-| **[`WorldAccessor`](core/world-setup.md#worldaccessor)** | Main-thread API for a world (read components, query, queue structural changes). Tagged with an `AccessorRole`. |
-| **[`AccessorRole`](advanced/accessor-roles.md)** | `Fixed` / `Variable` / `Unrestricted` — controls what an accessor can do. System-owned accessors get the right role from their phase. |
-| **[`NativeWorldAccessor`](performance/jobs-and-burst.md#nativeworldaccessor)** | Burst-compatible counterpart to `WorldAccessor` for use inside jobs. |
+| **[World](core/world-setup.md)** | Container that owns all entities, components, and systems. Drives the per-frame update. |
+| **[WorldAccessor](core/world-setup.md#worldaccessor)** | Main-thread API for a world. Tagged with an `AccessorRole` which determines what operations are permitted. |
+| **[AccessorRole](advanced/accessor-roles.md)** | `Fixed` / `Variable` / `Unrestricted` — controls what an accessor can do. System-owned accessors get the right role from their phase. |
+| **[NativeWorldAccessor](performance/jobs-and-burst.md#nativeworldaccessor)** | Burst-compatible counterpart to `WorldAccessor` for use inside jobs. |
 
 ## Running logic
 
@@ -62,13 +61,13 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 |---|---|
 | **[Submission](entity-management/structural-changes.md)** | The point in the frame where queued structural ops are applied. Add / remove / partition transitions are deferred until submission. |
 | **[Heap](advanced/heap.md)** | Storage for managed or unmanaged data outside the component buffer, accessed via `SharedPtr` / `UniquePtr` / native variants. |
-| **[`BlobId`](advanced/shared-heap-data.md#pattern-b-look-up-by-stable-blobid)** | Stable identifier for a heap blob. Auto-minted from a deterministic RNG, or supplied explicitly when init isn't deterministic. |
+| **[BlobId](advanced/shared-heap-data.md#pattern-b-look-up-by-stable-blobid)** | Stable identifier for a heap blob. Supplied explicitly when allocating shared data on heap. |
 
 ## Quick mental model
 
 - **Tags** describe an entity's identity
 - **Groups** are the contiguous memory blocks entities live in — one per unique tag combination.
-- **Partitions** are groups that double as runtime state (entities move between them).
+- **Partitions** are groups that double as runtime state (entities move between them so logic runs with maximum cache locality).
 - **TagSets** are portable handles naming a tag combination.
 - **Sets** are ad-hoc subsets you maintain yourself.
 - **Aspects** are reusable bundles of read/write component access.

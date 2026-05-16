@@ -101,7 +101,7 @@ foreach (var slice in accessor.Query().InSet<HighlightedParticles>().GroupSlices
 ```
 
 !!! tip
-    Prefer `[ForEachEntity]`, aspect queries, or `.Entities()` / `.EntityHandles()` iteration. GroupSlices are useful when you need maximum throughput and are comfortable working at the group level. See [Queries & Iteration](../data-access/queries-and-iteration.md) for the higher-level alternatives.
+    Prefer `[ForEachEntity]`, aspect queries, or `.Handles()` / `.Indices()` iteration. GroupSlices are useful when you need maximum throughput and are comfortable working at the group level. See [Queries & Iteration](../data-access/queries-and-iteration.md) for the higher-level alternatives.
 
 ## TagSet
 

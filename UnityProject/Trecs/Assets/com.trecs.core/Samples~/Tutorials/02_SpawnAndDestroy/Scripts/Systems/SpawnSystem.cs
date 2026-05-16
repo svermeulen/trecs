@@ -9,8 +9,6 @@ namespace Trecs.Samples.SpawnAndDestroy
         readonly float _lifetime;
         readonly float _spawnRadius;
 
-        float _timer;
-
         public SpawnSystem(float spawnInterval, float lifetime, float spawnRadius)
         {
             _spawnInterval = spawnInterval;
@@ -18,13 +16,13 @@ namespace Trecs.Samples.SpawnAndDestroy
             _spawnRadius = spawnRadius;
         }
 
-        public void Execute()
+        void Execute([SingleEntity(typeof(TrecsTags.Globals))] ref State state)
         {
-            _timer += World.DeltaTime;
+            state.Timer += World.DeltaTime;
 
-            while (_timer >= _spawnInterval)
+            while (state.Timer >= _spawnInterval)
             {
-                _timer -= _spawnInterval;
+                state.Timer -= _spawnInterval;
                 SpawnSphere();
             }
         }
@@ -43,6 +41,11 @@ namespace Trecs.Samples.SpawnAndDestroy
                 .Set(new Position(position))
                 .Set(new Lifetime(_lifetime))
                 .Set(new ColorComponent(color));
+        }
+
+        public partial struct State : IEntityComponent
+        {
+            public float Timer;
         }
     }
 }

@@ -18,7 +18,7 @@ namespace Trecs.SourceGen
     /// have one or more <c>[SingleEntity]</c> parameters and no other iteration attribute.
     /// <para>
     /// Each <c>[SingleEntity]</c> parameter is resolved via
-    /// <c>World.Query().WithTags&lt;...&gt;().SingleEntityIndex()</c> (which asserts
+    /// <c>World.Query().WithTags&lt;...&gt;().SingleIndex()</c> (which asserts
     /// exactly one match) before the user method body. Aspect-typed parameters get a
     /// materialized aspect view; <c>in</c>/<c>ref</c> component parameters get a buffer
     /// element reference. The user method is then called once with all parameters bound.

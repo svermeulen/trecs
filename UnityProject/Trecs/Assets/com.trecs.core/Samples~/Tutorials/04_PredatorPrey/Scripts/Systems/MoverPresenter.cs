@@ -4,11 +4,11 @@ using UnityEngine;
 namespace Trecs.Samples.PredatorPrey
 {
     [ExecuteIn(SystemPhase.Presentation)]
-    public partial class EntityPresenter : ISystem
+    public partial class MoverPresenter : ISystem
     {
         readonly RenderableGameObjectManager _goManager;
 
-        public EntityPresenter(RenderableGameObjectManager goManager)
+        public MoverPresenter(RenderableGameObjectManager goManager)
         {
             _goManager = goManager;
         }
@@ -26,7 +26,7 @@ namespace Trecs.Samples.PredatorPrey
                 go.transform.rotation = Quaternion.Lerp(
                     go.transform.rotation,
                     desiredRotation,
-                    Time.deltaTime * 10f
+                    World.DeltaTime * 10f
                 );
             }
         }

@@ -56,7 +56,7 @@ public partial class RemoveCleanupHandler : IDisposable
     void OnFishRemoved(in TargetMeal targetMeal)
     {
         if (targetMeal.Value.Exists(World))
-            World.RemoveEntity(targetMeal.Value);
+            targetMeal.Value.Remove(World);
     }
 
     public void Dispose() => _disposables.Dispose();

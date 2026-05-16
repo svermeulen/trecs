@@ -33,7 +33,7 @@ public struct WaveX : IEntitySet { }
 public struct WaveZ : IEntitySet { }
 ```
 
-Sets define sparse entity subsets. Membership is managed at runtime via `Set<T>().Defer.Add` / `Defer.Remove`.
+Sets define sparse entity subsets. Membership is managed at runtime via `Set<T>().DeferredAdd` / `DeferredRemove`.
 
 ### Registration
 
@@ -71,14 +71,14 @@ public void Execute()
         var handle = particle.Handle(World);
 
         if (distX < _settings.WaveBandWidth)
-            World.Set<SampleSets.WaveX>().Defer.Add(handle);
+            World.Set<SampleSets.WaveX>().DeferredAdd(handle);
         else
-            World.Set<SampleSets.WaveX>().Defer.Remove(handle);
+            World.Set<SampleSets.WaveX>().DeferredRemove(handle);
 
         if (distZ < _settings.WaveBandWidth)
-            World.Set<SampleSets.WaveZ>().Defer.Add(handle);
+            World.Set<SampleSets.WaveZ>().DeferredAdd(handle);
         else
-            World.Set<SampleSets.WaveZ>().Defer.Remove(handle);
+            World.Set<SampleSets.WaveZ>().DeferredRemove(handle);
     }
 }
 ```
@@ -117,7 +117,7 @@ The trade-off: sets are sparse and may iterate slower than partitions due to wea
 ## Concepts introduced
 
 - **`IEntitySet`** — sparse entity subset. See [Sets](../entity-management/sets.md).
-- **`Set<T>().Defer.Add` / `Defer.Remove`** — deferred membership changes. See [Structural Changes](../entity-management/structural-changes.md).
+- **`Set<T>().DeferredAdd` / `DeferredRemove`** — deferred membership changes. See [Structural Changes](../entity-management/structural-changes.md).
 - **`[ForEachEntity(Set = typeof(...))]`** — iterate only set members. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 - **Overlapping membership** — entities can be in multiple sets at once.
 - **Sets vs Partitions** — see [Partitions](06-partitions.md) for the mutually-exclusive alternative, and [Entity Subset Patterns](../guides/entity-subset-patterns.md) for guidance.

@@ -56,7 +56,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 99 }).AssertComplete();
             a.SubmitEntities();
 
-            var comp = a.Query().WithTags(TestTags.Alpha).Single().Get<TestInt>();
+            var comp = a.Query().WithTags(TestTags.Alpha).SingleHandle().Component<TestInt>(a);
             NAssert.AreEqual(99, comp.Read.Value);
         }
 
@@ -69,8 +69,11 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Delta).AssertComplete();
             a.SubmitEntities();
 
-            var intComp = a.Query().WithTags(TestTags.Delta).Single().Get<TestInt>();
-            var floatComp = a.Query().WithTags(TestTags.Delta).Single().Get<TestFloat>();
+            var intComp = a.Query().WithTags(TestTags.Delta).SingleHandle().Component<TestInt>(a);
+            var floatComp = a.Query()
+                .WithTags(TestTags.Delta)
+                .SingleHandle()
+                .Component<TestFloat>(a);
 
             NAssert.AreEqual(42, intComp.Read.Value);
             NAssert.AreEqual(3.14f, floatComp.Read.Value, 0.001f);
@@ -217,8 +220,8 @@ namespace Trecs.Tests
             a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             a.SubmitEntities();
 
-            var intComp = a.Query().WithTags(partitionB).Single().Get<TestInt>();
-            var vecComp = a.Query().WithTags(partitionB).Single().Get<TestVec>();
+            var intComp = a.Query().WithTags(partitionB).SingleHandle().Component<TestInt>(a);
+            var vecComp = a.Query().WithTags(partitionB).SingleHandle().Component<TestVec>(a);
 
             NAssert.AreEqual(77, intComp.Read.Value);
             NAssert.AreEqual(1.5f, vecComp.Read.X, 0.001f);

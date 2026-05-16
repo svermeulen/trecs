@@ -9,9 +9,9 @@ namespace Trecs
     /// </summary>
     /// <remarks>
     /// Self-enumerable — use directly in foreach:
-    /// <code>foreach (var ei in queryBuilder.EntityIndices()) { ... }</code>
+    /// <code>foreach (var ei in queryBuilder.Indices()) { ... }</code>
     /// </remarks>
-    internal ref struct QueryIterator
+    public ref struct IndexQueryIterator
     {
         bool _done;
         GroupIndex _currentGroup;
@@ -27,7 +27,10 @@ namespace Trecs
         int _slicePosition;
 
         /// <summary>No-set constructor — iterates all entities in every matched group.</summary>
-        internal QueryIterator(WorldAccessor world, ReadOnlyFastList<GroupIndex> resolvedGroups)
+        internal IndexQueryIterator(
+            WorldAccessor world,
+            ReadOnlyFastList<GroupIndex> resolvedGroups
+        )
         {
             _done = false;
             _currentGroup = default;
@@ -43,7 +46,7 @@ namespace Trecs
         }
 
         /// <summary>Single-set constructor — iterates entities belonging to the given set.</summary>
-        internal QueryIterator(
+        internal IndexQueryIterator(
             WorldAccessor world,
             ReadOnlyFastList<GroupIndex> resolvedGroups,
             SetId set
@@ -69,7 +72,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public QueryIterator GetEnumerator() => this;
+        public IndexQueryIterator GetEnumerator() => this;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool MoveNext()

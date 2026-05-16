@@ -118,6 +118,13 @@ internal static class TrecsStubs
                 // callbacks that declare an `EntityHandle` parameter.
                 public EntityHandle ToHandle(WorldAccessor world) => default;
                 public EntityHandle ToHandle(NativeWorldAccessor world) => default;
+
+                // Entity-targeted ops — generated aspect SetTag/UnsetTag delegate to
+                // `_entityIndex.SetTag<T>(world)` / `_entityIndex.UnsetTag<T>(world)`.
+                public void SetTag<T>(WorldAccessor world) where T : struct, ITag { }
+                public void SetTag<T>(in NativeWorldAccessor world) where T : struct, ITag { }
+                public void UnsetTag<T>(WorldAccessor world) where T : struct, ITag { }
+                public void UnsetTag<T>(in NativeWorldAccessor world) where T : struct, ITag { }
             }
 
             // Note: every "Null" / "IsNull" member is expression-bodied (or omitted via
@@ -362,6 +369,28 @@ internal static class TrecsStubs
                     => System.Linq.Enumerable.Empty<int>().GetEnumerator();
             }
 
+            // SetAccessor<T> — gateway returned by WorldAccessor.Set<T>().
+            // Real impl lives at com.trecs.core/Scripts/Sets/SetAccessor.cs.
+            public readonly ref struct SetAccessor<T> where T : struct, IEntitySet
+            {
+                public void DeferredAdd(EntityIndex entityIndex) { }
+                public void DeferredAdd(EntityHandle entityHandle) { }
+                public void DeferredRemove(EntityIndex entityIndex) { }
+                public void DeferredRemove(EntityHandle entityHandle) { }
+                public void DeferredClear() { }
+            }
+
+            // NativeSetAccessor<T> — Burst-compatible gateway returned by NativeWorldAccessor.Set<T>().
+            // Real impl lives at com.trecs.core/Scripts/Sets/NativeSetAccessor.cs.
+            public readonly struct NativeSetAccessor<T> where T : struct, IEntitySet
+            {
+                public void DeferredAdd(EntityIndex entityIndex) { }
+                public void DeferredAdd(EntityHandle entityHandle) { }
+                public void DeferredRemove(EntityIndex entityIndex) { }
+                public void DeferredRemove(EntityHandle entityHandle) { }
+                public void DeferredClear() { }
+            }
+
             // Buffer types — Read indexer returns `ref readonly T`, Write returns `ref T`.
             // These are the field/parameter types on aspect structs (read-only or read-write
             // depending on IRead vs IWrite for that component).
@@ -501,8 +530,8 @@ internal static class TrecsStubs
 
                 public DenseGroupSliceIterator GroupSlices() => default;
                 public int Count() => 0;
-                public EntityIndex SingleEntityIndex() => default;
-                public bool TrySingleEntityIndex(out EntityIndex entityIndex) { entityIndex = default; return false; }
+                public EntityIndex SingleIndex() => default;
+                public bool TrySingleIndex(out EntityIndex entityIndex) { entityIndex = default; return false; }
             }
 
             // SparseQueryBuilder mirrors most of QueryBuilder's filtering surface — emitted
@@ -513,8 +542,8 @@ internal static class TrecsStubs
                 public bool HasAnyCriteria => false;
                 public SparseGroupSliceIterator GroupSlices() => default;
                 public int Count() => 0;
-                public EntityIndex SingleEntityIndex() => default;
-                public bool TrySingleEntityIndex(out EntityIndex entityIndex) { entityIndex = default; return false; }
+                public EntityIndex SingleIndex() => default;
+                public bool TrySingleIndex(out EntityIndex entityIndex) { entityIndex = default; return false; }
 
                 public SparseQueryBuilder WithTags<T1>() where T1 : struct, ITag => this;
                 public SparseQueryBuilder WithTags<T1, T2>() where T1 : struct, ITag where T2 : struct, ITag => this;
@@ -547,20 +576,16 @@ internal static class TrecsStubs
                 public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
                 public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
                 public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
-                public void SetAdd<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
-                public void SetRemove<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
+
+                // Set gateway: emitted aspect/system code uses `Set<TSet>().DeferredAdd(...)` etc.
+                // Real impl lives at com.trecs.core/Scripts/Sets/SetAccessor.cs.
+                public SetAccessor<TSet> Set<TSet>() where TSet : struct, IEntitySet => default;
 
                 // Aspect-emitted SetTag/UnsetTag verbs route through EntityIndex-based overloads.
                 // Real implementations live as extension methods in
                 // com.trecs.core/Scripts/Internal/WorldAccessorInternalExtensions.cs.
                 public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
                 public void UnsetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
-
-                // Entity materialization from an EntityIndex — emitted by EntityRefEmitter
-                // when an iteration callback declares an EntityAccessor parameter. The
-                // EntityHandle case routes through `EntityIndex.ToHandle(world)` instead.
-                // Real impls live in WorldAccessor.cs and WorldAccessorInternalExtensions.cs.
-                public EntityAccessor Entity(EntityIndex entityIndex) => default;
 
                 // Per-group EntityHandle buffer fetched by jobs that declare a
                 // `NativeEntityHandleBuffer` [FromWorld] field. Real impl lives in
@@ -624,17 +649,14 @@ internal static class TrecsStubs
                 public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
                 public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
                 public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
-                public void SetAdd<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
-                public void SetRemove<TSet>(EntityIndex entityIndex) where TSet : struct, IEntitySet { }
+
+                // Burst-side set gateway: emitted job code uses `Set<TSet>().DeferredAdd(...)` etc.
+                // Real impl lives at com.trecs.core/Scripts/Native/NativeWorldAccessor.cs.
+                public NativeSetAccessor<TSet> Set<TSet>() where TSet : struct, IEntitySet => default;
+
                 public void SetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
                 public void UnsetTag<T>(EntityIndex entityIndex) where T : struct, ITag { }
             }
-
-            // EntityAccessor — main-thread iteration param type bound to a WorldAccessor.
-            // Real type lives in com.trecs.core/Scripts/Accessor/. Source-gen only needs
-            // the type name to resolve so the emitted `var __entityAccessor = world.Entity(...)`
-            // and forwarding `Execute(__entityAccessor)` parses.
-            public readonly ref struct EntityAccessor { }
 
             // NativeEntityHandleBuffer — per-group handle buffer materialized from
             // GetEntityHandleBufferForJob. Real type lives at

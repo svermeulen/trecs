@@ -66,7 +66,7 @@ World.AddEntity<MyTag>()
     .Set(new CMeshReference { Mesh = SharedPtr.Alloc(World, MeshIds.Bullet, mesh) });
 
 // At a system call site
-ref readonly CMeshReference meshRef = ref World.Component<CMeshReference>(entity).Read;
+ref readonly CMeshReference meshRef = ref entity.Component<CMeshReference>(World).Read;
 Mesh mesh = meshRef.Mesh.Get(World);
 ```
 

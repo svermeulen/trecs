@@ -13,6 +13,11 @@ namespace Trecs.Samples.SpawnAndDestroy
 
     public static partial class SampleTemplates
     {
+        public partial class SampleGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
+        {
+            SpawnSystem.State SpawnState = default;
+        }
+
         public partial class SphereEntity
             : ITemplate,
                 IExtends<CommonTemplates.RenderableGameObject>,

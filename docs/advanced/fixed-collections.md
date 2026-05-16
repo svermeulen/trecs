@@ -42,7 +42,7 @@ public struct Waypoints : IEntityComponent
     public FixedArray8<float3> Points;
 }
 
-ref Waypoints wp = ref world.Component<Waypoints>(entityIndex).Write;
+ref Waypoints wp = ref entityIndex.Component<Waypoints>(world).Write;
 wp.Points.Mut(0) = new float3(1, 0, 0);
 ref readonly float3 p = ref wp.Points[2];   // ref readonly — no element copy
 ref float3 m = ref wp.Points.Mut(3);         // mutable ref
@@ -62,7 +62,7 @@ public struct ContactPoints : IEntityComponent
     public FixedList16<EntityHandle> Contacts;
 }
 
-ref ContactPoints cp = ref world.Component<ContactPoints>(entityIndex).Write;
+ref ContactPoints cp = ref entityIndex.Component<ContactPoints>(world).Write;
 cp.Contacts.Add(otherHandle);
 
 // Remove-during-iterate: walk backwards to avoid index skips.

@@ -15,7 +15,7 @@ namespace Trecs.SourceGen.Shared
     /// <para>
     /// Per call this emits, for each <see cref="HoistedSingletonInfo"/>:
     /// <list type="number">
-    ///   <item><c>var __&lt;Name&gt;_ei = &lt;world&gt;.Query().WithTags&lt;Tags...&gt;().SingleEntityIndex();</c></item>
+    ///   <item><c>var __&lt;Name&gt;_ei = &lt;world&gt;.Query().WithTags&lt;Tags...&gt;().SingleIndex();</c></item>
     ///   <item>For aspects: per-component buffer locals (<c>__&lt;Name&gt;_b{i}</c>) and the
     ///     aspect view (<c>var __&lt;Name&gt; = new MyAspect(__&lt;Name&gt;_ei, ...);</c>).</item>
     ///   <item>For components: a <c>ref readonly</c> / <c>ref</c> alias <c>__&lt;Name&gt;</c>
@@ -70,7 +70,7 @@ namespace Trecs.SourceGen.Shared
             var eiVar = $"__{info.ParamName}_ei";
             sb.AppendLine(
                 indentLevel,
-                $"var {eiVar} = {worldVar}.Query().WithTags<{withTagsArgs}>().SingleEntityIndex();"
+                $"var {eiVar} = {worldVar}.Query().WithTags<{withTagsArgs}>().SingleIndex();"
             );
 
             // The aspect's generated EntityIndex constructor takes buffers in
@@ -117,7 +117,7 @@ namespace Trecs.SourceGen.Shared
             var eiVar = $"__{info.ParamName}_ei";
             sb.AppendLine(
                 indentLevel,
-                $"var {eiVar} = {worldVar}.Query().WithTags<{withTagsArgs}>().SingleEntityIndex();"
+                $"var {eiVar} = {worldVar}.Query().WithTags<{withTagsArgs}>().SingleIndex();"
             );
             var aliasModifier = info.IsRef ? "ref" : "ref readonly";
             var bufferSuffix = info.IsRef ? "Write" : "Read";

@@ -91,10 +91,10 @@ namespace Trecs.Tests
 
         #endregion
 
-        #region GetSingleEntityIndex
+        #region GetSingleHandle
 
         [Test]
-        public void GetSingleEntityIndex_OneEntity_ReturnsCorrectIndex()
+        public void GetSingleHandle_OneEntity_ReturnsCorrectEntity()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
@@ -102,23 +102,23 @@ namespace Trecs.Tests
             var init = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
             a.SubmitEntities();
 
-            var entity = a.Query().WithTags(TestTags.Alpha).Single();
-            ref readonly var comp = ref entity.Get<TestInt>().Read;
+            var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();
+            ref readonly var comp = ref entity.Component<TestInt>(a).Read;
             NAssert.AreEqual(42, comp.Value);
         }
 
         [Test]
-        public void TryGetSingleEntityIndex_NoEntities_ReturnsFalse()
+        public void TryGetSingleHandle_NoEntities_ReturnsFalse()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
 
-            bool found = a.Query().WithTags(TestTags.Alpha).TrySingle(out _);
+            bool found = a.Query().WithTags(TestTags.Alpha).TrySingleHandle(out _);
             NAssert.IsFalse(found);
         }
 
         [Test]
-        public void TryGetSingleEntityIndex_OneEntity_ReturnsTrue()
+        public void TryGetSingleHandle_OneEntity_ReturnsTrue()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
@@ -126,17 +126,17 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 77 }).AssertComplete();
             a.SubmitEntities();
 
-            bool found = a.Query().WithTags(TestTags.Alpha).TrySingle(out var entity);
+            bool found = a.Query().WithTags(TestTags.Alpha).TrySingleHandle(out var entity);
             NAssert.IsTrue(found);
-            NAssert.AreEqual(77, entity.Get<TestInt>().Read.Value);
+            NAssert.AreEqual(77, entity.Component<TestInt>(a).Read.Value);
         }
 
         #endregion
 
-        #region QueryEntityIndices
+        #region QueryIndices
 
         [Test]
-        public void QueryEntityIndices_ReturnsAllEntities()
+        public void QueryIndices_ReturnsAllEntities()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
@@ -148,7 +148,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             int count = 0;
-            foreach (var ei in a.Query().WithTags(TestTags.Alpha).EntityIndices())
+            foreach (var ei in a.Query().WithTags(TestTags.Alpha).Indices())
             {
                 count++;
             }
@@ -156,7 +156,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void QueryEntityIndices_AcrossStates_ReturnsAll()
+        public void QueryIndices_AcrossStates_ReturnsAll()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.WithPartitions);
             var a = env.Accessor;
@@ -172,7 +172,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             int count = 0;
-            foreach (var ei in a.Query().WithTags(TestTags.Gamma).EntityIndices())
+            foreach (var ei in a.Query().WithTags(TestTags.Gamma).Indices())
             {
                 count++;
             }
@@ -239,7 +239,7 @@ namespace Trecs.Tests
             a.Component<TestInt>(new EntityIndex(0, group)).Write.Value = 99;
 
             // Read via QueryEntitiesSingle
-            var comp = a.Query().WithTags(TestTags.Alpha).Single().Get<TestInt>();
+            var comp = a.Query().WithTags(TestTags.Alpha).SingleHandle().Component<TestInt>(a);
             NAssert.AreEqual(99, comp.Read.Value);
         }
 
@@ -432,7 +432,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             int manualCount = 0;
-            foreach (var _ in a.Query().WithTags(TestTags.Gamma).EntityIndices())
+            foreach (var _ in a.Query().WithTags(TestTags.Gamma).Indices())
             {
                 manualCount++;
             }

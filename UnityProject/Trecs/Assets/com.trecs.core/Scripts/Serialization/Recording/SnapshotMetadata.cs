@@ -27,7 +27,7 @@ namespace Trecs.Internal
 
         public static void RegisterSerializers(SerializerRegistry registry)
         {
-            registry.RegisterSerializer<Serializer>();
+            registry.RegisterSerializer(new Serializer());
         }
 
         public sealed class Serializer : ISerializer<SnapshotMetadata>

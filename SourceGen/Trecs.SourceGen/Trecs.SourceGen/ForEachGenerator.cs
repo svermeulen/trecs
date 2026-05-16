@@ -478,9 +478,6 @@ namespace Trecs.SourceGen
                     case ParamSlotKind.LoopEntityHandle:
                         args.Add("__entityHandle");
                         break;
-                    case ParamSlotKind.LoopEntityAccessor:
-                        args.Add("__entityAccessor");
-                        break;
                     case ParamSlotKind.LoopWorldAccessor:
                         args.Add(worldVar);
                         break;
@@ -778,8 +775,7 @@ namespace Trecs.SourceGen
             bool hasAnyIterationParameter =
                 classified.ComponentParameters.Count > 0
                 || classified.HasEntityIndex
-                || classified.HasEntityHandle
-                || classified.HasEntityAccessor;
+                || classified.HasEntityHandle;
 
             if (!hasAnyIterationParameter)
             {
@@ -818,7 +814,6 @@ namespace Trecs.SourceGen
                     CustomParameters = classified.CustomParameters.ToList(),
                     HasEntityIndexParameter = classified.HasEntityIndex,
                     HasEntityHandleParameter = classified.HasEntityHandle,
-                    HasEntityAccessorParameter = classified.HasEntityAccessor,
                     ParameterSlots = classified.ParameterSlots.ToList(),
                     AttributeTagTypes = attributeTagTypes,
                     AttributeWithoutTagTypes = attributeWithoutTagTypes,

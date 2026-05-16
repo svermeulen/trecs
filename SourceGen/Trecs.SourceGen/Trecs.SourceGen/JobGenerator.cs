@@ -750,26 +750,6 @@ namespace Trecs.SourceGen
                     continue;
                 }
 
-                // EntityAccessor is a ref struct bound to a managed WorldAccessor —
-                // it can't cross into a job. Targeted diagnostic to point users at
-                // EntityHandle (the value-type equivalent) instead.
-                bool isEntityAccessor =
-                    paramType.Name == "EntityAccessor"
-                    && PerformanceCache.GetDisplayString(paramType.ContainingNamespace)
-                        == TrecsNamespaces.Trecs;
-                if (isEntityAccessor)
-                {
-                    context.ReportDiagnostic(
-                        Diagnostic.Create(
-                            DiagnosticDescriptors.InvalidJobParameterList,
-                            p.GetLocation(),
-                            $"Parameter '{p.Identifier.Text}' is EntityAccessor, which is supported in main-thread [ForEachEntity] callbacks but not in jobs (it carries a managed WorldAccessor reference). "
-                                + "Use EntityHandle instead — it's a plain value type and is materialized per-iteration from a NativeEntityHandleBuffer at no extra cost."
-                        )
-                    );
-                    return null;
-                }
-
                 // Otherwise expect an in/ref IEntityComponent parameter.
                 bool isRef = p.Modifiers.Any(m => m.IsKind(SyntaxKind.RefKeyword));
                 bool isIn = p.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword));
@@ -2393,7 +2373,7 @@ namespace Trecs.SourceGen
 
             /// <summary>
             /// <c>[SingleEntity]</c>-decorated fields on the job struct. Each entry is
-            /// resolved at schedule time via <c>Query().WithTags&lt;...&gt;().SingleEntityIndex()</c>
+            /// resolved at schedule time via <c>Query().WithTags&lt;...&gt;().SingleIndex()</c>
             /// and assigned into the per-group job instance. Aspect-typed fields are
             /// constructed from the singleton's group buffers; component fields use
             /// <c>NativeComponentRead/Write&lt;T&gt;</c>.

@@ -102,9 +102,9 @@ namespace Trecs.Internal
             // checksum dict and the blob-id set on the header. Registered
             // here rather than in TrecsSerialization's general-purpose set
             // so the bundle is self-contained for users who only need it.
-            registry.RegisterSerializer<DenseDictionarySerializer<int, uint>>();
-            registry.RegisterSerializer<DenseHashSetSerializer<BlobId>>();
-            registry.RegisterSerializer<Serializer>();
+            registry.RegisterSerializer(new DenseDictionarySerializer<int, uint>());
+            registry.RegisterSerializer(new DenseHashSetSerializer<BlobId>());
+            registry.RegisterSerializer(new Serializer());
         }
 
         public sealed class Serializer : ISerializer<BundleHeader>

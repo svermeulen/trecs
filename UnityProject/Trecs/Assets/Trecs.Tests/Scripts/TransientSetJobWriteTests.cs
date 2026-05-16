@@ -227,7 +227,7 @@ namespace Trecs.Tests
 
             // Query using InSet<TFJTestTransientSet> via QueryBuilder
             var result = new List<int>();
-            foreach (var ei in a.Query().InSet<TFJTestTransientSet>().EntityIndices())
+            foreach (var ei in a.Query().InSet<TFJTestTransientSet>().Indices())
             {
                 result.Add(ei.Index);
             }

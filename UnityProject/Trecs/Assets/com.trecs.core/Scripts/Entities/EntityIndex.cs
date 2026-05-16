@@ -144,15 +144,6 @@ namespace Trecs
             return accessor.GetEntityHandle(this);
         }
 
-        /// <summary>
-        /// Creates a live <see cref="EntityAccessor"/> bound to the given <see cref="WorldAccessor"/>.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityAccessor ToEntity(WorldAccessor accessor)
-        {
-            return new EntityAccessor(accessor, this);
-        }
-
         /// <inheritdoc/>
         public int CompareTo(object obj)
         {
@@ -166,5 +157,75 @@ namespace Trecs
                 nameof(obj)
             );
         }
+
+        // ── Entity-targeted operations ──────────────────────────────
+        // No handle-to-index lookup cost — call these from hot loops after
+        // converting via handle.ToIndex(world) once.
+
+        /// <summary>
+        /// Schedules removal of this entity. Deferred until the next entity submission.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Remove(WorldAccessor world) => world.RemoveEntity(this);
+
+        /// <summary>
+        /// Burst-safe variant of <see cref="Remove(WorldAccessor)"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Remove(in NativeWorldAccessor world) => world.RemoveEntity(this);
+
+        /// <summary>
+        /// Sets <typeparamref name="T"/> as the active tag on this entity's
+        /// <see cref="IPartitionedBy{T1}"/> / <see cref="IPartitionedBy{T1, T2}"/> dimension.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetTag<T>(WorldAccessor world)
+            where T : struct, ITag => world.SetTag<T>(this);
+
+        /// <summary>
+        /// Burst-safe variant of <see cref="SetTag{T}(WorldAccessor)"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetTag<T>(in NativeWorldAccessor world)
+            where T : struct, ITag => world.SetTag<T>(this);
+
+        /// <summary>
+        /// Clears <typeparamref name="T"/> from this entity, moving it to the absent
+        /// partition of <typeparamref name="T"/>'s presence/absence dimension.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void UnsetTag<T>(WorldAccessor world)
+            where T : struct, ITag => world.UnsetTag<T>(this);
+
+        /// <summary>
+        /// Burst-safe variant of <see cref="UnsetTag{T}(WorldAccessor)"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void UnsetTag<T>(in NativeWorldAccessor world)
+            where T : struct, ITag => world.UnsetTag<T>(this);
+
+        /// <summary>
+        /// Enqueues an input component value for this entity for the next fixed-update frame.
+        /// Only callable from <see cref="SystemPhase.Input"/> systems.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddInput<T>(WorldAccessor world, in T value)
+            where T : unmanaged, IEntityComponent => world.AddInput(this, value);
+
+        /// <summary>
+        /// Returns a <see cref="ComponentAccessor{T}"/> for lazy read/write access to this
+        /// entity's component of type <typeparamref name="T"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ComponentAccessor<T> Component<T>(WorldAccessor world)
+            where T : unmanaged, IEntityComponent => world.Component<T>(this);
+
+        /// <summary>
+        /// Attempts to access this entity's component of type <typeparamref name="T"/>,
+        /// returning false if the entity no longer exists or lacks the component.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryComponent<T>(WorldAccessor world, out ComponentAccessor<T> componentRef)
+            where T : unmanaged, IEntityComponent => world.TryComponent(this, out componentRef);
     }
 }

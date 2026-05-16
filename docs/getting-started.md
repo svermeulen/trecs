@@ -39,8 +39,6 @@ In **Window → Package Manager**, click **+ → Add package from git URL** and 
 https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs.core
 ```
 
-`com.trecs.core` includes the ECS runtime, deterministic binary serialization, snapshot / recording / playback, and the Trecs Player editor window. No separate serialization package is required.
-
 ## Your first entity
 
 We'll build a spinning cube using these pieces:
@@ -62,7 +60,7 @@ public partial struct Rotation : IEntityComponent
 }
 ```
 
-`partial` is required — the source generator emits a companion file with `Equals`, `GetHashCode`, and equality operators.
+`partial` is required — the source generator emits a companion file with `Equals` and equality operators.
 
 ### 2. Define a tag
 
@@ -74,7 +72,7 @@ public struct Spinner : ITag { }
 
 ### 3. Define a template
 
-A template declares an entity kind — its tags (`ITagged<...>`) and its components (as fields):
+A template is an entity blueprint — its tags (via `ITagged<...>`) and its components (declared as fields):
 
 ```csharp
 public partial class SpinnerEntity : ITemplate, ITagged<Spinner>

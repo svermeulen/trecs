@@ -39,7 +39,7 @@ public partial class PlayerInputSystem : ISystem
     public void Execute()
     {
         var dir = new float2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-        World.AddInput(_player, new MoveInput { Direction = dir });
+        _player.AddInput(World, new MoveInput { Direction = dir });
     }
 }
 ```

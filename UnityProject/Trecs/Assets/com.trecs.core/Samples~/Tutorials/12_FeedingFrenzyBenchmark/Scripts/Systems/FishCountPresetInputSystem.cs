@@ -31,7 +31,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             {
                 int current = World.GlobalComponent<DesiredPreset>().Read.Value;
                 int next = Mathf.Clamp(current + _pendingDelta, 0, _presets.Length - 1);
-                World.AddInput(World.GlobalEntityHandle, new DesiredPreset { Value = next });
+                World.GlobalEntityHandle.AddInput(World, new DesiredPreset { Value = next });
                 _pendingDelta = 0;
             }
         }

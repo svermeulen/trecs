@@ -17,7 +17,7 @@ namespace Trecs.Tests
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
 
             // Register custom serializers for test classes
-            _serializerRegistry.RegisterSerializer<Foo.Serializer>();
+            _serializerRegistry.RegisterSerializer(new Foo.Serializer());
             _serializerRegistry.RegisterSerializerDelta<Foo.Serializer>();
             _cacheHelper = new SerializationBuffer(_serializerRegistry);
         }

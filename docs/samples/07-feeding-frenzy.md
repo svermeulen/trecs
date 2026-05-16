@@ -128,7 +128,7 @@ static void ExecuteImpl(
 
     if (scale.Value <= settings.MinScale)
     {
-        world.RemoveEntity(handle);
+        handle.Remove(world);
         return;
     }
 
@@ -188,14 +188,14 @@ public partial class RemoveCleanupHandler : IDisposable
     void OnFishRemoved(in TargetMeal targetMeal)
     {
         if (targetMeal.Value.Exists(World))
-            World.RemoveEntity(targetMeal.Value);
+            targetMeal.Value.Remove(World);
     }
 
     [ForEachEntity]
     void OnMealRemoved(in ApproachingFish fish)
     {
         if (fish.Value.Exists(World))
-            World.RemoveEntity(fish.Value);
+            fish.Value.Remove(World);
     }
 
     public void Dispose() => _disposables.Dispose();

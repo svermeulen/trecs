@@ -1,10 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
-namespace Trecs.Internal
+namespace Trecs
 {
     /// <summary>
     /// Serializes or deserializes the full game state. Implemented by
@@ -19,7 +17,11 @@ namespace Trecs.Internal
     }
 
     /// <summary>
-    /// Optional class that can be used to serialize/deserialize the entire game state.
+    /// Serializes/deserializes the entire game state of a <see cref="World"/>.
+    /// To override how a particular component type's array is serialized
+    /// (e.g. to skip transient state or reset a runtime handle on load),
+    /// register an <see cref="IComponentArraySerializer{T}"/> via
+    /// <see cref="World.ComponentArraySerializerRegistry"/>.
     /// </summary>
     public sealed class WorldStateSerializer : IWorldStateSerializer
     {
@@ -27,8 +29,6 @@ namespace Trecs.Internal
 
         readonly World _world;
         readonly WorldInfo _worldDef;
-        readonly Dictionary<Type, IComponentArrayCustomSerializer> _customComponentSerializers =
-            new();
 
         public WorldStateSerializer(World world)
         {
@@ -55,85 +55,32 @@ namespace Trecs.Internal
         }
 #endif
 
-        /// <summary>
-        /// Register a custom serializer for component type <typeparamref name="T"/>.
-        /// If a serializer is already registered for the type the existing one is
-        /// replaced and a warning is logged — callers that want strict
-        /// duplicate-detection should call <see cref="TryGetCustomComponentSerializer{T}"/>
-        /// first and decide what to do.
-        /// </summary>
-        public void RegisterCustomComponentSerializer<T>(IComponentArrayCustomSerializer serializer)
-            where T : unmanaged, IEntityComponent
-        {
-            TrecsAssert.IsNotNull(serializer);
-            var key = typeof(ComponentArray<T>);
-            if (_customComponentSerializers.ContainsKey(key))
-            {
-                _log.Warning(
-                    "Replacing existing custom component serializer for component type {0}",
-                    typeof(T)
-                );
-            }
-            _customComponentSerializers[key] = serializer;
-        }
-
-        /// <summary>
-        /// Remove the custom serializer registered for component type
-        /// <typeparamref name="T"/>. Returns <c>true</c> if a serializer was
-        /// removed, <c>false</c> if none was registered.
-        /// </summary>
-        public bool UnregisterCustomComponentSerializer<T>()
-            where T : unmanaged, IEntityComponent
-        {
-            return _customComponentSerializers.Remove(typeof(ComponentArray<T>));
-        }
-
-        /// <summary>
-        /// Retrieve the custom serializer registered for component type
-        /// <typeparamref name="T"/>, if any. Returns <c>true</c> with the
-        /// serializer in <paramref name="serializer"/> when registered,
-        /// <c>false</c> with <c>null</c> when not.
-        /// </summary>
-        public bool TryGetCustomComponentSerializer<T>(
-            out IComponentArrayCustomSerializer serializer
-        )
-            where T : unmanaged, IEntityComponent
-        {
-            return _customComponentSerializers.TryGetValue(
-                typeof(ComponentArray<T>),
-                out serializer
-            );
-        }
-
-        /// <summary>
-        /// Enumerate the component types that currently have a custom serializer
-        /// registered. Returns the component value types (e.g. <c>typeof(CFoo)</c>),
-        /// not the underlying <c>ComponentArray&lt;T&gt;</c> wrappers.
-        /// </summary>
-        public IEnumerable<Type> GetCustomComponentSerializerTypes()
-        {
-            return _customComponentSerializers.Keys.Select(k => k.GetGenericArguments()[0]);
-        }
-
         void WriteComponentArray(IComponentArray array, ISerializationWriter writer)
         {
-            if (_customComponentSerializers.TryGetValue(array.GetType(), out var custom))
+            var count = array.Count;
+            writer.Write("Count", count);
+
+            if (
+                _world.ComponentArraySerializerRegistry.TryGetDispatcher(
+                    array.ComponentType,
+                    out var dispatcher
+                )
+            )
             {
                 writer.WriteBit(true);
-                custom.Serialize(array, writer);
+                dispatcher.Serialize(array, writer);
                 return;
             }
 
             writer.WriteBit(false);
-            writer.Write("Count", array.Count);
-            if (array.Count > 0)
+            if (count > 0)
             {
                 unsafe
                 {
                     writer.BlitWriteRawBytes(
                         "Values",
                         array.GetUnsafePtr(),
-                        array.ElementSize * array.Count
+                        array.ElementSize * count
                     );
                 }
             }
@@ -141,15 +88,23 @@ namespace Trecs.Internal
 
         void ReadComponentArray(IComponentArray array, ISerializationReader reader)
         {
+            var count = reader.Read<int>("Count");
             bool isCustom = reader.ReadBit();
             if (isCustom)
             {
-                var custom = _customComponentSerializers[array.GetType()];
-                custom.Deserialize(array, reader);
+                var ok = _world.ComponentArraySerializerRegistry.TryGetDispatcher(
+                    array.ComponentType,
+                    out var dispatcher
+                );
+                TrecsAssert.That(
+                    ok,
+                    "Stream marks a custom serializer for component type {0} but none is registered on this world",
+                    array.ComponentType
+                );
+                dispatcher.Deserialize(array, count, reader);
                 return;
             }
 
-            var count = reader.Read<int>("Count");
             array.Clear();
             if (count > 0)
             {

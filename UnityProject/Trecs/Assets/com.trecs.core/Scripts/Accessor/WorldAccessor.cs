@@ -451,14 +451,14 @@ namespace Trecs
         /// or if another SetTag/UnsetTag has already touched the same dimension on
         /// this entity in the current submission.
         /// </summary>
-        public void SetTag<T>(EntityIndex entityIndex)
+        internal void SetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
             _structuralOps.QueueSetTag(Id, entityIndex, Tag<T>.Value);
         }
 
-        public void SetTag<T>(EntityHandle entityHandle)
+        internal void SetTag<T>(EntityHandle entityHandle)
             where T : struct, ITag => SetTag<T>(entityHandle.ToIndex(_world));
 
         /// <summary>
@@ -469,20 +469,20 @@ namespace Trecs
         /// dimensions there is no "absent" partition — use
         /// <see cref="SetTag{T}(EntityIndex)"/> to switch variants instead.
         /// </summary>
-        public void UnsetTag<T>(EntityIndex entityIndex)
+        internal void UnsetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
             _structuralOps.QueueUnsetTag(Id, entityIndex, Tag<T>.Value);
         }
 
-        public void UnsetTag<T>(EntityHandle entityHandle)
+        internal void UnsetTag<T>(EntityHandle entityHandle)
             where T : struct, ITag => UnsetTag<T>(entityHandle.ToIndex(_world));
 
         /// <summary>
         /// Schedules removal of an entity. The removal is deferred until the next entity submission.
         /// </summary>
-        public void RemoveEntity(EntityIndex entityIndex)
+        internal void RemoveEntity(EntityIndex entityIndex)
         {
             AssertCanMakeStructuralChangesToGroup(entityIndex.GroupIndex);
 
@@ -521,7 +521,7 @@ namespace Trecs
             where T3 : struct, ITag
             where T4 : struct, ITag => RemoveEntitiesWithTags(TagSet<T1, T2, T3, T4>.Value);
 
-        public void RemoveEntity(EntityHandle entityHandle)
+        internal void RemoveEntity(EntityHandle entityHandle)
         {
             RemoveEntity(entityHandle.ToIndex(_world));
         }
@@ -707,19 +707,22 @@ namespace Trecs
             return new ComponentBufferAccessor<T>(this, group);
         }
 
-        public ComponentAccessor<T> Component<T>(EntityIndex entityIndex)
+        internal ComponentAccessor<T> Component<T>(EntityIndex entityIndex)
             where T : unmanaged, IEntityComponent
         {
             return new ComponentAccessor<T>(this, entityIndex);
         }
 
-        public ComponentAccessor<T> Component<T>(EntityHandle entityHandle)
+        internal ComponentAccessor<T> Component<T>(EntityHandle entityHandle)
             where T : unmanaged, IEntityComponent
         {
             return new ComponentAccessor<T>(this, entityHandle.ToIndex(_entitiesDb));
         }
 
-        public bool TryComponent<T>(EntityIndex entityIndex, out ComponentAccessor<T> componentRef)
+        internal bool TryComponent<T>(
+            EntityIndex entityIndex,
+            out ComponentAccessor<T> componentRef
+        )
             where T : unmanaged, IEntityComponent
         {
             SyncAndRecordRead<T>(entityIndex.GroupIndex);
@@ -732,7 +735,7 @@ namespace Trecs
             return false;
         }
 
-        public bool TryComponent<T>(
+        internal bool TryComponent<T>(
             EntityHandle entityHandle,
             out ComponentAccessor<T> componentRef
         )
@@ -749,16 +752,6 @@ namespace Trecs
             where T : unmanaged, IEntityComponent
         {
             return Component<T>(_worldInfo.GlobalEntityIndex);
-        }
-
-        public EntityAccessor Entity(EntityIndex entityIndex)
-        {
-            return new EntityAccessor(this, entityIndex);
-        }
-
-        public EntityAccessor Entity(EntityHandle entityHandle)
-        {
-            return new EntityAccessor(this, entityHandle);
         }
 
         public QueryBuilder Query()
@@ -823,9 +816,9 @@ namespace Trecs
         /// <summary>
         /// Returns a lazy-sync gateway for an entity set registered on the
         /// WorldBuilder via AddSet&lt;T&gt;(). The returned <see cref="SetAccessor{T}"/>
-        /// selects the timing mode via its properties:
+        /// selects the timing mode:
         /// <list type="bullet">
-        ///   <item><description><c>.Defer</c> — queue Add / Remove / Clear for next submission (no sync).</description></item>
+        ///   <item><description><c>.DeferredAdd</c> / <c>.DeferredRemove</c> / <c>.DeferredClear</c> — queue for next submission (no sync).</description></item>
         ///   <item><description><c>.Read</c> — synchronous read view (syncs writers once at acquisition).</description></item>
         ///   <item><description><c>.Write</c> — synchronous read+write view (syncs all jobs once at acquisition).</description></item>
         /// </list>
@@ -875,7 +868,7 @@ namespace Trecs
         /// <see cref="SystemPhase.Input"/> systems. The value is applied to the entity's
         /// <see cref="InputAttribute"/> component at the start of the next fixed-update tick.
         /// </summary>
-        public void AddInput<T>(EntityHandle entityHandle, in T value)
+        internal void AddInput<T>(EntityHandle entityHandle, in T value)
             where T : unmanaged, IEntityComponent
         {
             AssertCanAddInputsSystem();
@@ -883,7 +876,7 @@ namespace Trecs
             _entityInputQueue.AddInput(_systemRunner.FixedFrame, entityHandle, value);
         }
 
-        public void AddInput<T>(EntityIndex entityIndex, in T value)
+        internal void AddInput<T>(EntityIndex entityIndex, in T value)
             where T : unmanaged, IEntityComponent
         {
             AssertCanAddInputsSystem();

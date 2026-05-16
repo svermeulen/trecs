@@ -22,61 +22,63 @@ public partial class SpinnerSystem : ISystem
 
 - Systems are `partial class` — the source generator fills in the rest.
 - You construct systems yourself (`new SpinnerSystem(...)`) and register them with [`WorldBuilder`](world-setup.md#worldbuilder).
-- `World` is a source-generated property that returns the system's [`WorldAccessor`](../advanced/accessor-roles.md). It is *not* the `World` class itself; it only exists inside types the source generator processes (systems, event handlers, `[ForEachEntity]` hosts).
+- `World` is a source-generated property that returns the system's [`WorldAccessor`](../advanced/accessor-roles.md). It is *not* the `World` class itself.  Each system gets its own accessor with the right permissions for its phase.
 
 ## ForEachEntity
 
-`[ForEachEntity]` marks a method for source-generated entity iteration. The generator emits the query and loop.
-
-### Scoping
+`[ForEachEntity]` marks a method for source-generated entity iteration. The generator emits the query and loop. The most common shape is a single tag scope plus either an aspect or a few component refs:
 
 ```csharp
-// Single tag
-[ForEachEntity(typeof(SampleTags.Spinner))]
-void Execute(ref Rotation rotation) { ... }
+// Using an aspect — bundled access for related components
+[ForEachEntity(typeof(GameTags.Enemy))]
+void Execute(in EnemyView enemy)
+{
+    enemy.Position.Write.Value += enemy.Velocity.Read.Value * World.DeltaTime;
+}
 
-// Multiple tags (entities must have all of them)
-[ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
-void Execute(in ActiveBall ball) { ... }
-
-// Match by component shape — every group whose template declares these components
-[ForEachEntity(MatchByComponents = true)]
-void Execute(ref Position position, in Velocity velocity) { ... }
-
-// Restrict to members of a set
-[ForEachEntity(Set = typeof(SampleSets.HighlightedParticle))]
-void Execute(in ParticleView particle) { ... }
+// Using component refs directly
+[ForEachEntity(typeof(GameTags.Enemy))]
+void Execute(ref Position position, in Velocity velocity)
+{
+    position.Value += velocity.Value * World.DeltaTime;
+}
 ```
 
-See [Sets](../entity-management/sets.md) for set-scoped iteration.
+Pick one style of component access per method — refs *or* an aspect, not both.
 
-### Parameters
+### Scope options
 
-`[ForEachEntity]` methods accept these parameter shapes. The generator wires each one automatically.
+The attribute properties below control *which* entities the method iterates over.
 
-**Component data** (pick one style per method):
+- **`typeof(A), typeof(B)`** — entities must have all listed tags.
+- **`Without = typeof(T)`** / **`Withouts = new[] { ... }`** — exclude entities tagged with the given tag(s).
+- **`MatchByComponents = true`** — match every group whose template declares the component parameters.  When set, providing a tag is optional.
+- **`Set = typeof(MySet)`** — restrict iteration to members of a set. See [Sets](../entity-management/sets.md).
 
-- **Component refs** — `ref T` (read-write) or `in T` (read-only) for `IEntityComponent` types. Multiple components can be listed.
-- **Aspect** — `in MyAspect` for bundled access. One aspect per method. See [Aspects](../data-access/aspects.md).
+```csharp
+// Combining scope properties
+[ForEachEntity(typeof(GameTags.Enemy), Without = typeof(GameTags.Dead))]
+void Execute(in EnemyView enemy) { ... }
+```
 
-**Optional extras:**
+### Extra parameters
 
-- **`EntityAccessor`** — a live single-entity view; offers `Get<T>()`, `Remove()`, `SetTag<T>()` / `UnsetTag<T>()`, set / input ops, and a `Handle` property. Default choice when you need to act on the iterated entity.
-- **`EntityHandle`** — the stable handle for the iterated entity, when you only need to store it (e.g. on another component).
+Beyond component refs or an aspect, a method can also receive any of these:
+
+- **`EntityHandle`** — the stable handle for the iterated entity. Carries the entity-targeted ops (`Component<T>(world)`, `Remove(world)`, `SetTag<T>(world)`, `AddInput<T>(world, v)`, …); store it on another component when you need a long-lived reference.
+- **`EntityIndex`** — the transient hot-loop variant. Same methods as `EntityHandle` but skips the per-call handle-to-index lookup; only valid within the current submission cycle.
 - **`WorldAccessor`** — the system's accessor (main-thread only).
 - **`NativeWorldAccessor`** — job-safe world access (`[WrapAsJob]` only).
 - **`[GlobalIndex] int`** — see [Cross-group index](#cross-group-index).
 - **`[PassThroughArgument]`** — a value the caller forwards in. See [PassThroughArgument](#passthroughargument).
 - **`[SingleEntity]`** — a singleton entity hoisted out of the loop. See [SingleEntity](#singleentity).
 
-> A low-level `EntityIndex` parameter is also accepted for advanced cases — a transient index into the underlying buffers that skips the per-call handle lookup. Only stable until the next submission. Prefer `EntityAccessor` / `EntityHandle` unless you have a specific perf reason.
-
 ### The Execute method
 
 A system has exactly one method named `Execute`. It takes one of three forms:
 
 - **`[ForEachEntity]`** — source-generated iteration. The most common form.
-- **Plain `Execute()`** — manual entry point where you write your own queries and loops. Required when a system has multiple `[ForEachEntity]` methods, so you can call them in order.
+- **Plain `void Execute()`** — manual entry point where you write your own queries and loops. Required when a system has multiple `[ForEachEntity]` methods, so you can call them in order from Execute.
 - **`[WrapAsJob]` static method** — a `[ForEachEntity]` method that runs as a Burst-compiled parallel job. See [Jobs & Burst](../performance/jobs-and-burst.md).
 
 ```csharp
@@ -310,9 +312,7 @@ new WorldBuilder()
 
 ---
 
-## Less common features
-
-### PassThroughArgument
+## PassThroughArgument
 
 `[PassThroughArgument]` lets the caller pass values into a `[ForEachEntity]` method. The generated method takes one parameter per attributed argument:
 
@@ -338,9 +338,9 @@ public partial class ParticleBoundSystem : ISystem
 
 Useful for configuration values or precomputed data that aren't components on the iterated entities. Works with both main-thread and `[WrapAsJob]` methods. Values must be unmanaged when used with jobs.
 
-### SingleEntity
+## SingleEntity
 
-`[SingleEntity]` resolves a parameter to the unique entity with a given tag. The framework runs the equivalent of `World.Query().WithTags<...>().Single()` once before the body, asserts exactly one match, and binds the result.
+`[SingleEntity]` resolves a parameter to the unique entity with a given tag. The framework runs the equivalent of `World.Query().WithTags<...>().SingleHandle()` once before the body, asserts exactly one match, and binds the result.
 
 ```csharp
 void Execute([SingleEntity(typeof(GlobalTag))] ref Score score)
@@ -349,7 +349,7 @@ void Execute([SingleEntity(typeof(GlobalTag))] ref Score score)
 }
 ```
 
-Tags must be hardcoded in the attribute (e.g. `[SingleEntity(typeof(MyTag))]`) — there's no runtime form and no `Optional` mode. For a dynamic tag or no-throw form, call `World.Query().WithTags(...).Single()` (or `TrySingle`) directly.
+Tags must be hardcoded in the attribute (e.g. `[SingleEntity(typeof(MyTag))]`). This is similar to calling `World.Query().WithTags(...).SingleHandle()`.
 
 `[SingleEntity]` works in four contexts:
 
@@ -360,28 +360,21 @@ Tags must be hardcoded in the attribute (e.g. `[SingleEntity(typeof(MyTag))]`) �
 
 For a complete `[SingleEntity]` example tracking a single head entity, see [Sample 11 — Snake](../samples/11-snake.md).
 
-### Cross-group index
+## Cross-group index
 
 Mark an `int` parameter with `[GlobalIndex]` to receive a unique index spanning every group iterated by the call. The first entity gets `0`, the next `1`, and so on through `total − 1`, even across multiple groups.
 
 ```csharp
-[BurstCompile]
-partial struct BuildInstanceData
+[ForEachEntity]
+public void Execute(in Position position, [GlobalIndex] int globalIndex)
 {
-    [WriteOnly] public NativeArray<InstanceData> Instances;
-
-    [ForEachEntity]
-    [WrapAsJob]
-    public void Execute(in Position position, [GlobalIndex] int globalIndex)
-    {
-        Instances[globalIndex] = new InstanceData { Position = position.Value };
-    }
+    Instances[globalIndex] = new InstanceData { Position = position.Value };
 }
 ```
 
 Useful when filling a contiguous output buffer across groups — e.g. packed data for instanced rendering. The per-group iteration index resets per group; `[GlobalIndex]` doesn't.
 
-### Entity operations from inside a system
+## Entity operations from inside a system
 
 Systems can mutate world state through the source-generated `World` property:
 
@@ -390,7 +383,7 @@ World.AddEntity<SampleTags.Sphere>()
     .Set(new Position(float3.zero))
     .Set(new Lifetime(5f));
 
-World.RemoveEntity(handle);
+handle.Remove(World);
 ball.UnsetTag<BallTags.Active>(World);   // partition transition
 
 float dt = World.DeltaTime;

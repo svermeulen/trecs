@@ -6,7 +6,8 @@
         "UnityEditor.TestRunner",
         "GUID:281cd1989f6948c4aeefd4731e3a1aec",
         "GUID:ca113807f121449999e1498c70dd263b",
-        "GUID:d10e13b391d1f4dd9bb249dd4a93d433"
+        "GUID:d10e13b391d1f4dd9bb249dd4a93d433",
+        "Trecs.Benchmarks"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -34,6 +34,7 @@ namespace Trecs
         readonly EntitySubmitter _entitySubmitter;
         readonly WorldAccessorRegistry _accessorRegistry;
         readonly SerializerRegistry _serializerRegistry;
+        readonly ComponentArraySerializerRegistry _componentArraySerializerRegistry;
         IAccessRecorder _accessRecorder;
         readonly WorldSettings _settings;
         readonly Rng _fixedRng;
@@ -87,7 +88,8 @@ namespace Trecs
             InterpolatedPreviousSaverManager interpolatedPreviousSaverManager,
             ComponentStore componentStore,
             List<ISystem> systems,
-            SerializerRegistry serializerRegistry
+            SerializerRegistry serializerRegistry,
+            ComponentArraySerializerRegistry componentArraySerializerRegistry
         )
         {
             _log = log;
@@ -136,6 +138,9 @@ namespace Trecs
 
             TrecsAssert.IsNotNull(serializerRegistry);
             _serializerRegistry = serializerRegistry;
+
+            TrecsAssert.IsNotNull(componentArraySerializerRegistry);
+            _componentArraySerializerRegistry = componentArraySerializerRegistry;
         }
 
         /// <summary>
@@ -151,6 +156,18 @@ namespace Trecs
         /// runtime save / load.
         /// </summary>
         public SerializerRegistry SerializerRegistry => _serializerRegistry;
+
+        /// <summary>
+        /// The <see cref="ComponentArraySerializerRegistry"/> for this world.
+        /// Register <see cref="IComponentArraySerializer{T}"/> implementations
+        /// here to override how the component array of a given component type
+        /// is serialized during snapshots, recordings, and checksums — for
+        /// example to skip transient single-frame state, to reset a runtime
+        /// handle on load, or to walk a native container that can't be
+        /// byte-blitted. Empty by default.
+        /// </summary>
+        public ComponentArraySerializerRegistry ComponentArraySerializerRegistry =>
+            _componentArraySerializerRegistry;
 
         public bool IsDisposed
         {
@@ -562,9 +579,16 @@ namespace Trecs
                 CallSystemShutdownHooks();
             }
 
-            _entityInputQueue.Dispose();
-
+            // The input queue is a peer of the heaps and component store, not
+            // a leaf that should die first. Keep it alive across SystemRunner
+            // teardown so any code path reachable from OnShutdown or from the
+            // job drain in SystemRunner.Dispose() can still touch it without
+            // hitting "already disposed". Tearing it down before SystemRunner
+            // works today only because no in-tree code path needs the queue
+            // after OnShutdown has run — that's a contract every future hook
+            // author would otherwise have to remember.
             _systemRunner.Dispose();
+            _entityInputQueue.Dispose();
             _systemEnableState.Dispose();
             _heapAllocator.Dispose();
 

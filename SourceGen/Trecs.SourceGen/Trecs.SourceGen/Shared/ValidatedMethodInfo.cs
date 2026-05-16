@@ -25,9 +25,6 @@ namespace Trecs.SourceGen.Shared
         /// <summary>The loop's stable entity handle (Trecs.EntityHandle, no modifiers, no [PassThroughArgument]).</summary>
         LoopEntityHandle,
 
-        /// <summary>The loop's live entity accessor (Trecs.EntityAccessor, no modifiers, no [PassThroughArgument]). Main-thread only.</summary>
-        LoopEntityAccessor,
-
         /// <summary>The loop's world accessor (Trecs.WorldAccessor, no modifiers, no [PassThroughArgument]).</summary>
         LoopWorldAccessor,
 
@@ -46,7 +43,7 @@ namespace Trecs.SourceGen.Shared
         /// <summary>
         /// A parameter marked <c>[SingleEntity]</c> that is hoisted out of the iteration
         /// loop. The framework resolves the entity once per call via
-        /// <c>Query().WithTags&lt;...&gt;().SingleEntityIndex()</c> and binds the resulting
+        /// <c>Query().WithTags&lt;...&gt;().SingleIndex()</c> and binds the resulting
         /// aspect view (or component value) to the parameter. Index points into
         /// <see cref="ClassifiedParameters.HoistedSingletons"/> /
         /// <see cref="ValidatedMethodInfo.HoistedSingletons"/>.
@@ -58,7 +55,7 @@ namespace Trecs.SourceGen.Shared
     /// Info for a parameter (or field) marked <c>[SingleEntity]</c>. The source
     /// generator emits a hoist preamble before the iteration loop (or run-once
     /// method body) that resolves the singleton via
-    /// <c>Query().WithTags&lt;...&gt;().SingleEntityIndex()</c>, materializes the
+    /// <c>Query().WithTags&lt;...&gt;().SingleIndex()</c>, materializes the
     /// aspect / fetches the component, and binds it to <c>__&lt;ParamName&gt;</c>.
     /// </summary>
     internal class HoistedSingletonInfo
@@ -177,9 +174,6 @@ namespace Trecs.SourceGen.Shared
 
         /// <summary>True if the user took a <c>EntityHandle</c> parameter on the iteration method.</summary>
         public bool HasEntityHandleParameter { get; set; }
-
-        /// <summary>True if the user took a <c>EntityAccessor</c> parameter on the iteration method.</summary>
-        public bool HasEntityAccessorParameter { get; set; }
 
         /// <summary>
         /// Parameter slots in declaration order. Used by the code generator to emit

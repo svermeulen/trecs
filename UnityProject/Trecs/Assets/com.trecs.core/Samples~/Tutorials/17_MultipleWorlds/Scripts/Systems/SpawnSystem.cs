@@ -5,12 +5,15 @@ namespace Trecs.Samples.MultipleWorlds
 {
     public partial class SpawnSystem : ISystem
     {
+        public partial struct State : IEntityComponent
+        {
+            public float Timer;
+        }
+
         readonly float _spawnInterval;
         readonly float _lifetime;
         readonly float _spawnRadius;
         readonly Vector3 _origin;
-
-        float _timer;
 
         public SpawnSystem(float spawnInterval, float lifetime, float spawnRadius, Vector3 origin)
         {
@@ -20,13 +23,13 @@ namespace Trecs.Samples.MultipleWorlds
             _origin = origin;
         }
 
-        public void Execute()
+        void Execute([SingleEntity(typeof(TrecsTags.Globals))] ref State state)
         {
-            _timer += World.DeltaTime;
+            state.Timer += World.DeltaTime;
 
-            while (_timer >= _spawnInterval)
+            while (state.Timer >= _spawnInterval)
             {
-                _timer -= _spawnInterval;
+                state.Timer -= _spawnInterval;
                 Spawn();
             }
         }

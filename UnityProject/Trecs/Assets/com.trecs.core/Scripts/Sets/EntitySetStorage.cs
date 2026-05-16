@@ -224,7 +224,7 @@ namespace Trecs.Internal
         /// Drain all entries from a bag-set, discarding the dequeued values.
         /// Shared by the immediate-clear path (job-write queues) and the
         /// deferred-clear path (deferred Add/Remove queues, when superseded
-        /// by a queued <c>SetClear</c>).
+        /// by a queued <c>DeferredClear</c>).
         /// </summary>
         internal static void DrainEntityIndexBags(AtomicNativeBags bags)
         {

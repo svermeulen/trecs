@@ -33,7 +33,7 @@ namespace Trecs.Tests
             a.SubmitEntities();
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
 
-            var comp = a.Query().WithTags(TestTags.Alpha).Single().Get<TestInt>();
+            var comp = a.Query().WithTags(TestTags.Alpha).SingleHandle().Component<TestInt>(a);
             NAssert.AreEqual(2, comp.Read.Value);
         }
 
@@ -593,7 +593,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.SubmitEntities();
 
-            NAssert.Catch(() => a.Query().WithTags(TestTags.Alpha).Single());
+            NAssert.Catch(() => a.Query().WithTags(TestTags.Alpha).SingleHandle());
         }
 
         [Test]
@@ -602,7 +602,7 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
 
-            NAssert.Catch(() => a.Query().WithTags(TestTags.Alpha).Single());
+            NAssert.Catch(() => a.Query().WithTags(TestTags.Alpha).SingleHandle());
         }
 
         [Test]
@@ -615,7 +615,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.SubmitEntities();
 
-            NAssert.IsFalse(a.Query().WithTags(TestTags.Alpha).TrySingle(out _));
+            NAssert.IsFalse(a.Query().WithTags(TestTags.Alpha).TrySingleHandle(out _));
         }
 
         [Test]

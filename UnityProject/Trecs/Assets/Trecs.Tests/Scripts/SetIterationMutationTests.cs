@@ -57,7 +57,7 @@ namespace Trecs.Tests
                 a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
 
             var visited = new List<int>();
-            foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
+            foreach (var ei in a.Query().InSet<ItMutSetA>().Indices())
             {
                 visited.Add(ei.Index);
                 a.Set<ItMutSetB>().Write.Add(new EntityIndex(ei.Index, group));
@@ -82,7 +82,7 @@ namespace Trecs.Tests
             }
 
             var visited = new List<int>();
-            foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
+            foreach (var ei in a.Query().InSet<ItMutSetA>().Indices())
             {
                 visited.Add(ei.Index);
                 a.Set<ItMutSetB>().Write.Remove(new EntityIndex(ei.Index, group));
@@ -108,7 +108,7 @@ namespace Trecs.Tests
 
             var visited = new List<int>();
             bool cleared = false;
-            foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
+            foreach (var ei in a.Query().InSet<ItMutSetA>().Indices())
             {
                 visited.Add(ei.Index);
                 if (!cleared)
@@ -148,7 +148,7 @@ namespace Trecs.Tests
             // Mutating a *different* group's entry within the same set is safe —
             // it touches a different SetGroupEntry/dense dict.
             var visitedA = 0;
-            foreach (var ei in a.Query().WithTags<QId1>().InSet<ItMutSetMulti>().EntityIndices())
+            foreach (var ei in a.Query().WithTags<QId1>().InSet<ItMutSetMulti>().Indices())
             {
                 NAssert.AreEqual(groupA.Index, ei.GroupIndex.Index);
                 visitedA++;
@@ -183,7 +183,7 @@ namespace Trecs.Tests
 
             // Filter the query to QCatA so it only iterates groupA — leaves groupB alone.
             var visited = 0;
-            foreach (var ei in a.Query().WithTags<QCatA>().InSet<ItMutSetMulti>().EntityIndices())
+            foreach (var ei in a.Query().WithTags<QCatA>().InSet<ItMutSetMulti>().Indices())
             {
                 if (ei.GroupIndex.Index != groupA.Index)
                     continue;
@@ -206,11 +206,11 @@ namespace Trecs.Tests
             a.Set<ItMutSetA>().Write.Add(new EntityIndex(1, group));
 
             var visited = new List<int>();
-            foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
+            foreach (var ei in a.Query().InSet<ItMutSetA>().Indices())
             {
                 visited.Add(ei.Index);
                 // Deferred — must not change what's iterated.
-                a.Set<ItMutSetA>().Defer.Add(new EntityIndex(2, group));
+                a.Set<ItMutSetA>().DeferredAdd(new EntityIndex(2, group));
             }
             visited.Sort();
             NAssert.AreEqual(
@@ -235,10 +235,10 @@ namespace Trecs.Tests
                 a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
 
             var visited = new List<int>();
-            foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
+            foreach (var ei in a.Query().InSet<ItMutSetA>().Indices())
             {
                 visited.Add(ei.Index);
-                a.Set<ItMutSetA>().Defer.Remove(ei);
+                a.Set<ItMutSetA>().DeferredRemove(ei);
             }
             visited.Sort();
             NAssert.AreEqual(
@@ -263,9 +263,9 @@ namespace Trecs.Tests
                 a.Set<ItMutSetA>().Write.Add(new EntityIndex(i, group));
 
             int pairs = 0;
-            foreach (var outerEi in a.Query().InSet<ItMutSetA>().EntityIndices())
+            foreach (var outerEi in a.Query().InSet<ItMutSetA>().Indices())
             {
-                foreach (var innerEi in a.Query().InSet<ItMutSetA>().EntityIndices())
+                foreach (var innerEi in a.Query().InSet<ItMutSetA>().Indices())
                 {
                     pairs++;
                 }
@@ -288,7 +288,7 @@ namespace Trecs.Tests
 
             NAssert.Catch<Exception>(() =>
             {
-                foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
+                foreach (var ei in a.Query().InSet<ItMutSetA>().Indices())
                 {
                     a.Set<ItMutSetA>().Write.Add(new EntityIndex(2, group));
                 }
@@ -307,7 +307,7 @@ namespace Trecs.Tests
 
             NAssert.Catch<Exception>(() =>
             {
-                foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
+                foreach (var ei in a.Query().InSet<ItMutSetA>().Indices())
                 {
                     a.Set<ItMutSetA>().Write.Remove(ei);
                 }
@@ -326,7 +326,7 @@ namespace Trecs.Tests
 
             NAssert.Catch<Exception>(() =>
             {
-                foreach (var ei in a.Query().InSet<ItMutSetA>().EntityIndices())
+                foreach (var ei in a.Query().InSet<ItMutSetA>().Indices())
                 {
                     a.Set<ItMutSetA>().Write.Clear();
                 }

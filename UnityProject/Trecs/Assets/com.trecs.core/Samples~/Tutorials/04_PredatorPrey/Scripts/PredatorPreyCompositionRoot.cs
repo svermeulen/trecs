@@ -37,7 +37,7 @@ namespace Trecs.Samples.PredatorPrey
                     new MovementSystem(),
                     new PredatorChaseSystem(),
                     new PreyRespawnSystem(Settings),
-                    new EntityPresenter(goManager),
+                    new MoverPresenter(goManager),
                 }
             );
 

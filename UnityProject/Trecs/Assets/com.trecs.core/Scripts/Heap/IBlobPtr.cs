@@ -1,5 +1,3 @@
-using System.ComponentModel;
-
 namespace Trecs
 {
     /// <summary>
@@ -8,7 +6,6 @@ namespace Trecs
     /// asynchronous loading state queries, and disposal against the
     /// <see cref="BlobCache"/>.
     /// </summary>
-    [EditorBrowsable(EditorBrowsableState.Never)]
     public interface IBlobPtr : IBlobAnchor
     {
         bool IsNull { get; }

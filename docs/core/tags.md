@@ -26,7 +26,7 @@ public partial class SpinnerEntity : ITemplate, ITagged<SampleTags.Spinner>
 }
 ```
 
-See [Templates](templates.md) for partitions (`IPartitionedBy`) and template inheritance.
+See [Templates](templates.md).
 
 ## Tags in systems
 
@@ -49,21 +49,14 @@ foreach (var player in PlayerView.Query(World).WithTags<GameTags.Player>())
     player.Position += player.Velocity * World.DeltaTime;
 }
 
-// World.Query() — returns an EntityAccessor; useful when no aspect fits.
-var boss = World.Query().WithTags<GameTags.Boss>().Single();
+// World.Query().SingleHandle() — returns an EntityHandle; useful when no aspect fits.
+EntityHandle boss = World.Query().WithTags<GameTags.Boss>().SingleHandle();
 ```
 
 See [Queries & Iteration](../data-access/queries-and-iteration.md) for the full filter / terminator API.
 
-## Tags in queries
-
-```csharp
-int count = World.CountEntitiesWithTags<GameTags.Player>();
-World.RemoveEntitiesWithTags<GameTags.Bullet>();
-```
-
 ## Storage
 
-Entities with the same tag combination are stored together in contiguous memory for cache-friendly iteration. Unrelated entities are skipped entirely.
+Entities with the same tag combination are stored together in contiguous memory for cache-friendly iteration.
 
 For the storage model and the low-level `TagSet` / `GroupIndex` / `Tag<T>` APIs, see [Groups, GroupIndex & TagSets](../advanced/groups-and-tagsets.md).

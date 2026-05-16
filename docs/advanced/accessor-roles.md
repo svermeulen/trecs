@@ -24,7 +24,7 @@ Every rule below is asserted at the call site. Crossing a role boundary throws a
 | Structural change (`AddEntity` / `RemoveEntity` / `SetTag` / `UnsetTag`) on a non-VUO template | ✅ | ❌ | ✅ |
 | Structural change on a [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) template | ❌ | ✅ | ✅ |
 | Read set (`Set<T>().Read` — `Exists`, `Count`, iterate) | ✅ | ✅ | ✅ |
-| Mutate set (`Set<T>().Defer`, `Set<T>().Write`) | ✅ | ❌ | ✅ |
+| Mutate set (`Set<T>().DeferredAdd` / `DeferredRemove` / `DeferredClear`, `Set<T>().Write`) | ✅ | ❌ | ✅ |
 | `SetSystemPaused` | ✅ | ❌ | ✅ |
 | `FixedRng` | ✅ | ❌ | ✅ |
 | `VariableRng` | ❌ | ✅ | ✅ |

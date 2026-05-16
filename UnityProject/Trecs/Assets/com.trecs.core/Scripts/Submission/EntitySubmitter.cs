@@ -27,6 +27,17 @@ namespace Trecs.Internal
         readonly FastList<IComponentArray> _cachedSrcArrays;
         readonly FastList<IComponentArray> _cachedDstArrays;
 
+        // Deferred handle-free state for OnRemoved fan-out. Mirrors the data
+        // swap-back's "removed entities at the tail" trick into the handle
+        // map: removed entities' handle entries are temporarily relocated to
+        // the [newCount, originalCount) range of each group's reverse-map
+        // list, so EntityIndex.ToHandle works inside OnRemoved callbacks. The
+        // real free + TrimGroupList happens after FireRemoveCallbacks
+        // completes.
+        readonly FastList<(GroupIndex Group, int Id, int TailSlot)> _cachedDeferredHandleFrees;
+        readonly FastList<(GroupIndex Group, int PostRemoveCount)> _cachedDeferredHandleTrims;
+        readonly DenseDictionary<int, int> _cachedTailSlotByOriginalSlot;
+
         // Cached array for native add component lookups to avoid per-frame allocation
         IComponentArray[] _cachedNativeAddComponentArrays;
 
@@ -164,6 +175,9 @@ namespace Trecs.Internal
             );
             _cachedSrcArrays = new FastList<IComponentArray>();
             _cachedDstArrays = new FastList<IComponentArray>();
+            _cachedDeferredHandleFrees = new FastList<(GroupIndex, int, int)>();
+            _cachedDeferredHandleTrims = new FastList<(GroupIndex, int)>();
+            _cachedTailSlotByOriginalSlot = new DenseDictionary<int, int>();
             _worldInfo = worldInfo;
             _accessorRegistry = accessorRegistry;
             _trecsSettings = trecsSettings ?? new WorldSettings();
@@ -272,38 +286,48 @@ namespace Trecs.Internal
             );
             _isRunningSubmit = true;
 
-            using (TrecsProfiling.Start("Entities Submission"))
+            try
             {
-                var iterations = 0;
-                var hasEverSubmitted = false;
-
-                FlushAllDeferredOps();
-
-                while (
-                    HasMadeNewStructuralChangesInThisIteration()
-                    && iterations++ < _trecsSettings.MaxSubmissionIterations
-                )
+                using (TrecsProfiling.Start("Entities Submission"))
                 {
-                    hasEverSubmitted = true;
+                    var iterations = 0;
+                    var hasEverSubmitted = false;
 
-                    SingleSubmission();
                     FlushAllDeferredOps();
-                }
+
+                    while (
+                        HasMadeNewStructuralChangesInThisIteration()
+                        && iterations++ < _trecsSettings.MaxSubmissionIterations
+                    )
+                    {
+                        hasEverSubmitted = true;
+
+                        SingleSubmission();
+                        FlushAllDeferredOps();
+                    }
 
 #if DEBUG
-                if (iterations == _trecsSettings.MaxSubmissionIterations)
-                    throw new TrecsException("possible circular submission detected");
+                    if (iterations == _trecsSettings.MaxSubmissionIterations)
+                        throw new TrecsException("possible circular submission detected");
 #endif
-                if (hasEverSubmitted)
-                {
-                    using (TrecsProfiling.Start("NotifyOnSubmissionCompleted"))
+                    if (hasEverSubmitted)
                     {
-                        _eventsManager.NotifyOnSubmissionCompleted();
+                        using (TrecsProfiling.Start("NotifyOnSubmissionCompleted"))
+                        {
+                            _eventsManager.NotifyOnSubmissionCompleted();
+                        }
                     }
                 }
             }
-
-            _isRunningSubmit = false;
+            finally
+            {
+                // Always clear the in-flight flag so an observer exception
+                // (or any other mid-submission throw) does not wedge the
+                // submitter for the rest of the World's lifetime via the
+                // "A submission started while the previous one was still
+                // flushing" assert on the next SubmitEntities() call.
+                _isRunningSubmit = false;
+            }
         }
 
         public void Dispose()
@@ -557,16 +581,34 @@ namespace Trecs.Internal
             using (TrecsProfiling.Start("remove Entities"))
             {
                 ecsRoot._cachedRangeOfSubmittedIndices.Clear();
+                ecsRoot._cachedDeferredHandleFrees.Clear();
+                ecsRoot._cachedDeferredHandleTrims.Clear();
 
-                for (int i = 0; i < removeOperations.Length; i++)
+                try
                 {
-                    var list = removeOperations[i];
-                    if (list == null || list.Count == 0)
-                        continue;
-                    ExecuteRemoveForGroup(GroupIndex.FromIndex(i), list, ecsRoot);
-                }
+                    for (int i = 0; i < removeOperations.Length; i++)
+                    {
+                        var list = removeOperations[i];
+                        if (list == null || list.Count == 0)
+                            continue;
+                        ExecuteRemoveForGroup(GroupIndex.FromIndex(i), list, ecsRoot);
+                    }
 
-                FireRemoveCallbacks(removeOperations, ecsRoot);
+                    FireRemoveCallbacks(removeOperations, ecsRoot);
+                }
+                finally
+                {
+                    // Always finalize even if an observer threw inside
+                    // FireRemoveCallbacks: handles captured in (a) live in an
+                    // instance-scoped FastList that the *next* RemoveEntities
+                    // call would unconditionally Clear(), so skipping finalize
+                    // here means those IDs are never returned to the free list
+                    // and the forward-map entries never bump their version.
+                    // That would leak one handle slot per never-finalized
+                    // entity and leave any caller-resolved EntityHandle
+                    // permanently Exists()==true.
+                    FinalizeDeferredHandleFrees(ecsRoot);
+                }
             }
         }
 
@@ -705,32 +747,123 @@ namespace Trecs.Internal
             }
 
             // R3: Update entity references (batched).
-            // RemoveEntityHandle must happen BEFORE UpdateIndexAfterSwapBack:
-            // after swap-back, entity Y moves into removed entity X's slot. If we called
-            // UpdateIndexAfterSwapBack first, it would move Y's reverse map entry to X's old key,
-            // then RemoveEntityHandle(X) would incorrectly remove Y's entry.
+            //
+            // Three ordered phases:
+            //   (a) Clear-and-capture: zero each removed entity's original
+            //       slot in the reverse-map group list and stash its (id,
+            //       tailSlot) for the post-callback finalize. The tail slot
+            //       mirrors where the data swap-back placed the removed
+            //       entity's component data: the i-th entry in
+            //       sortedDescendingIndices ends up at slot
+            //       (originalCount - 1 - i). We DO NOT bump the handle's
+            //       version or return it to the free list yet — that would
+            //       invalidate any handle a user observer captures via
+            //       ToHandle and break free-list determinism for the
+            //       in-flight submission.
+            //   (b) Swap-back of survivor handle entries. Same as before:
+            //       moves survivor (id, slot) pairs from their pre-swap
+            //       positions to their post-swap positions. The clear in (a)
+            //       leaves removed-entity source slots at 0 so the existing
+            //       `if (id == 0) continue;` guard in
+            //       BatchUpdateIndexAfterSwapBack skips them.
+            //   (c) Relocate-to-tail: write each captured (id, tailSlot)
+            //       back into the group list and update _entityHandleMap[id-1]
+            //       to point at the tail slot, so EntityIndex.ToHandle
+            //       resolves correctly for indices in [newCount, originalCount)
+            //       inside OnRemoved callbacks. After FireRemoveCallbacks
+            //       returns, FinalizeDeferredHandleFrees zeroes the tail
+            //       slots, bumps the version, and returns the IDs to the
+            //       free list.
+            //
+            // TrimGroupList and ValidateGroupConsistency are deferred to the
+            // finalize step for the same reason — the tail slots must remain
+            // addressable until observers have finished running.
+            var postRemoveCount = originalCount - numRemovals;
             using (TrecsProfiling.Start("Remove Refs"))
             {
-                ecsRoot._entitiesQuerier._entityLocator.BatchRemoveEntityHandles(
+                var locator = ecsRoot._entitiesQuerier._entityLocator;
+
+                // Build (originalSlot → tailSlot) so we can capture in
+                // entityHandlesToRemove (submission) order. This bridge
+                // exists because the tail slot is determined by position
+                // in sortedIndices (descending) but we deliberately walk
+                // submission order in the capture step below.
+                //
+                // Why submission order matters: the capture order is the
+                // order in which freed ids are pushed onto the
+                // _entityHandleMap free list during
+                // FinalizeDeferredHandleFrees. The free list is a linked
+                // list embedded in the unused slots' Index fields, with
+                // _nextFreeIndex pointing at the head. Both are byte-
+                // serialized by WorldStateSerializer.WriteEntityHandlesMap
+                // for snapshots AND for the determinism checksum used by
+                // replay / desync detection. Changing the push order here
+                // would shift the checksum and desync any existing
+                // recording on the first multi-entity remove. The dict +
+                // submission-order capture preserves the pre-spike
+                // BatchRemoveEntityHandles ordering exactly.
+                var tailMap = ecsRoot._cachedTailSlotByOriginalSlot;
+                tailMap.Recycle();
+                for (int i = 0; i < numRemovals; i++)
+                {
+                    tailMap[sortedIndices[i]] = originalCount - 1 - i;
+                }
+
+                // (a) Clear-and-capture in submission order.
+                var deferredBaseCount = ecsRoot._cachedDeferredHandleFrees.Count;
+                locator.BatchClearAndCaptureRemovedHandles(
                     entityHandlesToRemove,
-                    fromGroup
+                    fromGroup,
+                    tailMap,
+                    ecsRoot._cachedDeferredHandleFrees
                 );
 
-                ecsRoot._entitiesQuerier._entityLocator.BatchUpdateIndexAfterSwapBack(
+                // (b) Swap-back of survivors.
+                locator.BatchUpdateIndexAfterSwapBack(
                     ecsRoot._transientEntityIDsAffectedByRemoveAtSwapBack,
                     fromGroup
                 );
+
+                // (c) Relocate the captured handle entries to their tail
+                // slots so OnRemoved observers can resolve them. Walks only
+                // the entries we just added (per-group slice).
+                locator.BatchRelocateRemovedHandlesToTail(
+                    fromGroup,
+                    ecsRoot._cachedDeferredHandleFrees,
+                    deferredBaseCount
+                );
             }
 
-            var postRemoveCount = originalCount - numRemovals;
-            ecsRoot._entitiesQuerier._entityLocator.TrimGroupList(fromGroup, postRemoveCount);
+            ecsRoot._cachedDeferredHandleTrims.Add((fromGroup, postRemoveCount));
+        }
+
+        // Finalize phase for the deferred handle frees set up by
+        // ExecuteRemoveForGroup. Runs after FireRemoveCallbacks so that
+        // observers had a window in which ToHandle worked for the removed
+        // entities. Performs the actual version bump + free-list push, zeroes
+        // the tail slots, and trims each affected group's reverse-map list
+        // back down to its post-remove count.
+        static void FinalizeDeferredHandleFrees(EntitySubmitter ecsRoot)
+        {
+            var locator = ecsRoot._entitiesQuerier._entityLocator;
+
+            var frees = ecsRoot._cachedDeferredHandleFrees;
+            for (int i = 0; i < frees.Count; i++)
+            {
+                var entry = frees[i];
+                locator.FreeHandleAtTailSlot(entry.Group, entry.Id, entry.TailSlot);
+            }
+
+            var trims = ecsRoot._cachedDeferredHandleTrims;
+            for (int i = 0; i < trims.Count; i++)
+            {
+                var entry = trims[i];
+                locator.TrimGroupList(entry.Group, entry.PostRemoveCount);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            ecsRoot._entitiesQuerier._entityLocator.ValidateGroupConsistency(
-                fromGroup,
-                postRemoveCount
-            );
+                locator.ValidateGroupConsistency(entry.Group, entry.PostRemoveCount);
 #endif
+            }
         }
 
         /// <summary>
@@ -759,13 +892,30 @@ namespace Trecs.Internal
         {
             var rangeEnumerator = ecsRoot._cachedRangeOfSubmittedIndices.GetEnumerator();
 
-            //Note, very important: This is exploiting a trick of the removal operation (RemoveEntitiesFromArray)
-            //You may wonder: how can the remove callbacks iterate entities that have been just removed
-            //from the database? This works just because during a remove, entities are put at the end of the
-            //array and not actually removed. The entities are not iterated anymore in future just because
-            //the count of the array decreases. This means that at the end of the array, after the remove
-            //operations, we will find the collection of entities just removed. The remove callbacks are
-            //going to iterate the array from the new count to the new count + the number of entities removed
+            // Why observers can read the entities they're being told were
+            // just removed: during R2/R3 in ExecuteRemoveForGroup, the
+            // removed entities are deliberately kept reachable in the tail
+            // of each group's backing storage.
+            //
+            //   - Component data: the R2 Burst job swap-backs survivors
+            //     down and places removed values at slots
+            //     [newCount, originalCount). ComponentArray.SetCount(newCount)
+            //     then shrinks only the logical count — NativeList.Length
+            //     stays at originalCount, so NativeComponentBufferRead/Write
+            //     views still cover those tail slots.
+            //
+            //   - Handles: the R3a/R3c sequence captures each removed
+            //     entity's id, writes it into the matching tail slot of
+            //     the reverse-map group list, and repoints the forward-map
+            //     element at that tail slot — so EntityIndex.ToHandle
+            //     resolves to the still-valid pre-removal handle for
+            //     observers that need to do cross-entity cleanup. The real
+            //     handle free (version bump + free-list push) and the
+            //     matching TrimGroupList both run in
+            //     FinalizeDeferredHandleFrees after this method returns.
+            //
+            // rangeEnumerator yields one EntityRange per group that had
+            // removals, in the iteration order RemoveEntities used.
             using (TrecsProfiling.Start("Execute remove Callbacks Fast"))
             {
                 for (int groupIdx = 0; groupIdx < removeOperations.Length; groupIdx++)
@@ -1303,7 +1453,7 @@ namespace Trecs.Internal
 
         // Drives the cascade loop in SubmitEntitiesImpl: returns true while
         // there's still entity-level work to apply. Deferred set ops
-        // (Set<T>().Defer.Add / .Remove / .Clear) are intentionally excluded here.
+        // (Set<T>().DeferredAdd / .DeferredRemove / .DeferredClear) are intentionally excluded here.
         // They get drained by FlushAllDeferredOps at the end of each loop
         // iteration, so a set op queued by an observer in iteration N is
         // applied at the boundary between N and N+1. The hidden invariant

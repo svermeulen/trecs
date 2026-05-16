@@ -64,10 +64,10 @@ namespace Trecs.Samples.FeedingFrenzy101
                 var entity in World
                     .Query()
                     .WithTags<FrenzyTags.Meal, FrenzyTags.NotEating>()
-                    .Entities()
+                    .Handles()
             )
             {
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
                 if (removed >= count)
                     return;
@@ -75,13 +75,10 @@ namespace Trecs.Samples.FeedingFrenzy101
 
             // Then remove eaten meals if needed
             foreach (
-                var entity in World
-                    .Query()
-                    .WithTags<FrenzyTags.Meal, FrenzyTags.Eating>()
-                    .Entities()
+                var entity in World.Query().WithTags<FrenzyTags.Meal, FrenzyTags.Eating>().Handles()
             )
             {
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
                 if (removed >= count)
                     return;

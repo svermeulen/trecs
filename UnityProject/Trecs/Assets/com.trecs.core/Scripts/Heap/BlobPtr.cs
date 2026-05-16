@@ -1,5 +1,4 @@
 using System;
-using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
 using Unity.Mathematics;
@@ -13,7 +12,6 @@ namespace Trecs
     /// <see cref="SharedPtr.Alloc{T}(HeapAccessor, BlobId, T)"/>; <see cref="BlobPtr{T}"/>
     /// is only used by callers writing custom <see cref="IBlobStore"/> backends.
     /// </summary>
-    [EditorBrowsable(EditorBrowsableState.Never)]
     public readonly struct BlobPtr<T> : IEquatable<BlobPtr<T>>, IBlobPtr
         where T : class
     {

@@ -9,15 +9,15 @@ namespace Trecs
     /// </summary>
     /// <remarks>
     /// Self-enumerable — use directly in foreach:
-    /// <code>foreach (var handle in queryBuilder.EntityHandles()) { ... }</code>
+    /// <code>foreach (var handle in queryBuilder.Handles()) { ... }</code>
     /// </remarks>
-    public ref struct EntityHandlesQueryIterator
+    public ref struct HandleQueryIterator
     {
-        QueryIterator _inner;
+        IndexQueryIterator _inner;
         readonly WorldAccessor _world;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal EntityHandlesQueryIterator(QueryIterator inner, WorldAccessor world)
+        internal HandleQueryIterator(IndexQueryIterator inner, WorldAccessor world)
         {
             _inner = inner;
             _world = world;
@@ -30,7 +30,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityHandlesQueryIterator GetEnumerator() => this;
+        public HandleQueryIterator GetEnumerator() => this;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool MoveNext() => _inner.MoveNext();

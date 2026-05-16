@@ -17,8 +17,8 @@ namespace Trecs.Tests
             _serializerRegistry = TestSerializerInstaller.CreateTestRegistry();
 
             // Register polymorphic types (concrete classes only - framework doesn't support interfaces)
-            _serializerRegistry.RegisterSerializer<BaseClassSerializer>();
-            _serializerRegistry.RegisterSerializer<DerivedClassSerializer>();
+            _serializerRegistry.RegisterSerializer(new BaseClassSerializer());
+            _serializerRegistry.RegisterSerializer(new DerivedClassSerializer());
             _cacheHelper = new SerializationBuffer(_serializerRegistry);
         }
 

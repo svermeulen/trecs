@@ -70,7 +70,7 @@ public partial class SnakeInputSystem : ISystem
     {
         if (_pendingDirection.x != 0 || _pendingDirection.y != 0)
         {
-            World.AddInput(World.GlobalEntityHandle, new MoveInput { RequestedDirection = _pendingDirection });
+            World.GlobalEntityHandle.AddInput(World, new MoveInput { RequestedDirection = _pendingDirection });
             _pendingDirection = int2.zero;
         }
     }
@@ -159,7 +159,7 @@ See [Serialization](../advanced/serialization.md) for custom-serializer authorin
 
 - **`[Input(Retain)]`** on a template field — input persists until replaced
 - **`[ExecuteIn(SystemPhase.Input)]`** — runs in the input phase, before fixed update
-- **`World.AddInput`** — queues input from outside the ECS tick
+- **`entity.AddInput<T>(World, value)`** — queues input from outside the ECS tick
 - **`[SingleEntity(typeof(Tag))]`** parameter — binds the one tagged entity into the `Execute` signature
 - **Grid-based gameplay** — integer positions, discrete movement
 - **FIFO entity management** — `SegmentAge` tracks creation order for oldest-first removal

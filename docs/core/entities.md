@@ -18,7 +18,14 @@ EntityHandle handle = World.AddEntity<MyTag>()
 EntityHandle preyHandle = prey.Handle(World);
 
 // From a query iterator
-foreach (EntityHandle h in World.Query().WithTags<GameTags.Enemy>().EntityHandles())
+foreach (EntityHandle h in World.Query().WithTags<GameTags.Enemy>().Handles())
+{
+    // ...
+}
+
+// As a [ForEachEntity] parameter
+[ForEachEntity(MatchByComponents = true)]
+void Execute(ref Position pos, EntityHandle handle)
 {
     // ...
 }
@@ -45,14 +52,14 @@ EntityHandle handle = World.AddEntity<MyTag>()
     .Handle;
 ```
 
-`.AssertComplete()` verifies that every non-optional template field has been set. The same check runs at submission; calling it explicitly surfaces the error earlier, at the call site.
+Note that `.AssertComplete()` is optional.  This verifies that every non-optional template field has been set. The same check runs at submission; calling it explicitly as part of AddEntity just surfaces the error earlier.
 
 ## Removing entities
 
 ```csharp
-World.RemoveEntity(entityHandle);
+entityHandle.Remove(World);
 
-// Inside an iteration callback, the bound entity removes itself:
+// Inside an aspect iteration callback, the bound entity removes itself:
 entity.Remove();
 
 // Remove every entity matching a tag combination
@@ -64,48 +71,79 @@ Removal is **deferred** — the entity disappears at the next [submission](../en
 
 ## Accessing entity data
 
-`EntityAccessor` is a live single-entity view bound to a `WorldAccessor`. It exposes component access plus remove and partition-transition operations on the bound entity.
+### Aspects (preferred)
+
+Aspects are the primary entity-access API in Trecs — bundled component views with auto-generated read/write properties. Most systems read and mutate entity data through an aspect passed to `[ForEachEntity]`:
 
 ```csharp
-EntityAccessor entity = World.Entity(handle);
+partial struct FishView : IAspect, IRead<Velocity>, IWrite<Position> { }
 
-ref Position pos = ref entity.Get<Position>().Write;
-ref readonly Velocity vel = ref entity.Get<Velocity>().Read;
+[ForEachEntity(typeof(FrenzyTags.Fish))]
+void Execute(in FishView fish)
+{
+    fish.Position.Write.Value += fish.Velocity.Read.Value * World.DeltaTime;
+}
+```
 
-// Safe access
-if (entity.TryGet<Velocity>(out var velAccessor))
+See [Aspects](../data-access/aspects.md) for the full reference, including manual queries and multi-interface aspects.
+
+### Operating on an entity via its handle
+
+When you have an `EntityHandle` (the stable identifier — see [EntityHandle](#entityhandle) above) you can read components and perform structural changes directly on it, taking the `WorldAccessor` as an argument:
+
+```csharp
+// Component access
+ref Position pos = ref handle.Component<Position>(World).Write;
+ref readonly Velocity vel = ref handle.Component<Velocity>(World).Read;
+
+// Safe access — false if the entity no longer exists or lacks the component
+if (handle.TryComponent<Velocity>(World, out var velAccessor))
 {
     // ...
 }
 
-// Structural / input ops on the bound entity
-entity.Remove();
-entity.SetTag<BallTags.Resting>();      // partition transition (turn tag on / switch variant)
-entity.UnsetTag<BallTags.Active>();     // partition transition (presence/absence dim only)
-
-// Resolve the stable handle when you need to store it
-EntityHandle handle = entity.Handle;
+// Structural / input ops
+handle.Remove(World);
+handle.SetTag<BallTags.Resting>(World);    // partition transition (turn tag on / switch variant)
+handle.UnsetTag<BallTags.Active>(World);   // partition transition (presence/absence dim only)
+handle.AddInput<TInput>(World, value);     // queue an input component (only from Input-phase systems)
 ```
 
-`EntityAccessor` is a `ref struct` — it lives on the stack and isn't suitable for storage. For long-lived references, store an `EntityHandle` instead.
+These same methods exist on `EntityIndex` and take the same shape — see the [hot-loop note](#entityindex-hot-loop-variant) below.
 
-You can also receive an `EntityAccessor` directly as a `[ForEachEntity]` parameter, or from a query terminator:
+You can also receive an `EntityHandle` directly as a `[ForEachEntity]` parameter (typically alongside an aspect for the component data), or from a query terminator:
 
 ```csharp
 [ForEachEntity(typeof(GameTags.Enemy))]
-void Execute(in EnemyView enemy, EntityAccessor entity)
+void Execute(in EnemyView enemy, EntityHandle entity)
 {
-    if (enemy.Health <= 0) entity.Remove();
+    if (enemy.Health <= 0) entity.Remove(World);
 }
 
-// Single-entity terminator returns an EntityAccessor
-EntityAccessor player = World.Query().WithTags<GameTags.Player>().Single();
+// Single-entity terminator returns an EntityHandle
+EntityHandle player = World.Query().WithTags<GameTags.Player>().SingleHandle();
 
-// Multi-entity terminator yields one per match
-foreach (var e in World.Query().WithTags<GameTags.Enemy>().Entities()) { /* ... */ }
+// Multi-entity iterator yields a handle per match
+foreach (var e in World.Query().WithTags<GameTags.Enemy>().Handles()) { /* ... */ }
 ```
 
-For most multi-component access prefer [aspects](../data-access/aspects.md) — they bundle related components into a typed view with auto-generated read/write properties.
+### `EntityIndex` (hot-loop variant)
+
+`EntityIndex` is the transient counterpart to `EntityHandle`. It identifies an entity by its buffer position within a specific group, so it's only valid within the current submission cycle — any structural change can invalidate it. In exchange, it skips the per-call handle-to-index lookup that `EntityHandle.X(world)` does internally.
+
+Every entity-targeted method on `EntityHandle` has a matching overload on `EntityIndex`:
+
+```csharp
+// Amortize one lookup across multiple ops on the same entity
+EntityIndex idx = handle.ToIndex(World);
+idx.SetTag<BallTags.Resting>(World);
+idx.Component<Position>(World).Write = newPos;
+
+// Or get an EntityIndex directly from a query — no handle ever materialized
+foreach (var idx in World.Query().WithTags<GameTags.Active>().Indices()) { /* ... */ }
+```
+
+Prefer `EntityHandle` everywhere else — the stability across submissions is almost always worth more than the lookup cost.
 
 ## Counting entities
 

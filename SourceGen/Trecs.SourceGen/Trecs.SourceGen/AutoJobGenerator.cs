@@ -479,11 +479,7 @@ namespace Trecs.SourceGen
                 // Check for EntityIndex.
                 if (
                     !paramHasSingleEntity
-                    && SymbolAnalyzer.IsExactType(
-                        paramType,
-                        "EntityIndex",
-                        TrecsNamespaces.Trecs
-                    )
+                    && SymbolAnalyzer.IsExactType(paramType, "EntityIndex", TrecsNamespaces.Trecs)
                 )
                 {
                     if (param.RefKind != RefKind.None)
@@ -548,29 +544,6 @@ namespace Trecs.SourceGen
                     hasEntityHandle = true;
                     paramSlots.Add(AutoJobParam.EntityHandle(paramName));
                     continue;
-                }
-
-                // EntityAccessor is a ref struct bound to a managed WorldAccessor —
-                // it can't cross into a job. Targeted diagnostic to point users at
-                // EntityHandle (the value-type equivalent) instead.
-                if (
-                    !paramHasSingleEntity
-                    && SymbolAnalyzer.IsExactType(
-                        paramType,
-                        "EntityAccessor",
-                        TrecsNamespaces.Trecs
-                    )
-                )
-                {
-                    context.ReportDiagnostic(
-                        Diagnostic.Create(
-                            DiagnosticDescriptors.InvalidParameterList,
-                            param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
-                            $"Parameter '{paramName}' is EntityAccessor, which is supported in main-thread [ForEachEntity] callbacks but not in jobs (it carries a managed WorldAccessor reference). "
-                                + "Use EntityHandle instead — it's a plain value type and is materialized per-iteration from a NativeEntityHandleBuffer at no extra cost."
-                        )
-                    );
-                    return null;
                 }
 
                 // Check for IAspect. [SingleEntity]-marked aspect params skip the
@@ -998,8 +971,7 @@ namespace Trecs.SourceGen
                         DiagnosticDescriptors.InvalidParameterList,
                         param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                         $"Parameter '{paramName}' of type '{PerformanceCache.GetDisplayString(paramType)}' is not recognized. "
-                            + "Expected: IAspect (in), IEntityComponent (in/ref), EntityHandle, EntityIndex, NativeWorldAccessor, NativeSetRead<T>, NativeSetCommandBuffer<T>, [PassThroughArgument], or [FromWorld]. "
-                            + "Note: EntityAccessor is accepted in main-thread [ForEachEntity] callbacks but not in jobs (it carries a managed WorldAccessor reference) — use EntityHandle in jobs."
+                            + "Expected: IAspect (in), IEntityComponent (in/ref), EntityHandle, EntityIndex, NativeWorldAccessor, NativeSetRead<T>, NativeSetCommandBuffer<T>, [PassThroughArgument], or [FromWorld]."
                     )
                 );
                 return null;
@@ -2070,7 +2042,7 @@ namespace Trecs.SourceGen
             /// Aspect-typed parameter marked <c>[SingleEntity(Tag/Tags)]</c>. Becomes a
             /// hidden <c>NativeFactory</c> + <c>EntityIndex</c> field pair on the generated
             /// job. The scheduler resolves the singleton via
-            /// <c>Query().WithTags&lt;...&gt;().SingleEntityIndex()</c> once per call;
+            /// <c>Query().WithTags&lt;...&gt;().SingleIndex()</c> once per call;
             /// <c>Execute(int)</c> materializes the aspect via <c>factory.Create(index)</c>.
             /// </summary>
             SingleEntityAspect,

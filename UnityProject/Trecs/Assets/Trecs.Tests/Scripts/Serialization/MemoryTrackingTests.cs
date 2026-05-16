@@ -21,8 +21,8 @@ namespace Trecs.Tests
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(_serializerRegistry);
 
             // Register test-specific serializers
-            _serializerRegistry.RegisterSerializer<ListSerializer<int>>();
-            _serializerRegistry.RegisterSerializer<DictionarySerializer<string, float>>();
+            _serializerRegistry.RegisterSerializer(new ListSerializer<int>());
+            _serializerRegistry.RegisterSerializer(new DictionarySerializer<string, float>());
 
             _writer = new BinarySerializationWriter(_serializerRegistry);
             _memoryStream = new MemoryStream();

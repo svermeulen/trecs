@@ -82,7 +82,7 @@ namespace Trecs
         static object ReadComponentBoxedImpl<T>(WorldAccessor accessor, EntityIndex entityIndex)
             where T : unmanaged, IEntityComponent
         {
-            T copy = accessor.Component<T>(entityIndex).Read;
+            T copy = entityIndex.Component<T>(accessor).Read;
             return copy;
         }
 
@@ -93,7 +93,7 @@ namespace Trecs
         )
             where T : unmanaged, IEntityComponent
         {
-            ref var slot = ref accessor.Component<T>(entityIndex).Write;
+            ref var slot = ref entityIndex.Component<T>(accessor).Write;
             slot = (T)value;
         }
     }

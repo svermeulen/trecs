@@ -22,8 +22,8 @@ namespace Trecs.Tests
         {
             _serializerRegistry = TestSerializerInstaller.CreateTestRegistry();
 
-            _serializerRegistry.RegisterSerializer<DerivedASerializer>();
-            _serializerRegistry.RegisterSerializer<DerivedBSerializer>();
+            _serializerRegistry.RegisterSerializer(new DerivedASerializer());
+            _serializerRegistry.RegisterSerializer(new DerivedBSerializer());
             _serializerRegistry.RegisterSerializerDelta<DerivedASerializer>();
             _serializerRegistry.RegisterSerializerDelta<DerivedBSerializer>();
 

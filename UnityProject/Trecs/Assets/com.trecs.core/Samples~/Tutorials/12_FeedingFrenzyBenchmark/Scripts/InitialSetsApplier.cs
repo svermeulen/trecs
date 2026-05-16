@@ -31,13 +31,13 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         [ForEachEntity]
         void OnFishAdded(EntityHandle handle)
         {
-            World.Set<FrenzySets.NotEating>().Defer.Add(handle);
+            World.Set<FrenzySets.NotEating>().DeferredAdd(handle);
         }
 
         [ForEachEntity]
         void OnMealAdded(EntityHandle handle)
         {
-            World.Set<FrenzySets.NotEating>().Defer.Add(handle);
+            World.Set<FrenzySets.NotEating>().DeferredAdd(handle);
         }
 
         public void Dispose()

@@ -57,7 +57,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var idx in World.Query().WithTags<VuoTemplateTag>().EntityIndices())
+            foreach (var idx in World.Query().WithTags<VuoTemplateTag>().Indices())
             {
                 World.RemoveEntity(idx);
                 return;
@@ -72,7 +72,7 @@ namespace Trecs.Tests
             // Querying a tag that resolves to a VUO group from Fixed must
             // throw at query construction time per the design — silent
             // filtering hides the underlying mistake.
-            foreach (var _ in World.Query().WithTags<VuoTemplateTag>().EntityIndices())
+            foreach (var _ in World.Query().WithTags<VuoTemplateTag>().Indices())
             {
                 // unreachable
             }
@@ -110,7 +110,7 @@ namespace Trecs.Tests
     {
         public void Execute()
         {
-            foreach (var _ in World.Query().WithTags<VuoChildTag>().EntityIndices())
+            foreach (var _ in World.Query().WithTags<VuoChildTag>().Indices())
             {
                 // unreachable — query construction should throw.
             }
@@ -364,7 +364,7 @@ namespace Trecs.Tests
             // CreateEnvWithSystem pre-populates one VUO entity via Bypass.
             // Bind the mover to it before the first Tick so Execute has a
             // valid victim index to feed MoveTo.
-            mover.Victim = env.Accessor.Query().WithTags<VuoTemplateTag>().SingleEntityIndex();
+            mover.Victim = env.Accessor.Query().WithTags<VuoTemplateTag>().SingleIndex();
 
             NAssert.Throws<TrecsException>(() => env.World.Tick());
         }
@@ -419,7 +419,7 @@ namespace Trecs.Tests
                 .AssertComplete();
             env.Accessor.SubmitEntities();
 
-            var entityIdx = env.Accessor.Query().WithTags<VuoTemplateTag>().SingleEntityIndex();
+            var entityIdx = env.Accessor.Query().WithTags<VuoTemplateTag>().SingleIndex();
 
             // Round-trip through the snapshot serializer. Mirrors the
             // pattern in WorldStateSerializerTests — write to a memory
@@ -451,7 +451,7 @@ namespace Trecs.Tests
                 serializer.DeserializeState(reader);
             }
 
-            var restoredIdx = env.Accessor.Query().WithTags<VuoTemplateTag>().SingleEntityIndex();
+            var restoredIdx = env.Accessor.Query().WithTags<VuoTemplateTag>().SingleIndex();
             NAssert.AreEqual(
                 7,
                 env.Accessor.Component<VuoTemplateRenderComp>(restoredIdx).Read.Value,

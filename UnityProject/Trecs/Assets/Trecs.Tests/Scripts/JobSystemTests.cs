@@ -269,8 +269,7 @@ namespace Trecs.Tests
             // assertion stays robust if storage is reordered between submit and read.
             for (int i = 0; i < EntityCount; i++)
             {
-                var entity = a.Entity(handles[i]);
-                int actual = entity.Get<TestInt>().Read.Value;
+                int actual = handles[i].Component<TestInt>(a).Read.Value;
                 NAssert.AreEqual(
                     handles[i].Id,
                     actual,

@@ -43,9 +43,6 @@ namespace Trecs.SourceGen.Shared
         /// <summary>Whether an EntityHandle parameter was found.</summary>
         public bool HasEntityHandle { get; set; }
 
-        /// <summary>Whether an EntityAccessor parameter was found.</summary>
-        public bool HasEntityAccessor { get; set; }
-
         /// <summary>Whether a WorldAccessor parameter was found.</summary>
         public bool HasWorldAccessor { get; set; }
 
@@ -366,11 +363,6 @@ namespace Trecs.SourceGen.Shared
                     "EntityHandle",
                     TrecsNamespaces.Trecs
                 );
-                bool isEntityAccessor = SymbolAnalyzer.IsExactType(
-                    paramType,
-                    "EntityAccessor",
-                    TrecsNamespaces.Trecs
-                );
                 bool isWorldAccessor = SymbolAnalyzer.IsExactType(
                     paramType,
                     "WorldAccessor",
@@ -412,25 +404,6 @@ namespace Trecs.SourceGen.Shared
                         )
                     )
                         result.HasEntityHandle = true;
-                    continue;
-                }
-
-                if (!isPassThrough && isEntityAccessor)
-                {
-                    if (
-                        TryClassifyByValueLoopParam(
-                            param,
-                            isRef,
-                            isIn,
-                            alreadyPresent: result.HasEntityAccessor,
-                            typeName: "EntityAccessor",
-                            slotKind: ParamSlotKind.LoopEntityAccessor,
-                            result,
-                            reportDiagnostic,
-                            ref isValid
-                        )
-                    )
-                        result.HasEntityAccessor = true;
                     continue;
                 }
 

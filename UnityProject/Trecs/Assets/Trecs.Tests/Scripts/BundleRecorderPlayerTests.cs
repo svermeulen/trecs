@@ -489,7 +489,7 @@ namespace Trecs.Tests
 
                 // Mutate every QId1 entity's TestInt to a value the recording
                 // can't have produced.
-                foreach (var ei in env.Accessor.Query().WithTags(Tag<QId1>.Value).EntityIndices())
+                foreach (var ei in env.Accessor.Query().WithTags(Tag<QId1>.Value).Indices())
                 {
                     env.Accessor.Component<TestInt>(ei).Write.Value = 999999;
                 }

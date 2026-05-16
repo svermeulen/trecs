@@ -102,7 +102,7 @@ namespace Trecs.Tests
 
             // Verify data is correct
             var results = new List<int>();
-            foreach (var ei in a.Query().InSet<FMSet>().EntityIndices())
+            foreach (var ei in a.Query().InSet<FMSet>().Indices())
             {
                 results.Add(a.Component<TestInt>(ei).Read.Value);
             }
@@ -181,7 +181,7 @@ namespace Trecs.Tests
 
             // Verify query through set gets correct values
             var values = new List<int>();
-            foreach (var ei in a.Query().InSet<FMSet>().EntityIndices())
+            foreach (var ei in a.Query().InSet<FMSet>().Indices())
             {
                 values.Add(a.Component<TestInt>(ei).Read.Value);
             }

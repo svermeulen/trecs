@@ -63,11 +63,14 @@ namespace Trecs.Tests
                 .AssertComplete();
             a.SubmitEntities();
 
-            var entity = a.Query().WithTags(TestTags.Alpha).Single();
+            var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();
 
-            NAssert.AreEqual(42, entity.Get<TestInt>().Read.Value);
-            NAssert.AreEqual(42, entity.Get<Interpolated<TestInt>>().Read.Value.Value);
-            NAssert.AreEqual(42, entity.Get<InterpolatedPrevious<TestInt>>().Read.Value.Value);
+            NAssert.AreEqual(42, entity.Component<TestInt>(a).Read.Value);
+            NAssert.AreEqual(42, entity.Component<Interpolated<TestInt>>(a).Read.Value.Value);
+            NAssert.AreEqual(
+                42,
+                entity.Component<InterpolatedPrevious<TestInt>>(a).Read.Value.Value
+            );
         }
 
         [Test]
@@ -79,9 +82,9 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).SetInterpolated(new TestInt { Value = 7 }).AssertComplete();
             a.SubmitEntities();
 
-            var entity = a.Query().WithTags(TestTags.Alpha).Single();
-            var current = entity.Get<TestInt>().Read.Value;
-            var previous = entity.Get<InterpolatedPrevious<TestInt>>().Read.Value.Value;
+            var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();
+            var current = entity.Component<TestInt>(a).Read.Value;
+            var previous = entity.Component<InterpolatedPrevious<TestInt>>(a).Read.Value.Value;
 
             NAssert.AreEqual(
                 current,
@@ -105,17 +108,17 @@ namespace Trecs.Tests
             a.SubmitEntities();
 
             // Mutate current to simulate a fixed tick advancing state.
-            var entity = a.Query().WithTags(TestTags.Alpha).Single();
-            entity.Get<TestInt>().Write.Value = 100;
+            var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();
+            entity.Component<TestInt>(a).Write.Value = 100;
 
             // One tick drives the saver via the fixed-update loop.
             env.World.Tick();
             env.World.LateTick();
 
-            entity = a.Query().WithTags(TestTags.Alpha).Single();
+            entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();
             NAssert.AreEqual(
                 100,
-                entity.Get<InterpolatedPrevious<TestInt>>().Read.Value.Value,
+                entity.Component<InterpolatedPrevious<TestInt>>(a).Read.Value.Value,
                 "After a tick, Previous should have been updated to the current value"
             );
         }

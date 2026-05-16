@@ -58,7 +58,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
 
             if (distanceSqr < EatDistanceSqr)
             {
-                World.RemoveEntity(fish.TargetMeal);
+                fish.TargetMeal.Remove(World);
 
                 fish.TargetMeal = EntityHandle.Null;
             }
@@ -81,7 +81,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
 
             if (distanceSqr < EatDistanceSqr)
             {
-                World.RemoveEntity(fishMeal.Value.ToIndex(World));
+                fishMeal.Value.Remove(World);
 
                 fishMeal.Value = EntityHandle.Null;
             }
@@ -100,7 +100,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
 
                 if (distanceSqr < EatDistanceSqr)
                 {
-                    World.RemoveEntity(fish.TargetMeal);
+                    fish.TargetMeal.Remove(World);
 
                     fish.TargetMeal = EntityHandle.Null;
                 }
@@ -128,7 +128,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
 
                     if (distanceSqr < EatDistanceSqr)
                     {
-                        World.RemoveEntity(meals[fi].Value.ToIndex(World));
+                        meals[fi].Value.Remove(World);
 
                         meals[fi].Value = EntityHandle.Null;
                     }
@@ -171,7 +171,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
 
             if (distanceSqr < EatDistanceSqr)
             {
-                world.RemoveEntity(fish.TargetMeal);
+                fish.TargetMeal.Remove(world);
                 fish.TargetMeal = EntityHandle.Null;
             }
         }
@@ -194,7 +194,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
 
             if (distanceSqr < EatDistanceSqr)
             {
-                world.RemoveEntity(fishMeal.Value);
+                fishMeal.Value.Remove(world);
                 fishMeal.Value = EntityHandle.Null;
             }
         }
@@ -217,7 +217,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
 
                 if (distanceSqr < EatDistanceSqr)
                 {
-                    World.RemoveEntity(fish.TargetMeal);
+                    fish.TargetMeal.Remove(World);
                     fish.TargetMeal = EntityHandle.Null;
                 }
             }
@@ -247,7 +247,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
                 if (distanceSqr < EatDistanceSqr)
                 {
                     var mealIndex = fishMeal.Value.ToIndex(World);
-                    World.RemoveEntity(mealIndex);
+                    mealIndex.Remove(World);
                     fishMeal.Value = EntityHandle.Null;
                 }
             }
@@ -281,7 +281,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Branching
                 if (distanceSqr < EatDistanceSqr)
                 {
                     var mealIndex = Meals[i].Value.ToIndex(World);
-                    World.RemoveEntity(mealIndex);
+                    mealIndex.Remove(World);
                     Meals[i].Value = EntityHandle.Null;
                 }
             }

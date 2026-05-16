@@ -6,7 +6,7 @@ namespace Trecs
     /// <summary>
     /// Fluent builder for dense entity queries. Chain <c>WithTags</c>, <c>WithoutTags</c>,
     /// <c>WithComponents</c>, and <c>WithoutComponents</c> to narrow matching groups, then
-    /// terminate with <see cref="EntityIndices"/>, <see cref="GroupSlices"/>, <see cref="Single"/>,
+    /// terminate with <see cref="Indices"/>, <see cref="GroupSlices"/>, <see cref="SingleHandle"/>,
     /// or <see cref="Count"/> to consume results. Call <see cref="InSet{T}"/> to switch to
     /// sparse (set-filtered) iteration via <see cref="SparseQueryBuilder"/>.
     /// Obtained from <see cref="WorldAccessor.Query"/>.
@@ -248,30 +248,26 @@ namespace Trecs
             );
         }
 
-        internal readonly QueryIterator EntityIndices()
+        /// <summary>
+        /// Returns an iterator that yields a transient <see cref="EntityIndex"/> per
+        /// matched entity. Low-level — prefer <see cref="Handles"/> in most
+        /// code; reach for indices only when you have a hot loop that does multiple
+        /// ops per entity and wants to skip the per-call handle-to-index lookup.
+        /// </summary>
+        public readonly IndexQueryIterator Indices()
         {
             AssertHasAnyCriteria();
             return CreateIterator();
         }
 
         /// <summary>
-        /// Returns an iterator that yields a stable <see cref="EntityHandle"/> per matched entity.
+        /// Returns an iterator that yields a stable <see cref="EntityHandle"/> per
+        /// matched entity. Primary entry point for entity iteration.
         /// </summary>
-        public readonly EntityHandlesQueryIterator EntityHandles()
+        public readonly HandleQueryIterator Handles()
         {
             AssertHasAnyCriteria();
-            return new EntityHandlesQueryIterator(CreateIterator(), _world);
-        }
-
-        /// <summary>
-        /// Returns an iterator that yields an <see cref="EntityAccessor"/> per matched entity,
-        /// bound to the world and the entity's transient index. Use this for structural / set /
-        /// input operations on iterated entities — the bound index avoids a per-call lookup.
-        /// </summary>
-        public readonly EntitiesQueryIterator Entities()
-        {
-            AssertHasAnyCriteria();
-            return new EntitiesQueryIterator(CreateIterator(), _world);
+            return new HandleQueryIterator(CreateIterator(), _world);
         }
 
         /// <summary>
@@ -298,23 +294,35 @@ namespace Trecs
             return _world.CountEntitiesInGroups(groups);
         }
 
-        public readonly EntityAccessor Single()
-        {
-            return new EntityAccessor(_world, SingleEntityIndex());
-        }
+        /// <summary>
+        /// Returns the single matching entity as a stable <see cref="EntityHandle"/>.
+        /// Asserts exactly one match. Primary entry point — use
+        /// <see cref="SingleIndex"/> only in hot-loop code that wants to skip
+        /// the handle conversion.
+        /// </summary>
+        public readonly EntityHandle SingleHandle() => SingleIndex().ToHandle(_world);
 
-        public readonly bool TrySingle(out EntityAccessor entityRef)
+        /// <summary>
+        /// Resolves the single matching entity to an <see cref="EntityHandle"/>,
+        /// returning false on zero or multiple matches.
+        /// </summary>
+        public readonly bool TrySingleHandle(out EntityHandle entityHandle)
         {
-            if (!TrySingleEntityIndex(out var entityIndex))
+            if (!TrySingleIndex(out var entityIndex))
             {
-                entityRef = default;
+                entityHandle = default;
                 return false;
             }
-            entityRef = new EntityAccessor(_world, entityIndex);
+            entityHandle = entityIndex.ToHandle(_world);
             return true;
         }
 
-        internal readonly EntityIndex SingleEntityIndex()
+        /// <summary>
+        /// Hot-loop variant of <see cref="SingleHandle"/> — returns the matching entity
+        /// as a transient <see cref="EntityIndex"/>, skipping the handle conversion.
+        /// Only valid within the current submission cycle.
+        /// </summary>
+        public readonly EntityIndex SingleIndex()
         {
             AssertHasAnyCriteria();
             var iter = CreateIterator();
@@ -328,7 +336,10 @@ namespace Trecs
             return result;
         }
 
-        internal readonly bool TrySingleEntityIndex(out EntityIndex entityIndex)
+        /// <summary>
+        /// Hot-loop variant of <see cref="TrySingleHandle"/>.
+        /// </summary>
+        public readonly bool TrySingleIndex(out EntityIndex entityIndex)
         {
             AssertHasAnyCriteria();
             var iter = CreateIterator();
@@ -375,10 +386,10 @@ namespace Trecs
             return groups;
         }
 
-        internal readonly QueryIterator CreateIterator()
+        internal readonly IndexQueryIterator CreateIterator()
         {
             var groups = ResolveGroups();
-            return new QueryIterator(_world, groups);
+            return new IndexQueryIterator(_world, groups);
         }
 
         static TagSet MergeTags(TagSet existing, TagSet addition)

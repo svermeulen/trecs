@@ -117,30 +117,30 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         {
             int removed = 0;
 
-            foreach (var entity in World.Query().WithTags<FrenzyTags.Meal>().Entities())
+            foreach (var entity in World.Query().WithTags<FrenzyTags.Meal>().Handles())
             {
                 if (removed >= count)
                 {
                     return;
                 }
 
-                if (!entity.Get<ApproachingFish>().Read.Value.IsNull)
+                if (!entity.Component<ApproachingFish>(World).Read.Value.IsNull)
                 {
                     continue;
                 }
 
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
             }
 
-            foreach (var entity in World.Query().WithTags<FrenzyTags.Meal>().Entities())
+            foreach (var entity in World.Query().WithTags<FrenzyTags.Meal>().Handles())
             {
                 if (removed >= count)
                 {
                     return;
                 }
 
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
             }
         }
@@ -154,7 +154,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     .Query()
                     .WithTags<FrenzyTags.Meal>()
                     .InSet<FrenzySets.NotEating>()
-                    .Entities()
+                    .Handles()
             )
             {
                 if (removed >= count)
@@ -162,7 +162,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     return;
                 }
 
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
             }
 
@@ -171,7 +171,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     .Query()
                     .WithTags<FrenzyTags.Meal>()
                     .InSet<FrenzySets.Eating>()
-                    .Entities()
+                    .Handles()
             )
             {
                 if (removed >= count)
@@ -179,7 +179,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     return;
                 }
 
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
             }
         }
@@ -192,7 +192,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 var entity in World
                     .Query()
                     .WithTags<FrenzyTags.Meal, FrenzyTags.NotEating>()
-                    .Entities()
+                    .Handles()
             )
             {
                 if (removed >= count)
@@ -200,18 +200,15 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     return;
                 }
 
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
             }
 
             foreach (
-                var entity in World
-                    .Query()
-                    .WithTags<FrenzyTags.Meal, FrenzyTags.Eating>()
-                    .Entities()
+                var entity in World.Query().WithTags<FrenzyTags.Meal, FrenzyTags.Eating>().Handles()
             )
             {
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
 
                 if (removed >= count)

@@ -60,30 +60,30 @@ A query must have at least one filter — terminators assert otherwise.
 ### Terminators
 
 ```csharp
-// Iterate entity-by-entity, yielding a live EntityAccessor per match
-foreach (var entity in World.Query().WithTags<GameTags.Player>().Entities())
+// Iterate stable handles — primary path; do entity-targeted ops on the handle
+foreach (EntityHandle entity in World.Query().WithTags<GameTags.Player>().Handles())
 {
-    ref Position pos = ref entity.Get<Position>().Write;
+    ref Position pos = ref entity.Component<Position>(World).Write;
     pos.Value.y += 1f;
 }
 
-// Iterate stable handles only — useful when you just want to store / pass them
-foreach (EntityHandle handle in World.Query().WithTags<GameTags.Enemy>().EntityHandles())
+// Iterate transient indices — hot-loop variant, avoids the per-iter handle materialization
+foreach (EntityIndex idx in World.Query().WithTags<GameTags.Enemy>().Indices())
 {
-    _enemies.Add(handle);
+    // ...
 }
 
 // Count
 int total = World.Query().WithTags<GameTags.Enemy>().Count();
 
-// Single entity (asserts exactly one match) — returns an EntityAccessor
-EntityAccessor player = World.Query().WithTags<GameTags.Player>().Single();
-ref Health hp = ref player.Get<Health>().Write;
+// Single entity (asserts exactly one match) — returns an EntityHandle
+EntityHandle player = World.Query().WithTags<GameTags.Player>().SingleHandle();
+ref Health hp = ref player.Component<Health>(World).Write;
 
 // Single, no-throw form
-if (World.Query().WithTags<GameTags.Player>().TrySingle(out var p))
+if (World.Query().WithTags<GameTags.Player>().TrySingleHandle(out var p))
 {
-    ref readonly Position pos = ref p.Get<Position>().Read;
+    ref readonly Position pos = ref p.Component<Position>(World).Read;
 }
 ```
 
@@ -97,7 +97,7 @@ Other counting helpers on `WorldAccessor`: `CountAllEntities()`, `CountEntitiesW
 foreach (var entity in World.Query()
     .WithTags<GameTags.Particle>()
     .InSet<HighlightedParticles>()
-    .Entities())
+    .Handles())
 {
     // ...
 }
@@ -105,7 +105,7 @@ foreach (var entity in World.Query()
 
 ## Aspect queries
 
-Every [aspect](aspects.md) gets a generated `Query()` method that bundles component access into the iteration variable. Read and write through the aspect's properties instead of `World.Component<T>(...)`:
+Every [aspect](aspects.md) gets a generated `Query()` method that bundles component access into the iteration variable. Read and write through the aspect's properties instead of `....Component<T>(World)`:
 
 ```csharp
 partial struct PlayerView : IAspect, IRead<Position>, IWrite<Health> { }

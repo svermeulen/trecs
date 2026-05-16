@@ -71,11 +71,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
 
                 meal.ApproachingFish = fishHandle;
 
-                World.Set<FrenzySets.NotEating>().Defer.Remove(fishHandle);
-                World.Set<FrenzySets.Eating>().Defer.Add(fishHandle);
+                World.Set<FrenzySets.NotEating>().DeferredRemove(fishHandle);
+                World.Set<FrenzySets.Eating>().DeferredAdd(fishHandle);
 
-                World.Set<FrenzySets.NotEating>().Defer.Remove(mealHandle);
-                World.Set<FrenzySets.Eating>().Defer.Add(mealHandle);
+                World.Set<FrenzySets.NotEating>().DeferredRemove(mealHandle);
+                World.Set<FrenzySets.Eating>().DeferredAdd(mealHandle);
             }
         }
 
@@ -149,11 +149,11 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
                     rotations[fi].Value = quaternion.LookRotationSafe(dir, math.up());
                     velocities[fi].Value = dir * speeds[fi].Value;
 
-                    World.Set<FrenzySets.NotEating>().Defer.Remove(fishEntityIndex);
-                    World.Set<FrenzySets.Eating>().Defer.Add(fishEntityIndex);
+                    World.Set<FrenzySets.NotEating>().DeferredRemove(fishEntityIndex);
+                    World.Set<FrenzySets.Eating>().DeferredAdd(fishEntityIndex);
 
-                    World.Set<FrenzySets.NotEating>().Defer.Remove(mealEntityIndex);
-                    World.Set<FrenzySets.Eating>().Defer.Add(mealEntityIndex);
+                    World.Set<FrenzySets.NotEating>().DeferredRemove(mealEntityIndex);
+                    World.Set<FrenzySets.Eating>().DeferredAdd(mealEntityIndex);
                 }
             }
         }
@@ -256,10 +256,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark.Sets
 
                 var fishEntityIndex = new EntityIndex(fi, FishGroup);
                 var mealEntityIndex = new EntityIndex(mi, MealGroup);
-                World.SetRemove<FrenzySets.NotEating>(fishEntityIndex);
-                World.SetAdd<FrenzySets.Eating>(fishEntityIndex);
-                World.SetRemove<FrenzySets.NotEating>(mealEntityIndex);
-                World.SetAdd<FrenzySets.Eating>(mealEntityIndex);
+                World.Set<FrenzySets.NotEating>().DeferredRemove(fishEntityIndex);
+                World.Set<FrenzySets.Eating>().DeferredAdd(fishEntityIndex);
+                World.Set<FrenzySets.NotEating>().DeferredRemove(mealEntityIndex);
+                World.Set<FrenzySets.Eating>().DeferredAdd(mealEntityIndex);
             }
         }
 

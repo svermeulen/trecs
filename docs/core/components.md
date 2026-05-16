@@ -18,6 +18,14 @@ A component must:
 2. Be unmanaged (no reference types, strings, or managed arrays)
 3. Implement `IEntityComponent`
 
+The source generator extends each component with:
+
+- `Equals` and `==` / `!=` overloads that compare the struct as raw bytes — equivalent to `memcmp`, so equality is fast and fixed-cost regardless of field count.
+- `[System.Serializable]` so Unity's `SerializedObject` machinery can navigate the type's fields. This is what lets the [Trecs entity inspector](../editor-windows/hierarchy.md) render component values when an entity is selected in the Hierarchy.
+- A constructor for `[Unwrap]` components that takes the inner value directly (so you can write `new Speed(5f)` instead of `new Speed { Value = 5f }`).
+
+These are the reasons components must be `partial`.
+
 ## The `[Unwrap]` shorthand
 
 For single-field components, `[Unwrap]` exposes the inner value directly through [aspects](../data-access/aspects.md):
@@ -37,21 +45,18 @@ Inside an aspect that reads `Position`, `aspect.Position` returns a `float3` rat
 Most access goes through [aspects](../data-access/aspects.md) and `[ForEachEntity]` parameters. For ad-hoc access by `EntityHandle`:
 
 ```csharp
-ref readonly Health hp = ref World.Component<Health>(handle).Read;
+ref readonly Health hp = ref handle.Component<Health>(World).Read;
 
-ref Health hpW = ref World.Component<Health>(handle).Write;
+ref Health hpW = ref handle.Component<Health>(World).Write;
 hpW.Current -= damage;
 ```
 
 The `.Read` / `.Write` split lets Trecs lazily complete any in-flight jobs with conflicting access before handing back the reference. See [Dependency Tracking](../performance/dependency-tracking.md).
 
-For a single-entity view that bundles several lookups (with `TryGet` for optional components), see [`EntityAccessor`](entities.md#accessing-entity-data):
+For optional components, use the matching `TryComponent` overload — it returns `false` if the entity no longer exists or lacks that component:
 
 ```csharp
-var entity = World.Entity(handle);
-ref Health hp = ref entity.Get<Health>().Write;
-
-if (entity.TryGet<Velocity>(out var velAccessor))
+if (handle.TryComponent<Velocity>(World, out var velAccessor))
 {
     ref readonly Velocity vel = ref velAccessor.Read;
 }

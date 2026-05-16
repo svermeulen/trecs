@@ -216,23 +216,31 @@ namespace Trecs
             return count;
         }
 
-        public readonly EntityAccessor Single()
-        {
-            return new EntityAccessor(_world, SingleEntityIndex());
-        }
+        /// <summary>
+        /// Returns the single matching entity as a stable <see cref="EntityHandle"/>.
+        /// </summary>
+        public readonly EntityHandle SingleHandle() => SingleIndex().ToHandle(_world);
 
-        public readonly bool TrySingle(out EntityAccessor entityRef)
+        /// <summary>
+        /// Resolves the single matching entity to an <see cref="EntityHandle"/>,
+        /// returning false on zero or multiple matches.
+        /// </summary>
+        public readonly bool TrySingleHandle(out EntityHandle entityHandle)
         {
-            if (!TrySingleEntityIndex(out var entityIndex))
+            if (!TrySingleIndex(out var entityIndex))
             {
-                entityRef = default;
+                entityHandle = default;
                 return false;
             }
-            entityRef = new EntityAccessor(_world, entityIndex);
+            entityHandle = entityIndex.ToHandle(_world);
             return true;
         }
 
-        internal readonly EntityIndex SingleEntityIndex()
+        /// <summary>
+        /// Hot-loop variant of <see cref="SingleHandle"/> — returns a transient
+        /// <see cref="EntityIndex"/> without the handle conversion.
+        /// </summary>
+        public readonly EntityIndex SingleIndex()
         {
             var iter = CreateIterator();
 
@@ -245,7 +253,10 @@ namespace Trecs
             return result;
         }
 
-        internal readonly bool TrySingleEntityIndex(out EntityIndex entityIndex)
+        /// <summary>
+        /// Hot-loop variant of <see cref="TrySingleHandle"/>.
+        /// </summary>
+        public readonly bool TrySingleIndex(out EntityIndex entityIndex)
         {
             var iter = CreateIterator();
 
@@ -267,7 +278,10 @@ namespace Trecs
             return true;
         }
 
-        internal readonly QueryIterator EntityIndices()
+        /// <summary>
+        /// Hot-loop iterator yielding transient <see cref="EntityIndex"/> values.
+        /// </summary>
+        public readonly IndexQueryIterator Indices()
         {
             return CreateIterator();
         }
@@ -275,24 +289,15 @@ namespace Trecs
         /// <summary>
         /// Returns an iterator that yields a stable <see cref="EntityHandle"/> per matched entity.
         /// </summary>
-        public readonly EntityHandlesQueryIterator EntityHandles()
+        public readonly HandleQueryIterator Handles()
         {
-            return new EntityHandlesQueryIterator(CreateIterator(), _world);
+            return new HandleQueryIterator(CreateIterator(), _world);
         }
 
-        /// <summary>
-        /// Returns an iterator that yields an <see cref="EntityAccessor"/> per matched entity,
-        /// bound to the world and the entity's transient index.
-        /// </summary>
-        public readonly EntitiesQueryIterator Entities()
-        {
-            return new EntitiesQueryIterator(CreateIterator(), _world);
-        }
-
-        internal readonly QueryIterator CreateIterator()
+        internal readonly IndexQueryIterator CreateIterator()
         {
             var groups = ResolveGroups();
-            return new QueryIterator(_world, groups, _set);
+            return new IndexQueryIterator(_world, groups, _set);
         }
 
         readonly ReadOnlyFastList<GroupIndex> ResolveGroups()

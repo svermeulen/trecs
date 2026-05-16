@@ -14,8 +14,23 @@ using Trecs.SourceGen.Shared;
 namespace Trecs.SourceGen
 {
     /// <summary>
-    /// Incremental source generator that adds required equality and operator methods to all types
-    /// implementing IEntityComponent. Provides better compilation performance than the legacy EntityComponentGenerator.
+    /// Incremental source generator that extends every type implementing
+    /// <c>IEntityComponent</c> with:
+    /// <list type="bullet">
+    ///   <item><description><c>Equals</c> / <c>GetHashCode</c> / <c>==</c> / <c>!=</c> that delegate to
+    ///     <c>UnmanagedUtil.BlittableEquals</c> / <c>BlittableHashCode</c> — byte-blit comparison so
+    ///     equality is fast and fixed-cost regardless of field count.</description></item>
+    ///   <item><description><c>[System.Serializable]</c> (skipped when the user has already applied
+    ///     it to a hand-written partial — <c>SerializableAttribute</c> has <c>AllowMultiple=false</c>
+    ///     and applying twice is CS0579) so Unity's <c>SerializedObject</c> machinery can navigate
+    ///     the component's fields, which is what lets the Trecs entity inspector render component
+    ///     values when an entity is selected in the Hierarchy.</description></item>
+    ///   <item><description>A convenience constructor for <c>[Unwrap]</c> components that takes the
+    ///     inner value directly (so users can write <c>new Speed(5f)</c> instead of
+    ///     <c>new Speed { Value = 5f }</c>). Skipped when the user has already written a
+    ///     matching constructor.</description></item>
+    /// </list>
+    /// These three together are why components must be declared <c>partial</c>.
     /// </summary>
     [Generator]
     public class EntityComponentGenerator : IIncrementalGenerator

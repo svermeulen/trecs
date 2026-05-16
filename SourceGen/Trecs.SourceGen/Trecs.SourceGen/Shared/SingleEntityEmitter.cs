@@ -85,7 +85,7 @@ namespace Trecs.SourceGen.Shared
 
         /// <summary>
         /// Pre-loop EntityIndex resolution: one local per target, fetched via
-        /// <c>Query().WithTags&lt;...&gt;().SingleEntityIndex()</c>.
+        /// <c>Query().WithTags&lt;...&gt;().SingleIndex()</c>.
         /// </summary>
         internal static void EmitHoistedSetup(
             StringBuilder sb,
@@ -97,7 +97,7 @@ namespace Trecs.SourceGen.Shared
             {
                 var ei = EiLocal(e);
                 sb.AppendLine(
-                    $"{body}var {ei} = {GenPrefix}world.Query().{WithTagsClause(e)}.SingleEntityIndex();"
+                    $"{body}var {ei} = {GenPrefix}world.Query().{WithTagsClause(e)}.SingleIndex();"
                 );
             }
         }

@@ -165,6 +165,81 @@ namespace Trecs.Internal
             }
         }
 
+        /// <summary>
+        /// Snapshot of internal allocator state — per-bucket page/slot counts, side-table
+        /// density, total reserved bytes. Intended for benchmarking and diagnostics only;
+        /// kept <c>internal</c> so it isn't part of the public API surface yet.
+        /// </summary>
+        internal HeapStatistics GetStatistics()
+        {
+            TrecsAssert.That(!_isDisposed);
+            TrecsAssert.That(
+                UnityThreadHelper.IsMainThread,
+                "NativeChunkStore.GetStatistics must be called from the main thread"
+            );
+
+            var bucketStats = new BucketStatistics[_buckets.Length];
+            long totalReserved = 0;
+
+            for (int b = 0; b < _buckets.Length; b++)
+            {
+                var bucket = _buckets[b];
+                int pageCount = 0;
+                int liveSlotCount = 0;
+                int freeSlotCount = 0;
+                long reservedBytes = 0;
+                foreach (var pageId in bucket.PageIds)
+                {
+                    var page = _pages[pageId];
+                    if (page == null)
+                    {
+                        continue;
+                    }
+                    pageCount++;
+                    liveSlotCount += page.SlotCount - page.FreeCount;
+                    freeSlotCount += page.FreeCount;
+                    reservedBytes += (long)page.SlotSize * page.SlotCount;
+                }
+                bucketStats[b] = new BucketStatistics
+                {
+                    SlotSize = bucket.SlotSize,
+                    SlotsPerPage = bucket.SlotsPerPage,
+                    PageCount = pageCount,
+                    LiveSlotCount = liveSlotCount,
+                    FreeSlotCount = freeSlotCount,
+                    ReservedBytes = reservedBytes,
+                };
+                totalReserved += reservedBytes;
+            }
+
+            int numHuge = 0;
+            long hugeReserved = 0;
+            for (int pageId = 0; pageId < _pages.Count; pageId++)
+            {
+                var page = _pages[pageId];
+                if (page == null || page.BucketIdx >= 0)
+                {
+                    continue;
+                }
+                numHuge++;
+                hugeReserved += (long)page.SlotSize * page.SlotCount;
+            }
+            totalReserved += hugeReserved;
+
+            return new HeapStatistics
+            {
+                LiveAllocations = _liveCount,
+                NumPages = _pages.Count - _freePageIds.Count,
+                NumHugePages = numHuge,
+                SideTableLength = _sideTableLength,
+                FreeSideTableSlots = _freeSideTableSlots.Count,
+                NextFreshSideTableSlot = _nextFreshSideTableSlot,
+                HugePagesReservedBytes = hugeReserved,
+                TotalReservedBytes = totalReserved,
+                Buckets = bucketStats,
+            };
+        }
+
         public ref NativeChunkStoreResolver Resolver
         {
             get
@@ -196,6 +271,7 @@ namespace Trecs.Internal
         /// </summary>
         public unsafe PtrHandle Alloc(int size, int alignment, int typeHash, out IntPtr address)
         {
+            using var _ = TrecsProfiling.Start("NativeChunkStore.Alloc");
             TrecsAssert.That(!_isDisposed);
             TrecsAssert.That(size > 0, "Allocation size must be positive");
             TrecsAssert.That(
@@ -316,6 +392,7 @@ namespace Trecs.Internal
         /// </summary>
         public void Free(PtrHandle handle, Action<NativeChunkStoreEntry> onDrained = null)
         {
+            using var _ = TrecsProfiling.Start("NativeChunkStore.Free");
             TrecsAssert.That(!_isDisposed);
             TrecsAssert.That(!handle.IsNull, "Attempted to free null PtrHandle");
             TrecsAssert.That(
@@ -386,6 +463,7 @@ namespace Trecs.Internal
         /// </summary>
         internal int ReclaimEmptyPages()
         {
+            using var _ = TrecsProfiling.Start("NativeChunkStore.ReclaimEmptyPages");
             TrecsAssert.That(!_isDisposed);
             TrecsAssert.That(UnityThreadHelper.IsMainThread);
 
@@ -468,6 +546,7 @@ namespace Trecs.Internal
         /// </summary>
         public unsafe void Serialize(ISerializationWriter writer)
         {
+            using var _ = TrecsProfiling.Start("NativeChunkStore.Serialize");
             TrecsAssert.That(!_isDisposed);
             TrecsAssert.That(UnityThreadHelper.IsMainThread);
 
@@ -571,6 +650,7 @@ namespace Trecs.Internal
         /// </summary>
         public unsafe void Deserialize(ISerializationReader reader)
         {
+            using var _ = TrecsProfiling.Start("NativeChunkStore.Deserialize");
             TrecsAssert.That(!_isDisposed);
             TrecsAssert.That(UnityThreadHelper.IsMainThread);
             TrecsAssert.That(
@@ -1003,6 +1083,7 @@ namespace Trecs.Internal
         /// </summary>
         public PtrHandle AllocExternal(IntPtr address, int size, int alignment, int typeHash)
         {
+            using var _ = TrecsProfiling.Start("NativeChunkStore.AllocExternal");
             TrecsAssert.That(!_isDisposed);
             TrecsAssert.That(address != IntPtr.Zero, "AllocExternal: null address");
             TrecsAssert.That(size > 0, "AllocExternal: size must be positive");
@@ -1307,5 +1388,33 @@ namespace Trecs.Internal
             // allocator requires symmetric alloc/free parameters.
             public int Alignment;
         }
+    }
+
+    /// <summary>
+    /// Snapshot of <see cref="NativeChunkStore"/> state at one point in time. Returned by
+    /// <c>NativeChunkStore.GetStatistics</c>. Intended for diagnostics / benchmarks only;
+    /// not part of the public Trecs API surface.
+    /// </summary>
+    internal struct HeapStatistics
+    {
+        public int LiveAllocations;
+        public int NumPages;
+        public int NumHugePages;
+        public int SideTableLength;
+        public int FreeSideTableSlots;
+        public int NextFreshSideTableSlot;
+        public long HugePagesReservedBytes;
+        public long TotalReservedBytes;
+        public BucketStatistics[] Buckets;
+    }
+
+    internal struct BucketStatistics
+    {
+        public int SlotSize;
+        public int SlotsPerPage;
+        public int PageCount;
+        public int LiveSlotCount;
+        public int FreeSlotCount;
+        public long ReservedBytes;
     }
 }

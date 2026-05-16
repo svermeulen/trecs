@@ -484,14 +484,14 @@ namespace Trecs.SourceGen.Aspect
                 sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
                 sb.AppendLine(
                     indentLevel,
-                    $"public readonly void SetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => world.SetTag<T>(_entityIndex);"
+                    $"public readonly void SetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => _entityIndex.SetTag<T>(world);"
                 );
                 sb.AppendLine();
 
                 sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
                 sb.AppendLine(
                     indentLevel,
-                    $"public readonly void UnsetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => world.UnsetTag<T>(_entityIndex);"
+                    $"public readonly void UnsetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => _entityIndex.UnsetTag<T>(world);"
                 );
                 sb.AppendLine();
             }
@@ -644,11 +644,11 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 2, "if (_hasSet)");
             sb.AppendLine(indentLevel + 2, "{");
             sb.AppendLine(indentLevel + 3, "var __sb = _builder.InSet(_set);");
-            sb.AppendLine(indentLevel + 3, "__ei = __sb.SingleEntityIndex();");
+            sb.AppendLine(indentLevel + 3, "__ei = __sb.SingleIndex();");
             sb.AppendLine(indentLevel + 2, "}");
             sb.AppendLine(indentLevel + 2, "else");
             sb.AppendLine(indentLevel + 2, "{");
-            sb.AppendLine(indentLevel + 3, "__ei = _builder.SingleEntityIndex();");
+            sb.AppendLine(indentLevel + 3, "__ei = _builder.SingleIndex();");
             sb.AppendLine(indentLevel + 2, "}");
             sb.AppendLine(indentLevel + 2, "var __world = _builder.World;");
 
@@ -689,11 +689,11 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 2, "if (_hasSet)");
             sb.AppendLine(indentLevel + 2, "{");
             sb.AppendLine(indentLevel + 3, "var __sb = _builder.InSet(_set);");
-            sb.AppendLine(indentLevel + 3, "found = __sb.TrySingleEntityIndex(out __ei);");
+            sb.AppendLine(indentLevel + 3, "found = __sb.TrySingleIndex(out __ei);");
             sb.AppendLine(indentLevel + 2, "}");
             sb.AppendLine(indentLevel + 2, "else");
             sb.AppendLine(indentLevel + 2, "{");
-            sb.AppendLine(indentLevel + 3, "found = _builder.TrySingleEntityIndex(out __ei);");
+            sb.AppendLine(indentLevel + 3, "found = _builder.TrySingleIndex(out __ei);");
             sb.AppendLine(indentLevel + 2, "}");
             sb.AppendLine(indentLevel + 2, "if (!found) { view = default; return false; }");
             sb.AppendLine(indentLevel + 2, "var __world = _builder.World;");

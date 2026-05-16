@@ -25,11 +25,11 @@ The entity is buffered and joins its group on the next submission. Its storage l
 ### Remove
 
 ```csharp
-// By stable handle (the public removal entry point)
-World.RemoveEntity(entityHandle);
+// By stable handle (the canonical removal entry point)
+entityHandle.Remove(World);
 
-// From inside an iteration callback that takes an EntityAccessor
-entity.Remove();
+// From inside an iteration callback that takes an EntityHandle parameter
+entity.Remove(World);
 
 // From inside a system loop that has an aspect in hand
 enemy.Remove(World);
@@ -44,12 +44,12 @@ Partition transitions are expressed by mutating one tag at a time on the entity'
 
 ```csharp
 // By stable handle
-World.SetTag<BallTags.Resting>(handle);
-World.UnsetTag<BallTags.Active>(handle);
+handle.SetTag<BallTags.Resting>(World);
+handle.UnsetTag<BallTags.Active>(World);
 
-// From inside an iteration callback that takes an EntityAccessor
-entity.SetTag<BallTags.Resting>();
-entity.UnsetTag<BallTags.Active>();
+// From inside an iteration callback that takes an EntityHandle parameter
+entity.SetTag<BallTags.Resting>(World);
+entity.UnsetTag<BallTags.Active>(World);
 
 // From an aspect (source-generated, one overload per accessor type)
 ball.SetTag<BallTags.Resting>(World);
@@ -69,7 +69,7 @@ The single type parameter names the **tag being toggled**, not a from/to pair. T
 
 `SetTag<T>` is a no-op (and silently coalesced away) if the entity is already in the destination group — useful for idempotent state-machine code that doesn't have to check "am I already eating" before calling `SetTag<Eating>`.
 
-The Burst-side equivalents — `nativeWorld.SetTag<T>(...)` and `nativeWorld.UnsetTag<T>(...)` — match the managed signatures. See [Jobs & Burst](../performance/jobs-and-burst.md#nativeworldaccessor).
+The Burst-side equivalents — `handle.SetTag<T>(nativeWorld)` and `handle.UnsetTag<T>(nativeWorld)` (and the matching `EntityIndex` / aspect overloads) — take a `NativeWorldAccessor` and match the managed signatures otherwise. See [Jobs & Burst](../performance/jobs-and-burst.md#nativeworldaccessor).
 
 ## Same-frame coalescing
 

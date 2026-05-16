@@ -27,9 +27,9 @@ new WorldBuilder()
 
 All set mutations go through `World.Set<T>()`, which exposes three timing modes:
 
-| Property | Timing | When applied |
+| Call shape | Timing | When applied |
 |---|---|---|
-| `.Defer` | Submission-deferred | Next call to `SubmitEntities()` |
+| `.DeferredAdd` / `.DeferredRemove` / `.DeferredClear` | Submission-deferred | Next call to `SubmitEntities()` |
 | `.Write` | Synchronous | Immediately (main thread, syncs outstanding jobs) |
 | `.Read`  | Synchronous read | Immediately (main thread, syncs outstanding writers) |
 
@@ -38,12 +38,14 @@ All set mutations go through `World.Set<T>()`, which exposes three timing modes:
 Queued during system execution; applied at the next submission. Safe during iteration:
 
 ```csharp
-World.Set<HighlightedParticle>().Defer.Add(particle.Handle(World));
-World.Set<HighlightedParticle>().Defer.Remove(particle.Handle(World));
-World.Set<HighlightedParticle>().Defer.Clear();
+World.Set<HighlightedParticle>().DeferredAdd(particle.Handle(World));
+World.Set<HighlightedParticle>().DeferredRemove(particle.Handle(World));
+World.Set<HighlightedParticle>().DeferredClear();
 ```
 
-A queued `Defer.Clear()` **supersedes** any `Defer.Add` / `Defer.Remove` queued for the same set in the same submission, regardless of call order. For sequential semantics within a single frame ("clear, then add these"), use the immediate APIs below.
+A queued `DeferredClear()` **supersedes** any `DeferredAdd` / `DeferredRemove` queued for the same set in the same submission, regardless of call order. For sequential semantics within a single frame ("clear, then add these"), use the immediate APIs below.
+
+From a Burst job, `NativeWorldAccessor.Set<T>()` returns a `NativeSetAccessor<T>` with the same `DeferredAdd` / `DeferredRemove` / `DeferredClear` methods. There's no native `.Read` / `.Write` counterpart — Burst can't sync — so all native set mutations are deferred.
 
 ### Immediate
 
@@ -64,7 +66,7 @@ highlighted.Remove(handle, world);
 !!! warning "Don't mutate a set while iterating it"
     An immediate `Add` / `Remove` / `Clear` on the **same set in the same group** you're iterating throws in DEBUG builds. In release builds (assertion compiled out) iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
 
-    Safe: mutating a different set, mutating the same set in a different group, or using the deferred API (`Set<T>().Defer`) on the iterated set (applies at the next submission).
+    Safe: mutating a different set, mutating the same set in a different group, or using the deferred API (`Set<T>().DeferredAdd` / `DeferredRemove` / `DeferredClear`) on the iterated set (applies at the next submission).
 
     To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `NativeList<EntityHandle>` and apply them after the loop.
 
@@ -123,7 +125,7 @@ Notes:
 
 - Sets are **not auto-cleared** between frames. Clear them in the producer system if that's the contract you want.
 - Cache the `SetWrite<T>` returned by `Set<T>().Write` outside the loop. Each `.Write` access syncs outstanding job writes; caching syncs once, then writes hit the buffer directly.
-- From a Burst job, capture a `NativeSetCommandBuffer<T>` as a field for thread-safe `Add` / `Remove` / `Clear`. Job-side `Clear` wipes pre-existing contents and supersedes any `Add` / `Remove` queued in the same writer-job-cycle — analogous to `Set<T>().Defer.Clear()`.
+- From a Burst job, capture a `NativeSetCommandBuffer<T>` as a field for thread-safe `Add` / `Remove` / `Clear`. Job-side `Clear` wipes pre-existing contents and supersedes any `Add` / `Remove` queued in the same writer-job-cycle — analogous to `Set<T>().DeferredClear()`.
 
 ## Sets vs tags
 

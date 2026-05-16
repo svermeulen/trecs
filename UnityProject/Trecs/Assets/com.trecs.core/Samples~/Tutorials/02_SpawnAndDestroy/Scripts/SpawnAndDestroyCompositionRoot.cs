@@ -21,7 +21,13 @@ namespace Trecs.Samples.SpawnAndDestroy
         )
         {
             var world = new WorldBuilder()
-                .AddTemplate(SampleTemplates.SphereEntity.Template)
+                .AddTemplates(
+                    new[]
+                    {
+                        SampleTemplates.SampleGlobals.Template,
+                        SampleTemplates.SphereEntity.Template,
+                    }
+                )
                 .Build();
 
             var goManager = new RenderableGameObjectManager(world);

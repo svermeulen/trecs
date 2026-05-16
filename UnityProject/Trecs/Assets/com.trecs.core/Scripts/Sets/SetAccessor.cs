@@ -6,11 +6,12 @@ namespace Trecs
     /// Lightweight set gateway returned by <see cref="WorldAccessor.Set{T}"/>.
     /// Selects the set's timing mode:
     /// <list type="bullet">
-    ///   <item><description><see cref="Defer"/> — queue Add / Remove / Clear for next submission. No sync, no per-call cost beyond an enqueue.</description></item>
+    ///   <item><description><see cref="DeferredAdd(EntityHandle)"/> / <see cref="DeferredRemove(EntityHandle)"/> / <see cref="DeferredClear"/> — queue for next submission. No sync, no per-call cost beyond an enqueue.</description></item>
     ///   <item><description><see cref="Read"/> — synchronous read view. Syncs outstanding writer jobs once at acquisition.</description></item>
     ///   <item><description><see cref="Write"/> — synchronous read+write view. Syncs outstanding readers and writers once at acquisition.</description></item>
     /// </list>
-    /// Cache the returned view for repeated access in tight loops.
+    /// Cache the returned <c>.Read</c> / <c>.Write</c> view for repeated access in tight loops.
+    /// <c>Deferred*</c> methods sit directly on the accessor — there's no state to cache between calls.
     /// </summary>
     public readonly ref struct SetAccessor<T>
         where T : struct, IEntitySet
@@ -25,14 +26,61 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Returns a deferred-mutation view. Add / Remove / Clear are queued and
-        /// applied at the next submission. A queued Clear supersedes any queued
-        /// Add / Remove for the same set regardless of call order.
+        /// Queue an Add for the next submission. No sync — the per-set deferred
+        /// queues are independent of any outstanding job state.
         /// </summary>
-        public SetDefer<T> Defer
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void DeferredAdd(EntityIndex entityIndex)
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return new SetDefer<T>(_world, _world.GetSetDeferredQueues(_setId)); }
+            // Slot 0 is the main-thread writer slot — see NativeSetDeferredQueues
+            // for the full slot-layout invariant (worker threads always get a
+            // non-zero index, so no concurrent write to slot 0 is possible).
+            _world.GetSetDeferredQueues(_setId).AddQueue.GetBag(0).Enqueue(entityIndex);
+        }
+
+        /// <summary>
+        /// Queue an Add for the next submission. See
+        /// <see cref="DeferredAdd(EntityIndex)"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void DeferredAdd(EntityHandle entityHandle)
+        {
+            DeferredAdd(entityHandle.ToIndex(_world));
+        }
+
+        /// <summary>
+        /// Queue a Remove for the next submission. No sync.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void DeferredRemove(EntityIndex entityIndex)
+        {
+            // Slot 0 is the main-thread writer slot — see NativeSetDeferredQueues
+            // for the full slot-layout invariant.
+            _world.GetSetDeferredQueues(_setId).RemoveQueue.GetBag(0).Enqueue(entityIndex);
+        }
+
+        /// <summary>
+        /// Queue a Remove for the next submission. See
+        /// <see cref="DeferredRemove(EntityIndex)"/>.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void DeferredRemove(EntityHandle entityHandle)
+        {
+            DeferredRemove(entityHandle.ToIndex(_world));
+        }
+
+        /// <summary>
+        /// Queue a Clear for the next submission. At submission time, a queued
+        /// clear supersedes any queued <see cref="DeferredAdd(EntityIndex)"/> /
+        /// <see cref="DeferredRemove(EntityIndex)"/> for the same set, regardless
+        /// of call order — analogous to how a queued remove supersedes a queued
+        /// move on an entity. Use <see cref="SetWrite{T}.Clear"/> if you need
+        /// the clear to take effect within the current frame.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void DeferredClear()
+        {
+            _world.GetSetDeferredQueues(_setId).RequestClear();
         }
 
         /// <summary>

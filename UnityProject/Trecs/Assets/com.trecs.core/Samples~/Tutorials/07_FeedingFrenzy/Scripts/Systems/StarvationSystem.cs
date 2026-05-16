@@ -36,7 +36,7 @@ namespace Trecs.Samples.FeedingFrenzy101
 
             if (scale.Value <= settings.MinScale)
             {
-                world.RemoveEntity(handle);
+                handle.Remove(world);
                 return;
             }
 

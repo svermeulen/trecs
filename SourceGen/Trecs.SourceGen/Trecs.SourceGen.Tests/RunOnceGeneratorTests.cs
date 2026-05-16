@@ -8,7 +8,7 @@ namespace Trecs.SourceGen.Tests;
 /// Compile-cleanliness tests for RunOnceGenerator. Routed to from any method whose
 /// parameters are decorated with one or more <c>[SingleEntity]</c> attributes (and which
 /// has no <c>[ForEachEntity]</c> attribute). The generator hoists each singleton lookup
-/// via <c>__world.Query().WithTags&lt;...&gt;().SingleEntityIndex()</c> and calls the user
+/// via <c>__world.Query().WithTags&lt;...&gt;().SingleIndex()</c> and calls the user
 /// method exactly once with the resolved aspects/components plugged in.
 /// </summary>
 [TestFixture]

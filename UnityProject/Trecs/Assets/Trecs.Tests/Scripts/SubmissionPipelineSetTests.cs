@@ -154,7 +154,7 @@ namespace Trecs.Tests
             var set = a.Set<SPSet>();
 
             // Deferred add entity 1 to set, native-remove entity 0
-            a.Set<SPSet>().Defer.Add(new EntityIndex(1, groupA));
+            a.Set<SPSet>().DeferredAdd(new EntityIndex(1, groupA));
             nativeEcs.RemoveEntity(handles[0].ToIndex(a));
             a.SubmitEntities();
 
@@ -188,7 +188,7 @@ namespace Trecs.Tests
             var set = a.Set<SPSet>();
 
             // Add entity 0 to set, then native-remove entity 0
-            a.Set<SPSet>().Defer.Add(new EntityIndex(0, groupA));
+            a.Set<SPSet>().DeferredAdd(new EntityIndex(0, groupA));
             nativeEcs.RemoveEntity(handles[0].ToIndex(a));
             a.SubmitEntities();
 
@@ -451,7 +451,7 @@ namespace Trecs.Tests
             // - Move entity 0 to PartitionB (in set)
             // - Remove entity 1 (not in set, but causes swap-back)
             // - Add new entity
-            a.Set<SPSet>().Defer.Add(new EntityIndex(3, groupA));
+            a.Set<SPSet>().DeferredAdd(new EntityIndex(3, groupA));
             a.SetTag<SPPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[1]);
             var newHandle = a.AddEntity(PartitionA)

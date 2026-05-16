@@ -263,7 +263,7 @@ namespace Trecs.Tests
                 // Corrupt the state mid-playback — mutate entities so the next checksum
                 // cannot possibly match.
                 env.StepFixedFrames(1);
-                foreach (var ei in env.Accessor.Query().WithTags(Tag<QId1>.Value).EntityIndices())
+                foreach (var ei in env.Accessor.Query().WithTags(Tag<QId1>.Value).Indices())
                 {
                     env.Accessor.Component<TestInt>(ei).Write.Value = 999999;
                 }

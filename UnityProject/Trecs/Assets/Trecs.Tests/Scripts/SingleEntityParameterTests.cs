@@ -323,7 +323,7 @@ namespace Trecs.Tests
     //
     // The struct iterates QId1 entities and reads a singleton QId3-tagged entity
     // via a [SingleEntity] aspect field. The generator emits a hidden hoist of
-    // SingleEntityIndex() before the per-group foreach, and assigns the field on
+    // SingleIndex() before the per-group foreach, and assigns the field on
     // each per-group job instance from buffers fetched from the singleton's group.
     partial struct SingleEntityFieldAspectJob
     {

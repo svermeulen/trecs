@@ -27,7 +27,7 @@ A high-performance Entity Component System for Unity, built for **deterministic 
 public partial struct Position : IEntityComponent { public float3 Value; }
 public partial struct Velocity : IEntityComponent { public float3 Value; }
 
-// 2. A tag — a zero-cost marker
+// 2. A tag — an entity category
 public struct PlayerTag : ITag { }
 
 // 3. A template — the entity blueprint
@@ -58,7 +58,7 @@ void Update()    => world.Tick();
 void OnDestroy() => world.Dispose();
 ```
 
-`World` inside a system body is a source-generated property — your handle into the running world for that phase.
+Inside a system, `World` is a source-generated property that gives access to the running world for the current phase.
 
 ## Where to go next
 

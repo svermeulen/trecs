@@ -39,14 +39,14 @@ namespace Trecs.Samples.Sets
                 var handle = particle.Handle(World);
 
                 if (distX < _settings.WaveBandWidth)
-                    World.Set<SampleSets.WaveX>().Defer.Add(handle);
+                    World.Set<SampleSets.WaveX>().DeferredAdd(handle);
                 else
-                    World.Set<SampleSets.WaveX>().Defer.Remove(handle);
+                    World.Set<SampleSets.WaveX>().DeferredRemove(handle);
 
                 if (distZ < _settings.WaveBandWidth)
-                    World.Set<SampleSets.WaveZ>().Defer.Add(handle);
+                    World.Set<SampleSets.WaveZ>().DeferredAdd(handle);
                 else
-                    World.Set<SampleSets.WaveZ>().Defer.Remove(handle);
+                    World.Set<SampleSets.WaveZ>().DeferredRemove(handle);
             }
         }
 

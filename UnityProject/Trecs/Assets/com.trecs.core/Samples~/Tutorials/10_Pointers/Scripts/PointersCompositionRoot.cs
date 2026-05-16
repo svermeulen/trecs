@@ -43,7 +43,7 @@ namespace Trecs.Samples.Pointers
             // The Trecs Player window discovers the registry via the world,
             // so snapshots taken through that window round-trip TrailHistory
             // correctly.
-            world.SerializerRegistry.RegisterSerializer<TrailHistorySerializer>();
+            world.SerializerRegistry.RegisterSerializer(new TrailHistorySerializer());
 
             var goManager = new RenderableGameObjectManager(world);
 

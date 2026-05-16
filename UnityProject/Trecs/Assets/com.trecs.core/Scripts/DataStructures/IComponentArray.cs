@@ -20,6 +20,12 @@ namespace Trecs.Internal
     {
         int Count { get; }
 
+        /// <summary>
+        /// The component value type stored in this array (i.e. the <c>T</c> in
+        /// <c>ComponentArray&lt;T&gt;</c>).
+        /// </summary>
+        Type ComponentType { get; }
+
         IComponentArray Create();
 
         void AddEntitiesToDictionary(IComponentArray toDictionary, GroupIndex groupId);

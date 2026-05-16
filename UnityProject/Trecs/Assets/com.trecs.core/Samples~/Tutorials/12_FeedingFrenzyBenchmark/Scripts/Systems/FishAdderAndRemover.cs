@@ -178,10 +178,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     .Query()
                     .WithTags<FrenzyTags.Fish>()
                     .InSet<FrenzySets.NotEating>()
-                    .Entities()
+                    .Handles()
             )
             {
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
 
                 if (removed >= count)
@@ -195,7 +195,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             )
             {
                 fish.Remove(World);
-                World.RemoveEntity(fish.TargetMeal);
+                fish.TargetMeal.Remove(World);
 
                 removed++;
 
@@ -236,7 +236,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 }
 
                 fish.Remove(World);
-                World.RemoveEntity(fish.TargetMeal);
+                fish.TargetMeal.Remove(World);
 
                 removed++;
 
@@ -257,10 +257,10 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 var entity in World
                     .Query()
                     .WithTags<FrenzyTags.Fish, FrenzyTags.NotEating>()
-                    .Entities()
+                    .Handles()
             )
             {
-                entity.Remove();
+                entity.Remove(World);
                 removed++;
 
                 if (removed >= count)

@@ -29,7 +29,7 @@ Use sets for dynamic, sparse membership. Sets must be registered with the world 
 public struct DeadEnemies : IEntitySet { }
 
 // Add to set
-World.Set<DeadEnemies>().Defer.Add(entity.Handle);
+World.Set<DeadEnemies>().DeferredAdd(entity.Handle);
 
 // Iterate set members
 [ForEachEntity(Set = typeof(DeadEnemies))]

@@ -306,12 +306,20 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Batch remove entity references for a set of entities being removed from a group.
-        /// Looks up the group list once instead of per entity.
+        /// Step (a) of the deferred-handle-free pipeline used during entity
+        /// removal: zeroes each removed entity's original reverse-map slot
+        /// and captures (id, tailSlot) tuples — keyed by the caller-supplied
+        /// originalSlot→tailSlot map — into <paramref name="deferredFreesOut"/>
+        /// for the post-callback finalize. The capture iterates
+        /// <paramref name="entityHandlesToRemove"/> in submission order so
+        /// free-list ordering matches the prior BatchRemoveEntityHandles
+        /// behaviour.
         /// </summary>
-        internal void BatchRemoveEntityHandles(
+        internal void BatchClearAndCaptureRemovedHandles(
             FastList<int> entityHandlesToRemove,
-            GroupIndex fromGroup
+            GroupIndex fromGroup,
+            DenseDictionary<int, int> tailSlotByOriginalSlot,
+            FastList<(GroupIndex Group, int Id, int TailSlot)> deferredFreesOut
         )
         {
             ref var groupList = ref _entityIndexToReferenceMap.ElementAt(fromGroup.Index);
@@ -323,19 +331,63 @@ namespace Trecs
                 var id = groupList[entityArrayIndex];
                 TrecsAssert.That(
                     id != 0,
-                    "BatchRemoveEntityHandles: null EntityHandle at index {0} in group {1}",
+                    "BatchClearAndCaptureRemovedHandles: null EntityHandle at index {0} in group {1}",
                     entityArrayIndex,
                     fromGroup
                 );
 
                 groupList[entityArrayIndex] = 0;
 
-                ref var element = ref _entityHandleMap.ElementAt(id - 1);
-                element.Index = _nextFreeIndex;
-                element.GroupIndex = default;
-                element.BumpVersion();
-                _nextFreeIndex.Set(id - 1);
+                var tailSlot = tailSlotByOriginalSlot[entityArrayIndex];
+                deferredFreesOut.Add((fromGroup, id, tailSlot));
             }
+        }
+
+        /// <summary>
+        /// Step (c): for each entry added in step (a) for this group, write
+        /// the captured handle id into its tail slot in the reverse-map and
+        /// repoint the forward-map entry at the tail slot. The handle's
+        /// Version is intentionally NOT bumped here — any handle a user
+        /// observer obtains via ToHandle during the OnRemoved fan-out must
+        /// match the version that was visible before submission.
+        /// </summary>
+        internal void BatchRelocateRemovedHandlesToTail(
+            GroupIndex fromGroup,
+            FastList<(GroupIndex Group, int Id, int TailSlot)> deferredFrees,
+            int sliceStart
+        )
+        {
+            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(fromGroup.Index);
+
+            for (int i = sliceStart; i < deferredFrees.Count; i++)
+            {
+                var entry = deferredFrees[i];
+                groupList[entry.TailSlot] = entry.Id;
+
+                ref var element = ref _entityHandleMap.ElementAt(entry.Id - 1);
+                element.Index = entry.TailSlot;
+                element.GroupIndex = fromGroup;
+            }
+        }
+
+        /// <summary>
+        /// Finalize a single deferred handle free: clears the tail slot,
+        /// bumps the forward-map entry's version (invalidating any handle
+        /// references the user kept across the callback), and returns the
+        /// id to the free list. Called once per captured entry from
+        /// EntitySubmitter.FinalizeDeferredHandleFrees after
+        /// FireRemoveCallbacks has run.
+        /// </summary>
+        internal void FreeHandleAtTailSlot(GroupIndex group, int id, int tailSlot)
+        {
+            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(group.Index);
+            groupList[tailSlot] = 0;
+
+            ref var element = ref _entityHandleMap.ElementAt(id - 1);
+            element.Index = _nextFreeIndex;
+            element.GroupIndex = default;
+            element.BumpVersion();
+            _nextFreeIndex.Set(id - 1);
         }
 
         /// <summary>
@@ -476,7 +528,9 @@ namespace Trecs
             }
 
             throw new TrecsException(
-                $"Entity {entityIndex} does not exist. If you just created it, get it from initializer.Handle."
+                $"Entity {entityIndex} does not exist. Common causes: "
+                    + "just-created entity not yet submitted (use initializer.Handle "
+                    + "from AddEntity), or stale EntityIndex from before a structural change."
             );
         }
 

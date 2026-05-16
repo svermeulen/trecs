@@ -25,8 +25,8 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                 var next = (IterationStyle)(
                     ((int)current + _pendingIterationStyleDelta + count) % count
                 );
-                World.AddInput(
-                    World.GlobalEntityHandle,
+                World.GlobalEntityHandle.AddInput(
+                    World,
                     new DesiredIterationStyle { Value = next }
                 );
                 _pendingIterationStyleDelta = 0;
