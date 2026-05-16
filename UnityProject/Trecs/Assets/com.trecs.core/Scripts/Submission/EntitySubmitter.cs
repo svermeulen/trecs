@@ -352,12 +352,9 @@ namespace Trecs.Internal
 
                 _entitiesQuerier._entityLocator.Dispose();
 
-                if (_cachedSortedDescendingRemoveIndices.IsCreated)
-                    _cachedSortedDescendingRemoveIndices.Dispose();
-                if (_removalsScratch.IsCreated)
-                    _removalsScratch.Dispose();
-                if (_swapsScratch.IsCreated)
-                    _swapsScratch.Dispose();
+                _cachedSortedDescendingRemoveIndices.Dispose();
+                _removalsScratch.Dispose();
+                _swapsScratch.Dispose();
 
                 TrecsAssert.That(_submitCompleteEvent.NumObservers == 0);
                 TrecsAssert.That(_submitStartedEvent.NumObservers == 0);
@@ -927,10 +924,19 @@ namespace Trecs.Internal
                     var group = GroupIndex.FromIndex(groupIdx);
                     var fromGroupDictionary = ecsRoot.GetDBGroup(group);
 
-                    if (fromGroupDictionary.Count == 0)
-                    {
-                        continue;
-                    }
+                    // Invariant: if a group had a non-empty remove list at R1,
+                    // its component dictionary stays non-empty through R3a —
+                    // entity removal updates per-component counts, not the
+                    // set of component types. ExecuteRemoveForGroup's matching
+                    // early-out at line ~623 means we add exactly one range to
+                    // _cachedRangeOfSubmittedIndices per group reaching this
+                    // point. A divergence here would silently misalign the
+                    // enumerator with the wrong group's range; fail loud.
+                    TrecsAssert.That(
+                        fromGroupDictionary.Count > 0,
+                        "FireRemoveCallbacks invariant broken: group {0} has pending removes but no component types",
+                        group
+                    );
 
                     var advanced = rangeEnumerator.MoveNext();
                     TrecsAssert.That(advanced);

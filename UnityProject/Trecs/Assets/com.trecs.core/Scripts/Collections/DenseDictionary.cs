@@ -135,13 +135,15 @@ namespace Trecs.Collections
         public void Add(TKey key, in TValue value)
         {
             var itemAdded = AddValue(key, out var index);
-            TrecsAssert.That(
-                itemAdded,
-                "Key {0} already present in DenseDictionary<{1}, {2}>",
-                key,
-                typeof(TKey),
-                typeof(TValue)
-            );
+            if (!itemAdded)
+            {
+                throw TrecsAssert.CreateException(
+                    "Key {0} already present in DenseDictionary<{1}, {2}>",
+                    key,
+                    typeof(TKey),
+                    typeof(TValue)
+                );
+            }
             _values[index] = value;
         }
 
