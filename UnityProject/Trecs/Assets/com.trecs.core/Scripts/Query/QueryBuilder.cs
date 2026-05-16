@@ -163,6 +163,12 @@ namespace Trecs
             return this;
         }
 
+        public QueryBuilder WithComponents(ComponentTypeIdSet components)
+        {
+            _positiveComps = MergeComponents(_positiveComps, components);
+            return this;
+        }
+
         public QueryBuilder WithoutComponents<T1>()
             where T1 : unmanaged, IEntityComponent
         {
@@ -200,6 +206,12 @@ namespace Trecs
             _negativeComps = _negativeComps.Add(ComponentTypeId<T2>.Value);
             _negativeComps = _negativeComps.Add(ComponentTypeId<T3>.Value);
             _negativeComps = _negativeComps.Add(ComponentTypeId<T4>.Value);
+            return this;
+        }
+
+        public QueryBuilder WithoutComponents(ComponentTypeIdSet components)
+        {
+            _negativeComps = MergeComponents(_negativeComps, components);
             return this;
         }
 
@@ -396,6 +408,25 @@ namespace Trecs
         {
             TrecsAssert.That(!addition.IsNull);
             return existing.IsNull ? addition : existing.CombineWith(addition);
+        }
+
+        static ComponentTypeIdSet MergeComponents(
+            ComponentTypeIdSet existing,
+            ComponentTypeIdSet addition
+        )
+        {
+            TrecsAssert.That(!addition.IsNull);
+            if (existing.IsNull)
+            {
+                return addition;
+            }
+            var result = existing;
+            var components = addition.Components;
+            for (int i = 0; i < components.Count; i++)
+            {
+                result = result.Add(components[i]);
+            }
+            return result;
         }
     }
 }

@@ -246,6 +246,12 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Returns the frame count appropriate to the current phase —
+        /// <see cref="FixedFrame"/> in Fixed phase, <see cref="VariableFrame"/> in
+        /// Variable phase. Throws if the accessor's phase is ambiguous (e.g.
+        /// Unrestricted role) — use the explicit accessors in that case.
+        /// </summary>
         public int Frame
         {
             get
@@ -270,6 +276,11 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Deterministic RNG seeded for the fixed-update phase. Identical across
+        /// record/replay — safe for use in gameplay logic that must reproduce on
+        /// replay. Only callable from Fixed or Unrestricted accessors.
+        /// </summary>
         public Rng FixedRng
         {
             get
@@ -279,6 +290,11 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Deterministic RNG seeded for the variable-update phase. Only callable from
+        /// Variable or Unrestricted accessors. Not deterministic across record/replay
+        /// — use <see cref="FixedRng"/> for replayable randomness.
+        /// </summary>
         public Rng VariableRng
         {
             get
@@ -289,22 +305,50 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Human-readable name for this accessor, surfaced in error messages and
+        /// editor tooling. System accessors default to the system's type name;
+        /// user-created accessors take the name passed to <c>CreateAccessor</c>.
+        /// </summary>
         public string DebugName
         {
             get { return _debugName; }
         }
 
+        /// <summary>
+        /// Per-world unique integer identifier for this accessor. Stable across
+        /// the accessor's lifetime; used internally for access tracking and as a
+        /// hash key in tooling.
+        /// </summary>
         public int Id { get; }
 
+        /// <summary>
+        /// Static metadata about the owning <see cref="World"/> — registered
+        /// templates, groups, components, system list. Safe to read from any
+        /// phase.
+        /// </summary>
         public WorldInfo WorldInfo => _worldInfo;
 
         /// <summary>Whether there are any outstanding jobs that haven't completed yet.</summary>
         public bool HasOutstandingJobs => JobScheduler.HasOutstandingJobs;
 
+        /// <summary>
+        /// Handle for the world's auto-created global entity. Use this to access
+        /// or mutate world-singleton components via <c>EntityAccessor</c>.
+        /// </summary>
         public EntityHandle GlobalEntityHandle => _world.GlobalEntityHandle;
 
+        /// <summary>
+        /// Transient index for the world's global entity. Prefer
+        /// <see cref="GlobalEntityHandle"/> outside hot loops.
+        /// </summary>
         public EntityIndex GlobalEntityIndex => _worldInfo.GlobalEntityIndex;
 
+        /// <summary>
+        /// Accumulated wall-clock time delivered by the variable-update phase.
+        /// Only readable from Variable or Unrestricted accessors — Fixed-phase
+        /// code should use <see cref="FixedElapsedTime"/>.
+        /// </summary>
         public float VariableElapsedTime
         {
             get
@@ -315,6 +359,10 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Configured fixed-update step length, in seconds. Constant per world.
+        /// Safe to read from any phase.
+        /// </summary>
         public float FixedDeltaTime
         {
             get
@@ -324,6 +372,10 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Wall-clock delta for the current variable-update frame, in seconds.
+        /// Only readable from Variable or Unrestricted accessors.
+        /// </summary>
         public float VariableDeltaTime
         {
             get
@@ -334,6 +386,10 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Accumulated fixed-step time the simulation has consumed (<c>FixedFrame</c> ×
+        /// <see cref="FixedDeltaTime"/>). Deterministic across record/replay.
+        /// </summary>
         public float FixedElapsedTime
         {
             get
@@ -343,8 +399,17 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Number of fixed-update frames the simulation has executed. Deterministic
+        /// across record/replay; use as a stable time axis for replayable logic.
+        /// </summary>
         public int FixedFrame => _systemRunner.FixedFrame;
 
+        /// <summary>
+        /// Number of variable-update frames the host has driven. NOT deterministic
+        /// across record/replay — host frame rate is independent of the simulation.
+        /// Only readable from Variable or Unrestricted accessors.
+        /// </summary>
         public int VariableFrame
         {
             get
@@ -354,8 +419,17 @@ namespace Trecs
             }
         }
 
+        /// <summary>
+        /// Fires after each completed submission cycle (i.e. after structural
+        /// changes are applied and observers have run). Use to refresh derived
+        /// indexes after entities are added / removed / moved.
+        /// </summary>
         public ISimpleObservable SubmissionCompletedEvent => _world.SubmissionCompletedEvent;
 
+        /// <summary>
+        /// Entry point for subscribing to entity lifecycle and frame events
+        /// (<c>OnAdded</c>, <c>OnRemoved</c>, <c>OnFixedUpdateCompleted</c>, etc).
+        /// </summary>
         public EntityEventsBuilder Events
         {
             get

@@ -10,7 +10,7 @@ namespace Trecs
     /// the default Unity .gitignore. Safe to delete at any time; Trecs will
     /// regenerate caches and snapshots on the next run.
     /// </summary>
-    public static class TrecsPaths
+    internal static class TrecsPaths
     {
         public static string LibraryRoot =>
             Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "com.trecs"));

@@ -58,16 +58,29 @@ namespace Trecs
 
         internal TrecsListHeap TrecsListHeap => _heapAllocator.TrecsListHeap;
 
+        /// <summary>
+        /// Job-safe resolver for <see cref="NativeSharedPtr{T}"/> dereferences inside
+        /// Burst-compiled job structs. Copy by-value into the job's fields; the resolver
+        /// stays valid for the duration of the job.
+        /// </summary>
         public ref NativeSharedPtrResolver NativeSharedPtrResolver
         {
             get { return ref _heapAllocator.NativeSharedHeap.Resolver; }
         }
 
+        /// <summary>
+        /// Job-safe resolver for <see cref="NativeUniquePtr{T}"/> dereferences inside
+        /// Burst-compiled job structs.
+        /// </summary>
         public ref NativeUniquePtrResolver NativeUniquePtrResolver
         {
             get { return ref _heapAllocator.NativeUniquePtrResolver; }
         }
 
+        /// <summary>
+        /// Job-safe resolver for <see cref="TrecsList{T}"/> dereferences inside
+        /// Burst-compiled job structs.
+        /// </summary>
         public ref NativeTrecsListResolver NativeTrecsListResolver
         {
             get { return ref _heapAllocator.NativeTrecsListResolver; }
