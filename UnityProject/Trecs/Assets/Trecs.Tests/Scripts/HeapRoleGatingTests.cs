@@ -19,8 +19,7 @@ namespace Trecs.Tests
     [TestFixture]
     public class HeapRoleGatingTests
     {
-        TestEnvironment CreateEnv() =>
-            EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+        TestEnvironment CreateEnv() => EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
 
         [Test]
         public void SharedPtrAlloc_FromVariableRoleAccessor_Throws()

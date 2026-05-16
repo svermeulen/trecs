@@ -562,10 +562,7 @@ namespace Trecs.Internal
                 // Same reason for single-step: the `<=` bound would otherwise
                 // let a second tick through once _elapsedFixedTime hits the
                 // exact boundary.
-                if (
-                    stepTargetFrame.HasValue
-                    && _currentFixedFrameCount >= stepTargetFrame.Value
-                )
+                if (stepTargetFrame.HasValue && _currentFixedFrameCount >= stepTargetFrame.Value)
                 {
                     break;
                 }
