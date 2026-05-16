@@ -39,7 +39,6 @@ namespace Trecs.SourceGen.Template
                     // C# requires every partial declaration to agree on `abstract` — mirror it here.
                     var abstractModifier = data.IsAbstract ? "abstract " : "";
 
-                    builder.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
                     builder.AppendLine(
                         indentLevel,
                         $"{effectiveAccessibility} {abstractModifier}partial {typeKeyword} {data.TypeName}"

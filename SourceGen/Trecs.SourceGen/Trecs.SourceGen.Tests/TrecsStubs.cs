@@ -453,10 +453,10 @@ internal static class TrecsStubs
             public readonly struct NativeSetRead<T> where T : struct, IEntitySet { }
             public readonly struct NativeSetWrite<T> where T : struct, IEntitySet { }
 
-            // Main-thread set accessors. ParameterClassifier recognizes these in
-            // [WrapAsJob] methods and emits TRECS098. SetAccessor is iterated; SetRead
-            // is read-only. Real types live in com.trecs.core/Scripts/Sets/.
-            public readonly struct SetAccessor<T> where T : struct, IEntitySet { }
+            // Main-thread set read/write views. ParameterClassifier recognizes these
+            // in [WrapAsJob] methods and emits TRECS098. The iterating gateway
+            // SetAccessor<T> is stubbed above. Real types live in
+            // com.trecs.core/Scripts/Sets/.
             public readonly struct SetRead<T> where T : struct, IEntitySet { }
             public readonly struct SetWrite<T> where T : struct, IEntitySet { }
 

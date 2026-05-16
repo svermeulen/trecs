@@ -1609,7 +1609,6 @@ namespace Trecs.SourceGen
 
             var structName = info.Symbol.Name;
             var jobInterface = info.Kind == JobKind.CustomNonIteration ? "IJob" : "IJobFor";
-            sb.AppendLine($"{ind}{GeneratedCodeAttributes.Line}");
             sb.AppendLine($"{ind}partial struct {structName} : {jobInterface}");
             sb.AppendLine($"{ind}{{");
             indent++;

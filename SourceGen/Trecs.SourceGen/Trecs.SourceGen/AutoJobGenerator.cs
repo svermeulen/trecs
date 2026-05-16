@@ -1174,7 +1174,6 @@ namespace Trecs.SourceGen
             }
 
             string ind = new(' ', indent * 4);
-            sb.AppendLine($"{ind}{GeneratedCodeAttributes.Line}");
             sb.AppendLine($"{ind}partial class {info.ClassSymbol.Name}");
             sb.AppendLine($"{ind}{{");
             indent++;

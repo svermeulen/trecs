@@ -1056,7 +1056,6 @@ namespace Trecs.SourceGen.Aspect
                 0,
                 (b, indentLevel) =>
                 {
-                    b.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
                     b.AppendLine(
                         indentLevel,
                         $"{effectiveAccessibility} partial interface {symbol.Name}"

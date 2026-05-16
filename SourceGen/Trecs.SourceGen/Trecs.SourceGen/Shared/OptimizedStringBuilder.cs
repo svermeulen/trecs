@@ -263,7 +263,6 @@ namespace Trecs.SourceGen.Shared
         {
             var indent = new string(' ', indentLevel * SpacesPerIndent);
 
-            _sb.Append(indent).AppendLine(GeneratedCodeAttributes.Line);
             _sb.Append(indent).Append(accessibility).Append(" ");
             if (extraModifiers != null)
             {

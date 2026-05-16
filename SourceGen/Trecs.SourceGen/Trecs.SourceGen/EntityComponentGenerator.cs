@@ -214,7 +214,6 @@ namespace Trecs.SourceGen
             {
                 sb.AppendLine($"{structIndent}[global::System.Serializable]");
             }
-            sb.AppendLine($"{structIndent}{GeneratedCodeAttributes.Line}");
             sb.AppendLine(
                 $"{structIndent}{model.Accessibility} partial struct {model.TypeName}{model.TypeParameterList}"
             );
