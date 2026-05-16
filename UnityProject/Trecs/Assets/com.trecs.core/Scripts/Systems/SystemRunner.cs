@@ -522,11 +522,13 @@ namespace Trecs.Internal
             }
 
             float endOfFrameTime;
+            int? stepTargetFrame = null;
 
             if (_stepFixedFrame)
             {
                 _stepFixedFrame = false;
-                endOfFrameTime = _elapsedFixedTime + _settings.FixedTimeStep - 0.0001f;
+                stepTargetFrame = _currentFixedFrameCount + 1;
+                endOfFrameTime = _elapsedFixedTime + _settings.FixedTimeStep;
             }
             else
             {
@@ -553,6 +555,16 @@ namespace Trecs.Internal
                 if (
                     _fastForwardCatchupTargetFrame.HasValue
                     && _currentFixedFrameCount >= _fastForwardCatchupTargetFrame.Value
+                )
+                {
+                    break;
+                }
+                // Same reason for single-step: the `<=` bound would otherwise
+                // let a second tick through once _elapsedFixedTime hits the
+                // exact boundary.
+                if (
+                    stepTargetFrame.HasValue
+                    && _currentFixedFrameCount >= stepTargetFrame.Value
                 )
                 {
                     break;
