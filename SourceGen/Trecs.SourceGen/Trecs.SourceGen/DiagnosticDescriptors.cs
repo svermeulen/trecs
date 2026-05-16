@@ -354,7 +354,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor TagAndTagsBothSpecified = new(
             id: "TRECS053",
             title: "Both Tag and Tags specified",
-            messageFormat: "'{0}' specifies both Tag and Tags on [{1}]. Use one or the other.",
+            messageFormat: "'{0}' on [{1}] specifies both 'Tag' and 'Tags'. Keep one: use 'Tag = typeof(X)' for a single tag, or 'Tags = new[] {{ typeof(X), typeof(Y) }}' for multiple — not both. The positional constructor form '[{1}(typeof(X))]' is also available.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
