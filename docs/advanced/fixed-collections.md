@@ -37,7 +37,7 @@ A fixed-length array stored inline. `default(FixedArray8<float3>)` gives 8 zeroe
 ```csharp
 using Trecs.Collections;
 
-public struct Waypoints : IEntityComponent
+public partial struct Waypoints : IEntityComponent
 {
     public FixedArray8<float3> Points;
 }
@@ -57,7 +57,7 @@ m.x += 1.0f;
 A `FixedList<N><T>` is a `FixedArray<N><T>` plus a `Count` of live slots. `Capacity` is fixed at `N`; `Count` starts at `0` and grows with `Add` up to `Capacity`.
 
 ```csharp
-public struct ContactPoints : IEntityComponent
+public partial struct ContactPoints : IEntityComponent
 {
     public FixedList16<EntityHandle> Contacts;
 }

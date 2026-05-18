@@ -13,12 +13,12 @@ Fish swim toward meals. On contact a fish consumes the meal, grows, and looks fo
 ### Components
 
 ```csharp
-public struct SimPosition : IEntityComponent { public float3 Value; }
-public struct SimRotation : IEntityComponent { public quaternion Value; }
-public struct TargetMeal : IEntityComponent { public EntityHandle Value; }
-public struct ApproachingFish : IEntityComponent { public EntityHandle Value; }
-public struct DestinationPosition : IEntityComponent { public float3 Value; }
-public struct MealNutrition : IEntityComponent { public float Value; }
+public partial struct SimPosition : IEntityComponent { public float3 Value; }
+public partial struct SimRotation : IEntityComponent { public quaternion Value; }
+public partial struct TargetMeal : IEntityComponent { public EntityHandle Value; }
+public partial struct ApproachingFish : IEntityComponent { public EntityHandle Value; }
+public partial struct DestinationPosition : IEntityComponent { public float3 Value; }
+public partial struct MealNutrition : IEntityComponent { public float Value; }
 ```
 
 Plus `Position`, `Rotation`, `Velocity`, `Speed`, `UniformScale`, `ColorComponent` from Common.

@@ -60,7 +60,7 @@ Note that `.AssertComplete()` is optional.  This verifies that every non-optiona
 entityHandle.Remove(World);
 
 // Inside an aspect iteration callback, the bound entity removes itself:
-entity.Remove();
+entity.Remove(World);
 
 // Remove every entity matching a tag combination
 World.RemoveEntitiesWithTags<SampleTags.Sphere>();

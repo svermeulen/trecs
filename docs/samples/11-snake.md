@@ -36,10 +36,10 @@ public struct SnakeFood : ITag { }
 public partial class SnakeGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
 {
     [Input(MissingInputBehavior.Retain)]
-    MoveInput MoveInput;
+    MoveInput MoveInput = default;
     SnakeLength SnakeLength = new(4);
-    Score Score;
-    MoveTickCounter MoveTickCounter;
+    Score Score = default;
+    MoveTickCounter MoveTickCounter = default;
 }
 ```
 

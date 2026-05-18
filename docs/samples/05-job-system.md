@@ -15,8 +15,8 @@ Particles spawn, move, and bounce off boundaries. A toggle switches between main
 `Position`, `Velocity`, `Rotation`, `UniformScale`, `ColorComponent`, `GameObjectId` from Common, plus global components for configuration:
 
 ```csharp
-public struct DesiredNumParticles : IEntityComponent { public int Value; }
-public struct IsJobsEnabled : IEntityComponent { public bool Value; }
+public partial struct DesiredNumParticles : IEntityComponent { public int Value; }
+public partial struct IsJobsEnabled : IEntityComponent { public bool Value; }
 ```
 
 ### Templates

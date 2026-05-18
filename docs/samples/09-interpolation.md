@@ -8,7 +8,7 @@ Smooth rendering at variable frame rates despite a low fixed timestep. Side-by-s
 
 Two sets of entities orbit in circles. "Smooth" entities use interpolation; "Raw" entities read the fixed-update position directly and visibly stutter at high frame rates.
 
-The fixed timestep is set low (10 Hz) to make the difference obvious. An alternative is keeping the default timestep but lowering Unity's `Time.scale` — more useful for debugging in a real game.
+The fixed timestep is set low (10 Hz) to make the difference obvious. An alternative is keeping the default timestep but lowering Unity's `Time.timeScale` — more useful for debugging in a real game.
 
 ## Schema
 

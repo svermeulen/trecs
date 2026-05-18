@@ -56,7 +56,7 @@ To swap out the payload of a managed `UniquePtr` wholesale (replace the referenc
 Pointer structs are unmanaged, so they live directly in component fields:
 
 ```csharp
-public struct CMeshReference : IEntityComponent
+public partial struct CMeshReference : IEntityComponent
 {
     public SharedPtr<Mesh> Mesh;
 }
