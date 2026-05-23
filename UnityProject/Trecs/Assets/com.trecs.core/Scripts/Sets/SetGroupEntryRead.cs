@@ -18,7 +18,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Exists(int index) => _entityIdToDenseIndex.ContainsKey(index);
+        public bool Contains(int index) => _entityIdToDenseIndex.ContainsKey(index);
 
         public EntitySetIndices Indices
         {

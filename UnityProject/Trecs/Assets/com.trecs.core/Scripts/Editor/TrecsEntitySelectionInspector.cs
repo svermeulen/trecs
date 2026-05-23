@@ -232,7 +232,7 @@ namespace Trecs
             int hash = tags.Count;
             foreach (var t in tags)
             {
-                hash ^= t.Guid;
+                hash ^= t.Value;
             }
             if (hash == _lastTagsHash)
             {
@@ -258,7 +258,7 @@ namespace Trecs
                     TrecsInspectorLinks.MakeTagLink(
                         world,
                         captured,
-                        captured.ToString() ?? $"#{captured.Guid}"
+                        captured.ToString() ?? $"#{captured.Value}"
                     )
                 );
             }

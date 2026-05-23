@@ -1,14 +1,31 @@
 using System;
+using System.Buffers;
 using System.IO;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs
 {
     public sealed class BinarySerializationWriter : ISerializationWriter, IDisposable
     {
         static readonly TrecsLog _log = TrecsLog.Default;
 
+        // Initial capacity for the data buffer. Sized to keep small payloads
+        // (single-frame inputs, header probes) in a single allocation while
+        // still letting ArrayBufferWriter geometrically grow for large
+        // snapshots without a slow ramp from the default 256-byte start.
+        const int InitialDataBufferCapacity = 4 * 1024;
+
         readonly SerializerRegistry _serializerManager;
-        readonly MemoryStream _dataBuffer;
+
+        // Data section (post-header, post-bit-fields) is accumulated into an
+        // ArrayBufferWriter<byte> rather than a MemoryStream so Complete() can
+        // flush the bytes via a single span write into the outer stream
+        // instead of MemoryStream.CopyTo's chunked copy loop. BinaryWriter
+        // still drives the per-call writes via a thin BufferWriterStream
+        // adapter, keeping MemoryBlitter / TypeIdSerializer call sites
+        // unchanged.
+        readonly ArrayBufferWriter<byte> _dataBuffer;
+        readonly BufferWriterStream _dataBufferStream;
         readonly BinaryWriter _dataWriter;
         readonly BitWriter _bitWriter = new();
 #if TRECS_INTERNAL_CHECKS && DEBUG
@@ -22,15 +39,16 @@ namespace Trecs.Internal
         public BinarySerializationWriter(SerializerRegistry serializerManager)
         {
             _serializerManager = serializerManager;
-            _dataBuffer = new MemoryStream();
-            _dataWriter = new BinaryWriter(_dataBuffer);
+            _dataBuffer = new ArrayBufferWriter<byte>(InitialDataBufferCapacity);
+            _dataBufferStream = new BufferWriterStream(_dataBuffer);
+            _dataWriter = new BinaryWriter(_dataBufferStream);
         }
 
         public long Flags
         {
             get
             {
-                TrecsAssert.That(_hasStarted);
+                TrecsDebugAssert.That(_hasStarted);
                 return _flags;
             }
         }
@@ -39,7 +57,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_hasStarted);
+                TrecsDebugAssert.That(_hasStarted);
                 return _version;
             }
         }
@@ -51,7 +69,7 @@ namespace Trecs.Internal
 
         public bool HasFlag(long flag)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
             return (_flags & flag) != 0;
         }
 
@@ -71,14 +89,14 @@ namespace Trecs.Internal
             bool enableMemoryTracking = false
         )
         {
-            using var _ = TrecsProfiling.Start("BinarySerializationWriter.Start");
+            using var _ = TrecsProfiling.Start("SerializationWriter.Start");
 
-            TrecsAssert.That(!_hasStarted);
+            TrecsDebugAssert.That(!_hasStarted);
             _hasStarted = true;
 
             var reservedUnused =
                 flags & SerializationFlags.ReservedMask & ~SerializationFlags.AllDefinedMask;
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 reservedUnused == 0,
                 "Flag bits {0:X} are reserved for Trecs and must not be set by app code. Use bits >= SerializationFlags.FirstUserBitIndex ({1}) for app-defined flags.",
                 reservedUnused,
@@ -88,8 +106,10 @@ namespace Trecs.Internal
             _flags = flags;
             _includeTypeChecks = includeTypeChecks;
             _version = version;
-            _dataBuffer.Position = 0;
-            _dataBuffer.SetLength(0);
+            // ArrayBufferWriter.Clear is O(1) — just resets WrittenCount and
+            // zeroes the previously-written slice so subsequent geometric
+            // growth never copies stale bytes into a new larger buffer.
+            _dataBuffer.Clear();
             _bitWriter.Reset();
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
@@ -105,73 +125,67 @@ namespace Trecs.Internal
         public void BlitWriteDelta<T>(string name, in T value, in T baseValue)
             where T : unmanaged
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             bool isChanged = !UnmanagedUtil.BlittableEquals(value, baseValue);
             _bitWriter.WriteBit(isChanged);
 
             if (isChanged)
             {
-                MemoryBlitter.Write(value, _dataWriter);
+                MemoryBlitter.Write(value, _dataBuffer);
             }
         }
 
         public void WriteObjectDelta(string name, object value, object baseValue)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             // Delta serialization doesn't support nulls yet
-            TrecsAssert.IsNotNull(value, "Delta serialization doesn't support null values");
-            TrecsAssert.IsNotNull(
+            TrecsDebugAssert.IsNotNull(value, "Delta serialization doesn't support null values");
+            TrecsDebugAssert.IsNotNull(
                 baseValue,
                 "Delta serialization doesn't support null base values"
             );
 
             var concreteValueType = value.GetType();
-            TrecsAssert.That(concreteValueType == baseValue.GetType());
+            TrecsDebugAssert.That(concreteValueType == baseValue.GetType());
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long startPos = _dataBuffer.Position;
+            long startPos = _dataBuffer.WrittenCount;
             _memoryTracker.BeginTrackingField(name, concreteValueType);
 #endif
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 concreteValueType.DerivesFrom(
                     typeof(IEquatable<>).MakeGenericType(concreteValueType)
                 )
             );
 #endif
-            using (TrecsProfiling.Start("WriteTypeId({0})", concreteValueType))
-            {
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                long typeIdStartPos = _dataBuffer.Position;
+            long typeIdStartPos = _dataBuffer.WrittenCount;
 #endif
-                TypeIdSerializer.Write(concreteValueType, _dataWriter);
+            TypeIdSerializer.Write(concreteValueType, _dataWriter);
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                _memoryTracker.TrackTypeId(
-                    concreteValueType,
-                    (int)(_dataBuffer.Position - typeIdStartPos)
-                );
+            _memoryTracker.TrackTypeId(
+                concreteValueType,
+                (int)(_dataBuffer.WrittenCount - typeIdStartPos)
+            );
 #endif
-            }
 
             // Note that we don't do equality checks here, so it's up to
             // the serializer to do delta optimization logic
-            using (TrecsProfiling.Start("Serializing {0}", concreteValueType))
-            {
-                var serializer = _serializerManager.GetSerializerDelta(concreteValueType);
-                serializer.SerializeObjectDelta(value, baseValue, this);
-            }
+            var serializer = _serializerManager.GetSerializerDelta(concreteValueType);
+            serializer.SerializeObjectDelta(value, baseValue, this);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            _memoryTracker.EndTrackingField((int)(_dataBuffer.Position - startPos));
+            _memoryTracker.EndTrackingField((int)(_dataBuffer.WrittenCount - startPos));
 #endif
         }
 
         public void WriteBit(bool value)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             _bitWriter.WriteBit(value);
         }
@@ -186,11 +200,11 @@ namespace Trecs.Internal
         //   instantiate.
         public void WriteDelta<T>(string name, in T value, in T baseValue)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             // Delta serialization doesn't support nulls yet
-            TrecsAssert.That(value != null, "Delta serialization doesn't support null values");
-            TrecsAssert.That(
+            TrecsDebugAssert.That(value != null, "Delta serialization doesn't support null values");
+            TrecsDebugAssert.That(
                 baseValue != null,
                 "Delta serialization doesn't support null base values"
             );
@@ -205,57 +219,46 @@ namespace Trecs.Internal
                 return;
             }
 
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 type == typeof(Type) || type.IsValueType || value.GetType() == type,
                 "WriteDelta<T> requires the runtime type to match T={0} exactly; use WriteObjectDelta for polymorphic types",
                 type
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 type == typeof(Type) || type.IsValueType || baseValue.GetType() == type,
                 "WriteDelta<T> requires baseValue runtime type to match T={0} exactly",
                 type
             );
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long startPos = _dataBuffer.Position;
+            long startPos = _dataBuffer.WrittenCount;
             long typeIdBytes = 0;
 #endif
 
             if (_includeTypeChecks)
             {
-                using (TrecsProfiling.Start("WriteTypeId({0})", type))
-                {
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                    long typeIdStartPos = _dataBuffer.Position;
+                long typeIdStartPos = _dataBuffer.WrittenCount;
 #endif
-                    TypeIdSerializer.Write(type, _dataWriter);
+                TypeIdSerializer.Write(type, _dataWriter);
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                    typeIdBytes = _dataBuffer.Position - typeIdStartPos;
+                typeIdBytes = _dataBuffer.WrittenCount - typeIdStartPos;
 #endif
-                }
             }
 
             // Note that we don't do equality checks here, so it's up to
             // the serializer to do delta optimization logic
-            ISerializerDelta<T> serializer;
-
-            using (TrecsProfiling.Start("Looking up serializer for type {0}", type))
-            {
-                serializer = _serializerManager.GetSerializerDelta<T>();
-            }
+            var serializer = _serializerManager.GetSerializerDelta<T>();
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long dataStartPos = _dataBuffer.Position;
+            long dataStartPos = _dataBuffer.WrittenCount;
             _memoryTracker.BeginTrackingField(name, type);
 #endif
 
-            using (TrecsProfiling.Start("{0}.Serialize", serializer.GetType()))
-            {
-                serializer.SerializeDelta(value, baseValue, this);
-            }
+            serializer.SerializeDelta(value, baseValue, this);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long totalBytesWritten = _dataBuffer.Position - dataStartPos;
+            long totalBytesWritten = _dataBuffer.WrittenCount - dataStartPos;
             _memoryTracker.TrackTypeId(type, (int)typeIdBytes);
             _memoryTracker.EndTrackingField((int)totalBytesWritten);
 #endif
@@ -263,11 +266,11 @@ namespace Trecs.Internal
 
         public void WriteStringDelta(string name, string value, string baseValue)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             // Delta serialization doesn't support nulls yet
-            TrecsAssert.IsNotNull(value, "Delta serialization doesn't support null values");
-            TrecsAssert.IsNotNull(
+            TrecsDebugAssert.IsNotNull(value, "Delta serialization doesn't support null values");
+            TrecsDebugAssert.IsNotNull(
                 baseValue,
                 "Delta serialization doesn't support null base values"
             );
@@ -283,7 +286,7 @@ namespace Trecs.Internal
 
         public void Complete(BinaryWriter outputWriter)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
             _hasStarted = false;
 
             // Track header bytes
@@ -314,8 +317,10 @@ namespace Trecs.Internal
                 outputWriter.BaseStream.Position
             );
 
-            _dataBuffer.Position = 0;
-            _dataBuffer.CopyTo(outputWriter.BaseStream);
+            // Span write: single Stream.Write(ReadOnlySpan<byte>) into the
+            // outer stream. Replaces the MemoryStream.CopyTo chunked loop
+            // and avoids the temporary read buffer it allocates.
+            outputWriter.BaseStream.Write(_dataBuffer.WrittenSpan);
             _log.Trace(
                 "Completed writing data buffer at byte {0}",
                 outputWriter.BaseStream.Position
@@ -341,40 +346,43 @@ namespace Trecs.Internal
             _flags = 0;
             _version = 0;
             _includeTypeChecks = false;
-            _dataBuffer.Position = 0;
-            _dataBuffer.SetLength(0);
+            _dataBuffer.Clear();
             _bitWriter.ResetForErrorRecovery();
         }
 
         public void Dispose()
         {
+            // ArrayBufferWriter<byte> doesn't implement IDisposable — the
+            // backing array becomes eligible for GC once the writer is no
+            // longer referenced. The BufferWriterStream adapter is also
+            // stateless beyond its reference to the buffer; just disposing
+            // _dataWriter (which closes the adapter stream) is sufficient.
             _dataWriter?.Dispose();
-            _dataBuffer?.Dispose();
         }
 
         public long NumBytesWritten
         {
             get
             {
-                TrecsAssert.That(_hasStarted);
-                return _dataBuffer.Position + ((_bitWriter.BitCount + 7) / 8);
+                TrecsDebugAssert.That(_hasStarted);
+                return _dataBuffer.WrittenCount + ((_bitWriter.BitCount + 7) / 8);
             }
         }
 
         public void BlitWrite<T>(string name, in T value)
             where T : unmanaged
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long startPos = _dataBuffer.Position;
+            long startPos = _dataBuffer.WrittenCount;
 #endif
-            MemoryBlitter.Write(value, _dataWriter);
+            MemoryBlitter.Write(value, _dataBuffer);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackDirectWrite(
                 name,
                 typeof(T),
-                (int)(_dataBuffer.Position - startPos)
+                (int)(_dataBuffer.WrittenCount - startPos)
             );
 #endif
         }
@@ -382,21 +390,21 @@ namespace Trecs.Internal
         public unsafe void BlitWriteArrayPtr<T>(string name, T* value, int length)
             where T : unmanaged
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
-            MemoryBlitter.WriteArrayPtr(value, length, _dataWriter);
+            MemoryBlitter.WriteArrayPtr(value, length, _dataBuffer);
         }
 
         public void WriteTypeId(string name, Type type)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             TypeIdSerializer.Write(type, _dataWriter);
         }
 
         public void WriteObject(string name, object value)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             // Write null bit
             bool isNull = value == null;
@@ -410,38 +418,32 @@ namespace Trecs.Internal
             var type = value.GetType();
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long startPos = _dataBuffer.Position;
+            long startPos = _dataBuffer.WrittenCount;
             _memoryTracker.BeginTrackingField(name, type);
 #endif
 
-            using (TrecsProfiling.Start("WriteTypeId({0})", type))
-            {
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                long typeIdStartPos = _dataBuffer.Position;
+            long typeIdStartPos = _dataBuffer.WrittenCount;
 #endif
-                TypeIdSerializer.Write(type, _dataWriter);
+            TypeIdSerializer.Write(type, _dataWriter);
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                _memoryTracker.TrackTypeId(type, (int)(_dataBuffer.Position - typeIdStartPos));
+            _memoryTracker.TrackTypeId(type, (int)(_dataBuffer.WrittenCount - typeIdStartPos));
 #endif
-            }
 
-            using (TrecsProfiling.Start("Serializing {0}", type))
-            {
-                var serializer = _serializerManager.GetSerializer(type);
-                serializer.SerializeObject(value, this);
-            }
+            var serializer = _serializerManager.GetSerializer(type);
+            serializer.SerializeObject(value, this);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            _memoryTracker.EndTrackingField((int)(_dataBuffer.Position - startPos));
+            _memoryTracker.EndTrackingField((int)(_dataBuffer.WrittenCount - startPos));
 #endif
         }
 
         public unsafe void BlitWriteArray<T>(string name, T[] value, int count)
             where T : unmanaged
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
-            MemoryBlitter.WriteArray(value, count, _dataWriter);
+            MemoryBlitter.WriteArray(value, count, _dataBuffer);
         }
 
         // Advantages of Write<T> over WriteObject (apply only when T is non-abstract;
@@ -454,7 +456,7 @@ namespace Trecs.Internal
         //   instantiate.
         public void Write<T>(string name, in T value)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             var type = typeof(T);
 
@@ -479,51 +481,39 @@ namespace Trecs.Internal
                 }
             }
 
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 type == typeof(Type) || type.IsValueType || value.GetType() == type,
                 "Write<T> requires the runtime type to match T={0} exactly; use WriteObject for polymorphic types",
                 type
             );
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long startPos = _dataBuffer.Position;
+            long startPos = _dataBuffer.WrittenCount;
             _memoryTracker.BeginTrackingField(name, type);
 #endif
 
             if (_includeTypeChecks)
             {
-                using (TrecsProfiling.Start("WriteTypeId({0})", type))
-                {
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                    long typeIdStartPos = _dataBuffer.Position;
+                long typeIdStartPos = _dataBuffer.WrittenCount;
 #endif
-                    TypeIdSerializer.Write(type, _dataWriter);
+                TypeIdSerializer.Write(type, _dataWriter);
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                    _memoryTracker.TrackTypeId(type, (int)(_dataBuffer.Position - typeIdStartPos));
+                _memoryTracker.TrackTypeId(type, (int)(_dataBuffer.WrittenCount - typeIdStartPos));
 #endif
-                }
             }
 
-            ISerializer<T> serializer;
-
-            using (TrecsProfiling.Start("Looking up serializer for type {0}", type))
-            {
-                serializer = _serializerManager.GetSerializer<T>();
-            }
-
-            using (TrecsProfiling.Start("{0}.Serialize", serializer.GetType()))
-            {
-                serializer.Serialize(value, this);
-            }
+            var serializer = _serializerManager.GetSerializer<T>();
+            serializer.Serialize(value, this);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            _memoryTracker.EndTrackingField((int)(_dataBuffer.Position - startPos));
+            _memoryTracker.EndTrackingField((int)(_dataBuffer.WrittenCount - startPos));
 #endif
         }
 
         public void WriteString(string name, string value)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             // Write null bit
             bool isNull = value == null;
@@ -535,29 +525,29 @@ namespace Trecs.Internal
             }
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long startPos = _dataBuffer.Position;
+            long startPos = _dataBuffer.WrittenCount;
 #endif
             _dataWriter.Write(value);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackDirectWrite(
                 name,
                 typeof(string),
-                (int)(_dataBuffer.Position - startPos)
+                (int)(_dataBuffer.WrittenCount - startPos)
             );
 #endif
         }
 
         public unsafe void BlitWriteRawBytes(string name, void* ptr, int numBytes)
         {
-            TrecsAssert.That(_hasStarted);
-            MemoryBlitter.WriteRaw(ptr, numBytes, _dataWriter);
+            TrecsDebugAssert.That(_hasStarted);
+            MemoryBlitter.WriteRaw(ptr, numBytes, _dataBuffer);
         }
 
         public void WriteBytes(string name, byte[] buffer, int offset, int count)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long startPos = _dataBuffer.Position;
+            long startPos = _dataBuffer.WrittenCount;
 #endif
             _dataWriter.Write(count);
 
@@ -569,7 +559,7 @@ namespace Trecs.Internal
             _memoryTracker.TrackDirectWrite(
                 name,
                 typeof(byte[]),
-                (int)(_dataBuffer.Position - startPos)
+                (int)(_dataBuffer.WrittenCount - startPos)
             );
 #endif
         }

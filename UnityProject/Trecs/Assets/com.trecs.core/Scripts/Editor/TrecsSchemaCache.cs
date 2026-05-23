@@ -900,8 +900,8 @@ namespace Trecs
             {
                 var ss = new TrecsSchemaSet
                 {
-                    DebugName = entitySet.DebugName ?? $"#{entitySet.Id.Id}",
-                    Id = entitySet.Id.Id,
+                    DebugName = entitySet.DebugName ?? $"#{entitySet.Id.Value}",
+                    Id = entitySet.Id.Value,
                     TypeFullName = entitySet.SetType?.FullName,
                     TypeNamespace = entitySet.SetType?.Namespace,
                 };
@@ -954,7 +954,7 @@ namespace Trecs
             }
             foreach (var entitySet in info.AllSets)
             {
-                var setName = entitySet.DebugName ?? $"#{entitySet.Id.Id}";
+                var setName = entitySet.DebugName ?? $"#{entitySet.Id.Value}";
                 AddTagSetCrossLink(tagsByGuid, entitySet.Tags, t => t.SetNames.Add(setName));
             }
             foreach (var entry in tagsByGuid.Values)
@@ -971,10 +971,10 @@ namespace Trecs
             {
                 foreach (var t in seen)
                 {
-                    ComponentId id;
+                    TypeId id;
                     try
                     {
-                        id = new ComponentId(TypeIdProvider.GetTypeId(t));
+                        id = TypeId.FromType(t);
                     }
                     catch (Exception)
                     {
@@ -1262,14 +1262,14 @@ namespace Trecs
             }
             foreach (var tag in ts.Tags)
             {
-                if (tag.Guid == 0 || map.ContainsKey(tag.Guid))
+                if (tag.Value == 0 || map.ContainsKey(tag.Value))
                 {
                     continue;
                 }
-                map[tag.Guid] = new TrecsSchemaTag
+                map[tag.Value] = new TrecsSchemaTag
                 {
-                    Name = tag.ToString() ?? $"#{tag.Guid}",
-                    Guid = tag.Guid,
+                    Name = tag.ToString() ?? $"#{tag.Value}",
+                    Guid = tag.Value,
                 };
             }
         }
@@ -1286,7 +1286,7 @@ namespace Trecs
             }
             foreach (var tag in ts.Tags)
             {
-                if (tag.Guid != 0 && map.TryGetValue(tag.Guid, out var entry))
+                if (tag.Value != 0 && map.TryGetValue(tag.Value, out var entry))
                 {
                     onMatch(entry);
                 }

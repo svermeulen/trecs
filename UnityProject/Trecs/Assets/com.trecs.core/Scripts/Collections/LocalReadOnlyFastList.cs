@@ -45,7 +45,7 @@ namespace Trecs.Collections
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                TrecsAssert.That(index >= 0 && index < _count, "Index out of range");
+                TrecsDebugAssert.That(index >= 0 && index < _count, "Index out of range");
                 return ref _list[index];
             }
         }

@@ -154,7 +154,7 @@ namespace Trecs
             var entry = new TrecsSchemaSet
             {
                 DebugName = entitySet.DebugName,
-                Id = entitySet.Id.Id,
+                Id = entitySet.Id.Value,
                 TypeFullName = entitySet.SetType?.FullName,
                 TypeNamespace = entitySet.SetType?.Namespace,
             };

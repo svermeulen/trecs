@@ -49,7 +49,7 @@ namespace Trecs
         // Stable hash across sessions.
         public override int GetHashCode()
         {
-            return Id.Id;
+            return Id.Value;
         }
 
         public override string ToString()

@@ -44,15 +44,15 @@ namespace Trecs.Tests
             var deserializedVector = _cacheHelper.ReadAll<Vector3>();
 
             // Assert
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 TestUtil.Approximately(originalVector.x, deserializedVector.x, 0.0001f),
                 "X component should match"
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 TestUtil.Approximately(originalVector.y, deserializedVector.y, 0.0001f),
                 "Y component should match"
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 TestUtil.Approximately(originalVector.z, deserializedVector.z, 0.0001f),
                 "Z component should match"
             );
@@ -77,7 +77,7 @@ namespace Trecs.Tests
             var deserializedValue = _cacheHelper.ReadAll<int>();
 
             // Assert
-            TrecsAssert.That(deserializedValue == originalValue);
+            TrecsDebugAssert.That(deserializedValue == originalValue);
         }
 
         [Test]
@@ -99,7 +99,7 @@ namespace Trecs.Tests
             var deserializedValue = (string)_cacheHelper.ReadAllObject();
 
             // Assert
-            TrecsAssert.That(deserializedValue == originalValue);
+            TrecsDebugAssert.That(deserializedValue == originalValue);
         }
 
         [Test]
@@ -121,7 +121,7 @@ namespace Trecs.Tests
             var deserializedValue = (string)_cacheHelper.ReadAllObject();
 
             // Assert
-            TrecsAssert.That(deserializedValue == originalValue);
+            TrecsDebugAssert.That(deserializedValue == originalValue);
         }
 
         [Test]
@@ -143,7 +143,9 @@ namespace Trecs.Tests
             var deserializedValue = _cacheHelper.ReadAll<float>();
 
             // Assert
-            TrecsAssert.That(TestUtil.Approximately(originalValue, deserializedValue, 0.0001f));
+            TrecsDebugAssert.That(
+                TestUtil.Approximately(originalValue, deserializedValue, 0.0001f)
+            );
         }
 
         [Test]
@@ -157,14 +159,14 @@ namespace Trecs.Tests
             _cacheHelper.WriteAll(true, TestConstants.Version, includeTypeChecks: true, flags);
             _cacheHelper.ResetMemoryPosition();
             var deserializedTrue = _cacheHelper.ReadAll<bool>();
-            TrecsAssert.That(deserializedTrue);
+            TrecsDebugAssert.That(deserializedTrue);
 
             // Test false
             _cacheHelper.ClearMemoryStream();
             _cacheHelper.WriteAll(false, TestConstants.Version, includeTypeChecks: true, flags);
             _cacheHelper.ResetMemoryPosition();
             var deserializedFalse = _cacheHelper.ReadAll<bool>();
-            TrecsAssert.That(!deserializedFalse);
+            TrecsDebugAssert.That(!deserializedFalse);
         }
 
         [Test]
@@ -194,11 +196,11 @@ namespace Trecs.Tests
             _cacheHelper.StopRead(verifySentinel: true);
 
             // Assert
-            TrecsAssert.That(TestUtil.Approximately(vec.x, readVec.x, 0.0001f));
-            TrecsAssert.That(TestUtil.Approximately(vec.y, readVec.y, 0.0001f));
-            TrecsAssert.That(TestUtil.Approximately(vec.z, readVec.z, 0.0001f));
-            TrecsAssert.That(readInt == intVal);
-            TrecsAssert.That(readStr == strVal);
+            TrecsDebugAssert.That(TestUtil.Approximately(vec.x, readVec.x, 0.0001f));
+            TrecsDebugAssert.That(TestUtil.Approximately(vec.y, readVec.y, 0.0001f));
+            TrecsDebugAssert.That(TestUtil.Approximately(vec.z, readVec.z, 0.0001f));
+            TrecsDebugAssert.That(readInt == intVal);
+            TrecsDebugAssert.That(readStr == strVal);
         }
 
         [Test]
@@ -233,9 +235,15 @@ namespace Trecs.Tests
                 var loadedValue = _cacheHelper.ReadAll<Vector3>();
 
                 // Assert
-                TrecsAssert.That(TestUtil.Approximately(originalValue.x, loadedValue.x, 0.0001f));
-                TrecsAssert.That(TestUtil.Approximately(originalValue.y, loadedValue.y, 0.0001f));
-                TrecsAssert.That(TestUtil.Approximately(originalValue.z, loadedValue.z, 0.0001f));
+                TrecsDebugAssert.That(
+                    TestUtil.Approximately(originalValue.x, loadedValue.x, 0.0001f)
+                );
+                TrecsDebugAssert.That(
+                    TestUtil.Approximately(originalValue.y, loadedValue.y, 0.0001f)
+                );
+                TrecsDebugAssert.That(
+                    TestUtil.Approximately(originalValue.z, loadedValue.z, 0.0001f)
+                );
             }
             finally
             {

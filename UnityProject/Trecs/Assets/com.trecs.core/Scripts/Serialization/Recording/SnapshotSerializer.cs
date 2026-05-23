@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace Trecs.Internal
 {
@@ -23,6 +25,17 @@ namespace Trecs.Internal
     /// </remarks>
     public sealed class SnapshotSerializer : IDisposable
     {
+        /// <summary>
+        /// Default upper bound on the number of recycled payload buffers the
+        /// serializer keeps in its pool. Snapshots are typically multi-MB and
+        /// live on the LOH, so this bound also bounds resident LOH memory; pick
+        /// a value that comfortably covers any caller's working set of in-
+        /// memory snapshots (e.g. AutoRecorder's anchor cap + scrub-cache
+        /// peak). Beyond the cap, returned buffers are simply abandoned to
+        /// the GC.
+        /// </summary>
+        public const int DefaultMaxPoolBuffers = 64;
+
         readonly TrecsLog _log;
 
         readonly IWorldStateSerializer _worldStateSerializer;
@@ -30,18 +43,44 @@ namespace Trecs.Internal
         readonly BlobCache _blobCache;
         readonly WorldAccessor _world;
 
+        // Reused across SaveSnapshot calls. Returned to callers, but they only
+        // read FixedFrame and don't retain references — the next SaveSnapshot
+        // safely mutates it in place. Load paths construct fresh instances
+        // through the deserializer so they don't share this state.
+        readonly SnapshotMetadata _metadata = new();
+
+        // Pool of recycled payload byte[]s. Multi-MB allocations live on the
+        // LOH and would trigger Gen 2 GC on every capture; recycling avoids
+        // that. Capped by _maxPoolBuffers to bound resident memory. Buffers
+        // grow in place when SaveSnapshot needs more capacity — never shrink.
+        readonly Stack<byte[]> _payloadPool = new();
+        readonly int _maxPoolBuffers;
+#if DEBUG
+        // Mirror set of the pool used only for O(1) double-return detection.
+        // byte[] inherits Object.Equals/GetHashCode (reference equality) so a
+        // plain HashSet keys on reference identity.
+        readonly HashSet<byte[]> _payloadPoolSet = new();
+#endif
+
         bool _disposed;
 
         public SnapshotSerializer(
             IWorldStateSerializer worldStateSerializer,
             SerializerRegistry registry,
-            World world
+            World world,
+            int maxPoolBuffers = DefaultMaxPoolBuffers
         )
         {
             if (registry == null)
                 throw new ArgumentNullException(nameof(registry));
             if (world == null)
                 throw new ArgumentNullException(nameof(world));
+            if (maxPoolBuffers < 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(maxPoolBuffers),
+                    maxPoolBuffers,
+                    "maxPoolBuffers must be >= 0"
+                );
 
             _log = world.Log;
             _worldStateSerializer =
@@ -50,6 +89,7 @@ namespace Trecs.Internal
             _blobCache = world.BlobCache;
             _world = world.CreateAccessor(AccessorRole.Unrestricted);
             _buffer = new SerializationBuffer(registry);
+            _maxPoolBuffers = maxPoolBuffers;
         }
 
         /// <summary>
@@ -74,19 +114,16 @@ namespace Trecs.Internal
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
-            var metadata = new SnapshotMetadata
-            {
-                Version = version,
-                FixedFrame = _world.FixedFrame,
-            };
-            _blobCache.GetAllActiveBlobIds(metadata.BlobIds);
+            using var _profile = TrecsProfiling.Start("SnapshotSerializer.SaveSnapshot");
+
+            PrepareMetadata(version);
 
             try
             {
                 _buffer.ClearMemoryStream();
                 _buffer.StartWrite(version: version, includeTypeChecks: includeTypeChecks);
-                _buffer.Write("Metadata", metadata);
-                _worldStateSerializer.SerializeState(_buffer);
+                _buffer.Write("Metadata", _metadata);
+                _worldStateSerializer.SerializeFullState(_buffer.Writer);
                 var numBytes = _buffer.EndWrite();
                 _log.Trace("Saved snapshot ({0:0.00} kb)", numBytes / 1024f);
             }
@@ -98,7 +135,150 @@ namespace Trecs.Internal
 
             _buffer.MemoryStream.Position = 0;
             _buffer.MemoryStream.CopyTo(stream);
-            return metadata;
+            return _metadata;
+        }
+
+        void PrepareMetadata(int version)
+        {
+            _metadata.Version = version;
+            _metadata.FixedFrame = _world.FixedFrame;
+            _metadata.BlobIds.Clear();
+            _blobCache.GetAllActiveBlobIds(_metadata.BlobIds);
+        }
+
+        /// <summary>
+        /// Capture the current world state into a pooled payload buffer and
+        /// return an exact-length view over it. The returned
+        /// <see cref="ReadOnlyMemory{T}"/> is sized to the actual payload —
+        /// callers should not look at the underlying buffer's full length,
+        /// which may be larger when a recycled buffer is reused.
+        ///
+        /// <para>
+        /// When the caller is done with the payload, pass it back via
+        /// <see cref="ReturnPayloadBuffer"/> so the backing byte[] is
+        /// recycled instead of GC'd. Forgetting to call
+        /// <see cref="ReturnPayloadBuffer"/> is safe (the buffer just doesn't
+        /// recycle); calling it twice is a bug (the same buffer enters the
+        /// pool twice and a future <see cref="SaveSnapshot(int, out ReadOnlyMemory{byte}, bool)"/>
+        /// hands it out to two callers).
+        /// </para>
+        ///
+        /// <para>
+        /// The payload is only safe to read while the underlying buffer is
+        /// not yet recycled. In practice that means: don't return the buffer
+        /// while another consumer still holds a reference to the
+        /// <see cref="ReadOnlyMemory{T}"/>, and don't capture another
+        /// snapshot through the same serializer before reading the bytes if
+        /// the pool happened to be empty (a fresh capture into a pooled
+        /// buffer can mutate the bytes the previous slice references).
+        /// </para>
+        /// </summary>
+        public SnapshotMetadata SaveSnapshot(
+            int version,
+            out ReadOnlyMemory<byte> payload,
+            bool includeTypeChecks = true
+        )
+        {
+            ThrowIfDisposed();
+
+            using var _profile = TrecsProfiling.Start("SnapshotSerializer.SaveSnapshot");
+
+            PrepareMetadata(version);
+
+            try
+            {
+                _buffer.ClearMemoryStream();
+                _buffer.StartWrite(version: version, includeTypeChecks: includeTypeChecks);
+                _buffer.Write("Metadata", _metadata);
+                _worldStateSerializer.SerializeFullState(_buffer.Writer);
+                _buffer.EndWrite();
+            }
+            catch
+            {
+                _buffer.ResetForErrorRecovery();
+                throw;
+            }
+
+            var length = (int)_buffer.MemoryStream.Length;
+            // Pop a recycled buffer when one fits; allocate fresh otherwise.
+            // Buffers grow in place — they never shrink — so any pooled buffer
+            // that's >= length works.
+            byte[] buffer = null;
+            while (_payloadPool.Count > 0)
+            {
+                var candidate = _payloadPool.Pop();
+#if DEBUG
+                if (candidate != null)
+                {
+                    _payloadPoolSet.Remove(candidate);
+                }
+#endif
+                if (candidate != null && candidate.Length >= length)
+                {
+                    buffer = candidate;
+                    break;
+                }
+                // Too small — drop on the floor; a fresh allocation below is
+                // cheaper than carrying tiny buffers forward through evictions.
+            }
+            if (buffer == null)
+            {
+                buffer = new byte[length];
+            }
+            Buffer.BlockCopy(_buffer.MemoryStream.GetBuffer(), 0, buffer, 0, length);
+            payload = new ReadOnlyMemory<byte>(buffer, 0, length);
+            _log.Trace("Saved snapshot ({0:0.00} kb)", length / 1024f);
+            return _metadata;
+        }
+
+        /// <summary>
+        /// Return the byte[] backing a <paramref name="payload"/> previously
+        /// rented via <see cref="SaveSnapshot(int, out ReadOnlyMemory{byte}, bool)"/>
+        /// to the serializer's pool. No-op for empty payloads and for payloads
+        /// not backed by an array. The pool is bounded — past the cap the
+        /// buffer is dropped on the floor for the GC to reclaim.
+        ///
+        /// <para>
+        /// Calling this transfers ownership of the underlying byte[] from the
+        /// caller back to the pool. After calling, the caller must not read
+        /// from <paramref name="payload"/> — the next <see cref="SaveSnapshot(int, out ReadOnlyMemory{byte}, bool)"/>
+        /// may pop this buffer and overwrite the bytes.
+        /// </para>
+        ///
+        /// <para>
+        /// Calling this twice with the same payload is a bug: the underlying
+        /// byte[] would enter the pool twice, and two subsequent
+        /// <see cref="SaveSnapshot(int, out ReadOnlyMemory{byte}, bool)"/>
+        /// calls would hand the same buffer to two different consumers —
+        /// they'd then corrupt each other's payloads. DEBUG builds assert on
+        /// double-return via a side HashSet (O(1) per call); release builds
+        /// rely on the caller to track ownership.
+        /// </para>
+        /// </summary>
+        public void ReturnPayloadBuffer(ReadOnlyMemory<byte> payload)
+        {
+            if (payload.IsEmpty)
+            {
+                return;
+            }
+            if (_payloadPool.Count >= _maxPoolBuffers)
+            {
+                return;
+            }
+            if (
+                MemoryMarshal.TryGetArray(payload, out var seg)
+                && seg.Array != null
+                && seg.Array.Length > 0
+            )
+            {
+#if DEBUG
+                TrecsDebugAssert.That(
+                    _payloadPoolSet.Add(seg.Array),
+                    "SnapshotSerializer payload buffer returned twice — caller tracking is broken"
+                );
+#endif
+                _payloadPool.Push(seg.Array);
+            }
         }
 
         /// <summary>
@@ -141,20 +321,62 @@ namespace Trecs.Internal
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
 
+            using var _profile = TrecsProfiling.Start("SnapshotSerializer.LoadSnapshot");
+
             try
             {
                 LoadStreamIntoBuffer(stream);
-                _buffer.StartRead();
-                var metadata = _buffer.Read<SnapshotMetadata>("Metadata");
-                _worldStateSerializer.DeserializeState(_buffer);
-                _buffer.StopRead(verifySentinel: true);
-                return metadata;
+                return LoadFromInternalBuffer();
             }
             catch
             {
                 _buffer.ResetForErrorRecovery();
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Read a snapshot directly from an in-memory byte span and restore it
+        /// into the live world. Avoids wrapping the bytes in a
+        /// <see cref="MemoryStream"/> — preferred when the payload is already
+        /// resident in memory (e.g. a <see cref="RecordingBundle"/>'s anchor).
+        /// </summary>
+        /// <returns>The snapshot's header metadata.</returns>
+        /// <exception cref="SerializationException">The span is empty/truncated or the binary payload is invalid.</exception>
+        /// <exception cref="ObjectDisposedException">The snapshot serializer has been disposed.</exception>
+        public SnapshotMetadata LoadSnapshot(ReadOnlySpan<byte> payload)
+        {
+            ThrowIfDisposed();
+            if (payload.IsEmpty)
+            {
+                throw new SerializationException(
+                    "Snapshot payload is empty — cannot load an empty snapshot."
+                );
+            }
+
+            using var _profile = TrecsProfiling.Start("SnapshotSerializer.LoadSnapshot");
+
+            try
+            {
+                _buffer.ClearMemoryStream();
+                _buffer.MemoryStream.Write(payload);
+                _buffer.MemoryStream.Position = 0;
+                return LoadFromInternalBuffer();
+            }
+            catch
+            {
+                _buffer.ResetForErrorRecovery();
+                throw;
+            }
+        }
+
+        SnapshotMetadata LoadFromInternalBuffer()
+        {
+            _buffer.StartRead();
+            var metadata = _buffer.Read<SnapshotMetadata>("Metadata");
+            _worldStateSerializer.DeserializeState(_buffer.Reader);
+            _buffer.StopRead(verifySentinel: true);
+            return metadata;
         }
 
         /// <summary>
@@ -253,6 +475,10 @@ namespace Trecs.Internal
                 return;
             }
             _disposed = true;
+            _payloadPool.Clear();
+#if DEBUG
+            _payloadPoolSet.Clear();
+#endif
             _buffer.Dispose();
         }
     }

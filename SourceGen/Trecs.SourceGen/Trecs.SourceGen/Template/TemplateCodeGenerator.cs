@@ -96,6 +96,7 @@ namespace Trecs.SourceGen.Template
                 sb.AppendLine();
             }
 
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
             sb.AppendLine(indentLevel, "public static readonly Template Template = new Template(");
 
             int argIndent = indentLevel + 1;
@@ -294,7 +295,7 @@ namespace Trecs.SourceGen.Template
         /// entry). Empty input yields an empty result.
         /// </summary>
         private static IReadOnlyList<IReadOnlyList<string>> ComputeCrossProduct(
-            ImmutableArray<TemplateDimensionData> dimensions
+            EquatableArray<TemplateDimensionData> dimensions
         )
         {
             if (dimensions.Length == 0)
@@ -314,7 +315,7 @@ namespace Trecs.SourceGen.Template
         const string AbsentVariant = "<absent>";
 
         private static void BuildCrossProduct(
-            ImmutableArray<TemplateDimensionData> dimensions,
+            EquatableArray<TemplateDimensionData> dimensions,
             int dimIndex,
             List<string> current,
             List<IReadOnlyList<string>> result

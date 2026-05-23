@@ -126,7 +126,7 @@ namespace Trecs
         public QueryBuilder WithComponents<T1>()
             where T1 : unmanaged, IEntityComponent
         {
-            _positiveComps = _positiveComps.Add(ComponentTypeId<T1>.Value);
+            _positiveComps = _positiveComps.Add(TypeId<T1>.Value);
             return this;
         }
 
@@ -134,8 +134,8 @@ namespace Trecs
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
         {
-            _positiveComps = _positiveComps.Add(ComponentTypeId<T1>.Value);
-            _positiveComps = _positiveComps.Add(ComponentTypeId<T2>.Value);
+            _positiveComps = _positiveComps.Add(TypeId<T1>.Value);
+            _positiveComps = _positiveComps.Add(TypeId<T2>.Value);
             return this;
         }
 
@@ -144,9 +144,9 @@ namespace Trecs
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
         {
-            _positiveComps = _positiveComps.Add(ComponentTypeId<T1>.Value);
-            _positiveComps = _positiveComps.Add(ComponentTypeId<T2>.Value);
-            _positiveComps = _positiveComps.Add(ComponentTypeId<T3>.Value);
+            _positiveComps = _positiveComps.Add(TypeId<T1>.Value);
+            _positiveComps = _positiveComps.Add(TypeId<T2>.Value);
+            _positiveComps = _positiveComps.Add(TypeId<T3>.Value);
             return this;
         }
 
@@ -156,10 +156,10 @@ namespace Trecs
             where T3 : unmanaged, IEntityComponent
             where T4 : unmanaged, IEntityComponent
         {
-            _positiveComps = _positiveComps.Add(ComponentTypeId<T1>.Value);
-            _positiveComps = _positiveComps.Add(ComponentTypeId<T2>.Value);
-            _positiveComps = _positiveComps.Add(ComponentTypeId<T3>.Value);
-            _positiveComps = _positiveComps.Add(ComponentTypeId<T4>.Value);
+            _positiveComps = _positiveComps.Add(TypeId<T1>.Value);
+            _positiveComps = _positiveComps.Add(TypeId<T2>.Value);
+            _positiveComps = _positiveComps.Add(TypeId<T3>.Value);
+            _positiveComps = _positiveComps.Add(TypeId<T4>.Value);
             return this;
         }
 
@@ -172,7 +172,7 @@ namespace Trecs
         public QueryBuilder WithoutComponents<T1>()
             where T1 : unmanaged, IEntityComponent
         {
-            _negativeComps = _negativeComps.Add(ComponentTypeId<T1>.Value);
+            _negativeComps = _negativeComps.Add(TypeId<T1>.Value);
             return this;
         }
 
@@ -180,8 +180,8 @@ namespace Trecs
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
         {
-            _negativeComps = _negativeComps.Add(ComponentTypeId<T1>.Value);
-            _negativeComps = _negativeComps.Add(ComponentTypeId<T2>.Value);
+            _negativeComps = _negativeComps.Add(TypeId<T1>.Value);
+            _negativeComps = _negativeComps.Add(TypeId<T2>.Value);
             return this;
         }
 
@@ -190,9 +190,9 @@ namespace Trecs
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
         {
-            _negativeComps = _negativeComps.Add(ComponentTypeId<T1>.Value);
-            _negativeComps = _negativeComps.Add(ComponentTypeId<T2>.Value);
-            _negativeComps = _negativeComps.Add(ComponentTypeId<T3>.Value);
+            _negativeComps = _negativeComps.Add(TypeId<T1>.Value);
+            _negativeComps = _negativeComps.Add(TypeId<T2>.Value);
+            _negativeComps = _negativeComps.Add(TypeId<T3>.Value);
             return this;
         }
 
@@ -202,10 +202,10 @@ namespace Trecs
             where T3 : unmanaged, IEntityComponent
             where T4 : unmanaged, IEntityComponent
         {
-            _negativeComps = _negativeComps.Add(ComponentTypeId<T1>.Value);
-            _negativeComps = _negativeComps.Add(ComponentTypeId<T2>.Value);
-            _negativeComps = _negativeComps.Add(ComponentTypeId<T3>.Value);
-            _negativeComps = _negativeComps.Add(ComponentTypeId<T4>.Value);
+            _negativeComps = _negativeComps.Add(TypeId<T1>.Value);
+            _negativeComps = _negativeComps.Add(TypeId<T2>.Value);
+            _negativeComps = _negativeComps.Add(TypeId<T3>.Value);
+            _negativeComps = _negativeComps.Add(TypeId<T4>.Value);
             return this;
         }
 
@@ -220,7 +220,7 @@ namespace Trecs
         /// Returns a different builder type because set-filtered iteration is fundamentally
         /// sparse (walking set indices) rather than dense (walking all entities in a group).
         /// Only one set can be applied per query. If you need to intersect multiple sets,
-        /// query with one set and check <c>SetAccessor&lt;T&gt;.Exists()</c> for the others
+        /// query with one set and check <c>Set&lt;T&gt;().Read.Contains()</c> for the others
         /// inside the loop.
         /// </summary>
         public readonly SparseQueryBuilder InSet<T>()
@@ -340,10 +340,13 @@ namespace Trecs
             var iter = CreateIterator();
 
             var movedFirst = iter.MoveNext();
-            TrecsAssert.That(movedFirst, "Query matched no entities");
+            TrecsDebugAssert.That(movedFirst, "Query matched no entities");
             var result = iter.Current;
             var movedSecond = iter.MoveNext();
-            TrecsAssert.That(!movedSecond, "Query matched multiple entities, expected exactly one");
+            TrecsDebugAssert.That(
+                !movedSecond,
+                "Query matched multiple entities, expected exactly one"
+            );
 
             return result;
         }
@@ -376,7 +379,7 @@ namespace Trecs
 
         readonly void AssertHasAnyCriteria()
         {
-            TrecsRequire.That(
+            TrecsAssert.That(
                 HasAnyCriteria,
                 "Query has no criteria — add at least one WithTags / WithoutTags / WithComponents / WithoutComponents constraint before calling a terminator"
             );
@@ -406,7 +409,7 @@ namespace Trecs
 
         static TagSet MergeTags(TagSet existing, TagSet addition)
         {
-            TrecsAssert.That(!addition.IsNull);
+            TrecsDebugAssert.That(!addition.IsNull);
             return existing.IsNull ? addition : existing.CombineWith(addition);
         }
 
@@ -415,7 +418,7 @@ namespace Trecs
             ComponentTypeIdSet addition
         )
         {
-            TrecsAssert.That(!addition.IsNull);
+            TrecsDebugAssert.That(!addition.IsNull);
             if (existing.IsNull)
             {
                 return addition;

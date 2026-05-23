@@ -14,14 +14,14 @@ namespace Trecs
         public static UniquePtr<T> Alloc<T>(HeapAccessor heap)
             where T : class
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             return heap.UniqueHeap.AllocUnique<T>();
         }
 
         public static UniquePtr<T> Alloc<T>(HeapAccessor heap, T value)
             where T : class
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             return heap.UniqueHeap.AllocUnique<T>(value);
         }
 
@@ -30,26 +30,6 @@ namespace Trecs
 
         public static UniquePtr<T> Alloc<T>(WorldAccessor world, T value)
             where T : class => Alloc<T>(world.Heap, value);
-
-        public static UniquePtr<T> AllocFrameScoped<T>(HeapAccessor heap)
-            where T : class
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.FrameScopedUniqueHeap.Alloc<T>(heap.FixedFrame);
-        }
-
-        public static UniquePtr<T> AllocFrameScoped<T>(HeapAccessor heap, T value)
-            where T : class
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.FrameScopedUniqueHeap.Alloc<T>(heap.FixedFrame, value);
-        }
-
-        public static UniquePtr<T> AllocFrameScoped<T>(WorldAccessor world)
-            where T : class => AllocFrameScoped<T>(world.Heap);
-
-        public static UniquePtr<T> AllocFrameScoped<T>(WorldAccessor world, T value)
-            where T : class => AllocFrameScoped<T>(world.Heap, value);
     }
 
     /// <summary>
@@ -74,7 +54,10 @@ namespace Trecs
     {
         public readonly PtrHandle Handle;
 
-        public UniquePtr(PtrHandle handle)
+        // Internal so external code can't fabricate a handle from an arbitrary uint.
+        // Allocation goes through UniquePtr.Alloc; deserialization paths live in
+        // InternalsVisibleTo-allowed assemblies.
+        internal UniquePtr(PtrHandle handle)
         {
             Handle = handle;
         }
@@ -93,37 +76,13 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal readonly T Get(World world)
         {
-            if (world.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
-            {
-                TrecsAssert.That(
-                    entry.Type == typeof(T),
-                    "Expected heap memory address ({0}) to be of type {1}, but found type {2}",
-                    Handle.Value,
-                    typeof(T),
-                    entry.Type
-                );
-                return (T)entry.Value;
-            }
-
-            return world.FrameScopedUniqueHeap.ResolveValue<T>(world.FixedFrame, Handle.Value);
+            return Get(world.UniqueHeap);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly T Get(HeapAccessor heap)
         {
-            if (heap.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
-            {
-                TrecsAssert.That(
-                    entry.Type == typeof(T),
-                    "Expected heap memory address ({0}) to be of type {1}, but found type {2}",
-                    Handle.Value,
-                    typeof(T),
-                    entry.Type
-                );
-                return (T)entry.Value;
-            }
-
-            return heap.FrameScopedUniqueHeap.ResolveValue<T>(heap.FixedFrame, Handle.Value);
+            return Get(heap.UniqueHeap);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -143,41 +102,8 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal readonly bool TryGet(World world, out T value)
-        {
-            if (IsNull)
-            {
-                value = null;
-                return false;
-            }
-
-            if (world.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
-            {
-                TrecsAssert.That(
-                    entry.Type == typeof(T),
-                    "Expected heap memory address ({0}) to be of type {1}, but found type {2}",
-                    Handle.Value,
-                    typeof(T),
-                    entry.Type
-                );
-                value = (T)entry.Value;
-                return true;
-            }
-
-            if (
-                world.FrameScopedUniqueHeap.TryResolveValue<T>(
-                    Handle.Value,
-                    world.FixedFrame,
-                    out value
-                )
-            )
-            {
-                return true;
-            }
-
-            value = null;
-            return false;
-        }
+        internal readonly bool TryGet(World world, out T value) =>
+            TryGet(world.UniqueHeap, out value);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly bool TryGet(HeapAccessor heap, out T value)
@@ -190,7 +116,7 @@ namespace Trecs
 
             if (heap.UniqueHeap.TryGetEntry(Handle.Value, out var entry))
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     entry.Type == typeof(T),
                     "Expected heap memory address ({0}) to be of type {1}, but found type {2}",
                     Handle.Value,
@@ -198,17 +124,6 @@ namespace Trecs
                     entry.Type
                 );
                 value = (T)entry.Value;
-                return true;
-            }
-
-            if (
-                heap.FrameScopedUniqueHeap.TryResolveValue<T>(
-                    Handle.Value,
-                    heap.FixedFrame,
-                    out value
-                )
-            )
-            {
                 return true;
             }
 
@@ -227,9 +142,7 @@ namespace Trecs
             {
                 return false;
             }
-
-            return world.UniqueHeap.TryGetEntry(Handle.Value, out _)
-                || world.FrameScopedUniqueHeap.ContainsEntry(Handle.Value);
+            return world.UniqueHeap.TryGetEntry(Handle.Value, out _);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -239,56 +152,52 @@ namespace Trecs
             {
                 return false;
             }
-
-            return heap.UniqueHeap.TryGetEntry(Handle.Value, out _)
-                || heap.FrameScopedUniqueHeap.ContainsEntry(Handle.Value);
+            return heap.UniqueHeap.TryGetEntry(Handle.Value, out _);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly bool CanGet(WorldAccessor accessor) => CanGet(accessor.Heap);
 
+        // Public Set overloads live on UniquePtrExtensions as
+        // `this ref UniquePtr<T>` extension methods (bottom of file). The
+        // implementations here are `internal readonly` — extensions delegate to them.
+        // Same pattern as TrecsListExtensions / NativeUniquePtrExtensions.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void Set(UniqueHeap heap, T value)
+        internal readonly void Set(UniqueHeap heap, T value)
         {
             heap.SetEntry(Handle.Value, value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void Set(HeapAccessor heap, T value)
+        internal readonly void Set(HeapAccessor heap, T value)
         {
+            heap.AssertCanMutateHeap();
             Set(heap.UniqueHeap, value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void Set(WorldAccessor accessor, T value) => Set(accessor.Heap, value);
+        internal readonly void Set(WorldAccessor accessor, T value) => Set(accessor.Heap, value);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly void Set(World world, T value)
+        internal readonly void Set(World world, T value)
         {
             Set(world.UniqueHeap, value);
         }
 
         internal readonly void Dispose(UniqueHeap heap)
         {
-            TrecsAssert.That(!IsNull);
+            TrecsDebugAssert.That(!IsNull);
             heap.DisposeEntry<T>(Handle.Value);
         }
 
         internal readonly void Dispose(World world)
         {
-            TrecsAssert.That(
-                !world.FrameScopedUniqueHeap.ContainsEntry(Handle.Value),
-                "Frame-scoped UniquePtr must not be manually disposed"
-            );
             Dispose(world.UniqueHeap);
         }
 
         public readonly void Dispose(HeapAccessor heap)
         {
-            TrecsAssert.That(
-                !heap.FrameScopedUniqueHeap.ContainsEntry(Handle.Value),
-                "Frame-scoped UniquePtr must not be manually disposed"
-            );
+            heap.AssertCanMutateHeap();
             Dispose(heap.UniqueHeap);
         }
 
@@ -326,5 +235,24 @@ namespace Trecs
         {
             return !left.Equals(right);
         }
+    }
+
+    /// <summary>
+    /// Mutating operations on <see cref="UniquePtr{T}"/>. Each <c>Set</c> takes
+    /// <c>this ref UniquePtr&lt;T&gt;</c>, so the caller must hold writable access
+    /// to the handle struct — calling <c>Set</c> through an <c>in</c> parameter, a
+    /// <c>readonly</c> field, or an <c>IRead&lt;...&gt;</c> aspect field is a
+    /// compile error. Same pattern as <see cref="TrecsListExtensions"/> and
+    /// <see cref="NativeUniquePtrExtensions"/>.
+    /// </summary>
+    public static class UniquePtrExtensions
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Set<T>(this ref UniquePtr<T> ptr, HeapAccessor heap, T value)
+            where T : class => ptr.Set(heap, value);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Set<T>(this ref UniquePtr<T> ptr, WorldAccessor accessor, T value)
+            where T : class => ptr.Set(accessor.Heap, value);
     }
 }

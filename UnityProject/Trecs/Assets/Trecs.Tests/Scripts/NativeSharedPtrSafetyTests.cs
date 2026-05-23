@@ -27,14 +27,11 @@ namespace Trecs.Tests
     {
         static (NativeSharedHeap heap, BlobCache cache) CreateHeap()
         {
-            var blobStore = new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                null
-            );
+            var blobStore = new BlobStoreInMemory(BlobStoreInMemorySettings.Default, null);
             var cache = new BlobCache(
                 TrecsLog.Default,
                 new List<IBlobStore> { blobStore },
-                new BlobCacheSettings { CleanIntervalSeconds = 99999, SerializationVersion = 1 },
+                new BlobCacheSettings { SerializationVersion = 1 },
                 new NativeBlobBoxPool()
             );
             var heap = new NativeSharedHeap(TrecsLog.Default, cache);

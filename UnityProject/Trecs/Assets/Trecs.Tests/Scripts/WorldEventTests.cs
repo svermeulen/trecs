@@ -15,12 +15,12 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             int callCount = 0;
-            var sub = a.SubmissionCompletedEvent.Subscribe(() => callCount++);
+            var sub = a.Events.OnSubmissionCompleted(() => callCount++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
-            NAssert.Greater(callCount, 0, "SubmissionCompleted should fire on SubmitEntities");
+            NAssert.Greater(callCount, 0, "SubmissionCompleted should fire on Submit");
             sub.Dispose();
         }
 
@@ -31,14 +31,14 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             int callCount = 0;
-            var sub = a.SubmissionCompletedEvent.Subscribe(() => callCount++);
+            var sub = a.Events.OnSubmissionCompleted(() => callCount++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
             int afterFirst = callCount;
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.Greater(callCount, afterFirst, "Should fire on each submit");
             sub.Dispose();
@@ -55,16 +55,16 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             int callCount = 0;
-            var sub = a.SubmissionCompletedEvent.Subscribe(() => callCount++);
+            var sub = a.Events.OnSubmissionCompleted(() => callCount++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(1, callCount);
 
             sub.Dispose();
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(1, callCount, "Should not fire after dispose");
         }
 
@@ -80,11 +80,11 @@ namespace Trecs.Tests
 
             int count1 = 0,
                 count2 = 0;
-            var sub1 = a.SubmissionCompletedEvent.Subscribe(() => count1++);
-            var sub2 = a.SubmissionCompletedEvent.Subscribe(() => count2++);
+            var sub1 = a.Events.OnSubmissionCompleted(() => count1++);
+            var sub2 = a.Events.OnSubmissionCompleted(() => count2++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, count1);
             NAssert.AreEqual(1, count2);

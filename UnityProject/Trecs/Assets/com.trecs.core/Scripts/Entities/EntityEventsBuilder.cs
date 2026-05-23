@@ -35,31 +35,34 @@ namespace Trecs
         readonly EventsManager _eventsManager;
         readonly WorldInfo _worldInfo;
         readonly WorldAccessor _world;
+        readonly SystemRunner _systemRunner;
 
         public EntityEventsBuilder(
             EventsManager eventsManager,
             WorldInfo worldInfo,
-            WorldAccessor world
+            WorldAccessor world,
+            SystemRunner systemRunner
         )
         {
             _eventsManager = eventsManager;
             _worldInfo = worldInfo;
             _world = world;
+            _systemRunner = systemRunner;
         }
 
-        public EntityEventsSubscription InGroups(ReadOnlyFastList<GroupIndex> groups)
+        public EntityEventsSubscription EntitiesInGroups(ReadOnlyFastList<GroupIndex> groups)
         {
             return new EntityEventsSubscription(_eventsManager, _world, groups);
         }
 
-        public EntityEventsSubscription InGroup(GroupIndex group)
+        public EntityEventsSubscription EntitiesInGroup(GroupIndex group)
         {
-            return InGroups(new FastList<GroupIndex>(group));
+            return EntitiesInGroups(new FastList<GroupIndex>(group));
         }
 
         public EntityEventsSubscription EntitiesWithTags(TagSet tagSet)
         {
-            return InGroups(_worldInfo.GetGroupsWithTags(tagSet));
+            return EntitiesInGroups(_worldInfo.GetGroupsWithTags(tagSet));
         }
 
         public EntityEventsSubscription EntitiesWithTags<T1>()
@@ -83,14 +86,14 @@ namespace Trecs
         public EntityEventsSubscription EntitiesWithComponents<T>()
             where T : unmanaged, IEntityComponent
         {
-            return InGroups(_worldInfo.GetGroupsWithComponents<T>());
+            return EntitiesInGroups(_worldInfo.GetGroupsWithComponents<T>());
         }
 
         public EntityEventsSubscription EntitiesWithComponents<T1, T2>()
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
         {
-            return InGroups(_worldInfo.GetGroupsWithComponents<T1, T2>());
+            return EntitiesInGroups(_worldInfo.GetGroupsWithComponents<T1, T2>());
         }
 
         public EntityEventsSubscription EntitiesWithComponents<T1, T2, T3>()
@@ -98,7 +101,7 @@ namespace Trecs
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
         {
-            return InGroups(_worldInfo.GetGroupsWithComponents<T1, T2, T3>());
+            return EntitiesInGroups(_worldInfo.GetGroupsWithComponents<T1, T2, T3>());
         }
 
         public EntityEventsSubscription EntitiesWithComponents<T1, T2, T3, T4>()
@@ -107,20 +110,20 @@ namespace Trecs
             where T3 : unmanaged, IEntityComponent
             where T4 : unmanaged, IEntityComponent
         {
-            return InGroups(_worldInfo.GetGroupsWithComponents<T1, T2, T3, T4>());
+            return EntitiesInGroups(_worldInfo.GetGroupsWithComponents<T1, T2, T3, T4>());
         }
 
         public EntityEventsSubscription EntitiesWithTagsAndComponents<T>(TagSet tagSet)
             where T : unmanaged, IEntityComponent
         {
-            return InGroups(_worldInfo.GetGroupsWithTagsAndComponents<T>(tagSet));
+            return EntitiesInGroups(_worldInfo.GetGroupsWithTagsAndComponents<T>(tagSet));
         }
 
         public EntityEventsSubscription EntitiesWithTagsAndComponents<T1, T2>(TagSet tagSet)
             where T1 : unmanaged, IEntityComponent
             where T2 : unmanaged, IEntityComponent
         {
-            return InGroups(_worldInfo.GetGroupsWithTagsAndComponents<T1, T2>(tagSet));
+            return EntitiesInGroups(_worldInfo.GetGroupsWithTagsAndComponents<T1, T2>(tagSet));
         }
 
         public EntityEventsSubscription EntitiesWithTagsAndComponents<T1, T2, T3>(TagSet tagSet)
@@ -128,7 +131,7 @@ namespace Trecs
             where T2 : unmanaged, IEntityComponent
             where T3 : unmanaged, IEntityComponent
         {
-            return InGroups(_worldInfo.GetGroupsWithTagsAndComponents<T1, T2, T3>(tagSet));
+            return EntitiesInGroups(_worldInfo.GetGroupsWithTagsAndComponents<T1, T2, T3>(tagSet));
         }
 
         public EntityEventsSubscription EntitiesWithTagsAndComponents<T1, T2, T3, T4>(TagSet tagSet)
@@ -137,67 +140,80 @@ namespace Trecs
             where T3 : unmanaged, IEntityComponent
             where T4 : unmanaged, IEntityComponent
         {
-            return InGroups(_worldInfo.GetGroupsWithTagsAndComponents<T1, T2, T3, T4>(tagSet));
+            return EntitiesInGroups(
+                _worldInfo.GetGroupsWithTagsAndComponents<T1, T2, T3, T4>(tagSet)
+            );
         }
 
         public EntityEventsSubscription AllEntities()
         {
-            return InGroups(_worldInfo.AllGroups);
+            return EntitiesInGroups(_worldInfo.AllGroups);
         }
 
         public IDisposable OnDeserializeStarted(Action cb) =>
-            _eventsManager.DeserializeStartedEvent.Subscribe(cb);
+            _eventsManager.DeserializeStartedEvent.Subscribe(cb, 0, _world.DebugName);
 
         public IDisposable OnDeserializeStarted(Action cb, int priority) =>
-            _eventsManager.DeserializeStartedEvent.Subscribe(cb, priority);
+            _eventsManager.DeserializeStartedEvent.Subscribe(cb, priority, _world.DebugName);
 
         public IDisposable OnDeserializeCompleted(Action cb) =>
-            _eventsManager.DeserializeCompletedEvent.Subscribe(cb);
+            _eventsManager.DeserializeCompletedEvent.Subscribe(cb, 0, _world.DebugName);
 
         public IDisposable OnDeserializeCompleted(Action cb, int priority) =>
-            _eventsManager.DeserializeCompletedEvent.Subscribe(cb, priority);
+            _eventsManager.DeserializeCompletedEvent.Subscribe(cb, priority, _world.DebugName);
 
         public IDisposable OnSubmissionStarted(Action cb) =>
-            _eventsManager.SubmissionStartedEvent.Subscribe(cb);
+            _eventsManager.SubmissionStartedEvent.Subscribe(cb, 0, _world.DebugName);
 
         public IDisposable OnSubmissionStarted(Action cb, int priority) =>
-            _eventsManager.SubmissionStartedEvent.Subscribe(cb, priority);
+            _eventsManager.SubmissionStartedEvent.Subscribe(cb, priority, _world.DebugName);
 
         public IDisposable OnSubmissionCompleted(Action cb) =>
-            _eventsManager.SubmissionCompletedEvent.Subscribe(cb);
+            _eventsManager.SubmissionCompletedEvent.Subscribe(cb, 0, _world.DebugName);
 
         public IDisposable OnSubmissionCompleted(Action cb, int priority) =>
-            _eventsManager.SubmissionCompletedEvent.Subscribe(cb, priority);
+            _eventsManager.SubmissionCompletedEvent.Subscribe(cb, priority, _world.DebugName);
 
         public IDisposable OnFixedUpdateStarted(Action cb) =>
-            _eventsManager.FixedUpdateStartedEvent.Subscribe(cb);
+            _eventsManager.FixedUpdateStartedEvent.Subscribe(cb, 0, _world.DebugName);
 
         public IDisposable OnFixedUpdateStarted(Action cb, int priority) =>
-            _eventsManager.FixedUpdateStartedEvent.Subscribe(cb, priority);
+            _eventsManager.FixedUpdateStartedEvent.Subscribe(cb, priority, _world.DebugName);
 
         public IDisposable OnFixedUpdateCompleted(Action cb) =>
-            _eventsManager.FixedUpdateCompletedEvent.Subscribe(cb);
+            _eventsManager.FixedUpdateCompletedEvent.Subscribe(cb, 0, _world.DebugName);
 
         public IDisposable OnFixedUpdateCompleted(Action cb, int priority) =>
-            _eventsManager.FixedUpdateCompletedEvent.Subscribe(cb, priority);
+            _eventsManager.FixedUpdateCompletedEvent.Subscribe(cb, priority, _world.DebugName);
 
         public IDisposable OnVariableUpdateStarted(Action cb) =>
-            _eventsManager.VariableUpdateStartedEvent.Subscribe(cb);
+            _eventsManager.VariableUpdateStartedEvent.Subscribe(cb, 0, _world.DebugName);
 
         public IDisposable OnVariableUpdateStarted(Action cb, int priority) =>
-            _eventsManager.VariableUpdateStartedEvent.Subscribe(cb, priority);
+            _eventsManager.VariableUpdateStartedEvent.Subscribe(cb, priority, _world.DebugName);
 
         public IDisposable OnVariableUpdateCompleted(Action cb) =>
-            _eventsManager.VariableUpdateCompletedEvent.Subscribe(cb);
+            _eventsManager.VariableUpdateCompletedEvent.Subscribe(cb, 0, _world.DebugName);
 
         public IDisposable OnVariableUpdateCompleted(Action cb, int priority) =>
-            _eventsManager.VariableUpdateCompletedEvent.Subscribe(cb, priority);
+            _eventsManager.VariableUpdateCompletedEvent.Subscribe(cb, priority, _world.DebugName);
 
         public IDisposable OnInputsApplied(Action cb) =>
-            _eventsManager.InputsAppliedEvent.Subscribe(cb);
+            _eventsManager.InputsAppliedEvent.Subscribe(cb, 0, _world.DebugName);
 
         public IDisposable OnInputsApplied(Action cb, int priority) =>
-            _eventsManager.InputsAppliedEvent.Subscribe(cb, priority);
+            _eventsManager.InputsAppliedEvent.Subscribe(cb, priority, _world.DebugName);
+
+        /// <summary>
+        /// Fires when <see cref="WorldAccessor.FixedIsPaused"/> changes. The callback
+        /// receives the new value (true when fixed-update has just been paused, false
+        /// when it has just been unpaused).
+        /// </summary>
+        public IDisposable OnFixedPauseChanged(Action<bool> cb) =>
+            _systemRunner.FixedIsPausedChangedEvent.Subscribe(cb);
+
+        public IDisposable OnFixedPauseChanged(Action<bool> cb, int priority) =>
+            _systemRunner.FixedIsPausedChangedEvent.Subscribe(cb, priority);
     }
 
     /// <summary>
@@ -213,9 +229,9 @@ namespace Trecs
         readonly ReadOnlyFastList<GroupIndex> _groups;
         readonly string _debugName;
 
-        EntitiesAddedObserver _addedObserver;
-        EntitiesRemovedObserver _removedObserver;
-        EntitiesMovedObserver _movedObserver;
+        IDisposable[] _addedSubscriptions;
+        IDisposable[] _removedSubscriptions;
+        IDisposable[] _movedSubscriptions;
 
         int _priority;
         bool _isDisposed;
@@ -257,7 +273,7 @@ namespace Trecs
             {
                 var group = _groups[i];
                 var template = worldInfo.GetResolvedTemplateForGroup(group);
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     !template.VariableUpdateOnly,
                     "Entity-event subscription from Fixed-role accessor {0} resolved to [VariableUpdateOnly] template {1} (group {2}). VUO templates are render-cadence — only Variable-role / input-system / Unrestricted-role accessors drive structural changes there, so a Fixed-role observer would either never fire or leak render-rate state into the simulation. Narrow the predicate (e.g. add a WithoutTags constraint) or move the subscription to a Variable-role or input-system service.",
                     _debugName,
@@ -269,8 +285,10 @@ namespace Trecs
 
         public EntityEventsSubscription WithPriority(int priority)
         {
-            TrecsAssert.That(
-                _addedObserver == null && _removedObserver == null && _movedObserver == null,
+            TrecsDebugAssert.That(
+                _addedSubscriptions == null
+                    && _removedSubscriptions == null
+                    && _movedSubscriptions == null,
                 "WithPriority must be called before OnAdded/OnRemoved/OnMoved"
             );
             _priority = priority;
@@ -279,12 +297,17 @@ namespace Trecs
 
         public EntityEventsSubscription OnAdded(EntitiesAddedObserver observer)
         {
-            TrecsAssert.That(_addedObserver == null, "OnAdded already subscribed");
-            _addedObserver = observer;
+            TrecsDebugAssert.That(_addedSubscriptions == null, "OnAdded already subscribed");
+            _addedSubscriptions = new IDisposable[_groups.Count];
 
-            foreach (var group in _groups)
+            for (int i = 0; i < _groups.Count; i++)
             {
-                _eventsManager.ObserveEntitiesAddedEvent(group, observer, _priority, _debugName);
+                _addedSubscriptions[i] = _eventsManager.ObserveEntitiesAddedEvent(
+                    _groups[i],
+                    observer,
+                    _priority,
+                    _debugName
+                );
             }
 
             return this;
@@ -292,12 +315,17 @@ namespace Trecs
 
         public EntityEventsSubscription OnRemoved(EntitiesRemovedObserver observer)
         {
-            TrecsAssert.That(_removedObserver == null, "OnRemoved already subscribed");
-            _removedObserver = observer;
+            TrecsDebugAssert.That(_removedSubscriptions == null, "OnRemoved already subscribed");
+            _removedSubscriptions = new IDisposable[_groups.Count];
 
-            foreach (var group in _groups)
+            for (int i = 0; i < _groups.Count; i++)
             {
-                _eventsManager.ObserveEntitiesRemovedEvent(group, observer, _priority, _debugName);
+                _removedSubscriptions[i] = _eventsManager.ObserveEntitiesRemovedEvent(
+                    _groups[i],
+                    observer,
+                    _priority,
+                    _debugName
+                );
             }
 
             return this;
@@ -305,12 +333,17 @@ namespace Trecs
 
         public EntityEventsSubscription OnMoved(EntitiesMovedObserver observer)
         {
-            TrecsAssert.That(_movedObserver == null, "OnMoved already subscribed");
-            _movedObserver = observer;
+            TrecsDebugAssert.That(_movedSubscriptions == null, "OnMoved already subscribed");
+            _movedSubscriptions = new IDisposable[_groups.Count];
 
-            foreach (var group in _groups)
+            for (int i = 0; i < _groups.Count; i++)
             {
-                _eventsManager.ObserveEntitiesMovedEvent(group, observer, _priority, _debugName);
+                _movedSubscriptions[i] = _eventsManager.ObserveEntitiesMovedEvent(
+                    _groups[i],
+                    observer,
+                    _priority,
+                    _debugName
+                );
             }
 
             return this;
@@ -344,31 +377,25 @@ namespace Trecs
 
             _isDisposed = true;
 
-            if (_addedObserver != null)
+            if (_addedSubscriptions != null)
             {
-                foreach (var group in _groups)
-                {
-                    _eventsManager.UnobserveEntitiesAddedEvent(group, _addedObserver);
-                }
-                _addedObserver = null;
+                for (int i = 0; i < _addedSubscriptions.Length; i++)
+                    _addedSubscriptions[i].Dispose();
+                _addedSubscriptions = null;
             }
 
-            if (_removedObserver != null)
+            if (_removedSubscriptions != null)
             {
-                foreach (var group in _groups)
-                {
-                    _eventsManager.UnobserveEntitiesRemovedEvent(group, _removedObserver);
-                }
-                _removedObserver = null;
+                for (int i = 0; i < _removedSubscriptions.Length; i++)
+                    _removedSubscriptions[i].Dispose();
+                _removedSubscriptions = null;
             }
 
-            if (_movedObserver != null)
+            if (_movedSubscriptions != null)
             {
-                foreach (var group in _groups)
-                {
-                    _eventsManager.UnobserveEntitiesMovedEvent(group, _movedObserver);
-                }
-                _movedObserver = null;
+                for (int i = 0; i < _movedSubscriptions.Length; i++)
+                    _movedSubscriptions[i].Dispose();
+                _movedSubscriptions = null;
             }
         }
     }

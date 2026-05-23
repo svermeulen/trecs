@@ -155,5 +155,13 @@ namespace Trecs
 #endif
             return new IntPtr(_nb.GetRawPointer(out length));
         }
+
+        public void Clear()
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
+#endif
+            _nb.Clear();
+        }
     }
 }

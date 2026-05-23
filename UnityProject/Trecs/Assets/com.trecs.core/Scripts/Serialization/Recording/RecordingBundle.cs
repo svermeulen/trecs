@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Trecs.Collections;
 using Trecs.Serialization;
@@ -9,8 +10,8 @@ namespace Trecs.Internal
     /// initial world-state snapshot, the input queue covering the recorded
     /// frame range, sparse desync-detection checksums, optional auto-anchor
     /// snapshots used as desync-recovery / scrub-back points, and optional
-    /// user snapshots placed by the user (e.g. just before a bug)
-    /// for navigation in the recorder UI.
+    /// user snapshots placed by the user (e.g. just before a bug) for
+    /// navigation in the recorder UI.
     ///
     /// Use <see cref="RecordingBundleSerializer"/> to read or write a bundle
     /// to/from a stream or file.
@@ -22,42 +23,41 @@ namespace Trecs.Internal
         /// <summary>
         /// SnapshotSerializer payload bytes for the world state at
         /// <see cref="BundleHeader.StartFixedFrame"/>. Required: a bundle
-        /// without an initial snapshot cannot be replayed.
+        /// without an initial snapshot cannot be replayed. Length is the
+        /// exact payload size (never oversized).
         /// </summary>
-        public byte[] InitialSnapshot { get; init; }
-
-        /// <summary>
-        /// World-state checksum captured at the same time as
-        /// <see cref="InitialSnapshot"/>. Used to verify the snapshot
-        /// deserializes back to identical state, and to re-verify on
-        /// scrub-back when the simulation re-runs from the initial frame.
-        /// </summary>
-        public uint InitialSnapshotChecksum { get; init; }
+        public ReadOnlyMemory<byte> InitialSnapshot { get; init; }
 
         /// <summary>
         /// EntityInputQueue payload bytes covering the recorded frame range.
         /// May be empty (no inputs captured) but must not be null.
         /// </summary>
-        public byte[] InputQueue { get; init; }
+        public ReadOnlyMemory<byte> InputQueue { get; init; }
 
         /// <summary>
-        /// Sparse per-frame world-state checksums for desync detection during
-        /// playback. Cadence is independent of <see cref="Anchors"/>.
+        /// Sparse per-frame 64-bit xxHash world-state checksums for desync
+        /// detection during playback. Cadence is independent of
+        /// <see cref="Anchors"/>.
         /// </summary>
-        public DenseDictionary<int, uint> Checksums { get; init; }
+        public DenseDictionary<int, ulong> Checksums { get; init; }
 
         /// <summary>
         /// Auto-placed full-state snapshots used as desync-recovery points
         /// during runtime playback and as scrub-back anchors in the editor.
-        /// Sparse and ordered by frame.
+        /// Sparse and ordered by frame. All entries have
+        /// <see cref="WorldSnapshot.Kind"/> equal to
+        /// <see cref="SnapshotKind.Anchor"/>; their
+        /// <see cref="WorldSnapshot.Label"/> is empty.
         /// </summary>
-        public IReadOnlyList<BundleAnchor> Anchors { get; init; }
+        public IReadOnlyList<WorldSnapshot> Anchors { get; init; }
 
         /// <summary>
-        /// User-placed full-state snapshots with labels, surfaced in the
-        /// recorder UI for navigation. Ordered by frame.
+        /// User-placed labelled bookmarks, surfaced in the recorder UI for
+        /// navigation. Ordered by frame. All entries have
+        /// <see cref="WorldSnapshot.Kind"/> equal to
+        /// <see cref="SnapshotKind.Bookmark"/>.
         /// </summary>
-        public IReadOnlyList<BundleSnapshot> Snapshots { get; init; }
+        public IReadOnlyList<WorldSnapshot> Bookmarks { get; init; }
     }
 
     /// <summary>
@@ -70,6 +70,17 @@ namespace Trecs.Internal
     [TypeId(423917628)]
     public sealed class BundleHeader
     {
+        /// <summary>
+        /// Bundle wire-format version. Bumped whenever the bundle's binary
+        /// layout changes incompatibly (new fields, reordering, type
+        /// changes). Distinct from <see cref="Version"/> (user-defined
+        /// schema version) and from the Layer-1 SerializationHeader format
+        /// version (which guards the magic-byte envelope shared by all Trecs
+        /// payloads). Defaults to <see cref="TrecsConstants.CurrentBundleFormatVersion"/>;
+        /// load-time mismatch raises a <see cref="SerializationException"/>.
+        /// </summary>
+        public byte BundleFormatVersion { get; init; } = TrecsConstants.CurrentBundleFormatVersion;
+
         /// <summary>
         /// User-defined schema version. Trecs does not interpret this; it is
         /// surfaced so callers can decide whether a bundle is compatible
@@ -87,12 +98,6 @@ namespace Trecs.Internal
         /// </summary>
         public float FixedDeltaTime { get; init; }
 
-        /// <summary>
-        /// Serialization flags used when computing per-frame checksums during
-        /// recording. Playback must recompute checksums with the same flags.
-        /// </summary>
-        public long ChecksumFlags { get; init; }
-
         /// <summary>Heap blob references the bundle's snapshots depend on.</summary>
         public DenseHashSet<BlobId> BlobIds { get; init; } = new();
 
@@ -102,8 +107,8 @@ namespace Trecs.Internal
             // checksum dict and the blob-id set on the header. Registered
             // here rather than in TrecsSerialization's general-purpose set
             // so the bundle is self-contained for users who only need it.
-            registry.RegisterSerializer(new DenseDictionarySerializer<int, uint>());
-            registry.RegisterSerializer(new DenseHashSetSerializer<BlobId>());
+            registry.RegisterSerializer<DenseDictionarySerializer<int, ulong>>();
+            registry.RegisterSerializer<DenseHashSetSerializer<BlobId>>();
             registry.RegisterSerializer(new Serializer());
         }
 
@@ -113,74 +118,104 @@ namespace Trecs.Internal
 
             public void Deserialize(ref BundleHeader value, ISerializationReader reader)
             {
+                byte bundleFormatVersion = 0;
+                reader.BlitRead("BundleFormatVersion", ref bundleFormatVersion);
+                if (bundleFormatVersion != TrecsConstants.CurrentBundleFormatVersion)
+                {
+                    throw new SerializationException(
+                        $"Bundle format version {bundleFormatVersion} is not supported — "
+                            + $"this build expects version {TrecsConstants.CurrentBundleFormatVersion}. "
+                            + "Bundles from a different Trecs build cannot be loaded here."
+                    );
+                }
                 var version = reader.Read<int>("Version");
                 var startFrame = reader.Read<int>("StartFixedFrame");
                 var endFrame = reader.Read<int>("EndFixedFrame");
                 var fixedDeltaTime = reader.Read<float>("FixedDeltaTime");
-                var checksumFlags = reader.Read<long>("ChecksumFlags");
                 var blobIds = reader.Read<DenseHashSet<BlobId>>("BlobIds");
 
                 value = new BundleHeader
                 {
+                    BundleFormatVersion = bundleFormatVersion,
                     Version = version,
                     StartFixedFrame = startFrame,
                     EndFixedFrame = endFrame,
                     FixedDeltaTime = fixedDeltaTime,
-                    ChecksumFlags = checksumFlags,
                     BlobIds = blobIds,
                 };
             }
 
             public void Serialize(in BundleHeader value, ISerializationWriter writer)
             {
+                writer.BlitWrite("BundleFormatVersion", value.BundleFormatVersion);
                 writer.Write("Version", value.Version);
                 writer.Write("StartFixedFrame", value.StartFixedFrame);
                 writer.Write("EndFixedFrame", value.EndFixedFrame);
                 writer.Write("FixedDeltaTime", value.FixedDeltaTime);
-                writer.Write("ChecksumFlags", value.ChecksumFlags);
                 writer.Write("BlobIds", value.BlobIds);
             }
         }
     }
 
     /// <summary>
-    /// Auto-placed full-state snapshot. Carries no label; rendered as a
-    /// faint marker in the recorder UI's timeline. Doubles as a runtime
-    /// desync-recovery point on the playback side.
+    /// Categorizes a <see cref="WorldSnapshot"/> by what produced it. Drives
+    /// policy differences (cap enforcement, trim survival, UI rendering)
+    /// without changing the payload format.
     /// </summary>
-    public sealed class BundleAnchor
+    public enum SnapshotKind : byte
     {
-        public int FixedFrame { get; init; }
+        /// <summary>
+        /// Auto-cadenced snapshot. Captured at the recorder's
+        /// <c>AnchorIntervalSeconds</c> cadence (plus optional manual
+        /// captures via <c>CaptureAnchorAtCurrentFrame</c>). Used as a
+        /// desync-recovery point during runtime playback and a scrub-back
+        /// point in the editor. Subject to the recorder's max-anchor cap
+        /// (drop-oldest when full); the <see cref="WorldSnapshot.Label"/>
+        /// is always the empty string.
+        /// </summary>
+        Anchor = 0,
 
         /// <summary>
-        /// World-state checksum at capture time (computed with
-        /// <see cref="BundleHeader.ChecksumFlags"/>). Used to verify the
-        /// snapshot deserialized cleanly before the simulation resumes from it.
+        /// User-placed labelled bookmark, surfaced in the recorder UI for
+        /// navigation. Survives trims and capacity caps;
+        /// <see cref="WorldSnapshot.Label"/> is the user-supplied display
+        /// string (may be empty but is never null).
         /// </summary>
-        public uint Checksum { get; init; }
-
-        /// <summary>SnapshotSerializer payload bytes for this anchor's world state.</summary>
-        public byte[] Payload { get; init; }
+        Bookmark = 1,
     }
 
     /// <summary>
-    /// User-placed full-state snapshot. Carries a label string for display
-    /// in the recorder UI's timeline. Snapshots are independent of
-    /// <see cref="BundleAnchor"/>s; deleting a snapshot never removes an
-    /// auto-anchor that happens to share a frame.
+    /// Full-state snapshot inside a <see cref="RecordingBundle"/>. The same
+    /// type carries both auto-cadenced anchors (recovery / scrub points)
+    /// and user-labelled bookmarks; the two are distinguished by
+    /// <see cref="Kind"/>.
     /// </summary>
-    public sealed class BundleSnapshot
+    public sealed class WorldSnapshot
     {
+        /// <summary>Fixed-update frame this snapshot was captured at.</summary>
         public int FixedFrame { get; init; }
-        public uint Checksum { get; init; }
 
         /// <summary>
-        /// Caller-supplied label, displayed in the recorder UI. Must not be
-        /// null (use the empty string for an unlabeled snapshot).
+        /// Categorizes this entry — auto-cadenced anchor or user-labelled
+        /// bookmark. Drives policy (cap enforcement, trim survival) and
+        /// UI rendering; the on-disk payload is identical between the two.
         /// </summary>
-        public string Label { get; init; }
+        public SnapshotKind Kind { get; init; }
 
-        /// <summary>SnapshotSerializer payload bytes for this snapshot's world state.</summary>
-        public byte[] Payload { get; init; }
+        /// <summary>
+        /// Display label for the recorder UI. Required to be non-null;
+        /// the empty string for <see cref="SnapshotKind.Anchor"/> entries.
+        /// </summary>
+        public string Label { get; init; } = "";
+
+        /// <summary>
+        /// Snapshot payload bytes — a self-contained
+        /// <see cref="SnapshotSerializer"/> payload. The length of this
+        /// memory is the authoritative byte count; in-memory buffers may
+        /// be backed by oversized pooled arrays, but the
+        /// <see cref="ReadOnlyMemory{T}"/> slice is always exact and
+        /// safe to read in full.
+        /// </summary>
+        public ReadOnlyMemory<byte> Payload { get; init; }
     }
 }

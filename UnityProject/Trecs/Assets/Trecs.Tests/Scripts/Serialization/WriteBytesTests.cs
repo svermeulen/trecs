@@ -47,8 +47,8 @@ namespace Trecs.Tests
         public void Binary_Empty()
         {
             BinaryRoundTrip(new byte[0], 0, 0, out var buf, out var count);
-            TrecsAssert.That(count == 0);
-            TrecsAssert.That(buf != null);
+            TrecsDebugAssert.That(count == 0);
+            TrecsDebugAssert.That(buf != null);
         }
 
         [Test]
@@ -56,9 +56,9 @@ namespace Trecs.Tests
         {
             var data = new byte[] { 0x42, 0xFF, 0x00, 0x7F };
             BinaryRoundTrip(data, 0, data.Length, out var buf, out var count);
-            TrecsAssert.That(count == 4);
+            TrecsDebugAssert.That(count == 4);
             for (int i = 0; i < 4; i++)
-                TrecsAssert.That(buf[i] == data[i]);
+                TrecsDebugAssert.That(buf[i] == data[i]);
         }
 
         [Test]
@@ -68,9 +68,9 @@ namespace Trecs.Tests
             for (int i = 0; i < data.Length; i++)
                 data[i] = (byte)(i % 256);
             BinaryRoundTrip(data, 0, data.Length, out var buf, out var count);
-            TrecsAssert.That(count == 1024);
+            TrecsDebugAssert.That(count == 1024);
             for (int i = 0; i < 1024; i++)
-                TrecsAssert.That(buf[i] == data[i]);
+                TrecsDebugAssert.That(buf[i] == data[i]);
         }
 
         [Test]
@@ -84,9 +84,9 @@ namespace Trecs.Tests
                 buffer[i] = (byte)(i - 10 + 1); // 1..10
 
             BinaryRoundTrip(buffer, offset: 10, count: 10, out var buf, out var count);
-            TrecsAssert.That(count == 10);
+            TrecsDebugAssert.That(count == 10);
             for (int i = 0; i < 10; i++)
-                TrecsAssert.That(buf[i] == (byte)(i + 1));
+                TrecsDebugAssert.That(buf[i] == (byte)(i + 1));
         }
 
         [Test]
@@ -106,8 +106,8 @@ namespace Trecs.Tests
             int count = _binary.ReadBytes("bytes", ref buf);
             _binary.StopRead(verifySentinel: true);
 
-            TrecsAssert.That(count == 3);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(count == 3);
+            TrecsDebugAssert.That(
                 ReferenceEquals(buf, preallocated),
                 "Expected caller buffer to be reused when large enough"
             );

@@ -12,6 +12,8 @@ namespace Trecs
     public sealed class InterpolatedPreviousSaver<T> : IInterpolatedPreviousSaver
         where T : unmanaged, IEntityComponent
     {
+        static readonly string JobName = "InterpolatedPreviousSaver<" + typeof(T).Name + ">";
+
         WorldAccessor _world;
 
         public Type ComponentType
@@ -28,8 +30,8 @@ namespace Trecs
         {
             var combined = default(JobHandle);
             var scheduler = _world.JobScheduler;
-            var currentRid = ResourceId.Component(ComponentTypeId<T>.Value);
-            var previousRid = ResourceId.Component(ComponentTypeId<InterpolatedPrevious<T>>.Value);
+            var currentRid = ResourceId.Component(TypeId<T>.Value);
+            var previousRid = ResourceId.Component(TypeId<InterpolatedPrevious<T>>.Value);
 
             foreach (
                 var group in _world.WorldInfo.GetGroupsWithComponents<T, InterpolatedPrevious<T>>()
@@ -60,8 +62,8 @@ namespace Trecs
                 }.ScheduleParallel(count, JobsUtil.ChooseBatchSize(count), deps);
 #pragma warning restore TRECS070
 
-                scheduler.TrackJobRead(handle, currentRid, group);
-                scheduler.TrackJobWrite(handle, previousRid, group);
+                scheduler.TrackJobRead(handle, currentRid, group, JobName);
+                scheduler.TrackJobWrite(handle, previousRid, group, JobName);
 
                 combined = JobHandle.CombineDependencies(combined, handle);
             }

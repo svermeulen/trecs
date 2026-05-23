@@ -1,6 +1,9 @@
 using System;
 using Trecs.Collections;
+using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
 
 namespace Trecs.Internal
 {
@@ -9,10 +12,10 @@ namespace Trecs.Internal
         int _index;
         readonly int _length;
         readonly int[] _counts;
-        readonly DenseDictionary<ComponentId, IComponentArray>[] _components;
+        readonly DenseDictionary<TypeId, IComponentArray>[] _components;
 
         public OtherComponentsToAddPerGroupEnumerator(
-            DenseDictionary<ComponentId, IComponentArray>[] lastComponentsToAddPerGroup,
+            DenseDictionary<TypeId, IComponentArray>[] lastComponentsToAddPerGroup,
             int[] lastNumberEntitiesCreatedPerGroup
         )
         {
@@ -46,19 +49,17 @@ namespace Trecs.Internal
     struct GroupInfo
     {
         public GroupIndex GroupIndex;
-        public DenseDictionary<ComponentId, IComponentArray> Components;
+        public DenseDictionary<TypeId, IComponentArray> Components;
     }
 
     internal class DoubleBufferedEntitiesToAdd
     {
         public DoubleBufferedEntitiesToAdd(int groupCount)
         {
-            currentComponentsToAddPerGroup = new DenseDictionary<ComponentId, IComponentArray>[
+            currentComponentsToAddPerGroup = new DenseDictionary<TypeId, IComponentArray>[
                 groupCount
             ];
-            lastComponentsToAddPerGroup = new DenseDictionary<ComponentId, IComponentArray>[
-                groupCount
-            ];
+            lastComponentsToAddPerGroup = new DenseDictionary<TypeId, IComponentArray>[groupCount];
 
             _currentNumberEntitiesCreatedPerGroup = new int[groupCount];
             _lastNumberEntitiesCreatedPerGroup = new int[groupCount];
@@ -123,9 +124,11 @@ namespace Trecs.Internal
                 _cachedSortIndices.Dispose();
             if (_cachedSortTempRefs.IsCreated)
                 _cachedSortTempRefs.Dispose();
+            if (_cachedReorderScratch.IsCreated)
+                _cachedReorderScratch.Dispose();
         }
 
-        static void DisposeBuffer(DenseDictionary<ComponentId, IComponentArray>[] buffer)
+        static void DisposeBuffer(DenseDictionary<TypeId, IComponentArray>[] buffer)
         {
             for (int i = 0; i < buffer.Length; i++)
             {
@@ -187,19 +190,19 @@ namespace Trecs.Internal
         }
 
         static void PreallocateDictionaries(
-            DenseDictionary<ComponentId, IComponentArray>[] buffer,
+            DenseDictionary<TypeId, IComponentArray>[] buffer,
             GroupIndex groupId,
             int numberOfEntities,
             IComponentBuilder[] entityComponentsToBuild
         )
         {
             ref var group = ref buffer[groupId.Index];
-            group ??= new DenseDictionary<ComponentId, IComponentArray>();
+            group ??= new DenseDictionary<TypeId, IComponentArray>();
 
             foreach (var componentBuilder in entityComponentsToBuild)
             {
                 var components = group.GetOrAdd(
-                    componentBuilder.ComponentId,
+                    componentBuilder.TypeId,
                     () => componentBuilder.CreateDictionary(numberOfEntities)
                 );
                 componentBuilder.Preallocate(components, numberOfEntities);
@@ -242,12 +245,12 @@ namespace Trecs.Internal
             );
         }
 
-        internal DenseDictionary<ComponentId, IComponentArray> GetOrCreateCurrentComponentsForGroup(
+        internal DenseDictionary<TypeId, IComponentArray> GetOrCreateCurrentComponentsForGroup(
             GroupIndex group
         )
         {
             ref var slot = ref currentComponentsToAddPerGroup[group.Index];
-            return slot ??= new DenseDictionary<ComponentId, IComponentArray>();
+            return slot ??= new DenseDictionary<TypeId, IComponentArray>();
         }
 
         internal bool TryGetLastPendingReferences(
@@ -282,9 +285,49 @@ namespace Trecs.Internal
             }
         }
 
-        internal DenseDictionary<ComponentId, IComponentArray>[] currentComponentsToAddPerGroup;
+        /// <summary>
+        /// Walks the native-add slice of each group's pending-references list and
+        /// claims an <see cref="EntityHandle"/> for any slot still set to
+        /// <see cref="EntityHandle.Null"/> — i.e. queued by the void / handleless
+        /// AddEntity overloads, which deliberately defer id claiming to the main
+        /// thread to keep job-side enqueueing handle-free. Must run *after*
+        /// <see cref="SortNativeAdds"/> so the assigned ids follow deterministic
+        /// sort-key order rather than bag-thread arrival order. Pre-reserved
+        /// handles (non-Null) are skipped.
+        /// </summary>
+        internal void ClaimDeferredHandlesForNativeAdds(ref EntityHandleMap entityHandleMap)
+        {
+            for (int gi = 0; gi < _currentPendingReferences.Length; gi++)
+            {
+                var refs = _currentPendingReferences[gi];
+                if (refs == null || refs.Count == 0)
+                {
+                    continue;
+                }
 
-        DenseDictionary<ComponentId, IComponentArray>[] lastComponentsToAddPerGroup;
+                var startIndex = _currentNativeAddStartIndices[gi];
+                if (startIndex < 0)
+                {
+                    // No native adds for this group this frame — only managed
+                    // adds, which already claimed at enqueue time.
+                    continue;
+                }
+
+                var count = refs.Count;
+                for (int i = startIndex; i < count; i++)
+                {
+                    ref var slot = ref refs[i];
+                    if (slot == EntityHandle.Null)
+                    {
+                        slot = entityHandleMap.ClaimId();
+                    }
+                }
+            }
+        }
+
+        internal DenseDictionary<TypeId, IComponentArray>[] currentComponentsToAddPerGroup;
+
+        DenseDictionary<TypeId, IComponentArray>[] lastComponentsToAddPerGroup;
 
         int[] _currentNumberEntitiesCreatedPerGroup;
         int[] _lastNumberEntitiesCreatedPerGroup;
@@ -306,12 +349,36 @@ namespace Trecs.Internal
         NativeList<int> _cachedSortIndices;
         NativeList<EntityHandle> _cachedSortTempRefs;
 
+        // Scratch for ReorderRangeJob — sized to max(elementSize * count) seen so far.
+        // Reused sequentially across per-component reorders within one SortNativeAdds call.
+        NativeList<byte> _cachedReorderScratch;
+
         struct KeyedIndex : IComparable<KeyedIndex>
         {
             public ulong Key;
             public int Index;
 
             public int CompareTo(KeyedIndex other) => Key.CompareTo(other.Key);
+        }
+
+        // Burst-jobified equivalent of NativeList<KeyedIndex>.Sort(). Wrapped in
+        // IJob with .Run() so the AOT-compiled sort runs in place of the
+        // IL2CPP-generated managed call — same pattern as SortSwapsJob /
+        // SortRemovalsJob in SubmissionBurstJobs.cs.
+        [BurstCompile]
+        struct SortNatAddKeysJob : IJob
+        {
+            [NativeDisableUnsafePtrRestriction]
+            public long Ptr;
+            public int Count;
+
+            public void Execute()
+            {
+                unsafe
+                {
+                    NativeSortExtension.Sort((KeyedIndex*)Ptr, Count);
+                }
+            }
         }
 
         /// <summary>
@@ -325,6 +392,7 @@ namespace Trecs.Internal
                 _cachedSortBuffer = new NativeList<KeyedIndex>(16, Allocator.Persistent);
                 _cachedSortIndices = new NativeList<int>(16, Allocator.Persistent);
                 _cachedSortTempRefs = new NativeList<EntityHandle>(16, Allocator.Persistent);
+                _cachedReorderScratch = new NativeList<byte>(64, Allocator.Persistent);
             }
 
             for (int gi = 0; gi < _currentNativeAddSortKeys.Length; gi++)
@@ -338,7 +406,7 @@ namespace Trecs.Internal
                 var group = GroupIndex.FromIndex(gi);
                 var count = keys.Count;
                 var startIndex = _currentNativeAddStartIndices[gi];
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     startIndex >= 0,
                     "Native add start index not set for group {0} despite non-empty sort keys. "
                         + "MarkNativeAddStartIfNeeded must be called before AddPendingNativeAddSortKey.",
@@ -352,13 +420,21 @@ namespace Trecs.Internal
                     _cachedSortBuffer.Add(new KeyedIndex { Key = keys[i], Index = i });
                 }
 
-                // Native sort (non-allocating)
-                _cachedSortBuffer.Sort();
+                // Native sort (non-allocating) — Burst-jobified, .Run() blocks
+                // until the AOT-compiled sort completes on the main thread.
+                unsafe
+                {
+                    new SortNatAddKeysJob
+                    {
+                        Ptr = (long)_cachedSortBuffer.GetUnsafePtr(),
+                        Count = count,
+                    }.Run();
+                }
 
                 // Check for duplicates (adjacent after sort)
                 for (int i = 1; i < count; i++)
                 {
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         _cachedSortBuffer[i].Key != _cachedSortBuffer[i - 1].Key,
                         "Duplicate native add sort key detected in group {0} (composite key {1}). "
                             + "Each system must use unique sort keys for adds to the same group.",
@@ -390,14 +466,47 @@ namespace Trecs.Internal
                     _cachedSortIndices.Add(_cachedSortBuffer[i].Index);
                 }
 
-                // Apply permutation to all component arrays for this group
+                // Apply permutation to all component arrays for this group via a
+                // Burst-compiled reorder job. Scratch buffer is sized to the largest
+                // (elementSize * count) seen across the per-component loop and reused
+                // across .Run() calls — replaces a per-call Allocator.Temp alloc and
+                // moves the inner scatter-memcpy loop from IL2CPP-managed into Burst.
                 var groupDict = currentComponentsToAddPerGroup[gi];
                 var componentArrays = groupDict.UnsafeValues;
                 var componentCount = groupDict.Count;
 
+                int maxElementSize = 0;
                 for (int ci = 0; ci < componentCount; ci++)
                 {
-                    componentArrays[ci].ReorderRange(startIndex, count, _cachedSortIndices);
+                    var elemSize = componentArrays[ci].ElementSize;
+                    if (elemSize > maxElementSize)
+                        maxElementSize = elemSize;
+                }
+
+                int scratchBytes = maxElementSize * count;
+                if (_cachedReorderScratch.Length < scratchBytes)
+                    _cachedReorderScratch.Resize(
+                        scratchBytes,
+                        NativeArrayOptions.UninitializedMemory
+                    );
+
+                unsafe
+                {
+                    var scratchPtr = (long)_cachedReorderScratch.GetUnsafePtr();
+                    var permPtr = (long)_cachedSortIndices.GetUnsafePtr();
+                    for (int ci = 0; ci < componentCount; ci++)
+                    {
+                        var arr = componentArrays[ci];
+                        new ReorderRangeJob
+                        {
+                            BufferPtr = (long)arr.GetUnsafePtr(),
+                            ScratchPtr = scratchPtr,
+                            PermutationPtr = permPtr,
+                            ElementSize = arr.ElementSize,
+                            StartIndex = startIndex,
+                            Count = count,
+                        }.Run();
+                    }
                 }
 
                 // Apply permutation to pending references

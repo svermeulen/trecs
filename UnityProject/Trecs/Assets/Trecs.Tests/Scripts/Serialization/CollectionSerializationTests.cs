@@ -173,6 +173,100 @@ namespace Trecs.Tests
         }
 
         [Test]
+        public void Queue_EmptyQueue_SerializesAndDeserializes()
+        {
+            // Arrange
+            var originalQueue = new Queue<int>();
+            var flags = 0L;
+
+            // Act
+            _cacheHelper.ClearMemoryStream();
+            _cacheHelper.WriteAll(
+                originalQueue,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            _cacheHelper.ResetMemoryPosition();
+            var deserializedQueue = _cacheHelper.ReadAll<Queue<int>>();
+
+            // Assert
+            Assert.IsNotNull(deserializedQueue);
+            Assert.That(deserializedQueue.Count == 0);
+        }
+
+        [Test]
+        public void Queue_WithElements_SerializesAndPreservesFifoOrder()
+        {
+            // Arrange
+            var originalQueue = new Queue<int>();
+            int[] expectedOrder = { 1, 2, 3, 42, -5 };
+            foreach (var item in expectedOrder)
+            {
+                originalQueue.Enqueue(item);
+            }
+            var flags = 0L;
+
+            // Act
+            _cacheHelper.ClearMemoryStream();
+            _cacheHelper.WriteAll(
+                originalQueue,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            _cacheHelper.ResetMemoryPosition();
+            var deserializedQueue = _cacheHelper.ReadAll<Queue<int>>();
+
+            // Assert
+            Assert.IsNotNull(deserializedQueue);
+            Assert.That(deserializedQueue.Count == expectedOrder.Length);
+            for (int i = 0; i < expectedOrder.Length; i++)
+            {
+                Assert.That(
+                    deserializedQueue.Dequeue() == expectedOrder[i],
+                    $"FIFO element at index {i} should match"
+                );
+            }
+        }
+
+        [Test]
+        public void Queue_AfterDequeue_SerializesRemainingFifoOrder()
+        {
+            // Arrange — exercise the circular-buffer offset by dequeuing
+            // some entries before serializing.
+            var originalQueue = new Queue<int>();
+            for (int i = 0; i < 10; i++)
+            {
+                originalQueue.Enqueue(i);
+            }
+            for (int i = 0; i < 4; i++)
+            {
+                originalQueue.Dequeue();
+            }
+            var flags = 0L;
+
+            // Act
+            _cacheHelper.ClearMemoryStream();
+            _cacheHelper.WriteAll(
+                originalQueue,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            _cacheHelper.ResetMemoryPosition();
+            var deserializedQueue = _cacheHelper.ReadAll<Queue<int>>();
+
+            // Assert
+            Assert.IsNotNull(deserializedQueue);
+            Assert.That(deserializedQueue.Count == 6);
+            for (int i = 4; i < 10; i++)
+            {
+                Assert.That(deserializedQueue.Dequeue() == i);
+            }
+        }
+
+        [Test]
         public void HashSet_Empty_SerializesAndDeserializes()
         {
             // Arrange

@@ -52,7 +52,7 @@ public partial class GameStatsUpdater : IDisposable
 
 GameObject destruction is handled separately by `RenderableGameObjectManager` (in `Common/`), which subscribes to its own `OnAdded` / `OnRemoved` for entities carrying `PrefabId` + `GameObjectId` and spawns/pools the GO behind the scenes. This sample's observer is only concerned with the stats counters.
 
-**1. Scope** — `Events.EntitiesWithTags<T>()` picks which entities to observe. Also available: `EntitiesWithComponents<T>()`, `EntitiesWithTagsAndComponents<T>(TagSet)`, `InGroup(group)`, and `AllEntities()`.
+**1. Scope** — `Events.EntitiesWithTags<T>()` picks which entities to observe. Also available: `EntitiesWithComponents<T>()`, `EntitiesWithTagsAndComponents<T>(TagSet)`, `EntitiesInGroup(group)`, and `AllEntities()`.
 
 **2. Handlers** — `OnAdded`, `OnRemoved`, `OnMoved` attach `[ForEachEntity]` methods. The source generator emits per-entity iteration and reads the requested components from the group's buffers. The handler sees one entity at a time.
 
@@ -79,7 +79,7 @@ For intra-ECS reactions (e.g. "when an enemy is added, spawn a spawn-VFX entity"
 
 ## Frame events
 
-Beyond per-entity events, `Events` exposes frame-level callbacks: `OnSubmissionStarted`, `OnSubmissionCompleted`, `OnFixedUpdateStarted`, `OnFixedUpdateCompleted`, `OnVariableUpdateStarted`, `OnVariableUpdateCompleted`, `OnInputsApplied`. See [Entity Events — Frame Events](../entity-management/entity-events.md#frame-events) for the full list.
+Beyond per-entity events, `Events` exposes frame-level callbacks: `OnSubmissionStarted`, `OnSubmissionCompleted`, `OnFixedUpdateStarted`, `OnFixedUpdateCompleted`, `OnVariableUpdateStarted`, `OnVariableUpdateCompleted`, `OnInputsApplied`, `OnFixedPauseChanged`. See [Entity Events — Frame Events](../entity-management/entity-events.md#frame-events) for the full list.
 
 ## Concepts introduced
 

@@ -70,13 +70,13 @@ namespace Trecs
 
         int GetComponentsListHash(List<Type> componentTypes)
         {
-            TrecsAssert.That(componentTypes.Count > 0);
+            TrecsDebugAssert.That(componentTypes.Count > 0);
 
-            var componentsHash = TypeIdProvider.GetTypeId(componentTypes[0]);
+            var componentsHash = TypeId.FromType(componentTypes[0]).Value;
 
             for (int i = 1; i < componentTypes.Count; i++)
             {
-                componentsHash ^= TypeIdProvider.GetTypeId(componentTypes[i]);
+                componentsHash ^= TypeId.FromType(componentTypes[i]).Value;
             }
 
             return componentsHash;
@@ -171,7 +171,7 @@ namespace Trecs
                 }
                 else
                 {
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         uniqueTemplate == resolvedTemplate.Template,
                         "Ambiguous templates found for tags {0} but expected exactly one",
                         tags
@@ -179,7 +179,7 @@ namespace Trecs
                 }
             }
 
-            TrecsAssert.IsNotNull(
+            TrecsDebugAssert.IsNotNull(
                 uniqueTemplate,
                 "No templates found for tags {0}.  Expected exactly one",
                 tags
@@ -205,7 +205,7 @@ namespace Trecs
                 }
                 else
                 {
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         result == resolvedTemplate,
                         "Ambiguous templates found for tags {0} but expected exactly one",
                         tags
@@ -213,7 +213,7 @@ namespace Trecs
                 }
             }
 
-            TrecsAssert.IsNotNull(
+            TrecsDebugAssert.IsNotNull(
                 result,
                 "No concrete template found for tags {0}.  Expected exactly one",
                 tags
@@ -245,6 +245,94 @@ namespace Trecs
             where T3 : struct, ITag
             where T4 : struct, ITag => GetGroupsWithTags(TagSet<T1, T2, T3, T4>.Value);
 
+        // Non-throwing variant of GetSingleGroupWithTags. Returns true and sets
+        // `group` on a unique match; returns false on "no groups match" or "matches
+        // are ambiguous" (multi-template span, ties at smallest size, smallest not
+        // a subset of every other match). Used by the native TagSet→group map
+        // builder, which probes every subset and expects most to come back false.
+        // Avoids the exception unwind cost of the throwing variant on the failure
+        // path, since false is the common case there.
+        public bool TryGetSingleGroupWithTags(TagSet tagset, out GroupIndex group)
+        {
+            var tagsetInfo = GetTagsetInfo(tagset);
+
+            if (!tagsetInfo.SingleGroup.IsNull)
+            {
+                group = tagsetInfo.SingleGroup;
+                return true;
+            }
+
+            var groups = tagsetInfo.Groups;
+            if (groups.Count == 0)
+            {
+                group = default;
+                return false;
+            }
+
+            if (groups.Count == 1)
+            {
+                tagsetInfo.SingleGroup = groups[0];
+                group = groups[0];
+                return true;
+            }
+
+            var firstTemplate = _groupInfos[groups[0].Index].ResolvedTemplate.Template;
+            for (int i = 1; i < groups.Count; i++)
+            {
+                if (_groupInfos[groups[i].Index].ResolvedTemplate.Template != firstTemplate)
+                {
+                    group = default;
+                    return false;
+                }
+            }
+
+            int smallestIdx = 0;
+            int smallestCount = _groupInfos[groups[0].Index].Tags.Count;
+            bool smallestUnique = true;
+            for (int i = 1; i < groups.Count; i++)
+            {
+                var count = _groupInfos[groups[i].Index].Tags.Count;
+                if (count < smallestCount)
+                {
+                    smallestIdx = i;
+                    smallestCount = count;
+                    smallestUnique = true;
+                }
+                else if (count == smallestCount)
+                {
+                    smallestUnique = false;
+                }
+            }
+
+            if (!smallestUnique)
+            {
+                group = default;
+                return false;
+            }
+
+            var smallestGroup = groups[smallestIdx];
+            var smallestTags = _groupInfos[smallestGroup.Index].Tags;
+            for (int i = 0; i < groups.Count; i++)
+            {
+                if (i == smallestIdx)
+                    continue;
+
+                var otherTags = _groupInfos[groups[i].Index].Tags;
+                foreach (var tag in smallestTags)
+                {
+                    if (!otherTags.Contains(tag))
+                    {
+                        group = default;
+                        return false;
+                    }
+                }
+            }
+
+            tagsetInfo.SingleGroup = smallestGroup;
+            group = smallestGroup;
+            return true;
+        }
+
         public GroupIndex GetSingleGroupWithTags(TagSet tagset)
         {
             var tagsetInfo = GetTagsetInfo(tagset);
@@ -255,7 +343,7 @@ namespace Trecs
             }
 
             var groups = tagsetInfo.Groups;
-            TrecsAssert.That(groups.Count > 0, "No groups found for tags {0}", tagset);
+            TrecsDebugAssert.That(groups.Count > 0, "No groups found for tags {0}", tagset);
 
             if (groups.Count == 1)
             {
@@ -276,7 +364,7 @@ namespace Trecs
             {
                 if (_groupInfos[groups[i].Index].ResolvedTemplate.Template != firstTemplate)
                 {
-                    throw TrecsAssert.CreateException(
+                    throw TrecsDebugAssert.CreateException(
                         "Ambiguous groups found for tags {0}.  Matches span multiple templates: {1}.  "
                             + "The resolver only picks a smallest match within one template.  "
                             + "Add a discriminator tag to make the desired template's tag set unique.",
@@ -311,7 +399,7 @@ namespace Trecs
 
             if (!smallestUnique)
             {
-                throw TrecsAssert.CreateException(
+                throw TrecsDebugAssert.CreateException(
                     "Ambiguous groups found for tags {0}.  Multiple matching groups share the "
                         + "smallest tag-set size: {1}.  Narrow the query with an additional tag.",
                     tagset,
@@ -338,7 +426,7 @@ namespace Trecs
                 {
                     if (!otherTags.Contains(tag))
                     {
-                        throw TrecsAssert.CreateException(
+                        throw TrecsDebugAssert.CreateException(
                             "Ambiguous groups found for tags {0}.  The smallest match isn't a "
                                 + "subset of every other match — matches form siblings rather "
                                 + "than a chain: {1}.  Narrow the query with an additional tag.",
@@ -1028,7 +1116,7 @@ namespace Trecs
                         bool hasAll = true;
                         foreach (var compId in key.PositiveComponents.Components)
                         {
-                            var type = TypeIdProvider.GetTypeFromId(compId.Value);
+                            var type = TypeId.ToType(new TypeId(compId.Value));
                             if (!resolvedTemplate.HasComponent(type))
                             {
                                 hasAll = false;
@@ -1044,7 +1132,7 @@ namespace Trecs
                         bool hasNegative = false;
                         foreach (var compId in key.NegativeComponents.Components)
                         {
-                            var type = TypeIdProvider.GetTypeFromId(compId.Value);
+                            var type = TypeId.ToType(new TypeId(compId.Value));
                             if (resolvedTemplate.HasComponent(type))
                             {
                                 hasNegative = true;

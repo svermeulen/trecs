@@ -31,7 +31,7 @@ namespace Trecs.Internal
 
         internal NativeBlobBox(NativeBlobBoxPool pool)
         {
-            TrecsAssert.IsNotNull(pool);
+            TrecsDebugAssert.IsNotNull(pool);
             _pool = pool;
         }
 
@@ -42,7 +42,7 @@ namespace Trecs.Internal
             var addr = new IntPtr(
                 AllocatorManager.Allocate(Allocator.Persistent, size, alignment, items: 1)
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 addr != IntPtr.Zero && (addr.ToInt64() & (alignment - 1)) == 0,
                 "AllocatorManager returned a null or misaligned pointer (alignment {0})",
                 alignment
@@ -56,9 +56,9 @@ namespace Trecs.Internal
         internal void InitFromExistingPointer(NativeBlobAllocation alloc, Type innerType)
         {
             AssertCleanState();
-            TrecsAssert.That(alloc.Ptr != IntPtr.Zero);
+            TrecsDebugAssert.That(alloc.Ptr != IntPtr.Zero);
             AssertInitArgs(alloc.AllocSize, alloc.Alignment, innerType);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 (alloc.Ptr.ToInt64() & (alloc.Alignment - 1)) == 0,
                 "Pointer is not aligned to {0} bytes",
                 alloc.Alignment
@@ -71,7 +71,7 @@ namespace Trecs.Internal
 
         void AssertCleanState()
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 _ptr == IntPtr.Zero,
                 "NativeBlobBox re-initialized while still holding an allocation (inner type {0})",
                 _innerType
@@ -80,9 +80,9 @@ namespace Trecs.Internal
 
         static void AssertInitArgs(int size, int alignment, Type innerType)
         {
-            TrecsAssert.IsNotNull(innerType);
-            TrecsAssert.That(size > 0);
-            TrecsAssert.That(
+            TrecsDebugAssert.IsNotNull(innerType);
+            TrecsDebugAssert.That(size > 0);
+            TrecsDebugAssert.That(
                 alignment > 0 && (alignment & (alignment - 1)) == 0,
                 "Alignment must be a positive power of two"
             );
@@ -106,7 +106,7 @@ namespace Trecs.Internal
 
         public unsafe void Dispose()
         {
-            TrecsAssert.That(_ptr != IntPtr.Zero, "NativeBlobBox double-disposed");
+            TrecsDebugAssert.That(_ptr != IntPtr.Zero, "NativeBlobBox double-disposed");
             AllocatorManager.Free(
                 Allocator.Persistent,
                 _ptr.ToPointer(),

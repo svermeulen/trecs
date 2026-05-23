@@ -94,7 +94,7 @@ namespace Trecs
                 AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
                 ref var entry = ref ResolveEntry(entityIndex.GroupIndex);
-                TrecsRequire.That(
+                TrecsAssert.That(
                     entityIndex.Index < entry.Count,
                     "NativeComponentLookupRead: Entity index {0} out of range (count={1}) in group {2}",
                     entityIndex.Index,
@@ -289,7 +289,7 @@ namespace Trecs
                 AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
                 ref var entry = ref ResolveEntry(entityIndex.GroupIndex);
-                TrecsRequire.That(
+                TrecsAssert.That(
                     entityIndex.Index < entry.Count,
                     "NativeComponentLookupWrite: Entity index {0} out of range (count={1}) in group {2}",
                     entityIndex.Index,

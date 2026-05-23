@@ -43,7 +43,7 @@ namespace Trecs.Serialization
             ISerializationReader reader
         )
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 requiredCount == values.Length,
                 "SkipComponentSerializer<{0}>: snapshot has {1} entries for this group but the live world has {2}. The component is excluded from the stream, so its entries must already line up with the rest of the group when the snapshot is restored.",
                 typeof(T).Name,

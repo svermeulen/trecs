@@ -28,19 +28,19 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Exists(EntityIndex entityIndex)
+        public bool Contains(EntityIndex entityIndex)
         {
             var group = entityIndex.GroupIndex;
             if (group.IsNull)
                 return false;
             var entry = _entriesPerGroup[group.Index];
-            return entry.IsValid && entry.Exists(entityIndex.Index);
+            return entry.IsValid && entry.Contains(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Exists(EntityHandle entityHandle)
+        public bool Contains(EntityHandle entityHandle)
         {
-            return Exists(entityHandle.ToIndex(_world));
+            return Contains(entityHandle.ToIndex(_world));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

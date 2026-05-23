@@ -23,22 +23,29 @@ namespace Trecs
         public static SharedPtr<T> Alloc<T>(HeapAccessor heap, BlobId blobId, T value)
             where T : class
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             return heap.SharedHeap.CreateBlob<T>(blobId, value);
         }
 
-        public static SharedPtr<T> Alloc<T>(HeapAccessor heap, BlobId blobId)
+        /// <summary>
+        /// Returns a fresh reference-counted handle to the existing blob at
+        /// <paramref name="blobId"/>, throwing if no such blob exists. This is
+        /// the lookup-only counterpart to <see cref="Alloc{T}(HeapAccessor, BlobId, T)"/>
+        /// — it does not allocate new memory, just acquires another refcount
+        /// slot on data that has already been seeded.
+        /// </summary>
+        public static SharedPtr<T> Acquire<T>(HeapAccessor heap, BlobId blobId)
             where T : class
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             return heap.SharedHeap.GetBlob<T>(blobId);
         }
 
         public static SharedPtr<T> Alloc<T>(WorldAccessor world, BlobId blobId, T value)
             where T : class => Alloc<T>(world.Heap, blobId, value);
 
-        public static SharedPtr<T> Alloc<T>(WorldAccessor world, BlobId blobId)
-            where T : class => Alloc<T>(world.Heap, blobId);
+        public static SharedPtr<T> Acquire<T>(WorldAccessor world, BlobId blobId)
+            where T : class => Acquire<T>(world.Heap, blobId);
 
         /// <summary>
         /// Returns true and the cached blob if one exists at <paramref name="blobId"/>; otherwise false.
@@ -46,7 +53,7 @@ namespace Trecs
         public static bool TryGet<T>(HeapAccessor heap, BlobId blobId, out SharedPtr<T> ptr)
             where T : class
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             return heap.SharedHeap.TryGetBlob<T>(blobId, out ptr);
         }
 
@@ -63,7 +70,7 @@ namespace Trecs
         public static SharedPtr<T> GetOrAlloc<T>(HeapAccessor heap, BlobId blobId, Func<T> factory)
             where T : class
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             if (heap.SharedHeap.TryGetBlob<T>(blobId, out var ptr))
             {
                 return ptr;
@@ -77,53 +84,23 @@ namespace Trecs
             Func<T> factory
         )
             where T : class => GetOrAlloc<T>(world.Heap, blobId, factory);
-
-        public static SharedPtr<T> AllocFrameScoped<T>(HeapAccessor heap, BlobId blobId, T value)
-            where T : class
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.FrameScopedSharedHeap.CreateBlob<T>(heap.FixedFrame, blobId, value);
-        }
-
-        public static SharedPtr<T> AllocFrameScoped<T>(HeapAccessor heap, BlobId blobId)
-            where T : class
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.FrameScopedSharedHeap.CreateBlob<T>(heap.FixedFrame, blobId);
-        }
-
-        public static SharedPtr<T> AllocFrameScoped<T>(WorldAccessor world, BlobId blobId, T value)
-            where T : class => AllocFrameScoped<T>(world.Heap, blobId, value);
-
-        public static SharedPtr<T> AllocFrameScoped<T>(WorldAccessor world, BlobId blobId)
-            where T : class => AllocFrameScoped<T>(world.Heap, blobId);
-
-        public static bool TryGetFrameScoped<T>(
-            HeapAccessor heap,
-            BlobId blobId,
-            out SharedPtr<T> ptr
-        )
-            where T : class
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.FrameScopedSharedHeap.TryGetBlob<T>(heap.FixedFrame, blobId, out ptr);
-        }
-
-        public static bool TryGetFrameScoped<T>(
-            WorldAccessor world,
-            BlobId blobId,
-            out SharedPtr<T> ptr
-        )
-            where T : class => TryGetFrameScoped<T>(world.Heap, blobId, out ptr);
     }
 
     /// <summary>
     /// Reference-counted pointer to a shared managed (class) heap allocation. Multiple entities
     /// can hold a <see cref="SharedPtr{T}"/> referencing the same underlying object, identified
-    /// by a <see cref="BlobId"/>. Allocate via <see cref="SharedPtr.Alloc{T}(HeapAccessor, BlobId, T)"/>.
+    /// by a <see cref="BlobId"/>. Seed via <see cref="SharedPtr.Alloc{T}(HeapAccessor, BlobId, T)"/>;
+    /// look up an already-seeded blob via <see cref="SharedPtr.Acquire{T}(HeapAccessor, BlobId)"/>.
     /// <para>
     /// Resolve the value with <see cref="Get(HeapAccessor)"/> or <see cref="Get(WorldAccessor)"/>.
     /// Cloning increments the reference count; disposing decrements it and frees when zero.
+    /// </para>
+    /// <para>
+    /// <b>T must be marked <see cref="ImmutableAttribute"/></b> (or be one of the implicitly-
+    /// allowed types like <c>string</c>) — enforced by the TRECS125 analyzer. Managed shared
+    /// blobs live in the BlobCache, which is not snapshotted alongside game-state snapshots,
+    /// so any post-Alloc mutation silently desyncs determinism. See <see cref="ImmutableAttribute"/>
+    /// for the full contract and TRECS126 for what gets validated.
     /// </para>
     /// <para>
     /// Public verb set: <c>Get</c>, <c>TryGet</c>, <c>CanGet</c>, <c>Clone</c>, <c>GetBlobId</c>,
@@ -138,7 +115,10 @@ namespace Trecs
         public readonly PtrHandle Handle;
         public readonly BlobId Id;
 
-        public SharedPtr(PtrHandle handle, BlobId blobId)
+        // Internal so external code can't fabricate a handle from arbitrary values.
+        // Allocation goes through SharedPtr.Alloc / Clone; deserialization paths
+        // live in InternalsVisibleTo-allowed assemblies.
+        internal SharedPtr(PtrHandle handle, BlobId blobId)
         {
             Handle = handle;
             Id = blobId;
@@ -147,25 +127,14 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly T Get(HeapAccessor heap)
         {
-            TrecsAssert.That(!IsNull);
+            TrecsDebugAssert.That(!IsNull);
 
             if (heap.SharedHeap.TryGetBlobDirect<T>(Id, Handle, out var result))
             {
                 return result;
             }
 
-            if (
-                heap.FrameScopedSharedHeap.TryResolveValue<T>(
-                    heap.FixedFrame,
-                    Handle.Value,
-                    out result
-                )
-            )
-            {
-                return result;
-            }
-
-            throw TrecsAssert.CreateException(
+            throw TrecsDebugAssert.CreateException(
                 "Failed to resolve SharedPtr with id {0} and handle {1}",
                 Id,
                 Handle
@@ -189,17 +158,6 @@ namespace Trecs
                 return true;
             }
 
-            if (
-                heap.FrameScopedSharedHeap.TryResolveValue<T>(
-                    heap.FixedFrame,
-                    Handle.Value,
-                    out value
-                )
-            )
-            {
-                return true;
-            }
-
             value = null;
             return false;
         }
@@ -215,12 +173,7 @@ namespace Trecs
                 return false;
             }
 
-            if (heap.SharedHeap.ContainsBlobDirect(Id, Handle))
-            {
-                return true;
-            }
-
-            return heap.FrameScopedSharedHeap.ContainsEntry(Handle.Value);
+            return heap.SharedHeap.ContainsBlobDirect(Id, Handle);
         }
 
         public readonly bool CanGet(WorldAccessor world) => CanGet(world.Heap);
@@ -228,19 +181,20 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly SharedPtr<T> Clone(HeapAccessor heap)
         {
+            heap.AssertCanMutateHeap();
             if (IsNull)
             {
                 return default;
             }
-
-            if (heap.SharedHeap.TryClone<T>(Handle, out var result))
+            if (!heap.SharedHeap.TryClone<T>(Handle, out var result))
             {
-                return result;
+                throw TrecsDebugAssert.CreateException(
+                    "Failed to clone SharedPtr with id {0} and handle {1}",
+                    Id,
+                    Handle
+                );
             }
-
-            // Frame-scoped: clone into persistent heap
-            var blobId = heap.FrameScopedSharedHeap.GetBlobId(heap.FixedFrame, Handle.Value);
-            return heap.SharedHeap.GetBlob<T>(blobId);
+            return result;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -248,23 +202,15 @@ namespace Trecs
 
         public readonly BlobId GetBlobId(HeapAccessor heap)
         {
-            if (heap.SharedHeap.ContainsBlobDirect(Id, Handle))
-            {
-                return Id;
-            }
-
-            TrecsAssert.That(!IsNull);
-            return heap.FrameScopedSharedHeap.GetBlobId(heap.FixedFrame, Handle.Value);
+            TrecsDebugAssert.That(!IsNull);
+            return Id;
         }
 
         public readonly BlobId GetBlobId(WorldAccessor world) => GetBlobId(world.Heap);
 
         public readonly void Dispose(HeapAccessor heap)
         {
-            TrecsAssert.That(
-                !heap.FrameScopedSharedHeap.ContainsEntry(Handle.Value),
-                "Frame-scoped SharedPtr must not be manually disposed"
-            );
+            heap.AssertCanMutateHeap();
             heap.SharedHeap.DisposeHandle(Handle);
         }
 

@@ -59,7 +59,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         AtomicSafetyHandle GetHandle(ResourceId resource, GroupIndex group)
         {
-            TrecsAssert.That(!_disposed, "WorldSafetyManager is disposed");
+            TrecsDebugAssert.That(!_disposed, "WorldSafetyManager is disposed");
             var key = MakeKey(resource, group);
             if (!_handles.TryGetValue(key, out var handle))
             {

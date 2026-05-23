@@ -114,10 +114,10 @@ namespace Trecs
         public static void ReadInPlace<T>(this ISerializationReader reader, string name, T value)
             where T : class
         {
-            TrecsAssert.That(value != null);
+            TrecsDebugAssert.That(value != null);
             T tempValue = value;
             reader.Read(name, ref tempValue);
-            TrecsAssert.That(ReferenceEquals(tempValue, value));
+            TrecsDebugAssert.That(ReferenceEquals(tempValue, value));
         }
 
         public static object ReadObject(this ISerializationReader reader, string name)
@@ -133,10 +133,10 @@ namespace Trecs
             object value
         )
         {
-            TrecsAssert.That(value != null);
+            TrecsDebugAssert.That(value != null);
             object tempValue = value;
             reader.ReadObject(name, ref tempValue);
-            TrecsAssert.That(ReferenceEquals(tempValue, value));
+            TrecsDebugAssert.That(ReferenceEquals(tempValue, value));
         }
 
         public static T ReadDelta<T>(this ISerializationReader reader, string name, in T baseValue)
@@ -153,10 +153,10 @@ namespace Trecs
             T baseValue
         )
         {
-            TrecsAssert.That(value != null);
+            TrecsDebugAssert.That(value != null);
             T tempValue = value;
             reader.ReadDelta(name, ref tempValue, baseValue);
-            TrecsAssert.That(ReferenceEquals(tempValue, value));
+            TrecsDebugAssert.That(ReferenceEquals(tempValue, value));
         }
 
         public static object ReadObjectDelta(
@@ -177,11 +177,11 @@ namespace Trecs
             object baseValue
         )
         {
-            TrecsAssert.That(value != null);
+            TrecsDebugAssert.That(value != null);
             object tempValue = value;
             reader.ReadObjectDelta(name, ref tempValue, baseValue);
 
-            TrecsAssert.That(ReferenceEquals(tempValue, value));
+            TrecsDebugAssert.That(ReferenceEquals(tempValue, value));
         }
     }
 }

@@ -28,10 +28,10 @@ namespace Trecs.Serialization
             // IsCreated is best-effort (a separate alias may have disposed it),
             // but the assert at least catches the "I forgot to clear before
             // deserializing" mistake which would otherwise leak the prior allocation.
-            TrecsAssert.That(!value.IsCreated);
+            TrecsDebugAssert.That(!value.IsCreated);
 
             var length = reader.Read<int>("Count");
-            TrecsAssert.That(length >= 0);
+            TrecsDebugAssert.That(length >= 0);
 
             value = new NativeArray<T>(length, _allocator, NativeArrayOptions.UninitializedMemory);
 
@@ -47,7 +47,7 @@ namespace Trecs.Serialization
 
         public void Serialize(in NativeArray<T> value, ISerializationWriter writer)
         {
-            TrecsAssert.That(value.IsCreated);
+            TrecsDebugAssert.That(value.IsCreated);
 
             writer.Write("Count", value.Length);
 
@@ -63,7 +63,7 @@ namespace Trecs.Serialization
 
         public void DeserializeObject(ref object value, ISerializationReader reader)
         {
-            TrecsAssert.IsNotNull(value, "NativeArray should always be deserialized in-place");
+            TrecsDebugAssert.IsNotNull(value, "NativeArray should always be deserialized in-place");
             var typedValue = (NativeArray<T>)value;
             Deserialize(ref typedValue, reader);
             value = typedValue;

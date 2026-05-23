@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,24 +14,28 @@ namespace Trecs.SourceGen.Template
     internal static class TemplateValidator
     {
         /// <summary>
-        /// Validates a template declaration and reports diagnostics for any issues
+        /// Validates a template declaration and reports diagnostics for any issues. Runs
+        /// inside the pipeline transform stage so it produces <see cref="DiagnosticInfo"/>
+        /// (value-equatable) rather than <see cref="Diagnostic"/> (reference-equatable,
+        /// breaks cache). The terminal stage materializes real diagnostics.
         /// </summary>
         public static bool Validate(
             TypeDeclarationSyntax declaration,
             INamedTypeSymbol symbol,
             TemplateDefinitionData data,
-            Action<Diagnostic> reportDiagnostic
+            Action<DiagnosticInfo> reportDiagnostic
         )
         {
             bool isValid = true;
+            var declLocation = LocationInfo.From(declaration.GetLocation());
 
             // Must be partial
             if (!SymbolAnalyzer.IsPartialType(declaration))
             {
                 reportDiagnostic(
-                    Diagnostic.Create(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.TemplateMustBePartial,
-                        declaration.GetLocation(),
+                        declLocation,
                         symbol.Name
                     )
                 );
@@ -41,9 +46,9 @@ namespace Trecs.SourceGen.Template
             if (symbol.TypeKind != TypeKind.Class)
             {
                 reportDiagnostic(
-                    Diagnostic.Create(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.TemplateMustBeClass,
-                        declaration.GetLocation(),
+                        declLocation,
                         symbol.Name
                     )
                 );
@@ -56,7 +61,7 @@ namespace Trecs.SourceGen.Template
                 if (
                     !ValidateComponentAttributes(
                         component,
-                        declaration.GetLocation(),
+                        declLocation,
                         reportDiagnostic,
                         symbol.Name
                     )
@@ -66,11 +71,29 @@ namespace Trecs.SourceGen.Template
                 }
             }
 
+            // Build a lookup from template-field name to its [Input] behaviour so the
+            // per-field walk below can apply input-specific component checks without
+            // re-parsing the attribute. Value is the "Retain" suffix of the enum value
+            // (or empty string) so it's cheap to compare; absence from the dict means
+            // the template field is not [Input].
+            Dictionary<string, string>? inputFieldBehaviours = null;
+            foreach (var c in data.Components)
+            {
+                if (!c.IsInput)
+                    continue;
+                inputFieldBehaviours ??= new Dictionary<string, string>();
+                inputFieldBehaviours[c.FieldName] = c.OnMissing ?? string.Empty;
+            }
+
             // Validate instance fields
             foreach (var member in symbol.GetMembers())
             {
                 if (member is IFieldSymbol field && !field.IsStatic && !field.IsConst)
                 {
+                    var fieldLocation = LocationInfo.From(
+                        field.Locations.FirstOrDefault() ?? declaration.GetLocation()
+                    );
+
                     // Must have no access modifier — template fields are a
                     // config DSL, not an API surface. The check is
                     // syntax-level because Roslyn reports both `private T X;`
@@ -78,9 +101,9 @@ namespace Trecs.SourceGen.Template
                     if (HasExplicitAccessModifier(field))
                     {
                         reportDiagnostic(
-                            Diagnostic.Create(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.TemplateFieldMustHaveNoAccessModifier,
-                                field.Locations.FirstOrDefault() ?? declaration.GetLocation(),
+                                fieldLocation,
                                 field.Name,
                                 symbol.Name
                             )
@@ -92,9 +115,9 @@ namespace Trecs.SourceGen.Template
                     if (!ImplementsIEntityComponent(field.Type))
                     {
                         reportDiagnostic(
-                            Diagnostic.Create(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.TemplateFieldMustBeEntityComponent,
-                                field.Locations.FirstOrDefault() ?? declaration.GetLocation(),
+                                fieldLocation,
                                 field.Name,
                                 PerformanceCache.GetDisplayString(field.Type),
                                 symbol.Name
@@ -109,20 +132,27 @@ namespace Trecs.SourceGen.Template
                     // this loop doesn't recurse into them.
                     else if (field.Type is INamedTypeSymbol componentType)
                     {
+                        bool isInputField =
+                            inputFieldBehaviours != null
+                            && inputFieldBehaviours.TryGetValue(field.Name, out _);
+                        bool isRetainField =
+                            isInputField && inputFieldBehaviours![field.Name].EndsWith(".Retain");
+
                         foreach (var componentMember in componentType.GetMembers())
                         {
                             if (
-                                componentMember is IFieldSymbol componentField
-                                && !componentField.IsStatic
-                                && !componentField.IsConst
-                                && componentField.Type.IsReferenceType
+                                componentMember is not IFieldSymbol componentField
+                                || componentField.IsStatic
+                                || componentField.IsConst
                             )
+                                continue;
+
+                            if (componentField.Type.IsReferenceType)
                             {
                                 reportDiagnostic(
-                                    Diagnostic.Create(
+                                    DiagnosticInfo.Create(
                                         DiagnosticDescriptors.ComponentHasManagedFields,
-                                        field.Locations.FirstOrDefault()
-                                            ?? declaration.GetLocation(),
+                                        fieldLocation,
                                         PerformanceCache.GetDisplayString(componentType),
                                         field.Name,
                                         symbol.Name,
@@ -131,6 +161,24 @@ namespace Trecs.SourceGen.Template
                                     )
                                 );
                                 isValid = false;
+                            }
+
+                            if (isInputField)
+                            {
+                                if (
+                                    !ValidateInputComponentFieldType(
+                                        componentField,
+                                        componentType,
+                                        field,
+                                        symbol.Name,
+                                        isRetainField,
+                                        declLocation,
+                                        reportDiagnostic
+                                    )
+                                )
+                                {
+                                    isValid = false;
+                                }
                             }
                         }
                     }
@@ -145,9 +193,9 @@ namespace Trecs.SourceGen.Template
                     if (!component.HasExplicitDefault)
                     {
                         reportDiagnostic(
-                            Diagnostic.Create(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.GlobalsTemplateFieldMustHaveDefault,
-                                declaration.GetLocation(),
+                                declLocation,
                                 component.FieldName,
                                 symbol.Name
                             )
@@ -161,7 +209,7 @@ namespace Trecs.SourceGen.Template
             // threshold where sets are usually the better tool. Each emitted
             // partition pre-allocates a contiguous component buffer, so the
             // memory and startup cost compounds quickly with dimensions.
-            CheckPartitionCount(data, declaration, reportDiagnostic);
+            CheckPartitionCount(data, declLocation, reportDiagnostic);
 
             return isValid;
         }
@@ -174,8 +222,8 @@ namespace Trecs.SourceGen.Template
 
         private static void CheckPartitionCount(
             TemplateDefinitionData data,
-            TypeDeclarationSyntax declaration,
-            Action<Diagnostic> reportDiagnostic
+            LocationInfo declLocation,
+            Action<DiagnosticInfo> reportDiagnostic
         )
         {
             if (data.Dimensions.Length == 0)
@@ -206,12 +254,12 @@ namespace Trecs.SourceGen.Template
             );
 
             reportDiagnostic(
-                Diagnostic.Create(
+                DiagnosticInfo.Create(
                     DiagnosticDescriptors.TemplatePartitionCountHigh,
-                    declaration.GetLocation(),
+                    declLocation,
                     data.TypeName,
-                    count,
-                    data.Dimensions.Length,
+                    count.ToString(),
+                    data.Dimensions.Length.ToString(),
                     dimShape
                 )
             );
@@ -219,8 +267,8 @@ namespace Trecs.SourceGen.Template
 
         private static bool ValidateComponentAttributes(
             TemplateComponentData component,
-            Location location,
-            Action<Diagnostic> reportDiagnostic,
+            LocationInfo location,
+            Action<DiagnosticInfo> reportDiagnostic,
             string templateName
         )
         {
@@ -230,7 +278,7 @@ namespace Trecs.SourceGen.Template
             if (component.IsInterpolated && component.IsConstant)
             {
                 reportDiagnostic(
-                    Diagnostic.Create(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.TemplateInvalidAttributeCombination,
                         location,
                         component.FieldName,
@@ -246,7 +294,7 @@ namespace Trecs.SourceGen.Template
             if (component.IsInterpolated && component.IsVariableUpdateOnly)
             {
                 reportDiagnostic(
-                    Diagnostic.Create(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.TemplateInvalidAttributeCombination,
                         location,
                         component.FieldName,
@@ -262,7 +310,7 @@ namespace Trecs.SourceGen.Template
             if (component.IsInput && component.IsConstant)
             {
                 reportDiagnostic(
-                    Diagnostic.Create(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.TemplateInvalidAttributeCombination,
                         location,
                         component.FieldName,
@@ -278,13 +326,114 @@ namespace Trecs.SourceGen.Template
             if (component.IsInput && component.IsVariableUpdateOnly)
             {
                 reportDiagnostic(
-                    Diagnostic.Create(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.TemplateInvalidAttributeCombination,
                         location,
                         component.FieldName,
                         templateName,
                         "Input",
                         "VariableUpdateOnly"
+                    )
+                );
+                isValid = false;
+            }
+
+            return isValid;
+        }
+
+        // Persistent-pointer struct types: allocating one from an input system would
+        // outlive the input frame (which is bulk-released) and leak. Mapped to the
+        // Input*-equivalent in the diagnostic message so the suggested fix is concrete.
+        private static readonly (string PersistentName, string InputName)[] PersistentPtrTypes =
+        {
+            ("NativeUniquePtr", "InputNativeUniquePtr"),
+            ("NativeSharedPtr", "InputNativeSharedPtr"),
+            ("UniquePtr", "InputUniquePtr"),
+            ("SharedPtr", "InputSharedPtr"),
+        };
+
+        // Input-pointer types that themselves carry a handle into the per-frame arena
+        // / refcount slot. Safe in Reset-mode input components; never safe in
+        // Retain-mode because the previous frame's slot has already been released by
+        // the time Retain would re-apply the component.
+        private static readonly string[] InputPtrTypeNames =
+        {
+            "InputNativeUniquePtr",
+            "InputNativeSharedPtr",
+            "InputUniquePtr",
+            "InputSharedPtr",
+        };
+
+        private static bool ValidateInputComponentFieldType(
+            IFieldSymbol componentField,
+            INamedTypeSymbol componentType,
+            IFieldSymbol templateField,
+            string templateName,
+            bool isRetain,
+            LocationInfo fallbackLocation,
+            Action<DiagnosticInfo> reportDiagnostic
+        )
+        {
+            if (componentField.Type is not INamedTypeSymbol named)
+                return true;
+            if (!SymbolAnalyzer.IsInNamespace(named.ContainingNamespace, TrecsNamespaces.Trecs))
+                return true;
+
+            var fieldLoc = componentField.Locations.FirstOrDefault();
+            var location = fieldLoc != null ? LocationInfo.From(fieldLoc) : fallbackLocation;
+            bool isValid = true;
+
+            // TRECS121: persistent ptr in [Input] component.
+            foreach (var (persistentName, inputName) in PersistentPtrTypes)
+            {
+                if (named.Name == persistentName && named.TypeArguments.Length == 1)
+                {
+                    reportDiagnostic(
+                        DiagnosticInfo.Create(
+                            DiagnosticDescriptors.InputComponentHasPersistentPtrField,
+                            location,
+                            componentField.Name,
+                            PerformanceCache.GetDisplayString(componentType),
+                            templateField.Name,
+                            PerformanceCache.GetDisplayString(named),
+                            $"{inputName}<{PerformanceCache.GetDisplayString(named.TypeArguments[0])}>"
+                        )
+                    );
+                    return false;
+                }
+            }
+
+            // TRECS122: TrecsList<T> in [Input] component.
+            if (named.Name == "TrecsList" && named.TypeArguments.Length == 1)
+            {
+                reportDiagnostic(
+                    DiagnosticInfo.Create(
+                        DiagnosticDescriptors.InputComponentHasTrecsListField,
+                        location,
+                        componentField.Name,
+                        PerformanceCache.GetDisplayString(componentType),
+                        templateField.Name,
+                        PerformanceCache.GetDisplayString(named.TypeArguments[0])
+                    )
+                );
+                return false;
+            }
+
+            // TRECS123: InputXxxPtr in a [Input(MissingInputBehavior.Retain)] component.
+            if (
+                isRetain
+                && InputPtrTypeNames.Contains(named.Name)
+                && named.TypeArguments.Length == 1
+            )
+            {
+                reportDiagnostic(
+                    DiagnosticInfo.Create(
+                        DiagnosticDescriptors.InputRetainWithInputPtrField,
+                        location,
+                        PerformanceCache.GetDisplayString(componentType),
+                        templateField.Name,
+                        componentField.Name,
+                        PerformanceCache.GetDisplayString(named)
                     )
                 );
                 isValid = false;

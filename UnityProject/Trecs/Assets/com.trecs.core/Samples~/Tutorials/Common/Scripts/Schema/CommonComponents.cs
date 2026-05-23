@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace Trecs.Samples
 {
+    [Copyable]
     public partial struct GameObjectId : IEntityComponent
     {
         public int Value;

@@ -141,10 +141,10 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             a.RemoveEntitiesWithTags(TestTags.Alpha);
-            a.SubmitEntities();
+            a.Submit();
 
             // Global component should be unchanged
             NAssert.AreEqual(100, a.GlobalComponent<TestGlobalInt>().Read.Value);

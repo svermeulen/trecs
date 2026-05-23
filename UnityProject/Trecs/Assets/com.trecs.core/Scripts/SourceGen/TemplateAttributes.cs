@@ -3,21 +3,6 @@ using System;
 namespace Trecs
 {
     /// <summary>
-    /// Specifies an explicit GUID for a tag type, overriding the auto-generated hash.
-    /// Use this to preserve backward-compatible tag IDs when migrating from explicit Tag declarations.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false)]
-    public sealed class TagIdAttribute : Attribute
-    {
-        public int Id { get; }
-
-        public TagIdAttribute(int id)
-        {
-            Id = id;
-        }
-    }
-
-    /// <summary>
     /// Marker interface for tag types. Tags are empty structs that classify entities into
     /// <see cref="GroupIndex"/>s. Implement on a struct to define a new tag:
     /// <c>struct Doofus : ITag {}</c>
@@ -147,21 +132,6 @@ namespace Trecs
         where T2 : struct, ITag
         where T3 : struct, ITag
         where T4 : struct, ITag { }
-
-    /// <summary>
-    /// Specifies an explicit stable ID for a set type, overriding the auto-generated hash.
-    /// Similar to TagIdAttribute for tags.
-    /// </summary>
-    [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false)]
-    public sealed class SetIdAttribute : Attribute
-    {
-        public int Id { get; }
-
-        public SetIdAttribute(int id)
-        {
-            Id = id;
-        }
-    }
 
     /// <summary>
     /// Marks a template component field as interpolated. The framework stores a previous-frame

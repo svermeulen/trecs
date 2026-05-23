@@ -800,5 +800,122 @@ namespace Trecs.Tests
         }
 
         #endregion
+
+        #region Modification-During-Iteration Detection
+
+#if DEBUG
+        [Test]
+        public void Keys_AddDuringIteration_ThrowsOnNextMoveNext()
+        {
+            var dict = new DenseDictionary<int, string>();
+            dict.Add(1, "one");
+            dict.Add(2, "two");
+            dict.Add(3, "three");
+
+            var e = dict.Keys.GetEnumerator();
+            NAssert.IsTrue(e.MoveNext());
+
+            dict.Add(4, "four");
+
+            NAssert.Catch(() => e.MoveNext());
+        }
+
+        [Test]
+        public void Keys_RemoveDuringIteration_ThrowsOnNextMoveNext()
+        {
+            var dict = new DenseDictionary<int, string>();
+            dict.Add(1, "one");
+            dict.Add(2, "two");
+            dict.Add(3, "three");
+
+            var e = dict.Keys.GetEnumerator();
+            NAssert.IsTrue(e.MoveNext());
+
+            dict.TryRemove(2);
+
+            NAssert.Catch(() => e.MoveNext());
+        }
+
+        [Test]
+        public void Keys_OverwriteExistingDuringIteration_ThrowsOnNextMoveNext()
+        {
+            var dict = new DenseDictionary<int, string>();
+            dict.Add(1, "one");
+            dict.Add(2, "two");
+
+            var e = dict.Keys.GetEnumerator();
+            NAssert.IsTrue(e.MoveNext());
+
+            dict[1] = "ONE";
+
+            NAssert.Catch(() => e.MoveNext());
+        }
+
+        [Test]
+        public void Keys_ClearDuringIteration_ThrowsOnNextMoveNext()
+        {
+            var dict = new DenseDictionary<int, string>();
+            dict.Add(1, "one");
+            dict.Add(2, "two");
+
+            var e = dict.Keys.GetEnumerator();
+            NAssert.IsTrue(e.MoveNext());
+
+            dict.Clear();
+
+            NAssert.Catch(() => e.MoveNext());
+        }
+
+        [Test]
+        public void Keys_NoModification_IteratesCleanly()
+        {
+            var dict = new DenseDictionary<int, string>();
+            dict.Add(1, "one");
+            dict.Add(2, "two");
+            dict.Add(3, "three");
+
+            var seen = new List<int>();
+            foreach (var k in dict.Keys)
+            {
+                seen.Add(k);
+            }
+
+            CollectionAssert.AreEquivalent(new[] { 1, 2, 3 }, seen);
+        }
+
+        [Test]
+        public void PairEnumerator_AddDuringIteration_ThrowsOnNextMoveNext()
+        {
+            var dict = new DenseDictionary<int, string>();
+            dict.Add(1, "one");
+            dict.Add(2, "two");
+
+            var e = dict.GetEnumerator();
+            NAssert.IsTrue(e.MoveNext());
+
+            dict.Add(3, "three");
+
+            NAssert.Catch(() => e.MoveNext());
+        }
+
+        [Test]
+        public void PairEnumerator_OverwriteExistingDuringIteration_ThrowsOnNextMoveNext()
+        {
+            // Overwrite preserves Count, so the previous _count == _startCount
+            // check missed this case. The version-based check catches it.
+            var dict = new DenseDictionary<int, string>();
+            dict.Add(1, "one");
+            dict.Add(2, "two");
+
+            var e = dict.GetEnumerator();
+            NAssert.IsTrue(e.MoveNext());
+
+            dict[1] = "ONE";
+
+            NAssert.Catch(() => e.MoveNext());
+        }
+#endif
+
+        #endregion
     }
 }

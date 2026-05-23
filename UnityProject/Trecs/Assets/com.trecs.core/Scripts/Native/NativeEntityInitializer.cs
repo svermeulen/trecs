@@ -1,47 +1,73 @@
 using System.Runtime.CompilerServices;
 using Trecs.Internal;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
-    /// <summary>
-    /// Job-safe builder for setting initial component values on a newly created entity.
-    /// Returned by entity-creation APIs; each <see cref="Set{T}"/> call enqueues the
-    /// component into a <see cref="NativeBag"/> for deferred application during the
-    /// next submission phase. Supports fluent chaining.
-    /// </summary>
-    public readonly ref struct NativeEntityInitializer
+    // Builder returned by NativeWorldAccessor.AddEntity. Writes each .Set<T>
+    // component into a fixed offset within the entity's pre-reserved slot in the
+    // PerGroupAddBags cell — no variable-length tail, no per-component TypeId tag.
+    //
+    // The slot's `setMask` (TemplateComponentMask, 256-bit) tracks which
+    // component slots the user wrote explicitly. The drain pipeline branches
+    // per component:
+    //   - If the corresponding bit is set in setMask → MemCpy from this slot.
+    //   - Else, if the component's bit is set in the template's ZeroDefaultMask
+    //     → MemClear in the destination.
+    //   - Else → MemCpy from the template's default-bytes prototype.
+    //
+    // The struct stores raw pointers because it's a ref-struct returned by a
+    // Burst-compiled job-safe method; bounds-checked NativeArray indexer access
+    // would force the indexer through its safety handle on every .Set call.
+    public readonly unsafe ref struct NativeEntityInitializer
     {
-        readonly NativeBag _unsafeBuffer;
-        readonly UnsafeArrayIndex _componentsToInitializeCounterRef;
-        readonly EntityHandle _id;
+        readonly byte* _slotComponentBytes;
+        readonly TemplateComponentMask* _setMaskPtr;
+        readonly NativeComponentLayoutEntry* _layoutEntriesBase;
+        readonly int _firstEntryIndex;
+        readonly UnsafeHashMap<long, int> _typeIdToCi;
+        readonly long _groupKeyPrefix;
+        readonly EntityHandle _handle;
 
-        public NativeEntityInitializer(
-            in NativeBag unsafeBuffer,
-            UnsafeArrayIndex componentsToInitializeCounterRef,
-            EntityHandle id
+        internal NativeEntityInitializer(
+            byte* slotComponentBytes,
+            TemplateComponentMask* setMaskPtr,
+            NativeComponentLayoutEntry* layoutEntriesBase,
+            int firstEntryIndex,
+            UnsafeHashMap<long, int> typeIdToCi,
+            long groupKeyPrefix,
+            EntityHandle handle
         )
         {
-            _unsafeBuffer = unsafeBuffer;
-            _componentsToInitializeCounterRef = componentsToInitializeCounterRef;
-            _id = id;
+            _slotComponentBytes = slotComponentBytes;
+            _setMaskPtr = setMaskPtr;
+            _layoutEntriesBase = layoutEntriesBase;
+            _firstEntryIndex = firstEntryIndex;
+            _typeIdToCi = typeIdToCi;
+            _groupKeyPrefix = groupKeyPrefix;
+            _handle = handle;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public NativeEntityInitializer Set<T>(in T component)
             where T : unmanaged, IEntityComponent
         {
-            var componentId = ComponentTypeId<T>.Value;
-
-            _unsafeBuffer.AccessReserved<uint>(_componentsToInitializeCounterRef)++; //increase the number of components that have been initialised by the user
-
-            //Since NativeEntityInitializer is a ref struct, it guarantees that I am enqueueing components of the
-            //last entity built
-            _unsafeBuffer.Enqueue(componentId); //to know what component it's being stored
-            _unsafeBuffer.ReserveEnqueue<T>(out _) = component;
-
+            int typeIdValue = TypeId<T>.Value.Value;
+            // Composite key mirrors WorldComponentLayouts.MakeKey. Inlined here
+            // so the hot path doesn't reach across files.
+            long key = _groupKeyPrefix | (uint)typeIdValue;
+            if (!_typeIdToCi.TryGetValue(key, out int ci))
+            {
+                throw new TrecsException(
+                    "Component type not found in template layout for AddEntity"
+                );
+            }
+            var entry = _layoutEntriesBase[_firstEntryIndex + ci];
+            *(T*)(_slotComponentBytes + entry.ByteOffset) = component;
+            TemplateComponentMask.SetUnsafe(_setMaskPtr, ci);
             return this;
         }
 
-        public EntityHandle Handle => _id;
+        public EntityHandle Handle => _handle;
     }
 }

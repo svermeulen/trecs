@@ -15,6 +15,12 @@ namespace Trecs
         readonly bool _isInput;
         readonly string _debugName;
 
+        // Per-role-aware copy of the chunk store's resolver: same backing
+        // directory, but with the CanMutateHeap bit stamped from this accessor's
+        // role. Stored as a field (rather than computed per-getter-call) so the
+        // public getter can keep returning by-ref, matching the previous shape.
+        NativeChunkStoreResolver _chunkStoreResolver;
+
         internal HeapAccessor(
             EcsHeapAllocator heapAllocator,
             SystemRunner systemRunner,
@@ -28,11 +34,21 @@ namespace Trecs
             _role = role;
             _isInput = isInput;
             _debugName = debugName;
+            _chunkStoreResolver = new NativeChunkStoreResolver(
+                in heapAllocator.NativeChunkStoreResolver,
+                canMutateHeap: role == AccessorRole.Unrestricted || role == AccessorRole.Fixed
+            );
         }
 
         bool IsFixed => _role == AccessorRole.Fixed;
         bool IsUnrestricted => _role == AccessorRole.Unrestricted;
         bool IsInput => _isInput;
+
+        // Non-Conditional sibling of AssertCanMutateHeap. Exposed for callers that
+        // need to query the role without throwing — e.g. a NativeWorldAccessor
+        // constructor stamping the role onto its embedded chunk-store resolver so
+        // Burst-job Write paths can assert without re-reading any role state.
+        internal bool CanMutateHeap => IsUnrestricted || IsFixed;
 
         internal int FixedFrame => _systemRunner.FixedFrame;
 
@@ -40,23 +56,27 @@ namespace Trecs
 
         internal SharedHeap SharedHeap => _heapAllocator.SharedHeap;
 
-        internal FrameScopedSharedHeap FrameScopedSharedHeap =>
-            _heapAllocator.FrameScopedSharedHeap;
+        /// <summary>
+        /// The world's shared <see cref="Trecs.BlobCache"/>. Most game code reaches the
+        /// cache through <see cref="SharedPtr{T}"/> / <see cref="NativeSharedPtr{T}"/>;
+        /// this accessor is for code that needs to talk to the cache directly — async
+        /// preload, non-ECS anchoring.
+        /// </summary>
+        public BlobCache BlobCache => _heapAllocator.SharedHeap.BlobCache;
 
         internal NativeSharedHeap NativeSharedHeap => _heapAllocator.NativeSharedHeap;
 
-        internal FrameScopedNativeSharedHeap FrameScopedNativeSharedHeap =>
-            _heapAllocator.FrameScopedNativeSharedHeap;
+        internal InputNativeUniqueHeap InputNativeUniqueHeap =>
+            _heapAllocator.InputNativeUniqueHeap;
 
-        internal NativeUniqueHeap NativeUniqueHeap => _heapAllocator.NativeUniqueHeap;
+        internal InputNativeSharedHeap InputNativeSharedHeap =>
+            _heapAllocator.InputNativeSharedHeap;
 
-        internal FrameScopedNativeUniqueHeap FrameScopedNativeUniqueHeap =>
-            _heapAllocator.FrameScopedNativeUniqueHeap;
+        internal InputSharedHeap InputSharedHeap => _heapAllocator.InputSharedHeap;
 
-        internal FrameScopedUniqueHeap FrameScopedUniqueHeap =>
-            _heapAllocator.FrameScopedUniqueHeap;
+        internal InputUniqueHeap InputUniqueHeap => _heapAllocator.InputUniqueHeap;
 
-        internal TrecsListHeap TrecsListHeap => _heapAllocator.TrecsListHeap;
+        internal NativeChunkStore NativeUniqueChunkStore => _heapAllocator.NativeUniqueChunkStore;
 
         /// <summary>
         /// Job-safe resolver for <see cref="NativeSharedPtr{T}"/> dereferences inside
@@ -69,21 +89,18 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Job-safe resolver for <see cref="NativeUniquePtr{T}"/> dereferences inside
-        /// Burst-compiled job structs.
+        /// Job-safe resolver for <see cref="NativeUniquePtr{T}"/> and
+        /// <see cref="TrecsList{T}"/> dereferences inside Burst-compiled job structs.
+        /// Backed by the shared <see cref="NativeChunkStore"/>; the per-allocation
+        /// TypeId tag carries which heap owns the slot, so a single resolver covers
+        /// every native-heap pointer type.
+        ///
+        /// <para>Carries this accessor's role: a Variable-role resolver fails fast
+        /// at Write-open time inside Burst jobs (Read access is unaffected).</para>
         /// </summary>
-        public ref NativeUniquePtrResolver NativeUniquePtrResolver
+        public ref NativeChunkStoreResolver NativeChunkStoreResolver
         {
-            get { return ref _heapAllocator.NativeUniquePtrResolver; }
-        }
-
-        /// <summary>
-        /// Job-safe resolver for <see cref="TrecsList{T}"/> dereferences inside
-        /// Burst-compiled job structs.
-        /// </summary>
-        public ref NativeTrecsListResolver NativeTrecsListResolver
-        {
-            get { return ref _heapAllocator.NativeTrecsListResolver; }
+            get { return ref _chunkStoreResolver; }
         }
 
         // All allocation and Read/Write methods now live on the pointer types as static
@@ -98,23 +115,55 @@ namespace Trecs
 
         // ── Assertions ──────────────────────────────────────────────
 
+        // Centralized main-thread gate for managed heap operations reached through
+        // HeapAccessor. Every Alloc / Write-open path on a pointer type
+        // (SharedPtr, UniquePtr, NativeSharedPtr, NativeUniquePtr, TrecsList,
+        // InputSharedPtr, InputUniquePtr, InputNativeSharedPtr, InputNativeUniquePtr)
+        // routes through AssertCanAddInputsSystem or AssertCanMutateHeap below,
+        // both of which call into this — so adding the main-thread invariant once
+        // here covers every pointer-type entry point uniformly. Heap lifecycle
+        // methods that don't go through HeapAccessor (Dispose / Serialize /
+        // Deserialize / ClearAll / ClearAtOr*Frame, reached via EcsHeapAllocator
+        // and EntityInputQueue) still keep their own main-thread asserts as
+        // defense-in-depth. The Burst-job side (NativeWorldAccessor /
+        // NativeChunkStoreResolver) deliberately does NOT call this — Burst jobs
+        // are off-thread by construction.
+        [Conditional("DEBUG")]
+        internal void AssertMainThread()
+        {
+            TrecsDebugAssert.That(
+                UnityThreadHelper.IsMainThread,
+                "HeapAccessor entry points must be called from the main thread; "
+                    + "Burst jobs use the resolver types (NativeChunkStoreResolver, "
+                    + "NativeSharedPtrResolver, InputNativeUniqueResolver). "
+                    + "Accessor {0}",
+                _debugName
+            );
+        }
+
         [Conditional("DEBUG")]
         internal void AssertCanAddInputsSystem()
         {
-            TrecsAssert.That(
+            AssertMainThread();
+            TrecsDebugAssert.That(
                 IsUnrestricted || IsInput,
                 "Attempted to use input-only functionality from a non-Input accessor {0}",
                 _debugName
             );
         }
 
-        // Persistent heap allocations are only allowed from Fixed-role and
-        // Unrestricted-role accessors. Input-system and Variable-role accessors are
-        // rejected regardless of whether systems are currently executing —
-        // see docs/advanced/heap-allocation-rules.md.
+        // The Trecs heap is simulation state — its contents (and reference counts /
+        // capacities / live-slot sets) are walked by the snapshot, recording, and
+        // checksum serializers. Mutating it from a non-deterministic phase produces
+        // desyncs, so every heap-mutating entry point (Alloc, Write open, Set,
+        // Clone, Acquire, Dispose, EnsureCapacity, ...) routes through this gate.
+        // Only Fixed-role and Unrestricted-role accessors pass; Variable-role and
+        // input-system accessors are rejected. See docs/advanced/accessor-roles.md.
         [Conditional("DEBUG")]
-        internal void AssertCanAllocatePersistent()
+        internal void AssertCanMutateHeap()
         {
+            AssertMainThread();
+
             if (IsUnrestricted || IsFixed)
             {
                 return;
@@ -122,17 +171,17 @@ namespace Trecs
 
             if (IsInput)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     false,
-                    "Cannot allocate persistent heap pointers from input-system accessor {0}. Use the FrameScoped variant (e.g. SharedPtr.AllocFrameScoped) instead so that the pointer is frame scoped.",
+                    "Cannot mutate the persistent heap from input-system accessor {0}. Use an Input pointer type (InputSharedPtr.Alloc, InputNativeSharedPtr.Alloc, InputUniquePtr.Alloc, InputNativeUniquePtr.Alloc) for input-side allocations; mutating persistent heap entries from an input system would land in the deterministic snapshot but not in the input replay log, producing desyncs.",
                     _debugName
                 );
             }
             else
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     false,
-                    "Cannot allocate heap pointers from Variable-role accessor {0}. Heap allocation is only allowed from Fixed-role and Unrestricted-role accessors. See Heap Allocation Rules in the docs.",
+                    "Cannot mutate the heap from Variable-role accessor {0}. The Trecs heap is simulation state — Alloc, Write, Set, Clone, Acquire, Dispose, and EnsureCapacity are only allowed from Fixed-role or Unrestricted-role accessors. Read access is always allowed. See Accessor Roles in the docs.",
                     _debugName
                 );
             }

@@ -39,7 +39,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 42 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _runOnceAspectSeen = 0;
             RunOnceAspect(a);
@@ -70,7 +70,7 @@ namespace Trecs.Tests
                 .Set(new TestFloat())
                 .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 35 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _twoSingletonsSum = 0;
             RunOnceTwoSingletons(a);
@@ -103,7 +103,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 100 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _mixedAspectResults.Clear();
             IterateWithAspectSingleton(a);
@@ -139,7 +139,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 1000 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _mixedComponentResults.Clear();
             IterateWithComponentSingleton(a);
@@ -169,7 +169,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 999 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _runOnceComponentSeen = 0;
             RunOnceComponent(a);
@@ -210,7 +210,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 77 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _multiTagSeen = 0;
             RunOnceMultiTag(a);
@@ -235,7 +235,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 42 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             RunOnceComponentWrite(a);
 
@@ -266,7 +266,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 6 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _passThroughSeen = 0;
             RunOncePassThrough(a, 7);
@@ -368,7 +368,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 100 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var handle = new SingleEntityFieldAspectJob().ScheduleParallel(a);
             handle.Complete();
@@ -394,7 +394,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 1000 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var handle = new SingleEntityFieldComponentJob().ScheduleParallel(a);
             handle.Complete();
@@ -427,7 +427,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 100 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             env.StepFixedFrames(1);
 
@@ -455,7 +455,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 1000 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             env.StepFixedFrames(1);
 

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Trecs.Internal;
 using UnityEditor;
 
 namespace Trecs
@@ -22,10 +21,10 @@ namespace Trecs
     /// </summary>
     public sealed class TrecsAccessTracker : IAccessRecorder
     {
-        readonly Dictionary<ComponentId, HashSet<string>> _componentWriters = new();
-        readonly Dictionary<ComponentId, HashSet<string>> _componentReaders = new();
-        readonly Dictionary<string, HashSet<ComponentId>> _systemWrites = new();
-        readonly Dictionary<string, HashSet<ComponentId>> _systemReads = new();
+        readonly Dictionary<TypeId, HashSet<string>> _componentWriters = new();
+        readonly Dictionary<TypeId, HashSet<string>> _componentReaders = new();
+        readonly Dictionary<string, HashSet<TypeId>> _systemWrites = new();
+        readonly Dictionary<string, HashSet<TypeId>> _systemReads = new();
 
         // Tag-list derivation in the tag inspector needs the inverse — the
         // recorder fires per (system, group, component), so we keep the
@@ -43,7 +42,7 @@ namespace Trecs
         public void OnComponentAccess(
             string systemName,
             GroupIndex group,
-            ComponentId componentType,
+            TypeId componentType,
             bool isReadOnly
         )
         {
@@ -108,25 +107,25 @@ namespace Trecs
             Add(_groupSystems, toGroup, systemName);
         }
 
-        public IReadOnlyCollection<string> GetReadersOf(ComponentId id) =>
+        public IReadOnlyCollection<string> GetReadersOf(TypeId id) =>
             _componentReaders.TryGetValue(id, out var s)
                 ? (IReadOnlyCollection<string>)s
                 : Array.Empty<string>();
 
-        public IReadOnlyCollection<string> GetWritersOf(ComponentId id) =>
+        public IReadOnlyCollection<string> GetWritersOf(TypeId id) =>
             _componentWriters.TryGetValue(id, out var s)
                 ? (IReadOnlyCollection<string>)s
                 : Array.Empty<string>();
 
-        public IReadOnlyCollection<ComponentId> GetReadsBy(string systemName) =>
+        public IReadOnlyCollection<TypeId> GetReadsBy(string systemName) =>
             _systemReads.TryGetValue(systemName ?? string.Empty, out var s)
-                ? (IReadOnlyCollection<ComponentId>)s
-                : Array.Empty<ComponentId>();
+                ? (IReadOnlyCollection<TypeId>)s
+                : Array.Empty<TypeId>();
 
-        public IReadOnlyCollection<ComponentId> GetWritesBy(string systemName) =>
+        public IReadOnlyCollection<TypeId> GetWritesBy(string systemName) =>
             _systemWrites.TryGetValue(systemName ?? string.Empty, out var s)
-                ? (IReadOnlyCollection<ComponentId>)s
-                : Array.Empty<ComponentId>();
+                ? (IReadOnlyCollection<TypeId>)s
+                : Array.Empty<TypeId>();
 
         public IReadOnlyCollection<GroupIndex> GetGroupsTouchedBy(string systemName) =>
             _systemGroups.TryGetValue(systemName ?? string.Empty, out var s)

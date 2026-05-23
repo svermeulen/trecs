@@ -27,7 +27,7 @@ var world = new WorldBuilder()
 | `SetSettings(WorldSettings)` | Configure timing, determinism, debug options — see [WorldSettings](#worldsettings) |
 | `AddTemplate(Template)` / `AddTemplates(...)` | Register entity [templates](templates.md). Each contributes one or more [groups](../advanced/groups-and-tagsets.md#groups). |
 | `AddSet<T>()` | Register an [entity set](../entity-management/sets.md) |
-| `AddBlobStore(IBlobStore)` | Register a blob store for [heap](../advanced/heap.md) data |
+| `AddBlobStore(IBlobStore)` | Register a blob store for [heap](../experimental/pointers.md) data. Optional — defaults to an in-memory store if omitted. |
 | `SetBlobCacheSettings(...)` | Configure blob caching |
 | `AddSystem(ISystem)` / `AddSystems(...)` | Register [systems](systems.md) |
 | `AddSystemOrderConstraint(params Type[])` | Declare [system ordering](systems.md#system-ordering) |
@@ -66,7 +66,6 @@ var settings = new WorldSettings
 
     // Determinism
     RandomSeed = null,                          // ulong? — null seeds from System.Environment.TickCount
-    RequireDeterministicSubmission = false,     // Sort structural ops for replay
 
     // Startup
     StartPaused = false,
@@ -136,5 +135,5 @@ var accessor = world.CreateAccessor(AccessorRole.Unrestricted);
 - **[Events](../entity-management/entity-events.md)** — `Events` builder for entity lifecycle subscriptions
 - **[Time](../advanced/time-and-rng.md)** — `DeltaTime`, `ElapsedTime`, `Frame` (phase-aware)
 - **[RNG](../advanced/time-and-rng.md)** — `Rng`, `FixedRng`, `VariableRng`
-- **[Heap](../advanced/heap.md)** — `Heap` property (a `HeapAccessor`) for use with `SharedPtr.Alloc` / `UniquePtr.Alloc` / native variants
+- **[Heap](../experimental/pointers.md)** — `Heap` property (a `HeapAccessor`) for use with `SharedPtr.Alloc` / `UniquePtr.Alloc` / native variants
 - **[Jobs](../performance/jobs-and-burst.md)** — `ToNative()` for job-safe access

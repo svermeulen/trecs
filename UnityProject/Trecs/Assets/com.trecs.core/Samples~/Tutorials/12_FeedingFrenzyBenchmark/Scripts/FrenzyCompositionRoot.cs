@@ -19,10 +19,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
         public static FrenzyConfigSettings ConfigOverride;
 
-        // Set during Construct so play-mode tests can drive runtime config
-        // (e.g. cycling IterationStyle without needing a scene reload).
-        public static WorldAccessor CurrentWorld;
-
         // All we do here is call constructors and set up dependencies
         // between classes.  No initialization logic otherwise
         public override void Construct(
@@ -56,7 +52,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
                     new WorldSettings
                     {
                         RandomSeed = config.Deterministic ? 42 : (ulong)DateTime.Now.Ticks,
-                        RequireDeterministicSubmission = config.Deterministic,
                     }
                 )
                 .AddTemplates(GetTemplates(config));
@@ -67,7 +62,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             }
 
             var world = worldBuilder.Build();
-            CurrentWorld = world.CreateAccessor(AccessorRole.Fixed);
 
             var subsetApproachDynamicSwitcher = new SubsetApproachDynamicSwitcher(world);
 
@@ -147,13 +141,14 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             lateTickables = new() { world.LateTick };
 
+            // Bridge holds subscriptions on the world's EventsManager; must
+            // dispose before world or the EventsManager leak-check warns.
             disposables = new()
             {
                 fishSetInitializer.Dispose,
                 removeCleanupHandler.Dispose,
                 perfStats.Dispose,
                 world.Dispose,
-                () => CurrentWorld = null,
             };
         }
 

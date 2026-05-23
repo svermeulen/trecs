@@ -18,10 +18,10 @@ namespace Trecs
             this SerializationBuffer cacheHelper
         )
         {
-            TrecsAssert.That(cacheHelper.MemoryPosition == 0);
+            TrecsDebugAssert.That(cacheHelper.MemoryPosition == 0);
 
             int length = (int)cacheHelper.MemoryStream.Length;
-            TrecsAssert.That(length > 0);
+            TrecsDebugAssert.That(length > 0);
 
             byte[] buffer = cacheHelper.MemoryStream.GetBuffer();
             return unchecked(

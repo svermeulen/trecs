@@ -20,7 +20,7 @@ A scope picks which groups the subscription watches:
 |---|---|
 | `EntitiesWithTags<...>()` | Groups whose tag set includes all of the given tags |
 | `EntitiesWithComponents<T>()` | Groups whose template declares this component |
-| `InGroup(GroupIndex)` | One specific group |
+| `EntitiesInGroup(GroupIndex)` | One specific group |
 | `AllEntities()` | Every group |
 
 ### Events
@@ -143,6 +143,7 @@ Separate from the per-entity events, `World.Events` exposes lifecycle hooks for 
 | `OnVariableUpdateCompleted` | At the end of every `World.LateTick()`, after the final submission for the frame. |
 | `OnDeserializeStarted` | A snapshot or recording is about to load into the world. |
 | `OnDeserializeCompleted` | A snapshot or recording has finished loading. |
+| `OnFixedPauseChanged` | `WorldAccessor.FixedIsPaused` just toggled. Callback receives the new value (`Action<bool>`). |
 
 Each takes an `Action` (or `Action, int priority` for ordering) and returns `IDisposable`. Dispose to unsubscribe.
 

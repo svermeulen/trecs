@@ -24,7 +24,7 @@ namespace Trecs.Serialization
             }
             else
             {
-                TrecsAssert.That(dict.IsEmpty);
+                TrecsDebugAssert.That(dict.IsEmpty);
 
                 dict.Clear();
                 dict.EnsureCapacity(numItems);

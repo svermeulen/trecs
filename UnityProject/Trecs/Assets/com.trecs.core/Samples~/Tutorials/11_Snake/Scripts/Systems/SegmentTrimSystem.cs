@@ -9,9 +9,9 @@ namespace Trecs.Samples.Snake
     [ExecuteAfter(typeof(FoodConsumeSystem))]
     public partial class SegmentTrimSystem : ISystem
     {
-        public void Execute()
+        void Execute([SingleEntity(typeof(TrecsTags.Globals))] in Globals globals)
         {
-            int targetSegmentCount = World.GlobalComponent<SnakeLength>().Read.Value - 1;
+            int targetSegmentCount = globals.SnakeLength - 1;
             int currentCount = World.CountEntitiesWithTags<SnakeTags.SnakeSegment>();
 
             if (currentCount <= targetSegmentCount)
@@ -33,6 +33,8 @@ namespace Trecs.Samples.Snake
 
             oldestSegment.Value.Remove(World);
         }
+
+        partial struct Globals : IAspect, IRead<SnakeLength> { }
 
         partial struct SnakeSegment : IAspect, IRead<SegmentAge> { }
     }

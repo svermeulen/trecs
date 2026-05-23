@@ -4,7 +4,7 @@
 
 # Trecs
 
-A high-performance Entity Component System for Unity, built for **deterministic simulation, recording/playback, and Burst/Jobs**.
+A high-performance Entity Component System for Unity, built for **deterministic simulation, Burst/Jobs, and recording/playback/rollback**.
 
 </div>
 
@@ -12,10 +12,13 @@ A high-performance Entity Component System for Unity, built for **deterministic 
 
 </div>
 
+!!! info "0.x status"
+    Trecs is currently 0.x. The core APIs are stable in spirit but may shift between minor releases ahead of 1.0. Features under [Experimental](experimental/index.md) are explicitly in flux — expect breakage there.
+
 ## Features
 
 - **Cache-friendly storage.** Components live in contiguous structure-of-arrays buffers grouped by tag set.
-- **Composable building blocks.** Aspects bundle component access; sets give sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions; `SharedPtr` / `UniquePtr` let components reference heap data.
+- **Composable building blocks.** Aspects bundle component access; sets give sparse subsets without restructuring storage; templates declare entity blueprints with inheritance and partitions.
 - **Burst and Jobs out of the box.** A source generator emits job structs and chains `JobHandle` dependencies from the components you read and write — no manual wiring.
 - **Deterministic by construction.** Fixed-timestep simulation, seeded RNG, isolated input, and built-in snapshot / record / replay with desync detection.
 - **Editor tooling.** A live entity inspector and a record / scrub / fork timeline window for diagnosing transient bugs.
@@ -54,8 +57,9 @@ var world = new WorldBuilder()
     .BuildAndInitialize();
 
 // In a MonoBehaviour:
-void Update()    => world.Tick();
-void OnDestroy() => world.Dispose();
+void Update()     => world.Tick();
+void LateUpdate() => world.LateTick();
+void OnDestroy()  => world.Dispose();
 ```
 
 Inside a system, `World` is a source-generated property that gives access to the running world for the current phase.

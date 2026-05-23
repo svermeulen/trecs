@@ -6,12 +6,13 @@ using NAssert = NUnit.Framework.Assert;
 namespace Trecs.Tests
 {
     /// <summary>
-    /// Negative coverage for <see cref="HeapAccessor.AssertCanAllocatePersistent"/>:
-    /// only Fixed-role and Unrestricted-role accessors are allowed to allocate
-    /// persistent heap pointers. Variable and Input-system accessors must be
-    /// rejected — Variable because it has no business holding persistent heap
-    /// handles at all, Input because all input-side allocations must be
-    /// frame-scoped to match the input replay lifetime.
+    /// Negative coverage for <see cref="HeapAccessor.AssertCanMutateHeap"/>:
+    /// only Fixed-role and Unrestricted-role accessors are allowed to mutate
+    /// the heap (Alloc, Write, Set, Clone, Acquire, Dispose, EnsureCapacity).
+    /// Variable and Input-system accessors must be rejected — Variable because
+    /// the heap is simulation state and would desync on every variable tick;
+    /// Input because all input-side allocations must be frame-scoped to match
+    /// the input replay lifetime.
     ///
     /// The assertion is <c>[Conditional("DEBUG")]</c>; Unity EditMode tests run
     /// in DEBUG so the gate fires here.
@@ -48,7 +49,7 @@ namespace Trecs.Tests
                 "VariableRoleTest"
             );
 
-            // UniquePtr.Alloc routes through the same AssertCanAllocatePersistent
+            // UniquePtr.Alloc routes through the same AssertCanMutateHeap
             // gate as SharedPtr.Alloc, so it must reject the Variable role too.
             NAssert.Throws<TrecsException>(() =>
                 UniquePtr.Alloc(variableAccessor.Heap, new List<string> { "should-fail" })
@@ -83,7 +84,7 @@ namespace Trecs.Tests
         {
             // Companion positive case: input-system accessors *are* allowed to
             // allocate frame-scoped pointers — that's the prescribed escape hatch
-            // baked into the AssertCanAllocatePersistent error message.
+            // baked into the AssertCanMutateHeap error message.
             using var env = CreateEnv();
             var inputAccessor = env.World.CreateAccessorExplicit(
                 role: AccessorRole.Variable,
@@ -93,7 +94,7 @@ namespace Trecs.Tests
 
             NAssert.DoesNotThrow(() =>
             {
-                var ptr = SharedPtr.AllocFrameScoped(
+                var ptr = InputSharedPtr.Alloc(
                     inputAccessor.Heap,
                     BlobIdGenerator.FromKey(3),
                     new List<string> { "input-frame-scoped" }
@@ -142,6 +143,196 @@ namespace Trecs.Tests
                 NAssert.IsFalse(ptr.IsNull);
                 ptr.Dispose(fixedAccessor);
             });
+        }
+
+        // ---------------------------------------------------------------------
+        // Per-verb negative coverage. Alloc is covered by the tests above; these
+        // lock in the *other* mutation verbs (Clone, Set, Write, Dispose) across
+        // every pointer type. Each test allocs through an Unrestricted-role
+        // accessor (state setup), then drives the verb through a Variable-role
+        // accessor and asserts it throws. If a refactor drops an
+        // `AssertCanMutateHeap()` line from any individual call site, the
+        // matching test here flips green→red even though Alloc still works.
+        // ---------------------------------------------------------------------
+
+        [Test]
+        public void SharedPtrClone_FromVariableRoleAccessor_Throws()
+        {
+            using var env = CreateEnv();
+            var unrestricted = env.Accessor;
+            var variableAccessor = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                "VariableRoleTest"
+            );
+
+            var ptr = SharedPtr.Alloc(
+                unrestricted.Heap,
+                BlobIdGenerator.FromKey(10),
+                new List<string> { "src" }
+            );
+
+            NAssert.Throws<TrecsException>(() => ptr.Clone(variableAccessor.Heap));
+
+            ptr.Dispose(unrestricted);
+        }
+
+        [Test]
+        public void SharedPtrDispose_FromVariableRoleAccessor_Throws()
+        {
+            using var env = CreateEnv();
+            var unrestricted = env.Accessor;
+            var variableAccessor = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                "VariableRoleTest"
+            );
+
+            var ptr = SharedPtr.Alloc(
+                unrestricted.Heap,
+                BlobIdGenerator.FromKey(11),
+                new List<string> { "src" }
+            );
+
+            NAssert.Throws<TrecsException>(() => ptr.Dispose(variableAccessor.Heap));
+
+            // Pointer is still live (Dispose was blocked); clean up via the
+            // permissive accessor so the env tears down cleanly.
+            ptr.Dispose(unrestricted);
+        }
+
+        [Test]
+        public void NativeSharedPtrClone_FromVariableRoleAccessor_Throws()
+        {
+            using var env = CreateEnv();
+            var unrestricted = env.Accessor;
+            var variableAccessor = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                "VariableRoleTest"
+            );
+
+            var ptr = NativeSharedPtr.Alloc<int>(
+                unrestricted.Heap,
+                BlobIdGenerator.FromKey(12),
+                42
+            );
+
+            NAssert.Throws<TrecsException>(() => ptr.Clone(variableAccessor.Heap));
+
+            ptr.Dispose(unrestricted);
+        }
+
+        [Test]
+        public void NativeSharedPtrDispose_FromVariableRoleAccessor_Throws()
+        {
+            using var env = CreateEnv();
+            var unrestricted = env.Accessor;
+            var variableAccessor = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                "VariableRoleTest"
+            );
+
+            var ptr = NativeSharedPtr.Alloc<int>(
+                unrestricted.Heap,
+                BlobIdGenerator.FromKey(13),
+                42
+            );
+
+            NAssert.Throws<TrecsException>(() => ptr.Dispose(variableAccessor.Heap));
+
+            ptr.Dispose(unrestricted);
+        }
+
+        [Test]
+        public void UniquePtrSet_FromVariableRoleAccessor_Throws()
+        {
+            using var env = CreateEnv();
+            var unrestricted = env.Accessor;
+            var variableAccessor = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                "VariableRoleTest"
+            );
+
+            var ptr = UniquePtr.Alloc(unrestricted.Heap, new List<string> { "initial" });
+
+            NAssert.Throws<TrecsException>(() =>
+                ptr.Set(variableAccessor.Heap, new List<string> { "replacement" })
+            );
+
+            ptr.Dispose(unrestricted);
+        }
+
+        [Test]
+        public void UniquePtrDispose_FromVariableRoleAccessor_Throws()
+        {
+            using var env = CreateEnv();
+            var unrestricted = env.Accessor;
+            var variableAccessor = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                "VariableRoleTest"
+            );
+
+            var ptr = UniquePtr.Alloc(unrestricted.Heap, new List<string> { "val" });
+
+            NAssert.Throws<TrecsException>(() => ptr.Dispose(variableAccessor.Heap));
+
+            ptr.Dispose(unrestricted);
+        }
+
+        [Test]
+        public void NativeUniquePtrWrite_FromVariableRoleAccessor_Throws()
+        {
+            using var env = CreateEnv();
+            var unrestricted = env.Accessor;
+            var variableAccessor = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                "VariableRoleTest"
+            );
+
+            var ptr = NativeUniquePtr.Alloc<int>(unrestricted.Heap, 7);
+
+            NAssert.Throws<TrecsException>(() => ptr.Write(variableAccessor.Heap));
+
+            ptr.Dispose(unrestricted);
+        }
+
+        [Test]
+        public void NativeUniquePtrWrite_FromVariableRoleNativeResolver_Throws()
+        {
+            // Burst-job-side gate, mirroring TrecsList's
+            // NativeWrite_FromVariableRoleNativeWorldAccessor_Throws. The
+            // NativeChunkStoreResolver pulled off a Variable-role accessor's
+            // ToNative() carries _canMutateHeap = 0, so a job that holds only
+            // the resolver can't bypass the role check either.
+            using var env = CreateEnv();
+            var unrestricted = env.Accessor;
+            var variableAccessor = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                "VariableRoleTest"
+            );
+
+            var ptr = NativeUniquePtr.Alloc<int>(unrestricted.Heap, 9);
+            var nativeVariable = variableAccessor.ToNative();
+            var resolver = nativeVariable.ChunkStoreResolver;
+
+            NAssert.Throws<TrecsException>(() => ptr.Write(in resolver));
+
+            ptr.Dispose(unrestricted);
+        }
+
+        [Test]
+        public void NativeUniquePtrDispose_FromVariableRoleAccessor_Throws()
+        {
+            using var env = CreateEnv();
+            var unrestricted = env.Accessor;
+            var variableAccessor = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                "VariableRoleTest"
+            );
+
+            var ptr = NativeUniquePtr.Alloc<int>(unrestricted.Heap, 11);
+
+            NAssert.Throws<TrecsException>(() => ptr.Dispose(variableAccessor.Heap));
+
+            ptr.Dispose(unrestricted);
         }
     }
 }

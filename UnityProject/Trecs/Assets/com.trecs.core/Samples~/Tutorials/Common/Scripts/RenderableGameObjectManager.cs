@@ -15,6 +15,9 @@ namespace Trecs.Samples
         readonly Transform _activeParent;
         readonly Transform _inactiveParent;
 
+        // NativeUniquePtr<int>.Write is a `this ref` extension — needs writable access
+        // to the handle struct, so this can't be marked `readonly`. The handle itself
+        // never changes (it's a PtrHandle), only the heap entry it points at.
         NativeUniquePtr<int> _nextId;
 
         public RenderableGameObjectManager(World world)

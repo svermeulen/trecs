@@ -93,7 +93,7 @@ public class AutoJobGeneratorTests
     public void AutoJob_ComponentsModeWithEntityHandle_CompilesCleanly()
     {
         // Components-mode [WrapAsJob] takes an EntityHandle. AutoJobGenerator should
-        // emit a hidden `_trecs_EntityHandles` NativeEntityHandleBuffer field on the
+        // emit a hidden `__EntityHandles` NativeEntityHandleBuffer field on the
         // generated job struct, populated per-group at schedule time.
         const string source = """
             namespace Sample
@@ -291,10 +291,10 @@ public class AutoJobGeneratorTests
     {
         // [GlobalIndex] int on a [WrapAsJob] static method exercises the
         // NeedsGlobalIndexOffset wiring on the AutoJobGenerator path: the emitted
-        // job struct gets an internal _trecs_GlobalIndexOffset field, the call-site
-        // forwards `_trecs_GlobalIndexOffset + i`, and the generated
+        // job struct gets an internal __GlobalIndexOffset field, the call-site
+        // forwards `__GlobalIndexOffset + i`, and the generated
         // ScheduleParallel(QueryBuilder, ...) overload accumulates a
-        // _trecs_queryIndexOffset across the per-group loop. Mirrors
+        // __trecs_queryIndexOffset across the per-group loop. Mirrors
         // JobGeneratorTests.IterationJob_WithGlobalIndex_CompilesCleanly so the
         // user-facing API reads identically across both job-generation paths.
         const string source = """

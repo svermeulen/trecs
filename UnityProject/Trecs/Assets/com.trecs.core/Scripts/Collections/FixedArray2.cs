@@ -5,6 +5,7 @@ namespace Trecs.Collections
 {
     // Fixed size collection
     // Useful for ECS systems where we want everything inside a struct
+    [NonCopyable]
     public struct FixedArray2<T>
         where T : unmanaged
     {
@@ -28,7 +29,7 @@ namespace Trecs.Collections
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                TrecsRequire.That(index >= 0 && index < _length, "out of bound index");
+                TrecsAssert.That(index >= 0 && index < _length, "out of bound index");
                 unsafe
                 {
                     return ref *((T*)Unsafe.AsPointer(ref Unsafe.AsRef(in this)) + index);
@@ -67,7 +68,7 @@ namespace Trecs.Collections
         public static ref T Mut<T>(this ref FixedArray2<T> arr, int index)
             where T : unmanaged
         {
-            TrecsRequire.That(index >= 0 && index < 2, "out of bound index");
+            TrecsAssert.That(index >= 0 && index < 2, "out of bound index");
             unsafe
             {
                 return ref *((T*)Unsafe.AsPointer(ref arr) + index);

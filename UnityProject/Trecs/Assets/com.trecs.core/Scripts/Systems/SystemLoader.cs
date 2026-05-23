@@ -41,7 +41,7 @@ namespace Trecs.Internal
                 var localDeps = new HashSet<int>();
                 localDepsList.Add(localDeps);
 
-                TrecsAssert.That(systemInfo.Phase == phaseToSort);
+                TrecsDebugAssert.That(systemInfo.Phase == phaseToSort);
 
                 foreach (var otherGlobalIndex in systemDepsMap[systemGlobalIndex])
                 {
@@ -50,7 +50,7 @@ namespace Trecs.Internal
                     if (otherInfo.Phase == phaseToSort)
                     {
                         var otherLocalIndex = globalToLocalIndexMap[otherGlobalIndex];
-                        TrecsAssert.IsEqual(phaseSystems[otherLocalIndex], otherGlobalIndex);
+                        TrecsDebugAssert.IsEqual(phaseSystems[otherLocalIndex], otherGlobalIndex);
                         localDeps.Add(otherLocalIndex);
                     }
                 }
@@ -67,7 +67,7 @@ namespace Trecs.Internal
                 globalIndex => allSystems[globalIndex].DebugName
             );
 
-            TrecsAssert.IsEqual(sortedLocal.Count, phaseSystems.Count);
+            TrecsDebugAssert.IsEqual(sortedLocal.Count, phaseSystems.Count);
 
             var sortedGlobal = new List<int>(phaseSystems.Count);
 
@@ -76,7 +76,7 @@ namespace Trecs.Internal
                 var localIndex = sortedLocal[i];
                 var globalIndex = phaseSystems[localIndex];
                 var info = allSystems[globalIndex];
-                TrecsAssert.That(info.Phase == phaseToSort);
+                TrecsDebugAssert.That(info.Phase == phaseToSort);
                 sortedGlobal.Add(globalIndex);
             }
 
@@ -121,7 +121,7 @@ namespace Trecs.Internal
 
         public LoadInfo LoadSystems(World world, IReadOnlyList<ISystem> systems)
         {
-            TrecsAssert.That(!_isLocked);
+            TrecsDebugAssert.That(!_isLocked);
             _isLocked = true;
 
             var entries = _entryProvider.GetSystemEntries(world, systems);
@@ -159,7 +159,7 @@ namespace Trecs.Internal
                 entry.DeclarationIndex = i;
 
                 var depsSet = entry.SystemDependencies.ToHashSet();
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     !depsSet.Contains(i),
                     "System {0} found to depend on itself",
                     entry.DebugName

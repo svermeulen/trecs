@@ -15,7 +15,7 @@ namespace Trecs.Serialization
         public void Deserialize(ref HashSet<T> value, ISerializationReader reader)
         {
             var numItems = reader.Read<int>("Count");
-            TrecsAssert.That(numItems >= 0);
+            TrecsDebugAssert.That(numItems >= 0);
 
             if (value == null)
             {
@@ -23,7 +23,7 @@ namespace Trecs.Serialization
             }
             else
             {
-                TrecsAssert.That(value.Count == 0);
+                TrecsDebugAssert.That(value.Count == 0);
 
                 value.Clear();
                 value.EnsureCapacity(numItems);

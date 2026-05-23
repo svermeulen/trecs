@@ -10,11 +10,13 @@ using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
 {
+    [Copyable]
     public partial struct SerTestInt : IEntityComponent
     {
         public int Value;
     }
 
+    [Copyable]
     public partial struct SerTestFloat : IEntityComponent
     {
         public float Value;
@@ -79,10 +81,7 @@ namespace Trecs.Tests
                 localTags: Array.Empty<Tag>()
             );
 
-            var blobStore = new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                null
-            );
+            var blobStore = new BlobStoreInMemory(BlobStoreInMemorySettings.Default, null);
 
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
@@ -103,7 +102,7 @@ namespace Trecs.Tests
             var serializer = new WorldStateSerializer(world);
             using var writer = new BinarySerializationWriter(_serializerRegistry);
             writer.Start(version: 1, includeTypeChecks: false);
-            serializer.SerializeState(writer);
+            serializer.SerializeFullState(writer);
 
             using var outputStream = new MemoryStream();
             using var outputWriter = new BinaryWriter(outputStream);
@@ -133,7 +132,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 42 })
                 .Set(new SerTestFloat { Value = 3.14f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
 
@@ -142,7 +141,7 @@ namespace Trecs.Tests
 
             // Modify world state
             a.RemoveEntitiesWithTags(PartitionA);
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
 
             // Deserialize — should restore the entity
@@ -170,13 +169,13 @@ namespace Trecs.Tests
                     .Set(new SerTestFloat { Value = i * 1.5f })
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
 
             // Clear and restore
             a.RemoveEntitiesWithTags(PartitionA);
-            a.SubmitEntities();
+            a.Submit();
 
             DeserializeWorld(world, data);
 
@@ -201,13 +200,13 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 200 })
                 .Set(new SerTestFloat { Value = 2.0f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
 
             a.RemoveEntitiesWithTags(PartitionA);
             a.RemoveEntitiesWithTags(PartitionB);
-            a.SubmitEntities();
+            a.Submit();
 
             DeserializeWorld(world, data);
 
@@ -251,7 +250,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 77 })
                 .Set(new SerTestFloat { Value = 7.7f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
 
@@ -427,7 +426,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 99 })
                 .Set(new SerTestFloat { Value = 1.5f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var custom = new StubSerTestIntSerializer();
             world.ComponentArraySerializerRegistry.Register(custom);
@@ -441,7 +440,7 @@ namespace Trecs.Tests
 
             // Wipe and restore — the same registration on the world is reused.
             a.RemoveEntitiesWithTags(PartitionA);
-            a.SubmitEntities();
+            a.Submit();
 
             DeserializeWorld(world, data);
 
@@ -535,7 +534,7 @@ namespace Trecs.Tests
             a.AddEntity(NativeListPartition)
                 .Set(new SerTestNativeList { Items = items })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
 
@@ -583,7 +582,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 1 })
                 .Set(new SerTestFloat { Value = 1f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
 
@@ -592,7 +591,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 2 })
                 .Set(new SerTestFloat { Value = 2f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Deserialize should now blow up because SkipComponentSerializer
             // sees a 1-entry count in the stream but 2 entries in the live array.
@@ -618,7 +617,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 42 })
                 .Set(new SerTestFloat { Value = 1f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
 
@@ -659,7 +658,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 7 })
                 .Set(new SerTestFloat { Value = 1f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
 
@@ -671,7 +670,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 555 })
                 .Set(new SerTestFloat { Value = 2f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA));
 
             DeserializeWorld(world, data);
@@ -706,7 +705,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 55 })
                 .Set(new SerTestFloat { Value = 0f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
             NAssert.Greater(custom.SerializeCallCount, 0);
@@ -747,7 +746,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 22 })
                 .Set(new SerTestFloat { Value = 2f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
             NAssert.GreaterOrEqual(
@@ -795,7 +794,7 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 33 })
                 .Set(new SerTestFloat { Value = 0f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Two independent WorldStateSerializer instances — one for write,
             // one for read. The registration lives on the World, so both see it.
@@ -806,7 +805,7 @@ namespace Trecs.Tests
             using (var writer = new BinarySerializationWriter(_serializerRegistry))
             {
                 writer.Start(version: 1, includeTypeChecks: false);
-                wsWrite.SerializeState(writer);
+                wsWrite.SerializeFullState(writer);
                 using var outputStream = new MemoryStream();
                 using var outputWriter = new BinaryWriter(outputStream);
                 writer.Complete(outputWriter);
@@ -892,9 +891,9 @@ namespace Trecs.Tests
                 .Set(new SerTestFloat { Value = 1f })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
             a.RemoveEntity(handle);
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
 
             var data = SerializeWorld(world);
@@ -965,14 +964,14 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 22 })
                 .Set(new SerTestFloat { Value = 2f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
             NAssert.AreEqual(2, inner.SerializeCallCount);
 
             // Wipe and restore so a no-op deserialize would fail.
             a.RemoveEntitiesWithTags(PartitionA);
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
 
             DeserializeWorld(world, data);
@@ -1028,11 +1027,200 @@ namespace Trecs.Tests
                 .Set(new SerTestInt { Value = 1 })
                 .Set(new SerTestFloat { Value = 1f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var data = SerializeWorld(world);
 
             NAssert.Throws<TrecsException>(() => DeserializeWorld(world, data));
+        }
+
+        #endregion
+
+        #region Section guard drift
+
+        /// <summary>
+        /// Locks in the section-guard drift error path: corrupting the last
+        /// byte of the data buffer (which the wire format guarantees is the
+        /// <c>AfterSystemEnable</c> guard byte, 0xA6) must trigger a
+        /// <see cref="SerializationException"/> whose message names the
+        /// section that drifted.
+        ///
+        /// <para>
+        /// The other five section guards are covered by
+        /// <see cref="Deserialize_ThrowsSerializationException_WhenEachSectionGuardCorrupted"/>
+        /// via a value-scan; the last guard's position is structurally fixed
+        /// (last byte of the data buffer, written immediately before the
+        /// trailing EndOfPayloadMarker), so it gets its own targeted test
+        /// that doesn't depend on byte-value scanning.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void Deserialize_ThrowsSerializationException_WhenLastSectionGuardCorrupted()
+        {
+            using var world = CreateWorld();
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
+
+            a.AddEntity(PartitionA)
+                .Set(new SerTestInt { Value = 7 })
+                .Set(new SerTestFloat { Value = 1.5f })
+                .AssertComplete();
+            a.Submit();
+
+            var data = SerializeWorld(world);
+
+            // Wire format: [...data buffer ending with AfterSystemEnable
+            // guard byte 0xA6][EndOfPayloadMarker 0x5E]. The last guard byte
+            // therefore lives at data.Length - 2.
+            NAssert.AreEqual(
+                (byte)0x5E,
+                data[data.Length - 1],
+                "Trailing byte should be EndOfPayloadMarker"
+            );
+            NAssert.AreEqual(
+                (byte)0xA6,
+                data[data.Length - 2],
+                "Byte before EndOfPayloadMarker should be the AfterSystemEnable guard"
+            );
+
+            data[data.Length - 2] ^= 0xFF;
+
+            var ex = NAssert.Throws<SerializationException>(() => DeserializeWorld(world, data));
+            StringAssert.Contains("AfterSystemEnable", ex.Message);
+        }
+
+        /// <summary>
+        /// Drift-detection coverage for every section guard. For each guard
+        /// value (0xA1..0xA6), tries corrupting each occurrence of that byte
+        /// in the snapshot stream and asserts that at least one corruption
+        /// produces a <see cref="SerializationException"/> whose message
+        /// names the section. The "at least one" framing is robust to
+        /// false-positive byte-value matches (a content byte that happens to
+        /// equal the guard value); the real guard byte is the one whose
+        /// corruption produces the named exception.
+        ///
+        /// <para>
+        /// Without this test a regression that broke a section's wire format
+        /// would still pass round-trip (the guard fires on the corrupted
+        /// side too), but the load-bearing error path — load-bearing in
+        /// release builds, since the guards throw
+        /// <see cref="SerializationException"/> rather than a debug-only
+        /// assert — could drift silently (e.g. someone replacing the throw
+        /// with a <c>TrecsDebugAssert</c>).
+        /// </para>
+        /// </summary>
+        [TestCase(0xA1, "AfterTimingFields")]
+        [TestCase(0xA2, "AfterComponentArrays")]
+        [TestCase(0xA3, "AfterEntityHandles")]
+        [TestCase(0xA4, "AfterEntitySets")]
+        [TestCase(0xA5, "AfterHeaps")]
+        [TestCase(0xA6, "AfterSystemEnable")]
+        public void Deserialize_ThrowsSerializationException_WhenEachSectionGuardCorrupted(
+            int guardValue,
+            string sectionName
+        )
+        {
+            using var world = CreateWorld();
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
+
+            a.AddEntity(PartitionA)
+                .Set(new SerTestInt { Value = 13 })
+                .Set(new SerTestFloat { Value = 2.5f })
+                .AssertComplete();
+            a.Submit();
+
+            var data = SerializeWorld(world);
+
+            // Find every position where this guard's byte value appears.
+            // Each candidate gets one corruption attempt; we need at least
+            // one to produce the named exception. (Most snapshots only
+            // contain the guard's value at the guard position itself —
+            // 0xA1..0xA6 were chosen to be outside the natural range of the
+            // small ints/lengths surrounding them — but a content byte may
+            // coincidentally match, hence the "any candidate" loop.)
+            var candidates = new List<int>();
+            for (int i = 0; i < data.Length; i++)
+            {
+                if (data[i] == (byte)guardValue)
+                {
+                    candidates.Add(i);
+                }
+            }
+            NAssert.IsNotEmpty(
+                candidates,
+                $"Snapshot must contain at least one occurrence of guard byte 0x{guardValue:X2}"
+            );
+
+            bool foundNamedException = false;
+            var diagnostics = new List<string>();
+            foreach (var pos in candidates)
+            {
+                var corrupted = (byte[])data.Clone();
+                corrupted[pos] ^= 0xFF;
+
+                try
+                {
+                    DeserializeWorld(world, corrupted);
+                    diagnostics.Add($"pos {pos}: no exception");
+                }
+                catch (SerializationException ex)
+                {
+                    if (ex.Message.Contains(sectionName))
+                    {
+                        foundNamedException = true;
+                        break;
+                    }
+                    diagnostics.Add(
+                        $"pos {pos}: SerializationException not naming '{sectionName}': {ex.Message}"
+                    );
+                }
+                catch (Exception ex)
+                {
+                    diagnostics.Add($"pos {pos}: {ex.GetType().Name}: {ex.Message}");
+                }
+            }
+
+            NAssert.IsTrue(
+                foundNamedException,
+                $"Expected at least one corruption of byte 0x{guardValue:X2} to throw "
+                    + $"SerializationException naming '{sectionName}'. "
+                    + $"Candidates tried: {candidates.Count}. Diagnostics: "
+                    + string.Join(" | ", diagnostics)
+            );
+        }
+
+        /// <summary>
+        /// Inserts one byte into the snapshot stream just after the first
+        /// section guard's expected position, shifting all subsequent reads
+        /// by one byte. Verifies the resulting drift is caught at some
+        /// section boundary (rather than cascading silently through to a
+        /// late, vague failure) — the whole point of having multiple guards
+        /// across the stream.
+        /// </summary>
+        [Test]
+        public void Deserialize_ThrowsSerializationException_WhenStreamIsShiftedByOneByte()
+        {
+            using var world = CreateWorld();
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
+
+            a.AddEntity(PartitionA)
+                .Set(new SerTestInt { Value = 21 })
+                .Set(new SerTestFloat { Value = 3.5f })
+                .AssertComplete();
+            a.Submit();
+
+            var data = SerializeWorld(world);
+
+            // Insert a junk byte somewhere in the middle of the payload
+            // (past the header / bit fields, before the trailing sentinel).
+            // The exact position doesn't matter — any 1-byte shift inside
+            // the data buffer will cause section-guard drift.
+            int insertAt = data.Length / 2;
+            var shifted = new byte[data.Length + 1];
+            Array.Copy(data, 0, shifted, 0, insertAt);
+            shifted[insertAt] = 0x00; // junk byte
+            Array.Copy(data, insertAt, shifted, insertAt + 1, data.Length - insertAt);
+
+            NAssert.Throws<SerializationException>(() => DeserializeWorld(world, shifted));
         }
 
         #endregion

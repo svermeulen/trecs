@@ -13,7 +13,7 @@ namespace Trecs.Collections
 
         public ReadOnlyDenseHashSet(DenseHashSet<T> set)
         {
-            TrecsAssert.IsNotNull(set);
+            TrecsDebugAssert.IsNotNull(set);
             _set = set;
         }
 

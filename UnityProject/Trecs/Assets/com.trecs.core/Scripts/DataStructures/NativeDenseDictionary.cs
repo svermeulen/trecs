@@ -31,7 +31,7 @@ namespace Trecs.Internal
         public NativeDenseDictionary(int size, AllocatorManager.AllocatorHandle allocator)
             : this()
         {
-            TrecsAssert.That(size >= 0, "NativeDenseDictionary size must be non-negative");
+            TrecsDebugAssert.That(size >= 0, "NativeDenseDictionary size must be non-negative");
 
             _keyToIndex = new NativeHashMap<TKey, int>(size, allocator);
             _values = new NativeList<TValue>(size, allocator);
@@ -145,7 +145,7 @@ namespace Trecs.Internal
             var itemAdded = AddValue(key, out var index);
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            TrecsAssert.That(itemAdded, "Key {0} already present", key);
+            TrecsDebugAssert.That(itemAdded, "Key {0} already present", key);
 #endif
             _values[index] = value;
         }
@@ -412,7 +412,7 @@ namespace Trecs.Internal
         [BurstDiscard]
         readonly void ThrowManagedKeyNotFoundException(TKey key)
         {
-            throw TrecsAssert.CreateException(
+            throw TrecsDebugAssert.CreateException(
                 "Key {0} not found in NativeDenseDictionary for type {1}",
                 key,
                 typeof(TValue)
@@ -441,10 +441,12 @@ namespace Trecs.Internal
         ref TValue GetRefAt(int index)
         {
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            if (index < 0 || index >= _values.Length)
-                throw new IndexOutOfRangeException(
-                    $"NativeDenseDictionary.GetRefAt: index {index} out of range [0, {_values.Length})"
-                );
+            TrecsAssert.That(
+                index >= 0 && index < _values.Length,
+                "NativeDenseDictionary.GetRefAt: index {0} out of range [0, {1})",
+                index,
+                _values.Length
+            );
 #endif
             unsafe
             {

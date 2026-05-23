@@ -103,6 +103,12 @@ public partial class ProcessInputSystem : ISystem
 
 `[Input]` components are read-only everywhere — including inside Input systems themselves. The only way a value reaches an `[Input]` field is via `entity.AddInput<T>(world, value)`, which is gated to `[ExecuteIn(SystemPhase.Input)]` systems. A direct `.Write` on the component throws in DEBUG builds regardless of which phase the caller is in.
 
+## Variable-sized input payloads
+
+Plain `[Input]` components hold fixed-size data. When an input value is variable-sized or large enough that copying it into a component is wasteful (a network packet, a serialized command list, a managed object reference), use one of the **input pointer** types (`InputNativeUniquePtr<T>`, `InputNativeSharedPtr<T>`, `InputSharedPtr<T>`, `InputUniquePtr<T>`) on the `[Input]` field. They mirror the persistent pointer types but their backing storage is bulk-released when the target input frame retires, so there is no `Dispose`.
+
+See [Pointers — input pointer types](../experimental/pointers.md#input-pointer-types) for the full table, the allocation pattern, and the source-generator rules (TRECS121–123) that constrain pointer fields inside `[Input]` components.
+
 ## See also
 
 - [Sample 11 — Snake](../samples/11-snake.md) — full keyboard-driven input wired to a recordable global entity.

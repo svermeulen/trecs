@@ -18,7 +18,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = i }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(100, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -33,7 +33,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = i }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1000, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -56,11 +56,11 @@ namespace Trecs.Tests
                     .AssertComplete();
                 entityHandles[i] = init.Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Remove entity at index 2 (value 30)
             a.RemoveEntity(entityHandles[2]);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(4, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -85,13 +85,13 @@ namespace Trecs.Tests
                     .AssertComplete();
                 entityHandles[i] = init.Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Remove entities at indices 1, 4, 7
             a.RemoveEntity(entityHandles[1]);
             a.RemoveEntity(entityHandles[4]);
             a.RemoveEntity(entityHandles[7]);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(7, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -115,10 +115,10 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = i }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             a.RemoveEntitiesWithTags(TestTags.Alpha);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -142,14 +142,14 @@ namespace Trecs.Tests
                     .AssertComplete();
                 entityHandles[i] = init.Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(10, a.CountEntitiesWithTags(TestTags.Alpha));
 
             // Remove 3
             a.RemoveEntity(entityHandles[0]);
             a.RemoveEntity(entityHandles[5]);
             a.RemoveEntity(entityHandles[9]);
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(7, a.CountEntitiesWithTags(TestTags.Alpha));
 
             // Add 5 more
@@ -157,7 +157,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 100 + i }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(12, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -180,13 +180,13 @@ namespace Trecs.Tests
                     .AssertComplete();
                 entityHandles[i] = init.Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Move entity 1 to partition B
             a.SetTag<TestPartitionB>(entityHandles[1].ToIndex(a));
             // Remove entity 3
             a.RemoveEntity(entityHandles[3]);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(3, a.CountEntitiesWithTags(partitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionB));
@@ -219,14 +219,14 @@ namespace Trecs.Tests
                     .AssertComplete();
                 entityHandles[i] = init.Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Remove from the end first, then middle - tests multi-hop swap-back
             a.RemoveEntity(entityHandles[9]);
             a.RemoveEntity(entityHandles[8]);
             a.RemoveEntity(entityHandles[5]);
             a.RemoveEntity(entityHandles[2]);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(6, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -273,12 +273,12 @@ namespace Trecs.Tests
                     .AssertComplete();
                 gammaRefs[i] = init.Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Move one Gamma entity to PartitionB, then bulk-remove all Alpha
             a.SetTag<TestPartitionB>(gammaRefs[0].ToIndex(a));
             a.RemoveEntitiesWithTags(TestTags.Alpha);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(
                 0,

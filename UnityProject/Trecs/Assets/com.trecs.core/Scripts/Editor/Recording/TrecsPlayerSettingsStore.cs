@@ -5,12 +5,12 @@ namespace Trecs.Internal
 {
     /// <summary>
     /// EditorPrefs-backed defaults for the auto-recorder. Decouples settings
-    /// from the per-session <see cref="TrecsAutoRecorder"/> instance so users
+    /// from the per-session <see cref="TrecsRewindBuffer"/> instance so users
     /// can tune values outside play mode and have them persist across editor
     /// sessions.
     ///
     /// Values are pushed onto each new recorder when its controller registers
-    /// (subscribed via <see cref="TrecsGameStateRegistry.ControllerRegistered"/>).
+    /// (subscribed via <see cref="TrecsRecordingSessionRegistry.ControllerRegistered"/>).
     /// The <see cref="TrecsPlayerSettingsWindow"/> reads/writes these
     /// EditorPrefs and propagates Save to any live recorders so changes are
     /// instantly visible mid-session too.
@@ -26,7 +26,7 @@ namespace Trecs.Internal
         // 64 MB fits in int but users may push past 2 GB on big projects.
         const string MaxScrubCacheBytesKey = "Trecs.RecorderSettings.MaxScrubCacheBytes";
 
-        // Keep these in sync with TrecsAutoRecorderSettings's field defaults
+        // Keep these in sync with TrecsRewindBufferSettings's field defaults
         // — used only when the EditorPref is absent (first run / fresh user).
         const float DefaultAnchorIntervalSeconds = 30f;
         const float DefaultScrubCacheIntervalSeconds = 1f;
@@ -38,7 +38,7 @@ namespace Trecs.Internal
             // Patch each new recorder's settings as the controller registers,
             // before any recording starts. Idempotent and tiny — safe for
             // multiple play-mode entries.
-            TrecsGameStateRegistry.ControllerRegistered += controller =>
+            TrecsRecordingSessionRegistry.ControllerRegistered += controller =>
             {
                 ApplyTo(controller.AutoRecorder);
             };
@@ -88,7 +88,7 @@ namespace Trecs.Internal
         /// hook) and after the user clicks Save in the settings window so
         /// live recorders pick up the change immediately.
         /// </summary>
-        public static void ApplyTo(TrecsAutoRecorder recorder)
+        public static void ApplyTo(TrecsRewindBuffer recorder)
         {
             if (recorder == null)
                 return;
@@ -105,7 +105,7 @@ namespace Trecs.Internal
         /// </summary>
         public static void ApplyToAllLiveRecorders()
         {
-            foreach (var controller in TrecsGameStateRegistry.All)
+            foreach (var controller in TrecsRecordingSessionRegistry.All)
             {
                 ApplyTo(controller.AutoRecorder);
             }

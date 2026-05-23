@@ -40,7 +40,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity<PaBase>().Set(new TestInt { Value = 1 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             int absentCount = a.Query().WithTags<PaBase>().WithoutTags<PaPresent>().Count();
             int presentCount = a.Query().WithTags<PaBase, PaPresent>().Count();
@@ -56,7 +56,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity<PaBase, PaPresent>().Set(new TestInt { Value = 7 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.Query().WithTags<PaBase, PaPresent>().Count());
             NAssert.AreEqual(0, a.Query().WithTags<PaBase>().WithoutTags<PaPresent>().Count());
@@ -69,10 +69,10 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var init = a.AddEntity<PaBase>().Set(new TestInt { Value = 42 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             a.SetTag<PaPresent>(init.Handle.ToIndex(a));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.Query().WithTags<PaBase, PaPresent>().Count());
             NAssert.AreEqual(0, a.Query().WithTags<PaBase>().WithoutTags<PaPresent>().Count());
@@ -87,10 +87,10 @@ namespace Trecs.Tests
             var init = a.AddEntity<PaBase, PaPresent>()
                 .Set(new TestInt { Value = 13 })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             a.UnsetTag<PaPresent>(init.Handle.ToIndex(a));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.Query().WithTags<PaBase, PaPresent>().Count());
             NAssert.AreEqual(1, a.Query().WithTags<PaBase>().WithoutTags<PaPresent>().Count());
@@ -103,11 +103,11 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var init = a.AddEntity<PaBase>().Set(new TestInt { Value = 5 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // UnsetTag when already absent should be a no-op move (same destination group).
             a.UnsetTag<PaPresent>(init.Handle.ToIndex(a));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.Query().WithTags<PaBase>().WithoutTags<PaPresent>().Count());
             NAssert.AreEqual(0, a.Query().WithTags<PaBase, PaPresent>().Count());
@@ -158,11 +158,11 @@ namespace Trecs.Tests
             var init = a.AddEntity<McBase, McPoisoned, McAlive>()
                 .Set(new TestInt { Value = 1 })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // UnsetTag<Poisoned> should toggle just the poisoned dim, keeping McAlive.
             a.UnsetTag<McPoisoned>(init.Handle.ToIndex(a));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(
                 1,
@@ -181,11 +181,11 @@ namespace Trecs.Tests
             var init = a.AddEntity<McBase, McPoisoned, McAlive>()
                 .Set(new TestInt { Value = 2 })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // SetTag<Dead> should swap the Alive/Dead variant; Poisoned stays.
             a.SetTag<McDead>(init.Handle.ToIndex(a));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.Query().WithTags<McBase, McDead, McPoisoned>().Count());
             NAssert.AreEqual(0, a.Query().WithTags<McBase, McAlive>().Count());
@@ -203,7 +203,7 @@ namespace Trecs.Tests
 
             a.AddEntity<McBase, McAlive>().Set(new TestInt { Value = 1 }).AssertComplete();
             a.AddEntity<McBase, McAlive>().Set(new TestInt { Value = 2 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(2, a.Query().WithTags<McBase, McAlive>().Count());
         }
@@ -222,7 +222,7 @@ namespace Trecs.Tests
             // Sanity: adds into a previously-warmed group still work and
             // queries return the right counts.
             a.AddEntity<McBase, McAlive>().Set(new TestInt { Value = 10 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(1, a.Query().WithTags<McBase, McAlive>().Count());
         }
 
@@ -236,7 +236,7 @@ namespace Trecs.Tests
             var init = a.AddEntity<McBase, McAlive>()
                 .Set(new TestInt { Value = 3 })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Two SetTag calls on independent dims (poisoned dim + alive/dead dim).
             // They should merge into a single move with the entity landing in
@@ -244,7 +244,7 @@ namespace Trecs.Tests
             var idx = init.Handle.ToIndex(a);
             a.SetTag<McDead>(idx);
             a.SetTag<McPoisoned>(idx);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.Query().WithTags<McBase, McDead, McPoisoned>().Count());
             NAssert.AreEqual(0, a.Query().WithTags<McBase, McAlive>().Count());
@@ -259,7 +259,7 @@ namespace Trecs.Tests
             var init = a.AddEntity<McBase, McAlive>()
                 .Set(new TestInt { Value = 4 })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Both SetTag<McAlive> and SetTag<McDead> target the same dim
             // (Alive/Dead). Coalescing detects the conflict at submission and
@@ -267,7 +267,7 @@ namespace Trecs.Tests
             var idx = init.Handle.ToIndex(a);
             a.SetTag<McAlive>(idx);
             a.SetTag<McDead>(idx);
-            NAssert.Throws<TrecsException>(() => a.SubmitEntities());
+            NAssert.Throws<TrecsException>(() => a.Submit());
         }
 
         [Test]
@@ -279,7 +279,7 @@ namespace Trecs.Tests
             var init = a.AddEntity<McBase, McAlive>()
                 .Set(new TestInt { Value = 5 })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // SetTag<McPoisoned> and UnsetTag<McPoisoned> are also a same-dim
             // conflict, even though they're different verbs — the framework
@@ -287,7 +287,7 @@ namespace Trecs.Tests
             var idx = init.Handle.ToIndex(a);
             a.SetTag<McPoisoned>(idx);
             a.UnsetTag<McPoisoned>(idx);
-            NAssert.Throws<TrecsException>(() => a.SubmitEntities());
+            NAssert.Throws<TrecsException>(() => a.Submit());
         }
     }
 }

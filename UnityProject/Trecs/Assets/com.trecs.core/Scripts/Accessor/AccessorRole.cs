@@ -7,8 +7,8 @@ namespace Trecs
     /// component read/write rules, structural-change rules, and heap-allocation rules.
     /// Each value corresponds to a coherent set of permissions:
     /// <list type="bullet">
-    /// <item><c>Fixed</c> — simulation. Writes deterministic state, makes structural changes (Add/Remove/Move entity, set ops, SetSystemPaused), allocates persistent heap. Default for fixed-update systems.</item>
-    /// <item><c>Variable</c> — display / render. Reads everything (including [VariableUpdateOnly]); writes [VariableUpdateOnly] only; no structural changes; no heap allocation. Default for non-Fixed, non-Input systems.</item>
+    /// <item><c>Fixed</c> — simulation. Writes deterministic state, makes structural changes (Add/Remove/Move entity, set ops, SetSystemPaused), mutates the heap (Alloc/Write/Set/Clone/Acquire/Dispose). Default for fixed-update systems.</item>
+    /// <item><c>Variable</c> — display / render. Reads everything (including [VariableUpdateOnly] and the heap); writes [VariableUpdateOnly] only; no structural changes; no heap mutation (the heap is simulation state). Default for non-Fixed, non-Input systems.</item>
     /// <item><c>Unrestricted</c> — no role-specific restrictions. For non-system code: lifecycle hooks (<see cref="System.IDisposable.Dispose"/>, init), event callbacks, debug tooling, networking handlers, scripting bridges, and anything else that doesn't fit a tick-phase role. Use sparingly — runtime gameplay code should pick a real role so rule violations surface.</item>
     /// </list>
     /// Input handling is not exposed as a role: input-system permissions
@@ -47,7 +47,7 @@ namespace Trecs
                 or SystemPhase.Presentation
                 or SystemPhase.LatePresentation => AccessorRole.Variable,
                 SystemPhase.Fixed => AccessorRole.Fixed,
-                _ => throw TrecsAssert.CreateException("Unknown SystemPhase {0}", phase),
+                _ => throw TrecsDebugAssert.CreateException("Unknown SystemPhase {0}", phase),
             };
         }
     }

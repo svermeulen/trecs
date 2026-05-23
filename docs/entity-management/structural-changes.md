@@ -8,7 +8,7 @@ In the examples below, `World` is the [`WorldAccessor`](../advanced/accessor-rol
 
 Submission drains the queued operations. The system runner calls it automatically at the end of every fixed update and at the end of `World.LateTick()` — see the [per-frame phase diagram](../core/systems.md#phase-diagram).
 
-Call it manually via `World.SubmitEntities()`.
+Call it manually via `World.Submit()`.
 
 ## Deferred operations
 
@@ -100,19 +100,26 @@ To react to submission boundaries, see [Entity Events — Frame Events](entity-e
 
 ## Deterministic submission
 
-Any workflow that needs the simulation to evolve identically across runs — recording / replay, networked rollback, snapshot-load consistency, reproducible tests — needs deterministic submission ordering, so should include this flag:
+Trecs always sorts structural operations queued from Burst jobs (via [`NativeWorldAccessor`](../performance/jobs-and-burst.md)) before applying them, so submission order doesn't depend on job-thread interleaving. Main-thread operations apply in queue order. Job-side adds must therefore include a `sortKey`, and you have two ways to issue them:
+
+**Pre-reserved handles** — use when the caller needs to track the entity after the add (subsequent move, remove, or component lookup by handle):
 
 ```csharp
-var settings = new WorldSettings
-{
-    RequireDeterministicSubmission = true,
-};
+// On the main thread, before scheduling the job:
+using var refs = world.ReserveEntityHandles(count, Allocator.TempJob);
+
+// In the job:
+nativeAccessor.AddEntity<MyTag>(sortKey: (uint)i, refs[i]);
 ```
 
-This sorts structural operations queued from Burst jobs (via [`NativeWorldAccessor`](../performance/jobs-and-burst.md)) before applying them, so submission order doesn't depend on job-thread interleaving. Main-thread operations are already deterministic — they apply in queue order — so the setting only affects the native path. Cost is a single sort per submission; cheap enough to leave on by default if reproducibility may ever matter.
-
-This is why queuing structural changes from a Burst job through `NativeWorldAccessor` requires a `sortKey`:
+**Fire-and-forget** — use when the caller doesn't need a handle (most particles, projectiles, spawn-and-find-by-tag-later patterns). Skip `ReserveEntityHandles` entirely:
 
 ```csharp
-nativeAccessor.AddEntity<MyTag>(sortKey: (uint)i);  // i = the iteration index in the job
+// In the job — no main-thread setup, no NativeArray to thread through:
+nativeAccessor.AddEntity<MyTag>(sortKey: (uint)i)
+    .Set(new MyComponent { Value = 42 });
 ```
+
+The submitter claims an `EntityHandle` for each fire-and-forget add on the main thread *after* the deterministic sort runs, so id assignment follows sort-key order rather than bag-thread arrival order. The entity is still addressable by tag / set / observer queries after submission — the caller just doesn't get a handle back from the add site. The returned `NativeAnonymousEntityInitializer` exposes only `.Set<T>()` (no `.Handle` property), reflecting the API contract.
+
+The two forms compose freely in the same job — mix them per call site based on whether you need the handle.

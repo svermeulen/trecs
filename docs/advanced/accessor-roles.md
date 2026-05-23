@@ -20,10 +20,10 @@ Every rule below is asserted at the call site. Crossing a role boundary throws a
 | Write sim component (non-[`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template)) | ✅ | ❌ | ✅ |
 | Read [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) component | ❌ | ✅ | ✅ |
 | Write [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) component | ❌ | ✅ | ✅ |
-| Persistent heap alloc (`AllocShared`, `AllocUnique`, native variants) | ✅ | ❌ | ✅ |
+| Heap mutation (`Alloc`, `Write`, `Set`, `Clone`, `Acquire`, `Dispose`, `EnsureCapacity`) | ✅ | ❌ | ✅ |
 | Structural change (`AddEntity` / `RemoveEntity` / `SetTag` / `UnsetTag`) on a non-VUO template | ✅ | ❌ | ✅ |
 | Structural change on a [`[VariableUpdateOnly]`](#vuo-field-vs-vuo-template) template | ❌ | ✅ | ✅ |
-| Read set (`Set<T>().Read` — `Exists`, `Count`, iterate) | ✅ | ✅ | ✅ |
+| Read set (`Set<T>().Read` — `Contains`, `Count`, iterate) | ✅ | ✅ | ✅ |
 | Mutate set (`Set<T>().DeferredAdd` / `DeferredRemove` / `DeferredClear`, `Set<T>().Write`) | ✅ | ❌ | ✅ |
 | `SetSystemPaused` | ✅ | ❌ | ✅ |
 | `FixedRng` | ✅ | ❌ | ✅ |
@@ -62,7 +62,7 @@ System code never calls `world.CreateAccessor(AccessorRole.X)` — it gets the r
 
 ## Related
 
-- [Shared Heap Data](shared-heap-data.md) — the heap-specific subset of these rules, plus deterministic ID minting and the seeder / provider patterns for shared blobs.
+- [Shared Heap Data](../experimental/shared-heap-data.md) — the heap-specific subset of these rules, plus deterministic ID minting and the seeder / provider patterns for shared blobs.
 - [Input System](../core/input-system.md) — how `[Input]` components and `AddInput<T>` work with input systems.
 - [Time & RNG](time-and-rng.md) — `FixedRng` vs `VariableRng` deterministic streams.
 - [Pausing & Disabling Systems](pausing-and-disabling-systems.md) — when to use `SetSystemPaused` vs `EnableChannel`.

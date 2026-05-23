@@ -28,14 +28,14 @@ namespace Trecs.Tests
                 .Set(new TestVec())
                 .AssertComplete();
             var handle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Gamma));
 
             // Remove first, then move — remove should win
             a.RemoveEntity(handle.ToIndex(a));
             a.SetTag<TestPartitionB>(handle.ToIndex(a));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(
                 0,
@@ -57,12 +57,12 @@ namespace Trecs.Tests
                 .Set(new TestVec())
                 .AssertComplete();
             var handle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Move first, then remove — remove should win
             a.SetTag<TestPartitionB>(handle.ToIndex(a));
             a.RemoveEntity(handle.ToIndex(a));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(
                 0,
@@ -92,14 +92,14 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(5, a.CountEntitiesWithTags(PartitionASet));
 
             // Move entity 1 to PartitionB, remove entity 4 (at the tail — will be swap-back source)
             a.SetTag<TestPartitionB>(handles[1].ToIndex(a));
             a.RemoveEntity(handles[4]);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(
                 3,
@@ -137,12 +137,12 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Move tail entity (4) to PartitionB, remove middle entity (2)
             a.SetTag<TestPartitionB>(handles[4].ToIndex(a));
             a.RemoveEntity(handles[2]);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(3, a.CountEntitiesWithTags(PartitionASet));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionBSet));
@@ -177,7 +177,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Move entities 2, 5 to PartitionB. Remove entities 7, 8, 9 (tail entities).
             a.SetTag<TestPartitionB>(handles[2].ToIndex(a));
@@ -185,7 +185,7 @@ namespace Trecs.Tests
             a.RemoveEntity(handles[7]);
             a.RemoveEntity(handles[8]);
             a.RemoveEntity(handles[9]);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(5, a.CountEntitiesWithTags(PartitionASet));
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionBSet));
@@ -229,7 +229,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 2 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Register callback: when any entity is removed, remove entity B
             var subscription = a
@@ -245,7 +245,7 @@ namespace Trecs.Tests
                 );
 
             a.RemoveEntity(handleA);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.IsFalse(handleA.Exists(a), "Entity A should be removed");
             NAssert.IsFalse(handleB.Exists(a), "Entity B should be removed by callback");
@@ -270,7 +270,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Callback: when entities are removed, also remove entity 6
             var subscription = a
@@ -288,7 +288,7 @@ namespace Trecs.Tests
             // Remove entities 0 and 3 directly
             a.RemoveEntity(handles[0]);
             a.RemoveEntity(handles[3]);
-            a.SubmitEntities();
+            a.Submit();
 
             // 0, 3, and 6 should be removed (6 by callback)
             NAssert.AreEqual(5, a.CountEntitiesWithTags(TestTags.Alpha));

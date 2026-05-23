@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Trecs.Collections;
 
 namespace Trecs.Internal
@@ -23,19 +22,17 @@ namespace Trecs.Internal
     {
         readonly TrecsLog _log;
 
-        readonly World _world;
-        readonly IWorldStateSerializer _stateSerializer;
-        readonly SerializerRegistry _serializerRegistry;
+        // Lifecycle / IO primitives (accessor + checksum calculator + reusable
+        // buffers + queue serialization + locker registration) live on this
+        // shared collaborator. The editor recorder (TrecsRewindBuffer) also
+        // owns one — see RecorderEngine docs for the split rationale.
+        readonly RecorderEngine _core;
         readonly BundleRecorderSettings _settings;
-        readonly SnapshotSerializer _snapshotSerializer;
 
-        readonly DenseDictionary<int, uint> _checksums = new();
-        readonly List<BundleAnchor> _anchors = new();
-        readonly List<BundleSnapshot> _snapshots = new();
+        readonly DenseDictionary<int, ulong> _checksums = new();
+        readonly List<WorldSnapshot> _anchors = new();
+        readonly List<WorldSnapshot> _bookmarks = new();
 
-        WorldAccessor _accessor;
-        RecordingChecksumCalculator _checksumCalculator;
-        SerializationBuffer _checksumBuffer;
         IDisposable _frameSubscription;
 
         bool _isRecording;
@@ -43,8 +40,7 @@ namespace Trecs.Internal
         bool _lockerRegistered;
         int _startFrame;
         int _lastAnchorFrame;
-        byte[] _initialSnapshot;
-        uint _initialChecksum;
+        ReadOnlyMemory<byte> _initialSnapshot;
 
         public BundleRecorder(
             World world,
@@ -56,14 +52,8 @@ namespace Trecs.Internal
         {
             if (world == null)
                 throw new ArgumentNullException(nameof(world));
-            if (stateSerializer == null)
-                throw new ArgumentNullException(nameof(stateSerializer));
-            if (serializerRegistry == null)
-                throw new ArgumentNullException(nameof(serializerRegistry));
             if (settings == null)
                 throw new ArgumentNullException(nameof(settings));
-            if (snapshotSerializer == null)
-                throw new ArgumentNullException(nameof(snapshotSerializer));
             if (settings.ChecksumFrameInterval < 1)
                 throw new ArgumentOutOfRangeException(
                     nameof(settings) + "." + nameof(BundleRecorderSettings.ChecksumFrameInterval),
@@ -72,17 +62,23 @@ namespace Trecs.Internal
                 );
 
             _log = world.Log;
-            _world = world;
-            _stateSerializer = stateSerializer;
-            _serializerRegistry = serializerRegistry;
             _settings = settings;
-            _snapshotSerializer = snapshotSerializer;
+            // RecorderEngine's constructor validates the rest of the
+            // dependencies (state serializer, serializer registry, snapshot
+            // serializer), so the duplicate checks would be unreachable.
+            _core = new RecorderEngine(
+                world,
+                stateSerializer,
+                serializerRegistry,
+                snapshotSerializer,
+                accessorLabel: nameof(BundleRecorder)
+            );
         }
 
         public bool IsRecording => _isRecording;
         public int StartFrame => _startFrame;
-        public IReadOnlyList<BundleAnchor> Anchors => _anchors;
-        public IReadOnlyList<BundleSnapshot> Snapshots => _snapshots;
+        public IReadOnlyList<WorldSnapshot> Anchors => _anchors;
+        public IReadOnlyList<WorldSnapshot> Bookmarks => _bookmarks;
 
         /// <summary>
         /// Number of per-frame checksums captured so far this recording.
@@ -108,14 +104,6 @@ namespace Trecs.Internal
             }
         }
 
-        public void Initialize()
-        {
-            ThrowIfDisposed();
-            _accessor = _world.CreateAccessor(AccessorRole.Unrestricted, nameof(BundleRecorder));
-            _checksumCalculator = new RecordingChecksumCalculator(_stateSerializer);
-            _checksumBuffer = new SerializationBuffer(_serializerRegistry);
-        }
-
         /// <summary>
         /// Capture an initial snapshot of the world state and start recording
         /// inputs and checksums from the current frame.
@@ -134,39 +122,37 @@ namespace Trecs.Internal
 
             _checksums.Clear();
             _anchors.Clear();
-            _snapshots.Clear();
+            _bookmarks.Clear();
 
-            _startFrame = _accessor.FixedFrame;
+            _startFrame = _core.Accessor.FixedFrame;
             _lastAnchorFrame = _startFrame;
 
             // Capture the initial snapshot bytes + checksum so the produced
-            // bundle is self-contained.
-            using (var ms = new MemoryStream())
-            {
-                _snapshotSerializer.SaveSnapshot(_settings.Version, ms, includeTypeChecks: true);
-                _initialSnapshot = ms.ToArray();
-            }
-            _initialChecksum = _checksumCalculator.CalculateCurrentChecksum(
-                version: _settings.Version,
-                _checksumBuffer,
-                _settings.ChecksumFlags
+            // bundle is self-contained. The serializer's pool may hand us an
+            // oversized buffer; the returned ReadOnlyMemory<byte> is the
+            // exact valid slice. We don't return the buffer to the pool on
+            // Stop — the bundle's caller may hold the payload past Stop, so
+            // ceding ownership is the safe choice.
+            _core.CaptureInitialState(
+                _settings.Version,
+                SerializationFlags.IsForChecksum,
+                out _initialSnapshot,
+                out var initialChecksum
             );
 
-            // Start frame's checksum also goes in the dict so playback can
-            // verify the post-LoadInitialState world matches the recorded
-            // initial state at frame 0 of the timeline.
-            _checksums[_startFrame] = _initialChecksum;
+            // Start frame's checksum goes in the dict so playback can verify
+            // the post-LoadInitialState world matches the recorded initial
+            // state at frame 0 of the timeline.
+            _checksums[_startFrame] = initialChecksum;
 
             // Lock input history so the queue's periodic cleanup doesn't
             // prune frames the recording covers; clear pre-start inputs so
             // any client-side rollback noise from before Start doesn't end
             // up in the recording.
-            var queue = _accessor.GetEntityInputQueue();
-            queue.AddHistoryLocker(this);
-            queue.ClearInputsBeforeOrAt(_startFrame - 1);
-            _lockerRegistered = true;
+            EnsureLockerRegistered(true);
+            _core.Accessor.GetEntityInputQueue().ClearInputsBeforeOrAt(_startFrame - 1);
 
-            _frameSubscription = _accessor.Events.OnFixedUpdateCompleted(OnFixedUpdateCompleted);
+            _frameSubscription = _core.SubscribeFixedUpdateCompleted(OnFixedUpdateCompleted);
             _isRecording = true;
 
             _log.Debug("Recording started at fixed frame {0}", _startFrame);
@@ -190,8 +176,8 @@ namespace Trecs.Internal
                 );
             }
 
-            var endFrame = _accessor.FixedFrame;
-            var fixedDeltaTime = _accessor.GetSystemRunner().FixedDeltaTime;
+            var endFrame = _core.Accessor.FixedFrame;
+            var fixedDeltaTime = _core.Accessor.GetSystemRunner().FixedDeltaTime;
 
             // Drop the history lock before serializing the queue so the queue
             // is in its post-recording state (the queue's own Serialize
@@ -201,17 +187,10 @@ namespace Trecs.Internal
             EnsureLockerRegistered(false);
             _isRecording = false;
 
-            byte[] queueBytes;
-            using (var queueBuffer = new SerializationBuffer(_serializerRegistry))
-            {
-                queueBuffer.StartWrite(version: _settings.Version, includeTypeChecks: true);
-                _accessor.GetEntityInputQueue().Serialize(queueBuffer);
-                queueBuffer.EndWrite();
-                queueBytes = queueBuffer.MemoryStream.ToArray();
-            }
+            var queueBytes = _core.SerializeEntityInputQueue(_settings.Version);
 
             var blobs = new DenseHashSet<BlobId>();
-            _world.BlobCache.GetAllActiveBlobIds(blobs);
+            _core.World.BlobCache.GetAllActiveBlobIds(blobs);
 
             var bundle = new RecordingBundle
             {
@@ -221,32 +200,32 @@ namespace Trecs.Internal
                     StartFixedFrame = _startFrame,
                     EndFixedFrame = endFrame,
                     FixedDeltaTime = fixedDeltaTime,
-                    ChecksumFlags = _settings.ChecksumFlags,
                     BlobIds = blobs,
                 },
                 InitialSnapshot = _initialSnapshot,
-                InitialSnapshotChecksum = _initialChecksum,
                 InputQueue = queueBytes,
-                Checksums = CopyChecksums(),
+                Checksums = WorldSnapshotListUtil.CopyChecksums(_checksums),
                 Anchors = _anchors.ToArray(),
-                Snapshots = _snapshots.ToArray(),
+                Bookmarks = _bookmarks.ToArray(),
             };
 
             _log.Debug(
-                "Recording stopped: {0} frames, {1} anchors, {2} snapshots, {3} checksums, {4} bytes input queue",
+                "Recording stopped: {0} frames, {1} anchors, {2} bookmarks, {3} checksums, {4} bytes input queue",
                 endFrame - _startFrame,
                 _anchors.Count,
-                _snapshots.Count,
+                _bookmarks.Count,
                 _checksums.Count,
                 queueBytes.Length
             );
 
-            // Reset internal state so the recorder can be Started again.
-            _initialSnapshot = null;
-            _initialChecksum = 0;
+            // Reset internal state so the recorder can be Started again. The
+            // bundle owns its payload memory now; clearing here just detaches
+            // our local reference — the pool buffer (if any) stays alive via
+            // the bundle's ReadOnlyMemory<byte> until the caller releases it.
+            _initialSnapshot = default;
             _checksums.Clear();
             _anchors.Clear();
-            _snapshots.Clear();
+            _bookmarks.Clear();
 
             return bundle;
         }
@@ -260,7 +239,7 @@ namespace Trecs.Internal
         /// any existing anchor at the same frame, and resets the auto-anchor
         /// cadence timer so the next auto-capture fires a full interval from
         /// here rather than redundantly moments later. Use
-        /// <see cref="CaptureSnapshotAtCurrentFrame"/> instead when the marker
+        /// <see cref="CaptureBookmarkAtCurrentFrame"/> instead when the marker
         /// needs a user-visible label.
         /// </summary>
         /// <returns>True iff the anchor was captured.</returns>
@@ -272,12 +251,12 @@ namespace Trecs.Internal
                 _log.Warning("CaptureAnchorAtCurrentFrame called while not recording");
                 return false;
             }
-            if (_world.IsDisposed)
+            if (_core.World.IsDisposed)
             {
                 return false;
             }
 
-            var frame = _accessor.FixedFrame;
+            var frame = _core.Accessor.FixedFrame;
             CaptureAnchorAt(frame);
             // Reset the auto-anchor cadence timer so we don't emit a redundant
             // auto-anchor moments after this manual one.
@@ -286,13 +265,13 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// Capture a labeled full-state snapshot at the current fixed frame.
-        /// Replaces any existing snapshot at the same frame. Snapshots
+        /// Capture a labelled full-state bookmark at the current fixed frame.
+        /// Replaces any existing bookmark at the same frame. Bookmarks
         /// survive Save/Load and are independent of auto-anchors and
         /// checksums.
         /// </summary>
-        /// <returns>True iff the snapshot was captured.</returns>
-        public bool CaptureSnapshotAtCurrentFrame(string label)
+        /// <returns>True iff the bookmark was captured.</returns>
+        public bool CaptureBookmarkAtCurrentFrame(string label)
         {
             ThrowIfDisposed();
             if (label == null)
@@ -301,49 +280,20 @@ namespace Trecs.Internal
             }
             if (!_isRecording)
             {
-                _log.Warning("CaptureSnapshotAtCurrentFrame called while not recording");
+                _log.Warning("CaptureBookmarkAtCurrentFrame called while not recording");
                 return false;
             }
-            if (_world.IsDisposed)
+            if (_core.World.IsDisposed)
             {
                 return false;
             }
 
-            byte[] bytes;
-            using (var ms = new MemoryStream())
-            {
-                _snapshotSerializer.SaveSnapshot(_settings.Version, ms, includeTypeChecks: true);
-                bytes = ms.ToArray();
-            }
-            var checksum = _checksumCalculator.CalculateCurrentChecksum(
-                version: _settings.Version,
-                _checksumBuffer,
-                _settings.ChecksumFlags
+            var bookmark = CaptureSnapshotPayload(
+                _core.Accessor.FixedFrame,
+                SnapshotKind.Bookmark,
+                label
             );
-            var snapshot = new BundleSnapshot
-            {
-                FixedFrame = _accessor.FixedFrame,
-                Checksum = checksum,
-                Label = label,
-                Payload = bytes,
-            };
-
-            for (int i = 0; i < _snapshots.Count; i++)
-            {
-                if (_snapshots[i].FixedFrame == snapshot.FixedFrame)
-                {
-                    _snapshots[i] = snapshot;
-                    return true;
-                }
-            }
-            int insertAt = 0;
-            while (
-                insertAt < _snapshots.Count && _snapshots[insertAt].FixedFrame < snapshot.FixedFrame
-            )
-            {
-                insertAt++;
-            }
-            _snapshots.Insert(insertAt, snapshot);
+            WorldSnapshotListUtil.InsertOrReplaceByFrame(_bookmarks, bookmark);
             return true;
         }
 
@@ -366,8 +316,7 @@ namespace Trecs.Internal
                 _isRecording = false;
             }
 
-            _checksumBuffer?.Dispose();
-            _checksumBuffer = null;
+            _core.Dispose();
         }
 
         void OnFixedUpdateCompleted()
@@ -376,7 +325,7 @@ namespace Trecs.Internal
             {
                 return;
             }
-            var frame = _accessor.FixedFrame;
+            var frame = _core.Accessor.FixedFrame;
 
             // Per-frame checksum cadence — sparse compared to fixed frames,
             // dense compared to anchors. Catches desyncs close to where they
@@ -385,10 +334,9 @@ namespace Trecs.Internal
 #if !TRECS_IS_PROFILING
             if ((frame - _startFrame) % _settings.ChecksumFrameInterval == 0)
             {
-                var checksum = _checksumCalculator.CalculateCurrentChecksum(
-                    version: _settings.Version,
-                    _checksumBuffer,
-                    _settings.ChecksumFlags
+                var checksum = _core.ComputeChecksum(
+                    _settings.Version,
+                    SerializationFlags.IsForChecksum
                 );
                 // Overwrite rather than Add: client-style rollbacks may
                 // re-record the same frame with new state.
@@ -397,7 +345,7 @@ namespace Trecs.Internal
 #endif
 
             // Anchor cadence — full state snapshot captured at long intervals.
-            var fixedDeltaTime = _accessor.GetSystemRunner().FixedDeltaTime;
+            var fixedDeltaTime = _core.Accessor.GetSystemRunner().FixedDeltaTime;
             var anchorElapsed = (frame - _lastAnchorFrame) * fixedDeltaTime;
             if (anchorElapsed >= _settings.AnchorIntervalSeconds)
             {
@@ -408,24 +356,7 @@ namespace Trecs.Internal
 
         void CaptureAnchorAt(int frame)
         {
-            byte[] bytes;
-            using (var ms = new MemoryStream())
-            {
-                _snapshotSerializer.SaveSnapshot(_settings.Version, ms, includeTypeChecks: true);
-                bytes = ms.ToArray();
-            }
-            var checksum = _checksumCalculator.CalculateCurrentChecksum(
-                version: _settings.Version,
-                _checksumBuffer,
-                _settings.ChecksumFlags
-            );
-            var anchor = new BundleAnchor
-            {
-                FixedFrame = frame,
-                Checksum = checksum,
-                Payload = bytes,
-            };
-
+            var anchor = CaptureSnapshotPayload(frame, SnapshotKind.Anchor, label: "");
             // Auto-cadence captures always run at strictly increasing frames so
             // they would naturally append. CaptureAnchorAtCurrentFrame can land
             // on the same frame as the most recent auto-anchor though (manual
@@ -439,14 +370,33 @@ namespace Trecs.Internal
             _anchors.Add(anchor);
         }
 
-        DenseDictionary<int, uint> CopyChecksums()
+        WorldSnapshot CaptureSnapshotPayload(int frame, SnapshotKind kind, string label)
         {
-            var copy = new DenseDictionary<int, uint>();
-            foreach (var (frame, checksum) in _checksums)
+            // The pool may hand back an oversized buffer; the returned
+            // ReadOnlyMemory<byte> is the exact valid slice. Buffers are not
+            // returned to the pool here — the bundle returned by Stop() can
+            // outlive this recorder, so ceding ownership of the buffer to
+            // the bundle is the only safe choice.
+            _core.SnapshotSerializer.SaveSnapshot(
+                _settings.Version,
+                out var payload,
+                includeTypeChecks: true
+            );
+            var checksum = _core.ComputeChecksum(
+                _settings.Version,
+                SerializationFlags.IsForChecksum
+            );
+            // Single source of truth for every captured frame's checksum.
+            // Idempotent with the cadence-driven write in OnFixedUpdateCompleted
+            // when the two align on the same frame.
+            _checksums[frame] = checksum;
+            return new WorldSnapshot
             {
-                copy.Add(frame, checksum);
-            }
-            return copy;
+                FixedFrame = frame,
+                Kind = kind,
+                Label = label,
+                Payload = payload,
+            };
         }
 
         void EnsureLockerRegistered(bool registered)
@@ -455,19 +405,18 @@ namespace Trecs.Internal
             {
                 return;
             }
-            if (_world.IsDisposed || _accessor == null)
+            if (_core.World.IsDisposed)
             {
                 _lockerRegistered = false;
                 return;
             }
-            var queue = _accessor.GetEntityInputQueue();
             if (registered)
             {
-                queue.AddHistoryLocker(this);
+                _core.AddHistoryLocker(this);
             }
             else
             {
-                queue.RemoveHistoryLocker(this);
+                _core.RemoveHistoryLocker(this);
             }
             _lockerRegistered = registered;
         }

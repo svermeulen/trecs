@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -23,6 +22,10 @@ namespace Trecs.SourceGen
     /// materialized aspect view; <c>in</c>/<c>ref</c> component parameters get a buffer
     /// element reference. The user method is then called once with all parameters bound.
     /// </para>
+    /// <para>Pipeline shape: the transform produces a value-equatable
+    /// <see cref="RunOnceModel"/> (strings + EquatableArray, no symbols) and the
+    /// terminal stage materializes diagnostics + emits source. The compilation's
+    /// global-namespace name is folded in via a lightweight value-equatable combine.</para>
     /// </summary>
     [Generator]
     public class RunOnceGenerator : IIncrementalGenerator
@@ -31,27 +34,28 @@ namespace Trecs.SourceGen
         {
             var hasTrecsReference = AssemblyFilterHelper.CreateTrecsReferenceCheck(context);
 
-            var methodProviderRaw = context
+            var modelsRaw = context
                 .SyntaxProvider.CreateSyntaxProvider(
                     predicate: static (s, _) => IsCandidateMethod(s),
-                    transform: static (ctx, _) => GetMethodData(ctx)
+                    transform: static (ctx, _) => BuildModel(ctx)
                 )
-                .Where(static m => m is not null);
-            var methodProvider = AssemblyFilterHelper.FilterByTrecsReference(
-                methodProviderRaw,
-                hasTrecsReference
-            );
+                .Where(static m => m is not null)
+                .Select(static (m, _) => m!.Value);
+            var models = AssemblyFilterHelper.FilterByTrecsReference(modelsRaw, hasTrecsReference);
 
+            // Only the global-namespace name leaves the CompilationProvider — a single
+            // string, value-equatable. Unrelated edits to other types don't invalidate
+            // the downstream combine.
             var globalNsProvider = context.CompilationProvider.Select(
                 static (c, _) =>
                     PerformanceCache.GetDisplayString(c.GlobalNamespace) ?? string.Empty
             );
 
-            var methodWithGlobalNs = methodProvider.Combine(globalNsProvider);
+            var withGlobalNs = models.Combine(globalNsProvider);
 
             context.RegisterSourceOutput(
-                methodWithGlobalNs,
-                static (spc, source) => GenerateSource(spc, source.Left!, source.Right)
+                withGlobalNs,
+                static (spc, source) => GenerateSource(spc, source.Left, source.Right)
             );
         }
 
@@ -78,7 +82,7 @@ namespace Trecs.SourceGen
             return false;
         }
 
-        private static MethodData? GetMethodData(GeneratorSyntaxContext context)
+        private static RunOnceModel? BuildModel(GeneratorSyntaxContext context)
         {
             var methodDecl = (MethodDeclarationSyntax)context.Node;
             var classDecl = methodDecl.FirstAncestorOrSelf<ClassDeclarationSyntax>();
@@ -96,24 +100,31 @@ namespace Trecs.SourceGen
             if (!IterationAttributeRouting.IsRunOnceMethod(methodSymbol))
                 return null;
 
-            var diagnostics = new List<Diagnostic>();
-            ValidatedRunOnce? validated = null;
+            var classSymbol = methodSymbol.ContainingType;
+            var className = classDecl.Identifier.Text;
+            var methodName = methodDecl.Identifier.Text;
+            var diagnostics = new List<DiagnosticInfo>();
             bool isValid;
+            EquatableArray<RunOnceParamSlotModel> paramSlots =
+                EquatableArray<RunOnceParamSlotModel>.Empty;
+            EquatableArray<HoistedSingletonModel> hoistedSingletons =
+                EquatableArray<HoistedSingletonModel>.Empty;
+
             try
             {
                 isValid = Validate(
                     classDecl,
                     methodDecl,
-                    methodSymbol,
                     context.SemanticModel,
-                    diagnostics.Add,
-                    out validated
+                    diagnostics,
+                    out paramSlots,
+                    out hoistedSingletons
                 );
             }
             catch (Exception ex)
             {
                 diagnostics.Add(
-                    Diagnostic.Create(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.SourceGenerationError,
                         methodDecl.GetLocation(),
                         "RunOnce method validation",
@@ -121,70 +132,64 @@ namespace Trecs.SourceGen
                     )
                 );
                 isValid = false;
-                validated = null;
             }
 
-            return new MethodData(
-                classDecl,
-                methodDecl,
-                methodSymbol,
-                isValid,
-                validated,
-                diagnostics.ToImmutableArray()
+            var containingTypes = SymbolAnalyzer
+                .GetContainingTypeChainInfo(classSymbol)
+                .ToEquatableArray();
+
+            return new RunOnceModel(
+                ClassName: className,
+                MethodName: methodName,
+                Namespace: SymbolAnalyzer.GetNamespace(classDecl),
+                Visibility: SymbolAnalyzer.GetMethodVisibility(methodDecl),
+                HintFileName: SymbolAnalyzer.GetSafeFileName(classSymbol, $"{methodName}_RunOnce"),
+                ContainingTypes: containingTypes,
+                ParamSlots: paramSlots,
+                HoistedSingletons: hoistedSingletons,
+                IsValid: isValid,
+                Diagnostics: diagnostics.ToEquatableArray()
             );
         }
 
         private static void GenerateSource(
             SourceProductionContext context,
-            MethodData data,
+            RunOnceModel model,
             string globalNamespaceName
         )
         {
-            foreach (var diag in data.Diagnostics)
-                context.ReportDiagnostic(diag);
+            foreach (var diag in model.Diagnostics)
+                context.ReportDiagnostic(diag.ToDiagnostic());
 
-            if (!data.IsValid || data.Validated == null)
+            if (!model.IsValid)
                 return;
-
-            var className = data.ClassDecl.Identifier.Text;
-            var methodName = data.MethodDecl.Identifier.Text;
-            var fileName = SymbolAnalyzer.GetSafeFileName(
-                data.MethodSymbol.ContainingType,
-                $"{methodName}_RunOnce"
-            );
-            var location = data.MethodDecl.GetLocation();
 
             try
             {
                 using var _ = SourceGenTimer.Time("RunOnceGenerator.Total");
-                SourceGenLogger.Log($"[RunOnceGenerator] Processing {className}.{methodName}");
+                SourceGenLogger.Log(
+                    $"[RunOnceGenerator] Processing {model.ClassName}.{model.MethodName}"
+                );
 
                 var source = ErrorRecovery.TryExecute(
-                    () =>
-                        Emit(
-                            data.ClassDecl,
-                            data.MethodDecl,
-                            data.MethodSymbol.ContainingType,
-                            data.Validated,
-                            globalNamespaceName
-                        ),
+                    () => Emit(model, globalNamespaceName),
                     context,
-                    location,
+                    Location.None,
                     "RunOnce code generation"
                 );
 
                 if (source != null)
                 {
-                    context.AddSource(fileName, source);
-                    SourceGenLogger.WriteGeneratedFile(fileName, source);
+                    context.AddSource(model.HintFileName, source);
+                    SourceGenLogger.WriteGeneratedFile(model.HintFileName, source);
                 }
                 else
                 {
                     context.ReportDiagnostic(
                         Diagnostic.Create(
                             DiagnosticDescriptors.CouldNotResolveSymbol,
-                            location,
-                            $"{className}.{methodName}"
+                            Location.None,
+                            $"{model.ClassName}.{model.MethodName}"
                         )
                     );
                 }
@@ -193,8 +198,8 @@ namespace Trecs.SourceGen
             {
                 ErrorRecovery.ReportError(
                     context,
-                    location,
-                    $"RunOnce {className}.{methodName}",
+                    Location.None,
+                    $"RunOnce {model.ClassName}.{model.MethodName}",
                     ex
                 );
             }
@@ -207,19 +212,21 @@ namespace Trecs.SourceGen
         private static bool Validate(
             ClassDeclarationSyntax classDecl,
             MethodDeclarationSyntax methodDecl,
-            IMethodSymbol methodSymbol,
             SemanticModel semanticModel,
-            Action<Diagnostic> reportDiagnostic,
-            out ValidatedRunOnce? validated
+            List<DiagnosticInfo> diagnostics,
+            out EquatableArray<RunOnceParamSlotModel> paramSlots,
+            out EquatableArray<HoistedSingletonModel> hoistedSingletons
         )
         {
-            validated = null;
+            paramSlots = EquatableArray<RunOnceParamSlotModel>.Empty;
+            hoistedSingletons = EquatableArray<HoistedSingletonModel>.Empty;
+
             bool isValid = true;
 
             if (!classDecl.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.NotPartialClass,
                         classDecl.Identifier.GetLocation(),
                         classDecl.Identifier.Text
@@ -230,8 +237,8 @@ namespace Trecs.SourceGen
 
             if (methodDecl.ReturnType.ToString() != "void")
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.InvalidReturnType,
                         methodDecl.ReturnType.GetLocation()
                     )
@@ -239,8 +246,15 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
 
-            var paramSlots = new List<RunOnceParamSlot>();
-            var hoistedSingletons = new List<HoistedSingletonInfo>();
+            var slots = new List<RunOnceParamSlotModel>();
+            var hoisted = new List<HoistedSingletonModel>();
+            // ParameterClassifier.ClassifyHoistedSingleton emits already-substituted
+            // Diagnostic objects via its Action<Diagnostic> callback. Stash them as
+            // preformatted DiagnosticInfo so the descriptor's MessageFormat isn't applied
+            // a second time when we materialize at the terminal stage.
+            System.Action<Diagnostic> reportDiag = d =>
+                diagnostics.Add(DiagnosticInfo.FromDiagnostic(d));
+
             foreach (var param in methodDecl.ParameterList.Parameters)
             {
                 var paramType =
@@ -281,8 +295,8 @@ namespace Trecs.SourceGen
                 {
                     if (hasFromWorld || hasPassThrough)
                     {
-                        reportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics.Add(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.SingleEntityConflictingAttributes,
                                 param.GetLocation(),
                                 param.Identifier.Text,
@@ -299,16 +313,16 @@ namespace Trecs.SourceGen
                         paramSymbol!,
                         isRef,
                         isIn,
-                        reportDiagnostic
+                        reportDiag
                     );
                     if (info == null)
                     {
                         isValid = false;
                         continue;
                     }
-                    var idx = hoistedSingletons.Count;
-                    hoistedSingletons.Add(info);
-                    paramSlots.Add(new RunOnceParamSlot(RunOnceParamKind.Singleton, idx));
+                    var idx = hoisted.Count;
+                    hoisted.Add(HoistedSingletonModelBuilder.FromInfo(info));
+                    slots.Add(RunOnceParamSlotModel.Singleton(idx));
                     continue;
                 }
 
@@ -321,8 +335,8 @@ namespace Trecs.SourceGen
                 {
                     if (isRef || isIn)
                     {
-                        reportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics.Add(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.ParameterMustBeByValue,
                                 param.GetLocation(),
                                 param.Identifier.Text
@@ -331,21 +345,18 @@ namespace Trecs.SourceGen
                         isValid = false;
                         continue;
                     }
-                    paramSlots.Add(new RunOnceParamSlot(RunOnceParamKind.WorldAccessor, 0));
+                    slots.Add(RunOnceParamSlotModel.WorldAccessor());
                     continue;
                 }
 
                 if (hasPassThrough)
                 {
-                    var customIndex = paramSlots.Count(s => s.Kind == RunOnceParamKind.Custom);
-                    paramSlots.Add(
-                        new RunOnceParamSlot(
-                            RunOnceParamKind.Custom,
-                            customIndex,
-                            param.Identifier.ToString(),
-                            PerformanceCache.GetDisplayString(paramType),
-                            isRef,
-                            isIn
+                    slots.Add(
+                        RunOnceParamSlotModel.Custom(
+                            paramName: param.Identifier.ToString(),
+                            paramTypeDisplay: PerformanceCache.GetDisplayString(paramType),
+                            isRef: isRef,
+                            isIn: isIn
                         )
                     );
                     continue;
@@ -353,8 +364,8 @@ namespace Trecs.SourceGen
 
                 // Anything else is an error — RunOnce methods are nothing but
                 // [SingleEntity] params + WorldAccessor + [PassThroughArgument].
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.UnrecognizedParameterType,
                         param.GetLocation(),
                         param.Identifier.Text,
@@ -364,10 +375,10 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
 
-            if (isValid && hoistedSingletons.Count == 0)
+            if (isValid && hoisted.Count == 0)
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.EmptyParameters,
                         methodDecl.ParameterList.GetLocation()
                     )
@@ -379,11 +390,11 @@ namespace Trecs.SourceGen
             // wrapper rules (TRECS043).
             if (
                 methodDecl.Identifier.Text == "Execute"
-                && paramSlots.Any(s => s.Kind == RunOnceParamKind.Custom)
+                && slots.Any(s => s.Kind == RunOnceParamKind.Custom)
             )
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.AutoSystemMethodHasCustomParams,
                         methodDecl.Identifier.GetLocation(),
                         methodDecl.Identifier.Text
@@ -392,38 +403,17 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
 
-            if (isValid)
-            {
-                validated = new ValidatedRunOnce
-                {
-                    Visibility = SymbolAnalyzer.GetMethodVisibility(methodDecl),
-                    ParamSlots = paramSlots,
-                    HoistedSingletons = hoistedSingletons,
-                };
-            }
+            paramSlots = slots.ToEquatableArray();
+            hoistedSingletons = hoisted.ToEquatableArray();
             return isValid;
         }
-
-        // (singleton classification lives in ParameterClassifier.ClassifyHoistedSingleton —
-        // RunOnceGenerator's Validate above calls into it directly.)
 
         // ─────────────────────────────────────────────────────────────────────
         // Code emission
         // ─────────────────────────────────────────────────────────────────────
 
-        private static string Emit(
-            ClassDeclarationSyntax classDecl,
-            MethodDeclarationSyntax methodDecl,
-            INamedTypeSymbol classSymbol,
-            ValidatedRunOnce info,
-            string globalNamespaceName
-        )
+        private static string Emit(RunOnceModel model, string globalNamespaceName)
         {
-            var namespaceName = SymbolAnalyzer.GetNamespace(classDecl);
-            var className = classDecl.Identifier.Text;
-            var methodName = methodDecl.Identifier.Text;
-            var visibility = info.Visibility;
-
             var sb = OptimizedStringBuilder.ForAspect(8);
 
             var namespaces = new HashSet<string>(CommonUsings.Namespaces)
@@ -433,28 +423,24 @@ namespace Trecs.SourceGen
             };
             HoistedSingleEmitter.CollectNamespaces(
                 namespaces,
-                info.HoistedSingletons,
+                model.HoistedSingletons,
                 globalNamespaceName
             );
             sb.AppendUsings(namespaces.ToArray());
 
-            // Walk the system class's containing-type chain so the emitted partial merges
-            // with a nested system class instead of landing at namespace scope.
-            var containingTypes = SymbolAnalyzer.GetContainingTypeChainInfo(classSymbol);
-
             return sb.WrapInNamespace(
-                    namespaceName,
+                    model.Namespace,
                     (b) =>
                     {
                         b.WrapInContainingTypes(
-                            containingTypes,
+                            model.ContainingTypes.ToArray(),
                             0,
                             (inner, indent) =>
                                 inner.WrapInType(
                                     "public",
                                     "class",
-                                    className,
-                                    (cb) => EmitOverload(cb, methodName, visibility, info),
+                                    model.ClassName,
+                                    (cb) => EmitOverload(cb, model),
                                     indent
                                 )
                         );
@@ -463,37 +449,37 @@ namespace Trecs.SourceGen
                 .ToString();
         }
 
-        private static void EmitOverload(
-            OptimizedStringBuilder sb,
-            string methodName,
-            string visibility,
-            ValidatedRunOnce info
-        )
+        private static void EmitOverload(OptimizedStringBuilder sb, RunOnceModel model)
         {
             var customDecl = string.Join(
                 "",
-                info.ParamSlots.Where(s => s.Kind == RunOnceParamKind.Custom)
+                model
+                    .ParamSlots.Where(s => s.Kind == RunOnceParamKind.Custom)
                     .Select(s =>
                         $", {(s.IsRef ? "ref " : s.IsIn ? "in " : "")}{s.ParamTypeDisplay} {s.ParamName}"
                     )
             );
-            sb.AppendLine(2, $"{visibility} void {methodName}(WorldAccessor __world{customDecl})");
+            sb.AppendLine(2, GeneratedCodeAttributes.Line);
+            sb.AppendLine(
+                2,
+                $"{model.Visibility} void {model.MethodName}(WorldAccessor __world{customDecl})"
+            );
             sb.AppendLine(2, "{");
 
             HoistedSingleEmitter.Emit(
                 sb,
                 indentLevel: 3,
                 worldVar: "__world",
-                info.HoistedSingletons
+                model.HoistedSingletons
             );
 
             var callArgs = new List<string>();
-            foreach (var slot in info.ParamSlots)
+            foreach (var slot in model.ParamSlots)
             {
                 switch (slot.Kind)
                 {
                     case RunOnceParamKind.Singleton:
-                        var s = info.HoistedSingletons[slot.Index];
+                        var s = model.HoistedSingletons[slot.Index];
                         callArgs.Add(s.IsRef ? $"ref __{s.ParamName}" : $"in __{s.ParamName}");
                         break;
                     case RunOnceParamKind.WorldAccessor:
@@ -509,93 +495,69 @@ namespace Trecs.SourceGen
                 }
             }
 
-            sb.AppendLine(3, $"{methodName}({string.Join(", ", callArgs)});");
+            sb.AppendLine(3, $"{model.MethodName}({string.Join(", ", callArgs)});");
             sb.AppendLine(2, "}");
             sb.AppendLine();
         }
-
-        // ─────────────────────────────────────────────────────────────────────
-        // Data carriers
-        // ─────────────────────────────────────────────────────────────────────
-
-        private enum RunOnceParamKind
-        {
-            Singleton,
-            WorldAccessor,
-            Custom,
-        }
-
-        private class RunOnceParamSlot
-        {
-            public RunOnceParamKind Kind { get; }
-
-            /// <summary>Index into the singleton or custom-param list (unused for WorldAccessor).</summary>
-            public int Index { get; }
-
-            // Custom-param fields. Singleton fields live in HoistedSingletonInfo.
-            public string ParamName { get; }
-            public string ParamTypeDisplay { get; }
-            public bool IsRef { get; }
-            public bool IsIn { get; }
-
-            public RunOnceParamSlot(RunOnceParamKind kind, int index)
-            {
-                Kind = kind;
-                Index = index;
-                ParamName = string.Empty;
-                ParamTypeDisplay = string.Empty;
-            }
-
-            public RunOnceParamSlot(
-                RunOnceParamKind kind,
-                int index,
-                string paramName,
-                string paramTypeDisplay,
-                bool isRef,
-                bool isIn
-            )
-            {
-                Kind = kind;
-                Index = index;
-                ParamName = paramName;
-                ParamTypeDisplay = paramTypeDisplay;
-                IsRef = isRef;
-                IsIn = isIn;
-            }
-        }
-
-        private class ValidatedRunOnce
-        {
-            public string Visibility = string.Empty;
-            public List<RunOnceParamSlot> ParamSlots = new();
-            public List<HoistedSingletonInfo> HoistedSingletons = new();
-        }
-
-        private class MethodData
-        {
-            public ClassDeclarationSyntax ClassDecl { get; }
-            public MethodDeclarationSyntax MethodDecl { get; }
-            public IMethodSymbol MethodSymbol { get; }
-            public bool IsValid { get; }
-            public ValidatedRunOnce? Validated { get; }
-            public ImmutableArray<Diagnostic> Diagnostics { get; }
-
-            public MethodData(
-                ClassDeclarationSyntax classDecl,
-                MethodDeclarationSyntax methodDecl,
-                IMethodSymbol methodSymbol,
-                bool isValid,
-                ValidatedRunOnce? validated,
-                ImmutableArray<Diagnostic> diagnostics
-            )
-            {
-                ClassDecl = classDecl;
-                MethodDecl = methodDecl;
-                MethodSymbol = methodSymbol;
-                IsValid = isValid;
-                Validated = validated;
-                Diagnostics = diagnostics;
-            }
-        }
     }
+
+    /// <summary>
+    /// What a parameter slot in a RunOnce method represents. The slot list is walked at
+    /// emit time to build the call to the user's method preserving declaration order.
+    /// </summary>
+    internal enum RunOnceParamKind
+    {
+        Singleton,
+        WorldAccessor,
+        Custom,
+    }
+
+    /// <summary>
+    /// Value-equality slot record for a single RunOnce parameter. <see cref="Index"/>
+    /// references <see cref="RunOnceModel.HoistedSingletons"/> for <c>Singleton</c>
+    /// kind; the custom-param fields are populated only for <c>Custom</c>; everything
+    /// else is unused.
+    /// </summary>
+    internal readonly record struct RunOnceParamSlotModel(
+        RunOnceParamKind Kind,
+        int Index,
+        string ParamName,
+        string ParamTypeDisplay,
+        bool IsRef,
+        bool IsIn
+    )
+    {
+        public static RunOnceParamSlotModel Singleton(int index) =>
+            new(RunOnceParamKind.Singleton, index, string.Empty, string.Empty, false, false);
+
+        public static RunOnceParamSlotModel WorldAccessor() =>
+            new(RunOnceParamKind.WorldAccessor, 0, string.Empty, string.Empty, false, false);
+
+        public static RunOnceParamSlotModel Custom(
+            string paramName,
+            string paramTypeDisplay,
+            bool isRef,
+            bool isIn
+        ) => new(RunOnceParamKind.Custom, 0, paramName, paramTypeDisplay, isRef, isIn);
+    }
+
+    /// <summary>
+    /// Value-equality model carried through the RunOnceGenerator pipeline. Has no
+    /// references to Roslyn symbols, syntax, or live <see cref="Diagnostic"/> objects
+    /// (diagnostics flow as <see cref="DiagnosticInfo"/> and are materialized only at
+    /// the terminal stage). That's what lets the SourceOutput step cache when an
+    /// unrelated tree edit re-runs the generator.
+    /// </summary>
+    internal readonly record struct RunOnceModel(
+        string ClassName,
+        string MethodName,
+        string Namespace,
+        string Visibility,
+        string HintFileName,
+        EquatableArray<ContainingTypeInfo> ContainingTypes,
+        EquatableArray<RunOnceParamSlotModel> ParamSlots,
+        EquatableArray<HoistedSingletonModel> HoistedSingletons,
+        bool IsValid,
+        EquatableArray<DiagnosticInfo> Diagnostics
+    );
 }

@@ -117,43 +117,6 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void ReorderRange(int startIndex, int count, NativeList<int> permutation)
-        {
-            if (count <= 1)
-            {
-                return;
-            }
-
-            unsafe
-            {
-                var elementSize = UnsafeUtility.SizeOf<TValue>();
-                var ptr = (byte*)_values.GetUnsafePtr();
-                var rangePtr = ptr + startIndex * elementSize;
-
-                // Copy the range to a temp buffer
-                var temp = new NativeArray<TValue>(
-                    count,
-                    Allocator.Temp,
-                    NativeArrayOptions.UninitializedMemory
-                );
-                UnsafeUtility.MemCpy(temp.GetUnsafePtr(), rangePtr, count * elementSize);
-
-                // Scatter-write from temp back using permutation
-                var tempPtr = (byte*)temp.GetUnsafeReadOnlyPtr();
-                for (int i = 0; i < count; i++)
-                {
-                    UnsafeUtility.MemCpy(
-                        rangePtr + i * elementSize,
-                        tempPtr + permutation[i] * elementSize,
-                        elementSize
-                    );
-                }
-
-                temp.Dispose();
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnsureCapacity(int size)
         {
             if (size > _values.Length)
@@ -214,7 +177,7 @@ namespace Trecs.Internal
             {
                 var indexToRemove = sortedDescendingIndices[i];
 
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     indexToRemove < _count,
                     "Removing an entity at an index that is out of range"
                 );
@@ -252,7 +215,7 @@ namespace Trecs.Internal
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SwapEntitiesBetweenDictionaries(
-            in DenseDictionary<int, MoveInfo> entitiesIDsToSwap,
+            FastList<MoveInfoEntry> entitiesIDsToSwap,
             GroupIndex fromgroup,
             GroupIndex togroup,
             IComponentArray toComponentsDictionary
@@ -261,7 +224,7 @@ namespace Trecs.Internal
             var toDic = (ComponentArray<TValue>)toComponentsDictionary;
 
             var iterations = entitiesIDsToSwap.Count;
-            var entitiesToSwapInfo = entitiesIDsToSwap.UnsafeValues;
+            var entitiesToSwapInfo = entitiesIDsToSwap._buffer;
 
             // The caller has already called EnsureCapacity on toDic.
             // Pre-compute destination base index so we can set toIndex without calling Add().
@@ -275,10 +238,10 @@ namespace Trecs.Internal
 
                 for (var i = 0; i < iterations; i++)
                 {
-                    ref MoveInfo swapInfo = ref entitiesToSwapInfo[i];
+                    ref MoveInfo swapInfo = ref entitiesToSwapInfo[i].Info;
                     var indexToRemove = swapInfo.ResolvedFromIndex;
 
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         indexToRemove < _count,
                         "Swapping an entity at an index that is out of range"
                     );

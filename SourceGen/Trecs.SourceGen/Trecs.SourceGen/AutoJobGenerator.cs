@@ -35,20 +35,43 @@ namespace Trecs.SourceGen
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            var methodProvider = context
+            // Equatable-pipeline shape: the transform stage produces a value-equatable
+            // AutoJobModel (strings + EquatableArrays — no symbols, no syntax nodes, no
+            // raw Diagnostics). The terminal RegisterSourceOutput stage materializes
+            // diagnostics and emits source. The compilation's global-namespace name
+            // folds in via a lightweight string Combine — required by FromWorldFieldEmit
+            // projection's namespace filtering, even though AutoJobGenerator's emitted
+            // source uses a fixed `using`s set.
+            var modelsRaw = context
                 .SyntaxProvider.CreateSyntaxProvider(
                     predicate: static (s, _) => IsCandidateMethod(s),
-                    transform: static (ctx, _) => GetAutoJobData(ctx)
+                    transform: static (ctx, _) => BuildModel(ctx)
                 )
-                .Where(static d => d is not null);
+                .Where(static m => m is not null)
+                .Select(static (m, _) => m!.Value);
 
-            var methodWithCompilation = methodProvider.Combine(context.CompilationProvider);
+            var globalNsProvider = context.CompilationProvider.Select(
+                static (c, _) =>
+                    PerformanceCache.GetDisplayString(c.GlobalNamespace) ?? string.Empty
+            );
+
+            var withGlobalNs = modelsRaw.Combine(globalNsProvider);
 
             context.RegisterSourceOutput(
-                methodWithCompilation,
-                static (spc, source) => GenerateAutoJobSource(spc, source.Left!, source.Right)
+                withGlobalNs,
+                static (spc, source) => GenerateAutoJobSource(spc, source.Left, source.Right)
             );
         }
+
+        /// <summary>
+        /// Bridge from the framework's <see cref="Action{Diagnostic}"/> callback shape
+        /// (used by shared helpers like <see cref="IterationCriteriaParser"/> and
+        /// <see cref="InlineTagsParser"/>) into the pipeline's <see cref="DiagnosticInfo"/>
+        /// accumulator. <see cref="DiagnosticInfo.FromDiagnostic"/> stashes the
+        /// pre-built message so terminal-stage materialization doesn't double-format.
+        /// </summary>
+        static Action<Diagnostic> ToBridge(Action<DiagnosticInfo> diagnostics) =>
+            d => diagnostics(DiagnosticInfo.FromDiagnostic(d));
 
         // ─── Predicate (syntax-level) ──────────────────────────────────────────
 
@@ -85,9 +108,15 @@ namespace Trecs.SourceGen
             return hasWrapAsJob && hasEntityFilter;
         }
 
-        // ─── Transform (syntax → data) ────────────────────────────────────────
+        // ─── Transform (syntax → data → model) ────────────────────────────────
 
-        static AutoJobData? GetAutoJobData(GeneratorSyntaxContext context)
+        /// <summary>
+        /// Transform stage: validates a candidate <c>[WrapAsJob]</c> method and
+        /// projects the result (success or failure) into a value-equatable
+        /// <see cref="AutoJobModel"/>. The terminal stage materializes diagnostics and
+        /// emits source from the model.
+        /// </summary>
+        static AutoJobModel? BuildModel(GeneratorSyntaxContext context)
         {
             var methodDecl = (MethodDeclarationSyntax)context.Node;
             var classDecl = methodDecl.Parent as ClassDeclarationSyntax;
@@ -104,43 +133,70 @@ namespace Trecs.SourceGen
             if (!IterationAttributeRouting.HasEntityFilter(methodSymbol))
                 return null;
 
-            return new AutoJobData(classDecl, methodDecl, methodSymbol);
+            var diagnostics = new List<DiagnosticInfo>();
+            Action<DiagnosticInfo> reporter = diagnostics.Add;
+
+            AutoJobInfo? info;
+            try
+            {
+                info = Validate(
+                    reporter,
+                    new AutoJobData(classDecl, methodDecl, methodSymbol),
+                    context.SemanticModel
+                );
+            }
+            catch (Exception ex)
+            {
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
+                        DiagnosticDescriptors.SourceGenerationError,
+                        methodDecl.GetLocation(),
+                        $"AutoJob {methodSymbol.ContainingType.Name}.{methodDecl.Identifier.Text}",
+                        ex.Message
+                    )
+                );
+                info = null;
+            }
+
+            return BuildAutoJobModelFromInfo(info, methodSymbol, methodDecl, diagnostics);
         }
 
         // ─── Source output ─────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Terminal stage: surface accumulated diagnostics, then emit source from the
+        /// AutoJobModel. Skips emission when validation failed so the user sees
+        /// diagnostics without a cascading CS error from a half-formed partial.
+        /// </summary>
         static void GenerateAutoJobSource(
             SourceProductionContext context,
-            AutoJobData data,
-            Compilation compilation
+            AutoJobModel model,
+            string globalNamespaceName
         )
         {
-            var location = data.MethodDecl.GetLocation();
+            foreach (var d in model.Diagnostics)
+                context.ReportDiagnostic(d.ToDiagnostic());
+
+            if (!model.IsValid)
+                return;
+
             try
             {
                 using var _t = SourceGenTimer.Time("AutoJobGenerator.Total");
 
-                var info = Validate(context, data, compilation);
-                if (info == null)
-                    return;
-
-                var source = GenerateSource(info);
+                var source = GenerateSource(model);
                 if (source == null)
                     return;
 
-                var fileName = SymbolAnalyzer.GetSafeFileName(
-                    data.MethodSymbol.ContainingType,
-                    $"{data.MethodDecl.Identifier.Text}_AutoJob"
-                );
-                context.AddSource(fileName, source);
-                SourceGenLogger.WriteGeneratedFile(fileName, source);
+                context.AddSource(model.HintFileName, source);
+                SourceGenLogger.WriteGeneratedFile(model.HintFileName, source);
             }
             catch (Exception ex)
             {
                 ErrorRecovery.ReportError(
                     context,
-                    location,
-                    $"AutoJob {data.MethodSymbol.ContainingType.Name}.{data.MethodDecl.Identifier.Text}",
+                    Location.None,
+                    $"AutoJob {model.ClassName}.{model.MethodName}",
                     ex
                 );
             }
@@ -149,9 +205,9 @@ namespace Trecs.SourceGen
         // ─── Validation ────────────────────────────────────────────────────────
 
         static AutoJobInfo? Validate(
-            SourceProductionContext context,
+            Action<DiagnosticInfo> diagnostics,
             AutoJobData data,
-            Compilation compilation
+            SemanticModel semanticModel
         )
         {
             var methodDecl = data.MethodDecl;
@@ -159,13 +215,12 @@ namespace Trecs.SourceGen
             var methodSymbol = data.MethodSymbol;
             var classSymbol = methodSymbol.ContainingType;
             var methodName = methodDecl.Identifier.Text;
-            var semanticModel = compilation.GetSemanticModel(methodDecl.SyntaxTree);
 
             // V2: Must be static.
             if (!methodSymbol.IsStatic)
             {
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.WrapAsJobNonStatic,
                         methodDecl.Identifier.GetLocation(),
                         methodName
@@ -177,8 +232,8 @@ namespace Trecs.SourceGen
             // V3: Class must be partial.
             if (!SymbolAnalyzer.IsPartialType(classDecl))
             {
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.NotPartialClass,
                         classDecl.Identifier.GetLocation(),
                         classSymbol.Name
@@ -190,8 +245,8 @@ namespace Trecs.SourceGen
             // V4: Must return void.
             if (!methodSymbol.ReturnsVoid)
             {
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.InvalidReturnType,
                         methodDecl.ReturnType.GetLocation()
                     )
@@ -202,8 +257,8 @@ namespace Trecs.SourceGen
             // V5: Must have at least one parameter.
             if (methodSymbol.Parameters.Length == 0)
             {
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.EmptyParameters,
                         methodDecl.GetLocation()
                     )
@@ -216,8 +271,8 @@ namespace Trecs.SourceGen
             {
                 if (t.IsGenericType)
                 {
-                    context.ReportDiagnostic(
-                        Diagnostic.Create(
+                    diagnostics(
+                        DiagnosticInfo.Create(
                             DiagnosticDescriptors.JobInsideGenericOuterTypeNotSupported,
                             methodDecl.Identifier.GetLocation(),
                             methodName,
@@ -257,8 +312,8 @@ namespace Trecs.SourceGen
                 {
                     if (hasGlobalIndex)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.InvalidJobParameterList,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 $"Method '{methodName}' has more than one [GlobalIndex] parameter — only one is allowed."
@@ -268,8 +323,8 @@ namespace Trecs.SourceGen
                     }
                     if (paramType.SpecialType != SpecialType.System_Int32)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.GlobalIndexParamMustBeInt,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName,
@@ -296,8 +351,8 @@ namespace Trecs.SourceGen
                     // Validate: no ref/out on pass-through.
                     if (param.RefKind == RefKind.Ref || param.RefKind == RefKind.Out)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.WrapAsJobRefPassThrough,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 methodName,
@@ -310,8 +365,8 @@ namespace Trecs.SourceGen
                     // Validate: must be unmanaged.
                     if (paramType.IsReferenceType)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.WrapAsJobManagedPassThrough,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 methodName,
@@ -348,8 +403,8 @@ namespace Trecs.SourceGen
                 // Check for WorldAccessor (forbidden on [WrapAsJob]).
                 if (SymbolAnalyzer.IsExactType(paramType, "WorldAccessor", TrecsNamespaces.Trecs))
                 {
-                    context.ReportDiagnostic(
-                        Diagnostic.Create(
+                    diagnostics(
+                        DiagnosticInfo.Create(
                             DiagnosticDescriptors.WrapAsJobWorldAccessorParam,
                             param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                             methodName
@@ -370,8 +425,8 @@ namespace Trecs.SourceGen
                 {
                     if (param.RefKind != RefKind.In)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.InvalidParameterModifiers,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -381,8 +436,8 @@ namespace Trecs.SourceGen
                     }
                     if (hasNwa)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.DuplicateLoopParameter,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName,
@@ -407,8 +462,8 @@ namespace Trecs.SourceGen
                 {
                     if (param.RefKind != RefKind.In)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.InvalidParameterModifiers,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -435,8 +490,8 @@ namespace Trecs.SourceGen
                 {
                     if (param.RefKind != RefKind.In)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.InvalidParameterModifiers,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -465,8 +520,8 @@ namespace Trecs.SourceGen
                 )
                 {
                     var saTypeArg = PerformanceCache.GetDisplayString(namedSa.TypeArguments[0]);
-                    context.ReportDiagnostic(
-                        Diagnostic.Create(
+                    diagnostics(
+                        DiagnosticInfo.Create(
                             DiagnosticDescriptors.SetAccessorNotAllowedInJob,
                             param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                             paramName,
@@ -484,8 +539,8 @@ namespace Trecs.SourceGen
                 {
                     if (param.RefKind != RefKind.None)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.ParameterMustBeByValue,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -495,8 +550,8 @@ namespace Trecs.SourceGen
                     }
                     if (hasEntityIndex)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.DuplicateLoopParameter,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName,
@@ -520,8 +575,8 @@ namespace Trecs.SourceGen
                 {
                     if (param.RefKind != RefKind.None)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.ParameterMustBeByValue,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -531,8 +586,8 @@ namespace Trecs.SourceGen
                     }
                     if (hasEntityHandle)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.DuplicateLoopParameter,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName,
@@ -561,8 +616,8 @@ namespace Trecs.SourceGen
                 {
                     if (param.RefKind == RefKind.Ref)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.AspectParamMustBeIn,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -572,8 +627,8 @@ namespace Trecs.SourceGen
                     }
                     if (param.RefKind != RefKind.In)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.InvalidParameterModifiers,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -583,8 +638,8 @@ namespace Trecs.SourceGen
                     }
                     if (hasAspect)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.DuplicateLoopParameter,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName,
@@ -598,8 +653,8 @@ namespace Trecs.SourceGen
                     var aspectNamedType = paramType as INamedTypeSymbol;
                     if (aspectNamedType == null)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.CouldNotResolveSymbol,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -652,8 +707,8 @@ namespace Trecs.SourceGen
                     if (hasAspect)
                     {
                         // Mixed aspect and component params are not supported.
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.MixedAspectAndComponentParams,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 methodName,
@@ -668,8 +723,8 @@ namespace Trecs.SourceGen
                     bool isIn = param.RefKind == RefKind.In;
                     if (!isRef && !isIn)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.ComponentParameterMustBeInOrRef,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -703,8 +758,8 @@ namespace Trecs.SourceGen
                     );
                     if (hasFromWorldOnSE)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.SingleEntityConflictingAttributes,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName,
@@ -720,14 +775,14 @@ namespace Trecs.SourceGen
                         "SingleEntity",
                         seParamLoc,
                         paramName,
-                        context.ReportDiagnostic
+                        ToBridge(diagnostics)
                     );
                     if (seTagTypes == null)
                         return null;
                     if (seTagTypes.Count == 0)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.SingleEntityRequiresInlineTags,
                                 seParamLoc,
                                 paramName
@@ -747,8 +802,8 @@ namespace Trecs.SourceGen
 
                     if (!seIsAspect && !seIsComponent)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.SingleEntityWrongType,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName,
@@ -762,8 +817,8 @@ namespace Trecs.SourceGen
                     {
                         if (param.RefKind != RefKind.In)
                         {
-                            context.ReportDiagnostic(
-                                Diagnostic.Create(
+                            diagnostics(
+                                DiagnosticInfo.Create(
                                     DiagnosticDescriptors.SingleEntityWrongModifier,
                                     param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                     paramName
@@ -773,8 +828,8 @@ namespace Trecs.SourceGen
                         }
                         if (paramType is not INamedTypeSymbol seAspectType)
                         {
-                            context.ReportDiagnostic(
-                                Diagnostic.Create(
+                            diagnostics(
+                                DiagnosticInfo.Create(
                                     DiagnosticDescriptors.CouldNotResolveSymbol,
                                     param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                     paramName
@@ -800,8 +855,8 @@ namespace Trecs.SourceGen
                     bool seIsIn = param.RefKind == RefKind.In;
                     if (!seIsRef && !seIsIn)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.SingleEntityWrongModifier,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -833,8 +888,8 @@ namespace Trecs.SourceGen
                     // Must be 'in' modifier.
                     if (param.RefKind != RefKind.In)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.InvalidParameterModifiers,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -846,8 +901,8 @@ namespace Trecs.SourceGen
                     var namedType = paramType as INamedTypeSymbol;
                     if (namedType == null)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.CouldNotResolveSymbol,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -869,8 +924,8 @@ namespace Trecs.SourceGen
                         || fwKind == FromWorldFieldKind.NativeComponentWrite
                     )
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.FromWorldUnsupportedOnWrapAsJob,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName,
@@ -892,7 +947,7 @@ namespace Trecs.SourceGen
                             param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                             paramName,
                             "FromWorld",
-                            context.ReportDiagnostic
+                            ToBridge(diagnostics)
                         );
                         if (tagTypes == null)
                             return null;
@@ -916,8 +971,8 @@ namespace Trecs.SourceGen
 
                     if (needsGroupResolution && inlineTagTypes == null)
                     {
-                        context.ReportDiagnostic(
-                            Diagnostic.Create(
+                        diagnostics(
+                            DiagnosticInfo.Create(
                                 DiagnosticDescriptors.FromWorldRequiresInlineTagsOnWrapAsJob,
                                 param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                                 paramName
@@ -942,8 +997,8 @@ namespace Trecs.SourceGen
                         : null;
 
                     // Use the generated struct field name as FieldName so shared emitters
-                    // can reference it as _trecs_job.{FieldName}.
-                    var fwFieldName = GenPrefix + "fw_" + paramName;
+                    // can reference it as __trecs_job.{FieldName}.
+                    var fwFieldName = FromWorldEmitter.JobFieldPrefix + "fw_" + paramName;
 
                     var fromWorldInfo = new FromWorldFieldInfo(
                         fwFieldName,
@@ -966,8 +1021,8 @@ namespace Trecs.SourceGen
                 }
 
                 // Unrecognized parameter type without [PassThroughArgument] or [FromWorld].
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.InvalidParameterList,
                         param.Locations.FirstOrDefault() ?? methodDecl.GetLocation(),
                         $"Parameter '{paramName}' of type '{PerformanceCache.GetDisplayString(paramType)}' is not recognized. "
@@ -981,8 +1036,8 @@ namespace Trecs.SourceGen
             bool hasComponents = paramSlots.Any(p => p.Role == AutoJobParamRole.Component);
             if (!hasAspect && !hasComponents)
             {
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.EmptyParameters,
                         methodDecl.GetLocation()
                     )
@@ -994,8 +1049,8 @@ namespace Trecs.SourceGen
             if (hasAspect && hasComponents)
             {
                 var offending = paramSlots.First(p => p.Role == AutoJobParamRole.Component);
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.MixedAspectAndComponentParams,
                         methodDecl.GetLocation(),
                         methodName,
@@ -1009,7 +1064,7 @@ namespace Trecs.SourceGen
             // ── Parse [ForEachEntity] criteria ──
 
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                context.ReportDiagnostic,
+                ToBridge(diagnostics),
                 methodDecl,
                 methodSymbol,
                 classSymbol.Name
@@ -1025,8 +1080,8 @@ namespace Trecs.SourceGen
                 || criteria.SetTypes.Count > 0;
             if (!hasAnyCriteria)
             {
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.WrapAsJobEmptyCriteria,
                         methodDecl.Identifier.GetLocation(),
                         methodName
@@ -1046,8 +1101,8 @@ namespace Trecs.SourceGen
                 )
             )
             {
-                context.ReportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.WrapAsJobExecutePassThrough,
                         methodDecl.Identifier.GetLocation(),
                         methodName
@@ -1073,9 +1128,284 @@ namespace Trecs.SourceGen
             );
         }
 
+        // ─── Transform → Model projection ──────────────────────────────────────
+
+        /// <summary>
+        /// Projects the symbol-bearing <see cref="AutoJobInfo"/> into the value-equatable
+        /// <see cref="AutoJobModel"/>. Called at the transform-stage boundary while
+        /// symbols are still alive; everything downstream consumes only the model.
+        /// </summary>
+        static AutoJobModel BuildAutoJobModelFromInfo(
+            AutoJobInfo? info,
+            IMethodSymbol methodSymbol,
+            MethodDeclarationSyntax methodDecl,
+            List<DiagnosticInfo> diagnostics
+        )
+        {
+            const string globalNamespaceName = "";
+
+            var classSymbol = methodSymbol.ContainingType;
+            var className = classSymbol.Name;
+            var ns = PerformanceCache.GetDisplayString(classSymbol.ContainingNamespace);
+            var containingTypes = SymbolAnalyzer
+                .GetContainingTypeChainInfo(classSymbol)
+                .ToEquatableArray();
+            var methodName = methodDecl.Identifier.Text;
+            var hintFileName = SymbolAnalyzer.GetSafeFileName(classSymbol, $"{methodName}_AutoJob");
+
+            if (info == null)
+            {
+                return new AutoJobModel(
+                    ClassName: className,
+                    Namespace: ns,
+                    ContainingTypes: containingTypes,
+                    HintFileName: hintFileName,
+                    MethodName: methodName,
+                    IsOnSystemClass: false,
+                    IterKind: AutoJobIterationKindModel.Components,
+                    Params: EquatableArray<AutoJobParamModel>.Empty,
+                    AspectData: AutoJobAspectModel.Empty,
+                    Criteria: new IterationCriteriaModel(
+                        TagTypeDisplays: EquatableArray<string>.Empty,
+                        WithoutTagTypeDisplays: EquatableArray<string>.Empty,
+                        SetTypeDisplays: EquatableArray<string>.Empty,
+                        MatchByComponents: false
+                    ),
+                    AttributeCriteriaChain: string.Empty,
+                    FromWorldFields: EquatableArray<FromWorldFieldEmitModel>.Empty,
+                    SingleEntityFields: EquatableArray<SingleEntityEmitTargetModel>.Empty,
+                    AdditionalUsings: EquatableArray<string>.Empty,
+                    IsValid: false,
+                    Diagnostics: diagnostics.ToEquatableArray()
+                );
+            }
+
+            // Build the FromWorld emits and SingleEntity targets as flat arrays in
+            // param-declaration order, then point each param model at its slot via
+            // FromWorldIndex / SingleEntityIndex.
+            var fromWorldEmits = new List<FromWorldFieldEmitModel>();
+            var singleEntityTargets = new List<SingleEntityEmitTargetModel>();
+            var paramModels = new AutoJobParamModel[info.Params.Count];
+            var additionalUsings = new HashSet<string>();
+
+            for (int i = 0; i < info.Params.Count; i++)
+            {
+                var p = info.Params[i];
+                int fwIdx = -1;
+                int seIdx = -1;
+                bool seAspectHasWrites = false;
+
+                switch (p.Role)
+                {
+                    case AutoJobParamRole.NativeSetRead:
+                    case AutoJobParamRole.NativeSetCommandBuffer:
+                        if (p.SetTypeArgSymbol != null)
+                        {
+                            AddNamespace(additionalUsings, p.SetTypeArgSymbol.ContainingNamespace);
+                            if (p.SetTypeArgSymbol.ContainingType != null)
+                                AddNamespace(
+                                    additionalUsings,
+                                    p.SetTypeArgSymbol.ContainingType.ContainingNamespace
+                                );
+                        }
+                        break;
+
+                    case AutoJobParamRole.FromWorld:
+                        if (p.Type != null)
+                        {
+                            AddNamespace(additionalUsings, p.Type.ContainingNamespace);
+                            if (p.Type is INamedTypeSymbol { ContainingType: { } ct })
+                                AddNamespace(additionalUsings, ct.ContainingNamespace);
+                        }
+                        var fwInfo = p.FromWorldInfo!;
+                        if (fwInfo.InlineTagTypes != null)
+                        {
+                            foreach (var tagType in fwInfo.InlineTagTypes)
+                                AddNamespace(additionalUsings, tagType.ContainingNamespace);
+                        }
+                        if (fwInfo.GenericArgument != null)
+                            AddNamespace(
+                                additionalUsings,
+                                fwInfo.GenericArgument.ContainingNamespace
+                            );
+
+                        var fwEmit = FromWorldFieldEmit.Build(fwInfo, suppressScheduleParam: true);
+                        fwIdx = fromWorldEmits.Count;
+                        fromWorldEmits.Add(
+                            FromWorldFieldEmitModel.From(fwEmit, globalNamespaceName)
+                        );
+                        break;
+
+                    case AutoJobParamRole.SingleEntityAspect:
+                        seIdx = singleEntityTargets.Count;
+                        seAspectHasWrites =
+                            p.SingleEntityAspectData != null
+                            && p.SingleEntityAspectData.WriteTypes.Length > 0;
+                        singleEntityTargets.Add(ProjectSingleEntityParam(p, globalNamespaceName));
+                        break;
+
+                    case AutoJobParamRole.SingleEntityComponentRead:
+                    case AutoJobParamRole.SingleEntityComponentWrite:
+                        seIdx = singleEntityTargets.Count;
+                        singleEntityTargets.Add(ProjectSingleEntityParam(p, globalNamespaceName));
+                        break;
+                }
+
+                paramModels[i] = new AutoJobParamModel(
+                    Role: ProjectRole(p.Role),
+                    Name: p.Name,
+                    TypeDisplay: p.TypeDisplay,
+                    IsRef: p.IsRef,
+                    BufferIndex: p.BufferIndex,
+                    SetTypeArg: p.SetTypeArg ?? string.Empty,
+                    FromWorldIndex: fwIdx,
+                    SingleEntityIndex: seIdx,
+                    SingleEntityAspectHasWrites: seAspectHasWrites
+                );
+            }
+
+            // Aspect data (slim — components + name only).
+            var aspectModel = AutoJobAspectModel.Empty;
+            if (info.IterKind == AutoJobIterationKind.Aspect)
+            {
+                var ai = info.AspectData!;
+                var entries = new AspectBufferEntry[ai.ComponentTypes.Count];
+                for (int i = 0; i < ai.ComponentTypes.Count; i++)
+                {
+                    var t = ai.ComponentTypes[i];
+                    entries[i] = new AspectBufferEntry(
+                        TypeDisplay: PerformanceCache.GetDisplayString(t),
+                        VarName: ComponentTypeHelper.GetComponentVariableName(t),
+                        IsWrite: !ai.IsReadOnly(t)
+                    );
+                }
+                aspectModel = new AutoJobAspectModel(
+                    AspectTypeName: ai.AspectTypeName,
+                    Components: new EquatableArray<AspectBufferEntry>(entries)
+                );
+            }
+
+            // Attribute-criteria chain — precomputed at the transform boundary so the
+            // emitter doesn't need ITypeSymbols.
+            IEnumerable<ITypeSymbol> componentTypes =
+                info.IterKind == AutoJobIterationKind.Aspect
+                    ? (IEnumerable<ITypeSymbol>)info.AspectData!.ComponentTypes
+                    : info
+                        .Params.Where(p => p.Role == AutoJobParamRole.Component)
+                        .Select(p => p.Type!);
+            var attributeChain = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                info.Criteria.TagTypes,
+                info.Criteria.MatchByComponents,
+                componentTypes,
+                info.Criteria.WithoutTagTypes
+            );
+
+            bool isOnSystemClass = classSymbol.AllInterfaces.Any(i =>
+                i.Name == "ISystem" && SymbolAnalyzer.IsInNamespace(i.ContainingNamespace, "Trecs")
+            );
+
+            return new AutoJobModel(
+                ClassName: className,
+                Namespace: ns,
+                ContainingTypes: containingTypes,
+                HintFileName: hintFileName,
+                MethodName: methodName,
+                IsOnSystemClass: isOnSystemClass,
+                IterKind: info.IterKind == AutoJobIterationKind.Aspect
+                    ? AutoJobIterationKindModel.Aspect
+                    : AutoJobIterationKindModel.Components,
+                Params: new EquatableArray<AutoJobParamModel>(paramModels),
+                AspectData: aspectModel,
+                Criteria: JobModelBuilders.BuildCriteria(info.Criteria),
+                AttributeCriteriaChain: attributeChain,
+                FromWorldFields: fromWorldEmits.ToEquatableArray(),
+                SingleEntityFields: singleEntityTargets.ToEquatableArray(),
+                AdditionalUsings: additionalUsings.OrderBy(u => u).ToEquatableArray(),
+                IsValid: true,
+                Diagnostics: diagnostics.ToEquatableArray()
+            );
+        }
+
+        static void AddNamespace(HashSet<string> usings, INamespaceSymbol? ns)
+        {
+            if (ns == null)
+                return;
+            var s = PerformanceCache.GetDisplayString(ns);
+            if (!string.IsNullOrEmpty(s) && s != "<global namespace>")
+                usings.Add(s);
+        }
+
+        static AutoJobParamRoleKind ProjectRole(AutoJobParamRole r) =>
+            r switch
+            {
+                AutoJobParamRole.Aspect => AutoJobParamRoleKind.Aspect,
+                AutoJobParamRole.Component => AutoJobParamRoleKind.Component,
+                AutoJobParamRole.EntityIndex => AutoJobParamRoleKind.EntityIndex,
+                AutoJobParamRole.EntityHandle => AutoJobParamRoleKind.EntityHandle,
+                AutoJobParamRole.GlobalIndex => AutoJobParamRoleKind.GlobalIndex,
+                AutoJobParamRole.NativeWorldAccessor => AutoJobParamRoleKind.NativeWorldAccessor,
+                AutoJobParamRole.PassThrough => AutoJobParamRoleKind.PassThrough,
+                AutoJobParamRole.NativeSetRead => AutoJobParamRoleKind.NativeSetRead,
+                AutoJobParamRole.NativeSetCommandBuffer =>
+                    AutoJobParamRoleKind.NativeSetCommandBuffer,
+                AutoJobParamRole.FromWorld => AutoJobParamRoleKind.FromWorld,
+                AutoJobParamRole.SingleEntityAspect => AutoJobParamRoleKind.SingleEntityAspect,
+                AutoJobParamRole.SingleEntityComponentRead =>
+                    AutoJobParamRoleKind.SingleEntityComponentRead,
+                AutoJobParamRole.SingleEntityComponentWrite =>
+                    AutoJobParamRoleKind.SingleEntityComponentWrite,
+                _ => AutoJobParamRoleKind.Component,
+            };
+
+        static SingleEntityEmitTargetModel ProjectSingleEntityParam(
+            AutoJobParam p,
+            string globalNamespaceName
+        )
+        {
+            string aspectTypeDisplay =
+                p.Role == AutoJobParamRole.SingleEntityAspect ? p.TypeDisplay : string.Empty;
+            string componentTypeDisplay = p.Role
+                is AutoJobParamRole.SingleEntityComponentRead
+                    or AutoJobParamRole.SingleEntityComponentWrite
+                ? p.TypeDisplay
+                : string.Empty;
+            string lhs = p.Role switch
+            {
+                AutoJobParamRole.SingleEntityAspect =>
+                    $"{FromWorldEmitter.JobFieldPrefix}se_{p.Name}",
+                AutoJobParamRole.SingleEntityComponentRead =>
+                    $"{FromWorldEmitter.JobFieldPrefix}se_{p.Name}_read",
+                AutoJobParamRole.SingleEntityComponentWrite =>
+                    $"{FromWorldEmitter.JobFieldPrefix}se_{p.Name}_write",
+                _ => p.Name,
+            };
+            var aspectData =
+                p.SingleEntityAspectData != null
+                    ? AspectAttributeDataModelBuilder.FromData(
+                        p.SingleEntityAspectData,
+                        globalNamespaceName
+                    )
+                    : AspectAttributeDataModel.Empty;
+            var tags = (p.SingleEntityTags ?? new List<ITypeSymbol>())
+                .Select(PerformanceCache.GetDisplayString)
+                .ToEquatableArray();
+            return new SingleEntityEmitTargetModel(
+                LocalNameRoot: p.Name,
+                JobFieldAssignmentLhs: lhs,
+                IsAspect: p.Role == AutoJobParamRole.SingleEntityAspect,
+                IsComponentWrite: p.Role == AutoJobParamRole.SingleEntityComponentWrite,
+                TagTypeDisplays: tags,
+                AspectData: aspectData,
+                AspectTypeDisplay: aspectTypeDisplay,
+                ComponentTypeDisplay: componentTypeDisplay
+            );
+        }
+
         // ─── Emission ──────────────────────────────────────────────────────────
 
-        static string GenerateSource(AutoJobInfo info)
+        static string BufferFieldName(int index) => FromWorldEmitter.JobFieldPrefix + "buf" + index;
+
+        static string GenerateSource(in AutoJobModel model)
         {
             var sb = new StringBuilder();
             var usings = new HashSet<string>(CommonUsings.Namespaces)
@@ -1083,119 +1413,47 @@ namespace Trecs.SourceGen
                 "Unity.Collections",
                 "Unity.Jobs",
             };
-
-            // Add namespaces for NativeSetRead/NativeSetCommandBuffer type arguments.
-            foreach (var p in info.Params)
-            {
-                if (
-                    (
-                        p.Role == AutoJobParamRole.NativeSetRead
-                        || p.Role == AutoJobParamRole.NativeSetCommandBuffer
-                    )
-                    && p.SetTypeArgSymbol != null
-                )
-                {
-                    var ns2 = PerformanceCache.GetDisplayString(
-                        p.SetTypeArgSymbol.ContainingNamespace
-                    );
-                    if (!string.IsNullOrEmpty(ns2) && ns2 != "<global namespace>")
-                        usings.Add(ns2);
-                    if (p.SetTypeArgSymbol.ContainingType != null)
-                    {
-                        var ctNs = PerformanceCache.GetDisplayString(
-                            p.SetTypeArgSymbol.ContainingType.ContainingNamespace
-                        );
-                        if (!string.IsNullOrEmpty(ctNs) && ctNs != "<global namespace>")
-                            usings.Add(ctNs);
-                    }
-                }
-            }
-
-            // Add namespaces for [FromWorld] parameter types and their inline tag types.
-            foreach (var p in info.Params)
-            {
-                if (p.Role != AutoJobParamRole.FromWorld || p.Type == null)
-                    continue;
-                // The parameter type itself (e.g., MealNutritionView.NativeFactory).
-                var fwNs = PerformanceCache.GetDisplayString(p.Type.ContainingNamespace);
-                if (!string.IsNullOrEmpty(fwNs) && fwNs != "<global namespace>")
-                    usings.Add(fwNs);
-                if (p.Type is INamedTypeSymbol { ContainingType: { } ct })
-                {
-                    var ctNs = PerformanceCache.GetDisplayString(ct.ContainingNamespace);
-                    if (!string.IsNullOrEmpty(ctNs) && ctNs != "<global namespace>")
-                        usings.Add(ctNs);
-                }
-                // Inline tag types.
-                var fwInfo = p.FromWorldInfo;
-                if (fwInfo?.InlineTagTypes != null)
-                {
-                    foreach (var tagType in fwInfo.InlineTagTypes)
-                    {
-                        var tagNs = PerformanceCache.GetDisplayString(tagType.ContainingNamespace);
-                        if (!string.IsNullOrEmpty(tagNs) && tagNs != "<global namespace>")
-                            usings.Add(tagNs);
-                    }
-                }
-                // Generic argument type.
-                if (fwInfo?.GenericArgument != null)
-                {
-                    var gaNs = PerformanceCache.GetDisplayString(
-                        fwInfo.GenericArgument.ContainingNamespace
-                    );
-                    if (!string.IsNullOrEmpty(gaNs) && gaNs != "<global namespace>")
-                        usings.Add(gaNs);
-                }
-            }
+            foreach (var u in model.AdditionalUsings)
+                usings.Add(u);
 
             foreach (var u in usings.OrderBy(u => u))
                 sb.AppendLine($"using {u};");
             sb.AppendLine();
 
-            var ns = PerformanceCache.GetDisplayString(info.ClassSymbol.ContainingNamespace);
-            sb.AppendLine($"namespace {ns}");
+            sb.AppendLine($"namespace {model.Namespace}");
             sb.AppendLine("{");
 
-            // Walk up containing types so the partial class is emitted in its proper
-            // nesting context (matching the user's source declaration).
-            var nesting = new List<INamedTypeSymbol>();
-            for (var t = info.ClassSymbol.ContainingType; t != null; t = t.ContainingType)
-                nesting.Add(t);
-            nesting.Reverse();
-
             int indent = 1;
-            foreach (var enclosing in nesting)
+            foreach (var enclosing in model.ContainingTypes)
             {
                 string enclosingInd = new(' ', indent * 4);
-                string enclosingKind = enclosing.TypeKind == TypeKind.Struct ? "struct" : "class";
-                sb.AppendLine($"{enclosingInd}partial {enclosingKind} {enclosing.Name}");
+                sb.AppendLine($"{enclosingInd}partial {enclosing.Kind} {enclosing.Name}");
                 sb.AppendLine($"{enclosingInd}{{");
                 indent++;
             }
 
             string ind = new(' ', indent * 4);
-            sb.AppendLine($"{ind}partial class {info.ClassSymbol.Name}");
+            sb.AppendLine($"{ind}partial class {model.ClassName}");
             sb.AppendLine($"{ind}{{");
             indent++;
             ind = new string(' ', indent * 4);
 
-            EmitJobStruct(sb, info, ind, indent);
+            EmitJobStruct(sb, model, ind);
             sb.AppendLine();
-            if (info.HasSets)
+            if (model.HasSets)
             {
-                EmitSparseShim(sb, info, ind);
+                EmitSparseShim(sb, model, ind);
                 sb.AppendLine();
             }
-            EmitScheduleOverloads(sb, info, ind);
+            EmitScheduleOverloads(sb, model, ind);
             sb.AppendLine();
-            EmitWrapperMethod(sb, info, ind);
+            EmitWrapperMethod(sb, model, ind);
 
             indent--;
             ind = new string(' ', indent * 4);
             sb.AppendLine($"{ind}}}");
 
-            // Close enclosing types.
-            for (int i = 0; i < nesting.Count; i++)
+            for (int i = 0; i < model.ContainingTypes.Length; i++)
             {
                 indent--;
                 string closingInd = new(' ', indent * 4);
@@ -1209,31 +1467,29 @@ namespace Trecs.SourceGen
 
         // ─── Job struct emission ───────────────────────────────────────────────
 
-        static string BufferFieldName(int index) => GenPrefix + "buf" + index;
-
-        static void EmitJobStruct(StringBuilder sb, AutoJobInfo info, string ind, int indent)
+        static void EmitJobStruct(StringBuilder sb, in AutoJobModel model, string ind)
         {
-            var jobStructName = $"_{info.MethodName}_AutoJob";
+            var jobStructName = $"_{model.MethodName}_AutoJob";
 
             sb.AppendLine($"{ind}[Unity.Burst.BurstCompile]");
             sb.AppendLine($"{ind}{GeneratedCodeAttributes.Line}");
-            sb.AppendLine($"{ind}private partial struct {jobStructName} : IJobFor");
+            sb.AppendLine($"{ind}private partial struct {jobStructName} : IJobParallelForBatch");
             sb.AppendLine($"{ind}{{");
 
             string fieldInd = ind + "    ";
 
             // Buffer fields for iteration.
-            var buffers = GetIterationBuffers(info);
+            var buffers = model.IterationBuffers;
             for (int i = 0; i < buffers.Count; i++)
             {
-                var (type, readOnly) = buffers[i];
+                var (typeName, readOnly) = buffers[i];
                 if (!readOnly)
                     sb.AppendLine(
                         $"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]"
                     );
                 var bufferType = readOnly
-                    ? $"NativeComponentBufferRead<{PerformanceCache.GetDisplayString(type)}>"
-                    : $"NativeComponentBufferWrite<{PerformanceCache.GetDisplayString(type)}>";
+                    ? $"NativeComponentBufferRead<{typeName}>"
+                    : $"NativeComponentBufferWrite<{typeName}>";
                 sb.AppendLine($"{fieldInd}internal {bufferType} {BufferFieldName(i)};");
             }
 
@@ -1241,133 +1497,155 @@ namespace Trecs.SourceGen
                 sb,
                 fieldInd,
                 visibility: "internal",
-                needsGroupField: info.NeedsGroupField,
-                needsGlobalIndexOffset: info.NeedsGlobalIndexOffset,
-                hasNativeWorldAccessor: info.HasNativeWorldAccessor,
-                needsEntityHandleBuffer: info.NeedsEntityHandleBuffer
+                needsGroupField: model.NeedsGroupField,
+                needsGlobalIndexOffset: model.NeedsGlobalIndexOffset,
+                hasNativeWorldAccessor: model.HasNativeWorldAccessor,
+                needsEntityHandleBuffer: model.NeedsEntityHandleBuffer
             );
 
             // PassThrough fields.
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
-                if (p.Role == AutoJobParamRole.PassThrough)
-                    sb.AppendLine($"{fieldInd}public {p.TypeDisplay} {GenPrefix}pt_{p.Name};");
+                if (p.Role == AutoJobParamRoleKind.PassThrough)
+                    sb.AppendLine(
+                        $"{fieldInd}public {p.TypeDisplay} {FromWorldEmitter.JobFieldPrefix}pt_{p.Name};"
+                    );
             }
 
             // NativeSetRead fields.
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
-                if (p.Role == AutoJobParamRole.NativeSetRead)
+                if (p.Role == AutoJobParamRoleKind.NativeSetRead)
                     sb.AppendLine(
-                        $"{fieldInd}public NativeSetRead<{p.SetTypeArg}> {GenPrefix}nsr_{p.Name};"
+                        $"{fieldInd}public NativeSetRead<{p.SetTypeArg}> {FromWorldEmitter.JobFieldPrefix}nsr_{p.Name};"
                     );
             }
 
             // NativeSetCommandBuffer fields.
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
-                if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
+                if (p.Role == AutoJobParamRoleKind.NativeSetCommandBuffer)
                     sb.AppendLine(
-                        $"{fieldInd}public NativeSetCommandBuffer<{p.SetTypeArg}> {GenPrefix}nscb_{p.Name};"
+                        $"{fieldInd}public NativeSetCommandBuffer<{p.SetTypeArg}> {FromWorldEmitter.JobFieldPrefix}nscb_{p.Name};"
                     );
             }
 
             // FromWorld fields.
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
-                if (p.Role != AutoJobParamRole.FromWorld)
+                if (p.Role != AutoJobParamRoleKind.FromWorld)
                     continue;
-                var fwKind = p.FromWorldInfo!.Kind;
+                var fwModel = model.FromWorldFields[p.FromWorldIndex];
                 bool isWrite =
-                    fwKind == FromWorldFieldKind.NativeComponentBufferWrite
-                    || fwKind == FromWorldFieldKind.NativeComponentLookupWrite;
+                    fwModel.Kind == FromWorldFieldKind.NativeComponentBufferWrite
+                    || fwModel.Kind == FromWorldFieldKind.NativeComponentLookupWrite;
                 if (isWrite)
                     sb.AppendLine(
                         $"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]"
                     );
-                sb.AppendLine($"{fieldInd}public {p.TypeDisplay} {GenPrefix}fw_{p.Name};");
+                sb.AppendLine(
+                    $"{fieldInd}public {p.TypeDisplay} {FromWorldEmitter.JobFieldPrefix}fw_{p.Name};"
+                );
             }
 
-            // [SingleEntity] fields. Aspect-typed → store the materialized aspect
-            // directly (it's just an EntityIndex + buffer refs struct, all
-            // job-safe); component-typed → NativeComponentRead/Write wrappers (these
-            // already encapsulate the EntityIndex internally, accessed via .Value).
-            //
-            // Aspects with IWrite components contain a NativeComponentBufferWrite,
-            // which Unity's safety system flags on parallel jobs unless we add
-            // [NativeDisableParallelForRestriction]. (Read-only aspects get a
-            // NativeComponentBufferRead, which is read-only-typed and needs no
-            // attribute.)
-            foreach (var p in info.Params)
+            // [SingleEntity] fields.
+            foreach (var p in model.Params)
             {
                 switch (p.Role)
                 {
-                    case AutoJobParamRole.SingleEntityAspect:
-                        bool aspectHasWrites =
-                            p.SingleEntityAspectData != null
-                            && p.SingleEntityAspectData.WriteTypes.Length > 0;
-                        if (aspectHasWrites)
+                    case AutoJobParamRoleKind.SingleEntityAspect:
+                        if (p.SingleEntityAspectHasWrites)
                             sb.AppendLine(
                                 $"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]"
                             );
-                        sb.AppendLine($"{fieldInd}public {p.TypeDisplay} {GenPrefix}se_{p.Name};");
-                        break;
-                    case AutoJobParamRole.SingleEntityComponentRead:
                         sb.AppendLine(
-                            $"{fieldInd}public NativeComponentRead<{p.TypeDisplay}> {GenPrefix}se_{p.Name}_read;"
+                            $"{fieldInd}public {p.TypeDisplay} {FromWorldEmitter.JobFieldPrefix}se_{p.Name};"
                         );
                         break;
-                    case AutoJobParamRole.SingleEntityComponentWrite:
+                    case AutoJobParamRoleKind.SingleEntityComponentRead:
+                        sb.AppendLine(
+                            $"{fieldInd}public NativeComponentRead<{p.TypeDisplay}> {FromWorldEmitter.JobFieldPrefix}se_{p.Name}_read;"
+                        );
+                        break;
+                    case AutoJobParamRoleKind.SingleEntityComponentWrite:
                         sb.AppendLine(
                             $"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]"
                         );
                         sb.AppendLine(
-                            $"{fieldInd}public NativeComponentWrite<{p.TypeDisplay}> {GenPrefix}se_{p.Name}_write;"
+                            $"{fieldInd}public NativeComponentWrite<{p.TypeDisplay}> {FromWorldEmitter.JobFieldPrefix}se_{p.Name}_write;"
                         );
                         break;
                 }
             }
 
+            // Per-worker timing buffer + thread index. See RuntimeJobScheduler's
+            // RegisterJobTimings doc for the buffer layout. Both fields are
+            // populated by the generated ScheduleParallel_ method; the Execute
+            // shim writes ProfilerUnsafeUtility.Timestamp values into the buffer.
+            sb.AppendLine($"{fieldInd}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine($"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]");
+            sb.AppendLine(
+                $"{fieldInd}internal Unity.Collections.NativeArray<long> {FromWorldEmitter.JobFieldPrefix}timing;"
+            );
+            sb.AppendLine($"{fieldInd}[Unity.Collections.LowLevel.Unsafe.NativeSetThreadIndex]");
+            sb.AppendLine($"{fieldInd}internal int {FromWorldEmitter.JobFieldPrefix}threadIndex;");
+            sb.AppendLine($"{fieldInd}#endif");
+
             sb.AppendLine();
 
-            // Execute(int i) shim.
-            EmitExecuteShim(sb, info, fieldInd, indent + 1);
+            EmitExecuteShim(sb, model, fieldInd);
 
             sb.AppendLine($"{ind}}}");
         }
 
-        static void EmitExecuteShim(StringBuilder sb, AutoJobInfo info, string ind, int indent)
+        static void EmitExecuteShim(StringBuilder sb, in AutoJobModel model, string ind)
         {
-            sb.AppendLine($"{ind}public void Execute(int i)");
+            // IJobParallelForBatch: Execute is called once per batch with (start, count).
+            // The inner for-loop iterates the batch using `i`, which downstream emit code
+            // already references (buffer indexing, EntityIndex construction, etc.). Burst
+            // typically inlines this loop just like it would the per-index IJobFor thunk,
+            // so release-mode codegen is effectively equivalent; the win is a single
+            // pair of timestamp reads per batch instead of per-index when profiling is on.
+            sb.AppendLine($"{ind}public void Execute(int {GenPrefix}start, int {GenPrefix}count)");
             sb.AppendLine($"{ind}{{");
-            string body = ind + "    ";
+            string outer = ind + "    ";
 
-            // Build EntityIndex if needed by any param.
+            // Start-of-batch worker timestamp (one read per Execute call, not per-index).
+            sb.AppendLine($"{outer}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine(
+                $"{outer}var {GenPrefix}t0 = Unity.Profiling.LowLevel.Unsafe.ProfilerUnsafeUtility.Timestamp;"
+            );
+            sb.AppendLine($"{outer}#endif");
+
+            sb.AppendLine(
+                $"{outer}for (int i = {GenPrefix}start; i < {GenPrefix}start + {GenPrefix}count; i++)"
+            );
+            sb.AppendLine($"{outer}{{");
+            string body = outer + "    ";
+
             bool needsEntityIndex =
-                info.HasEntityIndex || info.IterKind == AutoJobIterationKind.Aspect;
+                model.HasEntityIndex || model.IterKind == AutoJobIterationKindModel.Aspect;
             if (needsEntityIndex)
                 sb.AppendLine(
-                    $"{body}var {GenPrefix}ei = new EntityIndex(i, {GenPrefix}GroupIndex);"
+                    $"{body}var {GenPrefix}ei = new EntityIndex(i, {FromWorldEmitter.JobFieldPrefix}GroupIndex);"
                 );
 
-            if (info.IterKind == AutoJobIterationKind.Aspect)
+            if (model.IterKind == AutoJobIterationKindModel.Aspect)
             {
-                // Construct the aspect from EntityIndex + buffer fields.
-                var aspectInfo = info.AspectData!;
+                var ad = model.AspectData;
                 var ctorArgs = string.Join(
                     ", ",
-                    Enumerable.Range(0, aspectInfo.ComponentTypes.Count).Select(BufferFieldName)
+                    Enumerable.Range(0, ad.Components.Length).Select(BufferFieldName)
                 );
                 sb.AppendLine(
-                    $"{body}var {GenPrefix}view = new {aspectInfo.AspectTypeName}({GenPrefix}ei, {ctorArgs});"
+                    $"{body}var {GenPrefix}view = new {ad.AspectTypeName}({GenPrefix}ei, {ctorArgs});"
                 );
             }
             else
             {
-                // Components path: create ref locals from buffers.
-                foreach (var p in info.Params)
+                foreach (var p in model.Params)
                 {
-                    if (p.Role != AutoJobParamRole.Component)
+                    if (p.Role != AutoJobParamRoleKind.Component)
                         continue;
                     var refKind = p.IsRef ? "ref" : "ref readonly";
                     sb.AppendLine(
@@ -1376,87 +1654,132 @@ namespace Trecs.SourceGen
                 }
             }
 
-            // [SingleEntity] preamble. Aspect-typed singletons are stored as fields
-            // directly (the field IS the materialized aspect — no preamble needed,
-            // the call args reference the field by name). Component-typed singletons
-            // need a ref/ref-readonly alias into the wrapper's .Value so the user
-            // method's `in`/`ref` parameter binds to the buffer slot rather than a
-            // copy.
-            foreach (var p in info.Params)
+            // [SingleEntity] preamble. Component-typed singletons get a ref/ref-readonly
+            // alias into the wrapper's .Value so the user method's parameter binds to
+            // the buffer slot rather than a copy.
+            foreach (var p in model.Params)
             {
                 switch (p.Role)
                 {
-                    case AutoJobParamRole.SingleEntityComponentRead:
+                    case AutoJobParamRoleKind.SingleEntityComponentRead:
                         sb.AppendLine(
-                            $"{body}ref readonly var {GenPrefix}se_{p.Name} = ref {GenPrefix}se_{p.Name}_read.Value;"
+                            $"{body}ref readonly var {GenPrefix}se_{p.Name} = ref {FromWorldEmitter.JobFieldPrefix}se_{p.Name}_read.Value;"
                         );
                         break;
-                    case AutoJobParamRole.SingleEntityComponentWrite:
+                    case AutoJobParamRoleKind.SingleEntityComponentWrite:
                         sb.AppendLine(
-                            $"{body}ref var {GenPrefix}se_{p.Name} = ref {GenPrefix}se_{p.Name}_write.Value;"
+                            $"{body}ref var {GenPrefix}se_{p.Name} = ref {FromWorldEmitter.JobFieldPrefix}se_{p.Name}_write.Value;"
                         );
                         break;
                 }
             }
 
-            // Build the call arguments in original parameter order.
-            var className = PerformanceCache.GetDisplayString(info.ClassSymbol);
+            var className =
+                model.ContainingTypes.Length == 0
+                    ? model.Namespace + "." + model.ClassName
+                    : BuildClassChainDisplay(model);
             var callArgs = new List<string>();
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
                 switch (p.Role)
                 {
-                    case AutoJobParamRole.Aspect:
+                    case AutoJobParamRoleKind.Aspect:
                         callArgs.Add($"in {GenPrefix}view");
                         break;
-                    case AutoJobParamRole.Component:
+                    case AutoJobParamRoleKind.Component:
                         var prefix = p.IsRef ? "ref" : "in";
                         callArgs.Add($"{prefix} {GenPrefix}v{p.BufferIndex}");
                         break;
-                    case AutoJobParamRole.EntityIndex:
+                    case AutoJobParamRoleKind.EntityIndex:
                         callArgs.Add($"{GenPrefix}ei");
                         break;
-                    case AutoJobParamRole.EntityHandle:
-                        callArgs.Add($"{GenPrefix}EntityHandles[i]");
+                    case AutoJobParamRoleKind.EntityHandle:
+                        callArgs.Add($"{FromWorldEmitter.JobFieldPrefix}EntityHandles[i]");
                         break;
-                    case AutoJobParamRole.GlobalIndex:
-                        callArgs.Add($"{GenPrefix}GlobalIndexOffset + i");
+                    case AutoJobParamRoleKind.GlobalIndex:
+                        callArgs.Add($"{FromWorldEmitter.JobFieldPrefix}GlobalIndexOffset + i");
                         break;
-                    case AutoJobParamRole.NativeWorldAccessor:
-                        callArgs.Add($"in {GenPrefix}nwa");
+                    case AutoJobParamRoleKind.NativeWorldAccessor:
+                        callArgs.Add($"in {FromWorldEmitter.JobFieldPrefix}nwa");
                         break;
-                    case AutoJobParamRole.PassThrough:
-                        callArgs.Add($"{GenPrefix}pt_{p.Name}");
+                    case AutoJobParamRoleKind.PassThrough:
+                        callArgs.Add($"{FromWorldEmitter.JobFieldPrefix}pt_{p.Name}");
                         break;
-                    case AutoJobParamRole.NativeSetRead:
-                        callArgs.Add($"in {GenPrefix}nsr_{p.Name}");
+                    case AutoJobParamRoleKind.NativeSetRead:
+                        callArgs.Add($"in {FromWorldEmitter.JobFieldPrefix}nsr_{p.Name}");
                         break;
-                    case AutoJobParamRole.NativeSetCommandBuffer:
-                        callArgs.Add($"in {GenPrefix}nscb_{p.Name}");
+                    case AutoJobParamRoleKind.NativeSetCommandBuffer:
+                        callArgs.Add($"in {FromWorldEmitter.JobFieldPrefix}nscb_{p.Name}");
                         break;
-                    case AutoJobParamRole.FromWorld:
-                        callArgs.Add($"in {GenPrefix}fw_{p.Name}");
+                    case AutoJobParamRoleKind.FromWorld:
+                        callArgs.Add($"in {FromWorldEmitter.JobFieldPrefix}fw_{p.Name}");
                         break;
-                    case AutoJobParamRole.SingleEntityAspect:
-                    case AutoJobParamRole.SingleEntityComponentRead:
+                    case AutoJobParamRoleKind.SingleEntityAspect:
+                        callArgs.Add($"in {FromWorldEmitter.JobFieldPrefix}se_{p.Name}");
+                        break;
+                    case AutoJobParamRoleKind.SingleEntityComponentRead:
                         callArgs.Add($"in {GenPrefix}se_{p.Name}");
                         break;
-                    case AutoJobParamRole.SingleEntityComponentWrite:
+                    case AutoJobParamRoleKind.SingleEntityComponentWrite:
                         callArgs.Add($"ref {GenPrefix}se_{p.Name}");
                         break;
                 }
             }
 
-            sb.AppendLine($"{body}{className}.{info.MethodName}({string.Join(", ", callArgs)});");
+            sb.AppendLine($"{body}{className}.{model.MethodName}({string.Join(", ", callArgs)});");
+
+            // Close the per-batch for-loop.
+            sb.AppendLine($"{outer}}}");
+
+            // End-of-batch worker timestamp. Per JobTimingEntry layout:
+            //   slot[0] = first-seen timestamp on this thread (sentinel 0 if untouched)
+            //   slot[1] = last-seen timestamp (last call wins)
+            //   slot[2] += delta — accumulates per-batch CPU on this worker
+            sb.AppendLine($"{outer}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine(
+                $"{outer}var {GenPrefix}t1 = Unity.Profiling.LowLevel.Unsafe.ProfilerUnsafeUtility.Timestamp;"
+            );
+            sb.AppendLine(
+                $"{outer}var {GenPrefix}tbase = {FromWorldEmitter.JobFieldPrefix}threadIndex * 3;"
+            );
+            sb.AppendLine(
+                $"{outer}if ({FromWorldEmitter.JobFieldPrefix}timing[{GenPrefix}tbase] == 0)"
+            );
+            sb.AppendLine(
+                $"{outer}    {FromWorldEmitter.JobFieldPrefix}timing[{GenPrefix}tbase] = {GenPrefix}t0;"
+            );
+            sb.AppendLine(
+                $"{outer}{FromWorldEmitter.JobFieldPrefix}timing[{GenPrefix}tbase + 1] = {GenPrefix}t1;"
+            );
+            sb.AppendLine(
+                $"{outer}{FromWorldEmitter.JobFieldPrefix}timing[{GenPrefix}tbase + 2] += {GenPrefix}t1 - {GenPrefix}t0;"
+            );
+            sb.AppendLine($"{outer}#endif");
+
             sb.AppendLine($"{ind}}}");
+        }
+
+        // Builds the user-class display chain for the static call inside the Execute
+        // shim. Mirrors the symbol-based PerformanceCache.GetDisplayString output:
+        // "Namespace.Outer.Inner.ClassName".
+        static string BuildClassChainDisplay(in AutoJobModel model)
+        {
+            var sb = new StringBuilder();
+            if (!string.IsNullOrEmpty(model.Namespace))
+                sb.Append(model.Namespace).Append('.');
+            // ContainingTypes is outer-to-inner.
+            foreach (var ct in model.ContainingTypes)
+                sb.Append(ct.Name).Append('.');
+            sb.Append(model.ClassName);
+            return sb.ToString();
         }
 
         // ─── Schedule overloads ────────────────────────────────────────────────
 
-        static void EmitScheduleOverloads(StringBuilder sb, AutoJobInfo info, string ind)
+        static void EmitScheduleOverloads(StringBuilder sb, in AutoJobModel model, string ind)
         {
-            var passThroughParams = info
-                .Params.Where(p => p.Role == AutoJobParamRole.PassThrough)
+            var passThroughParams = model
+                .Params.Where(p => p.Role == AutoJobParamRoleKind.PassThrough)
                 .ToList();
             var ptParamDecl =
                 passThroughParams.Count == 0
@@ -1469,54 +1792,53 @@ namespace Trecs.SourceGen
 
             // (1) Convenience overload: WorldAccessor entry. Always emitted because
             // validation ensures criteria is non-empty (TRECS096).
-            EmitWorldAccessorOverload(sb, info, ind, ptParamDecl, passThroughParams);
+            EmitWorldAccessorOverload(sb, model, ind, ptParamDecl, passThroughParams);
             sb.AppendLine();
 
-            if (info.HasSets)
+            if (model.HasSets)
             {
                 // (2a) Sparse ScheduleParallel: SparseQueryBuilder entry.
-                EmitSparseQueryBuilderOverload(sb, info, ind, ptParamDecl, passThroughParams);
+                EmitSparseQueryBuilderOverload(sb, model, ind, ptParamDecl, passThroughParams);
             }
             else
             {
                 // (2b) Dense ScheduleParallel: QueryBuilder entry.
-                EmitQueryBuilderOverload(sb, info, ind, ptParamDecl, passThroughParams);
+                EmitQueryBuilderOverload(sb, model, ind, ptParamDecl, passThroughParams);
             }
         }
 
         static void EmitWorldAccessorOverload(
             StringBuilder sb,
-            AutoJobInfo info,
+            in AutoJobModel model,
             string ind,
             string ptParamDecl,
-            List<AutoJobParam> ptParams
+            List<AutoJobParamModel> ptParams
         )
         {
+            sb.AppendLine($"{ind}{GeneratedCodeAttributes.Line}");
             sb.AppendLine(
-                $"{ind}private JobHandle {GenPrefix}ScheduleParallel_{info.MethodName}(WorldAccessor {GenPrefix}world{ptParamDecl}, JobHandle {GenPrefix}extraDeps = default)"
+                $"{ind}private JobHandle {GenPrefix}ScheduleParallel_{model.MethodName}(WorldAccessor {GenPrefix}world{ptParamDecl}, JobHandle {GenPrefix}extraDeps = default)"
             );
             sb.AppendLine($"{ind}{{");
             string body = ind + "    ";
 
-            if (info.HasSets)
+            if (model.HasSets)
             {
-                // Build a SparseQueryBuilder by chaining .InSet<T>() for the first set type.
-                var firstSetName = PerformanceCache.GetDisplayString(info.Criteria.SetTypes[0]);
+                var firstSetName = model.Criteria.SetTypeDisplays[0];
                 var args = new List<string> { $"{GenPrefix}world.Query().InSet<{firstSetName}>()" };
                 args.AddRange(ptParams.Select(p => p.Name));
                 args.Add($"{GenPrefix}extraDeps");
                 sb.AppendLine(
-                    $"{body}return {GenPrefix}ScheduleParallel_{info.MethodName}({string.Join(", ", args)});"
+                    $"{body}return {GenPrefix}ScheduleParallel_{model.MethodName}({string.Join(", ", args)});"
                 );
             }
             else
             {
-                // Pass a bare QueryBuilder — the QueryBuilder overload applies attribute criteria.
                 var args = new List<string> { $"{GenPrefix}world.Query()" };
                 args.AddRange(ptParams.Select(p => p.Name));
                 args.Add($"{GenPrefix}extraDeps");
                 sb.AppendLine(
-                    $"{body}return {GenPrefix}ScheduleParallel_{info.MethodName}({string.Join(", ", args)});"
+                    $"{body}return {GenPrefix}ScheduleParallel_{model.MethodName}({string.Join(", ", args)});"
                 );
             }
 
@@ -1525,41 +1847,45 @@ namespace Trecs.SourceGen
 
         static void EmitQueryBuilderOverload(
             StringBuilder sb,
-            AutoJobInfo info,
+            in AutoJobModel model,
             string ind,
             string ptParamDecl,
-            List<AutoJobParam> ptParams
+            List<AutoJobParamModel> ptParams
         )
         {
+            sb.AppendLine($"{ind}{GeneratedCodeAttributes.Line}");
             sb.AppendLine(
-                $"{ind}private JobHandle {GenPrefix}ScheduleParallel_{info.MethodName}(QueryBuilder {GenPrefix}builder{ptParamDecl}, JobHandle {GenPrefix}extraDeps = default)"
+                $"{ind}private JobHandle {GenPrefix}ScheduleParallel_{model.MethodName}(QueryBuilder {GenPrefix}builder{ptParamDecl}, JobHandle {GenPrefix}extraDeps = default)"
             );
             sb.AppendLine($"{ind}{{");
             string body = ind + "    ";
 
-            // Merge attribute criteria into the builder (for calls via the QBuilder entry directly).
-            var chain = BuildAttributeCriteriaChain(info);
-            if (chain.Length > 0)
-                sb.AppendLine($"{body}{GenPrefix}builder = {GenPrefix}builder{chain};");
+            if (model.AttributeCriteriaChain.Length > 0)
+                sb.AppendLine(
+                    $"{body}{GenPrefix}builder = {GenPrefix}builder{model.AttributeCriteriaChain};"
+                );
 
             sb.AppendLine(
-                $"{body}TrecsAssert.That({GenPrefix}builder.HasAnyCriteria, \"_{info.MethodName}_AutoJob.ScheduleParallel requires query criteria.\");"
+                $"{body}TrecsDebugAssert.That({GenPrefix}builder.HasAnyCriteria, \"_{model.MethodName}_AutoJob.ScheduleParallel requires query criteria.\");"
             );
 
             sb.AppendLine($"{body}var {GenPrefix}world = {GenPrefix}builder.World;");
             sb.AppendLine(
                 $"{body}var {GenPrefix}scheduler = {GenPrefix}world.GetJobSchedulerForJob();"
             );
+            sb.AppendLine(
+                $"{body}const string {GenPrefix}jobName = \"{model.ClassName}._{model.MethodName}_AutoJob\";"
+            );
             sb.AppendLine($"{body}var {GenPrefix}allJobs = {GenPrefix}extraDeps;");
 
-            if (info.NeedsGlobalIndexOffset)
+            if (model.NeedsGlobalIndexOffset)
                 sb.AppendLine($"{body}var {GenPrefix}queryIndexOffset = 0;");
 
-            // [FromWorld] hoisted setup: resolve TagSets and groups before the loop.
-            var fwEmits = GetFromWorldEmits(info);
+            var fwEmits = model.FromWorldFields.ToList();
+            var seTargets = model.SingleEntityFields.ToList();
             if (fwEmits.Count > 0)
                 FromWorldEmitter.EmitFromWorldHoistedSetup(sb, body, fwEmits);
-            EmitSingleEntityHoistedSetup(sb, body, info);
+            SingleEntityEmitter.EmitHoistedSetup(sb, body, seTargets);
 
             sb.AppendLine(
                 $"{body}foreach (var {GenPrefix}slice in {GenPrefix}builder.GroupSlices())"
@@ -1572,37 +1898,32 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{innerBody}if ({GenPrefix}count == 0) continue;");
             sb.AppendLine();
 
-            // Per-group deps.
             sb.AppendLine($"{innerBody}var {GenPrefix}deps = {GenPrefix}extraDeps;");
 
-            var buffers = GetIterationBuffers(info);
+            var buffers = model.IterationBuffers;
             IterationBufferEmitter.EmitDepRegistration(sb, innerBody, buffers);
 
-            // NativeSet dependency includes.
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
-                if (p.Role == AutoJobParamRole.NativeSetRead)
+                if (p.Role == AutoJobParamRoleKind.NativeSetRead)
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetReadDepsForJob<{p.SetTypeArg}>({GenPrefix}deps);"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
+                else if (p.Role == AutoJobParamRoleKind.NativeSetCommandBuffer)
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetCommandBufferDepsForJob<{p.SetTypeArg}>({GenPrefix}deps);"
                     );
             }
 
-            // [FromWorld] dependency registration.
             if (fwEmits.Count > 0)
                 FromWorldEmitter.EmitFromWorldDepRegistration(sb, innerBody, fwEmits);
-            EmitSingleEntityDepRegistration(sb, innerBody, info);
+            SingleEntityEmitter.EmitDepRegistration(sb, innerBody, seTargets);
 
             IterationBufferEmitter.EmitMaterialization(sb, innerBody, buffers);
 
-            // Construct the job.
-            var jobStructName = $"_{info.MethodName}_AutoJob";
+            var jobStructName = $"_{model.MethodName}_AutoJob";
             sb.AppendLine($"{innerBody}var {GenPrefix}job = new {jobStructName}();");
 
-            // Assign iteration buffers.
             for (int i = 0; i < buffers.Count; i++)
                 sb.AppendLine(
                     $"{innerBody}{GenPrefix}job.{BufferFieldName(i)} = {GenPrefix}buf{i}_value;"
@@ -1611,70 +1932,82 @@ namespace Trecs.SourceGen
             PerGroupHiddenFieldEmitter.EmitAssignments(
                 sb,
                 innerBody,
-                needsGroupField: info.NeedsGroupField,
-                needsGlobalIndexOffset: info.NeedsGlobalIndexOffset,
-                hasNativeWorldAccessor: info.HasNativeWorldAccessor,
-                needsEntityHandleBuffer: info.NeedsEntityHandleBuffer
+                needsGroupField: model.NeedsGroupField,
+                needsGlobalIndexOffset: model.NeedsGlobalIndexOffset,
+                hasNativeWorldAccessor: model.HasNativeWorldAccessor,
+                needsEntityHandleBuffer: model.NeedsEntityHandleBuffer
             );
 
-            // Assign passthrough fields.
             foreach (var p in ptParams)
-                sb.AppendLine($"{innerBody}{GenPrefix}job.{GenPrefix}pt_{p.Name} = {p.Name};");
+                sb.AppendLine(
+                    $"{innerBody}{GenPrefix}job.{FromWorldEmitter.JobFieldPrefix}pt_{p.Name} = {p.Name};"
+                );
 
-            // Assign NativeSet fields.
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
-                if (p.Role == AutoJobParamRole.NativeSetRead)
+                if (p.Role == AutoJobParamRoleKind.NativeSetRead)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}job.{GenPrefix}nsr_{p.Name} = {GenPrefix}world.CreateNativeSetReadForJob<{p.SetTypeArg}>();"
+                        $"{innerBody}{GenPrefix}job.{FromWorldEmitter.JobFieldPrefix}nsr_{p.Name} = {GenPrefix}world.CreateNativeSetReadForJob<{p.SetTypeArg}>();"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
+                else if (p.Role == AutoJobParamRoleKind.NativeSetCommandBuffer)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}job.{GenPrefix}nscb_{p.Name} = {GenPrefix}world.CreateNativeSetCommandBufferForJob<{p.SetTypeArg}>();"
+                        $"{innerBody}{GenPrefix}job.{FromWorldEmitter.JobFieldPrefix}nscb_{p.Name} = {GenPrefix}world.CreateNativeSetCommandBufferForJob<{p.SetTypeArg}>();"
                     );
             }
 
-            // Assign [FromWorld] fields.
             if (fwEmits.Count > 0)
                 FromWorldEmitter.EmitFromWorldFieldAssignments(sb, innerBody, fwEmits);
-            EmitSingleEntityFieldAssignments(sb, innerBody, info);
+            SingleEntityEmitter.EmitFieldAssignment(sb, innerBody, seTargets);
 
-            // Schedule.
+            // Rent and attach the per-worker timing buffer just before scheduling.
+            // Decoded + returned to the pool by RuntimeJobScheduler.CompleteAllOutstanding.
+            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine(
+                $"{innerBody}var {GenPrefix}timing = {GenPrefix}scheduler.RentTimingBuffer();"
+            );
+            sb.AppendLine(
+                $"{innerBody}{GenPrefix}job.{FromWorldEmitter.JobFieldPrefix}timing = {GenPrefix}timing;"
+            );
+            sb.AppendLine($"{innerBody}#endif");
+
             sb.AppendLine(
                 $"{innerBody}var {GenPrefix}handle = {GenPrefix}job.ScheduleParallel({GenPrefix}count, JobsUtil.ChooseBatchSize({GenPrefix}count), {GenPrefix}deps);"
             );
 
             IterationBufferEmitter.EmitOutputTracking(sb, innerBody, buffers);
 
-            // Track NativeSet deps.
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
-                if (p.Role == AutoJobParamRole.NativeSetRead)
+                if (p.Role == AutoJobParamRoleKind.NativeSetRead)
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}world.TrackNativeSetReadDepsForJob<{p.SetTypeArg}>({GenPrefix}handle);"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
+                else if (p.Role == AutoJobParamRoleKind.NativeSetCommandBuffer)
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}world.TrackNativeSetCommandBufferDepsForJob<{p.SetTypeArg}>({GenPrefix}handle);"
                     );
             }
 
-            // Track [FromWorld] deps.
             if (fwEmits.Count > 0)
                 FromWorldEmitter.EmitFromWorldTracking(sb, innerBody, fwEmits);
-            EmitSingleEntityTracking(sb, innerBody, info);
+            SingleEntityEmitter.EmitTracking(sb, innerBody, seTargets);
 
-            // NativeWorldAccessor performs structural operations (add/remove/move)
-            // that write to shared native queues. The job must complete before
-            // SubmitEntities processes those queues at the next phase boundary.
-            if (info.HasNativeWorldAccessor)
-                sb.AppendLine($"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}handle);");
+            if (model.HasNativeWorldAccessor)
+                sb.AppendLine(
+                    $"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}handle, {GenPrefix}jobName);"
+                );
+
+            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine(
+                $"{innerBody}{GenPrefix}scheduler.RegisterJobTimings({GenPrefix}handle, {GenPrefix}jobName, {GenPrefix}timing);"
+            );
+            sb.AppendLine($"{innerBody}#endif");
 
             sb.AppendLine(
                 $"{innerBody}{GenPrefix}allJobs = JobHandle.CombineDependencies({GenPrefix}allJobs, {GenPrefix}handle);"
             );
 
-            if (info.NeedsGlobalIndexOffset)
+            if (model.NeedsGlobalIndexOffset)
                 sb.AppendLine($"{innerBody}{GenPrefix}queryIndexOffset += {GenPrefix}count;");
 
             sb.AppendLine($"{body}}}");
@@ -1686,38 +2019,41 @@ namespace Trecs.SourceGen
 
         static void EmitSparseQueryBuilderOverload(
             StringBuilder sb,
-            AutoJobInfo info,
+            in AutoJobModel model,
             string ind,
             string ptParamDecl,
-            List<AutoJobParam> ptParams
+            List<AutoJobParamModel> ptParams
         )
         {
+            sb.AppendLine($"{ind}{GeneratedCodeAttributes.Line}");
             sb.AppendLine(
-                $"{ind}private JobHandle {GenPrefix}ScheduleParallel_{info.MethodName}(SparseQueryBuilder {GenPrefix}builder{ptParamDecl}, JobHandle {GenPrefix}extraDeps = default)"
+                $"{ind}private JobHandle {GenPrefix}ScheduleParallel_{model.MethodName}(SparseQueryBuilder {GenPrefix}builder{ptParamDecl}, JobHandle {GenPrefix}extraDeps = default)"
             );
             sb.AppendLine($"{ind}{{");
             string body = ind + "    ";
 
-            // Merge attribute Tags + Components into the builder. Sets are NOT merged here —
-            // they were already added by the convenience overload via .InSet<>().
-            var chain = BuildAttributeCriteriaChain(info);
-            if (chain.Length > 0)
-                sb.AppendLine($"{body}{GenPrefix}builder = {GenPrefix}builder{chain};");
+            if (model.AttributeCriteriaChain.Length > 0)
+                sb.AppendLine(
+                    $"{body}{GenPrefix}builder = {GenPrefix}builder{model.AttributeCriteriaChain};"
+                );
 
             sb.AppendLine($"{body}var {GenPrefix}world = {GenPrefix}builder.World;");
             sb.AppendLine(
                 $"{body}var {GenPrefix}scheduler = {GenPrefix}world.GetJobSchedulerForJob();"
             );
+            sb.AppendLine(
+                $"{body}const string {GenPrefix}jobName = \"{model.ClassName}._{model.MethodName}_AutoJob\";"
+            );
             sb.AppendLine($"{body}var {GenPrefix}allJobs = {GenPrefix}extraDeps;");
 
-            if (info.NeedsGlobalIndexOffset)
+            if (model.NeedsGlobalIndexOffset)
                 sb.AppendLine($"{body}var {GenPrefix}queryIndexOffset = 0;");
 
-            // [FromWorld] hoisted setup: resolve TagSets and groups before the loop.
-            var fwEmits = GetFromWorldEmits(info);
+            var fwEmits = model.FromWorldFields.ToList();
+            var seTargets = model.SingleEntityFields.ToList();
             if (fwEmits.Count > 0)
                 FromWorldEmitter.EmitFromWorldHoistedSetup(sb, body, fwEmits);
-            EmitSingleEntityHoistedSetup(sb, body, info);
+            SingleEntityEmitter.EmitHoistedSetup(sb, body, seTargets);
 
             sb.AppendLine(
                 $"{body}foreach (var {GenPrefix}slice in {GenPrefix}builder.GroupSlices())"
@@ -1728,7 +2064,6 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{innerBody}var {GenPrefix}group = {GenPrefix}slice.GroupIndex;");
             sb.AppendLine();
 
-            // Pre-walk the slice into a TempJob-backed sparse-indices buffer.
             sb.AppendLine(
                 $"{innerBody}var ({GenPrefix}indices, {GenPrefix}indicesLifetime, {GenPrefix}count) = {GenPrefix}world.AllocateSparseIndicesForJob({GenPrefix}slice);"
             );
@@ -1739,37 +2074,32 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{innerBody}}}");
             sb.AppendLine();
 
-            // Per-group deps.
             sb.AppendLine($"{innerBody}var {GenPrefix}deps = {GenPrefix}extraDeps;");
 
-            var buffers = GetIterationBuffers(info);
+            var buffers = model.IterationBuffers;
             IterationBufferEmitter.EmitDepRegistration(sb, innerBody, buffers);
 
-            // NativeSet dependency includes.
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
-                if (p.Role == AutoJobParamRole.NativeSetRead)
+                if (p.Role == AutoJobParamRoleKind.NativeSetRead)
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetReadDepsForJob<{p.SetTypeArg}>({GenPrefix}deps);"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
+                else if (p.Role == AutoJobParamRoleKind.NativeSetCommandBuffer)
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}deps = {GenPrefix}world.IncludeNativeSetCommandBufferDepsForJob<{p.SetTypeArg}>({GenPrefix}deps);"
                     );
             }
 
-            // [FromWorld] dependency registration.
             if (fwEmits.Count > 0)
                 FromWorldEmitter.EmitFromWorldDepRegistration(sb, innerBody, fwEmits);
-            EmitSingleEntityDepRegistration(sb, innerBody, info);
+            SingleEntityEmitter.EmitDepRegistration(sb, innerBody, seTargets);
 
             IterationBufferEmitter.EmitMaterialization(sb, innerBody, buffers);
 
-            // Construct the job.
-            var jobStructName = $"_{info.MethodName}_AutoJob";
+            var jobStructName = $"_{model.MethodName}_AutoJob";
             sb.AppendLine($"{innerBody}var {GenPrefix}job = new {jobStructName}();");
 
-            // Assign iteration buffers.
             for (int i = 0; i < buffers.Count; i++)
                 sb.AppendLine(
                     $"{innerBody}{GenPrefix}job.{BufferFieldName(i)} = {GenPrefix}buf{i}_value;"
@@ -1778,36 +2108,46 @@ namespace Trecs.SourceGen
             PerGroupHiddenFieldEmitter.EmitAssignments(
                 sb,
                 innerBody,
-                needsGroupField: info.NeedsGroupField,
-                needsGlobalIndexOffset: info.NeedsGlobalIndexOffset,
-                hasNativeWorldAccessor: info.HasNativeWorldAccessor,
-                needsEntityHandleBuffer: info.NeedsEntityHandleBuffer
+                needsGroupField: model.NeedsGroupField,
+                needsGlobalIndexOffset: model.NeedsGlobalIndexOffset,
+                hasNativeWorldAccessor: model.HasNativeWorldAccessor,
+                needsEntityHandleBuffer: model.NeedsEntityHandleBuffer
             );
 
-            // Assign passthrough fields.
             foreach (var p in ptParams)
-                sb.AppendLine($"{innerBody}{GenPrefix}job.{GenPrefix}pt_{p.Name} = {p.Name};");
+                sb.AppendLine(
+                    $"{innerBody}{GenPrefix}job.{FromWorldEmitter.JobFieldPrefix}pt_{p.Name} = {p.Name};"
+                );
 
-            // Assign NativeSet fields.
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
-                if (p.Role == AutoJobParamRole.NativeSetRead)
+                if (p.Role == AutoJobParamRoleKind.NativeSetRead)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}job.{GenPrefix}nsr_{p.Name} = {GenPrefix}world.CreateNativeSetReadForJob<{p.SetTypeArg}>();"
+                        $"{innerBody}{GenPrefix}job.{FromWorldEmitter.JobFieldPrefix}nsr_{p.Name} = {GenPrefix}world.CreateNativeSetReadForJob<{p.SetTypeArg}>();"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
+                else if (p.Role == AutoJobParamRoleKind.NativeSetCommandBuffer)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}job.{GenPrefix}nscb_{p.Name} = {GenPrefix}world.CreateNativeSetCommandBufferForJob<{p.SetTypeArg}>();"
+                        $"{innerBody}{GenPrefix}job.{FromWorldEmitter.JobFieldPrefix}nscb_{p.Name} = {GenPrefix}world.CreateNativeSetCommandBufferForJob<{p.SetTypeArg}>();"
                     );
             }
 
-            // Assign [FromWorld] fields.
             if (fwEmits.Count > 0)
                 FromWorldEmitter.EmitFromWorldFieldAssignments(sb, innerBody, fwEmits);
-            EmitSingleEntityFieldAssignments(sb, innerBody, info);
+            SingleEntityEmitter.EmitFieldAssignment(sb, innerBody, seTargets);
 
-            // Wrap in sparse shim and schedule.
-            var shimName = $"_{info.MethodName}_SparseShim";
+            // Rent the timing buffer and attach to the Inner job BEFORE wrapping in
+            // the Shim (Shim copies Inner by value). Decoded + returned to the pool
+            // by RuntimeJobScheduler.CompleteAllOutstanding.
+            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine(
+                $"{innerBody}var {GenPrefix}timing = {GenPrefix}scheduler.RentTimingBuffer();"
+            );
+            sb.AppendLine(
+                $"{innerBody}{GenPrefix}job.{FromWorldEmitter.JobFieldPrefix}timing = {GenPrefix}timing;"
+            );
+            sb.AppendLine($"{innerBody}#endif");
+
+            var shimName = $"_{model.MethodName}_SparseShim";
             sb.AppendLine(
                 $"{innerBody}var {GenPrefix}shim = new {shimName} {{ Inner = {GenPrefix}job, Indices = {GenPrefix}indices }};"
             );
@@ -1817,40 +2157,47 @@ namespace Trecs.SourceGen
 
             IterationBufferEmitter.EmitOutputTracking(sb, innerBody, buffers);
 
-            // Track NativeSet deps.
-            foreach (var p in info.Params)
+            foreach (var p in model.Params)
             {
-                if (p.Role == AutoJobParamRole.NativeSetRead)
+                if (p.Role == AutoJobParamRoleKind.NativeSetRead)
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}world.TrackNativeSetReadDepsForJob<{p.SetTypeArg}>({GenPrefix}handle);"
                     );
-                else if (p.Role == AutoJobParamRole.NativeSetCommandBuffer)
+                else if (p.Role == AutoJobParamRoleKind.NativeSetCommandBuffer)
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}world.TrackNativeSetCommandBufferDepsForJob<{p.SetTypeArg}>({GenPrefix}handle);"
                     );
             }
 
-            // Track [FromWorld] deps.
             if (fwEmits.Count > 0)
                 FromWorldEmitter.EmitFromWorldTracking(sb, innerBody, fwEmits);
-            EmitSingleEntityTracking(sb, innerBody, info);
+            SingleEntityEmitter.EmitTracking(sb, innerBody, seTargets);
 
-            // NativeWorldAccessor performs structural operations (add/remove/move)
-            // that write to shared native queues. The job must complete before
-            // SubmitEntities processes those queues at the next phase boundary.
-            if (info.HasNativeWorldAccessor)
-                sb.AppendLine($"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}handle);");
+            if (model.HasNativeWorldAccessor)
+                sb.AppendLine(
+                    $"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}handle, {GenPrefix}jobName);"
+                );
 
-            // Dispose the indices lifetime after the job completes.
+            // Register worker-execution timing against the user job's handle (not the
+            // dispose-handle chained off it) so the recorded timings reflect the actual
+            // worker execution window, not the dispose-job tail.
+            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine(
+                $"{innerBody}{GenPrefix}scheduler.RegisterJobTimings({GenPrefix}handle, {GenPrefix}jobName, {GenPrefix}timing);"
+            );
+            sb.AppendLine($"{innerBody}#endif");
+
             sb.AppendLine(
                 $"{innerBody}var {GenPrefix}disposeHandle = {GenPrefix}indicesLifetime.Dispose({GenPrefix}handle);"
             );
-            sb.AppendLine($"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}disposeHandle);");
+            sb.AppendLine(
+                $"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}disposeHandle, {GenPrefix}jobName);"
+            );
             sb.AppendLine(
                 $"{innerBody}{GenPrefix}allJobs = JobHandle.CombineDependencies({GenPrefix}allJobs, {GenPrefix}disposeHandle);"
             );
 
-            if (info.NeedsGlobalIndexOffset)
+            if (model.NeedsGlobalIndexOffset)
                 sb.AppendLine($"{innerBody}{GenPrefix}queryIndexOffset += {GenPrefix}count;");
 
             sb.AppendLine($"{body}}}");
@@ -1858,70 +2205,53 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{ind}}}");
         }
 
-        // ─── [SingleEntity] emit helpers ───────────────────────────────────────
-        // Pre-loop: hoist EntityIndex and (for aspect) groups list per slot.
-        // Per-loop: dep registration, field assignment, dep tracking. Aspect uses the
-        // same per-(component, group) machinery as a NativeFactory but feeds it the
-        // groups matching the singleton's inline tags. Component variants resolve a
-        // single GroupIndex from the singleton's EntityIndex.
+        // ─── Sparse shim struct emission ───────────────────────────────────────
 
-        static IEnumerable<AutoJobParam> SingleEntityParams(AutoJobInfo info) =>
-            info.Params.Where(p =>
-                p.Role == AutoJobParamRole.SingleEntityAspect
-                || p.Role == AutoJobParamRole.SingleEntityComponentRead
-                || p.Role == AutoJobParamRole.SingleEntityComponentWrite
-            );
-
-        static void EmitSingleEntityHoistedSetup(StringBuilder sb, string body, AutoJobInfo info) =>
-            SingleEntityEmitter.EmitHoistedSetup(sb, body, SingleEntityParams(info));
-
-        static void EmitSingleEntityDepRegistration(
-            StringBuilder sb,
-            string body,
-            AutoJobInfo info
-        ) => SingleEntityEmitter.EmitDepRegistration(sb, body, SingleEntityParams(info));
-
-        static void EmitSingleEntityFieldAssignments(
-            StringBuilder sb,
-            string body,
-            AutoJobInfo info
-        ) => SingleEntityEmitter.EmitFieldAssignment(sb, body, SingleEntityParams(info));
-
-        static void EmitSingleEntityTracking(StringBuilder sb, string body, AutoJobInfo info) =>
-            SingleEntityEmitter.EmitTracking(sb, body, SingleEntityParams(info));
-
-        static void EmitSparseShim(StringBuilder sb, AutoJobInfo info, string ind)
+        static void EmitSparseShim(StringBuilder sb, in AutoJobModel model, string ind)
         {
-            var jobStructName = $"_{info.MethodName}_AutoJob";
-            var shimName = $"_{info.MethodName}_SparseShim";
+            var jobStructName = $"_{model.MethodName}_AutoJob";
+            var shimName = $"_{model.MethodName}_SparseShim";
             string innerInd = ind + "    ";
             string bodyInd = innerInd + "    ";
 
             sb.AppendLine($"{ind}[Unity.Burst.BurstCompile]");
-            sb.AppendLine($"{ind}private struct {shimName} : IJobFor");
+            sb.AppendLine($"{ind}{GeneratedCodeAttributes.Line}");
+            sb.AppendLine($"{ind}private struct {shimName} : IJobParallelForBatch");
             sb.AppendLine($"{ind}{{");
             sb.AppendLine($"{innerInd}public {jobStructName} Inner;");
             sb.AppendLine($"{innerInd}public JobSparseIndices Indices;");
             sb.AppendLine();
-            sb.AppendLine($"{innerInd}public void Execute(int i)");
+            // Per-batch shim: iterate the dense [start, start+count) window of sparse
+            // indices and dispatch each one to Inner as a single-item batch. Inner
+            // is also IJobParallelForBatch — calling Inner.Execute(sparseIdx, 1) runs
+            // its body once with `i = sparseIdx`. Profiling is per-call to Inner
+            // here (effectively per sparse index), since the sparse mapping precludes
+            // contiguous-range dispatch — same cost profile as the IJobFor sparse shim.
+            sb.AppendLine($"{innerInd}public void Execute(int start, int count)");
             sb.AppendLine($"{innerInd}{{");
-            sb.AppendLine($"{bodyInd}Inner.Execute(Indices[i]);");
+            sb.AppendLine($"{bodyInd}for (int i = start; i < start + count; i++)");
+            sb.AppendLine($"{bodyInd}{{");
+            sb.AppendLine($"{bodyInd}    Inner.Execute(Indices[i], 1);");
+            sb.AppendLine($"{bodyInd}}}");
             sb.AppendLine($"{innerInd}}}");
             sb.AppendLine($"{ind}}}");
         }
 
         // ─── Wrapper method ────────────────────────────────────────────────────
 
-        static void EmitWrapperMethod(StringBuilder sb, AutoJobInfo info, string ind)
+        static void EmitWrapperMethod(StringBuilder sb, in AutoJobModel model, string ind)
         {
-            var ptParams = info.Params.Where(p => p.Role == AutoJobParamRole.PassThrough).ToList();
+            var ptParams = model
+                .Params.Where(p => p.Role == AutoJobParamRoleKind.PassThrough)
+                .ToList();
             var ptParamDecl =
                 ptParams.Count == 0
                     ? ""
                     : string.Join(", ", ptParams.Select(p => $"{p.TypeDisplay} {p.Name}"));
 
-            var visibility = info.MethodName == "Execute" ? "public " : "";
-            sb.AppendLine($"{ind}{visibility}void {info.MethodName}({ptParamDecl})");
+            var visibility = model.MethodName == "Execute" ? "public " : "";
+            sb.AppendLine($"{ind}{GeneratedCodeAttributes.Line}");
+            sb.AppendLine($"{ind}{visibility}void {model.MethodName}({ptParamDecl})");
             sb.AppendLine($"{ind}{{");
             string body = ind + "    ";
 
@@ -1929,62 +2259,9 @@ namespace Trecs.SourceGen
             args.AddRange(ptParams.Select(p => p.Name));
 
             sb.AppendLine(
-                $"{body}{GenPrefix}ScheduleParallel_{info.MethodName}({string.Join(", ", args)});"
+                $"{body}{GenPrefix}ScheduleParallel_{model.MethodName}({string.Join(", ", args)});"
             );
             sb.AppendLine($"{ind}}}");
-        }
-
-        // ─── Helpers ───────────────────────────────────────────────────────────
-
-        static List<FromWorldFieldEmit> GetFromWorldEmits(AutoJobInfo info)
-        {
-            return info
-                .Params.Where(p => p.Role == AutoJobParamRole.FromWorld)
-                .Select(p =>
-                    FromWorldFieldEmit.Build(p.FromWorldInfo!, suppressScheduleParam: true)
-                )
-                .ToList();
-        }
-
-        static IReadOnlyList<(ITypeSymbol Type, bool ReadOnly)> GetIterationBuffers(
-            AutoJobInfo info
-        )
-        {
-            if (info.IterKind == AutoJobIterationKind.Aspect)
-            {
-                var ai = info.AspectData!;
-                var result = new List<(ITypeSymbol, bool)>(ai.ComponentTypes.Count);
-                foreach (var t in ai.ComponentTypes)
-                    result.Add((t, ai.IsReadOnly(t)));
-                return result;
-            }
-            else
-            {
-                var result = new List<(ITypeSymbol, bool)>();
-                foreach (var p in info.Params)
-                {
-                    if (p.Role == AutoJobParamRole.Component)
-                        result.Add((p.Type!, !p.IsRef));
-                }
-                return result;
-            }
-        }
-
-        static string BuildAttributeCriteriaChain(AutoJobInfo info)
-        {
-            var c = info.Criteria;
-            var componentTypes =
-                info.IterKind == AutoJobIterationKind.Aspect
-                    ? (IEnumerable<ITypeSymbol>)info.AspectData!.ComponentTypes
-                    : info
-                        .Params.Where(p => p.Role == AutoJobParamRole.Component)
-                        .Select(p => p.Type!);
-            return QueryBuilderHelper.BuildAttributeCriteriaChain(
-                c.TagTypes,
-                c.MatchByComponents,
-                componentTypes,
-                c.WithoutTagTypes
-            );
         }
 
         // ─── Data classes ──────────────────────────────────────────────────────
@@ -2063,7 +2340,7 @@ namespace Trecs.SourceGen
             SingleEntityComponentWrite,
         }
 
-        sealed class AutoJobParam : SingleEntityEmitter.IEmitTarget
+        sealed class AutoJobParam
         {
             public AutoJobParamRole Role { get; }
             public ITypeSymbol? Type { get; }
@@ -2235,42 +2512,6 @@ namespace Trecs.SourceGen
                     isRef: isRef,
                     singleEntityTags: tagTypes
                 );
-
-            // SingleEntityEmitter.IEmitTarget — Phase 3 emits to auto-generated
-            // hidden fields on the lowered job struct, so the LHS uses the
-            // _trecs_se_<name>[/_read|_write] convention.
-            string SingleEntityEmitter.IEmitTarget.LocalNameRoot => Name;
-
-            string SingleEntityEmitter.IEmitTarget.JobFieldAssignmentLhs =>
-                Role switch
-                {
-                    AutoJobParamRole.SingleEntityAspect => $"{GenPrefix}se_{Name}",
-                    AutoJobParamRole.SingleEntityComponentRead => $"{GenPrefix}se_{Name}_read",
-                    AutoJobParamRole.SingleEntityComponentWrite => $"{GenPrefix}se_{Name}_write",
-                    _ => Name,
-                };
-
-            bool SingleEntityEmitter.IEmitTarget.IsAspect =>
-                Role == AutoJobParamRole.SingleEntityAspect;
-
-            bool SingleEntityEmitter.IEmitTarget.IsComponentWrite =>
-                Role == AutoJobParamRole.SingleEntityComponentWrite;
-
-            IReadOnlyList<ITypeSymbol> SingleEntityEmitter.IEmitTarget.TagTypes =>
-                SingleEntityTags ?? (IReadOnlyList<ITypeSymbol>)System.Array.Empty<ITypeSymbol>();
-
-            AspectAttributeData? SingleEntityEmitter.IEmitTarget.AspectData =>
-                SingleEntityAspectData;
-
-            string? SingleEntityEmitter.IEmitTarget.AspectTypeDisplay =>
-                Role == AutoJobParamRole.SingleEntityAspect ? TypeDisplay : null;
-
-            string? SingleEntityEmitter.IEmitTarget.ComponentTypeDisplay =>
-                Role
-                    is AutoJobParamRole.SingleEntityComponentRead
-                        or AutoJobParamRole.SingleEntityComponentWrite
-                    ? TypeDisplay
-                    : null;
         }
 
         sealed class AspectIterationData

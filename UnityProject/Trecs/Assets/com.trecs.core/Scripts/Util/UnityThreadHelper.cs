@@ -13,7 +13,7 @@ namespace Trecs.Internal
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void OnStart()
         {
-            TrecsAssert.That(MainThreadId == Thread.CurrentThread.ManagedThreadId);
+            TrecsDebugAssert.That(MainThreadId == Thread.CurrentThread.ManagedThreadId);
         }
 
         public static bool IsMainThread => Thread.CurrentThread.ManagedThreadId == MainThreadId;

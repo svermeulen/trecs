@@ -92,7 +92,7 @@ The type name picks the footprint. A `FixedArray256<float4x4>` is **16 KB** per 
 
 ## When to reach for something else
 
-- **The upper bound varies widely across entities, or usually sits far below the cap.** A `FixedArray256<T>` that's typically empty wastes storage on every entity in the group. Use a [heap pointer](heap.md) to an external `NativeList<T>` or managed `List<T>` instead.
+- **The upper bound varies widely across entities, or usually sits far below the cap.** A `FixedArray256<T>` that's typically empty wastes storage on every entity in the group. Use a [heap pointer](../experimental/pointers.md) to an external `NativeList<T>` or managed `List<T>` instead.
 
 ## Relation to Unity's `FixedList*Bytes`
 

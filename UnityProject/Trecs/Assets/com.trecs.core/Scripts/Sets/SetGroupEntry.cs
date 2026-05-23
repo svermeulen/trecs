@@ -30,7 +30,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool Exists(int index) => _entityIdToDenseIndex.ContainsKey(index);
+        public readonly bool Contains(int index) => _entityIdToDenseIndex.ContainsKey(index);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Remove(int index) => _entityIdToDenseIndex.Remove(index);

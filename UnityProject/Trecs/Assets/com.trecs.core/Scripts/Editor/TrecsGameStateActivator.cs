@@ -4,7 +4,7 @@ namespace Trecs.Internal
 {
     /// <summary>
     /// Wires Trecs game-state recording to the time travel window's open
-    /// state. When a <see cref="TrecsGameStateController"/> registers itself
+    /// state. When a <see cref="TrecsRecordingSession"/> registers itself
     /// (typically at scene startup, after the World is built), if a
     /// <see cref="TrecsPlayerWindow"/> instance is currently open and
     /// <see cref="AutoRecordEnabled"/> is true, we ask the controller to enter
@@ -17,7 +17,7 @@ namespace Trecs.Internal
 
         static TrecsGameStateActivator()
         {
-            TrecsGameStateRegistry.ControllerRegistered += OnControllerRegistered;
+            TrecsRecordingSessionRegistry.ControllerRegistered += OnControllerRegistered;
         }
 
         /// <summary>
@@ -33,7 +33,7 @@ namespace Trecs.Internal
             set => EditorPrefs.SetBool(AutoRecordEnabledPrefKey, value);
         }
 
-        static void OnControllerRegistered(TrecsGameStateController controller)
+        static void OnControllerRegistered(TrecsRecordingSession controller)
         {
             if (HasOpenWindow() && AutoRecordEnabled)
             {
@@ -53,7 +53,7 @@ namespace Trecs.Internal
             {
                 return;
             }
-            foreach (var controller in TrecsGameStateRegistry.All)
+            foreach (var controller in TrecsRecordingSessionRegistry.All)
             {
                 if (controller.CurrentMode == GameStateMode.Idle)
                 {
@@ -70,7 +70,7 @@ namespace Trecs.Internal
         /// </summary>
         public static void StopAllRecordingControllers()
         {
-            foreach (var controller in TrecsGameStateRegistry.All)
+            foreach (var controller in TrecsRecordingSessionRegistry.All)
             {
                 if (controller.CurrentMode != GameStateMode.Idle)
                 {

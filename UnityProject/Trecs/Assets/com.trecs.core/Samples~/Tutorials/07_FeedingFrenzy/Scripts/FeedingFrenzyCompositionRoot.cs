@@ -69,10 +69,13 @@ namespace Trecs.Samples.FeedingFrenzy101
 
             var cleanupHandler = new RemoveCleanupHandler(world);
 
+            var inputSystem = new InputSystem();
+
             world.AddSystems(
                 new ISystem[]
                 {
-                    new InputSystem(MinFishCount, MaxFishCount),
+                    inputSystem,
+                    new ApplyControlInputSystem(MinFishCount, MaxFishCount),
                     new FishAdderAndRemover(MealCountRatio, SpawnSpread, MaxFishChangePerFrame),
                     new MealAdderAndRemover(SpawnSpread, MaxMealChangePerFrame),
                     new LookingForMealSystem(),
@@ -87,7 +90,7 @@ namespace Trecs.Samples.FeedingFrenzy101
             );
 
             initializables = new() { world.Initialize };
-            tickables = new() { world.Tick };
+            tickables = new() { inputSystem.Tick, world.Tick };
             lateTickables = new() { world.LateTick };
             disposables = new() { cleanupHandler.Dispose, world.Dispose };
         }

@@ -91,6 +91,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         public float FrameMs;
     }
 
+    [Copyable]
     public partial struct FrenzyConfig : IEntityComponent
     {
         public FrenzySubsetApproach SubsetApproach;

@@ -5,7 +5,7 @@ namespace Trecs.Internal
     interface IFiller
     {
         void FillFromByteArray(
-            DenseDictionary<ComponentId, IComponentArray> groupDictionary,
+            DenseDictionary<TypeId, IComponentArray> groupDictionary,
             int indexInTransientBuffer,
             NativeBag buffer
         );
@@ -16,24 +16,24 @@ namespace Trecs.Internal
     {
         static Filler()
         {
-            TrecsAssert.That(TypeMeta<T>.IsUnmanaged, "invalid type used");
+            TrecsDebugAssert.That(TypeMeta<T>.IsUnmanaged, "invalid type used");
         }
 
         public void FillFromByteArray(
-            DenseDictionary<ComponentId, IComponentArray> groupDictionary,
+            DenseDictionary<TypeId, IComponentArray> groupDictionary,
             int indexInTransientBuffer,
             NativeBag buffer
         )
         {
             var component = buffer.Dequeue<T>();
-            var dictionary = (IComponentArray<T>)groupDictionary[ComponentTypeId<T>.Value];
+            var dictionary = (IComponentArray<T>)groupDictionary[TypeId<T>.Value];
             dictionary.GetValueAtIndexByRef(indexInTransientBuffer) = component;
         }
     }
 
     static class EntityComponentIdMap
     {
-        static readonly DenseDictionary<ComponentId, IFiller> _map;
+        static readonly DenseDictionary<TypeId, IFiller> _map;
 
         static EntityComponentIdMap()
         {
@@ -43,14 +43,14 @@ namespace Trecs.Internal
         internal static void Register<T>(IFiller entityBuilder)
             where T : unmanaged, IEntityComponent
         {
-            TrecsAssert.That(UnityThreadHelper.IsMainThread);
-            ComponentId location = ComponentTypeId<T>.Value;
+            TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
+            TypeId location = TypeId<T>.Value;
             _map.Add(location, entityBuilder);
         }
 
-        internal static IFiller GetBuilderFromId(ComponentId typeId)
+        internal static IFiller GetBuilderFromId(TypeId typeId)
         {
-            TrecsAssert.That(UnityThreadHelper.IsMainThread);
+            TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
             return _map[typeId];
         }
     }

@@ -181,8 +181,8 @@ MonoBehaviour:
   MaxFishCount: 1000000
   MealCountRatio: 0.75
   SpawnSpread: 200
-  MaxFishChangePerFrame: 700
-  MaxMealChangePerFrame: 700
+  MaxFishChangePerFrame: 300
+  MaxMealChangePerFrame: 300
   MealScale:
     x: 0.5
     y: 0.5

@@ -139,13 +139,12 @@ Maps `GridPos` to world coordinates for rendering.
 
 ## Determinism
 
-The world is configured for deterministic replay:
+The world is configured for deterministic replay via a fixed seed:
 
 ```csharp
 new WorldBuilder()
     .SetSettings(new WorldSettings
     {
-        RequireDeterministicSubmission = true,
         RandomSeed = settings.RandomSeed,
     })
     // ...
@@ -153,7 +152,7 @@ new WorldBuilder()
 
 That's all the sample does on the serialization side — no recorder/player, no key bindings. The Trecs Player editor window (**Window → Trecs → Player**) attaches itself to any active Trecs `World` automatically, so recording, scrubbing, save/load, and snapshot capture are available out of the box.
 
-See [Serialization](../advanced/serialization.md) for custom-serializer authoring if any of the world's heap data is a managed type that needs to round-trip through recording / scrub.
+See [Serialization](../experimental/serialization.md) for custom-serializer authoring if any of the world's heap data is a managed type that needs to round-trip through recording / scrub.
 
 ## Concepts introduced
 

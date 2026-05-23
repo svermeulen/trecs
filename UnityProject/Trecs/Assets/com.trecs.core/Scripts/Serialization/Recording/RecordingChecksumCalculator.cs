@@ -2,17 +2,17 @@ using System.ComponentModel;
 
 namespace Trecs.Internal
 {
+    /// <summary>
+    /// Compute a 64-bit xxHash of the world's current deterministic state.
+    /// Stateless — pass in the world-state serializer to use and a reusable
+    /// <see cref="SerializationBuffer"/> for the framing. The buffer is
+    /// reset before writing so callers can share one across capture sites.
+    /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public sealed class RecordingChecksumCalculator
+    public static class RecordingChecksumCalculator
     {
-        readonly IWorldStateSerializer _worldStateSerializer;
-
-        public RecordingChecksumCalculator(IWorldStateSerializer worldStateSerializer)
-        {
-            _worldStateSerializer = worldStateSerializer;
-        }
-
-        public uint CalculateCurrentChecksum(
+        public static ulong Calculate(
+            IWorldStateSerializer worldStateSerializer,
             int version,
             SerializationBuffer serializerHelper,
             long flags = 0
@@ -29,7 +29,7 @@ namespace Trecs.Internal
                     flags: flags
                 );
 
-                _worldStateSerializer.SerializeState(serializerHelper);
+                worldStateSerializer.SerializeForChecksum(serializerHelper.Writer);
                 serializerHelper.EndWrite();
 
                 using (TrecsProfiling.Start("ChecksumCalculator.Run"))

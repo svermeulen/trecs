@@ -1,359 +1,187 @@
-using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
-using Microsoft.CodeAnalysis;
-using Trecs.SourceGen.Performance;
 using Trecs.SourceGen.Shared;
 
 namespace Trecs.SourceGen.Aspect
 {
     /// <summary>
-    /// Handles source code generation for Aspect implementations
+    /// Aspect codegen — takes a fully precomputed <see cref="AspectModel"/> and emits the
+    /// generated partial. Touches zero Roslyn symbols: every string the emitter needs is
+    /// already baked into the model by <see cref="AspectModelBuilder"/>. That keeps this
+    /// stage a pure function of the equatable model, which is what lets the incremental
+    /// generator cache hit when nothing observable about the aspect has changed.
     /// </summary>
     internal static class AspectCodeGenerator
     {
-        /// <summary>
-        /// Generates the complete source code for an Aspect
-        /// </summary>
-        public static string GenerateAspectSource(
-            INamedTypeSymbol symbol,
-            AspectAttributeData attributeData
-        )
+        public static string GenerateAspectSource(AspectModel model)
         {
-            var componentCount = attributeData.ReadTypes.Length + attributeData.WriteTypes.Length;
-            var sb = OptimizedStringBuilder.ForAspect(componentCount);
-            var namespaceName = SymbolAnalyzer.GetNamespaceChain(symbol);
-            var accessibility = SymbolAnalyzer.GetAccessibilityModifier(symbol);
-            var containingTypes = SymbolAnalyzer.GetContainingTypeChainInfo(symbol);
-
-            // Generate using statements
+            var sb = OptimizedStringBuilder.ForAspect(model.Components.All.Length);
             sb.AppendUsings(CommonUsings.WithExtras("System", "System.Runtime.CompilerServices"));
 
-            // Generate in namespace if needed
             return sb.WrapInNamespace(
-                    namespaceName,
-                    (builder) =>
-                    {
-                        GenerateStructContent(
-                            builder,
-                            symbol,
-                            attributeData,
-                            accessibility,
-                            containingTypes
-                        );
-                    }
+                    model.Namespace,
+                    (builder) => GenerateStructContent(builder, model)
                 )
                 .ToString();
         }
 
-        /// <summary>
-        /// Generates the struct content for Aspects
-        /// </summary>
-        private static void GenerateStructContent(
-            OptimizedStringBuilder sb,
-            INamedTypeSymbol symbol,
-            AspectAttributeData attributeData,
-            string accessibility,
-            IReadOnlyList<ContainingTypeInfo> containingTypes
-        )
+        public static string GenerateAspectInterfaceSource(AspectModel model)
         {
-            // Start struct - user's partial already declares interfaces; C# merges partials
-            var effectiveAccessibility = accessibility == "private" ? "internal" : accessibility;
+            var sb = OptimizedStringBuilder.ForAspect(
+                model.Components.Read.Length + model.Components.Write.Length
+            );
+            sb.AppendUsings(CommonUsings.WithExtras("System", "System.Runtime.CompilerServices"));
+
+            return sb.WrapInNamespace(
+                    model.Namespace,
+                    (builder) => GenerateInterfaceContent(builder, model)
+                )
+                .ToString();
+        }
+
+        // -------------------------------------------------------------------------------------
+        // Struct path
+        // -------------------------------------------------------------------------------------
+
+        private static void GenerateStructContent(OptimizedStringBuilder sb, AspectModel model)
+        {
+            var effectiveAccessibility =
+                model.Accessibility == "private" ? "internal" : model.Accessibility;
+
             sb.WrapInContainingTypes(
-                containingTypes,
+                model.ContainingTypes.ToArray(),
                 0,
                 (b, indentLevel) =>
                     b.WrapInType(
                         effectiveAccessibility,
                         "struct",
-                        symbol.Name,
+                        model.TypeName,
                         (builder) =>
                         {
-                            // Generate fields
-                            GenerateFields(builder, indentLevel + 1, attributeData);
-
-                            // Generate constructors
+                            GenerateFields(builder, indentLevel + 1, model.Components.All);
                             GenerateConstructors(
                                 builder,
                                 indentLevel + 1,
-                                symbol.Name,
-                                attributeData
+                                model.TypeName,
+                                model.Components.All
                             );
-
-                            // DeclareDependencies removed — RuntimeJobScheduler handles deps implicitly
-
-                            // Generate properties
-                            GenerateProperties(builder, indentLevel + 1, attributeData);
-
-                            // Generate helper methods
-                            GenerateHelperMethods(builder, indentLevel + 1, symbol, attributeData);
-
-                            // Generate nested NativeFactory struct for cross-entity access in jobs
-                            GenerateNativeFactory(builder, indentLevel + 1, symbol, attributeData);
+                            GenerateProperties(builder, indentLevel + 1, model.Components);
+                            GenerateHelperMethods(
+                                builder,
+                                indentLevel + 1,
+                                model.TypeName,
+                                model.Components.All
+                            );
+                            GenerateNativeFactory(
+                                builder,
+                                indentLevel + 1,
+                                model.TypeName,
+                                model.Components.All
+                            );
                         },
                         indentLevel
                     )
             );
         }
 
-        /// <summary>
-        /// Emits a nested <c>NativeFactory</c> struct that bundles
-        /// <c>NativeComponentLookupRead/Write&lt;T&gt;</c> fields for each component in the
-        /// aspect. Provides a <c>Create(EntityIndex)</c> method that constructs a full
-        /// aspect view for any entity. Declare as a <c>[FromWorld]</c> field on a Trecs
-        /// job struct.
-        /// </summary>
-        private static void GenerateNativeFactory(
-            OptimizedStringBuilder sb,
-            int indentLevel,
-            INamedTypeSymbol symbol,
-            AspectAttributeData attributeData
-        )
-        {
-            var allTypes = attributeData.AllComponentTypes;
-            if (allTypes.Length == 0)
-                return;
-
-            var aspectName = symbol.Name;
-
-            sb.AppendLine();
-            sb.AppendLine(indentLevel, "/// <summary>");
-            sb.AppendLine(
-                indentLevel,
-                $"/// Burst-compatible factory for constructing <see cref=\"{aspectName}\"/> views"
-            );
-            sb.AppendLine(
-                indentLevel,
-                "/// of cross-entity lookups inside a job. Declare as a <c>[FromWorld]</c> field."
-            );
-            sb.AppendLine(indentLevel, "/// </summary>");
-            sb.AppendLine(
-                indentLevel,
-                "[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Advanced)]"
-            );
-            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
-            sb.AppendLine(indentLevel, "public struct NativeFactory : System.IDisposable");
-            sb.AppendLine(indentLevel, "{");
-
-            // Fields — one lookup per component
-            for (int i = 0; i < allTypes.Length; i++)
-            {
-                var componentTypeName = PerformanceCache.GetDisplayString(allTypes[i]);
-                var isReadOnly = IsReadOnlyComponent(allTypes[i], attributeData);
-                var lookupType = isReadOnly
-                    ? $"NativeComponentLookupRead<{componentTypeName}>"
-                    : $"NativeComponentLookupWrite<{componentTypeName}>";
-                if (!isReadOnly)
-                    sb.AppendLine(
-                        indentLevel + 1,
-                        "[Unity.Collections.NativeDisableParallelForRestriction]"
-                    );
-                sb.AppendLine(indentLevel + 1, $"{lookupType} _lookup{i};");
-            }
-
-            sb.AppendLine();
-
-            // Constructor
-            sb.AppendLine(
-                indentLevel + 1,
-                "[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]"
-            );
-            {
-                var ctorSig = new System.Text.StringBuilder("public NativeFactory(");
-                for (int i = 0; i < allTypes.Length; i++)
-                {
-                    var componentTypeName = PerformanceCache.GetDisplayString(allTypes[i]);
-                    var isReadOnly = IsReadOnlyComponent(allTypes[i], attributeData);
-                    var lookupType = isReadOnly
-                        ? $"NativeComponentLookupRead<{componentTypeName}>"
-                        : $"NativeComponentLookupWrite<{componentTypeName}>";
-                    if (i > 0)
-                        ctorSig.Append(", ");
-                    ctorSig.Append($"{lookupType} lookup{i}");
-                }
-                ctorSig.Append(")");
-                sb.AppendLine(indentLevel + 1, ctorSig.ToString());
-            }
-            sb.AppendLine(indentLevel + 1, "{");
-            for (int i = 0; i < allTypes.Length; i++)
-            {
-                sb.AppendLine(indentLevel + 2, $"_lookup{i} = lookup{i};");
-            }
-            sb.AppendLine(indentLevel + 1, "}");
-
-            sb.AppendLine();
-
-            // Create method
-            sb.AppendLine(indentLevel + 1, $"public {aspectName} Create(EntityIndex entityIndex)");
-            sb.AppendLine(indentLevel + 1, "{");
-            sb.AppendLine(indentLevel + 2, $"return new {aspectName}(");
-            sb.AppendLine(indentLevel + 3, "entityIndex,");
-            for (int i = 0; i < allTypes.Length; i++)
-            {
-                var suffix = (i == allTypes.Length - 1) ? ");" : ",";
-                sb.AppendLine(
-                    indentLevel + 3,
-                    $"Trecs.Internal.JobGenSchedulingExtensions.GetBufferForGroupForJob(_lookup{i}, entityIndex.GroupIndex){suffix}"
-                );
-            }
-            sb.AppendLine(indentLevel + 1, "}");
-
-            sb.AppendLine();
-
-            // Dispose method
-            sb.AppendLine(indentLevel + 1, "public void Dispose()");
-            sb.AppendLine(indentLevel + 1, "{");
-            for (int i = 0; i < allTypes.Length; i++)
-            {
-                sb.AppendLine(indentLevel + 2, $"_lookup{i}.Dispose();");
-            }
-            sb.AppendLine(indentLevel + 1, "}");
-
-            sb.AppendLine(indentLevel, "}");
-        }
-
-        /// <summary>
-        /// Generates private fields for standard Aspects
-        /// </summary>
         private static void GenerateFields(
             OptimizedStringBuilder sb,
             int indentLevel,
-            AspectAttributeData attributeData
+            EquatableArray<ComponentModel> allComponents
         )
         {
-            sb.AppendLine(indentLevel, "EntityIndex _entityIndex;");
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
+            sb.AppendLine(indentLevel, "EntityIndex __entityIndex;");
             sb.AppendLine();
 
-            // Generate buffer fields efficiently
-            var allTypes = attributeData.AllComponentTypes;
-            sb.AppendBlock(
-                allTypes,
-                type =>
-                {
-                    var fieldName = ComponentTypeHelper.GetPropertyName(type);
-                    var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(fieldName);
-                    var bufferType = GetBufferTypeName(type, attributeData);
-                    return $"readonly {bufferType} _{camelCaseFieldName}Buffer;";
-                },
-                indentLevel
-            );
+            foreach (var c in allComponents)
+            {
+                sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
+                sb.AppendLine(indentLevel, $"readonly {c.BufferTypeName} {c.BufferFieldName};");
+            }
 
             sb.AppendLine();
         }
 
-        /// <summary>
-        /// Generates constructors for standard Aspects
-        /// </summary>
         private static void GenerateConstructors(
             OptimizedStringBuilder sb,
             int indentLevel,
             string typeName,
-            AspectAttributeData attributeData
+            EquatableArray<ComponentModel> allComponents
         )
         {
-            var allTypes = attributeData.AllComponentTypes;
+            // EntityIndex constructor (used by aspect-mode [ForEachEntity], AspectJob, Single/TrySingle)
+            var entityIndexParams = new List<string> { "EntityIndex entityIndex" };
+            foreach (var c in allComponents)
+                entityIndexParams.Add($"in {c.BufferTypeName} {c.BufferParamName}");
 
-            // Generate EntityIndex constructor (used by aspect-mode [ForEachEntity], AspectJob, Single/TrySingle)
-            var entityIndexConstructorParams = new List<string> { "EntityIndex entityIndex" };
-            entityIndexConstructorParams.AddRange(
-                allTypes.Select(componentType =>
-                {
-                    var fieldName = ComponentTypeHelper.GetPropertyName(componentType);
-                    var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(fieldName);
-                    var bufferType = GetBufferTypeName(componentType, attributeData);
-                    return $"in {bufferType} {camelCaseFieldName}Buffer";
-                })
-            );
-
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
             sb.AppendLine(indentLevel, $"public {typeName}(");
-            sb.AppendParameterList(entityIndexConstructorParams, indentLevel);
+            sb.AppendParameterList(entityIndexParams, indentLevel);
             sb.AppendLine(0, ")");
             sb.AppendLine(indentLevel, "{");
-            sb.AppendLine(indentLevel + 1, "_entityIndex = entityIndex;");
-
-            // Generate field assignments efficiently
+            sb.AppendLine(indentLevel + 1, "__entityIndex = entityIndex;");
             sb.AppendBlock(
-                allTypes,
-                componentType =>
-                {
-                    var fieldName = ComponentTypeHelper.GetPropertyName(componentType);
-                    var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(fieldName);
-                    return $"_{camelCaseFieldName}Buffer = {camelCaseFieldName}Buffer;";
-                },
+                allComponents,
+                c => $"{c.BufferFieldName} = {c.BufferParamName};",
                 indentLevel + 1
             );
-
             sb.AppendLine(indentLevel, "}");
             sb.AppendLine();
 
-            // Generate GroupIndex-only constructor (used by aspect-mode [ForEachEntity] hoisted iteration)
-            var groupConstructorParams = new List<string> { "GroupIndex group" };
-            groupConstructorParams.AddRange(
-                allTypes.Select(componentType =>
-                {
-                    var fieldName = ComponentTypeHelper.GetPropertyName(componentType);
-                    var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(fieldName);
-                    var bufferType = GetBufferTypeName(componentType, attributeData);
-                    return $"in {bufferType} {camelCaseFieldName}Buffer";
-                })
-            );
+            // GroupIndex-only constructor (used by aspect-mode [ForEachEntity] hoisted iteration)
+            var groupParams = new List<string> { "GroupIndex group" };
+            foreach (var c in allComponents)
+                groupParams.Add($"in {c.BufferTypeName} {c.BufferParamName}");
 
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
             sb.AppendLine(indentLevel, $"internal {typeName}(");
-            sb.AppendParameterList(groupConstructorParams, indentLevel);
+            sb.AppendParameterList(groupParams, indentLevel);
             sb.AppendLine(0, ")");
             sb.AppendLine(indentLevel, "{");
-            sb.AppendLine(indentLevel + 1, "_entityIndex = new EntityIndex(0, group);");
-
+            sb.AppendLine(indentLevel + 1, "__entityIndex = new EntityIndex(0, group);");
             sb.AppendBlock(
-                allTypes,
-                componentType =>
-                {
-                    var fieldName = ComponentTypeHelper.GetPropertyName(componentType);
-                    var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(fieldName);
-                    return $"_{camelCaseFieldName}Buffer = {camelCaseFieldName}Buffer;";
-                },
+                allComponents,
+                c => $"{c.BufferFieldName} = {c.BufferParamName};",
                 indentLevel + 1
             );
-
             sb.AppendLine(indentLevel, "}");
             sb.AppendLine();
 
-            // Generate SetIndex method for hoisted iteration (avoids per-entity struct reconstruction)
+            // SetIndex helper for hoisted iteration (avoids per-entity struct reconstruction)
             sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
             sb.AppendLine(indentLevel, "internal void SetIndex(int index)");
             sb.AppendLine(indentLevel, "{");
-            sb.AppendLine(indentLevel + 1, "_entityIndex = _entityIndex.WithIndex(index);");
+            sb.AppendLine(indentLevel + 1, "__entityIndex = __entityIndex.WithIndex(index);");
             sb.AppendLine(indentLevel, "}");
             sb.AppendLine();
 
-            // Generate constructor that takes WorldAccessor and EntityIndex
+            // WorldAccessor + EntityIndex constructor
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
             sb.AppendLine(
                 indentLevel,
                 $"public {typeName}(WorldAccessor world, EntityIndex entityIndex)"
             );
             sb.AppendLine(indentLevel, "{");
-            sb.AppendLine(indentLevel + 1, "_entityIndex = entityIndex;");
+            sb.AppendLine(indentLevel + 1, "__entityIndex = entityIndex;");
             sb.AppendLine();
             sb.AppendLine(indentLevel + 1, "// Eagerly populate component buffers for performance");
-
-            // Generate batched buffer population for all component types
-            GenerateBatchedQueryComponents(
+            EmitBufferAssignments(
                 sb,
                 indentLevel + 1,
-                allTypes,
-                "_entityIndex.GroupIndex",
-                "world",
-                type => $"_{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
-                isFieldAssignment: true,
-                attributeData
+                allComponents,
+                groupExpression: "__entityIndex.GroupIndex",
+                worldExpression: "world",
+                lhs: c => c.BufferFieldName,
+                isFieldAssignment: true
             );
-
             sb.AppendLine(indentLevel, "}");
             sb.AppendLine();
 
-            // Generate constructor that takes WorldAccessor and EntityHandle (convenience overload)
+            // WorldAccessor + EntityHandle constructor (convenience overload)
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
             sb.AppendLine(
                 indentLevel,
                 $"public {typeName}(WorldAccessor world, EntityHandle entityHandle)"
@@ -364,104 +192,83 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine();
         }
 
-        /// <summary>
-        /// Generates component access properties.
-        /// </summary>
         private static void GenerateProperties(
             OptimizedStringBuilder sb,
             int indentLevel,
-            AspectAttributeData attributeData
+            AspectComponents components
         )
         {
-            // Generate read properties
-            foreach (var readType in attributeData.ReadTypes)
+            foreach (var c in components.Read)
             {
-                var propertyName = ComponentTypeHelper.GetPropertyName(readType);
-                var returnType = ComponentTypeHelper.GetPropertyReturnType(readType, true);
-                var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(propertyName);
-                var accessExpression = ComponentTypeHelper.GetPropertyAccessExpression(
-                    $"_{camelCaseFieldName}Buffer",
-                    "_entityIndex.Index",
-                    readType,
-                    true
-                );
-
+                var access = $"ref {c.BufferFieldName}[__entityIndex.Index]{c.UnwrapAccessSuffix}";
                 sb.AppendProperty(
-                    returnType,
-                    propertyName,
-                    $"ref {accessExpression}",
+                    c.ReadReturnType,
+                    c.PropertyName,
+                    access,
                     indentLevel,
-                    isInlined: true
+                    isInlined: true,
+                    attributeLine: GeneratedCodeAttributes.Line
                 );
                 sb.AppendLine();
             }
 
-            // Generate write properties
-            foreach (var writeType in attributeData.WriteTypes)
+            foreach (var c in components.Write)
             {
-                var propertyName = ComponentTypeHelper.GetPropertyName(writeType);
-                var returnType = ComponentTypeHelper.GetPropertyReturnType(writeType, false);
-                var (finalType, wasUnwrapped) = ComponentTypeHelper.UnwrapComponent(writeType);
-                var camelCaseFieldName = ComponentTypeHelper.ToCamelCase(propertyName);
-                var bufferName = $"_{camelCaseFieldName}Buffer";
-
-                var accessExpression = GetWritePropertyAccessExpression(bufferName, writeType);
-
+                var access = $"ref {c.BufferFieldName}[__entityIndex.Index]{c.UnwrapAccessSuffix}";
                 sb.AppendProperty(
-                    returnType,
-                    propertyName,
-                    $"ref {accessExpression}",
+                    c.WriteReturnType,
+                    c.PropertyName,
+                    access,
                     indentLevel,
-                    isInlined: true
+                    isInlined: true,
+                    attributeLine: GeneratedCodeAttributes.Line
                 );
                 sb.AppendLine();
             }
         }
 
-        /// <summary>
-        /// Generates helper methods (EntityIndex, Index, Single, TrySingle, Query)
-        /// </summary>
         private static void GenerateHelperMethods(
             OptimizedStringBuilder sb,
             int indentLevel,
-            INamedTypeSymbol symbol,
-            AspectAttributeData attributeData
+            string typeName,
+            EquatableArray<ComponentModel> allComponents
         )
         {
-            var typeName = symbol.Name;
-
-            // Generate AspectQuery builder + unified Enumerator (replaces old
-            // standalone Single/TrySingle/Query methods with a fluent builder API)
-            GenerateAspectQueryAndEnumerator(sb, indentLevel, typeName, attributeData);
+            GenerateAspectQueryAndEnumerator(sb, indentLevel, typeName, allComponents);
 
             // EntityIndex property
             sb.AppendProperty(
                 "EntityIndex",
                 "EntityIndex",
-                "_entityIndex",
+                "__entityIndex",
                 indentLevel,
-                isInlined: true
+                isInlined: true,
+                attributeLine: GeneratedCodeAttributes.Line
             );
             sb.AppendLine();
 
-            // Index property (read-only)
-            sb.AppendProperty("int", "Index", "_entityIndex.Index", indentLevel, isInlined: true);
+            // Index property
+            sb.AppendProperty(
+                "int",
+                "Index",
+                "__entityIndex.Index",
+                indentLevel,
+                isInlined: true,
+                attributeLine: GeneratedCodeAttributes.Line
+            );
             sb.AppendLine();
 
-            // Entity operation methods (Remove, MoveTo)
             GenerateEntityOperationMethods(sb, indentLevel);
         }
 
         /// <summary>
-        /// Generates the generic <c>MoveTo&lt;T1..T4&gt;</c> overloads on each
-        /// aspect, for both <c>WorldAccessor</c> and <c>NativeWorldAccessor</c>.
-        /// (The 1-arg <c>Remove</c> and <c>MoveTo(TagSet)</c> live in
-        /// <c>AspectExtensions</c>; only the generic forms need to be emitted
-        /// here because C# can't infer the aspect's concrete type through a
-        /// generic extension method on the open type parameter.)
-        /// Set membership is handled exclusively through
-        /// <c>World.Set&lt;TSet&gt;()</c> — users pick deferred vs immediate
-        /// there, so the aspect doesn't pre-bake one or the other.
+        /// Emits generic <c>SetTag&lt;T&gt;</c> / <c>UnsetTag&lt;T&gt;</c> for both
+        /// <c>WorldAccessor</c> and <c>NativeWorldAccessor</c>. The 1-arg <c>Remove</c> and
+        /// <c>MoveTo(TagSet)</c> live in <c>AspectExtensions</c>; only the generic forms
+        /// need per-aspect emission because C# cannot infer the concrete aspect type through
+        /// a generic extension method on the open type parameter. Set membership goes
+        /// through <c>World.Set&lt;TSet&gt;()</c>, so the aspect doesn't pre-bake either
+        /// the deferred or immediate path.
         /// </summary>
         private static void GenerateEntityOperationMethods(
             OptimizedStringBuilder sb,
@@ -476,46 +283,33 @@ namespace Trecs.SourceGen.Aspect
 
             foreach (var (accessorType, paramPrefix) in accessorSpecs)
             {
-                // Remove is defined as an extension method in AspectExtensions.cs.
-
-                // SetTag/UnsetTag — the only structural tag-change verbs.
-                // SetTag works for both presence/absence (turns the tag on) and
-                // multi-variant (switches the active variant); UnsetTag is the inverse,
-                // valid only on presence/absence dims.
                 sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
+                sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
                 sb.AppendLine(
                     indentLevel,
-                    $"public readonly void SetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => _entityIndex.SetTag<T>(world);"
+                    $"public readonly void SetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => __entityIndex.SetTag<T>(world);"
                 );
                 sb.AppendLine();
 
                 sb.AppendLine(indentLevel, "[MethodImpl(MethodImplOptions.AggressiveInlining)]");
+                sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
                 sb.AppendLine(
                     indentLevel,
-                    $"public readonly void UnsetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => _entityIndex.UnsetTag<T>(world);"
+                    $"public readonly void UnsetTag<T>({paramPrefix}{accessorType} world) where T : struct, ITag => __entityIndex.UnsetTag<T>(world);"
                 );
                 sb.AppendLine();
             }
         }
 
-        /// <summary>
-        /// Generates the <c>Query(WorldAccessor)</c> entry point, the nested <c>AspectQuery</c>
-        /// fluent builder ref struct, and the unified <c>Enumerator</c> ref struct that handles
-        /// both dense and sparse (set-filtered) iteration.
-        ///
-        /// Replaces the old standalone Single/TrySingle/Query static methods and the separate
-        /// QueryEnumerable/SparseQueryEnumerable/QueryEnumerator/SparseQueryEnumerator types.
-        /// </summary>
         private static void GenerateAspectQueryAndEnumerator(
             OptimizedStringBuilder sb,
             int indentLevel,
             string typeName,
-            AspectAttributeData attributeData
+            EquatableArray<ComponentModel> allComponents
         )
         {
-            var allTypes = attributeData.AllComponentTypes;
-
             // --- Query(WorldAccessor) static entry point ---
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
             sb.AppendLine(indentLevel, "public static AspectQuery Query(WorldAccessor world)");
             sb.AppendLine(indentLevel + 1, "=> new AspectQuery(world.Query());");
             sb.AppendLine();
@@ -523,16 +317,15 @@ namespace Trecs.SourceGen.Aspect
             // =====================================================================
             // AspectQuery ref struct — fluent builder with filter + terminal methods
             // =====================================================================
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
             sb.AppendLine(indentLevel, "public ref struct AspectQuery");
             sb.AppendLine(indentLevel, "{");
 
-            // --- Fields ---
             sb.AppendLine(indentLevel + 1, "QueryBuilder _builder;");
             sb.AppendLine(indentLevel + 1, "SetId _set;");
             sb.AppendLine(indentLevel + 1, "bool _hasSet;");
             sb.AppendLine();
 
-            // --- Constructor ---
             sb.AppendLine(indentLevel + 1, "internal AspectQuery(QueryBuilder builder)");
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(indentLevel + 2, "_builder = builder;");
@@ -541,7 +334,6 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "}");
             sb.AppendLine();
 
-            // --- WithTags filter methods ---
             EmitAspectQueryForwardingMethod(
                 sb,
                 indentLevel + 1,
@@ -561,7 +353,6 @@ namespace Trecs.SourceGen.Aspect
                 "WithTags",
                 "TagSet tags"
             );
-            // --- WithoutTags filter methods ---
             EmitAspectQueryForwardingMethod(
                 sb,
                 indentLevel + 1,
@@ -590,7 +381,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                "TrecsAssert.That(!_hasSet, \"Only one set per query is supported.\");"
+                "TrecsDebugAssert.That(!_hasSet, \"Only one set per query is supported.\");"
             );
             sb.AppendLine(indentLevel + 2, "_set = EntitySet<T>.Value.Id;");
             sb.AppendLine(indentLevel + 2, "_hasSet = true;");
@@ -602,7 +393,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                "TrecsAssert.That(!_hasSet, \"Only one set per query is supported.\");"
+                "TrecsDebugAssert.That(!_hasSet, \"Only one set per query is supported.\");"
             );
             sb.AppendLine(indentLevel + 2, "_set = entitySet.Id;");
             sb.AppendLine(indentLevel + 2, "_hasSet = true;");
@@ -614,7 +405,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                "TrecsAssert.That(!_hasSet, \"Only one set per query is supported.\");"
+                "TrecsDebugAssert.That(!_hasSet, \"Only one set per query is supported.\");"
             );
             sb.AppendLine(indentLevel + 2, "_set = setId;");
             sb.AppendLine(indentLevel + 2, "_hasSet = true;");
@@ -625,10 +416,10 @@ namespace Trecs.SourceGen.Aspect
             // --- MatchByComponents() — adds WithComponents for every component the aspect declares ---
             sb.AppendLine(indentLevel + 1, "public AspectQuery MatchByComponents()");
             sb.AppendLine(indentLevel + 1, "{");
-            foreach (var compType in allTypes)
+            foreach (var c in allComponents)
                 sb.AppendLine(
                     indentLevel + 2,
-                    $"_builder = _builder.WithComponents<{PerformanceCache.GetDisplayString(compType)}>();"
+                    $"_builder = _builder.WithComponents<{c.DisplayString}>();"
                 );
             sb.AppendLine(indentLevel + 2, "return this;");
             sb.AppendLine(indentLevel + 1, "}");
@@ -639,7 +430,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                $"TrecsAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling Single().\");"
+                $"TrecsDebugAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling Single().\");"
             );
             sb.AppendLine(indentLevel + 2, "EntityIndex __ei;");
             sb.AppendLine(indentLevel + 2, "if (_hasSet)");
@@ -653,25 +444,19 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 2, "}");
             sb.AppendLine(indentLevel + 2, "var __world = _builder.World;");
 
-            GenerateBatchedQueryComponents(
+            EmitBufferAssignments(
                 sb,
                 indentLevel + 2,
-                allTypes,
-                "__ei.GroupIndex",
-                "__world",
-                type => $"{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
-                isFieldAssignment: false,
-                attributeData
+                allComponents,
+                groupExpression: "__ei.GroupIndex",
+                worldExpression: "__world",
+                lhs: c => c.BufferParamName,
+                isFieldAssignment: false
             );
 
             var ctorArgs = new List<string> { "__ei" };
-            ctorArgs.AddRange(
-                allTypes.Select(t =>
-                {
-                    var n = ComponentTypeHelper.GetPropertyName(t);
-                    return $"{ComponentTypeHelper.ToCamelCase(n)}Buffer";
-                })
-            );
+            foreach (var c in allComponents)
+                ctorArgs.Add(c.BufferParamName);
             sb.AppendLine(indentLevel + 2, "return");
             sb.AppendConstructorCall(typeName, ctorArgs, indentLevel + 3);
             sb.AppendLine(0, ";");
@@ -683,7 +468,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                $"TrecsAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling TrySingle().\");"
+                $"TrecsDebugAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling TrySingle().\");"
             );
             sb.AppendLine(indentLevel + 2, "bool found;");
             sb.AppendLine(indentLevel + 2, "EntityIndex __ei;");
@@ -699,15 +484,14 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 2, "if (!found) { view = default; return false; }");
             sb.AppendLine(indentLevel + 2, "var __world = _builder.World;");
 
-            GenerateBatchedQueryComponents(
+            EmitBufferAssignments(
                 sb,
                 indentLevel + 2,
-                allTypes,
-                "__ei.GroupIndex",
-                "__world",
-                type => $"{ComponentTypeHelper.GetCamelCasePropertyName(type)}Buffer",
-                isFieldAssignment: false,
-                attributeData
+                allComponents,
+                groupExpression: "__ei.GroupIndex",
+                worldExpression: "__world",
+                lhs: c => c.BufferParamName,
+                isFieldAssignment: false
             );
 
             sb.AppendLine(indentLevel + 2, "view =");
@@ -722,7 +506,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                $"TrecsAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling Count().\");"
+                $"TrecsDebugAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before calling Count().\");"
             );
             sb.AppendLine(indentLevel + 2, "if (_hasSet)");
             sb.AppendLine(indentLevel + 2, "{");
@@ -738,7 +522,7 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 1, "{");
             sb.AppendLine(
                 indentLevel + 2,
-                $"TrecsAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before iterating.\");"
+                $"TrecsDebugAssert.That(_builder.HasAnyCriteria || _hasSet, \"{typeName}.Query requires at least one constraint before iterating.\");"
             );
             sb.AppendLine(indentLevel + 2, "if (_hasSet)");
             sb.AppendLine(indentLevel + 3, "return new Enumerator(_builder.InSet(_set));");
@@ -751,10 +535,10 @@ namespace Trecs.SourceGen.Aspect
             // =====================================================================
             // Enumerator ref struct — unified dense + sparse iteration
             // =====================================================================
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
             sb.AppendLine(indentLevel, "public ref struct Enumerator");
             sb.AppendLine(indentLevel, "{");
 
-            // Fields
             sb.AppendLine(indentLevel + 1, "readonly WorldAccessor _world;");
             sb.AppendLine(indentLevel + 1, "readonly bool _isSparse;");
             sb.AppendLine();
@@ -839,28 +623,18 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 2, "_denseSliceCount = slice.Count;");
             sb.AppendLine();
 
-            foreach (var type in allTypes)
+            foreach (var c in allComponents)
             {
-                var fieldName = ComponentTypeHelper.GetPropertyName(type);
-                var varName = ComponentTypeHelper.ToCamelCase(fieldName) + "Buffer";
-                var typeDisplay = PerformanceCache.GetDisplayString(type);
-                bool isReadOnly = IsReadOnlyComponent(type, attributeData);
-                var bufferSuffix = isReadOnly ? "Read" : "Write";
                 sb.AppendLine(
                     indentLevel + 2,
-                    $"var {varName} = _world.ComponentBuffer<{typeDisplay}>(__group).{bufferSuffix};"
+                    $"var {c.BufferParamName} = _world.ComponentBuffer<{c.DisplayString}>(__group).{c.ComponentBufferSuffix};"
                 );
             }
             sb.AppendLine();
 
             var groupCtorArgs = new List<string> { "__group" };
-            groupCtorArgs.AddRange(
-                allTypes.Select(t =>
-                {
-                    var n = ComponentTypeHelper.GetPropertyName(t);
-                    return $"{ComponentTypeHelper.ToCamelCase(n)}Buffer";
-                })
-            );
+            foreach (var c in allComponents)
+                groupCtorArgs.Add(c.BufferParamName);
             sb.AppendLine(
                 indentLevel + 2,
                 $"_aspect = new {typeName}({string.Join(", ", groupCtorArgs)});"
@@ -901,16 +675,11 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine(indentLevel + 4, "var idx = _indices[0];");
             sb.AppendLine(indentLevel + 4, "var __group = slice.GroupIndex;");
 
-            foreach (var type in allTypes)
+            foreach (var c in allComponents)
             {
-                var fieldName = ComponentTypeHelper.GetPropertyName(type);
-                var varName = ComponentTypeHelper.ToCamelCase(fieldName) + "Buffer";
-                var typeDisplay = PerformanceCache.GetDisplayString(type);
-                bool isReadOnly = IsReadOnlyComponent(type, attributeData);
-                var bufferSuffix = isReadOnly ? "Read" : "Write";
                 sb.AppendLine(
                     indentLevel + 4,
-                    $"var {varName} = _world.ComponentBuffer<{typeDisplay}>(__group).{bufferSuffix};"
+                    $"var {c.BufferParamName} = _world.ComponentBuffer<{c.DisplayString}>(__group).{c.ComponentBufferSuffix};"
                 );
             }
 
@@ -938,11 +707,6 @@ namespace Trecs.SourceGen.Aspect
             sb.AppendLine();
         }
 
-        /// <summary>
-        /// Emits generic forwarding methods on the AspectQuery for WithTags/WithoutTags.
-        /// For arityMin..arityMax, emits generic overloads. When arityMin==0 and a paramStr
-        /// is given, emits a non-generic overload (e.g. WithTags(TagSet tags)).
-        /// </summary>
         private static void EmitAspectQueryForwardingMethod(
             OptimizedStringBuilder sb,
             int indentLevel,
@@ -956,7 +720,6 @@ namespace Trecs.SourceGen.Aspect
         {
             if (nonGenericParam != null)
             {
-                // Non-generic overload: e.g. WithTags(TagSet tags)
                 var argName = nonGenericParam.Split(' ').Last();
                 sb.AppendLine(indentLevel, $"public AspectQuery {methodName}({nonGenericParam})");
                 sb.AppendLine(
@@ -987,192 +750,176 @@ namespace Trecs.SourceGen.Aspect
         }
 
         /// <summary>
-        /// Returns a C# expression that evaluates to a TagSet for the given tag types.
-        /// Uses static TagSet&lt;T1,...&gt;.Value for 1-4 tags, runtime TagSet.FromTags for 5+.
+        /// Emits a nested <c>NativeFactory</c> struct bundling one
+        /// <c>NativeComponentLookupRead/Write&lt;T&gt;</c> per component plus a
+        /// <c>Create(EntityIndex)</c> method. Declare as a <c>[FromWorld]</c> field on
+        /// a Trecs job struct for cross-entity aspect lookups in Burst code.
         /// </summary>
-        internal static string GenerateTagSetExpression(ImmutableArray<ITypeSymbol> tagTypes)
+        private static void GenerateNativeFactory(
+            OptimizedStringBuilder sb,
+            int indentLevel,
+            string aspectName,
+            EquatableArray<ComponentModel> allComponents
+        )
         {
-            var tagTypeNames = tagTypes.Select(t => PerformanceCache.GetDisplayString(t));
+            if (allComponents.Length == 0)
+                return;
 
-            if (tagTypes.Length <= 4)
+            sb.AppendLine();
+            sb.AppendLine(indentLevel, "/// <summary>");
+            sb.AppendLine(
+                indentLevel,
+                $"/// Burst-compatible factory for constructing <see cref=\"{aspectName}\"/> views"
+            );
+            sb.AppendLine(
+                indentLevel,
+                "/// of cross-entity lookups inside a job. Declare as a <c>[FromWorld]</c> field."
+            );
+            sb.AppendLine(indentLevel, "/// </summary>");
+            sb.AppendLine(
+                indentLevel,
+                "[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Advanced)]"
+            );
+            sb.AppendLine(indentLevel, GeneratedCodeAttributes.Line);
+            sb.AppendLine(indentLevel, "public struct NativeFactory : System.IDisposable");
+            sb.AppendLine(indentLevel, "{");
+
+            // Fields — one lookup per component
+            for (int i = 0; i < allComponents.Length; i++)
             {
-                return $"TagSet<{string.Join(", ", tagTypeNames)}>.Value";
+                var c = allComponents[i];
+                if (!c.IsReadOnly)
+                    sb.AppendLine(
+                        indentLevel + 1,
+                        "[Unity.Collections.NativeDisableParallelForRestriction]"
+                    );
+                sb.AppendLine(indentLevel + 1, $"{c.LookupTypeName} _lookup{i};");
             }
 
-            var tagExprs = tagTypeNames.Select(n => $"Tag<{n}>.Value");
-            return $"TagSet.FromTags(new Tag[] {{ {string.Join(", ", tagExprs)} }})";
+            sb.AppendLine();
+
+            // Constructor
+            sb.AppendLine(
+                indentLevel + 1,
+                "[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]"
+            );
+            {
+                var ctorSig = new StringBuilder("public NativeFactory(");
+                for (int i = 0; i < allComponents.Length; i++)
+                {
+                    if (i > 0)
+                        ctorSig.Append(", ");
+                    ctorSig.Append(allComponents[i].LookupTypeName).Append(" lookup").Append(i);
+                }
+                ctorSig.Append(")");
+                sb.AppendLine(indentLevel + 1, ctorSig.ToString());
+            }
+            sb.AppendLine(indentLevel + 1, "{");
+            for (int i = 0; i < allComponents.Length; i++)
+                sb.AppendLine(indentLevel + 2, $"_lookup{i} = lookup{i};");
+            sb.AppendLine(indentLevel + 1, "}");
+
+            sb.AppendLine();
+
+            // Create method
+            sb.AppendLine(indentLevel + 1, $"public {aspectName} Create(EntityIndex entityIndex)");
+            sb.AppendLine(indentLevel + 1, "{");
+            sb.AppendLine(indentLevel + 2, $"return new {aspectName}(");
+            sb.AppendLine(indentLevel + 3, "entityIndex,");
+            for (int i = 0; i < allComponents.Length; i++)
+            {
+                var suffix = (i == allComponents.Length - 1) ? ");" : ",";
+                sb.AppendLine(
+                    indentLevel + 3,
+                    $"Trecs.Internal.JobGenSchedulingExtensions.GetBufferForGroupForJob(_lookup{i}, entityIndex.GroupIndex){suffix}"
+                );
+            }
+            sb.AppendLine(indentLevel + 1, "}");
+
+            sb.AppendLine();
+
+            // Dispose method
+            sb.AppendLine(indentLevel + 1, "public void Dispose()");
+            sb.AppendLine(indentLevel + 1, "{");
+            for (int i = 0; i < allComponents.Length; i++)
+                sb.AppendLine(indentLevel + 2, $"_lookup{i}.Dispose();");
+            sb.AppendLine(indentLevel + 1, "}");
+
+            sb.AppendLine(indentLevel, "}");
         }
 
         /// <summary>
-        /// Generates the source code for an AspectInterface
+        /// Emits a sequence of <c>var name = world.ComponentBuffer&lt;T&gt;(group).Read|Write</c>
+        /// (or <c>name = ...;</c> for field assignment) lines, one per component, used by all
+        /// the buffer-population sites: constructors, Single/TrySingle terminals, and dense
+        /// enumerator slice advancement.
         /// </summary>
-        public static string GenerateAspectInterfaceSource(
-            INamedTypeSymbol symbol,
-            AspectInterfaceData attributeData
-        )
-        {
-            var componentCount = attributeData.ReadTypes.Length + attributeData.WriteTypes.Length;
-            var sb = OptimizedStringBuilder.ForAspect(componentCount);
-            var namespaceName = SymbolAnalyzer.GetNamespaceChain(symbol);
-            var accessibility = SymbolAnalyzer.GetAccessibilityModifier(symbol);
-            var containingTypes = SymbolAnalyzer.GetContainingTypeChainInfo(symbol);
-
-            // Generate using statements
-            sb.AppendUsings(CommonUsings.WithExtras("System", "System.Runtime.CompilerServices"));
-
-            // Generate in namespace if needed
-            return sb.WrapInNamespace(
-                    namespaceName,
-                    (builder) =>
-                    {
-                        GenerateInterfaceContent(
-                            builder,
-                            symbol,
-                            attributeData,
-                            accessibility,
-                            containingTypes
-                        );
-                    }
-                )
-                .ToString();
-        }
-
-        /// <summary>
-        /// Generates the interface content for AspectInterface
-        /// </summary>
-        private static void GenerateInterfaceContent(
+        private static void EmitBufferAssignments(
             OptimizedStringBuilder sb,
-            INamedTypeSymbol symbol,
-            AspectInterfaceData attributeData,
-            string accessibility,
-            IReadOnlyList<ContainingTypeInfo> containingTypes
+            int indentLevel,
+            EquatableArray<ComponentModel> components,
+            string groupExpression,
+            string worldExpression,
+            System.Func<ComponentModel, string> lhs,
+            bool isFieldAssignment
         )
         {
-            // Start interface - user's partial already declares base interfaces; C# merges partials
-            var effectiveAccessibility = accessibility == "private" ? "internal" : accessibility;
+            var prefix = isFieldAssignment ? "" : "var ";
+            foreach (var c in components)
+            {
+                sb.AppendLine(
+                    indentLevel,
+                    $"{prefix}{lhs(c)} = {worldExpression}.ComponentBuffer<{c.DisplayString}>({groupExpression}).{c.ComponentBufferSuffix};"
+                );
+            }
+        }
+
+        // -------------------------------------------------------------------------------------
+        // Interface path
+        // -------------------------------------------------------------------------------------
+
+        private static void GenerateInterfaceContent(OptimizedStringBuilder sb, AspectModel model)
+        {
+            var effectiveAccessibility =
+                model.Accessibility == "private" ? "internal" : model.Accessibility;
 
             sb.WrapInContainingTypes(
-                containingTypes,
+                model.ContainingTypes.ToArray(),
                 0,
                 (b, indentLevel) =>
                 {
                     b.AppendLine(
                         indentLevel,
-                        $"{effectiveAccessibility} partial interface {symbol.Name}"
+                        $"{effectiveAccessibility} partial interface {model.TypeName}"
                     );
                     b.AppendLine(indentLevel, "{");
 
-                    // Note: EntityIndex is inherited from Trecs.IAspect — re-declaring it here would
-                    // shadow the base and produce CS0108. The user's partial already lists IAspect in
-                    // the base list (that's how we detected this type as an aspect interface).
+                    // EntityIndex is inherited from Trecs.IAspect — re-declaring it here would
+                    // shadow the base and produce CS0108. The user's partial already lists
+                    // IAspect in the base list (that's how we detected this type as an
+                    // aspect interface).
 
-                    // Generate read properties with ref readonly
-                    foreach (var readType in attributeData.ReadTypes)
+                    foreach (var c in model.Components.Read)
                     {
-                        var propertyName = ComponentTypeHelper.GetPropertyName(readType);
-                        var returnType = ComponentTypeHelper.GetPropertyReturnType(readType, true);
-
-                        b.AppendLine(indentLevel + 1, $"{returnType} {propertyName} {{ get; }}");
+                        b.AppendLine(indentLevel + 1, GeneratedCodeAttributes.Line);
+                        b.AppendLine(
+                            indentLevel + 1,
+                            $"{c.ReadReturnType} {c.PropertyName} {{ get; }}"
+                        );
                     }
 
-                    // Generate write properties with ref (only getter needed, since ref provides both read and write)
-                    foreach (var writeType in attributeData.WriteTypes)
+                    foreach (var c in model.Components.Write)
                     {
-                        var propertyName = ComponentTypeHelper.GetPropertyName(writeType);
-                        var returnType = ComponentTypeHelper.GetPropertyReturnType(
-                            writeType,
-                            false
+                        b.AppendLine(indentLevel + 1, GeneratedCodeAttributes.Line);
+                        b.AppendLine(
+                            indentLevel + 1,
+                            $"{c.WriteReturnType} {c.PropertyName} {{ get; }}"
                         );
-
-                        b.AppendLine(indentLevel + 1, $"{returnType} {propertyName} {{ get; }}");
                     }
 
                     b.AppendLine(indentLevel, "}");
                 }
             );
-        }
-
-        /// <summary>
-        /// Generates individual GetBuffer().Read/Write calls per component.
-        /// </summary>
-        private static void GenerateBatchedQueryComponents(
-            OptimizedStringBuilder sb,
-            int indentLevel,
-            ImmutableArray<ITypeSymbol> allTypes,
-            string groupExpression,
-            string worldExpression,
-            Func<ITypeSymbol, string> getVarName,
-            bool isFieldAssignment,
-            AspectAttributeData attributeData
-        )
-        {
-            foreach (var type in allTypes)
-            {
-                var varName = getVarName(type);
-                var typeDisplay = PerformanceCache.GetDisplayString(type);
-                bool isReadOnly = IsReadOnlyComponent(type, attributeData);
-                var bufferSuffix = isReadOnly ? "Read" : "Write";
-                var prefix = isFieldAssignment ? "" : "var ";
-                sb.AppendLine(
-                    indentLevel,
-                    $"{prefix}{varName} = {worldExpression}.ComponentBuffer<{typeDisplay}>({groupExpression}).{bufferSuffix};"
-                );
-            }
-        }
-
-        /// <summary>
-        /// Gets the access expression for write properties, handling nested single-value components
-        /// </summary>
-        private static string GetWritePropertyAccessExpression(
-            string bufferName,
-            ITypeSymbol componentType
-        )
-        {
-            var (finalType, wasUnwrapped) = ComponentTypeHelper.UnwrapComponent(componentType);
-
-            var baseExpression = $"{bufferName}[_entityIndex.Index]";
-
-            if (wasUnwrapped)
-            {
-                // Build the full unwrapping chain for nested single-value components
-                var expression = baseExpression;
-                var currentType = componentType;
-
-                while (
-                    currentType is INamedTypeSymbol namedType
-                    && ComponentTypeHelper.IsUnwrapComponent(namedType)
-                )
-                {
-                    var field = ComponentTypeHelper.GetUnwrapComponentField(namedType);
-                    if (field == null)
-                        break;
-
-                    expression += $".{field.Name}";
-                    currentType = field.Type;
-                }
-
-                return expression;
-            }
-
-            return baseExpression;
-        }
-
-        private static bool IsReadOnlyComponent(ITypeSymbol type, AspectAttributeData attributeData)
-        {
-            bool isInRead = attributeData.ReadTypes.Any(r =>
-                SymbolEqualityComparer.Default.Equals(r, type)
-            );
-            bool isInWrite = attributeData.WriteTypes.Any(w =>
-                SymbolEqualityComparer.Default.Equals(w, type)
-            );
-            return isInRead && !isInWrite;
-        }
-
-        private static string GetBufferTypeName(ITypeSymbol type, AspectAttributeData attributeData)
-        {
-            return IsReadOnlyComponent(type, attributeData)
-                ? $"NativeComponentBufferRead<{PerformanceCache.GetDisplayString(type)}>"
-                : $"NativeComponentBufferWrite<{PerformanceCache.GetDisplayString(type)}>";
         }
     }
 }

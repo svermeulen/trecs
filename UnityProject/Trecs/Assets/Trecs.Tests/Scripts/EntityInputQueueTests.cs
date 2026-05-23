@@ -20,7 +20,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 42 });
 
@@ -40,7 +40,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             inputQueue.AddInput(frame: 5, handle, new TestInt { Value = 99 });
 
@@ -60,7 +60,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             bool found = inputQueue.TryGetInput<TestInt>(0, handle, out _);
             NAssert.IsFalse(found);
@@ -81,7 +81,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 10 });
             inputQueue.SetInput(frame: 0, handle, new TestInt { Value = 20 });
@@ -101,7 +101,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             inputQueue.SetInput(frame: 0, handle, new TestInt { Value = 55 });
 
@@ -124,7 +124,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 100 });
             inputQueue.AddInput(frame: 1, handle, new TestInt { Value = 200 });
@@ -158,7 +158,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             inputQueue.AddInput(frame: 0, h1, new TestInt { Value = 10 });
             inputQueue.AddInput(frame: 0, h2, new TestInt { Value = 20 });
@@ -185,7 +185,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             inputQueue.AddInput(frame: 5, handle, new TestInt { Value = 50 });
             inputQueue.AddInput(frame: 10, handle, new TestInt { Value = 100 });
@@ -219,7 +219,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             inputQueue.AddInput(frame: 5, handle, new TestInt { Value = 50 });
             inputQueue.AddInput(frame: 10, handle, new TestInt { Value = 100 });
@@ -253,7 +253,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 10 });
             inputQueue.AddInput(frame: 1, handle, new TestInt { Value = 20 });
@@ -279,7 +279,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 0 })
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             inputQueue.AddInput(frame: 0, handle, new TestInt { Value = 10 });
 

@@ -40,7 +40,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
             return a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
         }
 
@@ -139,7 +139,7 @@ namespace Trecs.Tests
                     .AssertComplete();
             }
             a.AddEntity(Tag<QId2>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             for (int i = 0; i < 3; i++)
                 a.Set<ItMutSetMulti>().Write.Add(new EntityIndex(i, groupA));
@@ -156,7 +156,7 @@ namespace Trecs.Tests
             }
 
             NAssert.AreEqual(3, visitedA);
-            NAssert.IsTrue(a.Set<ItMutSetMulti>().Read.Exists(new EntityIndex(0, groupB)));
+            NAssert.IsTrue(a.Set<ItMutSetMulti>().Read.Contains(new EntityIndex(0, groupB)));
         }
 
         [Test]
@@ -175,7 +175,7 @@ namespace Trecs.Tests
                     .AssertComplete();
             }
             a.AddEntity(Tag<QId2>.Value).Set(new TestInt()).Set(new TestFloat()).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             for (int i = 0; i < 3; i++)
                 a.Set<ItMutSetMulti>().Write.Add(new EntityIndex(i, groupA));
@@ -192,7 +192,7 @@ namespace Trecs.Tests
             }
 
             NAssert.AreEqual(3, visited);
-            NAssert.IsFalse(a.Set<ItMutSetMulti>().Read.Exists(new EntityIndex(0, groupB)));
+            NAssert.IsFalse(a.Set<ItMutSetMulti>().Read.Contains(new EntityIndex(0, groupB)));
         }
 
         [Test]
@@ -216,11 +216,11 @@ namespace Trecs.Tests
             NAssert.AreEqual(
                 new[] { 0, 1 },
                 visited.ToArray(),
-                "Deferred SetAdd must not be visible until SubmitEntities()."
+                "Deferred SetAdd must not be visible until Submit()."
             );
             NAssert.AreEqual(2, a.Set<ItMutSetA>().Read.Count);
 
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(3, a.Set<ItMutSetA>().Read.Count);
         }
 
@@ -244,11 +244,11 @@ namespace Trecs.Tests
             NAssert.AreEqual(
                 new[] { 0, 1, 2 },
                 visited.ToArray(),
-                "Deferred SetRemove must not be visible until SubmitEntities()."
+                "Deferred SetRemove must not be visible until Submit()."
             );
             NAssert.AreEqual(3, a.Set<ItMutSetA>().Read.Count);
 
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(0, a.Set<ItMutSetA>().Read.Count);
         }
 

@@ -15,7 +15,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -42,7 +42,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(5, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -54,7 +54,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 99 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var comp = a.Query().WithTags(TestTags.Alpha).SingleHandle().Component<TestInt>(a);
             NAssert.AreEqual(99, comp.Read.Value);
@@ -67,7 +67,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Delta).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var intComp = a.Query().WithTags(TestTags.Delta).SingleHandle().Component<TestInt>(a);
             var floatComp = a.Query()
@@ -89,7 +89,7 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
 
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -108,11 +108,11 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             a.RemoveEntity(new EntityIndex(0, group));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -127,10 +127,10 @@ namespace Trecs.Tests
             var entityHandle = init.Handle;
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             a.RemoveEntity(entityHandle);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -147,10 +147,10 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Beta).Set(new TestFloat { Value = 1.0f }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             a.RemoveEntitiesWithTags(TestTags.Alpha);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Beta));
@@ -166,10 +166,10 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             a.RemoveEntitiesWithTags(TestTags.Alpha);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -188,14 +188,14 @@ namespace Trecs.Tests
             var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
             a.AddEntity(partitionA).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(partitionB));
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
             a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(partitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionB));
@@ -214,11 +214,11 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 77 })
                 .Set(new TestVec { X = 1.5f, Y = 2.5f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
             a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
-            a.SubmitEntities();
+            a.Submit();
 
             var intComp = a.Query().WithTags(partitionB).SingleHandle().Component<TestInt>(a);
             var vecComp = a.Query().WithTags(partitionB).SingleHandle().Component<TestVec>(a);
@@ -239,11 +239,11 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(partitionA).AssertComplete();
             var entityHandle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
             a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.IsTrue(entityHandle.Exists(a));
         }
@@ -259,11 +259,11 @@ namespace Trecs.Tests
 
             a.AddEntity(partitionA).AssertComplete();
             a.AddEntity(partitionA).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
             a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(partitionB));
@@ -283,7 +283,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(7, a.CountEntitiesWithTags(TestTags.Alpha));
         }
@@ -298,7 +298,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             NAssert.AreEqual(4, a.CountEntitiesInGroup(group));

@@ -1,8 +1,6 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -112,15 +110,6 @@ namespace Trecs.SourceGen
                 }
             }
 
-            var containingTypeChain = SymbolAnalyzer.GetContainingTypeChainInfo(symbol);
-            var containingTypes = ImmutableArray.CreateBuilder<ContainingTypeInfo>(
-                containingTypeChain.Count
-            );
-            foreach (var info in containingTypeChain)
-            {
-                containingTypes.Add(info);
-            }
-
             // Capture the type parameter list (e.g. "<T>" or "<TKey, TValue>")
             // so the emitted partial matches the original declaration —
             // partial declarations are matched on the full name including
@@ -140,7 +129,9 @@ namespace Trecs.SourceGen
                 UnwrapFieldName: unwrapFieldName,
                 UnwrapFieldTypeDisplay: unwrapFieldTypeDisplay,
                 HasUnwrapConstructor: hasUnwrapConstructor,
-                ContainingTypes: containingTypes.ToImmutable(),
+                ContainingTypes: SymbolAnalyzer
+                    .GetContainingTypeChainInfo(symbol)
+                    .ToEquatableArray(),
                 SafeFileName: SymbolAnalyzer.GetSafeFileName(symbol)
             );
         }
@@ -229,6 +220,7 @@ namespace Trecs.SourceGen
                 && !model.HasUnwrapConstructor
             )
             {
+                sb.AppendLine($"{methodIndent}{GeneratedCodeAttributes.Line}");
                 sb.AppendLine(
                     $"{methodIndent}public {model.TypeName}({model.UnwrapFieldTypeDisplay} value)"
                 );
@@ -238,6 +230,7 @@ namespace Trecs.SourceGen
                 sb.AppendLine();
             }
 
+            sb.AppendLine($"{methodIndent}{GeneratedCodeAttributes.Line}");
             sb.AppendLine($"{methodIndent}public override bool Equals(object obj)");
             sb.AppendLine($"{methodIndent}{{");
             sb.AppendLine(
@@ -252,12 +245,14 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{methodIndent}}}");
             sb.AppendLine();
 
+            sb.AppendLine($"{methodIndent}{GeneratedCodeAttributes.Line}");
             sb.AppendLine($"{methodIndent}public override readonly int GetHashCode()");
             sb.AppendLine($"{methodIndent}{{");
             sb.AppendLine($"{methodIndent}    return UnmanagedUtil.BlittableHashCode(this);");
             sb.AppendLine($"{methodIndent}}}");
             sb.AppendLine();
 
+            sb.AppendLine($"{methodIndent}{GeneratedCodeAttributes.Line}");
             sb.AppendLine(
                 $"{methodIndent}public static bool operator ==(in {model.TypeName}{model.TypeParameterList} left, in {model.TypeName}{model.TypeParameterList} right)"
             );
@@ -266,6 +261,7 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{methodIndent}}}");
             sb.AppendLine();
 
+            sb.AppendLine($"{methodIndent}{GeneratedCodeAttributes.Line}");
             sb.AppendLine(
                 $"{methodIndent}public static bool operator !=(in {model.TypeName}{model.TypeParameterList} left, in {model.TypeName}{model.TypeParameterList} right)"
             );
@@ -298,8 +294,11 @@ namespace Trecs.SourceGen
     /// <summary>
     /// Value-equality model carried through the incremental pipeline so Roslyn
     /// can cache generator output. All fields are primitives or
-    /// <see cref="ImmutableArray{T}"/> of value-equality records — no Roslyn
-    /// symbol / syntax references.
+    /// <see cref="EquatableArray{T}"/> of value-equality records — no Roslyn
+    /// symbol / syntax references. <see cref="EquatableArray{T}"/> on the
+    /// containing-type chain gives the record struct's auto-generated
+    /// <c>Equals</c> / <c>GetHashCode</c> structural semantics, so no manual
+    /// equality implementation is needed.
     /// </summary>
     internal readonly record struct EntityComponentModel(
         string TypeName,
@@ -312,45 +311,9 @@ namespace Trecs.SourceGen
         string? UnwrapFieldName,
         string? UnwrapFieldTypeDisplay,
         bool HasUnwrapConstructor,
-        ImmutableArray<ContainingTypeInfo> ContainingTypes,
+        EquatableArray<ContainingTypeInfo> ContainingTypes,
         string SafeFileName
-    )
-    {
-        public bool Equals(EntityComponentModel other) =>
-            TypeName == other.TypeName
-            && TypeParameterList == other.TypeParameterList
-            && Namespace == other.Namespace
-            && Accessibility == other.Accessibility
-            && IsPartial == other.IsPartial
-            && IsUnwrap == other.IsUnwrap
-            && IsSerializable == other.IsSerializable
-            && UnwrapFieldName == other.UnwrapFieldName
-            && UnwrapFieldTypeDisplay == other.UnwrapFieldTypeDisplay
-            && HasUnwrapConstructor == other.HasUnwrapConstructor
-            && SafeFileName == other.SafeFileName
-            && ContainingTypes.SequenceEqual(other.ContainingTypes);
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                int h = 17;
-                h = h * 31 + (TypeName?.GetHashCode() ?? 0);
-                h = h * 31 + (TypeParameterList?.GetHashCode() ?? 0);
-                h = h * 31 + (Namespace?.GetHashCode() ?? 0);
-                h = h * 31 + (Accessibility?.GetHashCode() ?? 0);
-                h = h * 31 + IsPartial.GetHashCode();
-                h = h * 31 + IsUnwrap.GetHashCode();
-                h = h * 31 + IsSerializable.GetHashCode();
-                h = h * 31 + (UnwrapFieldName?.GetHashCode() ?? 0);
-                h = h * 31 + (UnwrapFieldTypeDisplay?.GetHashCode() ?? 0);
-                h = h * 31 + HasUnwrapConstructor.GetHashCode();
-                h = h * 31 + (SafeFileName?.GetHashCode() ?? 0);
-                h = h * 31 + ContainingTypes.Length;
-                return h;
-            }
-        }
-    }
+    );
 }
 
 namespace System.Runtime.CompilerServices

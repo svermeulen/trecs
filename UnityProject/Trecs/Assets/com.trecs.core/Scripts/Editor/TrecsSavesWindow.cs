@@ -65,7 +65,7 @@ namespace Trecs.Internal
         // Active controller for the selected world, tracked so the loaded-
         // row highlight updates immediately when the recorder's backing
         // file changes (load, save, fork, reset).
-        TrecsGameStateController _subscribedController;
+        TrecsRecordingSession _subscribedController;
 
         [MenuItem("Window/Trecs/Saves")]
         public static void ShowWindow()
@@ -82,7 +82,7 @@ namespace Trecs.Internal
             TrecsEditorSelection.ActiveWorldChanged += OnSharedActiveWorldChanged;
             // Library refreshes when any controller saves / deletes /
             // renames, so we don't have to poll or rely on a re-focus.
-            TrecsGameStateController.SavesChanged += OnSavesChanged;
+            TrecsRecordingSession.SavesChanged += OnSavesChanged;
         }
 
         void OnDisable()
@@ -90,7 +90,7 @@ namespace Trecs.Internal
             WorldRegistry.WorldRegistered -= OnWorldRegistered;
             WorldRegistry.WorldUnregistered -= OnWorldUnregistered;
             TrecsEditorSelection.ActiveWorldChanged -= OnSharedActiveWorldChanged;
-            TrecsGameStateController.SavesChanged -= OnSavesChanged;
+            TrecsRecordingSession.SavesChanged -= OnSavesChanged;
             UnsubscribeFromController();
         }
 
@@ -257,12 +257,19 @@ namespace Trecs.Internal
             RebuildSavesList();
         }
 
-        TrecsGameStateController GetController()
+        TrecsRecordingSession GetController()
         {
             return _selectedWorld == null
                 ? null
-                : TrecsGameStateRegistry.GetForWorld(_selectedWorld);
+                : TrecsRecordingSessionRegistry.GetForWorld(_selectedWorld);
         }
+
+        // Snapshot library for the selected world. Null when no world is
+        // selected or attached. Fetched per-call rather than cached — the
+        // attach refcount owns the lifetime; world unregister can invalidate
+        // a previously-returned reference.
+        TrecsSnapshotLibrary GetSnapshotLibrary() =>
+            TrecsEditorRecordingAutoAttach.GetSnapshotLibrary(_selectedWorld);
 
         // ── Capture ──
 
@@ -284,7 +291,7 @@ namespace Trecs.Internal
             {
                 return;
             }
-            if (File.Exists(TrecsGameStateController.GetSnapshotPath(name)))
+            if (File.Exists(TrecsSnapshotLibrary.GetSnapshotPath(name)))
             {
                 if (
                     !EditorUtility.DisplayDialog(
@@ -298,7 +305,8 @@ namespace Trecs.Internal
                     return;
                 }
             }
-            if (controller.SaveSnapshot(name))
+            var library = GetSnapshotLibrary();
+            if (library != null && library.SaveSnapshot(name))
             {
                 SetStatus($"Captured '{name}'.");
                 RebuildSavesList();
@@ -314,7 +322,8 @@ namespace Trecs.Internal
         void OnLoadSnapshotClicked(string name)
         {
             var controller = GetController();
-            if (controller == null)
+            var library = GetSnapshotLibrary();
+            if (controller == null || library == null)
             {
                 SetStatus("No active controller for the selected world.");
                 return;
@@ -340,7 +349,7 @@ namespace Trecs.Internal
                 if (choice == 2)
                     EditorPrefs.SetBool(SuppressLoadConfirmKey, true);
             }
-            if (controller.LoadSnapshot(name))
+            if (library.LoadSnapshot(name))
             {
                 SetStatus($"Loaded snapshot '{name}'.");
             }
@@ -362,7 +371,7 @@ namespace Trecs.Internal
             {
                 return;
             }
-            if (TrecsGameStateController.RenameSnapshot(oldName, newName))
+            if (TrecsSnapshotLibrary.RenameSnapshot(oldName, newName))
             {
                 SetStatus($"Renamed '{oldName}' → '{newName}'.");
                 RebuildSavesList();
@@ -386,16 +395,16 @@ namespace Trecs.Internal
             {
                 return;
             }
-            // Static delete is via File.Delete + log; piggyback on controller
-            // when available so logs route through the same module logger;
-            // fall through to direct File.Delete when no controller is
-            // around (e.g. when no scene is playing — file ops don't need a
-            // world).
-            var controller = GetController();
+            // Static delete is via File.Delete + log; piggyback on the
+            // snapshot library when available so logs route through the
+            // same module logger; fall through to direct File.Delete when
+            // no library is around (e.g. when no scene is playing — file
+            // ops don't need a world).
+            var library = GetSnapshotLibrary();
             var ok =
-                controller != null
-                    ? controller.DeleteSnapshot(name)
-                    : DeleteFile(TrecsGameStateController.GetSnapshotPath(name));
+                library != null
+                    ? library.DeleteSnapshot(name)
+                    : DeleteFile(TrecsSnapshotLibrary.GetSnapshotPath(name));
             if (ok)
             {
                 SetStatus($"Deleted snapshot '{name}'.");
@@ -439,7 +448,7 @@ namespace Trecs.Internal
             {
                 return;
             }
-            if (TrecsGameStateController.RenameNamedRecording(oldName, newName))
+            if (TrecsRecordingSession.RenameNamedRecording(oldName, newName))
             {
                 SetStatus($"Renamed '{oldName}' → '{newName}'.");
                 RebuildSavesList();
@@ -467,7 +476,7 @@ namespace Trecs.Internal
             var ok =
                 controller != null
                     ? controller.DeleteNamedRecording(name)
-                    : DeleteFile(TrecsGameStateController.GetRecordingPath(name));
+                    : DeleteFile(TrecsRecordingSession.GetRecordingPath(name));
             if (ok)
             {
                 SetStatus($"Deleted recording '{name}'.");
@@ -488,7 +497,7 @@ namespace Trecs.Internal
             File.Delete(path);
             // Fallback path bypasses the controller, so notify the library
             // event manually so other observers refresh.
-            TrecsGameStateController.NotifySavesChanged();
+            TrecsRecordingSession.NotifySavesChanged();
             return true;
         }
 
@@ -504,8 +513,8 @@ namespace Trecs.Internal
             var preservedOffset = _listScroll.scrollOffset;
             _listScroll.Clear();
 
-            var allRecordings = TrecsGameStateController.GetSavedRecordingNames();
-            var allSnapshots = TrecsGameStateController.GetSavedSnapshotNames();
+            var allRecordings = TrecsRecordingSession.GetSavedRecordingNames();
+            var allSnapshots = TrecsSnapshotLibrary.GetSavedSnapshotNames();
             var recordings = FilterByQuery(allRecordings);
             var snapshots = FilterByQuery(allSnapshots);
 
@@ -868,8 +877,8 @@ namespace Trecs.Internal
             try
             {
                 path = isRecording
-                    ? TrecsGameStateController.GetRecordingPath(name)
-                    : TrecsGameStateController.GetSnapshotPath(name);
+                    ? TrecsRecordingSession.GetRecordingPath(name)
+                    : TrecsSnapshotLibrary.GetSnapshotPath(name);
                 var info = new FileInfo(path);
                 size = info.Length;
                 savedAt = info.LastWriteTime;
@@ -1030,8 +1039,8 @@ namespace Trecs.Internal
                 // (filtered) ordering — what the user sees is what they
                 // select.
                 var names = isRecording
-                    ? FilterByQuery(TrecsGameStateController.GetSavedRecordingNames())
-                    : FilterByQuery(TrecsGameStateController.GetSavedSnapshotNames());
+                    ? FilterByQuery(TrecsRecordingSession.GetSavedRecordingNames())
+                    : FilterByQuery(TrecsSnapshotLibrary.GetSavedSnapshotNames());
                 var anchorIdx = names.IndexOf(_anchorItem.Value.name);
                 var clickIdx = names.IndexOf(name);
                 if (anchorIdx >= 0 && clickIdx >= 0)
@@ -1137,8 +1146,8 @@ namespace Trecs.Internal
         void OnRevealInFinder(string name, bool isRecording)
         {
             var path = isRecording
-                ? TrecsGameStateController.GetRecordingPath(name)
-                : TrecsGameStateController.GetSnapshotPath(name);
+                ? TrecsRecordingSession.GetRecordingPath(name)
+                : TrecsSnapshotLibrary.GetSnapshotPath(name);
             if (!File.Exists(path))
             {
                 SetStatus("File not found.");
@@ -1279,14 +1288,15 @@ namespace Trecs.Internal
                     ok =
                         controller != null
                             ? controller.DeleteNamedRecording(item.name)
-                            : DeleteFile(TrecsGameStateController.GetRecordingPath(item.name));
+                            : DeleteFile(TrecsRecordingSession.GetRecordingPath(item.name));
                 }
                 else
                 {
+                    var library = GetSnapshotLibrary();
                     ok =
-                        controller != null
-                            ? controller.DeleteSnapshot(item.name)
-                            : DeleteFile(TrecsGameStateController.GetSnapshotPath(item.name));
+                        library != null
+                            ? library.DeleteSnapshot(item.name)
+                            : DeleteFile(TrecsSnapshotLibrary.GetSnapshotPath(item.name));
                 }
                 if (ok)
                     deleted++;
@@ -1332,7 +1342,7 @@ namespace Trecs.Internal
                 return;
             }
             name = name.Trim();
-            if (File.Exists(TrecsGameStateController.GetRecordingPath(name)))
+            if (File.Exists(TrecsRecordingSession.GetRecordingPath(name)))
             {
                 if (
                     !EditorUtility.DisplayDialog(
@@ -1395,8 +1405,8 @@ namespace Trecs.Internal
 
         void OnOverwriteSnapshotClicked(string name)
         {
-            var controller = GetController();
-            if (controller == null)
+            var library = GetSnapshotLibrary();
+            if (library == null)
             {
                 SetStatus("No active controller for the selected world.");
                 return;
@@ -1413,7 +1423,7 @@ namespace Trecs.Internal
             {
                 return;
             }
-            if (controller.SaveSnapshot(name))
+            if (library.SaveSnapshot(name))
             {
                 SetStatus($"Overwrote snapshot '{name}'.");
             }
@@ -1454,7 +1464,7 @@ namespace Trecs.Internal
                     header = entry.header;
                     return true;
                 }
-                if (TrecsAutoRecorder.TryReadRecordingHeader(path, out header))
+                if (TrecsRewindBuffer.TryReadRecordingHeader(path, out header))
                 {
                     _recordingHeaderCache[path] = (mtime, header);
                     return true;

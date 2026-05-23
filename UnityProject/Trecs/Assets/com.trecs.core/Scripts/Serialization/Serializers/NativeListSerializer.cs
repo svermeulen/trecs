@@ -27,7 +27,7 @@ namespace Trecs.Serialization
         public void Deserialize(ref NativeList<T> value, ISerializationReader reader)
         {
             var length = reader.Read<int>("Count");
-            TrecsAssert.That(length >= 0);
+            TrecsDebugAssert.That(length >= 0);
 
             // IsCreated is best-effort but sufficient to drive the alloc-or-reuse
             // branch — `new NativeList(length, ...)` only reserves capacity, so
@@ -55,7 +55,7 @@ namespace Trecs.Serialization
 
         public void Serialize(in NativeList<T> value, ISerializationWriter writer)
         {
-            TrecsAssert.That(value.IsCreated);
+            TrecsDebugAssert.That(value.IsCreated);
 
             writer.Write("Count", value.Length);
 
@@ -71,7 +71,7 @@ namespace Trecs.Serialization
 
         public void DeserializeObject(ref object value, ISerializationReader reader)
         {
-            TrecsAssert.IsNotNull(value, "NativeList should always be deserialized in-place");
+            TrecsDebugAssert.IsNotNull(value, "NativeList should always be deserialized in-place");
             var typedValue = (NativeList<T>)value;
             Deserialize(ref typedValue, reader);
             value = typedValue;

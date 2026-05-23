@@ -33,7 +33,7 @@ namespace Trecs.Tests
         public void DenseDictionary_UnmanagedTypes_UsesBlitPath()
         {
             // Verify that blit path is selected for unmanaged types
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 DenseDictionaryBlitHelperCache<int, float>.CanUseBlit,
                 "Blit path should be enabled for int/float dictionary"
             );
@@ -43,7 +43,7 @@ namespace Trecs.Tests
         public void DenseDictionary_ManagedValueType_UsesFallbackPath()
         {
             // Verify that blit path is NOT selected when TValue is managed
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 !DenseDictionaryBlitHelperCache<int, string>.CanUseBlit,
                 "Blit path should be disabled for int/string dictionary"
             );
@@ -63,8 +63,8 @@ namespace Trecs.Tests
             var deserialized = _cacheHelper.ReadAll<DenseDictionary<int, float>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserialized);
-            TrecsAssert.That(deserialized.Count == 0);
+            TrecsDebugAssert.IsNotNull(deserialized);
+            TrecsDebugAssert.That(deserialized.Count == 0);
         }
 
         [Test]
@@ -86,16 +86,16 @@ namespace Trecs.Tests
             var deserialized = _cacheHelper.ReadAll<DenseDictionary<int, float>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserialized);
-            TrecsAssert.That(deserialized.Count == original.Count);
+            TrecsDebugAssert.IsNotNull(deserialized);
+            TrecsDebugAssert.That(deserialized.Count == original.Count);
 
             foreach (var kvp in original)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     deserialized.ContainsKey(kvp.Key),
                     $"Deserialized dictionary should contain key {kvp.Key}"
                 );
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     deserialized[kvp.Key] == kvp.Value,
                     $"Value for key {kvp.Key} should match. Expected: {kvp.Value}, Actual: {deserialized[kvp.Key]}"
                 );
@@ -120,13 +120,13 @@ namespace Trecs.Tests
             var deserialized = _cacheHelper.ReadAll<DenseDictionary<int, Vector3>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserialized);
-            TrecsAssert.That(deserialized.Count == original.Count);
+            TrecsDebugAssert.IsNotNull(deserialized);
+            TrecsDebugAssert.That(deserialized.Count == original.Count);
 
             foreach (var kvp in original)
             {
-                TrecsAssert.That(deserialized.ContainsKey(kvp.Key));
-                TrecsAssert.That(
+                TrecsDebugAssert.That(deserialized.ContainsKey(kvp.Key));
+                TrecsDebugAssert.That(
                     deserialized[kvp.Key] == kvp.Value,
                     $"Vector3 for key {kvp.Key} should match"
                 );
@@ -150,13 +150,13 @@ namespace Trecs.Tests
             var deserialized = _cacheHelper.ReadAll<DenseDictionary<int2, float3>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserialized);
-            TrecsAssert.That(deserialized.Count == original.Count);
+            TrecsDebugAssert.IsNotNull(deserialized);
+            TrecsDebugAssert.That(deserialized.Count == original.Count);
 
             foreach (var kvp in original)
             {
-                TrecsAssert.That(deserialized.ContainsKey(kvp.Key));
-                TrecsAssert.That(
+                TrecsDebugAssert.That(deserialized.ContainsKey(kvp.Key));
+                TrecsDebugAssert.That(
                     deserialized[kvp.Key].Equals(kvp.Value),
                     $"float3 for key {kvp.Key} should match"
                 );
@@ -182,19 +182,19 @@ namespace Trecs.Tests
             var deserialized = _cacheHelper.ReadAll<DenseDictionary<int, int>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserialized);
-            TrecsAssert.That(deserialized.Count == count);
+            TrecsDebugAssert.IsNotNull(deserialized);
+            TrecsDebugAssert.That(deserialized.Count == count);
 
             // Check first, middle, and last elements
-            TrecsAssert.That(deserialized[0] == original[0]);
-            TrecsAssert.That(deserialized[5000] == original[5000]);
-            TrecsAssert.That(deserialized[9999] == original[9999]);
+            TrecsDebugAssert.That(deserialized[0] == original[0]);
+            TrecsDebugAssert.That(deserialized[5000] == original[5000]);
+            TrecsDebugAssert.That(deserialized[9999] == original[9999]);
 
             // Spot check
             for (int i = 0; i < 100; i++)
             {
                 int key = i * 100;
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     deserialized[key] == original[key],
                     $"Value for key {key} should match"
                 );
@@ -216,9 +216,9 @@ namespace Trecs.Tests
             var deserialized = _cacheHelper.ReadAll<DenseDictionary<int, int>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserialized);
-            TrecsAssert.That(deserialized.Count == 1);
-            TrecsAssert.That(deserialized[42] == 123);
+            TrecsDebugAssert.IsNotNull(deserialized);
+            TrecsDebugAssert.That(deserialized.Count == 1);
+            TrecsDebugAssert.That(deserialized[42] == 123);
         }
 
         [Test]
@@ -242,11 +242,11 @@ namespace Trecs.Tests
             _cacheHelper.ReadAll(ref deserialized);
 
             // Assert
-            TrecsAssert.IsNotNull(deserialized);
-            TrecsAssert.That(deserialized.Count == original.Count);
+            TrecsDebugAssert.IsNotNull(deserialized);
+            TrecsDebugAssert.That(deserialized.Count == original.Count);
             foreach (var kvp in original)
             {
-                TrecsAssert.That(deserialized[kvp.Key] == kvp.Value);
+                TrecsDebugAssert.That(deserialized[kvp.Key] == kvp.Value);
             }
         }
 
@@ -292,11 +292,11 @@ namespace Trecs.Tests
             var regularDictTime = stopwatch.ElapsedTicks;
 
             // Verify correctness
-            TrecsAssert.That(deserializedSvDict.Count == elementCount);
-            TrecsAssert.That(deserializedRegularDict.Count == elementCount);
+            TrecsDebugAssert.That(deserializedSvDict.Count == elementCount);
+            TrecsDebugAssert.That(deserializedRegularDict.Count == elementCount);
             for (int i = 0; i < elementCount; i++)
             {
-                TrecsAssert.That(deserializedSvDict[i] == deserializedRegularDict[i]);
+                TrecsDebugAssert.That(deserializedSvDict[i] == deserializedRegularDict[i]);
             }
 
             // Log performance comparison

@@ -39,7 +39,7 @@ namespace Trecs
             BuildDimensionCaches();
         }
 
-        // Tag.Guid → (dim index in Dimensions, the dim's TagSet). Used by the
+        // Tag.Value → (dim index in Dimensions, the dim's TagSet). Used by the
         // submission coalescer to resolve "which dim does this tag belong to"
         // in O(1) instead of an O(numDims × dimSize) scan. Built once at
         // construction; immutable thereafter.
@@ -59,7 +59,7 @@ namespace Trecs
             // Structural cap: coalescer's TouchedDimsMask is a ulong, so 64 dims
             // is the hard upper bound. Always-on, once-at-build — replaces what
             // used to be a runtime per-op assertion in EntitySubmitter.
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 Dimensions.Count <= 64,
                 "Template {0} has {1} partition dimensions, exceeding the 64-dim cap (TouchedDimsMask is a ulong)",
                 DebugName,
@@ -75,16 +75,16 @@ namespace Trecs
                 {
                     var t = dimTags[i];
 #if DEBUG && TRECS_INTERNAL_CHECKS
-                    TrecsAssert.That(
-                        !_tagToDim.ContainsKey(t.Guid),
+                    TrecsDebugAssert.That(
+                        !_tagToDim.ContainsKey(t.Value),
                         "Tag {0} appears in two partition dimensions of template {1} (existing dim {2}, new dim {3}). Each tag must belong to at most one dim.",
                         t,
                         DebugName,
-                        _tagToDim.TryGetValue(t.Guid, out var existing) ? existing.Index : -1,
+                        _tagToDim.TryGetValue(t.Value, out var existing) ? existing.Index : -1,
                         d
                     );
 #endif
-                    _tagToDim[t.Guid] = (d, dim);
+                    _tagToDim[t.Value] = (d, dim);
                 }
             }
 
@@ -97,13 +97,13 @@ namespace Trecs
                 for (int i = 0; i < groupTags.Count; i++)
                 {
                     var t = groupTags[i];
-                    if (_tagToDim.TryGetValue(t.Guid, out var info))
+                    if (_tagToDim.TryGetValue(t.Value, out var info))
                     {
                         active[info.Index] = t;
                     }
                 }
 #if DEBUG && TRECS_INTERNAL_CHECKS
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     !_activeVariantsByGroupTagSetId.ContainsKey(groupTagSet.Id),
                     "Two GroupTagSets of template {0} resolve to id {1} — TagSet content-hash collision broke partition-variant uniqueness",
                     DebugName,
@@ -119,7 +119,7 @@ namespace Trecs
         // (e.g. it's a base/component tag rather than a partition variant). O(1).
         internal bool TryGetDimForTag(Tag tag, out int dimIdx, out TagSet dim)
         {
-            if (_tagToDim.TryGetValue(tag.Guid, out var info))
+            if (_tagToDim.TryGetValue(tag.Value, out var info))
             {
                 dimIdx = info.Index;
                 dim = info.Dim;
@@ -148,7 +148,7 @@ namespace Trecs
         {
 #if DEBUG && TRECS_INTERNAL_CHECKS
             if (!_activeVariantsByGroupTagSetId.TryGetValue(groupTagSet.Id, out var arr))
-                throw TrecsAssert.CreateException(
+                throw TrecsDebugAssert.CreateException(
                     "TagSet {0} is not a registered group of template {1} — coalescer invariant broken",
                     groupTagSet,
                     DebugName
@@ -196,7 +196,7 @@ namespace Trecs
         {
             get
             {
-                TrecsAssert.IsNotNull(
+                TrecsDebugAssert.IsNotNull(
                     _groups,
                     "ResolvedTemplate.Groups accessed before WorldBuilder.Build finished populating it"
                 );
@@ -208,11 +208,11 @@ namespace Trecs
 
         internal void SetGroups(IReadOnlyList<GroupIndex> groups)
         {
-            TrecsAssert.IsNull(
+            TrecsDebugAssert.IsNull(
                 _groups,
                 "ResolvedTemplate.Groups already initialized; SetGroups must be called exactly once per resolved template"
             );
-            TrecsAssert.IsNotNull(groups);
+            TrecsDebugAssert.IsNotNull(groups);
             _groups = groups;
         }
 
@@ -299,7 +299,7 @@ namespace Trecs
                 return dec;
             }
 
-            throw TrecsAssert.CreateException(
+            throw TrecsDebugAssert.CreateException(
                 "Expected to find component declaration for type {0} on entity {1} but was not found",
                 componentType,
                 Template.DebugName

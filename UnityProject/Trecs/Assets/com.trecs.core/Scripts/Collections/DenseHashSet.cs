@@ -120,7 +120,7 @@ namespace Trecs.Collections
         public void RemoveMustExist(T item)
         {
             var wasRemoved = _dictionary.TryRemove(item);
-            TrecsAssert.That(wasRemoved);
+            TrecsDebugAssert.That(wasRemoved);
         }
 
         /// <summary>
@@ -283,7 +283,7 @@ namespace Trecs.Collections
                 return false;
             }
 
-            public T Current => _dictionary.UnsafeKeys[_index].key;
+            public T Current => _dictionary.UnsafeKeys[_index].Key;
         }
 
         /// <summary>
@@ -317,7 +317,7 @@ namespace Trecs.Collections
                 _index = -1;
             }
 
-            public T Current => _dictionary.UnsafeKeys[_index].key;
+            public T Current => _dictionary.UnsafeKeys[_index].Key;
 
             object IEnumerator.Current => Current;
 

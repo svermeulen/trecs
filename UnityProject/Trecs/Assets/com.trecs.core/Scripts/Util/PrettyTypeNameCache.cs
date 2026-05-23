@@ -68,14 +68,14 @@ namespace Trecs.Internal
         /// <returns>A formatted, human-readable type name</returns>
         public static string GetPrettyName(this Type type)
         {
-            TrecsAssert.IsNotNull(type);
+            TrecsDebugAssert.IsNotNull(type);
             // The backing Dictionary<Type, string> has no synchronization. Callers
             // should only reach this from main-thread code: Burst-compiled jobs
             // never reach here because the [BurstDiscard] throw helpers short-
             // circuit before CustomFormatter's Type-formatting path runs. A
             // non-Burst job reaching here is already a misuse worth surfacing
             // loudly instead of silently racing on the cache.
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "PrettyTypeNameCache is main-thread only"
             );

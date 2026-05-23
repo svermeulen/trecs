@@ -19,9 +19,7 @@ namespace Trecs.SourceGen.Template
         /// </summary>
         public static TemplateDefinitionData Parse(
             INamedTypeSymbol symbol,
-            TypeDeclarationSyntax syntax,
-            Action<Diagnostic>? reportDiagnostic = null,
-            Location? location = null
+            TypeDeclarationSyntax syntax
         )
         {
             var typeName = symbol.Name;
@@ -43,25 +41,25 @@ namespace Trecs.SourceGen.Template
             var components = ExtractComponents(symbol, defaultInitializedFields);
 
             return new TemplateDefinitionData(
-                typeName,
-                namespaceName,
-                accessibility,
-                isClass,
-                isAbstract,
-                isGlobals,
-                isVariableUpdateOnly,
-                containingTypes,
-                tagTypeNames,
-                baseTemplateTypeNames,
-                components,
-                dimensions
+                TypeName: typeName,
+                NamespaceName: namespaceName,
+                Accessibility: accessibility,
+                IsClass: isClass,
+                IsAbstract: isAbstract,
+                IsGlobals: isGlobals,
+                IsVariableUpdateOnly: isVariableUpdateOnly,
+                ContainingTypes: containingTypes.ToEquatableArray(),
+                TagTypeNames: tagTypeNames,
+                BaseTemplateTypeNames: baseTemplateTypeNames,
+                Components: components,
+                Dimensions: dimensions
             );
         }
 
         /// <summary>
         /// Extracts tag type names from ITagged&lt;T1, T2, ...&gt; interfaces
         /// </summary>
-        private static ImmutableArray<string> ExtractTagTypeNames(INamedTypeSymbol symbol)
+        private static EquatableArray<string> ExtractTagTypeNames(INamedTypeSymbol symbol)
         {
             var tags = new List<string>();
 
@@ -76,13 +74,13 @@ namespace Trecs.SourceGen.Template
                 }
             }
 
-            return tags.ToImmutableArray();
+            return tags.ToEquatableArray();
         }
 
         /// <summary>
         /// Extracts base template type names from IExtends&lt;T1, T2, ...&gt; interfaces
         /// </summary>
-        private static ImmutableArray<string> ExtractBaseTemplateTypeNames(INamedTypeSymbol symbol)
+        private static EquatableArray<string> ExtractBaseTemplateTypeNames(INamedTypeSymbol symbol)
         {
             var baseTemplates = new List<string>();
 
@@ -97,7 +95,7 @@ namespace Trecs.SourceGen.Template
                 }
             }
 
-            return baseTemplates.ToImmutableArray();
+            return baseTemplates.ToEquatableArray();
         }
 
         /// <summary>
@@ -105,7 +103,7 @@ namespace Trecs.SourceGen.Template
         /// Each interface declares one dimension whose type arguments are mutually exclusive
         /// variant tags.
         /// </summary>
-        private static ImmutableArray<TemplateDimensionData> ExtractDimensions(
+        private static EquatableArray<TemplateDimensionData> ExtractDimensions(
             INamedTypeSymbol symbol
         )
         {
@@ -117,18 +115,18 @@ namespace Trecs.SourceGen.Template
                 {
                     var variantTagNames = iface
                         .TypeArguments.Select(t => PerformanceCache.GetDisplayString(t))
-                        .ToImmutableArray();
+                        .ToEquatableArray();
                     dimensions.Add(new TemplateDimensionData(variantTagNames));
                 }
             }
 
-            return dimensions.ToImmutableArray();
+            return dimensions.ToEquatableArray();
         }
 
         /// <summary>
         /// Extracts component field data from the struct's fields
         /// </summary>
-        private static ImmutableArray<TemplateComponentData> ExtractComponents(
+        private static EquatableArray<TemplateComponentData> ExtractComponents(
             INamedTypeSymbol symbol,
             ImmutableHashSet<string>? defaultInitializedFields
         )
@@ -183,20 +181,20 @@ namespace Trecs.SourceGen.Template
 
                     components.Add(
                         new TemplateComponentData(
-                            fieldName: field.Name,
-                            componentTypeFullName: PerformanceCache.GetDisplayString(field.Type),
-                            isInterpolated: isInterpolated,
-                            isVariableUpdateOnly: isVariableUpdateOnly,
-                            isConstant: isConstant,
-                            isInput: isInput,
-                            inputFrameBehaviour: inputFrameBehaviour ?? string.Empty,
-                            hasExplicitDefault: hasExplicitDefault
+                            FieldName: field.Name,
+                            ComponentTypeFullName: PerformanceCache.GetDisplayString(field.Type),
+                            IsInterpolated: isInterpolated,
+                            IsVariableUpdateOnly: isVariableUpdateOnly,
+                            IsConstant: isConstant,
+                            IsInput: isInput,
+                            OnMissing: inputFrameBehaviour ?? string.Empty,
+                            HasExplicitDefault: hasExplicitDefault
                         )
                     );
                 }
             }
 
-            return components.ToImmutableArray();
+            return components.ToEquatableArray();
         }
 
         /// <summary>

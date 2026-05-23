@@ -1,11 +1,10 @@
 #nullable enable
 
 using System;
-using System.Collections.Immutable;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Trecs.SourceGen.Performance;
 using Trecs.SourceGen.Shared;
@@ -13,104 +12,132 @@ using Trecs.SourceGen.Shared;
 namespace Trecs.SourceGen
 {
     /// <summary>
-    /// Incremental source generator that generates WorldBuilder extension methods
-    /// for registering interpolation systems and their previous-value savers.
+    /// Incremental source generator that emits <c>WorldBuilder</c> extension methods for
+    /// registering interpolation systems and their previous-value savers. One generated
+    /// extension class per <c>groupName</c> (the attribute's second ctor arg).
+    ///
+    /// <para>Pipeline shape: the transform produces a value-equatable per-method
+    /// <see cref="InterpolatorInstallerMethodModel"/>. <c>Collect()</c> brings them all
+    /// together so they can be grouped by group name — that combine is inherent to the
+    /// "one extension class per group" emission shape. The result is wrapped in an
+    /// <see cref="EquatableArray{T}"/> so unrelated edits (formatting, comments) that
+    /// produce the same logical model array don't force the terminal stage to re-run.
+    /// The old <c>.Combine(CompilationProvider)</c> is gone — the compilation parameter
+    /// was passed to the terminal stage but never read.</para>
     /// </summary>
     [Generator]
     public class InterpolatorInstallerGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            // Check if compilation references Trecs assembly for better performance
             var hasTrecsReference = AssemblyFilterHelper.CreateTrecsReferenceCheck(context);
 
-            // Create provider for methods with GenerateInterpolatorSystemAttribute
-            var interpolatorMethodProviderRaw = context
+            var perMethodRaw = context
                 .SyntaxProvider.ForAttributeWithMetadataName(
                     "Trecs.GenerateInterpolatorSystemAttribute",
                     predicate: static (node, _) => node is MethodDeclarationSyntax,
-                    transform: static (ctx, _) => GetInterpolatorMethodData(ctx)
+                    transform: static (ctx, _) => BuildModel(ctx)
                 )
-                .Where(static m => m is not null);
-            var interpolatorMethodProvider = AssemblyFilterHelper.FilterByTrecsReference(
-                interpolatorMethodProviderRaw,
+                .Where(static m => m is not null)
+                .Select(static (m, _) => m!.Value);
+            var perMethod = AssemblyFilterHelper.FilterByTrecsReference(
+                perMethodRaw,
                 hasTrecsReference
             );
 
-            // Collect all interpolator methods to group by group name
-            var allInterpolatorMethods = interpolatorMethodProvider.Collect();
+            // Collect + wrap-in-EquatableArray gives the downstream node structural-equality
+            // semantics so the terminal stage caches when the array of per-method models is
+            // unchanged. The per-method models cache individually upstream; this combine
+            // only re-runs when something observable about *some* method actually changed.
+            var allMethods = perMethod
+                .Collect()
+                .Select(
+                    static (arr, _) =>
+                        new EquatableArray<InterpolatorInstallerMethodModel>(arr.ToArray())
+                );
 
-            // Combine with compilation provider
-            var interpolatorMethodsWithCompilation = allInterpolatorMethods.Combine(
-                context.CompilationProvider
-            );
-
-            // Register source output
             context.RegisterSourceOutput(
-                interpolatorMethodsWithCompilation,
-                static (spc, source) =>
-                    GenerateInterpolatorExtensions(spc, source.Left, source.Right)
+                allMethods,
+                static (spc, models) => GenerateInterpolatorExtensions(spc, models)
             );
         }
 
-        private static InterpolatorInstallerMethodData? GetInterpolatorMethodData(
+        private static InterpolatorInstallerMethodModel? BuildModel(
             GeneratorAttributeSyntaxContext context
         )
         {
-            var methodDecl = (MethodDeclarationSyntax)context.TargetNode;
-            var methodSymbol = context.TargetSymbol as IMethodSymbol;
-
-            if (methodSymbol == null || !methodSymbol.IsStatic)
+            if (context.TargetSymbol is not IMethodSymbol methodSymbol || !methodSymbol.IsStatic)
+                return null;
+            if (methodSymbol.Parameters.Length == 0)
                 return null;
 
             var attribute = context.Attributes.FirstOrDefault();
-            if (attribute == null || methodSymbol.Parameters.Length == 0)
+            if (attribute is null)
                 return null;
 
-            return new InterpolatorInstallerMethodData(methodDecl, methodSymbol, attribute);
+            // The attribute layout is (className, groupName). systemName is the first
+            // ctor arg — same string used by InterpolatorJobGenerator to name the emitted
+            // class. groupName drives the extension class name and groups multiple
+            // interpolators under one WorldBuilder.Add{groupName}() call.
+            string? systemName =
+                attribute.ConstructorArguments.Length >= 1
+                    ? attribute.ConstructorArguments[0].Value as string
+                    : null;
+            string? groupName =
+                attribute.ConstructorArguments.Length >= 2
+                    ? attribute.ConstructorArguments[1].Value as string
+                    : null;
+
+            if (string.IsNullOrEmpty(systemName) || string.IsNullOrEmpty(groupName))
+                return null;
+
+            return new InterpolatorInstallerMethodModel(
+                SystemName: systemName!,
+                GroupName: groupName!,
+                Namespace: PerformanceCache.GetDisplayString(methodSymbol.ContainingNamespace),
+                ComponentTypeDisplay: PerformanceCache.GetDisplayString(
+                    methodSymbol.Parameters[0].Type
+                ),
+                // The hint-file name is derived from any *containing type* in the group so
+                // every method in the group lands in the same generated file path; the
+                // group's first-seen method's containing type wins.
+                ContainingTypeFileName: SymbolAnalyzer.GetSafeFileName(
+                    methodSymbol.ContainingType,
+                    $"{groupName}WorldBuilderExtensions"
+                )
+            );
         }
 
         private static void GenerateInterpolatorExtensions(
             SourceProductionContext context,
-            ImmutableArray<InterpolatorInstallerMethodData?> methodData,
-            Compilation compilation
+            EquatableArray<InterpolatorInstallerMethodModel> methods
         )
         {
-            if (methodData.IsEmpty)
+            if (methods.Length == 0)
                 return;
 
             try
             {
                 using var _timer_ = SourceGenTimer.Time("InterpolatorInstallerGenerator.Total");
                 SourceGenLogger.Log(
-                    $"[InterpolatorInstallerGenerator] Processing {methodData.Length} interpolator methods"
+                    $"[InterpolatorInstallerGenerator] Processing {methods.Length} interpolator methods"
                 );
 
-                // GroupIndex methods by group name (filter out nulls first)
-                var groups = methodData
-                    .Where(m => m != null)
-                    .GroupBy(m => GetGroupName(m!.AttributeData))
+                // GroupBy on the value-equatable model groups by group name; FirstOrDefault
+                // members tie-broken by enumeration order, same as the legacy implementation.
+                var groups = methods
+                    .GroupBy(m => m.GroupName)
                     .Where(g => !string.IsNullOrEmpty(g.Key))
                     .ToList();
 
                 foreach (var group in groups)
                 {
-                    var groupName = group.Key!;
-                    var methods = group.ToList();
+                    var groupMethods = group.ToList();
+                    var first = groupMethods[0];
 
-                    // Get namespace from first method (they should all be in same namespace for a given group)
-                    var nameSpace = PerformanceCache.GetDisplayString(
-                        methods.First()!.MethodSymbol.ContainingNamespace
-                    );
-
-                    var source = GenerateExtension(nameSpace, groupName, methods);
-                    var fileName = SymbolAnalyzer.GetSafeFileName(
-                        methods.First()!.MethodSymbol.ContainingType,
-                        $"{groupName}WorldBuilderExtensions"
-                    );
-
-                    context.AddSource(fileName, source);
-                    SourceGenLogger.WriteGeneratedFile(fileName, source);
+                    var source = GenerateExtension(first.Namespace, group.Key, groupMethods);
+                    context.AddSource(first.ContainingTypeFileName, source);
+                    SourceGenLogger.WriteGeneratedFile(first.ContainingTypeFileName, source);
                 }
             }
             catch (Exception ex)
@@ -119,7 +146,6 @@ namespace Trecs.SourceGen
                     $"[InterpolatorInstallerGenerator] Error generating extensions: {ex.Message}"
                 );
 
-                // Report error for any unhandled exceptions
                 var diagnostic = Diagnostic.Create(
                     DiagnosticDescriptors.CouldNotResolveSymbol,
                     Location.None,
@@ -129,24 +155,10 @@ namespace Trecs.SourceGen
             }
         }
 
-        private static string? GetGroupName(AttributeData attributeData)
-        {
-            return attributeData.ConstructorArguments.Length >= 2
-                ? attributeData.ConstructorArguments[1].Value as string
-                : null;
-        }
-
-        private static string? GetSystemName(AttributeData attributeData)
-        {
-            return attributeData.ConstructorArguments.Length >= 1
-                ? attributeData.ConstructorArguments[0].Value as string
-                : null;
-        }
-
         private static string GenerateExtension(
             string nameSpace,
             string groupName,
-            System.Collections.Generic.List<InterpolatorInstallerMethodData?> methods
+            List<InterpolatorInstallerMethodModel> methods
         )
         {
             var registrationsBuilder = new StringBuilder();
@@ -154,18 +166,11 @@ namespace Trecs.SourceGen
             for (int i = 0; i < methods.Count; i++)
             {
                 var method = methods[i];
-                if (method == null)
-                    continue;
-                var systemName = GetSystemName(method.AttributeData);
-                var componentType = PerformanceCache.GetDisplayString(
-                    method.MethodSymbol.Parameters[0].Type
-                );
-
                 registrationsBuilder.AppendLine(
-                    $"            builder.AddInterpolatedPreviousSaver(new InterpolatedPreviousSaver<{componentType}>());"
+                    $"            builder.AddInterpolatedPreviousSaver(new InterpolatedPreviousSaver<{method.ComponentTypeDisplay}>());"
                 );
                 registrationsBuilder.AppendLine(
-                    $"            builder.AddSystem(new {systemName}());"
+                    $"            builder.AddSystem(new {method.SystemName}());"
                 );
 
                 if (i < methods.Count - 1)
@@ -192,23 +197,16 @@ namespace {nameSpace}
     }
 
     /// <summary>
-    /// Data structure for interpolator method information used in incremental generation
+    /// Value-equality model for a single <c>[GenerateInterpolatorSystem]</c> method,
+    /// holding everything the terminal stage needs to emit the registration for that
+    /// method. No symbols / syntax — the cache can hit per-method and the Collect-wrapped
+    /// downstream can detect when nothing in the array has changed.
     /// </summary>
-    internal class InterpolatorInstallerMethodData
-    {
-        public MethodDeclarationSyntax MethodDecl { get; }
-        public IMethodSymbol MethodSymbol { get; }
-        public AttributeData AttributeData { get; }
-
-        public InterpolatorInstallerMethodData(
-            MethodDeclarationSyntax methodDecl,
-            IMethodSymbol methodSymbol,
-            AttributeData attributeData
-        )
-        {
-            MethodDecl = methodDecl;
-            MethodSymbol = methodSymbol;
-            AttributeData = attributeData;
-        }
-    }
+    internal readonly record struct InterpolatorInstallerMethodModel(
+        string SystemName,
+        string GroupName,
+        string Namespace,
+        string ComponentTypeDisplay,
+        string ContainingTypeFileName
+    );
 }

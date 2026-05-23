@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -14,54 +13,49 @@ using Trecs.SourceGen.Shared;
 namespace Trecs.SourceGen
 {
     /// <summary>
-    /// Source generator for [ForEachEntity] methods that iterate over ECS components
-    /// (component-parameter shape). The aspect-parameter shape is handled by
-    /// ForEachEntityAspectGenerator; routing is decided by IterationAttributeRouting.
+    /// Source generator for <c>[ForEachEntity]</c> methods that iterate over ECS
+    /// components (component-parameter shape). The aspect-parameter shape is handled
+    /// by <c>ForEachEntityAspectGenerator</c>; routing is decided by
+    /// <see cref="IterationAttributeRouting"/>.
+    ///
+    /// <para>Pipeline shape: the transform produces a value-equatable
+    /// <see cref="ForEachComponentModel"/> (strings + EquatableArrays, zero symbols
+    /// or syntax) and the terminal stage materializes diagnostics + emits source.
+    /// The compilation's global-namespace name folds in via a lightweight
+    /// value-equatable combine.</para>
     /// </summary>
     [Generator]
     public class ForEachGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            // Check if compilation references Trecs assembly for better performance
             var hasTrecsReference = AssemblyFilterHelper.CreateTrecsReferenceCheck(context);
 
-            // Create provider for methods with GenerateForEachComponentsMethods attribute.
-            // Validation runs inside the transform — accumulated diagnostics are replayed
-            // in the terminal stage. This avoids having to .Combine(CompilationProvider)
-            // to get a SemanticModel (the transform already has one via
-            // GeneratorSyntaxContext.SemanticModel), which is what used to invalidate the
-            // pipeline cache on every compilation change.
-            var forEachMethodProviderRaw = context
+            var modelsRaw = context
                 .SyntaxProvider.CreateSyntaxProvider(
-                    predicate: static (s, _) => IsMethodWithForEachComponentsAttribute(s),
-                    transform: static (ctx, _) => GetForEachMethodData(ctx)
+                    predicate: static (s, _) => IsMethodWithForEachAttribute(s),
+                    transform: static (ctx, _) => BuildModel(ctx)
                 )
-                .Where(static m => m is not null);
-            var forEachMethodProvider = AssemblyFilterHelper.FilterByTrecsReference(
-                forEachMethodProviderRaw,
-                hasTrecsReference
-            );
+                .Where(static m => m is not null)
+                .Select(static (m, _) => m!.Value);
+            var models = AssemblyFilterHelper.FilterByTrecsReference(modelsRaw, hasTrecsReference);
 
-            // Value-equality provider for the one compilation-derived datum we still need
-            // at codegen time: the global-namespace display string (used by
-            // NamespaceCollector to suppress a spurious `using ;`). Extracting just this
-            // string from the Compilation means the downstream .Combine only re-fires when
-            // the string actually changes, which is ~never in a given project.
+            // Only the global-namespace name leaves CompilationProvider — a single string,
+            // value-equatable. Unrelated edits don't invalidate this combine.
             var globalNsProvider = context.CompilationProvider.Select(
                 static (c, _) =>
                     PerformanceCache.GetDisplayString(c.GlobalNamespace) ?? string.Empty
             );
 
-            var forEachWithGlobalNs = forEachMethodProvider.Combine(globalNsProvider);
+            var withGlobalNs = models.Combine(globalNsProvider);
 
             context.RegisterSourceOutput(
-                forEachWithGlobalNs,
-                static (spc, source) => GenerateForEachSource(spc, source.Left!, source.Right)
+                withGlobalNs,
+                static (spc, source) => GenerateForEachSource(spc, source.Left, source.Right)
             );
         }
 
-        private static bool IsMethodWithForEachComponentsAttribute(SyntaxNode node)
+        private static bool IsMethodWithForEachAttribute(SyntaxNode node)
         {
             return node is MethodDeclarationSyntax methodDecl
                 && methodDecl.AttributeLists.Count > 0
@@ -73,16 +67,14 @@ namespace Trecs.SourceGen
                     );
         }
 
-        private static ForEachMethodData? GetForEachMethodData(GeneratorSyntaxContext context)
+        private static ForEachComponentModel? BuildModel(GeneratorSyntaxContext context)
         {
             var methodDecl = (MethodDeclarationSyntax)context.Node;
 
-            // [ForEachEntity] on a method of a struct is the JobGenerator's
-            // responsibility (it generates IJobFor scheduling). Skip those here.
+            // [ForEachEntity] on a struct method is the JobGenerator's responsibility.
             if (methodDecl.Parent is StructDeclarationSyntax)
                 return null;
 
-            // Find the containing class
             var classDecl = methodDecl.FirstAncestorOrSelf<ClassDeclarationSyntax>();
             if (classDecl == null)
                 return null;
@@ -91,9 +83,7 @@ namespace Trecs.SourceGen
             if (methodSymbol == null)
                 return null;
 
-            // [ForEachEntity] only routes to this generator when the method has NO
-            // IAspect parameter — otherwise the aspect-side generator
-            // (ForEachEntityAspectGenerator) takes it.
+            // [ForEachEntity] only routes here when the method has NO IAspect parameter.
             if (!IterationAttributeRouting.HasEntityFilter(methodSymbol))
                 return null;
             if (IterationAttributeRouting.HasWrapAsJobAttribute(methodSymbol))
@@ -101,30 +91,28 @@ namespace Trecs.SourceGen
             if (!IterationAttributeRouting.RoutesToComponentsGenerator(methodSymbol))
                 return null;
 
-            // Run validation here (the transform phase) so we don't have to combine with
-            // CompilationProvider just to fetch a SemanticModel in the terminal stage.
-            // Diagnostics are accumulated and replayed in RegisterSourceOutput. Unexpected
-            // exceptions are caught and surfaced as a SourceGenerationError diagnostic
-            // (matching the old ErrorRecovery.TryExecuteBool behaviour from before the
-            // validator moved into the transform).
-            var diagnostics = new List<Diagnostic>();
-            ValidatedMethodInfo? validated = null;
+            var classSymbol = methodSymbol.ContainingType;
+            var className = classDecl.Identifier.Text;
+            var methodName = methodDecl.Identifier.Text;
+            var diagnostics = new List<DiagnosticInfo>();
+            ForEachComponentValidation validation = ForEachComponentValidation.Empty;
             bool isValid;
+
             try
             {
                 isValid = ValidateMethod(
                     classDecl,
                     methodDecl,
                     methodSymbol,
-                    diagnostics.Add,
                     context.SemanticModel,
-                    out validated
+                    diagnostics,
+                    out validation
                 );
             }
             catch (Exception ex)
             {
                 diagnostics.Add(
-                    Diagnostic.Create(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.SourceGenerationError,
                         methodDecl.GetLocation(),
                         "ForEach method validation",
@@ -132,133 +120,116 @@ namespace Trecs.SourceGen
                     )
                 );
                 isValid = false;
-                validated = null;
+                validation = ForEachComponentValidation.Empty;
             }
 
-            return new ForEachMethodData(
-                classDecl,
-                methodDecl,
-                methodSymbol,
-                isValid,
-                validated,
-                diagnostics.ToImmutableArray()
+            var containingTypes = SymbolAnalyzer
+                .GetContainingTypeChainInfo(classSymbol)
+                .ToEquatableArray();
+
+            return new ForEachComponentModel(
+                ClassName: className,
+                MethodName: methodName,
+                Namespace: SymbolAnalyzer.GetNamespace(classDecl),
+                HintFileName: SymbolAnalyzer.GetSafeFileName(classSymbol, $"{methodName}_ForEach"),
+                ContainingTypes: containingTypes,
+                IsValid: isValid,
+                Validation: validation,
+                Diagnostics: diagnostics.ToEquatableArray()
             );
         }
 
         private static void GenerateForEachSource(
             SourceProductionContext context,
-            ForEachMethodData data,
+            ForEachComponentModel model,
             string globalNamespaceName
         )
         {
-            var location = data.MethodDecl.GetLocation();
-            var className = data.ClassDecl.Identifier.Text;
-            var methodName = data.MethodDecl.Identifier.Text;
-            var fileName = SymbolAnalyzer.GetSafeFileName(
-                data.MethodSymbol.ContainingType,
-                $"{methodName}_ForEach"
-            );
+            foreach (var diag in model.Diagnostics)
+                context.ReportDiagnostic(diag.ToDiagnostic());
 
-            // Replay diagnostics collected in the transform phase.
-            foreach (var diag in data.Diagnostics)
-            {
-                context.ReportDiagnostic(diag);
-            }
-
-            if (!data.IsValid || data.ValidatedInfo == null)
-            {
+            if (!model.IsValid)
                 return;
-            }
 
             try
             {
                 using var _timer_ = SourceGenTimer.Time("ForEachGenerator.Total");
-                SourceGenLogger.Log($"[ForEachGenerator] Processing {className}.{methodName}");
+                SourceGenLogger.Log(
+                    $"[ForEachGenerator] Processing {model.ClassName}.{model.MethodName}"
+                );
 
                 var source = ErrorRecovery.TryExecute(
-                    () =>
-                        GenerateSource(
-                            data.ClassDecl,
-                            data.MethodDecl,
-                            data.MethodSymbol.ContainingType,
-                            data.ValidatedInfo,
-                            globalNamespaceName
-                        ),
+                    () => GenerateSource(model, globalNamespaceName),
                     context,
-                    location,
+                    Location.None,
                     "ForEach code generation"
                 );
 
                 if (source != null)
                 {
-                    context.AddSource(fileName, source);
-                    SourceGenLogger.WriteGeneratedFile(fileName, source);
+                    context.AddSource(model.HintFileName, source);
+                    SourceGenLogger.WriteGeneratedFile(model.HintFileName, source);
                 }
                 else
                 {
-                    var diagnostic = Diagnostic.Create(
-                        DiagnosticDescriptors.CouldNotResolveSymbol,
-                        location,
-                        $"{className}.{methodName}"
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.CouldNotResolveSymbol,
+                            Location.None,
+                            $"{model.ClassName}.{model.MethodName}"
+                        )
                     );
-                    context.ReportDiagnostic(diagnostic);
                 }
             }
             catch (Exception ex)
             {
                 ErrorRecovery.ReportError(
                     context,
-                    location,
-                    $"ForEach {className}.{methodName}",
+                    Location.None,
+                    $"ForEach {model.ClassName}.{model.MethodName}",
                     ex
                 );
             }
         }
 
+        // ─────────────────────────────────────────────────────────────────────
+        // Code emission (all from the equatable model — no symbol access)
+        // ─────────────────────────────────────────────────────────────────────
+
         private static string GenerateSource(
-            ClassDeclarationSyntax classDec,
-            MethodDeclarationSyntax methodDec,
-            INamedTypeSymbol classSymbol,
-            ValidatedMethodInfo validatedParamsInfo,
+            ForEachComponentModel model,
             string globalNamespaceName
         )
         {
-            var namespaceName = SymbolAnalyzer.GetNamespace(classDec);
-            var className = classDec.Identifier.Text;
-            var methodName = methodDec.Identifier.Text;
+            var v = model.Validation;
 
-            var componentCount = validatedParamsInfo.ComponentParameters.Count;
-            var sb = OptimizedStringBuilder.ForAspect(componentCount);
+            var sb = OptimizedStringBuilder.ForAspect(v.ComponentParameters.Length);
 
-            // Add required namespaces
-            var requiredNamespaces = NamespaceCollector.Collect(
-                globalNamespaceName,
-                validatedParamsInfo
+            var namespaces = new HashSet<string>(CommonUsings.Namespaces) { "Unity.Jobs" };
+            foreach (var ns in v.Namespaces)
+            {
+                if (ns != globalNamespaceName)
+                    namespaces.Add(ns);
+            }
+            HoistedSingleEmitter.CollectNamespaces(
+                namespaces,
+                v.HoistedSingletons,
+                globalNamespaceName
             );
-
-            sb.AppendUsings(requiredNamespaces.ToArray());
-
-            // Walk the system class's containing-type chain so the emitted partial merges
-            // with a nested system class instead of landing at namespace scope.
-            var containingTypes = SymbolAnalyzer.GetContainingTypeChainInfo(classSymbol);
+            sb.AppendUsings(namespaces.ToArray());
 
             return sb.WrapInNamespace(
-                    namespaceName,
+                    model.Namespace,
                     (builder) =>
                     {
                         builder.WrapInContainingTypes(
-                            containingTypes,
+                            model.ContainingTypes.ToArray(),
                             0,
                             (b, indent) =>
                             {
-                                b.AppendLine(indent, $"partial class {className}");
+                                b.AppendLine(indent, $"partial class {model.ClassName}");
                                 b.AppendLine(indent, "{");
-                                GenerateForEachOverloads(
-                                    b,
-                                    methodName,
-                                    validatedParamsInfo,
-                                    methodDec
-                                );
+                                GenerateForEachOverloads(b, model.MethodName, v);
                                 b.AppendLine(indent, "}");
                             }
                         );
@@ -270,72 +241,61 @@ namespace Trecs.SourceGen
         private static void GenerateForEachOverloads(
             OptimizedStringBuilder sb,
             string methodName,
-            ValidatedMethodInfo info,
-            MethodDeclarationSyntax methodDec
+            ForEachComponentValidation v
         )
         {
-            // Build parameter declarations for custom arguments
-            var customArgsDecStr = "";
-            var customArgsCallStr = "";
+            string customArgsDecStr = "";
+            string customArgsCallStr = "";
 
-            if (info.CustomParameters.Any())
+            if (v.CustomParameters.Length > 0)
             {
                 customArgsDecStr =
                     ", "
                     + string.Join(
                         ", ",
-                        info.CustomParameters.Select(p =>
-                            $"{(p.IsRef ? "ref " : p.IsIn ? "in " : "")}{(p.TypeSymbol != null ? PerformanceCache.GetDisplayString(p.TypeSymbol) : p.Type)} {p.Name}"
+                        v.CustomParameters.Select(p =>
+                            $"{(p.IsRef ? "ref " : p.IsIn ? "in " : "")}{p.Type} {p.Name}"
                         )
                     );
                 customArgsCallStr =
                     ", "
                     + string.Join(
                         ", ",
-                        info.CustomParameters.Select(p =>
+                        v.CustomParameters.Select(p =>
                             $"{(p.IsRef ? "ref " : p.IsIn ? "in " : "")}{p.Name}"
                         )
                     );
             }
 
-            bool hasSets = info.HasSet;
-            bool hasAnyAttributeCriteria =
-                hasSets || info.HasAttributeTags || info.MatchByComponents;
+            bool hasSets = v.HasSet;
+            bool hasAnyAttributeCriteria = hasSets || v.HasAttributeTags || v.MatchByComponents;
 
             // (1) Convenience overload — only when the attribute supplies at least one criterion.
-            // For empty attributes we deliberately do NOT emit this; callers must explicitly pass
-            // a builder so iteration cannot accidentally walk every group in the world.
             if (hasAnyAttributeCriteria)
             {
-                GenerateConvenienceOverload(
-                    sb,
-                    methodName,
-                    info,
-                    customArgsDecStr,
-                    customArgsCallStr
-                );
+                GenerateConvenienceOverload(sb, methodName, v, customArgsDecStr, customArgsCallStr);
             }
 
             // (2) Public dense entry — only when the attribute imposes no Set/Sets.
             if (!hasSets)
             {
-                GenerateQueryBuilderEntry(sb, methodName, info, customArgsDecStr);
+                GenerateQueryBuilderEntry(sb, methodName, v, customArgsDecStr);
             }
 
             // (3) Public sparse entry — only when the attribute has no set baked in.
             if (!hasSets)
             {
-                GenerateSparseQueryBuilderEntry(sb, methodName, info, customArgsDecStr);
+                GenerateSparseQueryBuilderEntry(sb, methodName, v, customArgsDecStr);
             }
 
-            // (4) Range overload for event handlers — always emitted (event observers may forward
-            // their callback args + custom event args). Mirrors the aspect-mode generator.
+            // (4) Range overload for event handlers — always emitted.
+            sb.AppendLine(2, GeneratedCodeAttributes.Line);
             sb.AppendLine(
                 2,
                 $"void {methodName}(GroupIndex __group, EntityRange __indices, WorldAccessor __world{customArgsDecStr})"
             );
             sb.AppendLine(2, "{");
-            GenerateRangeIteration(sb, methodName, info, 3);
+            GenerateRangeIteration(sb, methodName, v, 3);
             sb.AppendLine(2, "}");
             sb.AppendLine();
         }
@@ -343,31 +303,26 @@ namespace Trecs.SourceGen
         private static void GenerateConvenienceOverload(
             OptimizedStringBuilder sb,
             string methodName,
-            ValidatedMethodInfo info,
+            ForEachComponentValidation v,
             string customArgsDecStr,
             string customArgsCallStr
         )
         {
+            sb.AppendLine(2, GeneratedCodeAttributes.Line);
             sb.AppendLine(2, $"void {methodName}(WorldAccessor __world{customArgsDecStr})");
             sb.AppendLine(2, "{");
 
-            if (info.HasSet)
+            if (v.HasSet)
             {
                 // Sparse path. Build the full SparseQueryBuilder inline.
-                var firstSetName = PerformanceCache.GetDisplayString(info.SetTypes[0]);
-                var attributeChain = QueryBuilderHelper.BuildAttributeCriteriaChain(
-                    info.AttributeTagTypes,
-                    info.MatchByComponents,
-                    info.ComponentParameters.Select(p => p.TypeSymbol)
-                );
                 sb.AppendLine(
                     3,
-                    $"var __builder = __world.Query(){attributeChain}.InSet<{firstSetName}>();"
+                    $"var __builder = __world.Query(){v.AttributeCriteriaChainNoWithouts}.InSet<{v.FirstSetTypeDisplay}>();"
                 );
                 EmitSparseIterationBody(
                     sb,
                     methodName,
-                    info,
+                    v,
                     indentLevel: 3,
                     builderVar: "__builder",
                     worldVar: "__world"
@@ -385,31 +340,26 @@ namespace Trecs.SourceGen
         private static void GenerateQueryBuilderEntry(
             OptimizedStringBuilder sb,
             string methodName,
-            ValidatedMethodInfo info,
+            ForEachComponentValidation v,
             string customArgsDecStr
         )
         {
+            sb.AppendLine(2, GeneratedCodeAttributes.Line);
             sb.AppendLine(2, $"void {methodName}(QueryBuilder __builder{customArgsDecStr})");
             sb.AppendLine(2, "{");
 
-            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
-                info.AttributeTagTypes,
-                info.MatchByComponents,
-                info.ComponentParameters.Select(p => p.TypeSymbol),
-                info.AttributeWithoutTagTypes
-            );
-            if (chain.Length > 0)
-                sb.AppendLine(3, $"__builder = __builder{chain};");
+            if (v.AttributeCriteriaChainFull.Length > 0)
+                sb.AppendLine(3, $"__builder = __builder{v.AttributeCriteriaChainFull};");
 
             sb.AppendLine(
                 3,
-                $"TrecsAssert.That(__builder.HasAnyCriteria, \"{methodName} requires query criteria — pass a builder with at least one tag, component, or set constraint, or specify Tag/Set/MatchByComponents on the [ForEachEntity] attribute.\");"
+                $"TrecsDebugAssert.That(__builder.HasAnyCriteria, \"{methodName} requires query criteria — pass a builder with at least one tag, component, or set constraint, or specify Tag/Set/MatchByComponents on the [ForEachEntity] attribute.\");"
             );
 
             EmitDenseIterationBody(
                 sb,
                 methodName,
-                info,
+                v,
                 indentLevel: 3,
                 builderVar: "__builder",
                 worldVar: null
@@ -422,26 +372,21 @@ namespace Trecs.SourceGen
         private static void GenerateSparseQueryBuilderEntry(
             OptimizedStringBuilder sb,
             string methodName,
-            ValidatedMethodInfo info,
+            ForEachComponentValidation v,
             string customArgsDecStr
         )
         {
+            sb.AppendLine(2, GeneratedCodeAttributes.Line);
             sb.AppendLine(2, $"void {methodName}(SparseQueryBuilder __builder{customArgsDecStr})");
             sb.AppendLine(2, "{");
 
-            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
-                info.AttributeTagTypes,
-                info.MatchByComponents,
-                info.ComponentParameters.Select(p => p.TypeSymbol),
-                info.AttributeWithoutTagTypes
-            );
-            if (chain.Length > 0)
-                sb.AppendLine(3, $"__builder = __builder{chain};");
+            if (v.AttributeCriteriaChainFull.Length > 0)
+                sb.AppendLine(3, $"__builder = __builder{v.AttributeCriteriaChainFull};");
 
             EmitSparseIterationBody(
                 sb,
                 methodName,
-                info,
+                v,
                 indentLevel: 3,
                 builderVar: "__builder",
                 worldVar: null
@@ -451,24 +396,20 @@ namespace Trecs.SourceGen
             sb.AppendLine();
         }
 
-        /// <summary>
-        /// Builds the comma-separated argument list for the call to the user's method,
-        /// preserving the user's declaration order via <see cref="ValidatedMethodInfo.ParameterSlots"/>.
-        /// </summary>
         private static string BuildUserMethodCallArgs(
-            ValidatedMethodInfo info,
+            ForEachComponentValidation v,
             string worldVar,
             string entityIndexVar,
             string componentValueVarPrefix
         )
         {
-            var args = new List<string>(info.ParameterSlots.Count);
-            foreach (var slot in info.ParameterSlots)
+            var args = new List<string>(v.ParameterSlots.Length);
+            foreach (var slot in v.ParameterSlots)
             {
                 switch (slot.Kind)
                 {
                     case ParamSlotKind.LoopComponent:
-                        var c = info.ComponentParameters[slot.Index];
+                        var c = v.ComponentParameters[slot.Index];
                         var refOrIn = c.IsRef ? "ref" : "in";
                         args.Add($"{refOrIn} {componentValueVarPrefix}{slot.Index + 1}");
                         break;
@@ -482,19 +423,19 @@ namespace Trecs.SourceGen
                         args.Add(worldVar);
                         break;
                     case ParamSlotKind.LoopSetAccessor:
-                        var sa = info.SetAccessorParameters[slot.Index];
+                        var sa = v.SetAccessorParameters[slot.Index];
                         args.Add(sa.IsIn ? $"in {sa.ParamName}" : sa.ParamName);
                         break;
                     case ParamSlotKind.LoopSetRead:
-                        var sr = info.SetReadParameters[slot.Index];
+                        var sr = v.SetReadParameters[slot.Index];
                         args.Add($"in {sr.ParamName}");
                         break;
                     case ParamSlotKind.LoopSetWrite:
-                        var sw = info.SetWriteParameters[slot.Index];
+                        var sw = v.SetWriteParameters[slot.Index];
                         args.Add($"in {sw.ParamName}");
                         break;
                     case ParamSlotKind.Custom:
-                        var p = info.CustomParameters[slot.Index];
+                        var p = v.CustomParameters[slot.Index];
                         var prefix =
                             p.IsRef ? "ref "
                             : p.IsIn ? "in "
@@ -502,7 +443,7 @@ namespace Trecs.SourceGen
                         args.Add($"{prefix}{p.Name}");
                         break;
                     case ParamSlotKind.HoistedSingleton:
-                        var hs = info.HoistedSingletons[slot.Index];
+                        var hs = v.HoistedSingletons[slot.Index];
                         args.Add(hs.IsRef ? $"ref __{hs.ParamName}" : $"in __{hs.ParamName}");
                         break;
                 }
@@ -513,7 +454,7 @@ namespace Trecs.SourceGen
         private static void EmitDenseIterationBody(
             OptimizedStringBuilder sb,
             string methodName,
-            ValidatedMethodInfo info,
+            ForEachComponentValidation v,
             int indentLevel,
             string builderVar,
             string? worldVar
@@ -523,23 +464,19 @@ namespace Trecs.SourceGen
             if (worldVar == null)
                 sb.AppendLine(indentLevel, $"var {worldName} = {builderVar}.World;");
 
-            NamespaceCollector.EmitSetAccessorDeclarations(sb, info, indentLevel, worldName);
-            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, info.HoistedSingletons);
+            EmitSetAccessorDeclarations(sb, v, indentLevel, worldName);
+            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, v.HoistedSingletons);
 
             sb.AppendLine(indentLevel, $"foreach (var __slice in {builderVar}.GroupSlices())");
             sb.AppendLine(indentLevel, "{");
 
-            for (int i = 0; i < info.ComponentParameters.Count; i++)
+            for (int i = 0; i < v.ComponentParameters.Length; i++)
             {
-                var param = info.ComponentParameters[i];
-                var typeStr =
-                    param.TypeSymbol != null
-                        ? PerformanceCache.GetDisplayString(param.TypeSymbol)
-                        : param.Type;
+                var param = v.ComponentParameters[i];
                 var bufferSuffix = param.IsRef ? "Write" : "Read";
                 sb.AppendLine(
                     indentLevel + 1,
-                    $"var values{i + 1} = {worldName}.ComponentBuffer<{typeStr}>(__slice.GroupIndex).{bufferSuffix};"
+                    $"var values{i + 1} = {worldName}.ComponentBuffer<{param.Type}>(__slice.GroupIndex).{bufferSuffix};"
                 );
             }
             sb.AppendLine();
@@ -547,9 +484,9 @@ namespace Trecs.SourceGen
             sb.AppendLine(indentLevel + 1, "for (int __i = 0; __i < __slice.Count; __i++)");
             sb.AppendLine(indentLevel + 1, "{");
 
-            for (int i = 0; i < info.ComponentParameters.Count; i++)
+            for (int i = 0; i < v.ComponentParameters.Length; i++)
             {
-                var param = info.ComponentParameters[i];
+                var param = v.ComponentParameters[i];
                 var refKind = param.IsRef ? "ref" : "ref readonly";
                 sb.AppendLine(
                     indentLevel + 2,
@@ -557,15 +494,15 @@ namespace Trecs.SourceGen
                 );
             }
 
-            EntityRefEmitter.EmitDeclarations(
+            EmitEntityRefDeclarations(
                 sb,
-                info,
+                v,
                 indentLevel + 2,
                 indexExpr: "new EntityIndex(__i, __slice.GroupIndex)",
                 worldVar: worldName
             );
 
-            EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
+            EmitUserBodyOrCall(sb, indentLevel + 2, methodName, v, worldName);
 
             sb.AppendLine(indentLevel + 1, "}");
             sb.AppendLine(indentLevel, "}");
@@ -574,7 +511,7 @@ namespace Trecs.SourceGen
         private static void EmitSparseIterationBody(
             OptimizedStringBuilder sb,
             string methodName,
-            ValidatedMethodInfo info,
+            ForEachComponentValidation v,
             int indentLevel,
             string builderVar,
             string? worldVar
@@ -584,23 +521,19 @@ namespace Trecs.SourceGen
             if (worldVar == null)
                 sb.AppendLine(indentLevel, $"var {worldName} = {builderVar}.World;");
 
-            NamespaceCollector.EmitSetAccessorDeclarations(sb, info, indentLevel, worldName);
-            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, info.HoistedSingletons);
+            EmitSetAccessorDeclarations(sb, v, indentLevel, worldName);
+            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, v.HoistedSingletons);
 
             sb.AppendLine(indentLevel, $"foreach (var __slice in {builderVar}.GroupSlices())");
             sb.AppendLine(indentLevel, "{");
 
-            for (int i = 0; i < info.ComponentParameters.Count; i++)
+            for (int i = 0; i < v.ComponentParameters.Length; i++)
             {
-                var param = info.ComponentParameters[i];
-                var typeStr =
-                    param.TypeSymbol != null
-                        ? PerformanceCache.GetDisplayString(param.TypeSymbol)
-                        : param.Type;
+                var param = v.ComponentParameters[i];
                 var bufferSuffix = param.IsRef ? "Write" : "Read";
                 sb.AppendLine(
                     indentLevel + 1,
-                    $"var values{i + 1} = {worldName}.ComponentBuffer<{typeStr}>(__slice.GroupIndex).{bufferSuffix};"
+                    $"var values{i + 1} = {worldName}.ComponentBuffer<{param.Type}>(__slice.GroupIndex).{bufferSuffix};"
                 );
             }
             sb.AppendLine();
@@ -608,9 +541,9 @@ namespace Trecs.SourceGen
             sb.AppendLine(indentLevel + 1, "foreach (var __i in __slice.Indices)");
             sb.AppendLine(indentLevel + 1, "{");
 
-            for (int i = 0; i < info.ComponentParameters.Count; i++)
+            for (int i = 0; i < v.ComponentParameters.Length; i++)
             {
-                var param = info.ComponentParameters[i];
+                var param = v.ComponentParameters[i];
                 var refKind = param.IsRef ? "ref" : "ref readonly";
                 sb.AppendLine(
                     indentLevel + 2,
@@ -618,15 +551,15 @@ namespace Trecs.SourceGen
                 );
             }
 
-            EntityRefEmitter.EmitDeclarations(
+            EmitEntityRefDeclarations(
                 sb,
-                info,
+                v,
                 indentLevel + 2,
                 indexExpr: "new EntityIndex(__i, __slice.GroupIndex)",
                 worldVar: worldName
             );
 
-            EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
+            EmitUserBodyOrCall(sb, indentLevel + 2, methodName, v, worldName);
 
             sb.AppendLine(indentLevel + 1, "}");
             sb.AppendLine(indentLevel, "}");
@@ -636,47 +569,31 @@ namespace Trecs.SourceGen
             OptimizedStringBuilder sb,
             int indentLevel,
             string methodName,
-            ValidatedMethodInfo info,
+            ForEachComponentValidation v,
             string worldName
         )
         {
-            var callArgs = BuildUserMethodCallArgs(info, worldName, "__entityIndex", "value");
+            var callArgs = BuildUserMethodCallArgs(v, worldName, "__entityIndex", "value");
             sb.AppendLine(indentLevel, $"{methodName}({callArgs});");
         }
 
         private static void GenerateRangeIteration(
             OptimizedStringBuilder sb,
             string methodName,
-            ValidatedMethodInfo validatedParamsInfo,
+            ForEachComponentValidation v,
             int indentLevel
         )
         {
-            NamespaceCollector.EmitSetAccessorDeclarations(
-                sb,
-                validatedParamsInfo,
-                indentLevel,
-                "__world"
-            );
-            HoistedSingleEmitter.Emit(
-                sb,
-                indentLevel,
-                worldVar: "__world",
-                validatedParamsInfo.HoistedSingletons
-            );
+            EmitSetAccessorDeclarations(sb, v, indentLevel, "__world");
+            HoistedSingleEmitter.Emit(sb, indentLevel, worldVar: "__world", v.HoistedSingletons);
 
-            var componentParams = validatedParamsInfo.ComponentParameters;
-
-            for (int idx = 0; idx < componentParams.Count; idx++)
+            for (int idx = 0; idx < v.ComponentParameters.Length; idx++)
             {
-                var param = componentParams[idx];
-                var typeStr =
-                    param.TypeSymbol != null
-                        ? PerformanceCache.GetDisplayString(param.TypeSymbol)
-                        : param.Type;
+                var param = v.ComponentParameters[idx];
                 var bufferSuffix = param.IsRef ? "Write" : "Read";
                 sb.AppendLine(
                     indentLevel,
-                    $"var values{idx + 1} = __world.ComponentBuffer<{typeStr}>(__group).{bufferSuffix};"
+                    $"var values{idx + 1} = __world.ComponentBuffer<{param.Type}>(__group).{bufferSuffix};"
                 );
             }
 
@@ -688,9 +605,9 @@ namespace Trecs.SourceGen
             );
             sb.AppendLine(indentLevel, "{");
 
-            for (int i = 0; i < validatedParamsInfo.ComponentParameters.Count; i++)
+            for (int i = 0; i < v.ComponentParameters.Length; i++)
             {
-                var param = validatedParamsInfo.ComponentParameters[i];
+                var param = v.ComponentParameters[i];
                 var refKind = param.IsRef ? "ref" : "ref readonly";
                 sb.AppendLine(
                     indentLevel + 1,
@@ -698,36 +615,80 @@ namespace Trecs.SourceGen
                 );
             }
 
-            EntityRefEmitter.EmitDeclarations(
+            EmitEntityRefDeclarations(
                 sb,
-                validatedParamsInfo,
+                v,
                 indentLevel + 1,
                 indexExpr: "new EntityIndex(__i, __group)",
                 worldVar: "__world"
             );
 
-            EmitUserBodyOrCall(sb, indentLevel + 1, methodName, validatedParamsInfo, "__world");
+            EmitUserBodyOrCall(sb, indentLevel + 1, methodName, v, "__world");
             sb.AppendLine(indentLevel, "}");
         }
 
-        // Validation and parameter info classes (reused from original ForEachGenerator)
+        private static void EmitSetAccessorDeclarations(
+            OptimizedStringBuilder sb,
+            ForEachComponentValidation v,
+            int indentLevel,
+            string worldVar
+        )
+        {
+            foreach (var sa in v.SetAccessorParameters)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var {sa.ParamName} = {worldVar}.Set<{sa.SetTypeArg}>();"
+                );
+            foreach (var sr in v.SetReadParameters)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var {sr.ParamName} = {worldVar}.Set<{sr.SetTypeArg}>().Read;"
+                );
+            foreach (var sw in v.SetWriteParameters)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var {sw.ParamName} = {worldVar}.Set<{sw.SetTypeArg}>().Write;"
+                );
+        }
+
+        private static void EmitEntityRefDeclarations(
+            OptimizedStringBuilder sb,
+            ForEachComponentValidation v,
+            int indentLevel,
+            string indexExpr,
+            string worldVar
+        )
+        {
+            bool needsIndex = v.HasEntityIndexParameter || v.HasEntityHandleParameter;
+            if (needsIndex)
+                sb.AppendLine(indentLevel, $"var __entityIndex = {indexExpr};");
+            if (v.HasEntityHandleParameter)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var __entityHandle = __entityIndex.ToHandle({worldVar});"
+                );
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // Validation
+        // ─────────────────────────────────────────────────────────────────────
+
         private static bool ValidateMethod(
             ClassDeclarationSyntax classDec,
             MethodDeclarationSyntax methodDec,
             IMethodSymbol methodSymbol,
-            System.Action<Diagnostic> reportDiagnostic,
             SemanticModel semanticModel,
-            out ValidatedMethodInfo? validatedParamsInfo
+            List<DiagnosticInfo> diagnostics,
+            out ForEachComponentValidation validation
         )
         {
-            validatedParamsInfo = null;
+            validation = ForEachComponentValidation.Empty;
             bool isValid = true;
 
-            // Check if the class is partial
             if (!classDec.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.NotPartialClass,
                         classDec.Identifier.GetLocation(),
                         classDec.Identifier.Text
@@ -736,11 +697,10 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
 
-            // Check return type
             if (methodDec.ReturnType.ToString() != "void")
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.InvalidReturnType,
                         methodDec.ReturnType.GetLocation()
                     )
@@ -748,13 +708,11 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
 
-            // Validate parameters
             var parameters = methodDec.ParameterList.Parameters;
-
             if (parameters.Count == 0)
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.EmptyParameters,
                         methodDec.ParameterList.GetLocation()
                     )
@@ -762,12 +720,17 @@ namespace Trecs.SourceGen
                 return false;
             }
 
-            // Classify parameters via shared classifier.
+            // ParameterClassifier emits already-substituted Diagnostic objects via its
+            // Action<Diagnostic> callback; stash them as preformatted DiagnosticInfo so
+            // the descriptor's MessageFormat isn't applied a second time.
+            System.Action<Diagnostic> reportDiag = d =>
+                diagnostics.Add(DiagnosticInfo.FromDiagnostic(d));
+
             var classified = ParameterClassifier.Classify(
                 parameters,
                 semanticModel,
                 IterationMode.Components,
-                reportDiagnostic,
+                reportDiag,
                 methodName: null,
                 aspectParam: null,
                 isValid: ref isValid
@@ -779,8 +742,8 @@ namespace Trecs.SourceGen
 
             if (!hasAnyIterationParameter)
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.EmptyParameters,
                         methodDec.ParameterList.GetLocation()
                     )
@@ -788,10 +751,9 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
 
-            // Extract tag types, set types, and MatchByComponents from the iteration attribute.
             var className = classDec.Identifier.Text;
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                reportDiagnostic,
+                reportDiag,
                 methodDec,
                 methodSymbol,
                 className,
@@ -801,65 +763,263 @@ namespace Trecs.SourceGen
             {
                 isValid = false;
             }
+
             var attributeTagTypes = criteria?.TagTypes ?? new List<ITypeSymbol>();
             var attributeWithoutTagTypes = criteria?.WithoutTagTypes ?? new List<ITypeSymbol>();
             var setTypes = criteria?.SetTypes ?? new List<ITypeSymbol>();
-            bool attributeMatchByComponents = criteria?.MatchByComponents ?? false;
+            bool matchByComponents = criteria?.MatchByComponents ?? false;
 
-            if (isValid)
+            if (!isValid)
+                return false;
+
+            validation = BuildValidationResult(
+                classified,
+                attributeTagTypes,
+                attributeWithoutTagTypes,
+                setTypes,
+                matchByComponents
+            );
+            return true;
+        }
+
+        /// <summary>
+        /// Materializes a value-equatable validation result from the symbol-bearing
+        /// <see cref="ClassifiedParameters"/> and criteria lists. Pre-computes the
+        /// QueryBuilder criteria chains and the namespace set so the codegen path
+        /// touches no symbols.
+        /// </summary>
+        private static ForEachComponentValidation BuildValidationResult(
+            ClassifiedParameters classified,
+            List<ITypeSymbol> attributeTagTypes,
+            List<ITypeSymbol> attributeWithoutTagTypes,
+            List<ITypeSymbol> setTypes,
+            bool matchByComponents
+        )
+        {
+            var componentParams = classified
+                .ComponentParameters.Select(p => new ParameterInfoModel(
+                    Type: p.TypeSymbol != null
+                        ? PerformanceCache.GetDisplayString(p.TypeSymbol)
+                        : p.Type,
+                    Name: p.Name,
+                    IsRef: p.IsRef,
+                    IsIn: p.IsIn
+                ))
+                .ToEquatableArray();
+
+            var customParams = classified
+                .CustomParameters.Select(p => new ParameterInfoModel(
+                    Type: p.TypeSymbol != null
+                        ? PerformanceCache.GetDisplayString(p.TypeSymbol)
+                        : p.Type,
+                    Name: p.Name,
+                    IsRef: p.IsRef,
+                    IsIn: p.IsIn
+                ))
+                .ToEquatableArray();
+
+            var setAccessorParams = classified
+                .SetAccessorParameters.Select(sa => new SetAccessorParameterModel(
+                    sa.SetTypeArg,
+                    sa.ParamName,
+                    sa.IsIn
+                ))
+                .ToEquatableArray();
+            var setReadParams = classified
+                .SetReadParameters.Select(sr => new SetAccessorParameterModel(
+                    sr.SetTypeArg,
+                    sr.ParamName,
+                    sr.IsIn
+                ))
+                .ToEquatableArray();
+            var setWriteParams = classified
+                .SetWriteParameters.Select(sw => new SetAccessorParameterModel(
+                    sw.SetTypeArg,
+                    sw.ParamName,
+                    sw.IsIn
+                ))
+                .ToEquatableArray();
+
+            var hoistedSingletons = classified
+                .HoistedSingletons.Select(HoistedSingletonModelBuilder.FromInfo)
+                .ToEquatableArray();
+
+            var parameterSlots = classified.ParameterSlots.ToArray().ToEquatableArray();
+
+            // Pre-compute both query-criteria chains. The convenience overload uses the
+            // no-withouts variant; the QueryBuilder / SparseQueryBuilder entries use the
+            // full chain. Doing this at transform time keeps the symbol references off
+            // the pipeline boundary entirely.
+            var componentTypes = classified.ComponentParameters.Select(p => p.TypeSymbol);
+            var chainNoWithouts = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                attributeTagTypes,
+                matchByComponents,
+                componentTypes
+            );
+            var chainFull = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                attributeTagTypes,
+                matchByComponents,
+                classified.ComponentParameters.Select(p => p.TypeSymbol),
+                attributeWithoutTagTypes
+            );
+
+            var firstSetDisplay =
+                setTypes.Count > 0 ? PerformanceCache.GetDisplayString(setTypes[0]) : string.Empty;
+
+            // Pre-collect required namespaces. Everything except the global-namespace
+            // filter (we don't know that here — the consumer drops it at emit time).
+            var namespaces = CollectNamespaces(
+                classified,
+                attributeTagTypes,
+                attributeWithoutTagTypes,
+                setTypes
+            );
+
+            return new ForEachComponentValidation(
+                ComponentParameters: componentParams,
+                CustomParameters: customParams,
+                SetAccessorParameters: setAccessorParams,
+                SetReadParameters: setReadParams,
+                SetWriteParameters: setWriteParams,
+                HoistedSingletons: hoistedSingletons,
+                ParameterSlots: parameterSlots,
+                HasEntityIndexParameter: classified.HasEntityIndex,
+                HasEntityHandleParameter: classified.HasEntityHandle,
+                HasAttributeTags: attributeTagTypes.Count > 0,
+                MatchByComponents: matchByComponents,
+                HasSet: setTypes.Count > 0,
+                FirstSetTypeDisplay: firstSetDisplay,
+                AttributeCriteriaChainNoWithouts: chainNoWithouts,
+                AttributeCriteriaChainFull: chainFull,
+                Namespaces: namespaces
+            );
+        }
+
+        private static EquatableArray<string> CollectNamespaces(
+            ClassifiedParameters classified,
+            List<ITypeSymbol> attributeTagTypes,
+            List<ITypeSymbol> attributeWithoutTagTypes,
+            List<ITypeSymbol> setTypes
+        )
+        {
+            var ns = new HashSet<string>();
+
+            void Add(ITypeSymbol? sym)
             {
-                validatedParamsInfo = new ValidatedMethodInfo
-                {
-                    ComponentParameters = classified.ComponentParameters.ToList(),
-                    CustomParameters = classified.CustomParameters.ToList(),
-                    HasEntityIndexParameter = classified.HasEntityIndex,
-                    HasEntityHandleParameter = classified.HasEntityHandle,
-                    ParameterSlots = classified.ParameterSlots.ToList(),
-                    AttributeTagTypes = attributeTagTypes,
-                    AttributeWithoutTagTypes = attributeWithoutTagTypes,
-                    SetTypes = setTypes,
-                    MatchByComponents = attributeMatchByComponents,
-                    SetAccessorParameters = classified.SetAccessorParameters.ToList(),
-                    SetReadParameters = classified.SetReadParameters.ToList(),
-                    SetWriteParameters = classified.SetWriteParameters.ToList(),
-                    HoistedSingletons = classified.HoistedSingletons.ToList(),
-                };
+                if (sym == null)
+                    return;
+                var s = PerformanceCache.GetDisplayString(sym.ContainingNamespace);
+                if (!string.IsNullOrEmpty(s) && s != "System" && !s.StartsWith("System."))
+                    ns.Add(s);
             }
 
-            return isValid;
+            void AddTagWithContaining(ITypeSymbol sym)
+            {
+                Add(sym);
+                if (sym.ContainingType != null)
+                    Add(sym.ContainingType);
+            }
+
+            foreach (var p in classified.ComponentParameters)
+                Add(p.TypeSymbol);
+            foreach (var p in classified.CustomParameters)
+                Add(p.TypeSymbol);
+            foreach (var t in attributeTagTypes)
+                AddTagWithContaining(t);
+            foreach (var t in attributeWithoutTagTypes)
+                AddTagWithContaining(t);
+            foreach (var t in setTypes)
+                AddTagWithContaining(t);
+            foreach (var sa in classified.SetAccessorParameters)
+                AddTagWithContaining(sa.SetTypeArgSymbol);
+            foreach (var sr in classified.SetReadParameters)
+                AddTagWithContaining(sr.SetTypeArgSymbol);
+            foreach (var sw in classified.SetWriteParameters)
+                AddTagWithContaining(sw.SetTypeArgSymbol);
+
+            return ns.ToEquatableArray();
         }
     }
 
     /// <summary>
-    /// Data structure for ForEach method information used in incremental generation.
-    /// Carries the validation result + captured diagnostics forward from the transform
-    /// phase so that the terminal stage doesn't need access to a <see cref="Compilation"/>
-    /// or <see cref="SemanticModel"/>.
+    /// Top-level value-equatable model carried through the ForEachGenerator pipeline.
+    /// Holds everything the terminal stage needs to materialize diagnostics and emit
+    /// source — no Roslyn symbols, syntax, or raw Diagnostic objects.
     /// </summary>
-    internal class ForEachMethodData
-    {
-        public ClassDeclarationSyntax ClassDecl { get; }
-        public MethodDeclarationSyntax MethodDecl { get; }
-        public IMethodSymbol MethodSymbol { get; }
-        public bool IsValid { get; }
-        public ValidatedMethodInfo? ValidatedInfo { get; }
-        public ImmutableArray<Diagnostic> Diagnostics { get; }
+    internal readonly record struct ForEachComponentModel(
+        string ClassName,
+        string MethodName,
+        string Namespace,
+        string HintFileName,
+        EquatableArray<ContainingTypeInfo> ContainingTypes,
+        bool IsValid,
+        ForEachComponentValidation Validation,
+        EquatableArray<DiagnosticInfo> Diagnostics
+    );
 
-        public ForEachMethodData(
-            ClassDeclarationSyntax classDecl,
-            MethodDeclarationSyntax methodDecl,
-            IMethodSymbol methodSymbol,
-            bool isValid,
-            ValidatedMethodInfo? validatedInfo,
-            ImmutableArray<Diagnostic> diagnostics
-        )
-        {
-            ClassDecl = classDecl;
-            MethodDecl = methodDecl;
-            MethodSymbol = methodSymbol;
-            IsValid = isValid;
-            ValidatedInfo = validatedInfo;
-            Diagnostics = diagnostics;
-        }
+    /// <summary>
+    /// All the codegen-time inputs the iteration emit functions need. Built once at
+    /// transform time from the classified parameters + iteration-attribute criteria;
+    /// thereafter pure data.
+    /// </summary>
+    internal readonly record struct ForEachComponentValidation(
+        EquatableArray<ParameterInfoModel> ComponentParameters,
+        EquatableArray<ParameterInfoModel> CustomParameters,
+        EquatableArray<SetAccessorParameterModel> SetAccessorParameters,
+        EquatableArray<SetAccessorParameterModel> SetReadParameters,
+        EquatableArray<SetAccessorParameterModel> SetWriteParameters,
+        EquatableArray<HoistedSingletonModel> HoistedSingletons,
+        EquatableArray<ParamSlot> ParameterSlots,
+        bool HasEntityIndexParameter,
+        bool HasEntityHandleParameter,
+        bool HasAttributeTags,
+        bool MatchByComponents,
+        bool HasSet,
+        string FirstSetTypeDisplay,
+        string AttributeCriteriaChainNoWithouts,
+        string AttributeCriteriaChainFull,
+        EquatableArray<string> Namespaces
+    )
+    {
+        public static ForEachComponentValidation Empty { get; } =
+            new(
+                EquatableArray<ParameterInfoModel>.Empty,
+                EquatableArray<ParameterInfoModel>.Empty,
+                EquatableArray<SetAccessorParameterModel>.Empty,
+                EquatableArray<SetAccessorParameterModel>.Empty,
+                EquatableArray<SetAccessorParameterModel>.Empty,
+                EquatableArray<HoistedSingletonModel>.Empty,
+                EquatableArray<ParamSlot>.Empty,
+                false,
+                false,
+                false,
+                false,
+                false,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                EquatableArray<string>.Empty
+            );
     }
+
+    /// <summary>
+    /// Value-equatable projection of <see cref="Shared.ParameterInfo"/> for use in
+    /// the ForEach pipeline model.
+    /// </summary>
+    internal readonly record struct ParameterInfoModel(
+        string Type,
+        string Name,
+        bool IsRef,
+        bool IsIn
+    );
+
+    /// <summary>
+    /// Value-equatable projection of <see cref="Shared.SetAccessorParameterInfo"/> for
+    /// the ForEach pipeline model. The symbol-bearing original isn't equatable.
+    /// </summary>
+    internal readonly record struct SetAccessorParameterModel(
+        string SetTypeArg,
+        string ParamName,
+        bool IsIn
+    );
 }

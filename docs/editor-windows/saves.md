@@ -92,4 +92,4 @@ The dropdown selects which world a Save / Capture / Load operates on. Save/Captu
 
 - [Player Window](player.md) — transport, scrub, and live recording for the active world.
 - [Hierarchy Window](hierarchy.md) — sibling editor window for inspecting world state.
-- [Serialization](../advanced/serialization.md) — how managed types stored on the heap need a custom `ISerializer<T>` to round-trip into saved files.
+- [Serialization](../experimental/serialization.md) — how managed types stored on the heap need a custom `ISerializer<T>` to round-trip into saved files.

@@ -6,7 +6,7 @@ using Assert = NUnit.Framework.Assert;
 namespace Trecs.Tests
 {
     // Locks in the wire format for the abstract-T divert in
-    // BinarySerializationWriter.Write<T>/WriteDelta<T> and BinarySerializationReader.
+    // ISerializationWriter.Write<T>/WriteDelta<T> and ISerializationReader.
     // Read<T>/ReadDelta<T>: when T is abstract, the typed entry points forward
     // to the WriteObject/ReadObject family so the runtime concrete-type id is
     // emitted into the payload. Roundtripping via the typed entry points must

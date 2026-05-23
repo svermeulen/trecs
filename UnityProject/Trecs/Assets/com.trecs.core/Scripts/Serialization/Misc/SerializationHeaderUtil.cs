@@ -39,24 +39,31 @@ namespace Trecs.Internal
             BinaryReader reader
         )
         {
+            // Magic + format-version checks throw SerializationException, not
+            // TrecsDebugAssert, because they need to fire in release builds.
+            // Letting a non-Trecs payload silently pass through here would
+            // cause downstream reads to interpret arbitrary bytes as field
+            // values and produce a much more confusing failure mode.
             var magic0 = reader.ReadByte();
             var magic1 = reader.ReadByte();
-            TrecsAssert.That(
-                magic0 == MagicByte0 && magic1 == MagicByte1,
-                "Invalid serialization magic bytes — not a Trecs-serialized payload (got {0:X2}{1:X2}, expected {2:X2}{3:X2})",
-                magic0,
-                magic1,
-                MagicByte0,
-                MagicByte1
-            );
+            if (magic0 != MagicByte0 || magic1 != MagicByte1)
+            {
+                throw new SerializationException(
+                    $"Invalid serialization magic bytes — not a Trecs-serialized "
+                        + $"payload (got {magic0:X2}{magic1:X2}, expected "
+                        + $"{MagicByte0:X2}{MagicByte1:X2})."
+                );
+            }
 
             var formatVersion = reader.ReadByte();
-            TrecsAssert.That(
-                formatVersion == FormatVersion,
-                "Unsupported Trecs serialization format version {0} (expected {1}). Payload was written by a different version of Trecs.",
-                formatVersion,
-                FormatVersion
-            );
+            if (formatVersion != FormatVersion)
+            {
+                throw new SerializationException(
+                    $"Unsupported Trecs serialization format version {formatVersion} "
+                        + $"(expected {FormatVersion}). Payload was written by a different "
+                        + "version of Trecs."
+                );
+            }
 
             var version = reader.ReadInt32();
             var flags = reader.ReadInt64();

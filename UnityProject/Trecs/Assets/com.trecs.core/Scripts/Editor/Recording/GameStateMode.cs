@@ -1,7 +1,7 @@
 namespace Trecs.Internal
 {
     /// <summary>
-    /// Source axis of <see cref="TrecsGameStateController"/>: where the
+    /// Source axis of <see cref="TrecsRecordingSession"/>: where the
     /// world's frame data is coming from / going to. Orthogonal to the
     /// SystemRunner's pause/play state.
     /// </summary>

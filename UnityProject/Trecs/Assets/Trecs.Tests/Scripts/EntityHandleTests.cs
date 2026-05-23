@@ -64,7 +64,7 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(TestTags.Alpha).AssertComplete();
             var entityHandle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             var entityIndex = entityHandle.ToIndex(a);
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
@@ -80,7 +80,7 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(TestTags.Alpha).AssertComplete();
             var entityHandle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.IsTrue(entityHandle.Exists(a));
         }
@@ -93,10 +93,10 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(TestTags.Alpha).AssertComplete();
             var entityHandle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             a.RemoveEntity(entityHandle);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.IsFalse(entityHandle.Exists(a));
         }
@@ -113,11 +113,11 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 11 }).AssertComplete();
             var entityHandle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Add another entity
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.IsTrue(entityHandle.Exists(a));
             var comp = a.Component<TestInt>(entityHandle);
@@ -141,11 +141,11 @@ namespace Trecs.Tests
             var entityHandle2 = init2.Handle;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 33 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Remove the second entity
             a.RemoveEntity(entityHandle2);
-            a.SubmitEntities();
+            a.Submit();
 
             // First entity should still be valid
             NAssert.IsTrue(entityHandle1.Exists(a));
@@ -164,11 +164,11 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(partitionA).Set(new TestInt { Value = 42 }).AssertComplete();
             var entityHandle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             var entityIndex = entityHandle.ToIndex(a);
             a.SetTag<TestPartitionB>(entityIndex);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.IsTrue(entityHandle.Exists(a));
             var comp = a.Component<TestInt>(entityHandle);
@@ -194,14 +194,14 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 300 })
                 .AssertComplete();
 
-            a.SubmitEntities();
+            a.Submit();
 
             var entityHandle0 = init0.Handle;
             var entityHandle2 = init2.Handle;
 
             // Remove the middle entity (triggers swap-back)
             a.RemoveEntity(init1.Handle);
-            a.SubmitEntities();
+            a.Submit();
 
             // Both remaining entity refs should still resolve to valid entity indices
             NAssert.IsTrue(entityHandle0.Exists(a));
@@ -228,7 +228,7 @@ namespace Trecs.Tests
                 .Set(new TestVec { X = 1.0f, Y = 2.0f })
                 .AssertComplete();
             var trackedRef = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Round 1: add 5 entities, remove 2
             var roundRefs = new EntityHandle[5];
@@ -237,10 +237,10 @@ namespace Trecs.Tests
                 var r = a.AddEntity(partitionA).Set(new TestInt { Value = i }).AssertComplete();
                 roundRefs[i] = r.Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
             a.RemoveEntity(roundRefs[0]);
             a.RemoveEntity(roundRefs[2]);
-            a.SubmitEntities();
+            a.Submit();
 
             // Round 2: move tracked entity to PartitionB, add 3 more, remove 1
             a.SetTag<TestPartitionB>(trackedRef.ToIndex(a));
@@ -252,16 +252,16 @@ namespace Trecs.Tests
                     .AssertComplete();
                 round2Refs[i] = r.Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
             a.RemoveEntity(round2Refs[1]);
-            a.SubmitEntities();
+            a.Submit();
 
             // Round 3: add 5 more to PartitionA
             for (int i = 0; i < 5; i++)
             {
                 a.AddEntity(partitionA).Set(new TestInt { Value = 200 + i }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Verify tracked entity ref still resolves correctly
             NAssert.IsTrue(trackedRef.Exists(a), "Tracked entity should still exist");
@@ -281,7 +281,7 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(TestTags.Alpha).AssertComplete();
             var entityHandle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             var entityIndex1 = entityHandle.ToIndex(a);
             var entityIndex2 = entityHandle.ToIndex(a);

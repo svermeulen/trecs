@@ -188,12 +188,17 @@ namespace Trecs.Internal
                 EntriesPerGroup = collection._entriesPerGroup,
                 RegisteredGroups = collection._registeredGroups,
                 ClearRequested = collection._jobClearRequested,
-                RequireDeterministic = world.RequireDeterministicSubmission,
             };
             var flushHandle = flushJob.Schedule(handle);
 
+            var name = SetFlushJobName<TSet>.Value;
             for (int i = 0; i < collection._registeredGroups.Length; i++)
-                scheduler.TrackJobWrite(flushHandle, rid, collection._registeredGroups[i]);
+                scheduler.TrackJobWrite(flushHandle, rid, collection._registeredGroups[i], name);
+        }
+
+        static class SetFlushJobName<TSet>
+        {
+            public static readonly string Value = "SetFlushJob<" + typeof(TSet).Name + ">";
         }
 
         // ── NativeEntitySetIndices (read-only set indices for one group) ──
@@ -251,8 +256,14 @@ namespace Trecs.Internal
             var rid = ResourceId.Set(setId);
             var scheduler = world.JobScheduler;
             ref var collection = ref world.GetSetForJobScheduling(setId);
+            var name = SetReadName<TSet>.Value;
             for (int i = 0; i < collection._registeredGroups.Length; i++)
-                scheduler.TrackJobRead(handle, rid, collection._registeredGroups[i]);
+                scheduler.TrackJobRead(handle, rid, collection._registeredGroups[i], name);
+        }
+
+        static class SetReadName<TSet>
+        {
+            public static readonly string Value = "SetRead<" + typeof(TSet).Name + ">";
         }
 
         // ── Sparse iteration helpers ──

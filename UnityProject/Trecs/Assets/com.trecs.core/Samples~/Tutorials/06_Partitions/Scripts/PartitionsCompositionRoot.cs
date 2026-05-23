@@ -43,12 +43,7 @@ namespace Trecs.Samples.Partitions
 
             var sceneInitializer = new SceneInitializer(world, BallCount, SpawnRadius, goManager);
 
-            initializables = new()
-            {
-                world.Initialize,
-                sceneInitializer.Initialize,
-                world.SubmitEntities,
-            };
+            initializables = new() { world.Initialize, sceneInitializer.Initialize, world.Submit };
 
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };

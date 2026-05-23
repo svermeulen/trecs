@@ -28,6 +28,16 @@ internal static class TrecsStubs
         // to exist as namespaces or every generated file fails to compile.
         namespace Trecs.Collections { }
 
+        // [NativeContainer] marker from Unity.Collections.LowLevel.Unsafe — used by the
+        // ImmutableAnalyzer's struct-mutation-surface check to fast-path reject writable
+        // native containers (NativeArray<T>, NativeSlice<T>, NativeHashMap<K, V>, …) as
+        // unsafe to expose on [Immutable] types. Real type lives in com.unity.collections.
+        namespace Unity.Collections.LowLevel.Unsafe
+        {
+            [System.AttributeUsage(System.AttributeTargets.Struct)]
+            public sealed class NativeContainerAttribute : System.Attribute { }
+        }
+
         // Subset of Unity.Collections used by attributes the generators emit. Real type is
         // [NativeDisableParallelForRestriction] from com.unity.collections — we only need
         // the attribute shell so the emitted decoration parses.
@@ -68,8 +78,9 @@ internal static class TrecsStubs
             }
             public interface IJob { void Execute(); }
             public interface IJobFor { void Execute(int index); }
+            public interface IJobParallelForBatch { void Execute(int startIndex, int count); }
 
-            // Generated job code calls `_trecs_job.ScheduleParallel(count, batchSize, deps)` —
+            // Generated job code calls `__trecs_job.ScheduleParallel(count, batchSize, deps)` —
             // mirrors Unity's IJobForExtensions.ScheduleParallel<T>(this T, int, int, JobHandle).
             public static class IJobForExtensions
             {
@@ -79,14 +90,123 @@ internal static class TrecsStubs
                 public static JobHandle Schedule<T>(this T jobData, JobHandle dependsOn)
                     where T : struct, IJob => default;
             }
+
+            // Mirrors Unity.Jobs.IJobParallelForBatchExtensions.ScheduleParallel<T>
+            // (com.unity.collections). AutoJobGenerator's emit calls
+            // `job.ScheduleParallel(count, batchSize, deps)` and overload resolution
+            // picks this when the job struct implements IJobParallelForBatch.
+            public static class IJobParallelForBatchExtensions
+            {
+                public static JobHandle ScheduleParallel<T>(
+                    this T jobData, int arrayLength, int indicesPerJobCount, JobHandle dependsOn
+                ) where T : struct, IJobParallelForBatch => default;
+            }
         }
 
-        // Tiny shim so Unity.Jobs.JobHandle.CombineDependencies(NativeArray<>) resolves —
-        // generators reference NativeArray indirectly via this overload. Real type is
-        // Unity.Collections.NativeArray<T>.
+        // Subset of Unity.Collections used by the source generators and by the
+        // ImmutableAnalyzer's external-library allowlist. Real types live in
+        // com.unity.collections (NativeHashMap/HashSet/Parallel*) and in
+        // UnityEngine.CoreModule (NativeArray<T>). The stubs mirror the public
+        // shape — including the nested `.ReadOnly` views and a writable
+        // indexer setter on `NativeArray<T>` — so analyzer/generator tests can
+        // reference the types without dragging Unity in.
+        //
+        // Each nested `.ReadOnly` carries an `internal unsafe void* _buffer`
+        // field — Unity's real ReadOnly views store an unmanaged pointer plus
+        // a safety handle. Modeling the pointer makes the safe-type walker
+        // reject them structurally (pointer types are neither value nor
+        // reference types in Roslyn's sense and fall through to "unsafe"),
+        // which is what forces the ImmutableAnalyzer's external-library
+        // allowlist to do real work. Without the pointer field the structs
+        // would be field-less and trivially pass the walker, hiding any
+        // regression where the allowlist gets bypassed (TRECS126/127 on
+        // these views would silently still pass).
         namespace Unity.Collections
         {
-            public struct NativeArray<T> where T : struct { }
+            [Unity.Collections.LowLevel.Unsafe.NativeContainer]
+            public struct NativeArray<T> : System.IDisposable where T : struct
+            {
+                public int Length => 0;
+                public T this[int index] { get { return default!; } set { } }
+                public void Dispose() { }
+                public ReadOnly AsReadOnly() => default;
+
+                public struct ReadOnly
+                {
+                    public int Length => 0;
+                    public T this[int index] => default!;
+                    internal unsafe void* _buffer;
+                }
+            }
+
+            [Unity.Collections.LowLevel.Unsafe.NativeContainer]
+            public struct NativeHashMap<TKey, TValue> : System.IDisposable
+                where TKey : unmanaged, System.IEquatable<TKey>
+                where TValue : unmanaged
+            {
+                public TValue this[TKey key] { get { return default!; } set { } }
+                public void Dispose() { }
+                public ReadOnly AsReadOnly() => default;
+
+                public struct ReadOnly
+                {
+                    public bool TryGetValue(TKey key, out TValue value) { value = default!; return false; }
+                    internal unsafe void* _buffer;
+                }
+            }
+
+            [Unity.Collections.LowLevel.Unsafe.NativeContainer]
+            public struct NativeHashSet<T> : System.IDisposable
+                where T : unmanaged, System.IEquatable<T>
+            {
+                public void Dispose() { }
+                public ReadOnly AsReadOnly() => default;
+
+                public struct ReadOnly
+                {
+                    public bool Contains(T item) => false;
+                    internal unsafe void* _buffer;
+                }
+            }
+
+            [Unity.Collections.LowLevel.Unsafe.NativeContainer]
+            public struct NativeParallelHashMap<TKey, TValue> : System.IDisposable
+                where TKey : unmanaged, System.IEquatable<TKey>
+                where TValue : unmanaged
+            {
+                public TValue this[TKey key] { get { return default!; } set { } }
+                public void Dispose() { }
+                public ReadOnly AsReadOnly() => default;
+
+                public struct ReadOnly
+                {
+                    public bool TryGetValue(TKey key, out TValue value) { value = default!; return false; }
+                    internal unsafe void* _buffer;
+                }
+            }
+
+            [Unity.Collections.LowLevel.Unsafe.NativeContainer]
+            public struct NativeParallelMultiHashMap<TKey, TValue> : System.IDisposable
+                where TKey : unmanaged, System.IEquatable<TKey>
+                where TValue : unmanaged
+            {
+                public void Dispose() { }
+                public ReadOnly AsReadOnly() => default;
+
+                public struct ReadOnly
+                {
+                    internal unsafe void* _buffer;
+                }
+            }
+
+            // NativeSlice<T> is NOT in the allowlist — its indexer has a setter.
+            // Stub included so the negative test can name the type.
+            [Unity.Collections.LowLevel.Unsafe.NativeContainer]
+            public struct NativeSlice<T> where T : struct
+            {
+                public int Length => 0;
+                public T this[int index] { get { return default!; } set { } }
+            }
         }
 
         namespace Trecs
@@ -97,6 +217,16 @@ internal static class TrecsStubs
             public interface ITag { }
             public interface IEntitySet { }
             public interface ITemplate { }
+
+            // [NonCopyable] / [Copyable] — picked up by NonCopyableAnalyzer
+            // (TRECS118-120) via attribute + IEntityComponent lookup on the target.
+            // Real types live at com.trecs.core/Scripts/SourceGen/NonCopyableAttribute.cs
+            // and CopyableAttribute.cs.
+            [System.AttributeUsage(System.AttributeTargets.Struct)]
+            public sealed class NonCopyableAttribute : System.Attribute { }
+
+            [System.AttributeUsage(System.AttributeTargets.Struct)]
+            public sealed class CopyableAttribute : System.Attribute { }
 
             // EntityIndex — handle used by aspect / iteration plumbing.
             // Real type lives at com.trecs.core/Scripts/Entities/EntityIndex.cs in the
@@ -110,7 +240,7 @@ internal static class TrecsStubs
 
                 public EntityIndex(int index, GroupIndex group) { Index = index; GroupIndex = group; }
 
-                // Aspect ctors call `_entityIndex.WithIndex(...)` to advance the index field
+                // Aspect ctors call `__entityIndex.WithIndex(...)` to advance the index field
                 // during iteration without rebuilding the GroupIndex.
                 public EntityIndex WithIndex(int index) => new EntityIndex(index, GroupIndex);
 
@@ -120,7 +250,7 @@ internal static class TrecsStubs
                 public EntityHandle ToHandle(NativeWorldAccessor world) => default;
 
                 // Entity-targeted ops — generated aspect SetTag/UnsetTag delegate to
-                // `_entityIndex.SetTag<T>(world)` / `_entityIndex.UnsetTag<T>(world)`.
+                // `__entityIndex.SetTag<T>(world)` / `__entityIndex.UnsetTag<T>(world)`.
                 public void SetTag<T>(WorldAccessor world) where T : struct, ITag { }
                 public void SetTag<T>(in NativeWorldAccessor world) where T : struct, ITag { }
                 public void UnsetTag<T>(WorldAccessor world) where T : struct, ITag { }
@@ -453,10 +583,10 @@ internal static class TrecsStubs
             public readonly struct NativeSetRead<T> where T : struct, IEntitySet { }
             public readonly struct NativeSetWrite<T> where T : struct, IEntitySet { }
 
-            // Main-thread set read/write views. ParameterClassifier recognizes these
-            // in [WrapAsJob] methods and emits TRECS098. The iterating gateway
-            // SetAccessor<T> is stubbed above. Real types live in
-            // com.trecs.core/Scripts/Sets/.
+            // Main-thread set accessors. ParameterClassifier recognizes these in
+            // [WrapAsJob] methods and emits TRECS098. SetRead is read-only; SetWrite is
+            // read-write. Real types live in com.trecs.core/Scripts/Sets/.
+            // (SetAccessor<T> itself is declared above with its full member surface.)
             public readonly struct SetRead<T> where T : struct, IEntitySet { }
             public readonly struct SetWrite<T> where T : struct, IEntitySet { }
 
@@ -562,7 +692,7 @@ internal static class TrecsStubs
             }
 
             // WorldAccessor — declared as a class so AutoSystemGenerator's emitted
-            // `WorldAccessor _world;` field and `WorldAccessor World => _world;` property
+            // `WorldAccessor __world;` field and `WorldAccessor World => __world;` property
             // resolve. Aspect machinery additionally needs Query/ComponentBuffer/MoveTo/Set;
             // job machinery needs the *ForJob accessors that return tuples (the buffer +
             // its current count for jobs that read the count).
@@ -730,7 +860,63 @@ internal static class TrecsStubs
                 public static TagSet Value { get; }
             }
 
-            public enum MissingInputBehavior { ResetToDefault, KeepLast }
+            // Mirrors Packages/com.trecs.core/Scripts/Systems/Attributes.cs.
+            public enum MissingInputBehavior { Reset, Retain }
+
+            // Mirrors heap pointer types from
+            // Packages/com.trecs.core/Scripts/Heap/{NativeUniquePtr,NativeSharedPtr,
+            // UniquePtr,SharedPtr,InputNativeUniquePtr,InputNativeSharedPtr,
+            // InputUniquePtr,InputSharedPtr,TrecsList}.cs — only the type symbol
+            // (name + namespace + single type-argument) is what TemplateValidator
+            // pattern-matches on.
+            public readonly struct NativeUniquePtr<T> where T : unmanaged { }
+            public readonly struct NativeSharedPtr<T> where T : unmanaged { }
+            public readonly struct UniquePtr<T> where T : class { }
+            public readonly struct SharedPtr<T> where T : class { }
+            public readonly struct InputNativeUniquePtr<T> where T : unmanaged { }
+            public readonly struct InputNativeSharedPtr<T> where T : unmanaged { }
+            public readonly struct InputUniquePtr<T> where T : class { }
+            public readonly struct InputSharedPtr<T> where T : class { }
+            public readonly struct TrecsList<T> where T : unmanaged { }
+
+            // NativeSharedRead<T> — safety-checked read view returned by NativeSharedPtr<T>.Read(...).
+            // Real type at Packages/com.trecs.core/Scripts/Heap/NativeSharedRead.cs. Stubbed here
+            // so NativeSharedPtrImmutabilityAnalyzer tests can reference it.
+            public readonly struct NativeSharedRead<T> where T : unmanaged { }
+
+            // Non-generic static helper class hosting the Alloc/Acquire/TryGet/etc factories
+            // for the generic NativeSharedPtr<T> struct above. The analyzer recognizes it as
+            // a static factory site so a call like NativeSharedPtr.Alloc<Bad>(...) is rejected
+            // even before the returned handle is stored anywhere.
+            public static class NativeSharedPtr
+            {
+                public static NativeSharedPtr<T> Alloc<T>(in T value)
+                    where T : unmanaged => default;
+            }
+
+            // Marker that gates a managed type for use behind SharedPtr<T>.
+            // ImmutableAnalyzer (TRECS125/126/127) keys on attribute name + Trecs namespace.
+            [System.AttributeUsage(
+                System.AttributeTargets.Class | System.AttributeTargets.Interface,
+                AllowMultiple = false,
+                Inherited = false
+            )]
+            public sealed class ImmutableAttribute : System.Attribute { }
+
+            // Suppression marker for TRECS127. ImmutableAnalyzer looks up only
+            // (name, namespace).
+            [System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+            public sealed class AllowMutableReturnAttribute : System.Attribute
+            {
+            }
+
+            // Non-generic static helper for SharedPtr<T> (mirrors Trecs.NativeSharedPtr).
+            // The factories themselves don't matter to the analyzer — only that they exist
+            // as generic static methods on a class named SharedPtr in the Trecs namespace.
+            public static class SharedPtr
+            {
+                public static SharedPtr<T> Alloc<T>(T value) where T : class => default;
+            }
 
             // ----- InterpolatorInstaller surface -----
             // InterpolatorInstallerGenerator emits a WorldBuilder extension method
@@ -807,10 +993,10 @@ internal static class TrecsStubs
                 void Shutdown();
             }
 
-            // TrecsAssert.That — generated code (e.g. AutoSystemGenerator's World setter, aspect
+            // TrecsDebugAssert.That — generated code (e.g. AutoSystemGenerator's World setter, aspect
             // Query DSLs) uses this for runtime invariants. Real signature lives at
-            // com.trecs.core/Scripts/Util/TrecsAssert.cs.
-            public static class TrecsAssert
+            // com.trecs.core/Scripts/Util/TrecsDebugAssert.cs.
+            public static class TrecsDebugAssert
             {
                 public static void That(bool condition) { }
                 public static void That(bool condition, string message) { }
@@ -840,19 +1026,19 @@ internal static class TrecsStubs
 
             // ----- Job scheduling surface -----
             // Generated job code threads dependency tracking through a JobScheduler returned
-            // by WorldAccessor.GetJobSchedulerForJob(). ResourceId / ComponentTypeId<T>
+            // by WorldAccessor.GetJobSchedulerForJob(). ResourceId / TypeId<T>
             // identify which component-on-which-group a job touches.
 
             public readonly struct ResourceId
             {
-                public static ResourceId Component(ComponentTypeId componentType) => default;
+                public static ResourceId Component(TypeId id) => default;
             }
 
-            public readonly struct ComponentTypeId { }
+            public readonly struct TypeId { }
 
-            public static class ComponentTypeId<T> where T : unmanaged, IEntityComponent
+            public static class TypeId<T> where T : unmanaged, IEntityComponent
             {
-                public static ComponentTypeId Value => default;
+                public static TypeId Value => default;
             }
 
             public class JobScheduler
@@ -863,9 +1049,9 @@ internal static class TrecsStubs
                 public Unity.Jobs.JobHandle IncludeWriteDep(
                     Unity.Jobs.JobHandle deps, ResourceId res, GroupIndex group
                 ) => default;
-                public void TrackJobRead(Unity.Jobs.JobHandle handle, ResourceId res, GroupIndex group) { }
-                public void TrackJobWrite(Unity.Jobs.JobHandle handle, ResourceId res, GroupIndex group) { }
-                public void TrackJob(Unity.Jobs.JobHandle handle) { }
+                public void TrackJobRead(Unity.Jobs.JobHandle handle, ResourceId res, GroupIndex group, string name = null) { }
+                public void TrackJobWrite(Unity.Jobs.JobHandle handle, ResourceId res, GroupIndex group, string name = null) { }
+                public void TrackJob(Unity.Jobs.JobHandle handle, string name = null) { }
 
                 // Disposes a per-job lookup once all in-flight jobs that touched it complete.
                 // Generic so it accepts the lookup-of-T returned by CreateNativeComponentLookup*ForJob.

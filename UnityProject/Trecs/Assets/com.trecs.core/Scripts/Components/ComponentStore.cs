@@ -17,23 +17,21 @@ namespace Trecs.Internal
         // serializer's eager pre-materialize for snapshot/recording reads. A
         // direct array index replaces the old Dict<GroupIndex, ...> hash
         // lookup on the hot path.
-        readonly DenseDictionary<ComponentId, IComponentArray>[] _groupEntityComponentsDB;
+        readonly DenseDictionary<TypeId, IComponentArray>[] _groupEntityComponentsDB;
 
         bool _configurationFrozen;
 
         public ComponentStore(TrecsLog log, int groupCount)
         {
             _log = log;
-            _groupEntityComponentsDB = new DenseDictionary<ComponentId, IComponentArray>[
-                groupCount
-            ];
+            _groupEntityComponentsDB = new DenseDictionary<TypeId, IComponentArray>[groupCount];
             for (int i = 0; i < groupCount; i++)
             {
-                _groupEntityComponentsDB[i] = new DenseDictionary<ComponentId, IComponentArray>();
+                _groupEntityComponentsDB[i] = new DenseDictionary<TypeId, IComponentArray>();
             }
         }
 
-        public DenseDictionary<ComponentId, IComponentArray>[] GroupEntityComponentsDB =>
+        public DenseDictionary<TypeId, IComponentArray>[] GroupEntityComponentsDB =>
             _groupEntityComponentsDB;
 
         public bool ConfigurationFrozen => _configurationFrozen;
@@ -49,7 +47,7 @@ namespace Trecs.Internal
         /// populated by <see cref="PreallocateDBGroup"/>.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public DenseDictionary<ComponentId, IComponentArray> GetDBGroup(GroupIndex groupId)
+        public DenseDictionary<TypeId, IComponentArray> GetDBGroup(GroupIndex groupId)
         {
             return _groupEntityComponentsDB[groupId.Index];
         }
@@ -57,8 +55,8 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IComponentArray GetOrAddTypeSafeDictionary(
             GroupIndex groupId,
-            DenseDictionary<ComponentId, IComponentArray> groupPerComponentType,
-            ComponentId typeId,
+            DenseDictionary<TypeId, IComponentArray> groupPerComponentType,
+            TypeId typeId,
             IComponentArray fromDictionary
         )
         {
@@ -92,13 +90,13 @@ namespace Trecs.Internal
         )
         {
             var numberOfEntityComponents = entityComponentsToBuild.Length;
-            DenseDictionary<ComponentId, IComponentArray> group = GetDBGroup(groupId);
+            DenseDictionary<TypeId, IComponentArray> group = GetDBGroup(groupId);
             group.EnsureCapacity(numberOfEntityComponents);
 
             for (var index = 0; index < numberOfEntityComponents; index++)
             {
                 var entityComponentBuilder = entityComponentsToBuild[index];
-                var entityComponentType = entityComponentBuilder.ComponentId;
+                var entityComponentType = entityComponentBuilder.TypeId;
 
                 var components = group.GetOrAdd(
                     entityComponentType,

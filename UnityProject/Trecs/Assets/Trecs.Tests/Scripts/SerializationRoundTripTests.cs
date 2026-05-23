@@ -17,7 +17,7 @@ namespace Trecs.Tests
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 11 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
@@ -30,7 +30,7 @@ namespace Trecs.Tests
 
             // Mutate after saving so we can verify the load reverts state
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 0 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(3, a.CountEntitiesWithTags(TestTags.Alpha));
 
             stream.Position = 0;
@@ -55,7 +55,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 11 }).AssertComplete();
             // Toss in a native-unique allocation so the chunk-store path is exercised.
             var ptr = NativeUniquePtr.Alloc<int>(a.Heap, 42);
-            a.SubmitEntities();
+            a.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
@@ -83,7 +83,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
@@ -107,7 +107,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 13 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
@@ -270,7 +270,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var ptr = NativeUniquePtr.Alloc<int>(a.Heap, 42);
-            a.SubmitEntities();
+            a.Submit();
             var savedHandle = ptr.Handle;
 
             var registry = new SerializerRegistry();
@@ -284,9 +284,9 @@ namespace Trecs.Tests
             // Mutate after save: dispose the original, allocate something else so the heap's
             // state is genuinely different at load time.
             ptr.Dispose(a);
-            a.SubmitEntities();
+            a.Submit();
             var sideEffect = NativeUniquePtr.Alloc<int>(a.Heap, 99);
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(99, sideEffect.Read(a.Heap).Value);
 
             // Load — should restore the original handle exactly.
@@ -308,7 +308,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var list = TrecsList.Alloc<int>(a.Heap);
-            a.SubmitEntities();
+            a.Submit();
             var savedHandle = list.Handle;
 
             var registry = new SerializerRegistry();
@@ -320,7 +320,7 @@ namespace Trecs.Tests
             snapshots.SaveSnapshot(version: 1, stream: stream);
 
             list.Dispose(a);
-            a.SubmitEntities();
+            a.Submit();
 
             stream.Position = 0;
             snapshots.LoadSnapshot(stream);
@@ -350,7 +350,7 @@ namespace Trecs.Tests
             w.Add(11);
             w.Add(22);
             w.Add(33);
-            a.SubmitEntities();
+            a.Submit();
             var savedHandle = list.Handle;
 
             var registry = new SerializerRegistry();
@@ -363,7 +363,7 @@ namespace Trecs.Tests
 
             // Mutate after save.
             list.Dispose(a);
-            a.SubmitEntities();
+            a.Submit();
 
             stream.Position = 0;
             snapshots.LoadSnapshot(stream);

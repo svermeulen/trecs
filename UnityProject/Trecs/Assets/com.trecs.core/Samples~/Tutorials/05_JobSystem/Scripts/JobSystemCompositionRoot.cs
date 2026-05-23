@@ -50,10 +50,13 @@ namespace Trecs.Samples.JobSystem
                 )
                 .Build();
 
+            var inputSystem = new InputSystem();
+
             world.AddSystems(
                 new ISystem[]
                 {
-                    new InputSystem(MinParticleCount, MaxParticleCount),
+                    inputSystem,
+                    new ApplyControlInputSystem(MinParticleCount, MaxParticleCount),
                     new ParticleSpawnerSystem(
                         AreaSize,
                         MaxSpeed,
@@ -69,7 +72,7 @@ namespace Trecs.Samples.JobSystem
             );
 
             initializables = new() { world.Initialize };
-            tickables = new() { world.Tick };
+            tickables = new() { inputSystem.Tick, world.Tick };
             lateTickables = new() { world.LateTick };
             disposables = new() { world.Dispose };
         }

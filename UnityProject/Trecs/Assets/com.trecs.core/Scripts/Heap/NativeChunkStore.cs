@@ -9,7 +9,9 @@ namespace Trecs.Internal
 {
     /// <summary>
     /// Paged-slab allocator with bucketed size classes, used as the shared backing for
-    /// <c>NativeUniqueHeap</c>, <c>FrameScopedNativeUniqueHeap</c>, and <c>TrecsListHeap</c>.
+    /// persistent <see cref="NativeUniquePtr{T}"/> and <see cref="TrecsList{T}"/>.
+    /// Per-frame input-allocated unmanaged data lives in
+    /// <see cref="InputNativeUniqueHeap"/>, not in this chunk store.
     ///
     /// <para>
     /// Allocations are bucketed by power-of-two size. Each bucket owns a list of pages,
@@ -56,7 +58,7 @@ namespace Trecs.Internal
     ///     <see cref="Deserialize"/>, <see cref="Dispose"/>. These free backing memory
     ///     or rebuild internal state in a transient way that would tear concurrent
     ///     reads. Trecs's standard step model satisfies this by blocking on outstanding
-    ///     jobs before each <c>SubmitEntities</c> call.
+    ///     jobs before each <c>Submit</c> call.
     ///   </item>
     /// </list>
     /// </summary>
@@ -102,6 +104,12 @@ namespace Trecs.Internal
         // with two slots aliasing the same memory; freeing either leaves the other dangling).
         // Removed when the slot is released. Debug-only — release builds skip the check.
         readonly HashSet<IntPtr> _externalAddresses = new();
+
+        // (handle.Value → call site that allocated it). Populated by Alloc / AllocExternal
+        // via [CallerFilePath] / [CallerLineNumber] attributes baked into the IL at user
+        // call sites; consumed by the Dispose-time leak warning to give actionable
+        // attribution. Debug-only — release builds skip both the tracking and the warning.
+        readonly Dictionary<uint, (string File, int Line)> _callerInfoByHandle = new();
 #endif
 
         // Chunked side table: a fixed-capacity directory of pointers to fixed-size
@@ -151,7 +159,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_isDisposed);
+                TrecsDebugAssert.That(!_isDisposed);
                 return _liveCount;
             }
         }
@@ -160,7 +168,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_isDisposed);
+                TrecsDebugAssert.That(!_isDisposed);
                 return _pages.Count - _freePageIds.Count;
             }
         }
@@ -172,8 +180,8 @@ namespace Trecs.Internal
         /// </summary>
         internal HeapStatistics GetStatistics()
         {
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "NativeChunkStore.GetStatistics must be called from the main thread"
             );
@@ -240,11 +248,87 @@ namespace Trecs.Internal
             };
         }
 
+        /// <summary>
+        /// Per-page occupancy snapshot — one <see cref="PageOccupancyHeader"/> per
+        /// currently-allocated page, plus a flat bool span recording per-slot in-use
+        /// state. Intended for the heap-stress HUD's fragmentation visualisation;
+        /// not part of the public Trecs API surface.
+        ///
+        /// <para>Caller owns the output lists and is expected to reuse them across
+        /// calls. Each call clears them and refills. Walking the side table to mark
+        /// live slots is O(sideTableLength), so prefer to call this at the same low
+        /// cadence as <see cref="GetStatistics"/> rather than per frame.</para>
+        /// </summary>
+        internal void SnapshotPageOccupancy(
+            List<PageOccupancyHeader> outPages,
+            List<bool> outLiveSlots
+        )
+        {
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(
+                UnityThreadHelper.IsMainThread,
+                "NativeChunkStore.SnapshotPageOccupancy must be called from the main thread"
+            );
+            TrecsDebugAssert.That(outPages != null && outLiveSlots != null);
+
+            outPages.Clear();
+            outLiveSlots.Clear();
+
+            // Pass 1: reserve a header + per-slot bool block for each live page.
+            // pageIdToHeaderIdx is keyed by raw pageId (which may have gaps due to
+            // reclaimed pages) and maps into the dense outPages list.
+            var pageIdToHeaderIdx = new int[_pages.Count];
+            for (int pageId = 0; pageId < _pages.Count; pageId++)
+            {
+                var page = _pages[pageId];
+                if (page == null)
+                {
+                    pageIdToHeaderIdx[pageId] = -1;
+                    continue;
+                }
+                pageIdToHeaderIdx[pageId] = outPages.Count;
+                outPages.Add(
+                    new PageOccupancyHeader
+                    {
+                        PageId = pageId,
+                        BucketIdx = page.BucketIdx,
+                        SlotSize = page.SlotSize,
+                        SlotCount = page.SlotCount,
+                        FreeCount = page.FreeCount,
+                        LiveSlotsStartIndex = outLiveSlots.Count,
+                    }
+                );
+                for (int s = 0; s < page.SlotCount; s++)
+                {
+                    outLiveSlots.Add(false);
+                }
+            }
+
+            // Pass 2: walk the side table and mark each live entry's slot. Skip
+            // slot 0 (the reserved null sentinel).
+            for (int i = 1; i < _sideTableLength; i++)
+            {
+                var entry = GetEntry(i);
+                if (entry.InUse != 1)
+                {
+                    continue;
+                }
+                var headerIdx = pageIdToHeaderIdx[entry.PageId];
+                TrecsDebugAssert.That(
+                    headerIdx >= 0,
+                    "SnapshotPageOccupancy: live entry references reclaimed page {0}",
+                    entry.PageId
+                );
+                var header = outPages[headerIdx];
+                outLiveSlots[header.LiveSlotsStartIndex + entry.SlotIndex] = true;
+            }
+        }
+
         public ref NativeChunkStoreResolver Resolver
         {
             get
             {
-                TrecsAssert.That(!_isDisposed);
+                TrecsDebugAssert.That(!_isDisposed);
                 return ref _resolver;
             }
         }
@@ -258,28 +342,48 @@ namespace Trecs.Internal
         /// so any Burst job scheduled afterwards with this handle can resolve it immediately.</para>
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public PtrHandle Alloc(int size, int alignment, int typeHash)
+        public PtrHandle Alloc(
+            int size,
+            int alignment,
+            int typeHash,
+            [CallerFilePath] string callerFile = null,
+            [CallerLineNumber] int callerLine = 0
+        )
         {
-            return Alloc(size, alignment, typeHash, out _);
+            return Alloc(size, alignment, typeHash, out _, callerFile, callerLine);
         }
 
         /// <summary>
-        /// Same as <see cref="Alloc(int, int, int)"/>, but additionally returns the slot's
-        /// address in <paramref name="address"/>. Callers that need to write the initial
-        /// value into the allocation should use this overload to avoid an immediate
+        /// Same as <see cref="Alloc(int, int, int, string, int)"/>, but additionally returns
+        /// the slot's address in <paramref name="address"/>. Callers that need to write the
+        /// initial value into the allocation should use this overload to avoid an immediate
         /// follow-up <see cref="ResolveEntry"/>.
+        ///
+        /// <para><paramref name="callerFile"/> / <paramref name="callerLine"/> are filled by
+        /// the compiler at the call site (<c>[CallerFilePath]</c> / <c>[CallerLineNumber]</c>);
+        /// pass them through explicitly when forwarding from a wrapper so the recorded site
+        /// is the user's, not the wrapper's. Stored under <c>ENABLE_UNITY_COLLECTIONS_CHECKS</c>
+        /// only; the leak warning at <see cref="Dispose"/> renders them to make the warning
+        /// actionable.</para>
         /// </summary>
-        public unsafe PtrHandle Alloc(int size, int alignment, int typeHash, out IntPtr address)
+        public unsafe PtrHandle Alloc(
+            int size,
+            int alignment,
+            int typeHash,
+            out IntPtr address,
+            [CallerFilePath] string callerFile = null,
+            [CallerLineNumber] int callerLine = 0
+        )
         {
             using var _ = TrecsProfiling.Start("NativeChunkStore.Alloc");
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(size > 0, "Allocation size must be positive");
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(size > 0, "Allocation size must be positive");
+            TrecsDebugAssert.That(
                 alignment > 0 && (alignment & (alignment - 1)) == 0,
                 "Alignment {0} must be a positive power of two",
                 alignment
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "NativeChunkStore.Alloc must be called from the main thread"
             );
@@ -355,6 +459,16 @@ namespace Trecs.Internal
             SetEntry(sideTableIdx, newEntry);
             _liveCount++;
 
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            // Stash the user's call site so the Dispose-time leak warning can render it.
+            // callerFile is null for callers that don't propagate (raw internal use); the
+            // warning renders those as "<unknown caller>".
+            if (callerFile != null)
+            {
+                _callerInfoByHandle[handleValue] = (callerFile, callerLine);
+            }
+#endif
+
             _log.Trace(
                 "Alloc: handle={0} bucket={1} page={2} slot={3} addr={4}",
                 handleValue,
@@ -390,27 +504,27 @@ namespace Trecs.Internal
         /// after the callback returns. Prefer a static method assigned to a static readonly
         /// field to avoid per-call GC allocation from closure capture.</para>
         /// </summary>
-        public void Free(PtrHandle handle, Action<NativeChunkStoreEntry> onDrained = null)
+        public void Free(PtrHandle handle)
         {
             using var _ = TrecsProfiling.Start("NativeChunkStore.Free");
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(!handle.IsNull, "Attempted to free null PtrHandle");
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!handle.IsNull, "Attempted to free null PtrHandle");
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "NativeChunkStore.Free must be called from the main thread"
             );
 
             NativeChunkStoreResolver.DecodeHandle(handle, out var idxU, out var gen);
             var idx = (int)idxU;
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 idx < _sideTableLength,
                 "Free: handle {0} side-table index {1} out of range",
                 handle.Value,
                 idx
             );
             var entry = GetEntry(idx);
-            TrecsAssert.That(entry.InUse == 1, "Free: handle {0} already freed", handle.Value);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(entry.InUse == 1, "Free: handle {0} already freed", handle.Value);
+            TrecsDebugAssert.That(
                 entry.Generation == gen,
                 "Free: stale handle {0} (slot gen {1})",
                 handle.Value,
@@ -425,10 +539,6 @@ namespace Trecs.Internal
             AtomicSafetyHandle.Release(entry.Safety);
 #endif
 
-            // Run caller cleanup while the entry's Address still points at live memory
-            // (chunk store hasn't called AllocatorManager.Free on huge/external pages yet).
-            onDrained?.Invoke(entry);
-
             entry.InUse = 0;
             entry.Address = IntPtr.Zero;
             SetEntry(idx, entry);
@@ -436,6 +546,11 @@ namespace Trecs.Internal
             ReturnSlot(entry.PageId, entry.SlotIndex, entry.OwnsWholePage != 0);
             _freeSideTableSlots.Push(idx);
             _liveCount--;
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            // Free is silent on miss — not every slot was registered with caller info
+            // (e.g. allocations from internal code that didn't propagate [CallerFilePath]).
+            _callerInfoByHandle.Remove(handle.Value);
+#endif
             _log.Trace("Free: handle={0}", handle.Value);
         }
 
@@ -446,9 +561,9 @@ namespace Trecs.Internal
         /// </summary>
         public NativeChunkStoreEntry ResolveEntry(PtrHandle handle)
         {
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(!handle.IsNull, "Attempted to resolve null PtrHandle");
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!handle.IsNull, "Attempted to resolve null PtrHandle");
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "NativeChunkStore.ResolveEntry is main-thread only; jobs use NativeChunkStoreResolver"
             );
@@ -464,8 +579,8 @@ namespace Trecs.Internal
         internal int ReclaimEmptyPages()
         {
             using var _ = TrecsProfiling.Start("NativeChunkStore.ReclaimEmptyPages");
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(UnityThreadHelper.IsMainThread);
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
 
             int reclaimed = 0;
             for (int pageId = 0; pageId < _pages.Count; pageId++)
@@ -492,13 +607,16 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            TrecsAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!_isDisposed);
 
-            // Any side-table slots still in use indicate leaked allocations. Release
-            // their safety handles so the safety system's slot table doesn't leak,
-            // even though we can't return their bucket slots cleanly without knowing
-            // who still references them.
+            // Any side-table slots still in use indicate leaked allocations. Render a
+            // single grouped warning (type + call site + occurrence count), then release
+            // their safety handles so the safety system's slot table doesn't leak.
+            // (Bucket slots themselves are reclaimed by the unconditional FreePage loop
+            // below, regardless of leak state.)
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
+            WarnAboutLiveLeaks();
+
             for (int i = 1; i < _sideTableLength; i++)
             {
                 var entry = GetEntry(i);
@@ -507,6 +625,7 @@ namespace Trecs.Internal
                     AtomicSafetyHandle.EnforceAllBufferJobsHaveCompletedAndRelease(entry.Safety);
                 }
             }
+            _callerInfoByHandle.Clear();
 #endif
 
             // Free every page we still own.
@@ -530,6 +649,57 @@ namespace Trecs.Internal
             _isDisposed = true;
         }
 
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+        /// <summary>
+        /// Walks every still-live side-table slot at <see cref="Dispose"/> time, groups
+        /// them by <c>(TypeHash, caller file, caller line)</c>, and logs one warning per
+        /// distinct group with a <c>(×N)</c> suffix. Types are resolved via
+        /// <see cref="TypeIdReverseLookup.TryGetTypeFromId"/>; slots whose id isn't
+        /// registered there render as <c>"TypeId 0x…"</c>. Slots with no recorded call
+        /// site (raw internal allocations that didn't propagate <c>[CallerFilePath]</c>)
+        /// render as <c>"&lt;unknown caller&gt;"</c>.
+        /// </summary>
+        void WarnAboutLiveLeaks()
+        {
+            if (_liveCount == 0 || !_log.IsWarningEnabled())
+            {
+                return;
+            }
+
+            // Group by (typeHash, file, line) so identical leaks dedupe with a count.
+            var groups = new Dictionary<(int TypeHash, string File, int Line), int>();
+            for (int i = 1; i < _sideTableLength; i++)
+            {
+                var entry = GetEntry(i);
+                if (entry.InUse != 1)
+                    continue;
+
+                var handleValue = NativeChunkStoreResolver.EncodeHandleValue(
+                    entry.Generation,
+                    (uint)i
+                );
+                _callerInfoByHandle.TryGetValue(handleValue, out var caller);
+                var key = (entry.TypeHash, caller.File, caller.Line);
+                groups.TryGetValue(key, out var count);
+                groups[key] = count + 1;
+            }
+
+            _log.Warning("NativeChunkStore: {0} undisposed allocation(s) at teardown:", _liveCount);
+            foreach (var (key, count) in groups)
+            {
+                var typeName = TypeIdReverseLookup.TryGetTypeFromId(
+                    new TypeId(key.TypeHash),
+                    out var t
+                )
+                    ? t.GetPrettyName()
+                    : $"TypeId 0x{key.TypeHash:X8}";
+                var site = key.File != null ? $"{key.File}:{key.Line}" : "<unknown caller>";
+                var suffix = count > 1 ? $" (×{count})" : "";
+                _log.Warning("  - {0} at {1}{2}", typeName, site, suffix);
+            }
+        }
+#endif
+
         // ─── Serialization ───────────────────────────────────────
 
         const int SerializationVersion = 1;
@@ -547,8 +717,8 @@ namespace Trecs.Internal
         public unsafe void Serialize(ISerializationWriter writer)
         {
             using var _ = TrecsProfiling.Start("NativeChunkStore.Serialize");
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(UnityThreadHelper.IsMainThread);
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
 
             writer.Write<int>("Version", SerializationVersion);
             writer.Write<int>("LiveCount", _liveCount);
@@ -580,59 +750,7 @@ namespace Trecs.Internal
                 writer.BlitWriteRawBytes("Data", page.Address.ToPointer(), pageBytes);
             }
 
-            // Sparse side-table entries: live entries only, indexed by slot.
-            writer.Write<int>("NumLiveEntries", _liveCount);
-            int liveEmitted = 0;
-            for (int i = 1; i < _sideTableLength; i++)
-            {
-                var entry = GetEntry(i);
-                if (entry.InUse != 1)
-                    continue;
-
-                writer.Write<int>("SlotIdx", i);
-                var payload = ToPayload(entry);
-                writer.BlitWriteRawBytes(
-                    "Entry",
-                    UnsafeUtility.AddressOf(ref payload),
-                    UnsafeUtility.SizeOf<NativeChunkStoreEntryPayload>()
-                );
-                liveEmitted++;
-            }
-            TrecsAssert.That(
-                liveEmitted == _liveCount,
-                "Serialize: live-count mismatch (emitted {0} vs _liveCount {1})",
-                liveEmitted,
-                _liveCount
-            );
-
-            // Free-slot / free-page-id stacks. Persisted explicitly so that subsequent
-            // allocations after restore return the same handle values they would have
-            // returned without the snapshot round-trip — necessary for rollback /
-            // checksum byte-determinism.
-            //
-            // The side-table free-slot stack carries each slot's *generation* alongside
-            // the slot index. A slot may have been allocated and freed many times before
-            // the snapshot, and Alloc reads its current Generation byte to compute the
-            // next handle's generation. If we restored a freed slot with Generation=0
-            // (chunk's zero-init default), the next Alloc would mint generation 1 even
-            // though the no-save path would mint generation N+1 — diverging handle values.
-            WriteSideTableFreeSlots(writer);
-            WriteStack(writer, "freePageIds", _freePageIds);
-
-            // Per-bucket FreeSlots stack: each entry is (pageId, slotIdx). Stack order
-            // matters for the same reason as above.
-            for (int b = 0; b < _buckets.Length; b++)
-            {
-                var bucket = _buckets[b];
-                writer.Write<int>("BucketFreeSlotsCount", bucket.FreeSlots.Count);
-                var slots = bucket.FreeSlots.ToArray(); // top-to-bottom
-                // Write bottom-to-top so a reader can Push in stream order.
-                for (int j = slots.Length - 1; j >= 0; j--)
-                {
-                    writer.Write<int>("PageId", slots[j].PageId);
-                    writer.Write<int>("SlotIdx", slots[j].SlotIdx);
-                }
-            }
+            WriteSideTableAndFreeSlots(writer);
 
             _log.Trace(
                 "Chunk store serialized: pages={0} liveEntries={1} sideTableLength={2}",
@@ -651,24 +769,26 @@ namespace Trecs.Internal
         public unsafe void Deserialize(ISerializationReader reader)
         {
             using var _ = TrecsProfiling.Start("NativeChunkStore.Deserialize");
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(UnityThreadHelper.IsMainThread);
-            TrecsAssert.That(
-                _liveCount == 0,
-                "Deserialize: chunk store must have no live allocations — got {0}. "
-                    + "Call ClearAll on all consuming heaps before Deserialize.",
-                _liveCount
-            );
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
+            // No "live count must be 0" pre-assert: ResetForDeserialize below wipes
+            // everything (pages, side-table generations, bucket bookkeeping, live count).
+            // Persistent NativeUniquePtr / TrecsList allocations live entirely here, so
+            // there's no upstream bookkeeping to ClearAll first; any leftover live slots
+            // from before deserialize get reclaimed by the reset along with their safety
+            // handles.
 
-            // Reset back to a fresh-construction state: free any stale bucket pages,
-            // zero-init existing side-table chunks (so stale Generation bytes don't bleed
-            // into post-restore allocations), reset bucket and free-slot bookkeeping.
-            // Required because heap.ClearAll empties live entries but leaves unused
-            // bucket pages and generation-bumped slots behind.
-            ResetForDeserialize();
-
+            // Read the header upfront so the reset below can scope its
+            // side-table memclear to only the slot range that actually needs
+            // clearing — slots that were "fresh" (untouched) under the old
+            // _nextFreshSideTableSlot but now fall past the new
+            // _nextFreshSideTableSlot. For the rollback shape (save then
+            // immediately reload the same world), that range is empty, so the
+            // memclear cost drops to zero — the largest single win in this
+            // path. See ResetForDeserialize's ZeroChunks loop for the
+            // rationale on the partial wipe.
             var version = reader.Read<int>("Version");
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 version == SerializationVersion,
                 "Deserialize: chunk-store snapshot version {0} does not match expected {1}",
                 version,
@@ -680,124 +800,153 @@ namespace Trecs.Internal
             var nextFreshSideTableSlot = reader.Read<int>("NextFreshSideTableSlot");
             var numPages = reader.Read<int>("NumPages");
 
+            // Reset back to a fresh-construction state: free any stale bucket pages,
+            // zero-init the side-table slots that need it (see partial-wipe
+            // rationale above), reset bucket and free-slot bookkeeping.
+            // Required because heap.ClearAll empties live entries but leaves unused
+            // bucket pages and generation-bumped slots behind.
+            using (TrecsProfiling.Start("ResetForDeserialize"))
+            {
+                ResetForDeserialize(nextFreshSideTableSlot);
+            }
+
             // Materialise side-table chunks up to the saved length. Chunks are zero-init
             // so unused slots read as default (InUse=0) without any extra work.
-            EnsureSideTableLength(sideTableLength);
+            using (TrecsProfiling.Start("EnsureSideTableLength"))
+            {
+                EnsureSideTableLength(sideTableLength);
+            }
 
             // Pages: allocate fresh persistent memory, blit bytes in, rebuild Page objects.
-            for (int pageId = 0; pageId < numPages; pageId++)
+            using (TrecsProfiling.Start("Reading pages"))
             {
-                var kind = (PageKind)reader.Read<byte>("Kind");
-                if (kind == PageKind.Null)
+                for (int pageId = 0; pageId < numPages; pageId++)
                 {
-                    _pages.Add(null);
-                    // _freePageIds is restored from the persisted stack below; we don't
-                    // push here so the stack order matches the original.
-                    continue;
-                }
+                    var kind = (PageKind)reader.Read<byte>("Kind");
+                    if (kind == PageKind.Null)
+                    {
+                        _pages.Add(null);
+                        // _freePageIds is restored from the persisted stack below; we don't
+                        // push here so the stack order matches the original.
+                        continue;
+                    }
 
-                var slotSize = reader.Read<int>("SlotSize");
-                var slotCount = reader.Read<int>("SlotCount");
-                var freeCount = reader.Read<int>("FreeCount");
-                var alignment = reader.Read<int>("Alignment");
-                var bucketIdx = reader.Read<int>("BucketIdx");
+                    var slotSize = reader.Read<int>("SlotSize");
+                    var slotCount = reader.Read<int>("SlotCount");
+                    var freeCount = reader.Read<int>("FreeCount");
+                    var alignment = reader.Read<int>("Alignment");
+                    var bucketIdx = reader.Read<int>("BucketIdx");
 
-                var pageBytes = bucketIdx >= 0 ? slotSize * slotCount : slotSize;
-                // Match the size/items convention used by AllocateNewPageForBucket and
-                // AllocHugePage: pass total bytes as `size`, items=1. FreePage uses the
-                // same convention symmetrically.
-                var pagePtr = AllocatorManager.Allocate(
-                    Allocator.Persistent,
-                    pageBytes,
-                    alignment,
-                    items: 1
-                );
-                TrecsAssert.That(
-                    pagePtr != null,
-                    "Deserialize: AllocatorManager returned null for page {0} ({1} bytes)",
-                    pageId,
-                    pageBytes
-                );
-                reader.BlitReadRawBytes("Data", pagePtr, pageBytes);
+                    var pageBytes = bucketIdx >= 0 ? slotSize * slotCount : slotSize;
+                    // Match the size/items convention used by AllocateNewPageForBucket and
+                    // AllocHugePage: pass total bytes as `size`, items=1. FreePage uses the
+                    // same convention symmetrically.
+                    var pagePtr = AllocatorManager.Allocate(
+                        Allocator.Persistent,
+                        pageBytes,
+                        alignment,
+                        items: 1
+                    );
+                    TrecsDebugAssert.That(
+                        pagePtr != null,
+                        "Deserialize: AllocatorManager returned null for page {0} ({1} bytes)",
+                        pageId,
+                        pageBytes
+                    );
+                    reader.BlitReadRawBytes("Data", pagePtr, pageBytes);
 
-                var page = new Page
-                {
-                    Address = new IntPtr(pagePtr),
-                    BucketIdx = bucketIdx,
-                    SlotSize = slotSize,
-                    SlotCount = slotCount,
-                    FreeCount = freeCount,
-                    Alignment = alignment,
-                };
-                _pages.Add(page);
-                if (bucketIdx >= 0)
-                {
-                    _buckets[bucketIdx].PageIds.Add(pageId);
+                    var page = new Page
+                    {
+                        Address = new IntPtr(pagePtr),
+                        BucketIdx = bucketIdx,
+                        SlotSize = slotSize,
+                        SlotCount = slotCount,
+                        FreeCount = freeCount,
+                        Alignment = alignment,
+                    };
+                    _pages.Add(page);
+                    if (bucketIdx >= 0)
+                    {
+                        _buckets[bucketIdx].PageIds.Add(pageId);
+                    }
                 }
             }
 
             // Sparse side-table entries.
             var numLiveEntries = reader.Read<int>("NumLiveEntries");
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 numLiveEntries == liveCount,
                 "Deserialize: numLiveEntries {0} does not match liveCount {1}",
                 numLiveEntries,
                 liveCount
             );
 
-            var payloadSize = UnsafeUtility.SizeOf<NativeChunkStoreEntryPayload>();
-            for (int n = 0; n < numLiveEntries; n++)
+            using (TrecsProfiling.Start("Reading side-table entries"))
             {
-                var slotIdx = reader.Read<int>("SlotIdx");
-                TrecsAssert.That(
-                    slotIdx > 0 && slotIdx < sideTableLength,
-                    "Deserialize: slotIdx {0} out of range [1, {1})",
-                    slotIdx,
-                    sideTableLength
-                );
-
-                NativeChunkStoreEntryPayload payload = default;
-                reader.BlitReadRawBytes("Entry", UnsafeUtility.AddressOf(ref payload), payloadSize);
-
-                var entry = FromPayload(payload);
-                // Patch the Address to the freshly-allocated page memory. The saved
-                // Address is stale (points at memory in the writing process).
-                var page = _pages[payload.PageId];
-                TrecsAssert.That(
-                    page != null,
-                    "Deserialize: live entry references reclaimed page {0}",
-                    payload.PageId
-                );
-                unsafe
+                var payloadSize = UnsafeUtility.SizeOf<NativeChunkStoreEntryPayload>();
+                for (int n = 0; n < numLiveEntries; n++)
                 {
-                    entry.Address = new IntPtr(
-                        (byte*)page.Address.ToPointer() + payload.SlotIndex * page.SlotSize
+                    var slotIdx = reader.Read<int>("SlotIdx");
+                    TrecsDebugAssert.That(
+                        slotIdx > 0 && slotIdx < sideTableLength,
+                        "Deserialize: slotIdx {0} out of range [1, {1})",
+                        slotIdx,
+                        sideTableLength
                     );
-                }
+
+                    NativeChunkStoreEntryPayload payload = default;
+                    reader.BlitReadRawBytes(
+                        "Entry",
+                        UnsafeUtility.AddressOf(ref payload),
+                        payloadSize
+                    );
+
+                    var entry = FromPayload(payload);
+                    // Patch the Address to the freshly-allocated page memory. The saved
+                    // Address is stale (points at memory in the writing process).
+                    var page = _pages[payload.PageId];
+                    TrecsDebugAssert.That(
+                        page != null,
+                        "Deserialize: live entry references reclaimed page {0}",
+                        payload.PageId
+                    );
+                    unsafe
+                    {
+                        entry.Address = new IntPtr(
+                            (byte*)page.Address.ToPointer() + payload.SlotIndex * page.SlotSize
+                        );
+                    }
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-                entry.Safety = AtomicSafetyHandle.Create();
-                AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(entry.Safety, true);
+                    entry.Safety = AtomicSafetyHandle.Create();
+                    AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(entry.Safety, true);
 #endif
-                SetEntry(slotIdx, entry);
+                    SetEntry(slotIdx, entry);
+                }
             }
 
             // Free-slot / free-page-id stacks: read in saved order and Push directly,
             // which restores the same bottom-to-top arrangement we wrote. The
             // side-table variant also patches each slot's Generation byte from the saved
             // value (see comment in Serialize).
-            ReadSideTableFreeSlots(reader);
-            ReadStack(reader, "freePageIds", _freePageIds);
-
-            // Per-bucket FreeSlots.
-            for (int b = 0; b < _buckets.Length; b++)
+            using (TrecsProfiling.Start("Reading free-slot stacks"))
             {
-                var bucket = _buckets[b];
-                var count = reader.Read<int>("BucketFreeSlotsCount");
-                for (int j = 0; j < count; j++)
+                ReadSideTableFreeSlots(reader);
+                ReadStack(reader, "freePageIds", _freePageIds);
+            }
+
+            using (TrecsProfiling.Start("Reading bucket free-slots"))
+            {
+                // Per-bucket FreeSlots.
+                for (int b = 0; b < _buckets.Length; b++)
                 {
-                    var pageId = reader.Read<int>("PageId");
-                    var slotIdx = reader.Read<int>("SlotIdx");
-                    bucket.FreeSlots.Push((pageId, slotIdx));
+                    var bucket = _buckets[b];
+                    var count = reader.Read<int>("BucketFreeSlotsCount");
+                    for (int j = 0; j < count; j++)
+                    {
+                        var pageId = reader.Read<int>("PageId");
+                        var slotIdx = reader.Read<int>("SlotIdx");
+                        bucket.FreeSlots.Push((pageId, slotIdx));
+                    }
                 }
             }
 
@@ -812,39 +961,100 @@ namespace Trecs.Internal
             );
         }
 
-        unsafe void ResetForDeserialize()
+        // Wipe everything Deserialize is about to repopulate. Takes the new
+        // world's _nextFreshSideTableSlot so the side-table memclear can be
+        // scoped to just the slots that need it: the live-vs-free state for
+        // slots [1, newNextFreshSlot) is restored by SetEntry (live) and by
+        // ReadSideTableFreeSlots (which writes a full default-state entry,
+        // not just a Generation patch — so a slot that was live in the old
+        // world but free in the new lands in the right state); slots
+        // [newNextFreshSlot, oldNextFreshSlot) were "used" in the old world
+        // (either live or in the free list) and won't be touched by the new
+        // world's deserialize, so they have to be cleared here back to
+        // fresh; slots beyond oldNextFreshSlot were never used and are
+        // already fresh (AllocateChunk zero-inits new chunks; previous
+        // resets left old chunks in the same state). For the rollback shape
+        // (newNextFreshSlot == oldNextFreshSlot), the wipe range is empty.
+        unsafe void ResetForDeserialize(int newNextFreshSlot)
         {
-            // Free pages we still own (heap.ClearAll emptied live entries but left
-            // unused bucket pages around for future allocs to reuse).
-            foreach (var page in _pages)
-            {
-                if (page != null)
-                {
-                    FreePage(page);
-                }
-            }
-            _pages.Clear();
-            _freePageIds.Clear();
-            _freeSideTableSlots.Clear();
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            _externalAddresses.Clear();
+            using (TrecsProfiling.Start("SafetyHandleRelease"))
+            {
+                // Release safety handles for any still-live slots before we wipe them —
+                // dropping the side-table chunk's bytes leaves Unity's safety-handle slots
+                // dangling otherwise. (No leak warning here: ResetForDeserialize is the
+                // Deserialize-time wipe, not a teardown — leaks should already have been
+                // surfaced when the source world was disposed.)
+                for (int i = 1; i < _sideTableLength; i++)
+                {
+                    var entry = GetEntry(i);
+                    if (entry.InUse == 1)
+                    {
+                        AtomicSafetyHandle.EnforceAllBufferJobsHaveCompletedAndRelease(
+                            entry.Safety
+                        );
+                    }
+                }
+                _callerInfoByHandle.Clear();
+            }
 #endif
 
-            // Zero-init any materialised side-table chunks so stale Generation /
-            // PageId values don't leak into post-restore allocations. We keep the
-            // chunks allocated (cheaper than free+reallocate) — Deserialize will
-            // EnsureSideTableLength up to the saved length, materialising additional
-            // chunks if needed.
-            var entrySize = UnsafeUtility.SizeOf<NativeChunkStoreEntry>();
-            for (int i = 0; i < _chunkDirectory.Length; i++)
+            using (TrecsProfiling.Start("FreePages"))
             {
-                var ptr = _chunkDirectory[i];
-                if (ptr != IntPtr.Zero)
+                // Free pages we still own. With stateless heaps, this also reclaims pages
+                // for any handles that weren't explicitly disposed before the snapshot load.
+                foreach (var page in _pages)
                 {
-                    UnsafeUtility.MemClear(
-                        ptr.ToPointer(),
-                        (long)entrySize * NativeChunkStoreResolver.ChunkSize
-                    );
+                    if (page != null)
+                    {
+                        FreePage(page);
+                    }
+                }
+                _pages.Clear();
+                _freePageIds.Clear();
+                _freeSideTableSlots.Clear();
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                _externalAddresses.Clear();
+#endif
+            }
+
+            using (TrecsProfiling.Start("ZeroChunks"))
+            {
+                // Wipe only the slot range [newNextFreshSlot, oldNextFreshSlot) —
+                // slots the old world had touched (live or in the free list)
+                // but the new world won't, so they need to look "fresh"
+                // ({InUse=0, Generation=0, ...}) post-restore. Slots <
+                // newNextFreshSlot are written explicitly by SetEntry or by
+                // ReadSideTableFreeSlots; slots >= oldNextFreshSlot are
+                // already fresh and need no work. Empty range when both
+                // worlds have the same _nextFreshSideTableSlot (the common
+                // rollback case), which avoids the bulk per-chunk memclear
+                // entirely. We don't try to be cleverer than that — partial-
+                // chunk memclears are fine; the case worth optimizing is the
+                // rollback one, and it's already zero work above.
+                var oldNextFreshSlot = _nextFreshSideTableSlot;
+                if (newNextFreshSlot < oldNextFreshSlot)
+                {
+                    var entrySize = UnsafeUtility.SizeOf<NativeChunkStoreEntry>();
+                    var chunkSize = NativeChunkStoreResolver.ChunkSize;
+                    var chunkSizeBits = NativeChunkStoreResolver.ChunkSizeBits;
+                    int slot = newNextFreshSlot;
+                    while (slot < oldNextFreshSlot)
+                    {
+                        var chunkIdx = slot >> chunkSizeBits;
+                        var slotInChunk = slot - (chunkIdx << chunkSizeBits);
+                        var slotsLeftInChunk = chunkSize - slotInChunk;
+                        var slotsToClear = Math.Min(slotsLeftInChunk, oldNextFreshSlot - slot);
+                        var ptr = _chunkDirectory[chunkIdx];
+                        if (ptr != IntPtr.Zero)
+                        {
+                            UnsafeUtility.MemClear(
+                                (byte*)ptr.ToPointer() + (long)slotInChunk * entrySize,
+                                (long)entrySize * slotsToClear
+                            );
+                        }
+                        slot += slotsToClear;
+                    }
                 }
             }
 
@@ -920,6 +1130,57 @@ namespace Trecs.Internal
             }
         }
 
+        unsafe void WriteSideTableAndFreeSlots(ISerializationWriter writer)
+        {
+            writer.Write<int>("NumLiveEntries", _liveCount);
+            int liveEmitted = 0;
+            for (int i = 1; i < _sideTableLength; i++)
+            {
+                var entry = GetEntry(i);
+                if (entry.InUse != 1)
+                {
+                    continue;
+                }
+
+                writer.Write<int>("SlotIdx", i);
+                var payload = ToPayload(entry);
+
+                // Address is a raw process-local pointer that the
+                // deserializer recomputes from PageId + SlotIndex (the
+                // saved value is stale). Zero it so saved recordings
+                // don't contain garbage pointers.
+                payload.Address = IntPtr.Zero;
+
+                writer.BlitWriteRawBytes(
+                    "Entry",
+                    UnsafeUtility.AddressOf(ref payload),
+                    UnsafeUtility.SizeOf<NativeChunkStoreEntryPayload>()
+                );
+                liveEmitted++;
+            }
+            TrecsDebugAssert.That(
+                liveEmitted == _liveCount,
+                "Serialize: live-count mismatch (emitted {0} vs _liveCount {1})",
+                liveEmitted,
+                _liveCount
+            );
+
+            WriteSideTableFreeSlots(writer);
+            WriteStack(writer, "freePageIds", _freePageIds);
+
+            for (int b = 0; b < _buckets.Length; b++)
+            {
+                var bucket = _buckets[b];
+                writer.Write<int>("BucketFreeSlotsCount", bucket.FreeSlots.Count);
+                var slots = bucket.FreeSlots.ToArray();
+                for (int j = slots.Length - 1; j >= 0; j--)
+                {
+                    writer.Write<int>("PageId", slots[j].PageId);
+                    writer.Write<int>("SlotIdx", slots[j].SlotIdx);
+                }
+            }
+        }
+
         void WriteSideTableFreeSlots(ISerializationWriter writer)
         {
             writer.Write<int>("FreeSideTableSlotsCount", _freeSideTableSlots.Count);
@@ -940,11 +1201,16 @@ namespace Trecs.Internal
                 var slotIdx = reader.Read<int>("SlotIdx");
                 var generation = reader.Read<byte>("Generation");
                 _freeSideTableSlots.Push(slotIdx);
-                // Patch the slot's Generation byte so the next Alloc that recycles this
-                // slot mints generation+1, matching the no-save-and-load behaviour.
-                var entry = GetEntry(slotIdx);
-                entry.Generation = generation;
-                SetEntry(slotIdx, entry);
+                // Overwrite the full slot, not just Generation. The slot may
+                // have been *live* in the old world we just replaced (with
+                // InUse=1 and a stale Address from a now-freed page); we
+                // need to bring it back to a clean free state. Other fields
+                // default to zero — Alloc overwrites them on slot reuse.
+                // Pairs with the partial-wipe scoping in
+                // ResetForDeserialize: slots below newNextFreshSlot are no
+                // longer cleared by the reset, so the deserialize-side write
+                // here is the only path that resets their state.
+                SetEntry(slotIdx, new NativeChunkStoreEntry { Generation = generation });
             }
         }
 
@@ -959,7 +1225,7 @@ namespace Trecs.Internal
                 if (BucketSlotSizes[i] >= slotSize)
                     return i;
             }
-            throw TrecsAssert.CreateException(
+            throw TrecsDebugAssert.CreateException(
                 "Allocation size {0} exceeds max bucket size {1}",
                 slotSize,
                 MaxBucketSlotSize
@@ -982,8 +1248,8 @@ namespace Trecs.Internal
 
             var (pId, sIdx) = bucket.FreeSlots.Pop();
             var page = _pages[pId];
-            TrecsAssert.That(page != null, "Free slot pointed at reclaimed page {0}", pId);
-            TrecsAssert.That(page.FreeCount > 0);
+            TrecsDebugAssert.That(page != null, "Free slot pointed at reclaimed page {0}", pId);
+            TrecsDebugAssert.That(page.FreeCount > 0);
             page.FreeCount--;
 
             pageId = pId;
@@ -1000,7 +1266,7 @@ namespace Trecs.Internal
                 bucket.SlotSize,
                 items: 1
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 pagePtr != null,
                 "AllocatorManager returned null page (size {0}, align {1})",
                 bucket.PageSizeBytes,
@@ -1051,7 +1317,7 @@ namespace Trecs.Internal
                 alignment,
                 items: 1
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 pagePtr != null,
                 "AllocatorManager returned null huge page (size {0})",
                 size
@@ -1081,24 +1347,31 @@ namespace Trecs.Internal
         /// values are stored verbatim and used to call <c>AllocatorManager.Free</c> when the
         /// returned handle is freed. After this call the chunk store takes exclusive ownership.
         /// </summary>
-        public PtrHandle AllocExternal(IntPtr address, int size, int alignment, int typeHash)
+        public PtrHandle AllocExternal(
+            IntPtr address,
+            int size,
+            int alignment,
+            int typeHash,
+            [CallerFilePath] string callerFile = null,
+            [CallerLineNumber] int callerLine = 0
+        )
         {
             using var _ = TrecsProfiling.Start("NativeChunkStore.AllocExternal");
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(address != IntPtr.Zero, "AllocExternal: null address");
-            TrecsAssert.That(size > 0, "AllocExternal: size must be positive");
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(address != IntPtr.Zero, "AllocExternal: null address");
+            TrecsDebugAssert.That(size > 0, "AllocExternal: size must be positive");
+            TrecsDebugAssert.That(
                 alignment > 0 && (alignment & (alignment - 1)) == 0,
                 "AllocExternal: alignment {0} must be a positive power of two",
                 alignment
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "NativeChunkStore.AllocExternal must be called from the main thread"
             );
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 _externalAddresses.Add(address),
                 "AllocExternal: pointer 0x{0} is already registered in this chunk store "
                     + "(double-take-ownership leaves two aliased slots; freeing either "
@@ -1154,6 +1427,13 @@ namespace Trecs.Internal
             SetEntry(sideTableIdx, entry);
             _liveCount++;
 
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (callerFile != null)
+            {
+                _callerInfoByHandle[handleValue] = (callerFile, callerLine);
+            }
+#endif
+
             return new PtrHandle(handleValue);
         }
 
@@ -1172,7 +1452,7 @@ namespace Trecs.Internal
         void ReturnSlot(int pageId, int slotIdx, bool ownsWholePage)
         {
             var page = _pages[pageId];
-            TrecsAssert.That(page != null, "ReturnSlot: page {0} already reclaimed", pageId);
+            TrecsDebugAssert.That(page != null, "ReturnSlot: page {0} already reclaimed", pageId);
 
             if (ownsWholePage)
             {
@@ -1189,7 +1469,7 @@ namespace Trecs.Internal
             }
 
             page.FreeCount++;
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 page.FreeCount <= page.SlotCount,
                 "Page {0} free-count overflow ({1} > {2})",
                 pageId,
@@ -1227,7 +1507,7 @@ namespace Trecs.Internal
             }
 
             var idx = _nextFreshSideTableSlot++;
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 (uint)idx <= NativeChunkStoreResolver.MaxIndex,
                 "NativeChunkStore exhausted side-table index space ({0} max)",
                 NativeChunkStoreResolver.MaxIndex
@@ -1254,13 +1534,13 @@ namespace Trecs.Internal
 
         unsafe void AllocateChunk(int chunkIdx)
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 chunkIdx < NativeChunkStoreResolver.MaxChunkCount,
                 "AllocateChunk: chunkIdx {0} exceeds max chunk count {1}",
                 chunkIdx,
                 NativeChunkStoreResolver.MaxChunkCount
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 _chunkDirectory[chunkIdx] == IntPtr.Zero,
                 "AllocateChunk: chunk {0} already allocated",
                 chunkIdx
@@ -1274,7 +1554,7 @@ namespace Trecs.Internal
                 entryAlign,
                 items: NativeChunkStoreResolver.ChunkSize
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 ptr != null,
                 "AllocateChunk: AllocatorManager returned null for chunk {0}",
                 chunkIdx
@@ -1295,7 +1575,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe NativeChunkStoreEntry GetEntry(int idx)
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 idx >= 0 && idx < _sideTableLength,
                 "GetEntry: idx {0} out of range (length {1})",
                 idx,
@@ -1309,7 +1589,7 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void SetEntry(int idx, in NativeChunkStoreEntry entry)
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 idx >= 0 && idx < _sideTableLength,
                 "SetEntry: idx {0} out of range (length {1})",
                 idx,
@@ -1416,5 +1696,21 @@ namespace Trecs.Internal
         public int LiveSlotCount;
         public int FreeSlotCount;
         public long ReservedBytes;
+    }
+
+    /// <summary>
+    /// One row of <see cref="NativeChunkStore.SnapshotPageOccupancy"/> output.
+    /// <c>LiveSlotsStartIndex</c> indexes into the parallel <c>List&lt;bool&gt;</c>
+    /// the caller passed in; <c>SlotCount</c> bools follow, one per slot, true if
+    /// the slot is currently in use.
+    /// </summary>
+    internal struct PageOccupancyHeader
+    {
+        public int PageId;
+        public int BucketIdx; // -1 for huge / external single-slot pages
+        public int SlotSize;
+        public int SlotCount;
+        public int FreeCount;
+        public int LiveSlotsStartIndex;
     }
 }

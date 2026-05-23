@@ -28,13 +28,5 @@ namespace Trecs.Internal
         /// per-frame cost. Must be &gt;= 1.
         /// </summary>
         public int ChecksumFrameInterval = 30;
-
-        /// <summary>
-        /// Serialization flags passed to the checksum serializer. Required
-        /// when any user serializer branches on writer flags (e.g. to exclude
-        /// non-deterministic state from checksums) — playback recomputes
-        /// with the same flags via the bundle header.
-        /// </summary>
-        public long ChecksumFlags = SerializationFlags.IsForChecksum;
     }
 }

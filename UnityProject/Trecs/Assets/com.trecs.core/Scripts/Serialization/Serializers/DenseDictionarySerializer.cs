@@ -21,7 +21,7 @@ namespace Trecs.Serialization
             // JSON serialization doesn't support BlitReadArrayPtr
             if (
                 DenseDictionaryBlitHelperCache<TKey, TValue>.CanUseBlit
-                && reader is BinarySerializationReader
+                && reader is ISerializationReader
             )
             {
                 if (dict == null)
@@ -30,7 +30,7 @@ namespace Trecs.Serialization
                 }
                 else
                 {
-                    TrecsAssert.That(dict.IsEmpty);
+                    TrecsDebugAssert.That(dict.IsEmpty);
                 }
 
                 DenseDictionaryBlitHelperCache<TKey, TValue>.Helper.DeserializeBlit(
@@ -49,7 +49,7 @@ namespace Trecs.Serialization
                 }
                 else
                 {
-                    TrecsAssert.That(dict.IsEmpty);
+                    TrecsDebugAssert.That(dict.IsEmpty);
                     dict.EnsureCapacity(numItems);
                 }
 
@@ -69,7 +69,7 @@ namespace Trecs.Serialization
             // JSON serialization doesn't support BlitWriteArrayPtr
             if (
                 DenseDictionaryBlitHelperCache<TKey, TValue>.CanUseBlit
-                && writer is BinarySerializationWriter
+                && writer is ISerializationWriter
             )
             {
                 DenseDictionaryBlitHelperCache<TKey, TValue>.Helper.SerializeBlit(value, writer);

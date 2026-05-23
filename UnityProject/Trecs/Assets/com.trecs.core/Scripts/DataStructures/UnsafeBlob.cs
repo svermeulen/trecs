@@ -142,8 +142,7 @@ namespace Trecs.Internal
             {
                 var wrappedIndex = index.Index % capacity;
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                if ((index.Index & (Alignment - 1)) != 0)
-                    throw new TrecsException($"invalid index detected");
+                TrecsAssert.That((index.Index & (Alignment - 1)) == 0, "invalid index detected");
 #endif
                 return ref Unsafe.AsRef<T>(ptr + wrappedIndex);
             }

@@ -14,10 +14,12 @@ namespace Trecs.Tests
         static readonly TagSet PartitionA = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionA);
         static readonly TagSet PartitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
-        TestEnvironment CreateEnv(bool deterministic = false)
+        TestEnvironment CreateEnv()
         {
-            var settings = new WorldSettings { RequireDeterministicSubmission = deterministic };
-            return EcsTestHelper.CreateEnvironment(settings, TestTemplates.WithPartitions);
+            return EcsTestHelper.CreateEnvironment(
+                new WorldSettings(),
+                TestTemplates.WithPartitions
+            );
         }
 
         #region Native add + native remove in same frame
@@ -34,14 +36,15 @@ namespace Trecs.Tests
                 .Set(new TestVec())
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Native add new entity + native remove existing
-            var init = nativeEcs.AddEntity(PartitionA, sortKey: 0);
+            using var refs = a.ReserveEntityHandles(1, Allocator.Temp);
+            var init = nativeEcs.AddEntity(PartitionA, sortKey: 0, refs[0]);
             init.Set(new TestInt { Value = 99 });
             init.Set(new TestVec());
             nativeEcs.RemoveEntity(existing.ToIndex(a));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.IsFalse(existing.Exists(a));
@@ -63,20 +66,21 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Remove 3 existing, add 2 new (native)
             nativeEcs.RemoveEntity(handles[0].ToIndex(a));
             nativeEcs.RemoveEntity(handles[2].ToIndex(a));
             nativeEcs.RemoveEntity(handles[4].ToIndex(a));
 
+            using var refs = a.ReserveEntityHandles(2, Allocator.Temp);
             for (int i = 0; i < 2; i++)
             {
-                var init = nativeEcs.AddEntity(PartitionA, sortKey: (uint)i);
+                var init = nativeEcs.AddEntity(PartitionA, sortKey: (uint)i, refs[i]);
                 init.Set(new TestInt { Value = 100 + i });
                 init.Set(new TestVec());
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // 5 - 3 + 2 = 4
             NAssert.AreEqual(4, a.CountEntitiesWithTags(PartitionA));
@@ -103,14 +107,15 @@ namespace Trecs.Tests
                 .Set(new TestVec())
                 .AssertComplete()
                 .Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Move existing to PartitionB + native add new to PartitionA
             a.SetTag<TestPartitionB>(handle.ToIndex(a));
-            var init = nativeEcs.AddEntity(PartitionA, sortKey: 0);
+            using var refs = a.ReserveEntityHandles(1, Allocator.Temp);
+            var init = nativeEcs.AddEntity(PartitionA, sortKey: 0, refs[0]);
             init.Set(new TestInt { Value = 77 });
             init.Set(new TestVec());
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
@@ -133,18 +138,19 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Move 0 to PartitionB, remove 1, native add 2 new
             a.SetTag<TestPartitionB>(handles[0].ToIndex(a));
             a.RemoveEntity(handles[1]);
+            using var refs = a.ReserveEntityHandles(2, Allocator.Temp);
             for (int i = 0; i < 2; i++)
             {
-                var init = nativeEcs.AddEntity(PartitionA, sortKey: (uint)i);
+                var init = nativeEcs.AddEntity(PartitionA, sortKey: (uint)i, refs[i]);
                 init.Set(new TestInt { Value = 100 + i });
                 init.Set(new TestVec());
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // PartitionA: 2, 3 (original) + 100, 101 (new) = 4
             // PartitionB: 0 (moved) = 1
@@ -161,7 +167,7 @@ namespace Trecs.Tests
         [Test]
         public void DeterministicAdd_ReverseSortKeys_OrderedCorrectly()
         {
-            using var env = CreateEnv(deterministic: true);
+            using var env = CreateEnv();
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
 
@@ -175,7 +181,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = count - 1 - i });
                 init.Set(new TestVec());
             }
-            a.SubmitEntities();
+            a.Submit();
 
             refs.Dispose();
 
@@ -196,7 +202,7 @@ namespace Trecs.Tests
         public void DeterministicAdd_MixedManagedAndNative_ManagedFirst()
         {
             // Managed adds should appear before native adds in the final layout
-            using var env = CreateEnv(deterministic: true);
+            using var env = CreateEnv();
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
 
@@ -215,7 +221,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = i });
                 init.Set(new TestVec());
             }
-            a.SubmitEntities();
+            a.Submit();
 
             refs.Dispose();
 
@@ -241,7 +247,7 @@ namespace Trecs.Tests
         [Test]
         public void DeterministicAdd_PlusRemoveExisting_OrderStillCorrect()
         {
-            using var env = CreateEnv(deterministic: true);
+            using var env = CreateEnv();
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
 
@@ -255,7 +261,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Remove entity 1, native add 5 new with sort keys
             a.RemoveEntity(existing[1]);
@@ -266,7 +272,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = i * 10 });
                 init.Set(new TestVec());
             }
-            a.SubmitEntities();
+            a.Submit();
 
             refs.Dispose();
 
@@ -284,7 +290,7 @@ namespace Trecs.Tests
         [Test]
         public void LargeScale_NativeAdds_AllExistWithCorrectData()
         {
-            using var env = CreateEnv(deterministic: true);
+            using var env = CreateEnv();
             var a = env.Accessor;
             var nativeEcs = a.ToNative();
 
@@ -297,7 +303,7 @@ namespace Trecs.Tests
                 init.Set(new TestInt { Value = i });
                 init.Set(new TestVec());
             }
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(count, a.CountEntitiesWithTags(PartitionA));
 
@@ -332,18 +338,19 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Remove every 3rd, native add 50 new
             for (int i = 0; i < 100; i += 3)
                 nativeEcs.RemoveEntity(handles[i].ToIndex(a));
+            using var refs = a.ReserveEntityHandles(50, Allocator.Temp);
             for (int i = 0; i < 50; i++)
             {
-                var init = nativeEcs.AddEntity(PartitionA, sortKey: (uint)i);
+                var init = nativeEcs.AddEntity(PartitionA, sortKey: (uint)i, refs[i]);
                 init.Set(new TestInt { Value = 1000 + i });
                 init.Set(new TestVec());
             }
-            a.SubmitEntities();
+            a.Submit();
 
             int removedCount = (100 + 2) / 3; // 34
             NAssert.AreEqual(100 - removedCount + 50, a.CountEntitiesWithTags(PartitionA));

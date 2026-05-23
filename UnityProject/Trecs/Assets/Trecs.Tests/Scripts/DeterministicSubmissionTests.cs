@@ -15,8 +15,10 @@ namespace Trecs.Tests
 
         TestEnvironment CreateEnv()
         {
-            var settings = new WorldSettings { RequireDeterministicSubmission = true };
-            return EcsTestHelper.CreateEnvironment(settings, TestTemplates.WithPartitions);
+            return EcsTestHelper.CreateEnvironment(
+                new WorldSettings(),
+                TestTemplates.WithPartitions
+            );
         }
 
         #region Deterministic native removes
@@ -44,12 +46,12 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.SubmitEntities();
+                a.Submit();
 
                 nativeEcs.RemoveEntity(handles[0].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[2].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[4].ToIndex(a));
-                a.SubmitEntities();
+                a.Submit();
 
                 survivorValuesForward = CollectValues(a, PartitionA);
             }
@@ -69,12 +71,12 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.SubmitEntities();
+                a.Submit();
 
                 nativeEcs.RemoveEntity(handles[4].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[2].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[0].ToIndex(a));
-                a.SubmitEntities();
+                a.Submit();
 
                 survivorValuesReverse = CollectValues(a, PartitionA);
             }
@@ -111,14 +113,14 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.SubmitEntities();
+                a.Submit();
 
                 // Remove 7, 1, 5, 3 (scattered)
                 nativeEcs.RemoveEntity(handles[7].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[3].ToIndex(a));
-                a.SubmitEntities();
+                a.Submit();
 
                 valuesScattered = CollectValues(a, PartitionA);
             }
@@ -138,14 +140,14 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.SubmitEntities();
+                a.Submit();
 
                 // Remove 1, 3, 5, 7 (sorted)
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[3].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[7].ToIndex(a));
-                a.SubmitEntities();
+                a.Submit();
 
                 valuesSorted = CollectValues(a, PartitionA);
             }
@@ -188,12 +190,12 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.SubmitEntities();
+                a.Submit();
 
                 nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[2].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[4].ToIndex(a));
-                a.SubmitEntities();
+                a.Submit();
 
                 stateAForward = CollectValues(a, PartitionA);
                 stateBForward = CollectValues(a, PartitionB);
@@ -214,12 +216,12 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.SubmitEntities();
+                a.Submit();
 
                 nativeEcs.SetTag<TestPartitionB>(handles[4].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[2].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
-                a.SubmitEntities();
+                a.Submit();
 
                 stateAReverse = CollectValues(a, PartitionA);
                 stateBReverse = CollectValues(a, PartitionB);
@@ -269,13 +271,13 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.SubmitEntities();
+                a.Submit();
 
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[3].ToIndex(a));
-                a.SubmitEntities();
+                a.Submit();
 
                 stateA1 = CollectValues(a, PartitionA);
                 stateB1 = CollectValues(a, PartitionB);
@@ -296,13 +298,13 @@ namespace Trecs.Tests
                         .AssertComplete()
                         .Handle;
                 }
-                a.SubmitEntities();
+                a.Submit();
 
                 nativeEcs.SetTag<TestPartitionB>(handles[3].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[5].ToIndex(a));
                 nativeEcs.SetTag<TestPartitionB>(handles[0].ToIndex(a));
                 nativeEcs.RemoveEntity(handles[1].ToIndex(a));
-                a.SubmitEntities();
+                a.Submit();
 
                 stateA2 = CollectValues(a, PartitionA);
                 stateB2 = CollectValues(a, PartitionB);

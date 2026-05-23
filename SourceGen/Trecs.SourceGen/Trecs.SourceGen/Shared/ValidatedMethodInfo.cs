@@ -121,104 +121,20 @@ namespace Trecs.SourceGen.Shared
     }
 
     /// <summary>
-    /// One slot in the user's [ForEach*] method parameter list.
+    /// One slot in the user's [ForEach*] method parameter list. A value-equality
+    /// record struct so it's safe to carry through Roslyn's incremental-pipeline
+    /// cache as an <see cref="EquatableArray{ParamSlot}"/>.
+    /// <para><see cref="Index"/> meaning depends on <see cref="Kind"/>:
+    /// <list type="bullet">
+    ///   <item><c>LoopComponent</c>: component-parameters list.</item>
+    ///   <item><c>Custom</c>: custom-parameters list.</item>
+    ///   <item><c>LoopSetAccessor</c> / <c>LoopSetRead</c> / <c>LoopSetWrite</c>: the matching set-* list.</item>
+    ///   <item><c>HoistedSingleton</c>: hoisted-singletons list.</item>
+    ///   <item><c>LoopAspect</c>, <c>LoopEntityIndex</c>, <c>LoopEntityHandle</c>, <c>LoopWorldAccessor</c>: unused.</item>
+    /// </list>
+    /// </para>
     /// </summary>
-    internal struct ParamSlot
-    {
-        public ParamSlotKind Kind;
-
-        /// <summary>
-        /// For LoopComponent, index into the generator's component-parameters list.
-        /// For Custom, index into the generator's custom-parameters list.
-        /// For LoopSetAccessor, index into set-accessor list.
-        /// For LoopSetRead, index into set-read list.
-        /// For LoopSetWrite, index into set-write list.
-        /// Unused for LoopAspect, LoopEntityIndex, and LoopWorldAccessor.
-        /// </summary>
-        public int Index;
-
-        public ParamSlot(ParamSlotKind kind, int index)
-        {
-            Kind = kind;
-            Index = index;
-        }
-    }
-
-    /// <summary>
-    /// Validated method info extracted from a <c>[ForEachEntity]</c> method (aspect path).
-    /// Used by <c>ForEachEntityAspectGenerator</c>.
-    /// </summary>
-    internal class ValidatedMethodInfo
-    {
-        public string AspectTypeName { get; set; } = string.Empty;
-        public INamedTypeSymbol? AspectTypeSymbol { get; set; }
-
-        public List<ITypeSymbol> ComponentTypes { get; set; } = new();
-        public List<ITypeSymbol> ReadComponentTypes { get; set; } = new();
-        public List<ITypeSymbol> WriteComponentTypes { get; set; } = new();
-
-        /// <summary>Component parameters (IEntityComponent). Only populated in components mode.</summary>
-        public List<ParameterInfo> ComponentParameters { get; set; } = new();
-
-        public List<ParameterInfo> CustomParameters { get; set; } = new();
-        public List<ITypeSymbol> AttributeTagTypes { get; set; } = new();
-        public bool HasAttributeTags => AttributeTagTypes.Count > 0;
-
-        /// <summary>
-        /// Tag types from <c>Without =</c> / <c>Withouts =</c> on the iteration
-        /// attribute. Source-generator emits a chained <c>.WithoutTags&lt;T&gt;()</c>
-        /// for each entry so matching groups are excluded from the query result.
-        /// </summary>
-        public List<ITypeSymbol> AttributeWithoutTagTypes { get; set; } = new();
-        public bool HasEntityIndexParameter { get; set; }
-
-        /// <summary>True if the user took a <c>EntityHandle</c> parameter on the iteration method.</summary>
-        public bool HasEntityHandleParameter { get; set; }
-
-        /// <summary>
-        /// Parameter slots in declaration order. Used by the code generator to emit
-        /// the call to the user's method respecting their chosen parameter order.
-        /// </summary>
-        public List<ParamSlot> ParameterSlots { get; set; } = new();
-
-        public List<ITypeSymbol> SetTypes { get; set; } = new();
-        public bool HasSet => SetTypes.Count > 0;
-        public bool MatchByComponents { get; set; }
-
-        /// <summary>
-        /// SetAccessor&lt;T&gt; parameters detected in the method signature. Each entry
-        /// produces a <c>var {ParamName} = __world.Set&lt;{SetTypeArg}&gt;();</c> before the loop.
-        /// </summary>
-        public List<SetAccessorParameterInfo> SetAccessorParameters { get; set; } = new();
-
-        /// <summary>
-        /// SetRead&lt;T&gt; parameters detected in the method signature. Each entry
-        /// produces a <c>var {ParamName} = __world.Set&lt;{SetTypeArg}&gt;().Read;</c> before the loop.
-        /// </summary>
-        public List<SetAccessorParameterInfo> SetReadParameters { get; set; } = new();
-
-        /// <summary>
-        /// SetWrite&lt;T&gt; parameters detected in the method signature. Each entry
-        /// produces a <c>var {ParamName} = __world.Set&lt;{SetTypeArg}&gt;().Write;</c> before the loop.
-        /// </summary>
-        public List<SetAccessorParameterInfo> SetWriteParameters { get; set; } = new();
-
-        /// <summary>
-        /// Hoisted <c>[SingleEntity]</c> parameters — resolved once before the iteration
-        /// loop (or once per call for run-once methods). Each entry corresponds to a
-        /// <see cref="ParamSlotKind.HoistedSingleton"/> slot in <see cref="ParameterSlots"/>.
-        /// </summary>
-        public List<HoistedSingletonInfo> HoistedSingletons { get; set; } = new();
-
-        /// <summary>
-        /// Returns true if the given component type is read-only (in ReadComponentTypes but not WriteComponentTypes).
-        /// </summary>
-        public bool IsReadOnly(ITypeSymbol type)
-        {
-            return ReadComponentTypes.Any(t => SymbolEqualityComparer.Default.Equals(t, type))
-                && !WriteComponentTypes.Any(t => SymbolEqualityComparer.Default.Equals(t, type));
-        }
-    }
+    internal readonly record struct ParamSlot(ParamSlotKind Kind, int Index);
 
     /// <summary>
     /// Info about a SetAccessor&lt;T&gt; parameter injected into an [ForEachEntity] method.

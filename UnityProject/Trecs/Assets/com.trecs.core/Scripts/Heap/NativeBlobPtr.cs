@@ -8,13 +8,14 @@ using Unity.Mathematics;
 namespace Trecs
 {
     /// <summary>
-    /// Pointer to a native (unmanaged) blob stored in the <see cref="BlobCache"/>.
-    /// Resolves to a <c>ref T</c> for direct access. Lives in
-    /// <see cref="Trecs.Internal"/> because the supported public path for shared
-    /// native data is <see cref="NativeSharedPtr{T}"/> via
-    /// <see cref="NativeSharedPtr.Alloc{T}(HeapAccessor, BlobId, in T)"/>;
-    /// <see cref="NativeBlobPtr{T}"/> is only used by callers writing custom
-    /// <see cref="IBlobStore"/> backends.
+    /// Lower-level pinning pointer for a native (unmanaged) blob in <see cref="BlobCache"/>.
+    /// Resolves to a <c>ref T</c> for direct access. Most game code should use
+    /// <see cref="NativeSharedPtr{T}"/> via
+    /// <see cref="NativeSharedPtr.Alloc{T}(HeapAccessor, BlobId, in T)"/> — that adds the
+    /// ECS-side refcount layer (and Burst-resolvable lookup) on top of the cache. Reach
+    /// for <see cref="NativeBlobPtr{T}"/> directly when you need to pin blob bytes
+    /// outside the ECS refcount lifetime — for example, async preload from a non-ECS
+    /// subsystem.
     /// </summary>
     [EditorBrowsable(EditorBrowsableState.Never)]
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
@@ -40,8 +41,8 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T Get(BlobCache blobCache)
         {
-            TrecsAssert.That(!IsNull);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!IsNull);
+            TrecsDebugAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to Get from a disposed NativeBlobPtr"
             );
@@ -77,8 +78,8 @@ namespace Trecs
 
         public void WarmUp(BlobCache blobCache)
         {
-            TrecsAssert.That(!IsNull);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!IsNull);
+            TrecsDebugAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to WarmUp from a disposed NativeBlobPtr"
             );
@@ -87,8 +88,8 @@ namespace Trecs
 
         public BlobLoadingState GetLoadingState(BlobCache blobCache)
         {
-            TrecsAssert.That(!IsNull);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!IsNull);
+            TrecsDebugAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to GetLoadingState from a disposed NativeBlobPtr"
             );
@@ -97,7 +98,7 @@ namespace Trecs
 
         public readonly void Dispose(BlobCache blobCache)
         {
-            TrecsAssert.That(!IsNull);
+            TrecsDebugAssert.That(!IsNull);
             blobCache.DisposeHandle(Handle);
         }
 

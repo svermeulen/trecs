@@ -122,5 +122,5 @@ In a multi-world scene the dropdown selects which world the Player drives. Each 
 
 - [Saves Window](saves.md) — library view of all on-disk recordings and snapshots, with rename, multi-select, and search.
 - [Hierarchy Window](hierarchy.md) — sibling editor window for inspecting live world state alongside the Player.
-- [Serialization](../advanced/serialization.md) — how managed types stored on the heap participate in recording and snapshots.
+- [Serialization](../experimental/serialization.md) — how managed types stored on the heap participate in recording and snapshots.
 - [Snake sample](../samples/11-snake.md) — a self-contained example of a recording-driven workflow.

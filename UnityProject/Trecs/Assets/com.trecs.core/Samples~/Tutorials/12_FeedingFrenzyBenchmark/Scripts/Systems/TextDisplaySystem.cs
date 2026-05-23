@@ -41,6 +41,22 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
 
             _sb.Clear();
             AppendStat("Entity Count", $"{stats.EntityCount:N0}");
+
+            if (config.SubsetApproach == FrenzySubsetApproach.Partitions)
+            {
+                int fishCount = World.CountEntitiesWithTags<FrenzyTags.Fish>();
+                int idleFishCount = World.CountEntitiesWithTags<
+                    FrenzyTags.Fish,
+                    FrenzyTags.NotEating
+                >();
+                float idlePercent = fishCount > 0 ? idleFishCount * 100f / fishCount : 0f;
+                AppendStat(
+                    "Idle Fish",
+                    $"{idleFishCount:N0}",
+                    secondary: $"({idlePercent:F1}% of {fishCount:N0})"
+                );
+            }
+
             int presetIndex = World.GlobalComponent<DesiredPreset>().Read.Value;
             int desiredFishCount = _fishCountPresets[
                 math.clamp(presetIndex, 0, _fishCountPresets.Length - 1)

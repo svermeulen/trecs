@@ -10,7 +10,7 @@ namespace Trecs.Internal
     /// keyboard, regardless of which window has focus. No default key bindings
     /// — assign via Edit > Shortcuts > Trecs.
     ///
-    /// Operates on the unique <see cref="TrecsGameStateController"/> if there
+    /// Operates on the unique <see cref="TrecsRecordingSession"/> if there
     /// is exactly one. With multiple worlds, logs a warning and does nothing
     /// (the user should use the per-window controls in that case).
     /// </summary>
@@ -80,10 +80,10 @@ namespace Trecs.Internal
             controller.ResetAutoRecording();
         }
 
-        static bool TryGetUniqueController(out TrecsGameStateController controller)
+        static bool TryGetUniqueController(out TrecsRecordingSession controller)
         {
             controller = null;
-            var all = TrecsGameStateRegistry.All;
+            var all = TrecsRecordingSessionRegistry.All;
             if (all.Count == 0)
             {
                 return false;

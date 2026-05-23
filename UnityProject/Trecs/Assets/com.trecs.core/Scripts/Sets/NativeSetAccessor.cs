@@ -8,7 +8,7 @@ namespace Trecs
     /// <c>.Read</c> / <c>.Write</c> counterpart to <see cref="SetAccessor{T}"/>
     /// on the native side. Operations are buffered with sort keys to ensure
     /// deterministic ordering when multiple jobs write concurrently, and are
-    /// applied during the next <c>SubmitEntities()</c> call on the main thread.
+    /// applied during the next <c>Submit()</c> call on the main thread.
     /// </summary>
     public readonly struct NativeSetAccessor<T>
         where T : struct, IEntitySet

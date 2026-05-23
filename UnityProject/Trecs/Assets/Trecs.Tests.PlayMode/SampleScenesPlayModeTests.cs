@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
+using Trecs.Samples.DynamicCollections;
 using Trecs.Samples.FeedingFrenzyBenchmark;
+using Trecs.Samples.HeightmapBlobs;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Assert = NUnit.Framework.Assert;
@@ -45,8 +47,29 @@ namespace Trecs.Tests.PlayMode
         [UnityTest]
         public IEnumerator Interpolation() => RunScene("Interpolation");
 
-        [UnityTest]
-        public IEnumerator Pointers() => RunScene("Pointers");
+        public static IEnumerable<TestCaseData> DynamicCollectionsCases()
+        {
+            foreach (TrailCollectionType type in Enum.GetValues(typeof(TrailCollectionType)))
+            {
+                yield return new TestCaseData(type)
+                    .Returns(null)
+                    .SetName($"DynamicCollections({type})");
+            }
+        }
+
+        [UnityTest, TestCaseSource(nameof(DynamicCollectionsCases))]
+        public IEnumerator DynamicCollections(TrailCollectionType collectionType)
+        {
+            DynamicCollectionsCompositionRoot.CollectionTypeOverride = collectionType;
+            try
+            {
+                yield return RunScene("DynamicCollections");
+            }
+            finally
+            {
+                DynamicCollectionsCompositionRoot.CollectionTypeOverride = null;
+            }
+        }
 
         [UnityTest]
         public IEnumerator Snake() => RunScene("Snake");
@@ -93,19 +116,10 @@ namespace Trecs.Tests.PlayMode
                 );
                 yield return load;
 
-                // One extra frame so Bootstrap.Awake has run and CurrentWorld is set.
-                yield return null;
-                Assert.IsNotNull(
-                    FrenzyCompositionRoot.CurrentWorld,
-                    "FrenzyCompositionRoot.CurrentWorld was not populated"
-                );
-
                 const int dwellFrames = 180;
                 foreach (IterationStyle style in Enum.GetValues(typeof(IterationStyle)))
                 {
-                    FrenzyCompositionRoot
-                        .CurrentWorld.GlobalComponent<FrenzyConfig>()
-                        .Write.IterationStyle = style;
+                    ConfigInputSystem.TestPendingIterationStyle = style;
 
                     for (int i = 0; i < dwellFrames; i++)
                     {
@@ -122,19 +136,40 @@ namespace Trecs.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator NativePointers() => RunScene("NativePointers");
-
-        [UnityTest]
         public IEnumerator AspectInterfaces() => RunScene("AspectInterfaces");
 
         [UnityTest]
-        public IEnumerator BlobStorage() => RunScene("BlobStorage");
+        public IEnumerator BlobSeedPattern() => RunScene("BlobSeedPattern");
 
         [UnityTest]
         public IEnumerator ReactiveEvents() => RunScene("ReactiveEvents");
 
         [UnityTest]
         public IEnumerator MultipleWorlds() => RunScene("MultipleWorlds");
+
+        public static IEnumerable<TestCaseData> HeightmapBlobsCases()
+        {
+            foreach (HeightmapFlavor flavor in Enum.GetValues(typeof(HeightmapFlavor)))
+            {
+                yield return new TestCaseData(flavor)
+                    .Returns(null)
+                    .SetName($"HeightmapBlobs({flavor})");
+            }
+        }
+
+        [UnityTest, TestCaseSource(nameof(HeightmapBlobsCases))]
+        public IEnumerator HeightmapBlobs(HeightmapFlavor flavor)
+        {
+            HeightmapBlobsCompositionRoot.FlavorOverride = flavor;
+            try
+            {
+                yield return RunScene("HeightmapBlobs");
+            }
+            finally
+            {
+                HeightmapBlobsCompositionRoot.FlavorOverride = null;
+            }
+        }
 
         static IEnumerator RunScene(string sceneName)
         {

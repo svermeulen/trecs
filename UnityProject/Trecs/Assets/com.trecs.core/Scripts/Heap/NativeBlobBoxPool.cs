@@ -51,8 +51,8 @@ namespace Trecs.Internal
 
         void AssertRentable()
         {
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "NativeBlobBoxPool is main-thread only; the free-list is not thread-safe"
             );
@@ -70,11 +70,11 @@ namespace Trecs.Internal
         // so we assert rather than silently absorbing it.
         internal void Return(NativeBlobBox box)
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 !_isDisposed,
                 "Box returned to disposed NativeBlobBoxPool — a heap or blob store outlived its pool"
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "NativeBlobBoxPool is main-thread only; the free-list is not thread-safe"
             );
@@ -83,7 +83,7 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            TrecsAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!_isDisposed);
             // Boxes on the free-list have already had their native memory freed.
             // We drop our references and let the GC collect the wrappers.
             _free.Clear();

@@ -52,7 +52,7 @@ namespace Trecs.Tests
                     new ArraySegment<byte>(truncatedData),
                     truncatedData.Length
                 );
-                TrecsAssert.Throws<Exception>(() => newCacheHelper.ReadAll<List<string>>());
+                TrecsDebugAssert.Throws<Exception>(() => newCacheHelper.ReadAll<List<string>>());
             }
             finally
             {
@@ -86,7 +86,7 @@ namespace Trecs.Tests
                     new ArraySegment<byte>(truncatedData),
                     truncatedData.Length
                 );
-                TrecsAssert.Throws<Exception>(() =>
+                TrecsDebugAssert.Throws<Exception>(() =>
                     newCacheHelper.ReadAll<Dictionary<int, string>>()
                 );
             }
@@ -119,10 +119,10 @@ namespace Trecs.Tests
                 if (includesTypeChecks)
                 {
                     var listTypeId = reader.ReadInt32(); // list<> type id
-                    TrecsAssert.IsEqual(listTypeId, TypeIdProvider.GetTypeId<List<int>>());
+                    TrecsDebugAssert.IsEqual(listTypeId, TypeId<List<int>>.Value.Value);
 
                     var intTypeId = reader.ReadInt32();
-                    TrecsAssert.IsEqual(intTypeId, TypeIdProvider.GetTypeId<int>());
+                    TrecsDebugAssert.IsEqual(intTypeId, TypeId<int>.Value.Value);
                 }
 
                 using (var writer = new BinaryWriter(stream))
@@ -140,7 +140,7 @@ namespace Trecs.Tests
                     new ArraySegment<byte>(serializedData),
                     serializedData.Length
                 );
-                TrecsAssert.Throws<Exception>(() => newCacheHelper.ReadAll<List<int>>());
+                TrecsDebugAssert.Throws<Exception>(() => newCacheHelper.ReadAll<List<int>>());
             }
             finally
             {
@@ -171,10 +171,10 @@ namespace Trecs.Tests
                 if (includesTypeChecks)
                 {
                     var listTypeId = reader.ReadInt32(); // list<> type id
-                    TrecsAssert.IsEqual(listTypeId, TypeIdProvider.GetTypeId<List<int>>());
+                    TrecsDebugAssert.IsEqual(listTypeId, TypeId<List<int>>.Value.Value);
 
                     var intTypeId = reader.ReadInt32();
-                    TrecsAssert.IsEqual(intTypeId, TypeIdProvider.GetTypeId<int>());
+                    TrecsDebugAssert.IsEqual(intTypeId, TypeId<int>.Value.Value);
                 }
 
                 using (var writer = new BinaryWriter(stream))
@@ -191,7 +191,7 @@ namespace Trecs.Tests
                     new ArraySegment<byte>(serializedData),
                     serializedData.Length
                 );
-                TrecsAssert.Throws<Exception>(() => newCacheHelper.ReadAll<List<int>>());
+                TrecsDebugAssert.Throws<Exception>(() => newCacheHelper.ReadAll<List<int>>());
             }
             finally
             {

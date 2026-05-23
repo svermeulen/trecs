@@ -23,7 +23,7 @@ namespace Trecs.Internal
         /// conservative, but harmless — the scheduler just syncs them together).
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ResourceId Component(ComponentId id) => new(id.Value & 0x7FFFFFFF);
+        public static ResourceId Component(TypeId id) => new(id.Value & 0x7FFFFFFF);
 
         /// <summary>
         /// Create a ResourceId for a set.
@@ -31,7 +31,7 @@ namespace Trecs.Internal
         /// guaranteeing no collision with component ResourceIds.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ResourceId Set(SetId id) => new(id.Id | unchecked((int)0x80000000));
+        public static ResourceId Set(SetId id) => new(id.Value | unchecked((int)0x80000000));
 
         public int Value
         {

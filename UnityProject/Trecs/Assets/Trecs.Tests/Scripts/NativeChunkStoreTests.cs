@@ -199,26 +199,6 @@ namespace Trecs.Tests
             NAssert.Throws<TrecsException>(() => store.Free(bogus));
         }
 
-        [Test]
-        public void Free_OnDrained_RunsForBucketPath()
-        {
-            // Parity with HugeAlloc_Free_OnDrainedRunsBeforePageRelease — the callback
-            // contract is the same on the bucket Free path (slot's still-live address
-            // visible to the callback before the slot is returned to its bucket).
-            using var store = new NativeChunkStore(TrecsLog.Default);
-            var h = store.Alloc(64, 8, typeHash: 0);
-            var allocAddress = store.ResolveEntry(h).Address;
-
-            IntPtr observedAddress = IntPtr.Zero;
-            store.Free(h, entry => observedAddress = entry.Address);
-
-            NAssert.AreEqual(
-                allocAddress,
-                observedAddress,
-                "onDrained must see the slot's live address before it's returned to the bucket"
-            );
-        }
-
         // ─── Bucket reuse ───────────────────────────────────────
 
         [Test]
@@ -342,25 +322,6 @@ namespace Trecs.Tests
 
             store.Free(huge);
             NAssert.AreEqual(0, store.NumPages);
-        }
-
-        [Test]
-        public void HugeAlloc_Free_OnDrainedRunsBeforePageRelease()
-        {
-            // onDrained runs after the safety-handle release but before ReturnSlot
-            // frees the huge page, so the entry's Address is still live memory when
-            // the callback inspects it.
-            using var store = new NativeChunkStore(TrecsLog.Default);
-            var huge = store.Alloc(200 * 1024, 16, typeHash: 0);
-
-            IntPtr observedAddress = IntPtr.Zero;
-            store.Free(huge, entry => observedAddress = entry.Address);
-
-            NAssert.AreNotEqual(
-                IntPtr.Zero,
-                observedAddress,
-                "onDrained should have run with a valid address"
-            );
         }
 
         // ─── Generation / stale handle detection ────────────────
@@ -633,12 +594,12 @@ namespace Trecs.Tests
             using var buf2 = new SerializationBuffer(registry);
 
             buf1.StartWrite(version: 1, includeTypeChecks: true);
-            store.Serialize(buf1);
+            store.Serialize(buf1.Writer);
             buf1.EndWrite();
             var bytes1 = buf1.MemoryStream.ToArray();
 
             buf2.StartWrite(version: 1, includeTypeChecks: true);
-            store.Serialize(buf2);
+            store.Serialize(buf2.Writer);
             buf2.EndWrite();
             var bytes2 = buf2.MemoryStream.ToArray();
 
@@ -771,7 +732,7 @@ namespace Trecs.Tests
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             using var buf = new SerializationBuffer(registry);
             buf.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buf);
+            src.Serialize(buf.Writer);
             buf.EndWrite();
 
             // Build a DIFFERENT chunk store (different shape, different size) then free
@@ -789,7 +750,7 @@ namespace Trecs.Tests
             // Deserialize over it.
             buf.MemoryStream.Position = 0;
             buf.StartRead();
-            dst.Deserialize(buf);
+            dst.Deserialize(buf.Reader);
             buf.StopRead(verifySentinel: false);
 
             NAssert.AreEqual(src.NumLiveAllocations, dst.NumLiveAllocations);
@@ -961,12 +922,12 @@ namespace Trecs.Tests
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             using var buf = new SerializationBuffer(registry);
             buf.StartWrite(version: 1, includeTypeChecks: true);
-            src.Serialize(buf);
+            src.Serialize(buf.Writer);
             buf.EndWrite();
             buf.MemoryStream.Position = 0;
             buf.StartRead();
             var dst = new NativeChunkStore(TrecsLog.Default);
-            dst.Deserialize(buf);
+            dst.Deserialize(buf.Reader);
             buf.StopRead(verifySentinel: false);
             return dst;
         }
@@ -1292,6 +1253,114 @@ namespace Trecs.Tests
             {
                 store.Free(h);
             }
+        }
+
+        // ─── SnapshotPageOccupancy ──────────────────────────────
+
+        [Test]
+        public void SnapshotPageOccupancy_EmptyStore_ProducesNoPages()
+        {
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            var headers = new List<PageOccupancyHeader>();
+            var liveSlots = new List<bool>();
+            store.SnapshotPageOccupancy(headers, liveSlots);
+            NAssert.AreEqual(0, headers.Count);
+            NAssert.AreEqual(0, liveSlots.Count);
+        }
+
+        [Test]
+        public void SnapshotPageOccupancy_MixedAllocs_MarksOnlyLiveSlotsInRightPages()
+        {
+            using var store = new NativeChunkStore(TrecsLog.Default);
+
+            // Three small allocs into two different buckets, plus one huge alloc that
+            // takes its own single-slot page. Free one of the small ones so the page
+            // it lives on has at least one free slot — the bitmap must reflect that.
+            var smallA = store.Alloc(16, 8, typeHash: 1);
+            var smallB = store.Alloc(16, 8, typeHash: 1);
+            var smallC = store.Alloc(64, 8, typeHash: 2);
+            var huge = store.Alloc(128 * 1024, 16, typeHash: 3);
+
+            store.Free(smallB);
+
+            var headers = new List<PageOccupancyHeader>();
+            var liveSlots = new List<bool>();
+            store.SnapshotPageOccupancy(headers, liveSlots);
+
+            // Expect three pages: one 16B page (with smallA live, smallB freed),
+            // one 64B page (smallC live), and one huge page.
+            NAssert.AreEqual(3, headers.Count);
+
+            int liveCountSum = 0;
+            int slotCountSum = 0;
+            int huges = 0;
+            foreach (var h in headers)
+            {
+                NAssert.That(h.SlotCount > 0);
+                NAssert.That(h.LiveSlotsStartIndex >= 0);
+                NAssert.That(h.LiveSlotsStartIndex + h.SlotCount <= liveSlots.Count);
+                slotCountSum += h.SlotCount;
+                int liveInPage = 0;
+                for (int i = 0; i < h.SlotCount; i++)
+                {
+                    if (liveSlots[h.LiveSlotsStartIndex + i])
+                    {
+                        liveInPage++;
+                    }
+                }
+                liveCountSum += liveInPage;
+                // FreeCount must equal SlotCount - liveInPage for bucket pages. Huge
+                // pages have SlotCount=1, FreeCount=0, liveInPage=1.
+                NAssert.AreEqual(
+                    h.SlotCount - h.FreeCount,
+                    liveInPage,
+                    "page {0}: SlotCount-FreeCount mismatch vs live bits",
+                    h.PageId
+                );
+                if (h.BucketIdx < 0)
+                {
+                    huges++;
+                    NAssert.AreEqual(1, h.SlotCount);
+                    NAssert.IsTrue(liveSlots[h.LiveSlotsStartIndex]);
+                }
+            }
+            NAssert.AreEqual(1, huges, "exactly one huge page expected");
+            NAssert.AreEqual(slotCountSum, liveSlots.Count);
+            NAssert.AreEqual(3, liveCountSum); // smallA + smallC + huge
+
+            store.Free(smallA);
+            store.Free(smallC);
+            store.Free(huge);
+        }
+
+        [Test]
+        public void SnapshotPageOccupancy_CallerListsAreReusedAcrossCalls()
+        {
+            using var store = new NativeChunkStore(TrecsLog.Default);
+            var headers = new List<PageOccupancyHeader>();
+            var liveSlots = new List<bool>();
+
+            var h1 = store.Alloc(64, 8, typeHash: 0);
+            store.SnapshotPageOccupancy(headers, liveSlots);
+            int firstHeaderCount = headers.Count;
+            int firstSlotCount = liveSlots.Count;
+            NAssert.That(firstHeaderCount > 0);
+            NAssert.That(firstSlotCount > 0);
+
+            // Second call should fully refill the SAME lists — counts may differ but
+            // there must be no stale entries from the previous snapshot.
+            var h2 = store.Alloc(256, 8, typeHash: 0);
+            store.SnapshotPageOccupancy(headers, liveSlots);
+
+            int totalSlotCount = 0;
+            foreach (var hdr in headers)
+            {
+                totalSlotCount += hdr.SlotCount;
+            }
+            NAssert.AreEqual(totalSlotCount, liveSlots.Count, "no stale bools should remain");
+
+            store.Free(h1);
+            store.Free(h2);
         }
     }
 }

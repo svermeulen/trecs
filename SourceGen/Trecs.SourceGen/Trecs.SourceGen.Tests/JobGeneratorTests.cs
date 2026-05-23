@@ -170,9 +170,9 @@ public class JobGeneratorTests
     {
         // [GlobalIndex] int on a component-iteration Execute method exercises the
         // NeedsGlobalIndexOffset wiring: the emitted job gets a private
-        // _trecs_GlobalIndexOffset field, the call-site forwards
-        // `_trecs_GlobalIndexOffset + i`, and the per-overload schedule path
-        // assigns `_trecs_job._trecs_GlobalIndexOffset = _trecs_queryIndexOffset`.
+        // __GlobalIndexOffset field, the call-site forwards
+        // `__GlobalIndexOffset + i`, and the per-overload schedule path
+        // assigns `__trecs_job.__GlobalIndexOffset = __trecs_queryIndexOffset`.
         const string source = """
             namespace Sample
             {
@@ -204,7 +204,7 @@ public class JobGeneratorTests
     public void IterationJob_ComponentsModeWithEntityHandle_CompilesCleanly()
     {
         // Components-mode method takes an EntityHandle. JobGenerator should plumb
-        // a hidden `_trecs_EntityHandles` NativeEntityHandleBuffer field through
+        // a hidden `__EntityHandles` NativeEntityHandleBuffer field through
         // the Execute shim and the per-group ScheduleParallel body.
         const string source = """
             namespace Sample
@@ -238,7 +238,7 @@ public class JobGeneratorTests
     {
         // Aspect-mode method takes (in AspectType, EntityHandle). The aspect
         // ExtraParamOrder list should record the EntityHandle and the Execute
-        // call args should append `_trecs_EntityHandles[i]` after the aspect.
+        // call args should append `__EntityHandles[i]` after the aspect.
         const string source = """
             namespace Sample
             {

@@ -16,7 +16,10 @@ namespace Trecs.Samples.Snake
             _displayText = displayText;
         }
 
-        public void Execute()
+        void Execute(
+            [SingleEntity(typeof(TrecsTags.Globals))] in Globals globals,
+            [SingleEntity(typeof(SnakeTags.SnakeHead))] in Head head
+        )
         {
             _refreshCountdown -= World.DeltaTime;
             if (_refreshCountdown > 0)
@@ -26,21 +29,12 @@ namespace Trecs.Samples.Snake
 
             _refreshCountdown = RefreshInterval;
 
-            int score = World.GlobalComponent<Score>().Read.Value;
-            int length = World.GlobalComponent<SnakeLength>().Read.Value;
-            int frame = World.FixedFrame;
-
-            var direction = World
-                .Query()
-                .WithTags<SnakeTags.SnakeHead>()
-                .SingleHandle()
-                .Component<Direction>(World)
-                .Read.Value;
+            var direction = head.Direction;
 
             _sb.Clear();
-            AppendStat("Score", $"{score}");
-            AppendStat("Length", $"{length}");
-            AppendStat("Frame", $"{frame}");
+            AppendStat("Score", $"{globals.Score}");
+            AppendStat("Length", $"{globals.SnakeLength}");
+            AppendStat("Frame", $"{World.FixedFrame}");
             AppendStat("Heading", DirectionName(direction.x, direction.y));
             _sb.AppendLine();
             AppendHeader("Controls:");
@@ -48,6 +42,10 @@ namespace Trecs.Samples.Snake
 
             _displayText.text = _sb.ToString();
         }
+
+        partial struct Globals : IAspect, IRead<Score, SnakeLength> { }
+
+        partial struct Head : IAspect, IRead<Direction> { }
 
         static string DirectionName(int x, int y)
         {

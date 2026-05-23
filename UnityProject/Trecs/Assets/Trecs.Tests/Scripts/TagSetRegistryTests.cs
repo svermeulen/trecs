@@ -28,15 +28,15 @@ namespace Trecs.Tests
         // Pair (A=0x70000001, B=0x70000002): XOR = 0x70000003.
         // Pair (C=0x70000005, D=0x70000006): XOR = 0x70000003 also — same
         // last-two-bits trick that bit the migration's TestPartition guids.
-        static readonly Tag TagA = new(0x70000001, "ColTestTagA");
-        static readonly Tag TagB = new(0x70000002, "ColTestTagB");
-        static readonly Tag TagC = new(0x70000005, "ColTestTagC");
-        static readonly Tag TagD = new(0x70000006, "ColTestTagD");
+        static readonly Tag TagA = new(0x70000001);
+        static readonly Tag TagB = new(0x70000002);
+        static readonly Tag TagC = new(0x70000005);
+        static readonly Tag TagD = new(0x70000006);
 
         // Cross-arity inputs: XGuid = aGuid XOR bGuid by construction.
-        static readonly Tag CrossArityA = new(0x70000013 ^ 0x12345678, "CrossArityA");
-        static readonly Tag CrossArityB = new(0x12345678, "CrossArityB");
-        static readonly Tag CrossArityX = new(0x70000013, "CrossArityX");
+        static readonly Tag CrossArityA = new(0x70000013 ^ 0x12345678);
+        static readonly Tag CrossArityB = new(0x12345678);
+        static readonly Tag CrossArityX = new(0x70000013);
 
         [Test]
         public void TagsToTagSet_SameTagsTwice_ReturnsSameId()
@@ -58,8 +58,8 @@ namespace Trecs.Tests
 
             // Self-check: confirm the adversarial pair actually collides on XOR.
             NAssert.AreEqual(
-                TagA.Guid ^ TagB.Guid,
-                TagC.Guid ^ TagD.Guid,
+                TagA.Value ^ TagB.Value,
+                TagC.Value ^ TagD.Value,
                 "Test inputs no longer collide; pick new guids."
             );
 
@@ -70,20 +70,76 @@ namespace Trecs.Tests
 
             // Second registration with different tags must throw.
             var ex = NAssert.Throws<TrecsException>(() => TagSet.FromTags(TagC, TagD));
-            StringAssert.Contains("TagSet hash collision", ex.Message);
+            StringAssert.Contains("TypeIdSet hash collision", ex.Message);
         }
 
         [Test]
         public void TagsToTagSet_SingleTagWithColludingSetId_Throws()
         {
-            // Cross-arity collision: a singleton set {X} has id = X.Guid;
-            // a two-element set {A, B} has id = A.Guid ^ B.Guid. If those
+            // Cross-arity collision: a singleton set {X} has id = X.Value;
+            // a two-element set {A, B} has id = A.Value ^ B.Value. If those
             // happen to be equal, both register at the same id slot.
-            NAssert.AreEqual(CrossArityA.Guid ^ CrossArityB.Guid, CrossArityX.Guid);
+            NAssert.AreEqual(CrossArityA.Value ^ CrossArityB.Value, CrossArityX.Value);
 
             TagSet.FromTags(CrossArityA, CrossArityB);
             var ex = NAssert.Throws<TrecsException>(() => TagSet.FromTags(CrossArityX));
-            StringAssert.Contains("TagSet hash collision", ex.Message);
+            StringAssert.Contains("TypeIdSet hash collision", ex.Message);
         }
+
+        // ── BurstableFromTags equivalence ────────────────────────────────────
+        //
+        // The Burst-safe XOR-based factory must produce the same TagSet.Id as
+        // the registry-routed managed TagSet<T...>.Value for every input. If it
+        // diverges, every Burst-job AddEntity<T...> call lands in the wrong
+        // group (or fails to resolve). These are the foundational correctness
+        // tests for the Burst-side fast path.
+
+        [Test]
+        public void BurstableFromTags_OneArg_MatchesGenericTagSet()
+        {
+            NAssert.AreEqual(TagSet<TestAlpha>.Value, TagSet.BurstableFromTags<TestAlpha>());
+        }
+
+        [Test]
+        public void BurstableFromTags_TwoArgs_MatchesGenericTagSet()
+        {
+            NAssert.AreEqual(
+                TagSet<TestAlpha, TestBeta>.Value,
+                TagSet.BurstableFromTags<TestAlpha, TestBeta>()
+            );
+        }
+
+        [Test]
+        public void BurstableFromTags_ThreeArgs_MatchesGenericTagSet()
+        {
+            NAssert.AreEqual(
+                TagSet<TestAlpha, TestBeta, TestGamma>.Value,
+                TagSet.BurstableFromTags<TestAlpha, TestBeta, TestGamma>()
+            );
+        }
+
+        [Test]
+        public void BurstableFromTags_FourArgs_MatchesGenericTagSet()
+        {
+            NAssert.AreEqual(
+                TagSet<TestAlpha, TestBeta, TestGamma, TestDelta>.Value,
+                TagSet.BurstableFromTags<TestAlpha, TestBeta, TestGamma, TestDelta>()
+            );
+        }
+
+#if DEBUG
+        [Test]
+        public void BurstableFromTags_DuplicateTypeArgs_AssertsInDebug()
+        {
+            // XOR cancels duplicates, so the resulting id would diverge from
+            // the managed-side dedup path. The DEBUG-only assert catches the
+            // misuse loudly.
+            NAssert.Catch(() => TagSet.BurstableFromTags<TestAlpha, TestAlpha>());
+            NAssert.Catch(() => TagSet.BurstableFromTags<TestAlpha, TestBeta, TestAlpha>());
+            NAssert.Catch(() =>
+                TagSet.BurstableFromTags<TestAlpha, TestBeta, TestGamma, TestAlpha>()
+            );
+        }
+#endif
     }
 }

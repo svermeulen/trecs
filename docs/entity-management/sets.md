@@ -29,7 +29,7 @@ All set mutations go through `World.Set<T>()`, which exposes three timing modes:
 
 | Call shape | Timing | When applied |
 |---|---|---|
-| `.DeferredAdd` / `.DeferredRemove` / `.DeferredClear` | Submission-deferred | Next call to `SubmitEntities()` |
+| `.DeferredAdd` / `.DeferredRemove` / `.DeferredClear` | Submission-deferred | Next call to `Submit()` |
 | `.Write` | Synchronous | Immediately (main thread, syncs outstanding jobs) |
 | `.Read`  | Synchronous read | Immediately (main thread, syncs outstanding writers) |
 

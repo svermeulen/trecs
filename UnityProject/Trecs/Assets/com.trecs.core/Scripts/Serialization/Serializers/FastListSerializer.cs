@@ -15,7 +15,7 @@ namespace Trecs.Serialization
         public void Deserialize(ref FastList<T> value, ISerializationReader reader)
         {
             var numItems = reader.Read<int>("Count");
-            TrecsAssert.That(numItems >= 0);
+            TrecsDebugAssert.That(numItems >= 0);
 
             if (value == null)
             {
@@ -23,7 +23,7 @@ namespace Trecs.Serialization
             }
             else
             {
-                TrecsAssert.That(value.Count == 0);
+                TrecsDebugAssert.That(value.Count == 0);
 
                 value.Clear();
 
@@ -42,7 +42,7 @@ namespace Trecs.Serialization
             value.SetCountTo(numItems);
 
             var buffer = value.ToArrayFast(out int count);
-            TrecsAssert.That(count == numItems);
+            TrecsDebugAssert.That(count == numItems);
 
             unsafe
             {

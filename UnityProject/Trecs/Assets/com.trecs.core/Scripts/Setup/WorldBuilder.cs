@@ -57,8 +57,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetDebugName(string debugName)
         {
-            TrecsRequire.That(debugName != null, "debugName must not be null");
-            TrecsRequire.That(_debugName == null, "DebugName has already been set");
+            TrecsAssert.That(debugName != null, "debugName must not be null");
+            TrecsAssert.That(_debugName == null, "DebugName has already been set");
             _debugName = debugName;
             return this;
         }
@@ -68,8 +68,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetSettings(WorldSettings settings)
         {
-            TrecsRequire.That(settings != null, "settings must not be null");
-            TrecsRequire.That(_settings == null, "Settings have already been set");
+            TrecsAssert.That(settings != null, "settings must not be null");
+            TrecsAssert.That(_settings == null, "Settings have already been set");
             _settings = settings;
             return this;
         }
@@ -83,8 +83,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddTemplate(Template template)
         {
-            TrecsRequire.That(template != null, "template must not be null");
-            TrecsRequire.That(
+            TrecsAssert.That(template != null, "template must not be null");
+            TrecsAssert.That(
                 !template.IsAbstract,
                 "Template '{0}' is marked abstract — abstract templates may only be used as IExtends<> bases. Remove the 'abstract' keyword or register a concrete derived template instead.",
                 template.DebugName
@@ -99,15 +99,11 @@ namespace Trecs
         public WorldBuilder AddSet<T>()
             where T : struct, IEntitySet
         {
+            // EntitySet<T>.Value's cctor runs SetFactory.CreateSet, which populates the
+            // registries that SetId<T>.Value (and everything downstream) depends on.
             var entitySet = EntitySet<T>.Value;
 
-            // Force EntitySetId<T> static constructor to run on the main thread,
-            // so the SharedStatic is populated before any Burst job accesses it.
-            // Without this, the [BurstDiscard] on Init() strips the initialization
-            // when the static constructor first runs inside a Burst-compiled job.
-            _ = EntitySetId<T>.Value;
-
-            TrecsRequire.That(
+            TrecsAssert.That(
                 !_sets.Any(f => f.Id == entitySet.Id),
                 "Set '{0}' is already added to the WorldBuilder",
                 entitySet.DebugName
@@ -122,7 +118,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddTemplates(IEnumerable<Template> templates)
         {
-            TrecsRequire.That(templates != null, "templates must not be null");
+            TrecsAssert.That(templates != null, "templates must not be null");
             foreach (var template in templates)
             {
                 AddTemplate(template);
@@ -135,8 +131,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetPoolManager(ITrecsPoolManager poolManager)
         {
-            TrecsRequire.That(poolManager != null, "poolManager must not be null");
-            TrecsRequire.That(_poolManager == null, "PoolManager has already been set");
+            TrecsAssert.That(poolManager != null, "poolManager must not be null");
+            TrecsAssert.That(_poolManager == null, "PoolManager has already been set");
             _poolManager = poolManager;
             return this;
         }
@@ -146,7 +142,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddSystem(ISystem system)
         {
-            TrecsRequire.That(system != null, "system must not be null");
+            TrecsAssert.That(system != null, "system must not be null");
             _systems.Add(system);
             return this;
         }
@@ -156,7 +152,7 @@ namespace Trecs
         /// </summary>
         public WorldBuilder AddSystems(IEnumerable<ISystem> systems)
         {
-            TrecsRequire.That(systems != null, "systems must not be null");
+            TrecsAssert.That(systems != null, "systems must not be null");
             foreach (var system in systems)
             {
                 AddSystem(system);
@@ -165,21 +161,27 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Adds a blob store for loading shared blob data.
+        /// Adds a blob store for loading shared blob data. Pass an instance of one of the
+        /// supplied store types — <see cref="BlobStoreInMemory"/>, or the Svkj-package
+        /// <c>BlobStoreFiles</c> / <c>BlobStoreAddressables</c>. The <see cref="IBlobStore"/>
+        /// contract is not intended for external implementation.
+        ///
+        /// If no blob store is added before <see cref="Build"/>, the builder falls back to a
+        /// <see cref="BlobStoreInMemory"/> with <see cref="BlobStoreInMemorySettings.Default"/>.
         /// </summary>
         public WorldBuilder AddBlobStore(IBlobStore store)
         {
-            TrecsRequire.That(store != null, "store must not be null");
+            TrecsAssert.That(store != null, "store must not be null");
             _blobStores.Add(store);
             return this;
         }
 
         /// <summary>
-        /// Adds multiple blob stores for loading shared blob data.
+        /// Adds multiple blob stores for loading shared blob data. See <see cref="AddBlobStore"/>.
         /// </summary>
         public WorldBuilder AddBlobStores(IEnumerable<IBlobStore> stores)
         {
-            TrecsRequire.That(stores != null, "stores must not be null");
+            TrecsAssert.That(stores != null, "stores must not be null");
             foreach (var store in stores)
             {
                 AddBlobStore(store);
@@ -192,11 +194,8 @@ namespace Trecs
         /// </summary>
         public WorldBuilder SetBlobCacheSettings(BlobCacheSettings settings)
         {
-            TrecsRequire.That(settings != null, "settings must not be null");
-            TrecsRequire.That(
-                _blobCacheSettings == null,
-                "BlobCacheSettings have already been set"
-            );
+            TrecsAssert.That(settings != null, "settings must not be null");
+            TrecsAssert.That(_blobCacheSettings == null, "BlobCacheSettings have already been set");
             _blobCacheSettings = settings;
             return this;
         }
@@ -226,7 +225,7 @@ namespace Trecs
             IEnumerable<SystemOrderConstraint> constraints
         )
         {
-            TrecsRequire.That(constraints != null, "constraints must not be null");
+            TrecsAssert.That(constraints != null, "constraints must not be null");
             foreach (var constraint in constraints)
             {
                 AddSystemOrderConstraint(constraint);
@@ -237,11 +236,36 @@ namespace Trecs
         /// <summary>
         /// Registers a custom serializer instance. The serializer must
         /// implement <see cref="ISerializer{T}"/>; the handled object type
-        /// is inferred from that interface.
+        /// is inferred from that interface. Instance registration is
+        /// exclusive — throws if the target object type already has a
+        /// serializer registered (instance or Type-based).
         /// </summary>
         public WorldBuilder RegisterSerializer(ISerializer serializer)
         {
             _serializerRegistry.RegisterSerializer(serializer);
+            return this;
+        }
+
+        /// <summary>
+        /// Registers a serializer by Type. The target object type is read
+        /// via reflection at registration time, but the serializer is
+        /// lazily constructed via its parameterless constructor on first
+        /// lookup and cached. The same serializer Type may be registered
+        /// from multiple call sites — extra registrations are silently
+        /// ignored. Different serializer Types targeting the same object
+        /// type still throw.
+        /// </summary>
+        public WorldBuilder RegisterSerializer<TSerializer>()
+            where TSerializer : ISerializer, new()
+        {
+            _serializerRegistry.RegisterSerializer<TSerializer>();
+            return this;
+        }
+
+        /// <inheritdoc cref="RegisterSerializer{TSerializer}"/>
+        public WorldBuilder RegisterSerializer(Type serializerType)
+        {
+            _serializerRegistry.RegisterSerializer(serializerType);
             return this;
         }
 
@@ -268,7 +292,7 @@ namespace Trecs
             var seenTemplates = new HashSet<Template>();
             foreach (var template in _templates)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     seenTemplates.Add(template),
                     "Duplicate template '{0}' added to WorldBuilder",
                     template.DebugName
@@ -305,7 +329,7 @@ namespace Trecs
         /// </summary>
         public World Build()
         {
-            TrecsRequire.That(!_hasBuilt, "Build() has already been called");
+            TrecsAssert.That(!_hasBuilt, "Build() has already been called");
             _hasBuilt = true;
 
 #if DEBUG && !TRECS_IS_PROFILING
@@ -322,19 +346,24 @@ namespace Trecs
 
             var uniqueHeap = new UniqueHeap(log, _poolManager);
             var nativeBlobBoxPool = new NativeBlobBoxPool();
+
+            // If no blob stores were registered, fall back to an in-memory store with default
+            // settings so heap operations work out of the box. Callers that added at least one
+            // store (even a read-only one like BlobStoreAddressables) are assumed to have
+            // configured things intentionally, so we leave their list untouched.
+            if (_blobStores.Count == 0)
+            {
+                _blobStores.Add(new BlobStoreInMemory(BlobStoreInMemorySettings.Default));
+            }
+
             var blobCache = new BlobCache(log, _blobStores, _blobCacheSettings, nativeBlobBoxPool);
             var sharedHeap = new SharedHeap(log, blobCache);
             var nativeSharedHeap = new NativeSharedHeap(log, blobCache);
-            var frameScopedUniqueHeap = new FrameScopedUniqueHeap(log, _poolManager);
-            var frameScopedSharedHeap = new FrameScopedSharedHeap(log, blobCache);
-            var nativeFrameScopedSharedHeap = new FrameScopedNativeSharedHeap(log, blobCache);
             var nativeUniqueChunkStore = new NativeChunkStore(log);
-            var nativeUniqueHeap = new NativeUniqueHeap(log, nativeUniqueChunkStore);
-            var frameScopedNativeUniqueHeap = new FrameScopedNativeUniqueHeap(
-                log,
-                nativeUniqueChunkStore
-            );
-            var trecsListHeap = new TrecsListHeap(log, nativeUniqueChunkStore);
+            var inputNativeUniqueHeap = new InputNativeUniqueHeap(log);
+            var inputNativeSharedHeap = new InputNativeSharedHeap(log, blobCache);
+            var inputSharedHeap = new InputSharedHeap(log, blobCache);
+            var inputUniqueHeap = new InputUniqueHeap(log, _poolManager);
 
             var accessorRegistry = new WorldAccessorRegistry(log);
 
@@ -375,9 +404,7 @@ namespace Trecs
                 settings,
                 entityQuerier,
                 nativeSharedHeap,
-                nativeUniqueHeap,
-                frameScopedNativeUniqueHeap,
-                trecsListHeap,
+                nativeUniqueChunkStore,
                 jobScheduler
             );
 
@@ -387,10 +414,10 @@ namespace Trecs
 
             var entityInputQueue = new EntityInputQueue(
                 log,
-                frameScopedSharedHeap,
-                nativeFrameScopedSharedHeap,
-                frameScopedUniqueHeap,
-                frameScopedNativeUniqueHeap,
+                inputSharedHeap,
+                inputNativeSharedHeap,
+                inputUniqueHeap,
+                inputNativeUniqueHeap,
                 worldInfo
             );
 
@@ -408,13 +435,11 @@ namespace Trecs
                 entityInputQueue: entityInputQueue,
                 systemRunner: systemRunner,
                 uniqueHeap: uniqueHeap,
-                frameScopedUniqueHeap: frameScopedUniqueHeap,
-                frameScopedSharedHeap: frameScopedSharedHeap,
-                nativeFrameScopedSharedHeap: nativeFrameScopedSharedHeap,
-                nativeUniqueHeap: nativeUniqueHeap,
-                frameScopedNativeUniqueHeap: frameScopedNativeUniqueHeap,
                 nativeUniqueChunkStore: nativeUniqueChunkStore,
-                trecsListHeap: trecsListHeap,
+                inputNativeUniqueHeap: inputNativeUniqueHeap,
+                inputNativeSharedHeap: inputNativeSharedHeap,
+                inputSharedHeap: inputSharedHeap,
+                inputUniqueHeap: inputUniqueHeap,
                 accessorRegistry: accessorRegistry,
                 entitySubmitter: submitter,
                 entitiesDb: entityQuerier,
@@ -470,7 +495,7 @@ namespace Trecs.Internal
             ISystemEntryProvider systemEntryProvider
         )
         {
-            TrecsRequire.That(systemEntryProvider != null, "systemEntryProvider must not be null");
+            TrecsAssert.That(systemEntryProvider != null, "systemEntryProvider must not be null");
             builder._systemEntryProvider = systemEntryProvider;
             return builder;
         }

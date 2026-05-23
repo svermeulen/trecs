@@ -6,11 +6,58 @@ using Unity.Mathematics;
 namespace Trecs
 {
     /// <summary>
-    /// Pointer to a managed (class) blob stored in the <see cref="BlobCache"/>.
-    /// Lives in <see cref="Trecs.Internal"/> because the supported public path
-    /// for shared managed data is <see cref="SharedPtr{T}"/> via
-    /// <see cref="SharedPtr.Alloc{T}(HeapAccessor, BlobId, T)"/>; <see cref="BlobPtr{T}"/>
-    /// is only used by callers writing custom <see cref="IBlobStore"/> backends.
+    /// Static factories for <see cref="BlobPtr{T}"/>. Per-instance operations
+    /// (<c>Get</c>, <c>TryGet</c>, <c>CanGet</c>, <c>Clone</c>, <c>Dispose</c>) live on
+    /// the struct itself.
+    /// </summary>
+    public static class BlobPtr
+    {
+        /// <summary>
+        /// Allocates a new managed blob under <paramref name="blobId"/> in
+        /// <paramref name="blobCache"/> and returns a pinning
+        /// <see cref="BlobPtr{T}"/>. Fails if a blob already exists at this id.
+        /// This is the <see cref="BlobCache"/>-layer counterpart to
+        /// <see cref="SharedPtr.Alloc{T}(HeapAccessor, BlobId, T)"/> — use it when the
+        /// caller's anchor lifetime is independent of any ECS refcount (e.g. startup
+        /// seeders, async preloaders, custom <see cref="IBlobStore"/> backends).
+        /// </summary>
+        public static BlobPtr<T> Alloc<T>(BlobCache blobCache, BlobId blobId, T value)
+            where T : class
+        {
+            return blobCache.AllocManagedBlob<T>(blobId, value);
+        }
+
+        /// <summary>
+        /// Returns a fresh pinning <see cref="BlobPtr{T}"/> for the existing managed
+        /// blob at <paramref name="blobId"/>, throwing if no such blob exists. The
+        /// lookup-only counterpart to <see cref="Alloc{T}(BlobCache, BlobId, T)"/>.
+        /// </summary>
+        public static BlobPtr<T> Acquire<T>(BlobCache blobCache, BlobId blobId)
+            where T : class
+        {
+            return blobCache.AcquireBlobPtr<T>(blobId);
+        }
+
+        /// <summary>
+        /// Returns true and a fresh pinning <see cref="BlobPtr{T}"/> if a managed blob
+        /// exists at <paramref name="blobId"/>; otherwise false.
+        /// </summary>
+        public static bool TryGet<T>(BlobCache blobCache, BlobId blobId, out BlobPtr<T> ptr)
+            where T : class
+        {
+            return blobCache.TryAcquireBlobPtr<T>(blobId, out ptr);
+        }
+    }
+
+    /// <summary>
+    /// Lower-level pinning pointer for a managed (class) blob in <see cref="BlobCache"/>.
+    /// Most game code should use <see cref="SharedPtr{T}"/> via
+    /// <see cref="SharedPtr.Alloc{T}(HeapAccessor, BlobId, T)"/> — that adds the ECS-side
+    /// refcount layer on top of the cache. Reach for <see cref="BlobPtr{T}"/> directly
+    /// when you need to pin blob bytes outside the ECS refcount lifetime — for example,
+    /// startup seeders that anchor blobs before any entity references them, async
+    /// preload from a non-ECS subsystem, or when writing a custom
+    /// <see cref="IBlobStore"/> backend.
     /// </summary>
     public readonly struct BlobPtr<T> : IEquatable<BlobPtr<T>>, IBlobPtr
         where T : class
@@ -34,8 +81,8 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Get(BlobCache blobCache)
         {
-            TrecsAssert.That(!IsNull);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!IsNull);
+            TrecsDebugAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to Get from a disposed BlobPtr"
             );
@@ -71,8 +118,8 @@ namespace Trecs
 
         public void WarmUp(BlobCache blobCache)
         {
-            TrecsAssert.That(!IsNull);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!IsNull);
+            TrecsDebugAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to WarmUp from a disposed BlobPtr"
             );
@@ -81,8 +128,8 @@ namespace Trecs
 
         public BlobLoadingState GetLoadingState(BlobCache blobCache)
         {
-            TrecsAssert.That(!IsNull);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!IsNull);
+            TrecsDebugAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to GetLoadingState from a disposed BlobPtr"
             );
@@ -97,14 +144,14 @@ namespace Trecs
                 return BlobPtr<TTarget>.Null;
             }
 
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 blobCache.ContainsHandle(Handle),
                 "Attempted to Cast a disposed BlobPtr"
             );
 
 #if DEBUG
             var actualType = blobCache.GetManagedBlobType(BlobId);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 typeof(TTarget).IsAssignableFrom(actualType),
                 "BlobPtr cast failed: expected blob assignable to type {0} but found type {1}",
                 typeof(TTarget),
@@ -116,7 +163,7 @@ namespace Trecs
 
         public readonly void Dispose(BlobCache blobCache)
         {
-            TrecsAssert.That(!IsNull);
+            TrecsDebugAssert.That(!IsNull);
             blobCache.DisposeHandle(Handle);
         }
 

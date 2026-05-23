@@ -67,13 +67,13 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool Exists(EntityIndex entityIndex)
+        internal bool Contains(EntityIndex entityIndex)
         {
             var group = entityIndex.GroupIndex;
             if (group.IsNull)
                 return false;
             var entry = _entriesPerGroup[group.Index];
-            return entry.IsValid && entry.Exists(entityIndex.Index);
+            return entry.IsValid && entry.Contains(entityIndex.Index);
         }
     }
 }

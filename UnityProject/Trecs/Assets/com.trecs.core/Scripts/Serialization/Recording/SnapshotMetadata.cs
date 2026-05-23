@@ -17,10 +17,13 @@ namespace Trecs.Internal
         /// interpret this value; it is surfaced so callers can decide whether
         /// a snapshot is compatible with the current world schema.
         /// </summary>
-        public int Version { get; init; }
+        // Plain {get; set;} (not init) so SnapshotSerializer can reuse a
+        // single instance across SaveSnapshot calls — avoiding a per-snapshot
+        // heap allocation on the recorder's hot path.
+        public int Version { get; set; }
 
         /// <summary>World fixed-frame at capture time.</summary>
-        public int FixedFrame { get; init; }
+        public int FixedFrame { get; set; }
 
         /// <summary>Heap blob references the snapshot depends on.</summary>
         public DenseHashSet<BlobId> BlobIds { get; init; } = new();

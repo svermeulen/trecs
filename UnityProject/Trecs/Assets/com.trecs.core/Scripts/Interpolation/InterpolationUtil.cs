@@ -22,16 +22,16 @@ namespace Trecs
 
             if (fixedCurrentTime <= fixedPreviousTime)
             {
-                throw TrecsAssert.CreateException(
+                throw TrecsDebugAssert.CreateException(
                     "Unexpected state when calculating percent through fixed frame. fixedCurrentTime: {0}, fixedPreviousTime: {1}",
                     fixedCurrentTime,
                     fixedPreviousTime
                 );
             }
 
-            TrecsAssert.That(fixedCurrentTime > 0);
-            TrecsAssert.That(fixedPreviousTime >= 0f);
-            TrecsAssert.That(fixedCurrentTime > fixedPreviousTime);
+            TrecsDebugAssert.That(fixedCurrentTime > 0);
+            TrecsDebugAssert.That(fixedPreviousTime >= 0f);
+            TrecsDebugAssert.That(fixedCurrentTime > fixedPreviousTime);
 
             if (fixedCurrentTime < endOfFrameTime)
             {

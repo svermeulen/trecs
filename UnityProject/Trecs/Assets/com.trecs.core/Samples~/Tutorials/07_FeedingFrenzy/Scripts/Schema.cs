@@ -95,6 +95,13 @@ namespace Trecs.Samples.FeedingFrenzy101
         public int Value;
     }
 
+    // -1 for halve, +1 for double, 0 for no change this frame.
+    [Unwrap]
+    public partial struct FishCountAdjustInput : IEntityComponent
+    {
+        public int Direction;
+    }
+
     // ─── Templates ──────────────────────────────────────────────────
     public static partial class SampleTemplates
     {
@@ -150,6 +157,9 @@ namespace Trecs.Samples.FeedingFrenzy101
         {
             DesiredFishCount DesiredFishCount = new() { Value = 1000 };
             DesiredMealCount DesiredMealCount = default;
+
+            [Input(MissingInputBehavior.Reset)]
+            FishCountAdjustInput FishCountAdjustInput = default;
         }
     }
 }

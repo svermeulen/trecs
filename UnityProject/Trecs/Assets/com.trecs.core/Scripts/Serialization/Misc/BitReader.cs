@@ -24,7 +24,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_hasStarted);
+                TrecsDebugAssert.That(_hasStarted);
                 return (_byteIndex * 8 + _bitPosition) < _totalBits;
             }
         }
@@ -33,7 +33,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_hasStarted);
+                TrecsDebugAssert.That(_hasStarted);
                 return _totalBits;
             }
         }
@@ -53,7 +53,7 @@ namespace Trecs.Internal
 
         public void Reset(BinaryReader reader)
         {
-            TrecsAssert.That(!_hasStarted);
+            TrecsDebugAssert.That(!_hasStarted);
             _hasStarted = true;
 
             _totalBits = reader.ReadInt32();
@@ -68,7 +68,7 @@ namespace Trecs.Internal
 
         public void Complete()
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
             _hasStarted = false;
         }
 
@@ -82,7 +82,7 @@ namespace Trecs.Internal
 
         public bool ReadBit()
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             if (_byteIndex >= _bytes.Length || (_byteIndex * 8 + _bitPosition) >= _totalBits)
             {

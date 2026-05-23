@@ -20,7 +20,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             var buffer = a.GetEntityHandleBufferForJob(group);
@@ -37,7 +37,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             var buffer = a.GetEntityHandleBufferForJob(group);
@@ -70,16 +70,16 @@ namespace Trecs.Tests
 
             var init1 = a.AddEntity(TestTags.Alpha).AssertComplete();
             var originalHandle = init1.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Destroy the entity — bumps the forward-map slot's Version on removal.
             a.RemoveEntity(originalHandle);
-            a.SubmitEntities();
+            a.Submit();
 
             // Create a new entity; the submitter should reuse the freed slot.
             var init2 = a.AddEntity(TestTags.Alpha).AssertComplete();
             var newHandle = init2.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(
                 originalHandle.Id,
@@ -119,7 +119,7 @@ namespace Trecs.Tests
             var init1 = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
             var init2 = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 2 }).AssertComplete();
             var init3 = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 3 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var handle1 = init1.Handle;
             var handle3 = init3.Handle;
@@ -127,7 +127,7 @@ namespace Trecs.Tests
             // Removing the middle entity triggers swap-back of #3 into index 1.
             // The reverse map's int at index 1 gets rewritten with #3's Id.
             a.RemoveEntity(init2.Handle);
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             var buffer = a.GetEntityHandleBufferForJob(group);

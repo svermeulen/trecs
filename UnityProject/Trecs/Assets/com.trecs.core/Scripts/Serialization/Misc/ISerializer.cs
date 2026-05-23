@@ -25,7 +25,7 @@ namespace Trecs
 
         void ISerializer.SerializeObject(object value, ISerializationWriter writer)
         {
-            TrecsAssert.That(value != null);
+            TrecsDebugAssert.That(value != null);
             Serialize((T)value, writer);
         }
     }
@@ -66,7 +66,7 @@ namespace Trecs
             ISerializationWriter writer
         )
         {
-            TrecsAssert.That(value != null);
+            TrecsDebugAssert.That(value != null);
 
             T typedValue = (T)value;
             T typedBaseValue = baseValue == null ? default : (T)baseValue;

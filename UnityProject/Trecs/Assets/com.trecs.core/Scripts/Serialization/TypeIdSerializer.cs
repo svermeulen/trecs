@@ -8,21 +8,19 @@ namespace Trecs
     {
         public static void Write(Type objectType, BinaryWriter writer)
         {
-            using var _ = TrecsProfiling.Start("WriteTypeId");
-
             if (objectType.DerivesFrom<Type>())
             {
                 objectType = typeof(Type);
             }
 
-            TrecsAssert.That(!objectType.IsGenericTypeDefinition);
-            writer.Write(TypeIdProvider.GetTypeId(objectType));
+            TrecsDebugAssert.That(!objectType.IsGenericTypeDefinition);
+            writer.Write(TypeId.FromType(objectType).Value);
         }
 
         public static Type Read(BinaryReader reader)
         {
             int id = reader.ReadInt32();
-            return TypeIdProvider.GetTypeFromId(id);
+            return TypeId.ToType(new TypeId(id));
         }
     }
 }

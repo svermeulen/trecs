@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Trecs.SourceGen.Aspect;
@@ -13,33 +10,38 @@ namespace Trecs.SourceGen
     /// (concrete, with component buffers and NativeFactory) and interface (shared contract for
     /// polymorphic helpers). A type participates by implementing Trecs.IAspect in its base list;
     /// dispatch into the two codegen paths is by symbol kind.
+    ///
+    /// <para>Pipeline shape: the transform produces a fully-precomputed <see cref="AspectModel"/>
+    /// (value-equatable, holds no symbols or syntax) and the terminal stage materializes
+    /// diagnostics + emits source. This keeps the incremental cache effective — typing in
+    /// an unrelated file does not invalidate aspect codegen.</para>
     /// </summary>
     [Generator]
     public class AspectGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            // Check if compilation references Trecs assembly for better performance
             var hasTrecsReference = AssemblyFilterHelper.CreateTrecsReferenceCheck(context);
 
             // Aspect types (struct or interface) — detected by IAspect appearing in the base list.
-            var aspectProviderRaw = context
+            // The transform builds an equatable AspectModel; symbols and syntax do not leave it.
+            var aspectModelsRaw = context
                 .SyntaxProvider.CreateSyntaxProvider(
                     predicate: static (node, _) => HasIAspectInBaseList(node),
-                    transform: static (context, _) => GetAspectTargetFromSyntax(context)
+                    transform: static (ctx, _) => BuildAspectModel(ctx)
                 )
-                .Where(static x => x != null);
-            var aspectProvider = AssemblyFilterHelper.FilterByTrecsReference(
-                aspectProviderRaw,
+                .Where(static x => x is not null);
+            var aspectModels = AssemblyFilterHelper.FilterByTrecsReference(
+                aspectModelsRaw,
                 hasTrecsReference
             );
 
-            // Unwrap component structs — used for validation downstream.
+            // Unwrap component structs — used for validation independent of any aspect.
             var unwrapComponentProviderRaw = context
                 .SyntaxProvider.ForAttributeWithMetadataName(
                     "Trecs.UnwrapAttribute",
                     predicate: static (node, _) => node is StructDeclarationSyntax,
-                    transform: static (context, _) => GetUnwrapComponentData(context)
+                    transform: static (ctx, _) => GetUnwrapComponentData(ctx)
                 )
                 .Where(static x => x != null);
             var unwrapComponentProvider = AssemblyFilterHelper.FilterByTrecsReference(
@@ -47,8 +49,8 @@ namespace Trecs.SourceGen
                 hasTrecsReference
             );
 
-            // Unwrap components are validated in their own pipeline so validation runs once
-            // per component rather than once per (aspect × unwrap) pair inside ExecuteGeneration.
+            // Unwrap components are validated in their own pipeline so validation runs once per
+            // component rather than once per (aspect × unwrap) pair during ExecuteGeneration.
             context.RegisterSourceOutput(
                 unwrapComponentProvider,
                 static (spc, data) =>
@@ -63,12 +65,10 @@ namespace Trecs.SourceGen
                 }
             );
 
-            // Aspect codegen no longer needs Compilation — the parser walks the symbol and the
-            // code generator is symbol-only. Dropping .Combine(CompilationProvider) lets upstream
-            // caching survive compilation edits that don't touch any aspect syntax.
+            // Aspect codegen consumes only the equatable model — no Compilation, no symbols.
             context.RegisterSourceOutput(
-                aspectProvider,
-                static (spc, source) => ExecuteGeneration(spc, source)
+                aspectModels,
+                static (spc, model) => ExecuteGeneration(spc, model!)
             );
         }
 
@@ -77,17 +77,17 @@ namespace Trecs.SourceGen
         /// implement <c>Trecs.IAspect</c>? Runs before any semantic work, so it must stay
         /// string-based.
         ///
-        /// Under the new (attribute-free) design an aspect can implement IAspect transitively
-        /// via an aspect-interface whose name we can't resolve syntactically (e.g. <c>struct
-        /// Foo : IMovable</c>). So this predicate must let through anything whose base list
-        /// contains at least one non-IRead/IWrite entry, and the transform step does the real
-        /// semantic check via <see cref="SymbolAnalyzer.ImplementsInterface"/>. The cost of
-        /// the extra semantic resolutions is bounded (at most one per type with a user-defined
-        /// base interface) and paid only when the syntax node changes — Roslyn caches the
-        /// transform output.
+        /// <para>Under the attribute-free aspect design an aspect can implement IAspect
+        /// transitively via an aspect-interface whose name we can't resolve syntactically
+        /// (e.g. <c>struct Foo : IMovable</c>). So this predicate lets through anything whose
+        /// base list contains at least one non-IRead/IWrite entry, and the transform step does
+        /// the real semantic check via <see cref="SymbolAnalyzer.ImplementsInterface"/>. The
+        /// cost of the extra semantic resolutions is bounded (at most one per type with a
+        /// user-defined base interface) and paid only when the syntax node changes — Roslyn
+        /// caches the transform output.</para>
         ///
-        /// Intentionally does NOT gate on the <c>partial</c> modifier so the validator can
-        /// emit <c>TRECS020 AspectInterfaceMustBePartial</c> on non-partial aspect interfaces.
+        /// <para>Intentionally does NOT gate on the <c>partial</c> modifier so the validator can
+        /// emit <c>TRECS020 AspectInterfaceMustBePartial</c> on non-partial aspect interfaces.</para>
         /// </summary>
         private static bool HasIAspectInBaseList(SyntaxNode node)
         {
@@ -123,7 +123,7 @@ namespace Trecs.SourceGen
             return true;
         }
 
-        private static AspectTargetData? GetAspectTargetFromSyntax(GeneratorSyntaxContext context)
+        private static AspectModel? BuildAspectModel(GeneratorSyntaxContext context)
         {
             var typeDecl = (TypeDeclarationSyntax)context.Node;
             var symbol = context.SemanticModel.GetDeclaredSymbol(typeDecl) as INamedTypeSymbol;
@@ -131,75 +131,12 @@ namespace Trecs.SourceGen
             if (symbol == null)
                 return null;
 
-            // Only emit for types that actually implement Trecs.IAspect. The syntactic predicate
-            // is conservative and lets through any partial with a non-IRead/IWrite base; this
-            // semantic check is the final gate.
+            // Final gate: the syntactic predicate is conservative; verify the type really
+            // implements Trecs.IAspect before producing a model.
             if (!SymbolAnalyzer.ImplementsInterface(symbol, "IAspect", TrecsNamespaces.Trecs))
                 return null;
 
-            // Run parsing + validation here (the transform phase) so RegisterSourceOutput
-            // only needs the cached value-equality-ish data to emit source. Diagnostics
-            // accumulate into a list and are replayed downstream. Unexpected exceptions
-            // surface as a SourceGenerationError rather than a generator crash.
-            var diagnostics = new List<Diagnostic>();
-            bool isValid;
-            AspectAttributeData? attributeData = null;
-            AspectInterfaceData? interfaceData = null;
-
-            try
-            {
-                if (symbol.TypeKind == TypeKind.Interface)
-                {
-                    var ifaceDecl = (InterfaceDeclarationSyntax)typeDecl;
-                    var isPartial = AspectValidator.ValidateAspectInterfaceDeclaration(
-                        ifaceDecl,
-                        symbol,
-                        diagnostics.Add
-                    );
-                    if (isPartial)
-                    {
-                        interfaceData = AspectInterfaceParser.ParseAspectInterface(symbol);
-                        isValid = interfaceData != null;
-                    }
-                    else
-                    {
-                        isValid = false;
-                    }
-                }
-                else
-                {
-                    attributeData = AspectAttributeParser.ParseAspectData(symbol);
-                    isValid = AspectValidator.ValidateAspect(
-                        typeDecl,
-                        symbol,
-                        attributeData,
-                        diagnostics.Add
-                    );
-                }
-            }
-            catch (Exception ex)
-            {
-                diagnostics.Add(
-                    Diagnostic.Create(
-                        DiagnosticDescriptors.SourceGenerationError,
-                        typeDecl.GetLocation(),
-                        "Aspect parse/validate",
-                        ex.Message
-                    )
-                );
-                isValid = false;
-                attributeData = null;
-                interfaceData = null;
-            }
-
-            return new AspectTargetData(
-                typeDecl,
-                symbol,
-                isValid,
-                attributeData,
-                interfaceData,
-                diagnostics.ToImmutableArray()
-            );
+            return AspectModelBuilder.Build(typeDecl, symbol);
         }
 
         private static UnwrapComponentData? GetUnwrapComponentData(
@@ -215,61 +152,38 @@ namespace Trecs.SourceGen
             return new UnwrapComponentData(structDecl, symbol);
         }
 
-        private static void ExecuteGeneration(
-            SourceProductionContext context,
-            AspectTargetData? aspectData
-        )
+        private static void ExecuteGeneration(SourceProductionContext context, AspectModel model)
         {
-            if (aspectData == null)
+            // Replay diagnostics collected in the transform phase. Materializing a Diagnostic
+            // happens here (terminal stage) — the pipeline only carried DiagnosticInfo.
+            foreach (var diag in model.Diagnostics)
+                context.ReportDiagnostic(diag.ToDiagnostic());
+
+            if (!model.IsValid)
                 return;
 
-            // Replay diagnostics collected in the transform phase.
-            foreach (var diag in aspectData.Diagnostics)
-            {
-                context.ReportDiagnostic(diag);
-            }
-
-            if (!aspectData.IsValid)
-                return;
-
-            if (aspectData.Symbol.TypeKind == TypeKind.Interface)
-            {
-                ExecuteAspectInterfaceGeneration(context, aspectData);
-            }
+            if (model.IsInterface)
+                ExecuteAspectInterfaceGeneration(context, model);
             else
-            {
-                ExecuteAspectStructGeneration(context, aspectData);
-            }
+                ExecuteAspectStructGeneration(context, model);
         }
 
         private static void ExecuteAspectStructGeneration(
             SourceProductionContext context,
-            AspectTargetData aspectData
+            AspectModel model
         )
         {
-            // Defensive: an IsValid struct-path target is guaranteed to have AttributeData,
-            // but this guards against future refactors.
-            if (aspectData.AttributeData == null)
-                return;
-
-            var location = aspectData.Syntax.GetLocation();
-            var typeName = aspectData.Symbol.Name;
-            var fileName = GeneratorBase.CreateSafeFileName(aspectData.Symbol, "Aspect");
-
+            var location = Location.None;
             try
             {
                 using var _ = SourceGenTimer.Time("AspectGenerator.Total");
-                SourceGenLogger.Log($"[AspectGenerator] Processing {typeName}");
+                SourceGenLogger.Log($"[AspectGenerator] Processing {model.TypeName}");
 
                 string? source;
                 using (SourceGenTimer.Time("AspectGenerator.CodeGen"))
                 {
                     source = ErrorRecovery.TryExecute(
-                        () =>
-                            AspectCodeGenerator.GenerateAspectSource(
-                                aspectData.Symbol,
-                                aspectData.AttributeData
-                            ),
+                        () => AspectCodeGenerator.GenerateAspectSource(model),
                         context,
                         location,
                         "Aspect code generation"
@@ -278,11 +192,11 @@ namespace Trecs.SourceGen
 
                 if (source != null)
                 {
-                    context.AddSource(fileName, source);
-                    SourceGenLogger.WriteGeneratedFile(fileName, source);
+                    context.AddSource(model.HintFileName, source);
+                    SourceGenLogger.WriteGeneratedFile(model.HintFileName, source);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 ErrorRecovery.ReportError(context, location, "Aspect generation", ex);
             }
@@ -290,31 +204,18 @@ namespace Trecs.SourceGen
 
         private static void ExecuteAspectInterfaceGeneration(
             SourceProductionContext context,
-            AspectTargetData interfaceData
+            AspectModel model
         )
         {
-            // Defensive: an IsValid interface-path target is guaranteed to have
-            // InterfaceData, but this guards against future refactors.
-            if (interfaceData.InterfaceData == null)
-                return;
-
-            var location = interfaceData.Syntax.GetLocation();
-            var typeName = interfaceData.Symbol.Name;
-            var fileName = GeneratorBase.CreateSafeFileName(
-                interfaceData.Symbol,
-                "AspectInterface"
-            );
-
+            var location = Location.None;
             try
             {
-                SourceGenLogger.Log($"[AspectGenerator] Processing AspectInterface {typeName}");
+                SourceGenLogger.Log(
+                    $"[AspectGenerator] Processing AspectInterface {model.TypeName}"
+                );
 
                 var source = ErrorRecovery.TryExecute(
-                    () =>
-                        AspectCodeGenerator.GenerateAspectInterfaceSource(
-                            interfaceData.Symbol,
-                            interfaceData.InterfaceData
-                        ),
+                    () => AspectCodeGenerator.GenerateAspectInterfaceSource(model),
                     context,
                     location,
                     "AspectInterface code generation"
@@ -322,11 +223,11 @@ namespace Trecs.SourceGen
 
                 if (source != null)
                 {
-                    context.AddSource(fileName, source);
-                    SourceGenLogger.WriteGeneratedFile(fileName, source);
+                    context.AddSource(model.HintFileName, source);
+                    SourceGenLogger.WriteGeneratedFile(model.HintFileName, source);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 ErrorRecovery.ReportError(context, location, "AspectInterface generation", ex);
             }
@@ -334,45 +235,10 @@ namespace Trecs.SourceGen
     }
 
     /// <summary>
-    /// Data structure for an aspect-generation target — a struct or an interface implementing
-    /// Trecs.IAspect. TypeKind on the symbol distinguishes the two flavors.
-    ///
-    /// Carries the parsed attribute/interface data and validation diagnostics forward from
-    /// the transform phase so the terminal stage can emit source without re-running parse
-    /// + validate on every compilation pump.
+    /// The Unwrap-component validation pipeline still carries Roslyn types because it's a
+    /// fire-and-forget validator (no source emission, just diagnostics). Caching its output
+    /// gives nothing back, so the symbol/syntax retention cost is acceptable here.
     /// </summary>
-    internal class AspectTargetData
-    {
-        public TypeDeclarationSyntax Syntax { get; }
-        public INamedTypeSymbol Symbol { get; }
-        public bool IsValid { get; }
-
-        /// <summary>Populated for the struct-aspect path; null on the interface path.</summary>
-        public AspectAttributeData? AttributeData { get; }
-
-        /// <summary>Populated for the interface-aspect path; null on the struct path.</summary>
-        public AspectInterfaceData? InterfaceData { get; }
-
-        public ImmutableArray<Diagnostic> Diagnostics { get; }
-
-        public AspectTargetData(
-            TypeDeclarationSyntax syntax,
-            INamedTypeSymbol symbol,
-            bool isValid,
-            AspectAttributeData? attributeData,
-            AspectInterfaceData? interfaceData,
-            ImmutableArray<Diagnostic> diagnostics
-        )
-        {
-            Syntax = syntax;
-            Symbol = symbol;
-            IsValid = isValid;
-            AttributeData = attributeData;
-            InterfaceData = interfaceData;
-            Diagnostics = diagnostics;
-        }
-    }
-
     internal class UnwrapComponentData
     {
         public StructDeclarationSyntax Syntax { get; }

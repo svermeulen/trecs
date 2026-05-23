@@ -25,5 +25,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
         public int MinPresetFishCount = 5000;
         public int MaxPresetFishCount = 1000000;
         public int DefaultPresetIndex = 3;
+        public int MaxChangesPerFrame = 500;
     }
 }

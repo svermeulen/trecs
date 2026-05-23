@@ -4,6 +4,7 @@ using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
 
 namespace Trecs
 {
@@ -12,7 +13,7 @@ namespace Trecs
     // find the last known EntityIndex from last entity submission.
     internal struct EntityHandleMap : IDisposable
     {
-        internal SharedNativeInt _nextFreeIndex;
+        internal int _nextFreeIndex;
 
         [NativeDisableContainerSafetyRestriction]
         internal NativeList<EntityHandleMapElement> _entityHandleMap;
@@ -42,28 +43,29 @@ namespace Trecs
         [NativeDisableContainerSafetyRestriction]
         internal NativeList<UnsafeList<int>> _entityIndexToReferenceMap;
 
-        // (SVKJ) notes
-        // This method is designed to work safely across threads
-        // It does not cause _entityHandleMap to be re-allocated,
-        // even though it does return indices into this array that exceed
-        // the length
-        // it is only when SetEntityHandle is called when this new index causes
-        // a realloc (which, for jobs, is submission time)
-        // Another note about this class is that it very cleverly embeds a linked list in the
-        // unused slots of the native array, presumably to help with cache locality
-        // and to minimize memory usage
+        // Free-list note: unused slots in _entityHandleMap form a linked list
+        // rooted at _nextFreeIndex, where each free element's Index field
+        // points to the next free slot (and the chain terminates once
+        // _nextFreeIndex reaches _entityHandleMap.Length, at which point we
+        // bulk-allocate fresh sequential ids past the high-water mark). This
+        // keeps free-list bookkeeping in the same memory the live entries
+        // occupy.
+        //
+        // Both ClaimId and BatchClaimIds are main-thread-only. Job-side
+        // entity adds must pre-reserve handles via ReserveEntityHandles on
+        // the main thread and pass them to NativeWorldAccessor.AddEntity.
         /// <summary>
-        /// Batch-claim multiple EntityHandles on the main thread (single-threaded, no CAS needed).
-        /// Two-phase: first drains the recycled free list, then bulk-allocates fresh sequential IDs.
-        /// Much faster than calling ClaimId() N times (~30μs for 100K vs ~1ms).
-        /// Must NOT be called concurrently with ClaimId or other batch claims.
+        /// Batch-claim multiple EntityHandles. Two-phase: drains the recycled
+        /// free list first, then bulk-allocates fresh sequential IDs past the
+        /// high-water mark. Much faster than calling ClaimId() N times
+        /// (~30μs for 100K vs ~1ms).
         /// </summary>
         internal NativeArray<EntityHandle> BatchClaimIds(int count, Allocator allocator)
         {
             var refs = new NativeArray<EntityHandle>(count, allocator);
             int filled = 0;
 
-            // Phase 1: drain free list (recycle slots, single-threaded, no CAS)
+            // Phase 1: drain free list (recycle slots)
             while (filled < count)
             {
                 int tempFreeIndex = _nextFreeIndex;
@@ -76,7 +78,7 @@ namespace Trecs
                 ref var element = ref _entityHandleMap.ElementAt(tempFreeIndex);
                 int newFreeIndex = element.Index;
                 int version = element.Version;
-                _nextFreeIndex.Set(newFreeIndex);
+                _nextFreeIndex = newFreeIndex;
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 _entityHandleMap[tempFreeIndex] = new EntityHandleMapElement(
@@ -93,7 +95,7 @@ namespace Trecs
             {
                 int remaining = count - filled;
                 int baseIndex = _nextFreeIndex;
-                _nextFreeIndex.Set(baseIndex + remaining);
+                _nextFreeIndex = baseIndex + remaining;
                 for (int i = 0; i < remaining; i++)
                 {
                     refs[filled + i] = new EntityHandle(baseIndex + i + 1, 0);
@@ -105,32 +107,25 @@ namespace Trecs
 
         internal EntityHandle ClaimId()
         {
-            int tempFreeIndex;
+            int tempFreeIndex = _nextFreeIndex;
             int newFreeIndex;
             int version;
-
-            do
+            if (tempFreeIndex >= _entityHandleMap.Length)
             {
-                tempFreeIndex = _nextFreeIndex;
-                // Check if we need to create a new EntityLocator or whether we can recycle an existing one.
-                if (tempFreeIndex >= _entityHandleMap.Length)
-                {
-                    newFreeIndex = tempFreeIndex + 1;
-                    version = 0;
-                }
-                else
-                {
-                    ref EntityHandleMapElement element = ref _entityHandleMap.ElementAt(
-                        tempFreeIndex
-                    );
-                    // The recycle entities form a linked list, using the entityIndex.Index to store the next element.
-                    newFreeIndex = element.Index;
-                    version = element.Version;
-                }
-            } while (tempFreeIndex != _nextFreeIndex.CompareExchange(newFreeIndex, tempFreeIndex));
+                newFreeIndex = tempFreeIndex + 1;
+                version = 0;
+            }
+            else
+            {
+                // Recycled slot — the free list links to the next-free slot
+                // via the element's Index field.
+                ref EntityHandleMapElement element = ref _entityHandleMap.ElementAt(tempFreeIndex);
+                newFreeIndex = element.Index;
+                version = element.Version;
+            }
+            _nextFreeIndex = newFreeIndex;
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            // This code should be safe since we own the tempFreeIndex, this allows us to later check that nothing went wrong.
             if (tempFreeIndex < _entityHandleMap.Length)
             {
                 _entityHandleMap[tempFreeIndex] = new EntityHandleMapElement(
@@ -145,8 +140,10 @@ namespace Trecs
 
         internal void SetEntityHandle(EntityHandle reference, EntityIndex entityIndex)
         {
-            // Since references can be claimed in parallel now, it might happen that they are set out of order,
-            // so we need to resize instead of add.
+            // BatchClaimIds can hand out handle ids whose slot index sits past the
+            // current map length (the bulk-allocate phase advances _nextFreeIndex
+            // past _entityHandleMap.Length, deferring the actual resize to first
+            // use). Resize here on demand to cover that case.
 
             if (reference.index >= _entityHandleMap.Length)
             {
@@ -239,15 +236,13 @@ namespace Trecs
             entityHandleMapElement.BumpVersion();
 
             // Mark the element as the last element used.
-            _nextFreeIndex.Set(id - 1);
+            _nextFreeIndex = id - 1;
         }
 
         // OPTIMIZATION OPPORTUNITY: The three Batch* methods below are candidates for Burst compilation.
         // The inner loops are simple array-indexed reads/writes on native data (NativeList<int>,
-        // NativeList<EntityHandleMapElement>). The main blockers are:
-        // 1. Input collections (FastList, DenseDictionary) are managed — need marshaling to NativeArrays
-        // 2. _nextFreeIndex (SharedNativeInt) uses Interlocked ops — need to expose raw int* for plain writes
-        //    (safe because submission is single-threaded, though ClaimId needs atomics for job safety)
+        // NativeList<EntityHandleMapElement>). The main blocker is that input collections (FastList,
+        // DenseDictionary) are managed — need marshaling to NativeArrays.
         // See docs/maintainer-docs/optimization_notes.md for detailed plan and proposed Burst job structs.
 
         /// <summary>
@@ -255,7 +250,7 @@ namespace Trecs
         /// Looks up the from/to group lists once instead of per entity.
         /// </summary>
         internal void BatchUpdateEntityHandles(
-            DenseDictionary<int, MoveInfo> entitiesToMove,
+            FastList<MoveInfoEntry> entitiesToMove,
             GroupIndex fromGroup,
             GroupIndex toGroup
         )
@@ -263,19 +258,18 @@ namespace Trecs
             ref var fromGroupList = ref _entityIndexToReferenceMap.ElementAt(fromGroup.Index);
             ref var toGroupList = ref GetGroupList(toGroup);
 
-            var keys = entitiesToMove.UnsafeKeys;
-            var values = entitiesToMove.UnsafeValues;
+            var entries = entitiesToMove._buffer;
             var count = entitiesToMove.Count;
 
             // Ensure toGroupList is large enough for the largest destination index
             if (count > 0)
             {
-                var maxToIndex = values[0].ToIndex;
+                var maxToIndex = entries[0].Info.ToIndex;
                 for (int i = 1; i < count; i++)
                 {
-                    if (values[i].ToIndex > maxToIndex)
+                    if (entries[i].Info.ToIndex > maxToIndex)
                     {
-                        maxToIndex = values[i].ToIndex;
+                        maxToIndex = entries[i].Info.ToIndex;
                     }
                 }
                 EnsureGroupListSize(ref toGroupList, maxToIndex + 1);
@@ -283,12 +277,12 @@ namespace Trecs
 
             for (int i = 0; i < count; i++)
             {
-                var fromIndex = keys[i].key;
-                var toIndex = values[i].ToIndex;
+                var fromIndex = entries[i].EntityIndex;
+                var toIndex = entries[i].Info.ToIndex;
 
                 var id = fromGroupList[fromIndex];
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     id != 0,
                     "BatchUpdateEntityHandles: null EntityHandle at fromIndex {0} in group {1}",
                     fromIndex,
@@ -315,32 +309,35 @@ namespace Trecs
         /// free-list ordering matches the prior BatchRemoveEntityHandles
         /// behaviour.
         /// </summary>
+        /// <summary>
+        /// Step (a) of the Remove Refs apply phase. Schedules
+        /// <see cref="Trecs.Internal.RemoveRefsCaptureJob"/> (Burst): builds the
+        /// tail-slot lookup from the sorted-descending indices, then in
+        /// submission order zeros each removed entity's per-group reverse-map
+        /// slot and appends a <see cref="DeferredHandleFreeEntry"/> capture to
+        /// <paramref name="deferredFreesOut"/>. The capture entries are later
+        /// consumed by step (c) (BatchRelocateRemovedHandlesToTail) and then
+        /// finalized after the OnRemoved fan-out.
+        /// </summary>
         internal void BatchClearAndCaptureRemovedHandles(
-            FastList<int> entityHandlesToRemove,
+            NativeList<int> entityHandlesToRemoveSubmissionOrder,
+            NativeList<int> sortedDescendingIndices,
+            int originalCount,
             GroupIndex fromGroup,
-            DenseDictionary<int, int> tailSlotByOriginalSlot,
-            FastList<(GroupIndex Group, int Id, int TailSlot)> deferredFreesOut
+            NativeHashMap<int, int> tailSlotByOriginalSlot,
+            NativeList<DeferredHandleFreeEntry> deferredFreesOut
         )
         {
-            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(fromGroup.Index);
-
-            for (int i = 0; i < entityHandlesToRemove.Count; i++)
+            new RemoveRefsCaptureJob
             {
-                var entityArrayIndex = entityHandlesToRemove[i];
-
-                var id = groupList[entityArrayIndex];
-                TrecsAssert.That(
-                    id != 0,
-                    "BatchClearAndCaptureRemovedHandles: null EntityHandle at index {0} in group {1}",
-                    entityArrayIndex,
-                    fromGroup
-                );
-
-                groupList[entityArrayIndex] = 0;
-
-                var tailSlot = tailSlotByOriginalSlot[entityArrayIndex];
-                deferredFreesOut.Add((fromGroup, id, tailSlot));
-            }
+                GroupList = _entityIndexToReferenceMap.ElementAt(fromGroup.Index),
+                RemoveIndicesSubmissionOrder = entityHandlesToRemoveSubmissionOrder,
+                SortedDescendingIndices = sortedDescendingIndices,
+                TailMap = tailSlotByOriginalSlot,
+                DeferredFreesOut = deferredFreesOut,
+                OriginalCount = originalCount,
+                FromGroup = fromGroup,
+            }.Run();
         }
 
         /// <summary>
@@ -351,23 +348,29 @@ namespace Trecs
         /// observer obtains via ToHandle during the OnRemoved fan-out must
         /// match the version that was visible before submission.
         /// </summary>
+        /// <summary>
+        /// Step (c) of the Remove Refs apply phase. Schedules
+        /// <see cref="Trecs.Internal.RemoveRefsRelocateJob"/> (Burst). Walks the
+        /// per-group slice <c>[sliceStart, Length)</c> of
+        /// <paramref name="deferredFrees"/> and writes each (id, tailSlot)
+        /// capture into the reverse-map's tail position plus the forward
+        /// handle map, so <c>EntityIndex.ToHandle</c> resolves removed entities
+        /// during the OnRemoved fan-out.
+        /// </summary>
         internal void BatchRelocateRemovedHandlesToTail(
             GroupIndex fromGroup,
-            FastList<(GroupIndex Group, int Id, int TailSlot)> deferredFrees,
+            NativeList<DeferredHandleFreeEntry> deferredFrees,
             int sliceStart
         )
         {
-            ref var groupList = ref _entityIndexToReferenceMap.ElementAt(fromGroup.Index);
-
-            for (int i = sliceStart; i < deferredFrees.Count; i++)
+            new RemoveRefsRelocateJob
             {
-                var entry = deferredFrees[i];
-                groupList[entry.TailSlot] = entry.Id;
-
-                ref var element = ref _entityHandleMap.ElementAt(entry.Id - 1);
-                element.Index = entry.TailSlot;
-                element.GroupIndex = fromGroup;
-            }
+                GroupList = _entityIndexToReferenceMap.ElementAt(fromGroup.Index),
+                EntityHandleMap = _entityHandleMap,
+                DeferredFrees = deferredFrees,
+                SliceStart = sliceStart,
+                FromGroup = fromGroup,
+            }.Run();
         }
 
         /// <summary>
@@ -387,7 +390,7 @@ namespace Trecs
             element.Index = _nextFreeIndex;
             element.GroupIndex = default;
             element.BumpVersion();
-            _nextFreeIndex.Set(id - 1);
+            _nextFreeIndex = id - 1;
         }
 
         /// <summary>
@@ -433,7 +436,7 @@ namespace Trecs
             for (int i = 0; i < entityCount; i++)
             {
                 var id = groupList[i];
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     id != 0,
                     "ValidateGroupConsistency: null handle at index {0} in group {1} (entityCount={2})",
                     i,
@@ -442,14 +445,14 @@ namespace Trecs
                 );
 
                 ref var element = ref _entityHandleMap.ElementAt(id - 1);
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     element.GroupIndex == group,
                     "ValidateGroupConsistency: group mismatch at index {0} in group {1}: element points to group {2}",
                     i,
                     group,
                     element.GroupIndex
                 );
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     element.Index == i,
                     "ValidateGroupConsistency: index mismatch at index {0} in group {1}: element points to index {2}",
                     i,
@@ -478,7 +481,7 @@ namespace Trecs
                 entityHandleMapElement.GroupIndex = default;
                 entityHandleMapElement.BumpVersion();
 
-                _nextFreeIndex.Set(id - 1);
+                _nextFreeIndex = id - 1;
             }
 
             groupList.Clear();
@@ -513,7 +516,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly EntityHandle GetEntityHandle(EntityIndex entityIndex)
         {
-            TrecsAssert.That(!entityIndex.IsNull);
+            TrecsDebugAssert.That(!entityIndex.IsNull);
 
             var groupList = _entityIndexToReferenceMap[entityIndex.GroupIndex.Index];
 
@@ -564,18 +567,18 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public EntityIndex GetEntityIndex(EntityHandle reference)
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 reference != EntityHandle.Null,
                 "Attempting to get EntityIndex from null EntityHandle"
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 reference.index < _entityHandleMap.Length,
                 "Attempting to get EntityIndex from EntityHandle with index out of bounds"
             );
             // Make sure we are querying for the current version of the locator.
             // Otherwise the locator is pointing to a removed entity.
             ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(reference.index);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 entityHandleMapElement.Version == reference.Version,
                 "Attempting to get EntityIndex from an EntityHandle that has been invalidated"
             );
@@ -600,7 +603,7 @@ namespace Trecs
 
         internal void InitEntityHandleMap(int groupCount)
         {
-            _nextFreeIndex = SharedNativeInt.Create(0, Allocator.Persistent);
+            _nextFreeIndex = 0;
             _entityHandleMap = new NativeList<EntityHandleMapElement>(0, Allocator.Persistent);
             _entityIndexToReferenceMap = new NativeList<UnsafeList<int>>(
                 groupCount,
@@ -620,7 +623,6 @@ namespace Trecs
 
         public void Dispose()
         {
-            _nextFreeIndex.Dispose();
             _entityHandleMap.Dispose();
 
             for (int i = 0; i < _entityIndexToReferenceMap.Length; i++)
@@ -670,5 +672,23 @@ namespace Trecs
                 groupList.Resize(requiredSize, NativeArrayOptions.ClearMemory);
             }
         }
+    }
+
+    /// <summary>
+    /// Per-entity captured state for the deferred-free pipeline used during
+    /// <see cref="Trecs.Internal.EntitySubmitter"/>'s OnRemoved fan-out. The
+    /// removed entity's handle id is temporarily relocated to <c>TailSlot</c>
+    /// so <c>EntityIndex.ToHandle</c> still resolves it during OnRemoved
+    /// callbacks; after the callbacks return, the id is freed (version bump
+    /// + push onto the free list) and the tail slot is zeroed. Blittable
+    /// (<see cref="GroupIndex"/> is a single int) so a
+    /// <c>NativeList&lt;DeferredHandleFreeEntry&gt;</c> can be populated
+    /// directly from a Burst job.
+    /// </summary>
+    internal struct DeferredHandleFreeEntry
+    {
+        public GroupIndex Group;
+        public int Id;
+        public int TailSlot;
     }
 }

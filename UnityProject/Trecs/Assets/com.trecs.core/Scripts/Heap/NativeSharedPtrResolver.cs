@@ -51,26 +51,28 @@ namespace Trecs
         internal NativeSharedHeapEntry ResolveEntry<T>(BlobId address)
             where T : unmanaged
         {
-            TrecsAssert.That(!address.IsNull, "Attempted to resolve null blob address");
+            TrecsDebugAssert.That(!address.IsNull, "Attempted to resolve null blob address");
 
-            if (!_entries.TryGetValue(address, out var entry))
-            {
-                // A common cause: scheduling a Burst job that reads a NativeSharedPtr
-                // created via CreateBlob in the same frame, before submission has
-                // run FlushPendingOperations to move the entry into _allEntries.
-                // See NativeSharedHeap's class docstring for the full invariant.
-                throw new TrecsException(
-                    $"NativeSharedPtrResolver could not resolve blob {address.Value} for type {typeof(T)}. "
-                        + "Blob was either never created, already disposed, or created this frame and not yet flushed."
-                );
-            }
+            // A common cause of the resolve failure below: scheduling a Burst job
+            // that reads a NativeSharedPtr created via CreateBlob in the same
+            // frame, before submission has run FlushPendingOperations to move the
+            // entry into _allEntries. See NativeSharedHeap's class docstring for
+            // the full invariant.
+            TrecsAssert.That(
+                _entries.TryGetValue(address, out var entry),
+                "NativeSharedPtrResolver could not resolve blob {0} for type hash {1}. "
+                    + "Blob was either never created, already disposed, or created this frame and not yet flushed.",
+                address.Value,
+                TypeId<T>.Value.Value
+            );
 
-            if (entry.TypeHash != TypeHash<T>.Value)
-            {
-                throw new TrecsException(
-                    $"Type hash mismatch for blob {address.Value}: stored {entry.TypeHash} != requested {TypeHash<T>.Value} ({typeof(T)})"
-                );
-            }
+            TrecsAssert.That(
+                entry.TypeHash == TypeId<T>.Value.Value,
+                "Type hash mismatch for blob {0}: stored {1} != requested {2}",
+                address.Value,
+                entry.TypeHash,
+                TypeId<T>.Value.Value
+            );
 
             return entry;
         }

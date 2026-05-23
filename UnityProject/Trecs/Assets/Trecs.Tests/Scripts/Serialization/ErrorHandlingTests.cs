@@ -33,7 +33,7 @@ namespace Trecs.Tests
             var flags = 0L;
 
             // Act & Assert
-            TrecsAssert.Throws<TrecsException>(() =>
+            TrecsDebugAssert.Throws<TrecsException>(() =>
             {
                 _cacheHelper.ClearMemoryStream();
                 _cacheHelper.WriteAll(
@@ -64,7 +64,7 @@ namespace Trecs.Tests
             var result = _cacheHelper.ReadAllObject() as string;
 
             // Assert - Verify null string is preserved
-            TrecsAssert.That(result == null);
+            TrecsDebugAssert.That(result == null);
         }
 
         [Test]
@@ -86,11 +86,11 @@ namespace Trecs.Tests
             var result = _cacheHelper.ReadAll<List<string>>();
 
             // Assert - Verify null elements are preserved
-            TrecsAssert.That(result != null);
-            TrecsAssert.That(result.Count == 3);
-            TrecsAssert.That(result[0] == "hello");
-            TrecsAssert.That(result[1] == null);
-            TrecsAssert.That(result[2] == "world");
+            TrecsDebugAssert.That(result != null);
+            TrecsDebugAssert.That(result.Count == 3);
+            TrecsDebugAssert.That(result[0] == "hello");
+            TrecsDebugAssert.That(result[1] == null);
+            TrecsDebugAssert.That(result[2] == "world");
         }
 
         [Test]
@@ -117,11 +117,11 @@ namespace Trecs.Tests
             var result = _cacheHelper.ReadAll<Dictionary<string, string>>();
 
             // Assert - Verify null values are preserved
-            TrecsAssert.That(result != null);
-            TrecsAssert.That(result.Count == 3);
-            TrecsAssert.That(result["key1"] == "value1");
-            TrecsAssert.That(result["key2"] == null);
-            TrecsAssert.That(result["key3"] == "value3");
+            TrecsDebugAssert.That(result != null);
+            TrecsDebugAssert.That(result.Count == 3);
+            TrecsDebugAssert.That(result["key1"] == "value1");
+            TrecsDebugAssert.That(result["key2"] == null);
+            TrecsDebugAssert.That(result["key3"] == "value3");
         }
 
         [Test]
@@ -143,10 +143,10 @@ namespace Trecs.Tests
             var result = _cacheHelper.ReadAll<List<int>>();
 
             // Assert
-            TrecsAssert.IsNotNull(result);
-            TrecsAssert.That(result.Count == 5);
+            TrecsDebugAssert.IsNotNull(result);
+            TrecsDebugAssert.That(result.Count == 5);
             // Capacity should be at least the number of elements
-            TrecsAssert.That(result.Capacity >= 5);
+            TrecsDebugAssert.That(result.Capacity >= 5);
         }
 
         [Test]
@@ -165,7 +165,7 @@ namespace Trecs.Tests
 
             // This should work fine since int is compatible
             var result = _cacheHelper.ReadAll<int>();
-            TrecsAssert.That(result == validData);
+            TrecsDebugAssert.That(result == validData);
         }
 
         [Test]
@@ -186,10 +186,10 @@ namespace Trecs.Tests
             var result = _cacheHelper.ReadAll<List<int>>();
 
             // Assert
-            TrecsAssert.IsNotNull(result);
-            TrecsAssert.That(result.Count == 10000);
-            TrecsAssert.That(result[0] == 0);
-            TrecsAssert.That(result[9999] == 9999);
+            TrecsDebugAssert.IsNotNull(result);
+            TrecsDebugAssert.That(result.Count == 10000);
+            TrecsDebugAssert.That(result[0] == 0);
+            TrecsDebugAssert.That(result[9999] == 9999);
         }
 
         [Test]
@@ -215,9 +215,9 @@ namespace Trecs.Tests
             var result = _cacheHelper.ReadAll<int>();
 
             // Assert
-            TrecsAssert.That(position1 > 0);
-            TrecsAssert.That(position2 > 0);
-            TrecsAssert.That(result == data2);
+            TrecsDebugAssert.That(position1 > 0);
+            TrecsDebugAssert.That(position2 > 0);
+            TrecsDebugAssert.That(result == data2);
         }
 
         [Test]
@@ -250,21 +250,21 @@ namespace Trecs.Tests
                 // Assert
                 if (float.IsNaN(original.x))
                 {
-                    TrecsAssert.That(float.IsNaN(result.x));
-                    TrecsAssert.That(float.IsNaN(result.y));
-                    TrecsAssert.That(float.IsNaN(result.z));
+                    TrecsDebugAssert.That(float.IsNaN(result.x));
+                    TrecsDebugAssert.That(float.IsNaN(result.y));
+                    TrecsDebugAssert.That(float.IsNaN(result.z));
                 }
                 else
                 {
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         result.x == original.x,
                         $"X component mismatch for {original}"
                     );
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         result.y == original.y,
                         $"Y component mismatch for {original}"
                     );
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         result.z == original.z,
                         $"Z component mismatch for {original}"
                     );
@@ -293,7 +293,7 @@ namespace Trecs.Tests
                 var result = _cacheHelper.ReadAll<bool>();
 
                 // Assert
-                TrecsAssert.That(result == original);
+                TrecsDebugAssert.That(result == original);
             }
         }
 
@@ -303,7 +303,7 @@ namespace Trecs.Tests
             var unregistered = new UnregisteredTestClass { Value = 42 };
             var flags = 0L;
 
-            TrecsAssert.Throws<TrecsException>(() =>
+            TrecsDebugAssert.Throws<TrecsException>(() =>
             {
                 _cacheHelper.ClearMemoryStream();
                 _cacheHelper.WriteAll(
@@ -320,7 +320,7 @@ namespace Trecs.Tests
             _cacheHelper.ResetMemoryPosition();
             var result = _cacheHelper.ReadAll<int>();
 
-            TrecsAssert.That(result == 123);
+            TrecsDebugAssert.That(result == 123);
         }
 
         [Test]
@@ -343,7 +343,7 @@ namespace Trecs.Tests
             _cacheHelper.ResetMemoryPosition();
             var result = _cacheHelper.ReadAll<int>();
 
-            TrecsAssert.That(result == 456);
+            TrecsDebugAssert.That(result == 456);
         }
 
         // Test class for unregistered type testing

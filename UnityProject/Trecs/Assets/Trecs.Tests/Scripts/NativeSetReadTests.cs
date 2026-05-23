@@ -12,7 +12,7 @@ namespace Trecs.Tests
         TestEnvironment CreateEnv() =>
             EcsTestHelper.CreateEnvironment(b => b.AddSet<NSRTestSet>(), QTestEntityA.Template);
 
-        // Job that consults NativeSetRead.Exists per entity, recording results into a buffer.
+        // Job that consults NativeSetRead.Contains per entity, recording results into a buffer.
         partial struct CheckMembershipJob
         {
             [FromWorld]
@@ -27,12 +27,12 @@ namespace Trecs.Tests
             [ForEachEntity(Tag = typeof(QId1))]
             void Execute(in TestInt value, EntityIndex entityIndex)
             {
-                Results[entityIndex.Index] = Reader.Exists(entityIndex) ? 1 : 0;
+                Results[entityIndex.Index] = Reader.Contains(entityIndex) ? 1 : 0;
             }
         }
 
         [Test]
-        public void NativeSetRead_Exists_AgreesWithMainThreadRead()
+        public void NativeSetRead_Contains_AgreesWithMainThreadRead()
         {
             using var env = CreateEnv();
             var a = env.Accessor;
@@ -42,7 +42,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = i })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<NSRTestSet>();
@@ -75,7 +75,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = i })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<NSRTestSet>();

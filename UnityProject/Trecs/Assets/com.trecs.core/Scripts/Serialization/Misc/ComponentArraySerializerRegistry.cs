@@ -23,15 +23,15 @@ namespace Trecs
         public void Register<T>(IComponentArraySerializer<T> serializer)
             where T : unmanaged, IEntityComponent
         {
-            TrecsAssert.IsNotNull(serializer);
-            TrecsAssert.That(
+            TrecsDebugAssert.IsNotNull(serializer);
+            TrecsDebugAssert.That(
                 !_byComponentType.ContainsKey(typeof(T)),
                 "Component array serializer for type {0} is already registered",
                 typeof(T)
             );
 
             // Dictionary.Add (not the indexer) so duplicate registration also
-            // throws in release builds, where the TrecsAssert above is a no-op.
+            // throws in release builds, where the TrecsDebugAssert above is a no-op.
             _byComponentType.Add(typeof(T), new ComponentArraySerializerDispatcher<T>(serializer));
         }
 

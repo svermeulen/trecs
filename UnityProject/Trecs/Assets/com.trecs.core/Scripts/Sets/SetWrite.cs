@@ -67,19 +67,19 @@ namespace Trecs
         // ── Read operations (write-sync is a superset of read-sync) ──────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Exists(EntityIndex entityIndex)
+        public bool Contains(EntityIndex entityIndex)
         {
             var group = entityIndex.GroupIndex;
             if (group.IsNull)
                 return false;
             var entry = _entriesPerGroup[group.Index];
-            return entry.IsValid && entry.Exists(entityIndex.Index);
+            return entry.IsValid && entry.Contains(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Exists(EntityHandle entityHandle)
+        public bool Contains(EntityHandle entityHandle)
         {
-            return Exists(entityHandle.ToIndex(_world));
+            return Contains(entityHandle.ToIndex(_world));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -120,7 +120,7 @@ namespace Trecs
         void AssertValidGroup(GroupIndex group)
         {
 #if DEBUG
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 !group.IsNull && _entriesPerGroup[group.Index].IsValid,
                 "GroupIndex {0} does not belong to this set's template",
                 group

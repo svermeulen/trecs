@@ -8,18 +8,14 @@ namespace Trecs.Samples.Snake
     [ExecuteAfter(typeof(SnakeMovementSystem))]
     public partial class FoodConsumeSystem : ISystem
     {
-        void Execute([SingleEntity(typeof(TrecsTags.Globals))] in Globals globals)
+        void Execute(
+            [SingleEntity(typeof(TrecsTags.Globals))] in Globals globals,
+            [SingleEntity(typeof(SnakeTags.SnakeHead))] in Head head
+        )
         {
-            var headPos = World
-                .Query()
-                .WithTags<SnakeTags.SnakeHead>()
-                .SingleHandle()
-                .Component<GridPos>(World)
-                .Read.Value;
-
             foreach (var food in Food.Query(World).WithTags<SnakeTags.SnakeFood>())
             {
-                if (food.GridPos.x != headPos.x || food.GridPos.y != headPos.y)
+                if (food.GridPos.x != head.GridPos.x || food.GridPos.y != head.GridPos.y)
                 {
                     continue;
                 }
@@ -35,6 +31,8 @@ namespace Trecs.Samples.Snake
         }
 
         partial struct Globals : IAspect, IWrite<SnakeLength, Score> { }
+
+        partial struct Head : IAspect, IRead<GridPos> { }
 
         partial struct Food : IAspect, IRead<GridPos> { }
     }

@@ -1,10 +1,8 @@
 #nullable enable
 
 using System;
-using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Trecs.SourceGen.Performance;
 using Trecs.SourceGen.Shared;
@@ -12,125 +10,116 @@ using Trecs.SourceGen.Shared;
 namespace Trecs.SourceGen
 {
     /// <summary>
-    /// Incremental source generator for interpolator jobs that generate interpolated updater systems.
-    /// Provides better compilation performance than the legacy InterpolationGenerator.
+    /// Incremental source generator for interpolator jobs that generates interpolated updater
+    /// systems. Provides better compilation performance than the legacy InterpolationGenerator.
+    ///
+    /// <para>Pipeline shape: the transform produces a value-equatable
+    /// <see cref="InterpolatorJobModel"/> and the terminal stage emits source. Previously
+    /// the pipeline carried <see cref="MethodDeclarationSyntax"/>, <see cref="IMethodSymbol"/>,
+    /// and <see cref="AttributeData"/> through to source-output, which prevented Roslyn's
+    /// incremental cache from hitting on any edit. The old <c>.Combine(CompilationProvider)</c>
+    /// is also gone — the compilation parameter was passed to the terminal stage but never
+    /// actually used.</para>
     /// </summary>
     [Generator]
     public class InterpolatorJobGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            // Check if compilation references Trecs assembly for better performance
             var hasTrecsReference = AssemblyFilterHelper.CreateTrecsReferenceCheck(context);
 
-            // Create provider for methods with GenerateInterpolatorSystemAttribute
-            var interpolatorMethodProviderRaw = context
+            var modelsRaw = context
                 .SyntaxProvider.ForAttributeWithMetadataName(
                     "Trecs.GenerateInterpolatorSystemAttribute",
                     predicate: static (node, _) => node is MethodDeclarationSyntax,
-                    transform: static (ctx, _) => GetInterpolatorMethodData(ctx)
+                    transform: static (ctx, _) => BuildModel(ctx)
                 )
-                .Where(static m => m is not null);
-            var interpolatorMethodProvider = AssemblyFilterHelper.FilterByTrecsReference(
-                interpolatorMethodProviderRaw,
-                hasTrecsReference
-            );
+                .Where(static m => m is not null)
+                .Select(static (m, _) => m!.Value);
+            var models = AssemblyFilterHelper.FilterByTrecsReference(modelsRaw, hasTrecsReference);
 
-            // Combine with compilation provider
-            var interpolatorMethodWithCompilation = interpolatorMethodProvider.Combine(
-                context.CompilationProvider
-            );
-
-            // Register source output
             context.RegisterSourceOutput(
-                interpolatorMethodWithCompilation,
-                static (spc, source) => GenerateInterpolatorSource(spc, source.Left!, source.Right)
+                models,
+                static (spc, model) => GenerateInterpolatorSource(spc, model)
             );
         }
 
-        private static InterpolatorMethodData? GetInterpolatorMethodData(
-            GeneratorAttributeSyntaxContext context
-        )
+        private static InterpolatorJobModel? BuildModel(GeneratorAttributeSyntaxContext context)
         {
-            var methodDecl = (MethodDeclarationSyntax)context.TargetNode;
-            var methodSymbol = context.TargetSymbol as IMethodSymbol;
-
-            if (methodSymbol == null)
+            if (context.TargetSymbol is not IMethodSymbol methodSymbol)
                 return null;
-
             var attribute = context.Attributes.FirstOrDefault();
             if (attribute == null)
                 return null;
+            if (methodSymbol.Parameters.Length == 0)
+                return null;
 
-            return new InterpolatorMethodData(methodDecl, methodSymbol, attribute);
+            // className comes from the attribute's first ctor arg. Bail if it's missing or
+            // not a string — the previous code did the same check inside the terminal stage
+            // and silently returned, but doing it here means we don't carry a half-built
+            // model through the pipeline at all.
+            if (
+                attribute.ConstructorArguments.Length == 0
+                || attribute.ConstructorArguments[0].Value is not string className
+            )
+            {
+                return null;
+            }
+
+            return new InterpolatorJobModel(
+                MethodName: methodSymbol.Name,
+                ContainingTypeDisplay: PerformanceCache.GetDisplayString(
+                    methodSymbol.ContainingType
+                ),
+                ContainingTypeFileName: SymbolAnalyzer.GetSafeFileName(
+                    methodSymbol.ContainingType,
+                    className
+                ),
+                Namespace: PerformanceCache.GetDisplayString(methodSymbol.ContainingNamespace),
+                ComponentTypeDisplay: PerformanceCache.GetDisplayString(
+                    methodSymbol.Parameters[0].Type
+                ),
+                ClassName: className
+            );
         }
 
         private static void GenerateInterpolatorSource(
             SourceProductionContext context,
-            InterpolatorMethodData data,
-            Compilation compilation
+            InterpolatorJobModel model
         )
         {
-            var location = data.MethodDecl.GetLocation();
-            var methodSymbol = data.MethodSymbol;
-            var attributeData = data.AttributeData;
-
             try
             {
                 using var _timer_ = SourceGenTimer.Time("InterpolatorJobGenerator.Total");
-                // Extract class name from attribute
-                if (
-                    attributeData.ConstructorArguments.Length == 0
-                    || attributeData.ConstructorArguments[0].Value is not string className
-                )
-                {
-                    SourceGenLogger.Log(
-                        $"[InterpolatorJobGenerator] Missing or invalid className in attribute for {methodSymbol.Name}"
-                    );
-                    return;
-                }
-
                 SourceGenLogger.Log(
-                    $"[InterpolatorJobGenerator] Processing {methodSymbol.Name} -> {className}"
+                    $"[InterpolatorJobGenerator] Processing {model.MethodName} -> {model.ClassName}"
                 );
 
-                // Generate the interpolated updater source code
-                var source = GenerateInterpolatedUpdater(methodSymbol, className);
-                var fileName = SymbolAnalyzer.GetSafeFileName(
-                    methodSymbol.ContainingType,
-                    className
-                );
-
-                context.AddSource(fileName, source);
-                SourceGenLogger.WriteGeneratedFile(fileName, source);
+                var source = GenerateInterpolatedUpdater(model);
+                context.AddSource(model.ContainingTypeFileName, source);
+                SourceGenLogger.WriteGeneratedFile(model.ContainingTypeFileName, source);
             }
             catch (Exception ex)
             {
                 SourceGenLogger.Log(
-                    $"[InterpolatorJobGenerator] Error generating code for {methodSymbol.Name}: {ex.Message}"
+                    $"[InterpolatorJobGenerator] Error generating code for {model.MethodName}: {ex.Message}"
                 );
 
-                // Report error for any unhandled exceptions
                 var diagnostic = Diagnostic.Create(
                     DiagnosticDescriptors.CouldNotResolveSymbol,
-                    location,
-                    $"{methodSymbol.Name}: {ex.Message}"
+                    Location.None,
+                    $"{model.MethodName}: {ex.Message}"
                 );
                 context.ReportDiagnostic(diagnostic);
             }
         }
 
-        private static string GenerateInterpolatedUpdater(
-            IMethodSymbol methodSymbol,
-            string className
-        )
+        private static string GenerateInterpolatedUpdater(InterpolatorJobModel model)
         {
-            string nameSpace = PerformanceCache.GetDisplayString(methodSymbol.ContainingNamespace);
-            string componentName = PerformanceCache.GetDisplayString(
-                methodSymbol.Parameters[0].Type
-            );
-            string interpolatorMethodName =
-                $"{PerformanceCache.GetDisplayString(methodSymbol.ContainingType)}.{methodSymbol.Name}";
+            string interpolatorMethodName = $"{model.ContainingTypeDisplay}.{model.MethodName}";
+            string componentName = model.ComponentTypeDisplay;
+            string className = model.ClassName;
+            string nameSpace = model.Namespace;
 
             return $@"
 using Unity.Jobs;
@@ -146,14 +135,14 @@ namespace {nameSpace}
     {GeneratedCodeAttributes.Line}
     public class {className} : ISystem, Trecs.Internal.ISystemInternal
     {{
-        WorldAccessor _world;
+        WorldAccessor __world;
 
-        public WorldAccessor World => _world;
+        public WorldAccessor World => __world;
 
         WorldAccessor Trecs.Internal.ISystemInternal.World
         {{
-            get => _world;
-            set {{ TrecsAssert.That(_world == null, ""World has already been set""); _world = value; }}
+            get => __world;
+            set {{ TrecsDebugAssert.That(__world == null, ""World has already been set""); __world = value; }}
         }}
 
         public {className}()
@@ -170,40 +159,41 @@ namespace {nameSpace}
 
         public void Execute()
         {{
-            var percentThroughFixedFrame = InterpolationUtil.CalculatePercentThroughFixedFrame(_world);
+            var percentThroughFixedFrame = InterpolationUtil.CalculatePercentThroughFixedFrame(__world);
             using var jobHandles = new NativeList<JobHandle>(4, Allocator.Temp);
             // Route through Trecs.Internal.JobGenSchedulingExtensions so this generated
             // code compiles in user assemblies that aren't friend-accessed by Trecs.
-            var _trecs_scheduler = _world.GetJobSchedulerForJob();
-            var _trecs_currentRid = ResourceId.Component(ComponentTypeId<{componentName}>.Value);
-            var _trecs_previousRid = ResourceId.Component(ComponentTypeId<InterpolatedPrevious<{componentName}>>.Value);
-            var _trecs_interpRid = ResourceId.Component(ComponentTypeId<Interpolated<{componentName}>>.Value);
+            var __trecs_scheduler = __world.GetJobSchedulerForJob();
+            const string __trecs_jobName = ""InterpolateJob<{componentName}>"";
+            var __trecs_currentRid = ResourceId.Component(TypeId<{componentName}>.Value);
+            var __trecs_previousRid = ResourceId.Component(TypeId<InterpolatedPrevious<{componentName}>>.Value);
+            var __trecs_interpRid = ResourceId.Component(TypeId<Interpolated<{componentName}>>.Value);
 
-            foreach (var group in _world.WorldInfo.GetGroupsWithComponents<{componentName}, InterpolatedPrevious<{componentName}>, Interpolated<{componentName}>>())
+            foreach (var group in __world.WorldInfo.GetGroupsWithComponents<{componentName}, InterpolatedPrevious<{componentName}>, Interpolated<{componentName}>>())
             {{
-                var (currents, count) = _world.GetBufferReadForJob<{componentName}>(group);
+                var (currents, count) = __world.GetBufferReadForJob<{componentName}>(group);
                 if (count == 0) continue;
-                var (previouses, _) = _world.GetBufferReadForJob<InterpolatedPrevious<{componentName}>>(group);
-                var (interpolates, _) = _world.GetBufferWriteForJob<Interpolated<{componentName}>>(group);
+                var (previouses, _) = __world.GetBufferReadForJob<InterpolatedPrevious<{componentName}>>(group);
+                var (interpolates, _) = __world.GetBufferWriteForJob<Interpolated<{componentName}>>(group);
 
-                var _trecs_deps = default(JobHandle);
-                _trecs_deps = _trecs_scheduler.IncludeReadDep(_trecs_deps, _trecs_currentRid, group);
-                _trecs_deps = _trecs_scheduler.IncludeReadDep(_trecs_deps, _trecs_previousRid, group);
-                _trecs_deps = _trecs_scheduler.IncludeWriteDep(_trecs_deps, _trecs_interpRid, group);
+                var __trecs_deps = default(JobHandle);
+                __trecs_deps = __trecs_scheduler.IncludeReadDep(__trecs_deps, __trecs_currentRid, group);
+                __trecs_deps = __trecs_scheduler.IncludeReadDep(__trecs_deps, __trecs_previousRid, group);
+                __trecs_deps = __trecs_scheduler.IncludeWriteDep(__trecs_deps, __trecs_interpRid, group);
 
-                var _trecs_handle = new InterpolateJob()
+                var __trecs_handle = new InterpolateJob()
                 {{
                     CurrentValues = currents,
                     InterpolatedValues = interpolates,
                     PreviousValues = previouses,
                     PercentThroughFixedFrame = percentThroughFixedFrame,
-                }}.ScheduleParallel(count, JobsUtil.ChooseBatchSize(count), _trecs_deps);
+                }}.ScheduleParallel(count, JobsUtil.ChooseBatchSize(count), __trecs_deps);
 
-                _trecs_scheduler.TrackJobRead(_trecs_handle, _trecs_currentRid, group);
-                _trecs_scheduler.TrackJobRead(_trecs_handle, _trecs_previousRid, group);
-                _trecs_scheduler.TrackJobWrite(_trecs_handle, _trecs_interpRid, group);
+                __trecs_scheduler.TrackJobRead(__trecs_handle, __trecs_currentRid, group, __trecs_jobName);
+                __trecs_scheduler.TrackJobRead(__trecs_handle, __trecs_previousRid, group, __trecs_jobName);
+                __trecs_scheduler.TrackJobWrite(__trecs_handle, __trecs_interpRid, group, __trecs_jobName);
 
-                jobHandles.Add(_trecs_handle);
+                jobHandles.Add(__trecs_handle);
             }}
         }}
 
@@ -235,23 +225,16 @@ namespace {nameSpace}
     }
 
     /// <summary>
-    /// Data structure for interpolator method information used in incremental generation
+    /// Value-equality model carried through the incremental pipeline. All fields are
+    /// primitives / strings — no Roslyn symbol or syntax references — so the cache hits
+    /// when nothing observable about the interpolator method has changed.
     /// </summary>
-    internal class InterpolatorMethodData
-    {
-        public MethodDeclarationSyntax MethodDecl { get; }
-        public IMethodSymbol MethodSymbol { get; }
-        public AttributeData AttributeData { get; }
-
-        public InterpolatorMethodData(
-            MethodDeclarationSyntax methodDecl,
-            IMethodSymbol methodSymbol,
-            AttributeData attributeData
-        )
-        {
-            MethodDecl = methodDecl;
-            MethodSymbol = methodSymbol;
-            AttributeData = attributeData;
-        }
-    }
+    internal readonly record struct InterpolatorJobModel(
+        string MethodName,
+        string ContainingTypeDisplay,
+        string ContainingTypeFileName,
+        string Namespace,
+        string ComponentTypeDisplay,
+        string ClassName
+    );
 }

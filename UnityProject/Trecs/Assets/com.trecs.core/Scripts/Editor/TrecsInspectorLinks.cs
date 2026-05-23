@@ -157,10 +157,10 @@ namespace Trecs
         ) => MakeAccessorLink(displayName ?? text, text);
 
         public static VisualElement MakeTagLink(World world, Tag tag, string text) =>
-            MakeTagLink(tag.Guid == 0 ? null : (tag.ToString() ?? $"#{tag.Guid}"), text);
+            MakeTagLink(tag.Value == 0 ? null : (tag.ToString() ?? $"#{tag.Value}"), text);
 
         public static VisualElement MakeSetLink(World world, EntitySet entitySet, string text) =>
-            MakeSetLink(entitySet.DebugName ?? $"#{entitySet.Id.Id}", text);
+            MakeSetLink(entitySet.DebugName ?? $"#{entitySet.Id.Value}", text);
 
         // Small "go to component type inspector" button — renders as an
         // arrow glyph rather than a full row so it can sit inline next to

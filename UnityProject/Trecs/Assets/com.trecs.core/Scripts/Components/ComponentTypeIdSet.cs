@@ -1,55 +1,54 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using Trecs.Internal;
 
 namespace Trecs
 {
     /// <summary>
-    /// An immutable set of component type IDs, identified by a single int hash (XOR of ComponentId values).
-    /// Analogous to TagSet for tags. The registry stores the actual component list per ID.
+    /// Strongly-typed view over a <see cref="TypeIdSet"/> whose members are component
+    /// <see cref="TypeId"/>s. Used by queries that constrain on a component-set; layered
+    /// onto the same intern table that backs <see cref="TagSet"/>.
     /// </summary>
     public readonly struct ComponentTypeIdSet : IEquatable<ComponentTypeIdSet>
     {
-        public readonly int Id;
+        readonly TypeIdSet _inner;
+
+        public int Id => _inner.Id;
 
         public static readonly ComponentTypeIdSet Null;
 
-        public ComponentTypeIdSet(int id)
+        // Internal: external callers should never need to construct from a raw int —
+        // use Add / ComponentTypeIdSet<T...>. The ctor exists for serialization
+        // round-trips of an already-interned id.
+        internal ComponentTypeIdSet(int id)
         {
-            Id = id;
+            _inner = new TypeIdSet(id);
         }
 
-        public bool IsNull => Id == 0;
-
-        public IReadOnlyList<ComponentId> Components =>
-            ComponentTypeIdSetRegistry.GetComponents(this);
-
-        /// <summary>
-        /// Returns a new set with the given component added.
-        /// If the component is already in the set, returns the same set.
-        /// </summary>
-        public ComponentTypeIdSet Add(ComponentId componentId)
+        internal ComponentTypeIdSet(TypeIdSet inner)
         {
-            if (IsNull)
-            {
-                return ComponentTypeIdSetRegistry.FromSingle(componentId);
-            }
-
-            return ComponentTypeIdSetRegistry.AddComponent(this, componentId);
+            _inner = inner;
         }
+
+        public bool IsNull => _inner.IsNull;
+
+        public IReadOnlyList<TypeId> Components => _inner.Members;
+
+        public ComponentTypeIdSet Add(TypeId componentTypeId) => new(_inner.Add(componentTypeId));
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(ComponentTypeIdSet other) => Id == other.Id;
+        public bool Equals(ComponentTypeIdSet other) => _inner == other._inner;
 
         public override bool Equals(object obj) => obj is ComponentTypeIdSet other && Equals(other);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override int GetHashCode() => Id;
+        public override int GetHashCode() => _inner.Id;
 
-        public static bool operator ==(ComponentTypeIdSet a, ComponentTypeIdSet b) => a.Id == b.Id;
+        public static bool operator ==(ComponentTypeIdSet a, ComponentTypeIdSet b) =>
+            a._inner == b._inner;
 
-        public static bool operator !=(ComponentTypeIdSet a, ComponentTypeIdSet b) => a.Id != b.Id;
+        public static bool operator !=(ComponentTypeIdSet a, ComponentTypeIdSet b) =>
+            a._inner != b._inner;
 
         public override string ToString()
         {
@@ -57,44 +56,41 @@ namespace Trecs
             {
                 return "ComponentTypeIdSet(Null)";
             }
-
-            return ComponentTypeIdSetRegistry.SetToString(this);
+            return $"ComponentTypeIdSet({_inner})";
         }
     }
 
-    /// <summary>
-    /// Zero-allocation cache for a <see cref="ComponentTypeIdSet"/> composed of a single component type.
-    /// </summary>
+    /// <inheritdoc cref="ComponentTypeIdSet"/>
     public static class ComponentTypeIdSet<T1>
         where T1 : unmanaged, IEntityComponent
     {
-        public static readonly ComponentTypeIdSet Value = ComponentTypeIdSetRegistry.FromSingle(
-            ComponentTypeId<T1>.Value
+        public static readonly ComponentTypeIdSet Value = new(
+            TypeIdSet.FromMember(TypeId<T1>.Value)
         );
     }
 
-    /// <inheritdoc cref="ComponentTypeIdSet{T1}"/>
+    /// <inheritdoc cref="ComponentTypeIdSet"/>
     public static class ComponentTypeIdSet<T1, T2>
         where T1 : unmanaged, IEntityComponent
         where T2 : unmanaged, IEntityComponent
     {
         public static readonly ComponentTypeIdSet Value = ComponentTypeIdSet<T1>.Value.Add(
-            ComponentTypeId<T2>.Value
+            TypeId<T2>.Value
         );
     }
 
-    /// <inheritdoc cref="ComponentTypeIdSet{T1}"/>
+    /// <inheritdoc cref="ComponentTypeIdSet"/>
     public static class ComponentTypeIdSet<T1, T2, T3>
         where T1 : unmanaged, IEntityComponent
         where T2 : unmanaged, IEntityComponent
         where T3 : unmanaged, IEntityComponent
     {
         public static readonly ComponentTypeIdSet Value = ComponentTypeIdSet<T1, T2>.Value.Add(
-            ComponentTypeId<T3>.Value
+            TypeId<T3>.Value
         );
     }
 
-    /// <inheritdoc cref="ComponentTypeIdSet{T1}"/>
+    /// <inheritdoc cref="ComponentTypeIdSet"/>
     public static class ComponentTypeIdSet<T1, T2, T3, T4>
         where T1 : unmanaged, IEntityComponent
         where T2 : unmanaged, IEntityComponent
@@ -102,7 +98,7 @@ namespace Trecs
         where T4 : unmanaged, IEntityComponent
     {
         public static readonly ComponentTypeIdSet Value = ComponentTypeIdSet<T1, T2, T3>.Value.Add(
-            ComponentTypeId<T4>.Value
+            TypeId<T4>.Value
         );
     }
 }

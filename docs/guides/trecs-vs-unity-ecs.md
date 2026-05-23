@@ -12,7 +12,7 @@ Trecs has a deliberately small API surface — a handful of high-level concepts,
 | **Memory layout** | Fixed-size 16 KB chunks per archetype; entities split across many chunks | Structure-of-arrays: one contiguous buffer per component per group, indexed by the entity's position in the group |
 | **Entity identity** | `Entity` (stable, wraps index + version) | `EntityHandle` (stable, wraps index + version) |
 | **Definition** | No explicit templates (archetype emerges from components) | [Templates](../core/templates.md) (`ITemplate` + `ITagged`) |
-| **Structural changes** | `EntityManager` calls are synchronous (a sync point). For deferral, opt into an `EntityCommandBuffer`; ECBs play back automatically at built-in command-buffer systems (e.g. `EndSimulationEntityCommandBufferSystem`), or manually via `Playback()`. | Structural changes are deferred — [submission](../entity-management/structural-changes.md) runs automatically at the end of every fixed step.  Alternatively can run synchronously via `World.SubmitEntities()` |
+| **Structural changes** | `EntityManager` calls are synchronous (a sync point). For deferral, opt into an `EntityCommandBuffer`; ECBs play back automatically at built-in command-buffer systems (e.g. `EndSimulationEntityCommandBufferSystem`), or manually via `Playback()`. | Structural changes are deferred — [submission](../entity-management/structural-changes.md) runs automatically at the end of every fixed step.  Alternatively can run synchronously via `World.Submit()` |
 | **Multi-world** | Multiple `World` instances; default world auto-created. NetCode for Entities (separate package) adds explicit Client / Server / ThinClient world roles on top. | Multiple `World` instances; no built-in roles or cross-world bridging |
 
 ## Components
@@ -20,16 +20,16 @@ Trecs has a deliberately small API surface — a handful of high-level concepts,
 | | Unity ECS | Trecs |
 |---|---|---|
 | **Plain unmanaged data** | `IComponentData` (unmanaged struct) | `IEntityComponent` (unmanaged struct) |
-| **Managed data on an entity** | `class IComponentData` (managed component) | No managed components — use a [heap pointer](../advanced/heap.md) (`UniquePtr<T>` / `SharedPtr<T>`) referenced from a component |
-| **Per-entity dynamic collections** | `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) | [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline) for bounded cases, or a [heap pointer](../advanced/heap.md) (`UniquePtr<List<T>>` / `NativeUniquePtr<NativeList<T>>`) for unbounded |
+| **Managed data on an entity** | `class IComponentData` (managed component) | No managed components — use a [heap pointer](../experimental/pointers.md) (`UniquePtr<T>` / `SharedPtr<T>`) referenced from a component |
+| **Per-entity dynamic collections** | `IBufferElementData` / `DynamicBuffer<T>` (unbounded, separately allocated) | [`FixedList<N>`](../advanced/fixed-collections.md) (compile-time bounded, inline) for bounded cases, or a [heap pointer](../experimental/pointers.md) (`UniquePtr<List<T>>` / `NativeUniquePtr<NativeList<T>>`) for unbounded |
 | **Tags / markers** | Zero-field `IComponentData` acts as a tag | Dedicated [`ITag`](../core/tags.md) marker structs (separate from components) |
 | **Singletons / global state** | `SystemAPI.GetSingleton<T>()` | `World.GlobalComponent<T>()` on a [`Globals` template](../core/templates.md#global-entity-template) |
 | **Single-field component shorthand** | None | [`[Unwrap]`](../core/components.md#the-unwrap-shorthand) — exposes the inner value through aspect properties (e.g. `boid.Position` is a `float3`, not a `Position` wrapper) |
 | **Runtime add / remove of components** | Yes (`AddComponent` / `RemoveComponent`; causes archetype move) | No — a template's component set is fixed at compile time. Use [partitions](../core/templates.md#partitions), boolean / enum fields, [sets](../entity-management/sets.md), or child entities for the equivalents |
 | **Components shared across many entities** | `ISharedComponentData` | No equivalent; share by reference via a heap pointer |
 | **Cleanup-after-destroy components** | `ICleanupComponentData` — persists past entity destruction so a system can finalize and explicitly remove them | None — use [`OnRemoved`](../entity-management/entity-events.md) observer events for finalization |
-| **Per-chunk shared data** | Chunk components — one value attached per chunk (a 16 KB block of entities in the same archetype) | None — Trecs uses flat per-group buffers without sub-chunks; share via a [heap pointer](../advanced/heap.md) or a `Globals` component |
-| **Shared immutable blob assets** | `BlobAssetReference<T>` — structured immutable blobs shared across entities, baked into subscenes by a stable hash | [`SharedPtr<T>` / `NativeSharedPtr<T>`](../advanced/heap.md) with [stable `BlobId`s](../advanced/shared-heap-data.md#pattern-b-look-up-by-stable-blobid) for cross-run identity |
+| **Per-chunk shared data** | Chunk components — one value attached per chunk (a 16 KB block of entities in the same archetype) | None — Trecs uses flat per-group buffers without sub-chunks; share via a [heap pointer](../experimental/pointers.md) or a `Globals` component |
+| **Shared immutable blob assets** | `BlobAssetReference<T>` — structured immutable blobs shared across entities, baked into subscenes by a stable hash | [`SharedPtr<T>` / `NativeSharedPtr<T>`](../experimental/pointers.md) with [stable `BlobId`s](../experimental/shared-heap-data.md#pattern-b-look-up-by-stable-blobid) for cross-run identity |
 
 ## Systems
 
@@ -85,7 +85,7 @@ Trecs has a deliberately small API surface — a handful of high-level concepts,
 | **Edit-time authoring → entities** | Subscene baking — designers author with `MonoBehaviour`s, baked at edit/build time | No direct equivalent (yet) |
 | **Runtime save/load of full world state** | Limited runtime serialization | Built-in via the [Trecs Player editor window](../editor-windows/player.md) — capture, restore, and label full-state snapshots |
 | **Incremental scene streaming** | Subscenes load incrementally (open-world / large-scale streaming) | None built-in — full snapshots only |
-| **Custom type serializers** | None built-in for ECS save/load; managed/non-blittable types need bespoke save/load code | Register an [`ISerializer<T>`](../advanced/serialization.md) for any managed type stored on the heap; pure unmanaged components round-trip automatically |
+| **Custom type serializers** | None built-in for ECS save/load; managed/non-blittable types need bespoke save/load code | Register an [`ISerializer<T>`](../experimental/serialization.md) for any managed type stored on the heap; pure unmanaged components round-trip automatically |
 | **Per-save versioning** | Handled outside the engine | `Reader.Version` / `Writer.Version` for evolving custom serializers across save-format revisions |
 
 ## Editor tooling

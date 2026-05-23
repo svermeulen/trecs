@@ -42,7 +42,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = i }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             _observedValues.Clear();
 
@@ -51,7 +51,7 @@ namespace Trecs.Tests
             // Whole-group removal drives the worst case: newCount == 0, which
             // is what produced "index 0 - length 0" in the original regression.
             a.RemoveEntitiesWithTags(TestTags.Alpha);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(3, _observedValues.Count);
             _observedValues.Sort();
@@ -72,7 +72,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = i }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             _observedValues.Clear();
 
@@ -85,7 +85,7 @@ namespace Trecs.Tests
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             a.RemoveEntity(new EntityIndex(0, group));
             a.RemoveEntity(new EntityIndex(2, group));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(2, _observedValues.Count);
         }

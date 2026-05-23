@@ -75,12 +75,12 @@ namespace Trecs.Tests
             var result = _cacheHelper.ReadAllDelta<Foo>(fooBase);
 
             // Assert
-            TrecsAssert.That(result.A == foo.A);
-            TrecsAssert.That(result.B == foo.B);
-            TrecsAssert.That(result.C == foo.C);
+            TrecsDebugAssert.That(result.A == foo.A);
+            TrecsDebugAssert.That(result.B == foo.B);
+            TrecsDebugAssert.That(result.C == foo.C);
 
             // Delta should be smaller than full serialization
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 deltaSize < fullSize,
                 $"Delta size ({deltaSize}) should be less than full size ({fullSize})"
             );
@@ -119,12 +119,12 @@ namespace Trecs.Tests
             var result = _cacheHelper.ReadAllDelta<Foo>(fooBase);
 
             // Assert
-            TrecsAssert.That(result.A == foo.A);
-            TrecsAssert.That(result.B == foo.B);
-            TrecsAssert.That(result.C == foo.C);
+            TrecsDebugAssert.That(result.A == foo.A);
+            TrecsDebugAssert.That(result.B == foo.B);
+            TrecsDebugAssert.That(result.C == foo.C);
 
             // No delta should result in minimal size (just headers)
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 deltaSize < 35,
                 $"No-change delta should be minimal, but was {deltaSize} bytes"
             );
@@ -161,9 +161,9 @@ namespace Trecs.Tests
             var result = _cacheHelper.ReadAllDelta<Foo>(fooBase);
 
             // Assert
-            TrecsAssert.That(result.A == foo.A);
-            TrecsAssert.That(result.B == foo.B);
-            TrecsAssert.That(result.C == foo.C);
+            TrecsDebugAssert.That(result.A == foo.A);
+            TrecsDebugAssert.That(result.B == foo.B);
+            TrecsDebugAssert.That(result.C == foo.C);
         }
 
         // Test classes

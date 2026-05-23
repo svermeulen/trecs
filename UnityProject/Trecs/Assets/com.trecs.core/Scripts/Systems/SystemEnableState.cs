@@ -64,9 +64,9 @@ namespace Trecs.Internal
 
         public void Initialize(int systemCount)
         {
-            TrecsAssert.That(!_isInitialized);
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(systemCount >= 0);
+            TrecsDebugAssert.That(!_isInitialized);
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(systemCount >= 0);
 
             _systemCount = systemCount;
             _channelMasks = new int[systemCount];
@@ -85,7 +85,7 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            TrecsAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!_isDisposed);
 
             if (_pausedWords.IsCreated)
             {
@@ -99,21 +99,21 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_isInitialized);
+                TrecsDebugAssert.That(_isInitialized);
                 return _systemCount;
             }
         }
 
         public bool IsSystemEnabled(int systemIndex, EnableChannel channel)
         {
-            TrecsAssert.That(_isInitialized);
+            TrecsDebugAssert.That(_isInitialized);
             AssertValidIndex(systemIndex);
             return (_channelMasks[systemIndex] & (int)channel) == 0;
         }
 
         public void SetSystemEnabled(int systemIndex, EnableChannel channel, bool enabled)
         {
-            TrecsAssert.That(_isInitialized);
+            TrecsDebugAssert.That(_isInitialized);
             AssertValidIndex(systemIndex);
 
             if (enabled)
@@ -128,7 +128,7 @@ namespace Trecs.Internal
 
         public bool IsSystemPaused(int systemIndex)
         {
-            TrecsAssert.That(_isInitialized);
+            TrecsDebugAssert.That(_isInitialized);
             AssertValidIndex(systemIndex);
 
             var wordIndex = systemIndex / BitsPerWord;
@@ -138,7 +138,7 @@ namespace Trecs.Internal
 
         public void SetSystemPaused(int systemIndex, bool paused)
         {
-            TrecsAssert.That(_isInitialized);
+            TrecsDebugAssert.That(_isInitialized);
             AssertValidIndex(systemIndex);
 
             var wordIndex = systemIndex / BitsPerWord;
@@ -175,17 +175,17 @@ namespace Trecs.Internal
         // without manually combining channel checks and IsSystemPaused.
         public bool IsSystemEffectivelyEnabled(int systemIndex)
         {
-            TrecsAssert.That(_isInitialized);
+            TrecsDebugAssert.That(_isInitialized);
             AssertValidIndex(systemIndex);
             return !ShouldSkipSystem(systemIndex);
         }
 
         public unsafe void Serialize(ISerializationWriter writer)
         {
-            TrecsAssert.That(_isInitialized);
+            TrecsDebugAssert.That(_isInitialized);
 
             // Channels are intentionally NOT serialized — they're ephemeral
-            // and reapplied by their respective owners (BundlePlayer for
+            // and reapplied by their respective owners (BundleReplayer for
             // EnableChannel.Playback, the editor for EnableChannel.Editor,
             // and application code for EnableChannel.User) on each session.
             writer.Write("SystemCount", _systemCount);
@@ -203,13 +203,13 @@ namespace Trecs.Internal
 
         public unsafe void Deserialize(ISerializationReader reader)
         {
-            TrecsAssert.That(_isInitialized);
+            TrecsDebugAssert.That(_isInitialized);
 
             var serializedSystemCount = reader.Read<int>("SystemCount");
             var serializedWordCount = reader.Read<int>("WordCount");
 
-            TrecsAssert.IsEqual(serializedSystemCount, _systemCount);
-            TrecsAssert.IsEqual(serializedWordCount, _wordCount);
+            TrecsDebugAssert.IsEqual(serializedSystemCount, _systemCount);
+            TrecsDebugAssert.IsEqual(serializedWordCount, _wordCount);
 
             if (_wordCount > 0)
             {
@@ -223,7 +223,7 @@ namespace Trecs.Internal
 
         void AssertValidIndex(int systemIndex)
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 systemIndex >= 0 && systemIndex < _systemCount,
                 "System index {0} out of range [0, {1})",
                 systemIndex,

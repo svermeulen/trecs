@@ -39,8 +39,8 @@ namespace Trecs.Samples.Sets
             go.GetComponent<Renderer>().material.color = color;
 
             // WaveX lifts particles upward
-            var pos = go.transform.position;
-            pos.y = view.Position.y + warm * _settings.LiftAmount;
+            var pos = (Vector3)view.Position;
+            pos.y += warm * _settings.LiftAmount;
             go.transform.position = pos;
 
             // WaveZ scales particles up

@@ -129,10 +129,10 @@ namespace Trecs.SourceGen.Shared
             NeedsHoistedSingleGroup = needsHoistedSingleGroup;
             NeedsHoistedGroups = needsHoistedGroups;
             HoistedSingleGroupLocal = needsHoistedSingleGroup
-                ? "_trecs_" + LowerFirst(fieldName) + "_group"
+                ? FromWorldEmitter.GenPrefix + LowerFirst(fieldName) + "_group"
                 : "";
             HoistedGroupsLocal = needsHoistedGroups
-                ? "_trecs_" + LowerFirst(fieldName) + "_groups"
+                ? FromWorldEmitter.GenPrefix + LowerFirst(fieldName) + "_groups"
                 : "";
             InlineTagSetExpression = inlineTagSetExpression;
             TagSetExpression = tagSetExpression;
@@ -190,7 +190,9 @@ namespace Trecs.SourceGen.Shared
             // When inline tags are present, the resolved TagSet is computed in a
             // local variable by EmitFromWorldHoistedSetup (combining inline + optional
             // runtime tags). Otherwise it's just the schedule param name.
-            var resolvedTagsLocal = hasInlineTags ? "_trecs_" + lower + "_tags" : lower + "Tags";
+            var resolvedTagsLocal = hasInlineTags
+                ? FromWorldEmitter.GenPrefix + lower + "_tags"
+                : lower + "Tags";
             switch (info.Kind)
             {
                 case FromWorldFieldKind.NativeComponentBufferRead:
@@ -318,7 +320,7 @@ namespace Trecs.SourceGen.Shared
                     );
                 case FromWorldFieldKind.NativeWorldAccessor:
                     // No schedule param, no groups, no deps, no tracking.
-                    // Emits: _trecs_job.{field} = _trecs_world.ToNative();
+                    // Emits: __trecs_job.{field} = __trecs_world.ToNative();
                     return new(
                         info.Kind,
                         info.FieldName,

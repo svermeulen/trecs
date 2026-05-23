@@ -21,7 +21,7 @@ namespace Trecs.Serialization
             }
             else
             {
-                TrecsAssert.That(value.Count == 0);
+                TrecsDebugAssert.That(value.Count == 0);
 
                 value.Clear();
 

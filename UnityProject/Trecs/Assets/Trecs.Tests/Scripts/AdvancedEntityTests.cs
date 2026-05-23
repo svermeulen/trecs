@@ -36,14 +36,14 @@ namespace Trecs.Tests
                         i
                     );
                 }
-                a.SubmitEntities();
+                a.Submit();
 
                 // Remove all entities
                 for (int i = 0; i < 10; i++)
                 {
                     a.RemoveEntity(roundRefs[i]);
                 }
-                a.SubmitEntities();
+                a.Submit();
             }
         }
 
@@ -65,7 +65,7 @@ namespace Trecs.Tests
                         .AssertComplete();
                     activeRefs.Add(init.Handle);
                 }
-                a.SubmitEntities();
+                a.Submit();
 
                 // Remove half (every other)
                 var toRemove = new List<EntityHandle>();
@@ -78,7 +78,7 @@ namespace Trecs.Tests
                     a.RemoveEntity(r);
                     activeRefs.Remove(r);
                 }
-                a.SubmitEntities();
+                a.Submit();
             }
 
             // Verify all remaining refs are valid and the count matches
@@ -100,7 +100,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             var init = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();
             ref readonly var comp = ref entity.Component<TestInt>(a).Read;
@@ -124,7 +124,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 77 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             bool found = a.Query().WithTags(TestTags.Alpha).TrySingleHandle(out var entity);
             NAssert.IsTrue(found);
@@ -145,7 +145,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = i * 10 }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             int count = 0;
             foreach (var ei in a.Query().WithTags(TestTags.Alpha).Indices())
@@ -169,7 +169,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(PartitionB).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             int count = 0;
             foreach (var ei in a.Query().WithTags(TestTags.Gamma).Indices())
@@ -193,7 +193,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 123 })
                 .AssertComplete();
             var originalRef = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Ref -> Index -> Ref
             var entityIndex = originalRef.ToIndex(a);
@@ -209,11 +209,11 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(PartitionA).Set(new TestInt { Value = 50 }).AssertComplete();
             var entityHandle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Move to PartitionB
             a.SetTag<TestPartitionB>(entityHandle.ToIndex(a));
-            a.SubmitEntities();
+            a.Submit();
 
             // Get the new index and convert back to ref
             var newIndex = entityHandle.ToIndex(a);
@@ -232,7 +232,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 10 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Modify via QueryEntity
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
@@ -251,7 +251,7 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 10 }).AssertComplete();
             var entityHandle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Modify via EntityHandle
             a.Component<TestInt>(entityHandle).Write.Value = 77;
@@ -270,7 +270,7 @@ namespace Trecs.Tests
 
             var init = a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 10 }).AssertComplete();
             var entityHandle = init.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             // Modify via EntityIndex write access
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
@@ -298,13 +298,13 @@ namespace Trecs.Tests
             {
                 a.AddEntity(PartitionB).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(5, a.Query().WithTags(TestTags.Gamma).Count());
 
             // Remove all entities with Gamma tag (both PartitionA and PartitionB)
             a.RemoveEntitiesWithTags(TestTags.Gamma);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
@@ -335,11 +335,11 @@ namespace Trecs.Tests
                 );
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(1, callCount, "Should fire for Alpha group");
 
             a.AddEntity(TestTags.Beta).Set(new TestFloat { Value = 1.0f }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(2, callCount, "Should fire for Beta group too");
 
             sub.Dispose();
@@ -370,7 +370,7 @@ namespace Trecs.Tests
                 .OnAdded((GroupIndex g, EntityRange i) => count3++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, count1);
             NAssert.AreEqual(1, count2);
@@ -398,12 +398,12 @@ namespace Trecs.Tests
                 .OnAdded((GroupIndex g, EntityRange i) => count2++);
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             sub1.Dispose(); // Dispose first sub
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, count1, "Disposed sub should not fire again");
             NAssert.AreEqual(2, count2, "Active sub should still fire");
@@ -429,7 +429,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(PartitionB).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             int manualCount = 0;
             foreach (var _ in a.Query().WithTags(TestTags.Gamma).Indices())
@@ -460,7 +460,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(PartitionB).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             int sliceTotal = 0;
             foreach (var slice in a.Query().WithTags(TestTags.Gamma).GroupSlices())

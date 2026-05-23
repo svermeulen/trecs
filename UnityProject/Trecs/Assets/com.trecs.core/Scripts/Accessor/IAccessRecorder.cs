@@ -1,5 +1,3 @@
-using Trecs.Internal;
-
 namespace Trecs
 {
     /// <summary>
@@ -14,7 +12,7 @@ namespace Trecs
         void OnComponentAccess(
             string systemName,
             GroupIndex group,
-            ComponentId componentType,
+            TypeId componentType,
             bool isReadOnly
         );
 

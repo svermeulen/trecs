@@ -7,6 +7,7 @@ namespace Trecs.Collections
     /// <summary>
     /// A bounded list with compile-time capacity of 2 elements, stored inline.
     /// </summary>
+    [NonCopyable]
     public struct FixedList2<T>
         where T : unmanaged
     {
@@ -33,7 +34,7 @@ namespace Trecs.Collections
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                TrecsRequire.That(value >= 0 && value <= 2);
+                TrecsAssert.That(value >= 0 && value <= 2);
                 _count = value;
             }
         }
@@ -43,7 +44,7 @@ namespace Trecs.Collections
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                TrecsRequire.That(
+                TrecsAssert.That(
                     index >= 0 && index < _count,
                     "Out of bound index (index: {0}, count: {1})",
                     index,
@@ -112,7 +113,7 @@ namespace Trecs.Collections
         public static ref T Mut<T>(this ref FixedList2<T> list, int index)
             where T : unmanaged
         {
-            TrecsRequire.That(
+            TrecsAssert.That(
                 index >= 0 && index < list.Count,
                 "Out of bound index (index: {0}, count: {1})",
                 index,
@@ -128,7 +129,7 @@ namespace Trecs.Collections
         public static void Add<T>(this ref FixedList2<T> list, T item)
             where T : unmanaged
         {
-            TrecsRequire.That(list.Count < 2, "FixedList2 is full");
+            TrecsAssert.That(list.Count < 2, "FixedList2 is full");
             list.Buffer.Mut(list.Count) = item;
             list.Count++;
         }
@@ -144,7 +145,7 @@ namespace Trecs.Collections
         public static void RemoveAt<T>(this ref FixedList2<T> list, int index)
             where T : unmanaged
         {
-            TrecsRequire.That(index >= 0 && index < list.Count, "index out of bounds");
+            TrecsAssert.That(index >= 0 && index < list.Count, "index out of bounds");
             int lastIndex = list.Count - 1;
             for (int i = index; i < lastIndex; i++)
             {
@@ -157,7 +158,7 @@ namespace Trecs.Collections
         public static void RemoveAtSwapBack<T>(this ref FixedList2<T> list, int index)
             where T : unmanaged
         {
-            TrecsRequire.That(index >= 0 && index < list.Count, "index out of bounds");
+            TrecsAssert.That(index >= 0 && index < list.Count, "index out of bounds");
             int lastIndex = list.Count - 1;
             if (index != lastIndex)
             {

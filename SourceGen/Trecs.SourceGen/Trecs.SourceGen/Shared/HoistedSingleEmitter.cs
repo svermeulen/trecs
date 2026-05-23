@@ -1,9 +1,6 @@
 #nullable enable
 
 using System.Collections.Generic;
-using System.Linq;
-using Microsoft.CodeAnalysis;
-using Trecs.SourceGen.Performance;
 
 namespace Trecs.SourceGen.Shared
 {
@@ -13,7 +10,7 @@ namespace Trecs.SourceGen.Shared
     /// generators (before the iteration loop) so the hoist code shape stays in sync
     /// across all paths.
     /// <para>
-    /// Per call this emits, for each <see cref="HoistedSingletonInfo"/>:
+    /// Per call this emits, for each <see cref="HoistedSingletonModel"/>:
     /// <list type="number">
     ///   <item><c>var __&lt;Name&gt;_ei = &lt;world&gt;.Query().WithTags&lt;Tags...&gt;().SingleIndex();</c></item>
     ///   <item>For aspects: per-component buffer locals (<c>__&lt;Name&gt;_b{i}</c>) and the
@@ -28,148 +25,105 @@ namespace Trecs.SourceGen.Shared
     /// </summary>
     internal static class HoistedSingleEmitter
     {
-        /// <summary>
-        /// Emits the hoist preamble for every <see cref="HoistedSingletonInfo"/> in
-        /// <paramref name="hoisted"/>. No-op when the list is empty.
-        /// </summary>
-        /// <param name="sb">Target builder.</param>
-        /// <param name="indentLevel">Indent level for the emitted lines.</param>
-        /// <param name="worldVar">Name of the in-scope <c>WorldAccessor</c> local — typically <c>"__world"</c>.</param>
-        /// <param name="hoisted">Hoisted-singleton infos in user declaration order.</param>
         public static void Emit(
             OptimizedStringBuilder sb,
             int indentLevel,
             string worldVar,
-            List<HoistedSingletonInfo> hoisted
+            EquatableArray<HoistedSingletonModel> hoisted
         )
         {
-            foreach (var info in hoisted)
+            foreach (var model in hoisted)
             {
-                if (info.IsAspect)
-                    EmitAspect(sb, indentLevel, worldVar, info);
+                if (model.IsAspect)
+                    EmitAspectModel(sb, indentLevel, worldVar, model);
                 else
-                    EmitComponent(sb, indentLevel, worldVar, info);
+                    EmitComponentModel(sb, indentLevel, worldVar, model);
             }
         }
 
-        private static void EmitAspect(
+        private static void EmitAspectModel(
             OptimizedStringBuilder sb,
             int indentLevel,
             string worldVar,
-            HoistedSingletonInfo info
+            HoistedSingletonModel model
         )
         {
             sb.AppendLine(
                 indentLevel,
-                $"// [SingleEntity] {info.ParamName} : {info.AspectTypeDisplay}"
+                $"// [SingleEntity] {model.ParamName} : {model.AspectTypeDisplay}"
             );
-            var withTagsArgs = string.Join(
-                ", ",
-                info.TagTypes.Select(t => PerformanceCache.GetDisplayString(t))
-            );
-            var eiVar = $"__{info.ParamName}_ei";
+            var withTagsArgs = string.Join(", ", model.TagDisplays);
+            var eiVar = $"__{model.ParamName}_ei";
             sb.AppendLine(
                 indentLevel,
                 $"var {eiVar} = {worldVar}.Query().WithTags<{withTagsArgs}>().SingleIndex();"
             );
 
-            // The aspect's generated EntityIndex constructor takes buffers in
-            // AspectData.AllComponentTypes order — same canonical helper used by
-            // AspectCodeGenerator. Reusing it here keeps the orderings locked.
-            var aspectData = info.AspectData!;
-            var allComponents = aspectData.AllComponentTypes;
-            var bufferVars = new List<string>(allComponents.Length);
-            for (int i = 0; i < allComponents.Length; i++)
+            // Buffers emitted in AspectComponents order — same canonical order the
+            // aspect's generated EntityIndex constructor expects.
+            var bufferVars = new List<string>(model.AspectComponents.Length);
+            for (int i = 0; i < model.AspectComponents.Length; i++)
             {
-                var componentType = allComponents[i];
-                bool inWrite = aspectData.WriteTypes.Any(t =>
-                    SymbolEqualityComparer.Default.Equals(t, componentType)
-                );
-                var suffix = inWrite ? "Write" : "Read";
-                var bufferVar = $"__{info.ParamName}_b{i}";
+                var component = model.AspectComponents[i];
+                var suffix = component.IsWrite ? "Write" : "Read";
+                var bufferVar = $"__{model.ParamName}_b{i}";
                 bufferVars.Add(bufferVar);
                 sb.AppendLine(
                     indentLevel,
-                    $"var {bufferVar} = {worldVar}.ComponentBuffer<{PerformanceCache.GetDisplayString(componentType)}>({eiVar}.GroupIndex).{suffix};"
+                    $"var {bufferVar} = {worldVar}.ComponentBuffer<{component.TypeDisplay}>({eiVar}.GroupIndex).{suffix};"
                 );
             }
             sb.AppendLine(
                 indentLevel,
-                $"var __{info.ParamName} = new {info.AspectTypeDisplay}({eiVar}, {string.Join(", ", bufferVars)});"
+                $"var __{model.ParamName} = new {model.AspectTypeDisplay}({eiVar}, {string.Join(", ", bufferVars)});"
             );
         }
 
-        private static void EmitComponent(
+        private static void EmitComponentModel(
             OptimizedStringBuilder sb,
             int indentLevel,
             string worldVar,
-            HoistedSingletonInfo info
+            HoistedSingletonModel model
         )
         {
             sb.AppendLine(
                 indentLevel,
-                $"// [SingleEntity] {info.ParamName} : {info.ComponentTypeDisplay}"
+                $"// [SingleEntity] {model.ParamName} : {model.ComponentTypeDisplay}"
             );
-            var withTagsArgs = string.Join(
-                ", ",
-                info.TagTypes.Select(t => PerformanceCache.GetDisplayString(t))
-            );
-            var eiVar = $"__{info.ParamName}_ei";
+            var withTagsArgs = string.Join(", ", model.TagDisplays);
+            var eiVar = $"__{model.ParamName}_ei";
             sb.AppendLine(
                 indentLevel,
                 $"var {eiVar} = {worldVar}.Query().WithTags<{withTagsArgs}>().SingleIndex();"
             );
-            var aliasModifier = info.IsRef ? "ref" : "ref readonly";
-            var bufferSuffix = info.IsRef ? "Write" : "Read";
+            var aliasModifier = model.IsRef ? "ref" : "ref readonly";
+            var bufferSuffix = model.IsRef ? "Write" : "Read";
             sb.AppendLine(
                 indentLevel,
-                $"{aliasModifier} var __{info.ParamName} = ref {worldVar}.ComponentBuffer<{info.ComponentTypeDisplay}>({eiVar}.GroupIndex).{bufferSuffix}[{eiVar}.Index];"
+                $"{aliasModifier} var __{model.ParamName} = ref {worldVar}.ComponentBuffer<{model.ComponentTypeDisplay}>({eiVar}.GroupIndex).{bufferSuffix}[{eiVar}.Index];"
             );
         }
 
         /// <summary>
         /// Adds containing namespaces for every type referenced by the hoisted
-        /// singletons (tag types, aspect type, aspect's read/write component types,
-        /// component type) into <paramref name="namespaces"/>. Skips System and the
-        /// global namespace.
+        /// singleton models into <paramref name="namespaces"/>. The model already
+        /// pre-collected the per-singleton namespace set (with <c>System</c>
+        /// filtering applied); here we only drop the compilation's global namespace,
+        /// which the model couldn't know about at build time.
         /// </summary>
         public static void CollectNamespaces(
             HashSet<string> namespaces,
-            List<HoistedSingletonInfo> hoisted,
+            EquatableArray<HoistedSingletonModel> hoisted,
             string globalNamespaceName
         )
         {
-            void Add(ITypeSymbol? sym)
+            foreach (var model in hoisted)
             {
-                if (sym == null)
-                    return;
-                var ns = PerformanceCache.GetDisplayString(sym.ContainingNamespace);
-                if (
-                    !string.IsNullOrEmpty(ns)
-                    && ns != "System"
-                    && !ns.StartsWith("System.")
-                    && ns != globalNamespaceName
-                )
-                    namespaces.Add(ns);
-            }
-
-            foreach (var info in hoisted)
-            {
-                foreach (var t in info.TagTypes)
+                foreach (var ns in model.Namespaces)
                 {
-                    Add(t);
-                    if (t.ContainingType != null)
-                        Add(t.ContainingType);
+                    if (ns != globalNamespaceName)
+                        namespaces.Add(ns);
                 }
-                if (info.AspectData != null)
-                {
-                    foreach (var t in info.AspectData.ReadTypes)
-                        Add(t);
-                    foreach (var t in info.AspectData.WriteTypes)
-                        Add(t);
-                }
-                Add(info.AspectTypeSymbol);
-                Add(info.ComponentTypeSymbol);
             }
         }
     }

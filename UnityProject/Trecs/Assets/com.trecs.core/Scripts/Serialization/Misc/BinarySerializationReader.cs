@@ -1,7 +1,8 @@
 using System;
 using System.IO;
+using Trecs.Internal;
 
-namespace Trecs.Internal
+namespace Trecs
 {
     public sealed class BinarySerializationReader : ISerializationReader
     {
@@ -14,6 +15,14 @@ namespace Trecs.Internal
         int _version;
         bool _includesTypeChecks;
         BinaryReader _binaryReader;
+
+        // MemoryStream extracted from _binaryReader.BaseStream at Start
+        // time so the blit path can read directly from its underlying
+        // byte[] without going through BinaryReader.Read → Stream.Read
+        // virtual dispatch. Sharing the same underlying MemoryStream means
+        // BinaryReader's next ReadString / ReadInt32 picks up at whatever
+        // position the blit fast-path left it at.
+        MemoryStream _memoryStream;
         bool _hasStarted;
 
         public BinarySerializationReader(SerializerRegistry serializerManager)
@@ -25,7 +34,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_hasStarted);
+                TrecsDebugAssert.That(_hasStarted);
                 return _flags;
             }
         }
@@ -34,8 +43,8 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_hasStarted);
-                TrecsAssert.IsNotNull(_binaryReader);
+                TrecsDebugAssert.That(_hasStarted);
+                TrecsDebugAssert.IsNotNull(_binaryReader);
                 return _binaryReader;
             }
         }
@@ -44,14 +53,14 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_hasStarted);
+                TrecsDebugAssert.That(_hasStarted);
                 return _version;
             }
         }
 
         public bool HasFlag(long flag)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
             return (_flags & flag) != 0;
         }
 
@@ -62,12 +71,18 @@ namespace Trecs.Internal
         /// </summary>
         public void Start(BinaryReader binaryReader)
         {
-            TrecsAssert.That(!_hasStarted);
+            TrecsDebugAssert.That(!_hasStarted);
 
             _hasStarted = true;
 
-            TrecsAssert.IsNull(_binaryReader);
+            TrecsDebugAssert.IsNull(_binaryReader);
             _binaryReader = binaryReader;
+            // All current callers wrap a MemoryStream — the bulk Heap
+            // serialization paths in particular depend on the seek-by-
+            // Position behaviour that file-backed streams cost a syscall
+            // for. If a non-MemoryStream caller appears, route it through
+            // a buffering MemoryStream upstream.
+            _memoryStream = (MemoryStream)binaryReader.BaseStream;
 
             (_version, _flags, _includesTypeChecks) = SerializationHeaderUtil.ReadHeader(
                 binaryReader
@@ -92,22 +107,24 @@ namespace Trecs.Internal
         /// </summary>
         public void Stop(bool verifySentinel)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
             _hasStarted = false;
             _bitReader.Complete();
 
-            TrecsAssert.IsNotNull(_binaryReader);
+            TrecsDebugAssert.IsNotNull(_binaryReader);
             if (verifySentinel)
             {
                 VerifySentinel();
             }
             _binaryReader = null;
+            _memoryStream = null;
         }
 
         public void ResetForErrorRecovery()
         {
             _hasStarted = false;
             _binaryReader = null;
+            _memoryStream = null;
             _flags = 0;
             _version = 0;
             _includesTypeChecks = false;
@@ -122,37 +139,48 @@ namespace Trecs.Internal
         /// </summary>
         void VerifySentinel()
         {
+            // SerializationException (not TrecsDebugAssert) because the end-
+            // of-payload sentinel is the primary defense against truncated /
+            // corrupt streams and must fire in release builds too. Stripping
+            // the check in release would let downstream code silently consume
+            // an incomplete payload as if it were valid.
+            byte sentinel;
             try
             {
-                var sentinel = _binaryReader.ReadByte();
-                TrecsAssert.That(
-                    sentinel == SerializationConstants.EndOfPayloadMarker,
-                    "Data corruption detected - expected end-of-payload marker {0} but found {1}. This indicates incomplete deserialization, corrupted data, or version mismatch.",
-                    SerializationConstants.EndOfPayloadMarker,
-                    sentinel
-                );
-                _log.Trace("Verified end-of-payload marker");
+                sentinel = _binaryReader.ReadByte();
             }
             catch (EndOfStreamException)
             {
-                throw TrecsAssert.CreateException(
-                    "Data corruption detected - missing end-of-payload marker. This indicates truncated data or incomplete serialization."
+                throw new SerializationException(
+                    "Data corruption detected — missing end-of-payload marker. "
+                        + "This indicates truncated data or incomplete serialization."
                 );
             }
+
+            if (sentinel != SerializationConstants.EndOfPayloadMarker)
+            {
+                throw new SerializationException(
+                    $"Data corruption detected — expected end-of-payload marker "
+                        + $"0x{SerializationConstants.EndOfPayloadMarker:X2} but found "
+                        + $"0x{sentinel:X2}. This indicates incomplete deserialization, "
+                        + "corrupted data, or version mismatch."
+                );
+            }
+            _log.Trace("Verified end-of-payload marker");
         }
 
         public bool ReadBit()
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
             return _bitReader.ReadBit();
         }
 
         public void ReadObjectDelta(string name, ref object value, object baseValue)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             // Delta serialization doesn't support nulls yet
-            TrecsAssert.IsNotNull(
+            TrecsDebugAssert.IsNotNull(
                 baseValue,
                 "Delta serialization doesn't support null base values"
             );
@@ -162,26 +190,23 @@ namespace Trecs.Internal
             // Note that we don't do equality checks here, so it's up to
             // the serializer to do delta optimization logic
 
-            using (TrecsProfiling.Start("Deserializing {0}", concreteType))
-            {
-                var serializer = _serializerManager.GetSerializerDelta(concreteType);
-                serializer.DeserializeObjectDelta(ref value, baseValue, this);
-                TrecsAssert.IsNotNull(value, "Delta serialization doesn't support null values");
-                TrecsAssert.That(value.GetType() == concreteType);
-                TrecsAssert.That(baseValue.GetType() == concreteType);
-            }
+            var serializer = _serializerManager.GetSerializerDelta(concreteType);
+            serializer.DeserializeObjectDelta(ref value, baseValue, this);
+            TrecsDebugAssert.IsNotNull(value, "Delta serialization doesn't support null values");
+            TrecsDebugAssert.That(value.GetType() == concreteType);
+            TrecsDebugAssert.That(baseValue.GetType() == concreteType);
         }
 
         public void BlitReadDelta<T>(string name, ref T value, in T baseValue)
             where T : unmanaged
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             var isChanged = _bitReader.ReadBit();
 
             if (isChanged)
             {
-                MemoryBlitter.Read(ref value, _binaryReader);
+                MemoryBlitter.Read(ref value, _memoryStream);
             }
             else
             {
@@ -191,10 +216,10 @@ namespace Trecs.Internal
 
         public void ReadDelta<T>(string name, ref T value, in T baseValue)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             // Delta serialization doesn't support nulls yet
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 baseValue != null,
                 "Delta serialization doesn't support null base values"
             );
@@ -207,7 +232,7 @@ namespace Trecs.Internal
             {
                 object obj = value;
                 ReadObjectDelta(name, ref obj, baseValue);
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     obj is T,
                     "Wire concrete type {0} does not derive from T={1}",
                     obj?.GetType(),
@@ -222,7 +247,7 @@ namespace Trecs.Internal
                 // a potential optimization here is to just skip the type id in release mode
                 // since it's only needed for verification purposes
                 var savedType = TypeIdSerializer.Read(_binaryReader);
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     savedType == type,
                     "Expected type {0} but found '{1}'",
                     type,
@@ -233,19 +258,16 @@ namespace Trecs.Internal
             // Note that we don't do equality checks here, so it's up to
             // the serializer to do delta optimization logic
 
-            using (TrecsProfiling.Start("Deserializing {0}", type))
-            {
-                var serializer = _serializerManager.GetSerializerDelta<T>();
-                serializer.DeserializeDelta(ref value, baseValue, this);
-            }
+            var serializer = _serializerManager.GetSerializerDelta<T>();
+            serializer.DeserializeDelta(ref value, baseValue, this);
         }
 
         public string ReadStringDelta(string name, string baseValue)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             // Delta serialization doesn't support nulls yet
-            TrecsAssert.IsNotNull(
+            TrecsDebugAssert.IsNotNull(
                 baseValue,
                 "Delta serialization doesn't support null base values"
             );
@@ -264,14 +286,14 @@ namespace Trecs.Internal
 
         public Type ReadTypeId(string name)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             return TypeIdSerializer.Read(_binaryReader);
         }
 
         public void ReadObject(string name, ref object value)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             // Read null bit
             bool isNull = _bitReader.ReadBit();
@@ -283,39 +305,36 @@ namespace Trecs.Internal
 
             var concreteType = TypeIdSerializer.Read(_binaryReader);
 
-            using (TrecsProfiling.Start("Deserializing {0}", concreteType))
-            {
-                var serializer = _serializerManager.GetSerializer(concreteType);
-                serializer.DeserializeObject(ref value, this);
-                TrecsAssert.IsNotNull(value);
-                TrecsAssert.That(value.GetType() == concreteType);
-            }
+            var serializer = _serializerManager.GetSerializer(concreteType);
+            serializer.DeserializeObject(ref value, this);
+            TrecsDebugAssert.IsNotNull(value);
+            TrecsDebugAssert.That(value.GetType() == concreteType);
         }
 
         public void BlitRead<T>(string name, ref T value)
             where T : unmanaged
         {
-            TrecsAssert.That(_hasStarted);
-            MemoryBlitter.Read(ref value, _binaryReader);
+            TrecsDebugAssert.That(_hasStarted);
+            MemoryBlitter.Read(ref value, _memoryStream);
         }
 
         public unsafe void BlitReadArrayPtr<T>(string name, T* value, int length)
             where T : unmanaged
         {
-            TrecsAssert.That(_hasStarted);
-            MemoryBlitter.ReadArrayPtr(value, length, _binaryReader);
+            TrecsDebugAssert.That(_hasStarted);
+            MemoryBlitter.ReadArrayPtr(value, length, _memoryStream);
         }
 
         public unsafe void BlitReadArray<T>(string name, T[] buffer, int count)
             where T : unmanaged
         {
-            TrecsAssert.That(_hasStarted);
-            MemoryBlitter.ReadArray(buffer, count, _binaryReader);
+            TrecsDebugAssert.That(_hasStarted);
+            MemoryBlitter.ReadArray(buffer, count, _memoryStream);
         }
 
         public void Read<T>(string name, ref T value)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             var type = typeof(T);
 
@@ -325,7 +344,7 @@ namespace Trecs.Internal
             {
                 object obj = value;
                 ReadObject(name, ref obj);
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     obj == null || obj is T,
                     "Wire concrete type {0} does not derive from T={1}",
                     obj?.GetType(),
@@ -350,7 +369,7 @@ namespace Trecs.Internal
             if (_includesTypeChecks)
             {
                 var savedType = TypeIdSerializer.Read(_binaryReader);
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     savedType == type,
                     "Expected type {0} but found '{1}'",
                     type,
@@ -358,16 +377,13 @@ namespace Trecs.Internal
                 );
             }
 
-            using (TrecsProfiling.Start("Deserializing {0}", type))
-            {
-                var serializer = _serializerManager.GetSerializer<T>();
-                serializer.Deserialize(ref value, this);
-            }
+            var serializer = _serializerManager.GetSerializer<T>();
+            serializer.Deserialize(ref value, this);
         }
 
         public string ReadString(string name)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             // Read null bit
             bool isNull = _bitReader.ReadBit();
@@ -381,13 +397,13 @@ namespace Trecs.Internal
 
         public unsafe void BlitReadRawBytes(string name, void* ptr, int numBytes)
         {
-            TrecsAssert.That(_hasStarted);
-            MemoryBlitter.ReadRaw(ptr, numBytes, _binaryReader);
+            TrecsDebugAssert.That(_hasStarted);
+            MemoryBlitter.ReadRaw(ptr, numBytes, _memoryStream);
         }
 
         public int ReadBytes(string name, ref byte[] buffer)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             var length = _binaryReader.ReadInt32();
 

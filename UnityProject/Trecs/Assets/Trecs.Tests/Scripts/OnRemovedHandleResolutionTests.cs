@@ -26,7 +26,7 @@ namespace Trecs.Tests
             var initializer = a.AddEntity(TestTags.Alpha);
             initializer.AssertComplete();
             var originalHandle = initializer.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             EntityHandle observedHandle = default;
             var sub = a
@@ -43,7 +43,7 @@ namespace Trecs.Tests
 
             var alphaGroup = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             a.RemoveEntity(new EntityIndex(0, alphaGroup));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(
                 originalHandle,
@@ -62,7 +62,7 @@ namespace Trecs.Tests
 
             var initializer = a.AddEntity(TestTags.Alpha);
             initializer.AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             EntityHandle handleCapturedInCallback = default;
             var sub = a
@@ -78,7 +78,7 @@ namespace Trecs.Tests
 
             var alphaGroup = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             a.RemoveEntity(new EntityIndex(0, alphaGroup));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreNotEqual(EntityHandle.Null, handleCapturedInCallback);
             NAssert.IsFalse(
@@ -102,7 +102,7 @@ namespace Trecs.Tests
                 initializer.AssertComplete();
                 originalHandles.Add(initializer.Handle);
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var observedHandles = new List<EntityHandle>();
             var sub = a
@@ -118,7 +118,7 @@ namespace Trecs.Tests
                 );
 
             a.RemoveEntitiesWithTags(TestTags.Alpha);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(3, observedHandles.Count);
             // Order is implementation-defined (depends on swap-back layout);
@@ -140,7 +140,7 @@ namespace Trecs.Tests
                 initializer.AssertComplete();
                 originalHandles.Add(initializer.Handle);
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var observedHandles = new List<EntityHandle>();
             var sub = a
@@ -162,7 +162,7 @@ namespace Trecs.Tests
             var alphaGroup = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             a.RemoveEntity(new EntityIndex(1, alphaGroup));
             a.RemoveEntity(new EntityIndex(3, alphaGroup));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(2, observedHandles.Count);
             CollectionAssert.AreEquivalent(
@@ -187,7 +187,7 @@ namespace Trecs.Tests
             var initializer = a.AddEntity(TestTags.Alpha);
             initializer.AssertComplete();
             var firstHandle = initializer.Handle;
-            a.SubmitEntities();
+            a.Submit();
 
             EntityHandle handleSeenByThrowingObserver = default;
             var sub = a
@@ -205,7 +205,7 @@ namespace Trecs.Tests
 
             var alphaGroup = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             a.RemoveEntity(new EntityIndex(0, alphaGroup));
-            NAssert.Throws<InvalidOperationException>(() => a.SubmitEntities());
+            NAssert.Throws<InvalidOperationException>(() => a.Submit());
             sub.Dispose();
 
             NAssert.AreEqual(
@@ -223,7 +223,7 @@ namespace Trecs.Tests
             // A follow-up submission must succeed — i.e. _isRunningSubmit
             // wasn't left stuck at true by the throw.
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            NAssert.DoesNotThrow(() => a.SubmitEntities());
+            NAssert.DoesNotThrow(() => a.Submit());
         }
     }
 }

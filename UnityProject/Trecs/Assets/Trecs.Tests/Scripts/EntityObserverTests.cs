@@ -25,7 +25,7 @@ namespace Trecs.Tests
                 );
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.Greater(callCount, 0);
             sub.Dispose();
@@ -51,7 +51,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(3u, totalAdded);
             sub.Dispose();
@@ -78,7 +78,7 @@ namespace Trecs.Tests
 
             // Add to Beta, not Alpha
             a.AddEntity(TestTags.Beta).Set(new TestFloat { Value = 1.0f }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, alphaCallCount);
             sub.Dispose();
@@ -95,7 +95,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             int callCount = 0;
             var sub = a
@@ -109,7 +109,7 @@ namespace Trecs.Tests
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
             a.RemoveEntity(new EntityIndex(0, group));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.Greater(callCount, 0);
             sub.Dispose();
@@ -125,7 +125,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(TestTags.Alpha).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             int totalRemoved = 0;
             var sub = a
@@ -138,7 +138,7 @@ namespace Trecs.Tests
                 );
 
             a.RemoveEntitiesWithTags(TestTags.Alpha);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(3u, totalRemoved);
             sub.Dispose();
@@ -158,7 +158,7 @@ namespace Trecs.Tests
             var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
             a.AddEntity(partitionA).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             int callCount = 0;
             var sub = a
@@ -172,7 +172,7 @@ namespace Trecs.Tests
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
             a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.Greater(callCount, 0);
             sub.Dispose();
@@ -188,7 +188,7 @@ namespace Trecs.Tests
             var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
             a.AddEntity(partitionA).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var expectedGroupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
             var expectedGroupB = a.WorldInfo.GetSingleGroupWithTags(partitionB);
@@ -207,7 +207,7 @@ namespace Trecs.Tests
                 );
 
             a.SetTag<TestPartitionB>(new EntityIndex(0, expectedGroupA));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(expectedGroupA, observedFrom);
             NAssert.AreEqual(expectedGroupB, observedTo);
@@ -240,7 +240,7 @@ namespace Trecs.Tests
                 );
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(
                 42,
@@ -260,7 +260,7 @@ namespace Trecs.Tests
             var partitionB = TagSet.FromTags(TestTags.Gamma, TestTags.PartitionB);
 
             a.AddEntity(partitionA).Set(new TestInt { Value = 88 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             int observedValue = -1;
             var sub = a
@@ -279,7 +279,7 @@ namespace Trecs.Tests
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(partitionA);
             a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(
                 88,
@@ -310,7 +310,7 @@ namespace Trecs.Tests
                 );
 
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, callCount);
 
@@ -319,7 +319,7 @@ namespace Trecs.Tests
 
             // Add another entity, should not fire
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, callCount);
         }

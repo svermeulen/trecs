@@ -16,20 +16,21 @@ namespace Trecs.Samples.Snake
             _settings = settings;
         }
 
-        void Execute([SingleEntity(typeof(SnakeTags.SnakeHead))] in SnakeHead head)
+        void Execute(
+            [SingleEntity(typeof(TrecsTags.Globals))] in Globals globals,
+            [SingleEntity(typeof(SnakeTags.SnakeHead))] in SnakeHead head
+        )
         {
-            ref var counter = ref World.GlobalComponent<MoveTickCounter>().Write;
-
-            if (counter.FramesUntilNextMove > 0)
+            if (globals.MoveTickCounter > 0)
             {
-                counter.FramesUntilNextMove--;
+                globals.MoveTickCounter--;
                 return;
             }
 
-            counter.FramesUntilNextMove = _settings.FramesPerMove - 1;
+            globals.MoveTickCounter = _settings.FramesPerMove - 1;
 
             // Apply turn input if it's non-zero and not a 180° reversal.
-            var requested = World.GlobalComponent<MoveInput>().Read.RequestedDirection;
+            var requested = globals.MoveInput;
 
             bool hasRequest = requested.x != 0 || requested.y != 0;
             bool isReversal = requested.x == -head.Direction.x && requested.y == -head.Direction.y;
@@ -59,5 +60,7 @@ namespace Trecs.Samples.Snake
         }
 
         partial struct SnakeHead : IAspect, IWrite<Direction, GridPos> { }
+
+        partial struct Globals : IAspect, IWrite<MoveTickCounter>, IRead<MoveInput> { }
     }
 }

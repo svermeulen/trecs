@@ -190,7 +190,7 @@ namespace Trecs
         {
             LiveSet = liveSet;
             HasLiveSet = true;
-            DebugName = liveSet.DebugName ?? $"#{liveSet.Id.Id}";
+            DebugName = liveSet.DebugName ?? $"#{liveSet.Id.Value}";
             TagNames = tagNames ?? EmptyNames;
         }
 
@@ -215,7 +215,7 @@ namespace Trecs
         {
             LiveTag = liveTag;
             HasLiveTag = true;
-            Name = liveTag.ToString() ?? $"#{liveTag.Guid}";
+            Name = liveTag.ToString() ?? $"#{liveTag.Value}";
         }
 
         public TagRef(TrecsSchemaTag cache)

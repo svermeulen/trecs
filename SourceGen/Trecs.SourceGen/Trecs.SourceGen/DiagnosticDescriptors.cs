@@ -401,7 +401,7 @@ namespace Trecs.SourceGen
         public static readonly DiagnosticDescriptor CustomJobExecuteMustBePublic = new(
             id: "TRECS078",
             title: "Custom job's Execute method must be public",
-            messageFormat: "Custom job '{0}'.Execute must be declared 'public' so it directly satisfies the IJob/IJobFor interface (the generator no longer emits a visibility shim).",
+            messageFormat: "Custom job '{0}'.Execute must be declared 'public' so it directly satisfies the IJob/IJobFor interface (the generator no longer emits a visibility shim)",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true
@@ -665,6 +665,132 @@ namespace Trecs.SourceGen
             id: "TRECS117",
             title: "[GlobalIndex] parameter must be int",
             messageFormat: "Parameter '{0}' on '{1}' is marked [GlobalIndex] but its type is '{2}'. The packed query index is always an int — change the parameter type to int.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        // ── [NonCopyable] enforcement (TRECS118-119) ──────────────────────────────
+
+        public static readonly DiagnosticDescriptor NonCopyableByValueLocal = new(
+            id: "TRECS118",
+            title: "[NonCopyable] struct must not be copied to a by-value local",
+            messageFormat: "'{0}' is [NonCopyable]; copying it to a by-value local loses identity with the original. "
+                + "Use 'ref' / 'ref readonly' to alias the source, or access the source variable directly.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor NonCopyableByValueParameter = new(
+            id: "TRECS119",
+            title: "[NonCopyable] struct must not be passed by value",
+            messageFormat: "Parameter '{0}' of type '{1}' is [NonCopyable] and must be declared 'ref', 'in', or 'out' — "
+                + "not by value — so mutations affect the caller's storage",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor NonCopyableCopyableConflict = new(
+            id: "TRECS120",
+            title: "[NonCopyable] and [Copyable] cannot both be applied",
+            messageFormat: "Struct '{0}' carries both [NonCopyable] and [Copyable]; remove one — they are contradictory",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        // ── NativeSharedPtr<T> immutability enforcement (TRECS124) ──────────
+
+        public static readonly DiagnosticDescriptor NativeSharedPtrTypeMustBeReadonlyStruct = new(
+            id: "TRECS124",
+            title: "NativeSharedPtr<T> requires T to be defensive-copy-safe",
+            messageFormat: "Type argument '{0}' to NativeSharedPtr<T> must be either a 'readonly struct' or a struct whose every instance "
+                + "method/accessor carries the 'readonly' modifier (or a built-in primitive / allowlisted trecs type). "
+                + "Native shared blobs are immutable by design — the BlobCache does not snapshot blob memory along with game-state snapshots, "
+                + "so any post-Alloc mutation would silently desync determinism, and a defensive copy through 'ref readonly T' would silently "
+                + "break relative-offset BlobArray<T> reads. The readonly-struct form is the simplest fix; the all-readonly-members form lets "
+                + "BlobBuilder users mutate fields directly during construction.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        // ── SharedPtr<T> immutability enforcement (TRECS125-126) ───────────
+
+        public static readonly DiagnosticDescriptor SharedPtrTypeMustBeImmutable = new(
+            id: "TRECS125",
+            title: "SharedPtr<T> requires T to carry [Trecs.Immutable]",
+            messageFormat: "Type argument '{0}' to SharedPtr<T> must be a class or interface marked with [Trecs.Immutable] "
+                + "(or be a built-in immutable type like string). Managed shared blobs live in the BlobCache, which is "
+                + "not snapshotted alongside game-state, so any post-Alloc mutation silently desyncs determinism. Either "
+                + "mark the class [Immutable] (and audit its contents — see TRECS126), or declare an [Immutable] interface "
+                + "exposing the read-only face of '{0}' and route the SharedPtr through that.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor ImmutableTypeViolatesContract = new(
+            id: "TRECS126",
+            title: "[Immutable] type violates immutability rules",
+            messageFormat: "[Immutable] type '{0}' violates the immutability contract: {1}. "
+                + "Fix or remove the [Immutable] marker. Note: private instance fields are exempt from "
+                + "the type-of-field check — the canonical 'wrap a mutable T[] as private readonly and "
+                + "expose ReadOnlySpan<T>' pattern is allowed.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor ImmutableInterfaceMethodMutableReturn = new(
+            id: "TRECS127",
+            title: "[Immutable] interface method returns a non-immutable type",
+            messageFormat: "Method '{0}' on [Immutable] interface '{1}' returns type '{2}' which is not provably immutable. "
+                + "Callers holding the read-only face can mutate shared state through this method, defeating the "
+                + "immutability guarantee. Refactor the return type to a safe type (a primitive, enum, readonly "
+                + "struct, [Immutable] class or interface, or BCL/Unity read-only view), or — if the looseness is "
+                + "intentional — annotate the method with [Trecs.AllowMutableReturn] to acknowledge "
+                + "the escape and surface it in review.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
+
+        // ── [Input] component field-type enforcement (TRECS121-123) ──────────
+
+        public static readonly DiagnosticDescriptor InputComponentHasPersistentPtrField = new(
+            id: "TRECS121",
+            title: "[Input] component must not contain persistent-pointer fields",
+            messageFormat: "Field '{0}' of component '{1}' on [Input] template field '{2}' has persistent-pointer type '{3}'. "
+                + "Input components are bulk-released when their target frame is retired, so any persistent allocation "
+                + "made by an input system would leak. Use the input-pointer variant '{4}' instead.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor InputComponentHasTrecsListField = new(
+            id: "TRECS122",
+            title: "[Input] component must not contain TrecsList fields",
+            messageFormat: "Field '{0}' of component '{1}' on [Input] template field '{2}' has type 'TrecsList<{3}>'. "
+                + "TrecsList is backed by the persistent chunk store and is not supported on input components — input "
+                + "data lives in a per-frame arena and is bulk-released. Use a fixed-size buffer (e.g. an inline "
+                + "fixed-size struct field) for small bounded lists, or model the data as a separate persistent component.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor InputRetainWithInputPtrField = new(
+            id: "TRECS123",
+            title: "[Input(MissingInputBehavior.Retain)] component cannot contain InputXxxPtr fields",
+            messageFormat: "[Input(MissingInputBehavior.Retain)] component '{0}' on template field '{1}' has Input-pointer field '{2}' of type '{3}'. "
+                + "Retain keeps the previous frame's component value when no input arrives, but the embedded {3} "
+                + "would point into storage that was freed when the previous input frame was retired — a silent "
+                + "use-after-free. Either switch to MissingInputBehavior.Reset, or move the pointed-to data out "
+                + "of the input component.",
             category: TrecsCategory,
             DiagnosticSeverity.Error,
             isEnabledByDefault: true

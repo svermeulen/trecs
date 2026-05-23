@@ -21,7 +21,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 10 })
                 .Set(new TestFloat { Value = 2.5f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Verify both parent (TestInt) and child (TestFloat) components are accessible
             var intComp = a.Query().WithTags(tags).SingleHandle().Component<TestInt>(a);
@@ -39,7 +39,7 @@ namespace Trecs.Tests
 
             var tags = TagSet.FromTags(TestTags.Alpha, TestTags.Beta);
             a.AddEntity(tags).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Entity should be queryable via parent tag (Alpha)
             NAssert.AreEqual(
@@ -77,7 +77,7 @@ namespace Trecs.Tests
 
             var tags = TagSet.FromTags(TestTags.Delta, TestTags.Epsilon);
             a.AddEntity(tags).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Parent defaults should propagate to child entities
             var intComp = a.Query().WithTags(tags).SingleHandle().Component<TestInt>(a);

@@ -1,42 +1,67 @@
+using System;
 using System.Runtime.CompilerServices;
-using Trecs.Internal;
-using Unity.Burst;
 
 namespace Trecs
 {
     /// <summary>
-    /// Zero-allocation cache for the <see cref="ComponentId"/> of a component type.
-    /// Access via <c>ComponentTypeId&lt;MyComponent&gt;.Value</c>. The ID is derived from the
-    /// type's <see cref="TypeIdAttribute"/> and stored in a <c>SharedStatic</c> for Burst compatibility.
+    /// Strongly-typed wrapper for the <see cref="TypeId"/> of an <see cref="IEntityComponent"/>
+    /// struct type. Use <see cref="ComponentTypeId{T}"/> for zero-allocation access to a
+    /// component type's runtime id; layered onto the same intern table that backs
+    /// <see cref="Tag"/> and <see cref="SetId"/>.
     /// </summary>
-    public sealed class ComponentTypeId<T>
+    public readonly struct ComponentTypeId : IEquatable<ComponentTypeId>
+    {
+        readonly TypeId _inner;
+
+        public int Value => _inner.Value;
+
+        public ComponentTypeId(int value)
+        {
+            _inner = new TypeId(value);
+        }
+
+        public ComponentTypeId(TypeId id)
+        {
+            _inner = id;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(ComponentTypeId other) => _inner == other._inner;
+
+        public override bool Equals(object obj) => obj is ComponentTypeId other && Equals(other);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override int GetHashCode() => _inner.GetHashCode();
+
+        public static bool operator ==(ComponentTypeId a, ComponentTypeId b) =>
+            a._inner == b._inner;
+
+        public static bool operator !=(ComponentTypeId a, ComponentTypeId b) =>
+            a._inner != b._inner;
+
+        // Safe widening: a ComponentTypeId is a TypeId (of a component-marker-interface type).
+        // Code that takes a TypeId receives one transparently; the type-safety boundary is
+        // the other direction — callers wanting a ComponentTypeId from a TypeId must `new()`
+        // explicitly.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static implicit operator TypeId(ComponentTypeId id) => id._inner;
+
+        public override string ToString() => _inner.Value.ToString();
+    }
+
+    /// <summary>
+    /// Zero-allocation accessor for the <see cref="ComponentTypeId"/> of a component type.
+    /// Property defers to <see cref="TypeId{T}.Value"/>, which carries the warmup contract.
+    /// </summary>
+    public static class ComponentTypeId<T>
         where T : unmanaged, IEntityComponent
     {
-        static readonly SharedStaticWrapper<ComponentId, ComponentTypeId<T>> _id;
-
-        public static ComponentId Value
+        public static ComponentTypeId Value
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => _id.Data;
+            get => new(TypeId<T>.Value);
         }
 
-        static ComponentTypeId()
-        {
-            Init();
-        }
-
-        public static void Warmup() { }
-
-        [BurstDiscard]
-        // SharedStatic values must be initialized from not burstified code
-        internal static void Init()
-        {
-            if (_id.Data.Value != 0)
-            {
-                return;
-            }
-
-            _id.Data = new(TypeIdProvider.GetTypeId(typeof(T)));
-        }
+        public static void Warmup() => _ = TypeId<T>.Value;
     }
 }

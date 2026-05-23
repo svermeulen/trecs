@@ -47,12 +47,7 @@ namespace Trecs.Tests
                 .AddTemplate(globals)
                 .AddSystem(new SerEnableSystemA())
                 .AddSystem(new SerEnableSystemB())
-                .AddBlobStore(
-                    new BlobStoreInMemory(
-                        new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                        null
-                    )
-                )
+                .AddBlobStore(new BlobStoreInMemory(BlobStoreInMemorySettings.Default, null))
                 .BuildAndInitialize();
         }
 
@@ -61,7 +56,7 @@ namespace Trecs.Tests
             var serializer = new WorldStateSerializer(world);
             using var writer = new BinarySerializationWriter(_serializerRegistry);
             writer.Start(version: 1, includeTypeChecks: false);
-            serializer.SerializeState(writer);
+            serializer.SerializeFullState(writer);
 
             using var outputStream = new MemoryStream();
             using var outputWriter = new BinaryWriter(outputStream);

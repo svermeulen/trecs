@@ -19,7 +19,7 @@ namespace Trecs.Internal
 
         public void WriteBit(bool value)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
 
             if (value)
             {
@@ -38,7 +38,7 @@ namespace Trecs.Internal
 
         public void Complete(BinaryWriter writer)
         {
-            TrecsAssert.That(_hasStarted);
+            TrecsDebugAssert.That(_hasStarted);
             _hasStarted = false;
 
             writer.Write(_totalBits);
@@ -57,7 +57,7 @@ namespace Trecs.Internal
 
         public void Reset()
         {
-            TrecsAssert.That(!_hasStarted);
+            TrecsDebugAssert.That(!_hasStarted);
             _hasStarted = true;
 
             _bytes.Clear();

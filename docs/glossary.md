@@ -60,8 +60,8 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 | Term | What it is |
 |---|---|
 | **[Submission](entity-management/structural-changes.md)** | The point in the frame where queued structural ops are applied. Add / remove / partition transitions are deferred until submission. |
-| **[Heap](advanced/heap.md)** | Storage for managed or unmanaged data outside the component buffer, accessed via `SharedPtr` / `UniquePtr` / native variants. |
-| **[BlobId](advanced/shared-heap-data.md#pattern-b-look-up-by-stable-blobid)** | Stable identifier for a heap blob. Supplied explicitly when allocating shared data on heap. |
+| **[Heap](experimental/pointers.md)** | Storage for managed or unmanaged data outside the component buffer, accessed via `SharedPtr` / `UniquePtr` / native variants. |
+| **[BlobId](experimental/shared-heap-data.md#pattern-b-look-up-by-stable-blobid)** | Stable identifier for a heap blob. Supplied explicitly when allocating shared data on heap. |
 
 ## Quick mental model
 

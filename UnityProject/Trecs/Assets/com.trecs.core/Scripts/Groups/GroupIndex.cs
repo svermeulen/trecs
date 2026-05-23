@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Trecs.Internal;
 
 namespace Trecs
 {
@@ -66,20 +67,20 @@ namespace Trecs
         }
 
         /// <summary>
-        /// 0-based index for array access. Throws if this is the null sentinel —
-        /// guard with <see cref="IsNull"/> first when that's possible.
+        /// 0-based index for array access. In DEBUG builds, asserts the value is
+        /// not the null sentinel; in release the assert is stripped and a null
+        /// GroupIndex yields -1, which will crash any downstream array access
+        /// loudly. Guard with <see cref="IsNull"/> first when null is possible.
         /// </summary>
         public int Index
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                if (_raw == 0)
-                {
-                    throw new TrecsException(
-                        "Cannot get Index of a null GroupIndex. Check IsNull first."
-                    );
-                }
+                TrecsDebugAssert.That(
+                    _raw != 0,
+                    "Cannot get Index of a null GroupIndex. Check IsNull first."
+                );
                 return _raw - 1;
             }
         }

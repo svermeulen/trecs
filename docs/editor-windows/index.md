@@ -11,4 +11,4 @@ Trecs ships three editor windows under `Window > Trecs`.
 ## See also
 
 - [World Setup](../core/world-setup.md) — for `SetDebugName` and where the windows pick worlds up from.
-- [Serialization](../advanced/serialization.md) — how custom managed types stored on the heap participate in recording, scrubbing, and save/load.
+- [Serialization](../experimental/serialization.md) — how custom managed types stored on the heap participate in recording, scrubbing, and save/load.

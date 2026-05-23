@@ -12,22 +12,29 @@ namespace Trecs
     /// </summary>
     public static class NativeSharedPtr
     {
-        public static NativeSharedPtr<T> Alloc<T>(HeapAccessor heap, BlobId blobId)
+        /// <summary>
+        /// Returns a fresh reference-counted handle to the existing native blob at
+        /// <paramref name="blobId"/>, throwing if no such blob exists. This is the
+        /// lookup-only counterpart to <see cref="Alloc{T}(HeapAccessor, BlobId, in T)"/>
+        /// — it does not allocate new memory, just acquires another refcount slot
+        /// on data that has already been seeded.
+        /// </summary>
+        public static NativeSharedPtr<T> Acquire<T>(HeapAccessor heap, BlobId blobId)
             where T : unmanaged
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             return heap.NativeSharedHeap.GetBlob<T>(blobId);
         }
 
         public static NativeSharedPtr<T> Alloc<T>(HeapAccessor heap, BlobId blobId, in T value)
             where T : unmanaged
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             return heap.NativeSharedHeap.CreateBlob<T>(blobId, in value);
         }
 
-        public static NativeSharedPtr<T> Alloc<T>(WorldAccessor world, BlobId blobId)
-            where T : unmanaged => Alloc<T>(world.Heap, blobId);
+        public static NativeSharedPtr<T> Acquire<T>(WorldAccessor world, BlobId blobId)
+            where T : unmanaged => Acquire<T>(world.Heap, blobId);
 
         public static NativeSharedPtr<T> Alloc<T>(WorldAccessor world, BlobId blobId, in T value)
             where T : unmanaged => Alloc<T>(world.Heap, blobId, in value);
@@ -38,7 +45,7 @@ namespace Trecs
         public static bool TryGet<T>(HeapAccessor heap, BlobId blobId, out NativeSharedPtr<T> ptr)
             where T : unmanaged
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             return heap.NativeSharedHeap.TryGetBlob<T>(blobId, out ptr);
         }
 
@@ -56,7 +63,7 @@ namespace Trecs
         )
             where T : unmanaged
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             return heap.NativeSharedHeap.CreateBlobTakingOwnership<T>(blobId, alloc);
         }
 
@@ -85,7 +92,7 @@ namespace Trecs
         )
             where T : unmanaged
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             if (heap.NativeSharedHeap.TryGetBlob<T>(blobId, out var ptr))
             {
                 return ptr;
@@ -115,7 +122,7 @@ namespace Trecs
         )
             where T : unmanaged
         {
-            heap.AssertCanAllocatePersistent();
+            heap.AssertCanMutateHeap();
             if (heap.NativeSharedHeap.TryGetBlob<T>(blobId, out var ptr))
             {
                 return ptr;
@@ -129,75 +136,34 @@ namespace Trecs
             Func<NativeBlobAllocation> factory
         )
             where T : unmanaged => GetOrAllocTakingOwnership<T>(world.Heap, blobId, factory);
-
-        public static NativeSharedPtr<T> AllocFrameScoped<T>(
-            HeapAccessor heap,
-            BlobId blobId,
-            in T value
-        )
-            where T : unmanaged
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.FrameScopedNativeSharedHeap.CreateBlob<T>(
-                heap.FixedFrame,
-                blobId,
-                in value
-            );
-        }
-
-        public static NativeSharedPtr<T> AllocFrameScoped<T>(HeapAccessor heap, BlobId blobId)
-            where T : unmanaged
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.FrameScopedNativeSharedHeap.CreateBlob<T>(heap.FixedFrame, blobId);
-        }
-
-        public static NativeSharedPtr<T> AllocFrameScoped<T>(
-            WorldAccessor world,
-            BlobId blobId,
-            in T value
-        )
-            where T : unmanaged => AllocFrameScoped<T>(world.Heap, blobId, in value);
-
-        public static NativeSharedPtr<T> AllocFrameScoped<T>(WorldAccessor world, BlobId blobId)
-            where T : unmanaged => AllocFrameScoped<T>(world.Heap, blobId);
-
-        public static bool TryGetFrameScoped<T>(
-            HeapAccessor heap,
-            BlobId blobId,
-            out NativeSharedPtr<T> ptr
-        )
-            where T : unmanaged
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.FrameScopedNativeSharedHeap.TryGetBlob<T>(heap.FixedFrame, blobId, out ptr);
-        }
-
-        public static bool TryGetFrameScoped<T>(
-            WorldAccessor world,
-            BlobId blobId,
-            out NativeSharedPtr<T> ptr
-        )
-            where T : unmanaged => TryGetFrameScoped<T>(world.Heap, blobId, out ptr);
     }
 
     /// <summary>
     /// Reference-counted pointer to a shared native (unmanaged) heap allocation. Burst-compatible.
     /// Multiple entities can reference the same data via <see cref="BlobId"/>.
     /// <para>
-    /// Allocate via <see cref="NativeSharedPtr.Alloc{T}(HeapAccessor, BlobId)"/>. Open a
-    /// safety-checked view with <see cref="Read(HeapAccessor)"/> on the main thread, or
+    /// Seed via <see cref="NativeSharedPtr.Alloc{T}(HeapAccessor, BlobId, in T)"/>;
+    /// look up an already-seeded blob via <see cref="NativeSharedPtr.Acquire{T}(HeapAccessor, BlobId)"/>.
+    /// Open a safety-checked view with <see cref="Read(HeapAccessor)"/> on the main thread, or
     /// <see cref="Read(in NativeSharedPtrResolver)"/> in Burst jobs. <see cref="Clone"/>
     /// increments the reference count; <see cref="Dispose(HeapAccessor)"/> decrements it and
     /// frees on zero.
     /// </para>
     /// <para>
-    /// Shared native data is immutable by design — any number of readers can resolve the same
-    /// blob in parallel without coordination, so the API only exposes read-only access. The
-    /// persistent struct stores only (<see cref="PtrHandle"/>, <see cref="BlobId"/>) — 12 bytes,
-    /// cheap to copy and store on components. Per-blob <c>AtomicSafetyHandle</c>s live on the
-    /// owning heap and are attached to the <see cref="NativeSharedRead{T}"/> wrapper at Open
-    /// time so Unity's job-safety walker can detect use-after-free.
+    /// <b>T must be a <c>readonly struct</c></b> (or a built-in primitive / enum) — enforced by
+    /// the TRECS124 analyzer. Native shared blobs live in the BlobCache, which is not
+    /// snapshotted alongside game-state snapshots, so any post-Alloc mutation silently desyncs
+    /// determinism. The <c>readonly struct</c> requirement also lets <see cref="NativeSharedRead{T}.Value"/>
+    /// return <c>ref readonly T</c> without the defensive-copy footgun a non-readonly receiver
+    /// would introduce.
+    /// </para>
+    /// <para>
+    /// Any number of readers can resolve the same blob in parallel without coordination, so
+    /// the API only exposes read-only access. The persistent struct stores only
+    /// (<see cref="PtrHandle"/>, <see cref="BlobId"/>) — 12 bytes, cheap to copy and store on
+    /// components. Per-blob <c>AtomicSafetyHandle</c>s live on the owning heap and are attached
+    /// to the <see cref="NativeSharedRead{T}"/> wrapper at Open time so Unity's job-safety
+    /// walker can detect use-after-free.
     /// </para>
     /// </summary>
     /// <remarks>
@@ -210,7 +176,10 @@ namespace Trecs
         public readonly PtrHandle Handle;
         public readonly BlobId BlobId;
 
-        public NativeSharedPtr(PtrHandle handle, BlobId blobId)
+        // Internal so external code can't fabricate a handle from arbitrary values.
+        // Allocation goes through NativeSharedPtr.Alloc / Clone; deserialization
+        // paths live in InternalsVisibleTo-allowed assemblies.
+        internal NativeSharedPtr(PtrHandle handle, BlobId blobId)
         {
             Handle = handle;
             BlobId = blobId;
@@ -219,19 +188,20 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly NativeSharedPtr<T> Clone(HeapAccessor heap)
         {
+            heap.AssertCanMutateHeap();
             if (IsNull)
             {
                 return default;
             }
-
-            if (heap.NativeSharedHeap.TryClone<T>(Handle, out var result))
+            if (!heap.NativeSharedHeap.TryClone<T>(Handle, out var result))
             {
-                return result;
+                throw TrecsDebugAssert.CreateException(
+                    "Failed to clone NativeSharedPtr with blobId {0} and handle {1}",
+                    BlobId,
+                    Handle
+                );
             }
-
-            // Frame-scoped: clone into persistent heap
-            var blobId = heap.FrameScopedNativeSharedHeap.GetBlobId(heap.FixedFrame, Handle.Value);
-            return heap.NativeSharedHeap.GetBlob<T>(blobId);
+            return result;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -267,10 +237,7 @@ namespace Trecs
 
         public readonly void Dispose(HeapAccessor heap)
         {
-            TrecsAssert.That(
-                !heap.FrameScopedNativeSharedHeap.ContainsEntry(Handle.Value),
-                "Frame-scoped NativeSharedPtr must not be manually disposed"
-            );
+            heap.AssertCanMutateHeap();
             heap.NativeSharedHeap.DisposeHandle(Handle);
         }
 

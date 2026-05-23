@@ -33,11 +33,11 @@ namespace Trecs.Tests
     /// End-to-end record → playback determinism: runs a deterministic fixed-update
     /// simulation, records via <see cref="BundleRecorder"/>, persists the bundle
     /// through <see cref="RecordingBundleSerializer"/>, then replays the loaded
-    /// bundle against a fresh world (seeded identically) via <see cref="BundlePlayer"/>
+    /// bundle against a fresh world (seeded identically) via <see cref="BundleReplayer"/>
     /// and verifies no desync. This is the canary for the whole
     /// recording/playback story — any non-determinism in the simulation, the
     /// checksum path, or the bundle's wire format surfaces as
-    /// <see cref="BundlePlayer.HasDesynced"/>.
+    /// <see cref="BundleReplayer.HasDesynced"/>.
     ///
     /// <para>
     /// The recorder's per-frame checksum cadence is gated on <c>!TRECS_IS_PROFILING</c>,
@@ -47,7 +47,7 @@ namespace Trecs.Tests
     /// <c>OnFixedUpdateCompleted</c> themselves, capture checksums via the same
     /// <see cref="RecordingChecksumCalculator"/> the recorder uses, and merge
     /// the results into the bundle before playback. This mirrors the workaround
-    /// in <see cref="BundleRecorderPlayerTests"/>.
+    /// in <see cref="BundleRecorderReplayerTests"/>.
     /// </para>
     /// </summary>
     [TestFixture]
@@ -61,7 +61,7 @@ namespace Trecs.Tests
         public void RecordThenPlayback_DeterministicSim_NoDesync()
         {
             byte[] bundleBytes;
-            var manualChecksums = new Dictionary<int, uint>();
+            var manualChecksums = new Dictionary<int, ulong>();
 
             // ── Record phase ────────────────────────────────────────────────────
             using (var env = CreateEnv())
@@ -90,18 +90,17 @@ namespace Trecs.Tests
                     settings,
                     snapshots
                 );
-                recorder.Initialize();
                 recorder.Start();
 
-                var checksumCalc = new RecordingChecksumCalculator(worldStateSer);
                 using var checksumBuffer = new SerializationBuffer(registry);
                 using var sub = env.Accessor.Events.OnFixedUpdateCompleted(() =>
                 {
                     var fixedFrame = env.World.FixedFrame;
-                    manualChecksums[fixedFrame] = checksumCalc.CalculateCurrentChecksum(
+                    manualChecksums[fixedFrame] = RecordingChecksumCalculator.Calculate(
+                        worldStateSer,
                         version: Version,
                         checksumBuffer,
-                        settings.ChecksumFlags
+                        SerializationFlags.IsForChecksum
                     );
                 });
 
@@ -110,7 +109,7 @@ namespace Trecs.Tests
                 var bundle = recorder.Stop();
 
                 // Merge the manually-captured checksums into the bundle so
-                // BundlePlayer has something to verify against on every frame.
+                // BundleReplayer has something to verify against on every frame.
                 foreach (var kv in manualChecksums)
                 {
                     bundle.Checksums[kv.Key] = kv.Value;
@@ -146,21 +145,26 @@ namespace Trecs.Tests
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);
-                using var player = new BundlePlayer(env.World, worldStateSer, registry, snapshots);
-                player.Initialize();
+                using var replayer = new BundleReplayer(
+                    env.World,
+                    worldStateSer,
+                    registry,
+                    snapshots
+                );
+                replayer.Initialize();
 
                 using var stream = new MemoryStream(bundleBytes);
                 var bundle = bundleSer.Load(stream);
-                player.Start(bundle);
+                replayer.Start(bundle);
 
                 int verifiedCount = 0;
                 for (int i = 0; i < FramesToRun; i++)
                 {
                     env.StepFixedFrames(1);
-                    var result = player.Tick();
+                    var result = replayer.Tick();
 
                     NAssert.IsFalse(
-                        player.HasDesynced,
+                        replayer.HasDesynced,
                         $"Playback desynced at frame {i + 1}. "
                             + "Simulation is not deterministic, or the serialization round-trip dropped/mutated state."
                     );
@@ -176,7 +180,7 @@ namespace Trecs.Tests
                     "No frames were checksum-verified during playback — the manual-capture merge into the bundle isn't working."
                 );
 
-                player.Stop();
+                replayer.Stop();
             }
         }
 
@@ -185,14 +189,14 @@ namespace Trecs.Tests
         {
             // Defensive: the "no desync" test above can only fail if mutation ISN'T
             // detected. This sibling test corrupts playback state mid-flight and
-            // asserts the player actually notices — proving the check is live
+            // asserts the replayer actually notices — proving the check is live
             // even when the recording itself is honest.
             //
             // Same workaround as RecordThenPlayback_DeterministicSim_NoDesync:
             // capture every-frame checksums ourselves so the test exercises the
             // API regardless of TRECS_IS_PROFILING.
             byte[] bundleBytes;
-            var manualChecksums = new Dictionary<int, uint>();
+            var manualChecksums = new Dictionary<int, ulong>();
 
             using (var env = CreateEnv())
             {
@@ -215,18 +219,17 @@ namespace Trecs.Tests
                     settings,
                     snapshots
                 );
-                recorder.Initialize();
                 recorder.Start();
 
-                var checksumCalc = new RecordingChecksumCalculator(worldStateSer);
                 using var checksumBuffer = new SerializationBuffer(registry);
                 using var sub = env.Accessor.Events.OnFixedUpdateCompleted(() =>
                 {
                     var fixedFrame = env.World.FixedFrame;
-                    manualChecksums[fixedFrame] = checksumCalc.CalculateCurrentChecksum(
+                    manualChecksums[fixedFrame] = RecordingChecksumCalculator.Calculate(
+                        worldStateSer,
                         version: Version,
                         checksumBuffer,
-                        settings.ChecksumFlags
+                        SerializationFlags.IsForChecksum
                     );
                 });
 
@@ -253,12 +256,17 @@ namespace Trecs.Tests
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);
-                using var player = new BundlePlayer(env.World, worldStateSer, registry, snapshots);
-                player.Initialize();
+                using var replayer = new BundleReplayer(
+                    env.World,
+                    worldStateSer,
+                    registry,
+                    snapshots
+                );
+                replayer.Initialize();
 
                 using var stream = new MemoryStream(bundleBytes);
                 var bundle = bundleSer.Load(stream);
-                player.Start(bundle);
+                replayer.Start(bundle);
 
                 // Corrupt the state mid-playback — mutate entities so the next checksum
                 // cannot possibly match.
@@ -267,22 +275,22 @@ namespace Trecs.Tests
                 {
                     env.Accessor.Component<TestInt>(ei).Write.Value = 999999;
                 }
-                env.Accessor.SubmitEntities();
+                env.Accessor.Submit();
 
                 for (int i = 1; i < FramesToRun; i++)
                 {
                     env.StepFixedFrames(1);
-                    player.Tick();
-                    if (player.HasDesynced)
+                    replayer.Tick();
+                    if (replayer.HasDesynced)
                         break;
                 }
 
                 NAssert.IsTrue(
-                    player.HasDesynced,
+                    replayer.HasDesynced,
                     "Playback should have detected the injected state corruption as a desync."
                 );
 
-                player.Stop();
+                replayer.Stop();
             }
         }
 
@@ -323,11 +331,10 @@ namespace Trecs.Tests
                     settings,
                     snapshots
                 );
-                recorder.Initialize();
                 recorder.Start();
 
                 env.StepFixedFrames(5);
-                NAssert.IsTrue(recorder.CaptureSnapshotAtCurrentFrame("before-the-bug"));
+                NAssert.IsTrue(recorder.CaptureBookmarkAtCurrentFrame("before-the-bug"));
                 firstSnapshotFrame = env.World.FixedFrame;
                 firstSnapshotEntityCount = env.Accessor.CountEntitiesWithTags(Tag<QId1>.Value);
 
@@ -337,10 +344,10 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = 12345 })
                     .Set(new TestFloat { Value = 9.5f })
                     .AssertComplete();
-                env.Accessor.SubmitEntities();
+                env.Accessor.Submit();
 
                 env.StepFixedFrames(7);
-                NAssert.IsTrue(recorder.CaptureSnapshotAtCurrentFrame("after-spawn"));
+                NAssert.IsTrue(recorder.CaptureBookmarkAtCurrentFrame("after-spawn"));
                 secondSnapshotFrame = env.World.FixedFrame;
                 secondSnapshotEntityCount = env.Accessor.CountEntitiesWithTags(Tag<QId1>.Value);
 
@@ -353,7 +360,7 @@ namespace Trecs.Tests
                 env.StepFixedFrames(5);
                 var bundle = recorder.Stop();
 
-                NAssert.AreEqual(2, bundle.Snapshots.Count);
+                NAssert.AreEqual(2, bundle.Bookmarks.Count);
 
                 using var bundleSer = new RecordingBundleSerializer(registry);
                 using var stream = new MemoryStream();
@@ -370,15 +377,13 @@ namespace Trecs.Tests
                 using var stream = new MemoryStream(bundleBytes);
                 var loaded = bundleSer.Load(stream);
 
-                NAssert.AreEqual(2, loaded.Snapshots.Count, "Snapshot count should round-trip");
-                NAssert.AreEqual("before-the-bug", loaded.Snapshots[0].Label);
-                NAssert.AreEqual("after-spawn", loaded.Snapshots[1].Label);
-                NAssert.AreEqual(firstSnapshotFrame, loaded.Snapshots[0].FixedFrame);
-                NAssert.AreEqual(secondSnapshotFrame, loaded.Snapshots[1].FixedFrame);
-                NAssert.IsNotNull(loaded.Snapshots[0].Payload);
-                NAssert.Greater(loaded.Snapshots[0].Payload.Length, 0);
-                NAssert.IsNotNull(loaded.Snapshots[1].Payload);
-                NAssert.Greater(loaded.Snapshots[1].Payload.Length, 0);
+                NAssert.AreEqual(2, loaded.Bookmarks.Count, "Snapshot count should round-trip");
+                NAssert.AreEqual("before-the-bug", loaded.Bookmarks[0].Label);
+                NAssert.AreEqual("after-spawn", loaded.Bookmarks[1].Label);
+                NAssert.AreEqual(firstSnapshotFrame, loaded.Bookmarks[0].FixedFrame);
+                NAssert.AreEqual(secondSnapshotFrame, loaded.Bookmarks[1].FixedFrame);
+                NAssert.Greater(loaded.Bookmarks[0].Payload.Length, 0);
+                NAssert.Greater(loaded.Bookmarks[1].Payload.Length, 0);
 
                 // Verify each snapshot's snapshot payload restores the world to
                 // the exact state captured at that frame. This exercises
@@ -393,8 +398,7 @@ namespace Trecs.Tests
                         env.World
                     );
 
-                    using var snapStream = new MemoryStream(loaded.Snapshots[0].Payload);
-                    var meta = snapshots.LoadSnapshot(snapStream);
+                    var meta = snapshots.LoadSnapshot(loaded.Bookmarks[0].Payload.Span);
                     NAssert.AreEqual(firstSnapshotFrame, meta.FixedFrame);
                     NAssert.AreEqual(
                         firstSnapshotEntityCount,
@@ -412,8 +416,7 @@ namespace Trecs.Tests
                         env.World
                     );
 
-                    using var snapStream = new MemoryStream(loaded.Snapshots[1].Payload);
-                    var meta = snapshots.LoadSnapshot(snapStream);
+                    var meta = snapshots.LoadSnapshot(loaded.Bookmarks[1].Payload.Span);
                     NAssert.AreEqual(secondSnapshotFrame, meta.FixedFrame);
                     NAssert.AreEqual(
                         secondSnapshotEntityCount,
@@ -462,7 +465,6 @@ namespace Trecs.Tests
                     settings,
                     snapshots
                 );
-                recorder.Initialize();
                 recorder.Start();
 
                 env.StepFixedFrames(FramesToRun);
@@ -495,7 +497,6 @@ namespace Trecs.Tests
 
                 NAssert.AreEqual(recorderAnchorCount, loaded.Anchors.Count);
                 NAssert.AreEqual(firstAnchorFrame, loaded.Anchors[0].FixedFrame);
-                NAssert.IsNotNull(loaded.Anchors[0].Payload);
                 NAssert.Greater(loaded.Anchors[0].Payload.Length, 0);
 
                 // Anchor frames must be strictly increasing — guards against any
@@ -523,8 +524,7 @@ namespace Trecs.Tests
 
                     NAssert.AreEqual(0, env.Accessor.CountEntitiesWithTags(Tag<QId1>.Value));
 
-                    using var snapStream = new MemoryStream(loaded.Anchors[0].Payload);
-                    var meta = snapshots.LoadSnapshot(snapStream);
+                    var meta = snapshots.LoadSnapshot(loaded.Anchors[0].Payload.Span);
                     NAssert.AreEqual(firstAnchorFrame, meta.FixedFrame);
                     NAssert.AreEqual(
                         firstAnchorEntityCount,
@@ -555,7 +555,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat { Value = i * 0.5f })
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
         }
     }
 }

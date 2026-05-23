@@ -32,7 +32,7 @@ namespace Trecs
         {
             // The buffer is stateful and reused per call, so this must be a
             // single-threaded operation.
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "UniqueHashGenerator is main-thread only"
             );

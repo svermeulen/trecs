@@ -45,7 +45,7 @@ namespace Trecs.Internal
         )
         {
             int magic = reader.ReadInt32();
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 magic == Magic,
                 "Invalid native blob {0}: bad magic {x} (expected {x})",
                 sourceDescription,
@@ -54,7 +54,7 @@ namespace Trecs.Internal
             );
 
             int version = reader.ReadInt32();
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 version == expectedSerializationVersion,
                 "Native blob serialization version mismatch in {0}: file is {1}, current is {2}",
                 sourceDescription,
@@ -65,13 +65,13 @@ namespace Trecs.Internal
             int size = reader.ReadInt32();
             int alignment = reader.ReadInt32();
 
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 size > 0 && size <= MaxBlobSize,
                 "Invalid native blob size {0} in {1}",
                 size,
                 sourceDescription
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 alignment > 0 && (alignment & (alignment - 1)) == 0,
                 "Invalid native blob alignment {0} in {1}",
                 alignment,
@@ -79,7 +79,7 @@ namespace Trecs.Internal
             );
 
             var remaining = stream.Length - stream.Position;
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 remaining >= size,
                 "Native blob {0} truncated: expected {1} bytes, only {2} available",
                 sourceDescription,
@@ -101,7 +101,7 @@ namespace Trecs.Internal
                     int bytesRead = stream.Read(span.Slice(totalRead));
                     if (bytesRead == 0)
                     {
-                        throw TrecsAssert.CreateException(
+                        throw TrecsDebugAssert.CreateException(
                             "Short read on native blob {0}: expected {1} bytes, got {2}",
                             sourceDescription,
                             size,

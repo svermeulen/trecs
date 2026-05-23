@@ -1,17 +1,39 @@
 using System;
 using Trecs.Collections;
+using Trecs.Internal;
 
 namespace Trecs
 {
     /// <summary>
     /// Metadata for a single blob entry in a <see cref="BlobManifest"/>.
     /// </summary>
+    /// <remarks>
+    /// <see cref="LastAccessTime"/> is a monotonic per-store counter (see
+    /// <see cref="Trecs.Internal.BlobStoreCommon.NextAccessTime"/>), not a wall-clock
+    /// timestamp. Higher values are more recent. Values may be persisted (e.g. by
+    /// <c>BlobStoreFiles</c>) and the counter is bumped above the max-loaded value
+    /// when the manifest is restored so cross-run LRU ordering is preserved.
+    /// </remarks>
     [TypeId(378502946)]
     public struct BlobMetadata
     {
         public Type Type;
         public long LastAccessTime;
-        public long NumBytes;
+
+        /// <summary>
+        /// In-memory size of the native payload, in bytes — i.e. the value reported by
+        /// <see cref="NativeBlobBox.Size"/> when the blob is native. Always <c>0</c> for
+        /// managed (class) blobs; the byte cost of a managed object is not knowable in C#.
+        /// </summary>
+        /// <remarks>
+        /// This is intentionally a single, store-independent unit: every <see cref="IBlobStore"/>
+        /// reports the same number for the same native payload regardless of how it stores
+        /// the bytes. Stores that also care about secondary sizes (e.g. <c>BlobStoreFiles</c>
+        /// tracks on-disk file size for its file-cache eviction pass) keep that bookkeeping
+        /// privately and do not surface it here.
+        /// </remarks>
+        public long NativeBytes;
+
         public bool IsNative;
 
         internal sealed class Serializer : ISerializer<BlobMetadata>
@@ -20,7 +42,7 @@ namespace Trecs
             {
                 value.Type = reader.Read<Type>("Type");
                 value.LastAccessTime = reader.Read<long>("LastAccessTime");
-                value.NumBytes = reader.Read<long>("NumBytes");
+                value.NativeBytes = reader.Read<long>("NativeBytes");
                 value.IsNative = reader.Read<bool>("IsNative");
             }
 
@@ -28,7 +50,7 @@ namespace Trecs
             {
                 writer.Write<Type>("Type", value.Type);
                 writer.Write<long>("LastAccessTime", value.LastAccessTime);
-                writer.Write<long>("NumBytes", value.NumBytes);
+                writer.Write<long>("NativeBytes", value.NativeBytes);
                 writer.Write<bool>("IsNative", value.IsNative);
             }
         }
@@ -42,11 +64,6 @@ namespace Trecs
     public sealed class BlobManifest
     {
         public readonly DenseDictionary<BlobId, BlobMetadata> Values = new();
-
-        public static long GetTimeForAccessTime()
-        {
-            return DateTime.Now.Ticks;
-        }
 
         internal sealed class Serializer : ISerializer<BlobManifest>
         {

@@ -11,7 +11,7 @@ namespace Trecs
     public readonly ref struct EntityInitializer
     {
         readonly GroupIndex _group;
-        readonly DenseDictionary<ComponentId, IComponentArray> _groupDictionary;
+        readonly DenseDictionary<TypeId, IComponentArray> _groupDictionary;
         readonly int _indexInTransientBuffer;
 #if DEBUG && !TRECS_IS_PROFILING
         readonly EntityInitializationTracker _tracker;
@@ -28,7 +28,7 @@ namespace Trecs
         /// </summary>
         public EntityInitializer(
             GroupIndex group,
-            DenseDictionary<ComponentId, IComponentArray> groupDictionary,
+            DenseDictionary<TypeId, IComponentArray> groupDictionary,
             in EntityHandle id,
             int indexInTransientBuffer
 #if DEBUG && !TRECS_IS_PROFILING
@@ -68,7 +68,7 @@ namespace Trecs
         public EntityInitializer Set<T>(in T component)
             where T : unmanaged, IEntityComponent
         {
-            if (!_groupDictionary.TryGetValue(ComponentTypeId<T>.Value, out var typeSafeDictionary))
+            if (!_groupDictionary.TryGetValue(TypeId<T>.Value, out var typeSafeDictionary))
             {
                 throw new TrecsException(
                     $"Expected to find component type '{typeof(T).GetPrettyName()}' associated with entity initializer but none was found, while adding to group {_group}"
@@ -76,7 +76,7 @@ namespace Trecs
             }
 
 #if DEBUG && !TRECS_IS_PROFILING
-            _tracker?.MarkComponentSet(_trackingId, ComponentTypeId<T>.Value, _group);
+            _tracker?.MarkComponentSet(_trackingId, TypeId<T>.Value, _group);
 #endif
 
             var dictionary = (IComponentArray<T>)typeSafeDictionary;
@@ -89,7 +89,7 @@ namespace Trecs
         /// Type-erased version of Set for runtime-determined component types.
         /// Copies raw bytes from <paramref name="valuePtr"/> into the component buffer.
         /// </summary>
-        internal unsafe EntityInitializer SetRawImpl(ComponentId componentId, void* valuePtr)
+        internal unsafe EntityInitializer SetRawImpl(TypeId componentId, void* valuePtr)
         {
             if (!_groupDictionary.TryGetValue(componentId, out var componentArray))
             {
@@ -119,7 +119,7 @@ namespace Trecs.Internal
     {
         public static unsafe EntityInitializer SetRaw(
             this EntityInitializer initializer,
-            ComponentId componentId,
+            TypeId componentId,
             void* valuePtr
         )
         {

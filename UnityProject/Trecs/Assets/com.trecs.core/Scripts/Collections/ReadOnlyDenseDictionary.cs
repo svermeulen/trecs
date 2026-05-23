@@ -12,7 +12,7 @@ namespace Trecs.Collections
 
         public ReadOnlyDenseDictionary(DenseDictionary<TKey, TValue> dictionary)
         {
-            TrecsAssert.IsNotNull(dictionary);
+            TrecsDebugAssert.IsNotNull(dictionary);
             _dictionary = dictionary;
         }
 
@@ -33,6 +33,8 @@ namespace Trecs.Collections
 
         public bool TryGetValue(TKey key, out TValue result) =>
             _dictionary.TryGetValue(key, out result);
+
+        public DenseDictionaryKeyEnumerable<TKey> Keys => _dictionary.Keys;
 
         public Enumerator GetEnumerator()
         {

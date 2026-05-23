@@ -339,7 +339,7 @@ namespace Trecs
                 return;
             foreach (var t in ts.Tags)
             {
-                if (t.Guid == 0 || !seen.Add(t.Guid))
+                if (t.Value == 0 || !seen.Add(t.Value))
                     continue;
                 sink.Add(new TagRef(t));
             }
@@ -466,7 +466,7 @@ namespace Trecs
     }
 
     /// <summary>
-    /// Adapts <see cref="TrecsAccessTracker"/>'s ComponentId-keyed surface to
+    /// Adapts <see cref="TrecsAccessTracker"/>'s TypeId-keyed surface to
     /// the display-name-keyed <see cref="IAccessTracker"/> shape so live and
     /// cache mode answer the same questions.
     /// </summary>
@@ -644,7 +644,7 @@ namespace Trecs
             return seen ?? (IReadOnlyCollection<string>)Array.Empty<string>();
         }
 
-        bool TryResolveComponentId(string displayName, out ComponentId id)
+        bool TryResolveComponentId(string displayName, out TypeId id)
         {
             id = default;
             if (_world == null || _world.IsDisposed || string.IsNullOrEmpty(displayName))
@@ -661,7 +661,7 @@ namespace Trecs
                                 == displayName
                         )
                         {
-                            id = new ComponentId(TypeIdProvider.GetTypeId(d.ComponentType));
+                            id = TypeId.FromType(d.ComponentType);
                             return true;
                         }
                     }
@@ -671,11 +671,11 @@ namespace Trecs
             return false;
         }
 
-        IReadOnlyCollection<string> ProjectIdsToNames(IReadOnlyCollection<ComponentId> ids)
+        IReadOnlyCollection<string> ProjectIdsToNames(IReadOnlyCollection<TypeId> ids)
         {
             if (ids == null || ids.Count == 0 || _world == null || _world.IsDisposed)
                 return Array.Empty<string>();
-            var idSet = new HashSet<ComponentId>(ids);
+            var idSet = new HashSet<TypeId>(ids);
             var names = new HashSet<string>();
             try
             {
@@ -685,7 +685,7 @@ namespace Trecs
                     {
                         if (d.ComponentType == null)
                             continue;
-                        var cid = new ComponentId(TypeIdProvider.GetTypeId(d.ComponentType));
+                        var cid = TypeId.FromType(d.ComponentType);
                         if (idSet.Contains(cid))
                         {
                             names.Add(

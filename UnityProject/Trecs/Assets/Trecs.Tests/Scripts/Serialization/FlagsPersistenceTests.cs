@@ -42,9 +42,9 @@ namespace Trecs.Tests
             _buffer.ResetMemoryPosition();
 
             _buffer.StartRead();
-            TrecsAssert.IsEqual(((ISerializationReader)_buffer).Flags, writtenFlags);
-            TrecsAssert.That(_buffer.HasFlag(TestFlagA));
-            TrecsAssert.That(_buffer.HasFlag(TestFlagB));
+            TrecsDebugAssert.IsEqual(_buffer.Reader.Flags, writtenFlags);
+            TrecsDebugAssert.That(_buffer.HasFlag(TestFlagA));
+            TrecsDebugAssert.That(_buffer.HasFlag(TestFlagB));
             _buffer.StopRead(verifySentinel: false);
         }
 
@@ -64,14 +64,14 @@ namespace Trecs.Tests
             _buffer.ResetMemoryPosition();
 
             var header = _buffer.PeekHeader();
-            TrecsAssert.IsEqual(header.Version, writtenVersion);
-            TrecsAssert.IsEqual(header.Flags, writtenFlags);
-            TrecsAssert.That(header.HasFlag(TestFlagA));
-            TrecsAssert.That(!header.HasFlag(TestFlagB));
+            TrecsDebugAssert.IsEqual(header.Version, writtenVersion);
+            TrecsDebugAssert.IsEqual(header.Flags, writtenFlags);
+            TrecsDebugAssert.That(header.HasFlag(TestFlagA));
+            TrecsDebugAssert.That(!header.HasFlag(TestFlagB));
 
             // Stream position is unchanged — we can still perform a full read.
             var value = _buffer.ReadAll<int>();
-            TrecsAssert.IsEqual(value, 123);
+            TrecsDebugAssert.IsEqual(value, 123);
         }
 
         [Test]
@@ -82,8 +82,8 @@ namespace Trecs.Tests
             _buffer.ResetMemoryPosition();
 
             var header = _buffer.PeekHeader();
-            TrecsAssert.IsEqual(header.Flags, 0L);
-            TrecsAssert.That(!header.HasFlag(TestFlagA));
+            TrecsDebugAssert.IsEqual(header.Flags, 0L);
+            TrecsDebugAssert.That(!header.HasFlag(TestFlagA));
         }
 
         [Test]
@@ -118,7 +118,7 @@ namespace Trecs.Tests
             );
             _buffer.ResetMemoryPosition();
             var header = _buffer.PeekHeader();
-            TrecsAssert.That(header.HasFlag(SerializationFlags.IsForChecksum));
+            TrecsDebugAssert.That(header.HasFlag(SerializationFlags.IsForChecksum));
         }
 
         [Test]
@@ -127,8 +127,8 @@ namespace Trecs.Tests
             var stream = new MemoryStream(new byte[] { 0x00, 0x00, 0x00, 0x01, 0x00 });
             stream.Position = 0;
 
-            Assert.Throws<TrecsException>(() => PayloadHeader.Peek(stream));
-            TrecsAssert.IsEqual(stream.Position, 0L);
+            Assert.Throws<SerializationException>(() => PayloadHeader.Peek(stream));
+            TrecsDebugAssert.IsEqual(stream.Position, 0L);
         }
 
         [Test]
@@ -155,9 +155,9 @@ namespace Trecs.Tests
             };
             var stream = new MemoryStream(bytes);
 
-            var ex = Assert.Throws<TrecsException>(() => PayloadHeader.Peek(stream));
+            var ex = Assert.Throws<SerializationException>(() => PayloadHeader.Peek(stream));
             StringAssert.Contains("format version", ex.Message);
-            TrecsAssert.IsEqual(stream.Position, 0L);
+            TrecsDebugAssert.IsEqual(stream.Position, 0L);
         }
     }
 }

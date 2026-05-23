@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Unity.Collections;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -18,14 +19,14 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
 
             a.SetTag<TestPartitionB>(entityIdx);
             a.RemoveEntity(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
@@ -38,14 +39,14 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
 
             a.RemoveEntity(entityIdx);
             a.SetTag<TestPartitionB>(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
@@ -63,7 +64,7 @@ namespace Trecs.Tests
             var nativeEcs = a.ToNative();
 
             a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
@@ -71,7 +72,7 @@ namespace Trecs.Tests
             // Native ops are processed removes-first regardless of queue order
             nativeEcs.SetTag<TestPartitionB>(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
@@ -89,7 +90,7 @@ namespace Trecs.Tests
             var nativeEcs = a.ToNative();
 
             a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
@@ -97,7 +98,7 @@ namespace Trecs.Tests
             // Managed swap queued first, then native remove
             a.SetTag<TestPartitionB>(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
@@ -115,7 +116,7 @@ namespace Trecs.Tests
             var nativeEcs = a.ToNative();
 
             a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
@@ -123,7 +124,7 @@ namespace Trecs.Tests
             // Managed remove queued first, then native swap
             a.RemoveEntity(entityIdx);
             nativeEcs.SetTag<TestPartitionB>(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
@@ -141,7 +142,7 @@ namespace Trecs.Tests
 
             a.AddEntity(PartitionA).Set(new TestInt { Value = 1 }).AssertComplete();
             a.AddEntity(PartitionA).Set(new TestInt { Value = 2 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
@@ -149,7 +150,7 @@ namespace Trecs.Tests
             // Remove the same entity twice via managed path
             a.RemoveEntity(entityIdx);
             a.RemoveEntity(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             // Only one entity should be removed, leaving one
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
@@ -164,7 +165,7 @@ namespace Trecs.Tests
 
             a.AddEntity(PartitionA).Set(new TestInt { Value = 1 }).AssertComplete();
             a.AddEntity(PartitionA).Set(new TestInt { Value = 2 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
@@ -172,7 +173,7 @@ namespace Trecs.Tests
             // Remove the same entity twice via native path (simulating two jobs)
             nativeEcs.RemoveEntity(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             // Only one entity should be removed, leaving one
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
@@ -187,7 +188,7 @@ namespace Trecs.Tests
 
             a.AddEntity(PartitionA).Set(new TestInt { Value = 1 }).AssertComplete();
             a.AddEntity(PartitionA).Set(new TestInt { Value = 2 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
@@ -195,7 +196,7 @@ namespace Trecs.Tests
             // Remove the same entity via both managed and native
             a.RemoveEntity(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             // Only one entity should be removed, leaving one
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
@@ -217,7 +218,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(PartitionA).Set(new TestInt { Value = (i + 1) * 10 }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
 
@@ -226,7 +227,7 @@ namespace Trecs.Tests
             var entityIdx = new EntityIndex(0, groupA);
             a.SetTag<TestPartitionB>(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
@@ -244,7 +245,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(PartitionA).Set(new TestInt { Value = (i + 1) * 10 }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
@@ -252,7 +253,7 @@ namespace Trecs.Tests
             // Duplicate native remove on entity 0
             nativeEcs.RemoveEntity(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             // Only entity 0 removed, entities 1 and 2 survive
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionA));
@@ -274,7 +275,7 @@ namespace Trecs.Tests
             {
                 a.AddEntity(PartitionA).Set(new TestInt { Value = (i + 1) * 10 }).AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(5, a.CountEntitiesWithTags(PartitionA));
 
@@ -296,7 +297,7 @@ namespace Trecs.Tests
             nativeEcs.SetTag<TestPartitionB>(new EntityIndex(3, groupA));
 
             // Entity 4: no operations → stays in PartitionA
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionB));
@@ -311,7 +312,7 @@ namespace Trecs.Tests
 
             a.AddEntity(PartitionA).Set(new TestInt { Value = 10 }).AssertComplete();
             a.AddEntity(PartitionA).Set(new TestInt { Value = 20 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
             var entityIdx = new EntityIndex(0, groupA);
@@ -319,7 +320,7 @@ namespace Trecs.Tests
             // Thread 0 queues a swap, thread 1 queues a remove for the same entity
             nativeEcs.SetTag<TestPartitionB>(entityIdx);
             nativeEcs.RemoveEntity(entityIdx);
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));
@@ -344,14 +345,14 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Entity 0: native swap to B
             // Entity 1: managed swap to B
             // Entity 2: stays
             nativeEcs.SetTag<TestPartitionB>(refs[0].ToIndex(a));
             a.SetTag<TestPartitionB>(refs[1].ToIndex(a));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(2, a.CountEntitiesWithTags(PartitionB));
@@ -378,13 +379,14 @@ namespace Trecs.Tests
                     .AssertComplete();
                 refs[i] = init.Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // In same submission: remove entity 0 (managed), add entity (native)
             a.RemoveEntity(refs[0]);
-            var nativeInit = nativeEcs.AddEntity(TestTags.Alpha, sortKey: 0);
+            using var newRefs = a.ReserveEntityHandles(1, Allocator.Temp);
+            var nativeInit = nativeEcs.AddEntity(TestTags.Alpha, sortKey: 0, newRefs[0]);
             nativeInit.Set(new TestInt { Value = 99 });
-            a.SubmitEntities();
+            a.Submit();
 
             // Should have 2 entities: entity 1 (value 1) and the native-added one (value 99)
             NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
@@ -412,14 +414,14 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 200 })
                 .Set(new TestVec { X = 3.0f, Y = 4.0f })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var groupA = a.WorldInfo.GetSingleGroupWithTags(PartitionA);
 
             // Swap entity 0 then native-remove it. Entity 1 should survive with correct data.
             a.SetTag<TestPartitionB>(new EntityIndex(0, groupA));
             nativeEcs.RemoveEntity(new EntityIndex(0, groupA));
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(1, a.CountEntitiesWithTags(PartitionA));
             NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionB));

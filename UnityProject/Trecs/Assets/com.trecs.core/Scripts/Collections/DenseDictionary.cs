@@ -21,21 +21,26 @@ namespace Trecs.Collections
     /// Supports any key type that implements IEquatable<T>, including strings, enums, and custom types.
     /// </summary>
     public sealed class DenseDictionary<TKey, TValue>
-        : IEnumerable<DenseDictionary<TKey, TValue>.KvPair>
+        : IEnumerable<DenseDictionary<TKey, TValue>.KvPair>,
+            IReadOnlyDenseDictionary<TKey, TValue>,
+            IDenseDictionaryVersion<TKey>
     {
-        Node[] _valuesInfo;
+        DenseDictionaryNode<TKey>[] _valuesInfo;
         TValue[] _values;
         int[] _buckets;
 
         int _freeValueCellIndex;
         int _collisions;
         ulong _fastModBucketsMultiplier;
+        ushort _version;
+
+        ushort IDenseDictionaryVersion<TKey>.Version => _version;
 
         public DenseDictionary(int size)
         {
-            TrecsAssert.That(size >= 0, "DenseDictionary size must be non-negative");
+            TrecsDebugAssert.That(size >= 0, "DenseDictionary size must be non-negative");
 
-            _valuesInfo = new Node[size];
+            _valuesInfo = new DenseDictionaryNode<TKey>[size];
             _values = new TValue[size];
             _buckets = new int[HashHelpers.GetPrime(size)];
 
@@ -84,7 +89,7 @@ namespace Trecs.Collections
             }
         }
 
-        public Node[] UnsafeKeys
+        public DenseDictionaryNode<TKey>[] UnsafeKeys
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _valuesInfo;
@@ -112,7 +117,8 @@ namespace Trecs.Collections
 
         public int Count => _freeValueCellIndex;
 
-        public KeyEnumerable Keys => new KeyEnumerable(this);
+        public DenseDictionaryKeyEnumerable<TKey> Keys =>
+            new(_valuesInfo, _freeValueCellIndex, this);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         //note, this returns readonly because the enumerator cannot be, but at the same time, it cannot be modified
@@ -131,19 +137,19 @@ namespace Trecs.Collections
             return GetEnumerator();
         }
 
+        DenseDictionaryKeyEnumerable<TKey> IReadOnlyDenseDictionary<TKey, TValue>.Keys => Keys;
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(TKey key, in TValue value)
         {
             var itemAdded = AddValue(key, out var index);
-            if (!itemAdded)
-            {
-                throw TrecsAssert.CreateException(
-                    "Key {0} already present in DenseDictionary<{1}, {2}>",
-                    key,
-                    typeof(TKey),
-                    typeof(TValue)
-                );
-            }
+            TrecsDebugAssert.That(
+                itemAdded,
+                "Key {0} already present in DenseDictionary<{1}, {2}>",
+                key,
+                typeof(TKey),
+                typeof(TValue)
+            );
             _values[index] = value;
         }
 
@@ -164,7 +170,7 @@ namespace Trecs.Collections
         public void Set(TKey key, in TValue value)
         {
             var itemAdded = AddValue(key, out var index);
-            TrecsAssert.That(!itemAdded, "trying to set a value on a not existing key");
+            TrecsDebugAssert.That(!itemAdded, "trying to set a value on a not existing key");
             _values[index] = value;
         }
 
@@ -178,7 +184,7 @@ namespace Trecs.Collections
             for (int i = 0; i < _freeValueCellIndex; i++)
             {
                 var bucketIndex = Reduce(
-                    (uint)_valuesInfo[i].hashcode,
+                    (uint)_valuesInfo[i].HashCode,
                     bucketsCapacity,
                     _fastModBucketsMultiplier
                 );
@@ -186,6 +192,10 @@ namespace Trecs.Collections
             }
 
             _freeValueCellIndex = 0;
+            unchecked
+            {
+                _version++;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -201,6 +211,10 @@ namespace Trecs.Collections
             Array.Clear(_buckets, 0, _buckets.Length);
             Array.Clear(_values, 0, _values.Length);
             Array.Clear(_valuesInfo, 0, _valuesInfo.Length);
+            unchecked
+            {
+                _version++;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -374,7 +388,7 @@ namespace Trecs.Collections
             if (TryGetIndex(key, out var findIndex))
                 return ref _values[findIndex];
 
-            throw TrecsAssert.CreateException("Key not found");
+            throw TrecsDebugAssert.CreateException("Key not found");
 #else
             //Burst is not able to vectorise code if throw is found, regardless if it's actually ever thrown
             TryGetIndex(key, out var findIndex);
@@ -392,6 +406,10 @@ namespace Trecs.Collections
 
                 Array.Resize(ref _values, expandPrime);
                 Array.Resize(ref _valuesInfo, expandPrime);
+                unchecked
+                {
+                    _version++;
+                }
             }
         }
 
@@ -402,6 +420,10 @@ namespace Trecs.Collections
 
             Array.Resize(ref _values, expandPrime);
             Array.Resize(ref _valuesInfo, expandPrime);
+            unchecked
+            {
+                _version++;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -420,7 +442,7 @@ namespace Trecs.Collections
         public void RemoveMustExist(in TKey key)
         {
             var wasRemoved = TryRemove(key);
-            TrecsAssert.That(wasRemoved);
+            TrecsDebugAssert.That(wasRemoved);
         }
 
         public TValue RemoveAndGet(in TKey key)
@@ -430,7 +452,7 @@ namespace Trecs.Collections
                 return value;
             }
 
-            throw TrecsAssert.CreateException("Dictionary key {0} not found", key);
+            throw TrecsDebugAssert.CreateException("Dictionary key {0} not found", key);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -448,7 +470,7 @@ namespace Trecs.Collections
             while (indexToValueToRemove != -1)
             {
                 ref var dictionaryNode = ref _valuesInfo[indexToValueToRemove];
-                if (dictionaryNode.hashcode == hash && _keyComp.Equals(dictionaryNode.key, key))
+                if (dictionaryNode.HashCode == hash && _keyComp.Equals(dictionaryNode.Key, key))
                 {
                     //if the key is found and the bucket points directly to the node to remove
                     if (_buckets[bucketIndex] - 1 == indexToValueToRemove)
@@ -461,13 +483,16 @@ namespace Trecs.Collections
                         //   |  1  | |  2  | |  3  | //bucket cannot have next, only previous
                         //   ------- ------- -------
                         //--> insert order
-                        _buckets[bucketIndex] = dictionaryNode.previous + 1;
+                        _buckets[bucketIndex] = dictionaryNode.Previous + 1;
                     }
                     else //we need to update the previous pointer if it's not the last element that is removed
                     {
-                        TrecsAssert.That(itemAfterCurrentOne != -1, "this should never happen");
+                        TrecsDebugAssert.That(
+                            itemAfterCurrentOne != -1,
+                            "this should never happen"
+                        );
                         //update the previous pointer of the item after the one to remove with the previous pointer of the item to remove
-                        _valuesInfo[itemAfterCurrentOne].previous = dictionaryNode.previous;
+                        _valuesInfo[itemAfterCurrentOne].Previous = dictionaryNode.Previous;
                     }
 
                     break; //don't miss this, at this point it must break and not update indexToValueToRemove
@@ -475,7 +500,7 @@ namespace Trecs.Collections
 
                 //a bucket always points to the last element of the list, so if the item is not found we need to iterate backward
                 itemAfterCurrentOne = indexToValueToRemove;
-                indexToValueToRemove = dictionaryNode.previous;
+                indexToValueToRemove = dictionaryNode.Previous;
             }
 
             if (indexToValueToRemove == -1)
@@ -508,7 +533,7 @@ namespace Trecs.Collections
                 ref var dictionaryNodeToMove = ref _valuesInfo[lastValueCellIndex];
 
                 var movingBucketIndex = Reduce(
-                    (uint)dictionaryNodeToMove.hashcode,
+                    (uint)dictionaryNodeToMove.HashCode,
                     (uint)_buckets.Length,
                     _fastModBucketsMultiplier
                 );
@@ -524,17 +549,17 @@ namespace Trecs.Collections
 
                 //find the prev element of the last element in the valuesInfo array
                 while (
-                    _valuesInfo[linkedListIterationIndex].previous != -1
-                    && _valuesInfo[linkedListIterationIndex].previous != lastValueCellIndex
+                    _valuesInfo[linkedListIterationIndex].Previous != -1
+                    && _valuesInfo[linkedListIterationIndex].Previous != lastValueCellIndex
                 )
                 {
-                    linkedListIterationIndex = _valuesInfo[linkedListIterationIndex].previous;
+                    linkedListIterationIndex = _valuesInfo[linkedListIterationIndex].Previous;
                 }
 
                 //if we find any value that has the last value cell as previous, we need to update it to point to the new value index that is going to be replaced
-                if (_valuesInfo[linkedListIterationIndex].previous != -1)
+                if (_valuesInfo[linkedListIterationIndex].Previous != -1)
                 {
-                    _valuesInfo[linkedListIterationIndex].previous = indexToValueToRemove;
+                    _valuesInfo[linkedListIterationIndex].Previous = indexToValueToRemove;
                 }
 
                 //finally, actually move the values
@@ -544,7 +569,11 @@ namespace Trecs.Collections
 
             // Clear the now-unused slot to allow GC to collect the value
             _values[_freeValueCellIndex] = default(TValue);
-            _valuesInfo[_freeValueCellIndex] = default(Node);
+            _valuesInfo[_freeValueCellIndex] = default(DenseDictionaryNode<TKey>);
+            unchecked
+            {
+                _version++;
+            }
 
             return true;
         }
@@ -554,6 +583,10 @@ namespace Trecs.Collections
         {
             Array.Resize(ref _values, _freeValueCellIndex);
             Array.Resize(ref _valuesInfo, _freeValueCellIndex);
+            unchecked
+            {
+                _version++;
+            }
         }
 
         //I store all the index with an offset + 1, so that in the bucket list 0 means actually not existing.
@@ -565,7 +598,7 @@ namespace Trecs.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGetIndex(TKey key, out int findIndex)
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 _buckets.Length > 0,
                 "Dictionary arrays are not correctly initialized (0 size)"
             );
@@ -580,14 +613,14 @@ namespace Trecs.Collections
             while (valueIndex != -1)
             {
                 ref var dictionaryNode = ref _valuesInfo[valueIndex];
-                if (dictionaryNode.hashcode == hash && _keyComp.Equals(dictionaryNode.key, key))
+                if (dictionaryNode.HashCode == hash && _keyComp.Equals(dictionaryNode.Key, key))
                 {
                     //this is the one
                     findIndex = valueIndex;
                     return true;
                 }
 
-                valueIndex = dictionaryNode.previous;
+                valueIndex = dictionaryNode.Previous;
             }
 
             findIndex = 0;
@@ -601,7 +634,7 @@ namespace Trecs.Collections
             if (TryGetIndex(key, out var findIndex) == true)
                 return findIndex;
 
-            throw TrecsAssert.CreateException("Key {0} not found in DenseDictionary", key);
+            throw TrecsDebugAssert.CreateException("Key {0} not found in DenseDictionary", key);
 #else
             //Burst is not able to vectorise code if throw is found, regardless if it's actually ever thrown
             TryGetIndex(key, out var findIndex);
@@ -615,7 +648,7 @@ namespace Trecs.Collections
         {
             for (int i = Count - 1; i >= 0; i--)
             {
-                var tKey = UnsafeKeys[i].key;
+                var tKey = UnsafeKeys[i].Key;
                 if (!otherDicKeys.ContainsKey(tKey))
                 {
                     TryRemove(tKey);
@@ -628,7 +661,7 @@ namespace Trecs.Collections
         {
             for (int i = Count - 1; i >= 0; i--)
             {
-                var tKey = UnsafeKeys[i].key;
+                var tKey = UnsafeKeys[i].Key;
                 if (otherDicKeys.ContainsKey(tKey) == true)
                     TryRemove(tKey);
             }
@@ -656,7 +689,7 @@ namespace Trecs.Collections
             {
                 ResizeIfNeeded();
                 //create the info node at the last position and fill it with the relevant information
-                _valuesInfo[_freeValueCellIndex] = new Node(key, hash);
+                _valuesInfo[_freeValueCellIndex] = new DenseDictionaryNode<TKey>(key, hash);
             }
             else //collision or already exists
             {
@@ -664,14 +697,18 @@ namespace Trecs.Collections
                 do
                 {
                     ref var dictionaryNode = ref _valuesInfo[currentValueIndex];
-                    if (dictionaryNode.hashcode == hash && _keyComp.Equals(dictionaryNode.key, key))
+                    if (dictionaryNode.HashCode == hash && _keyComp.Equals(dictionaryNode.Key, key))
                     {
                         //the key already exists, simply replace the value!
                         indexSet = currentValueIndex;
+                        unchecked
+                        {
+                            _version++;
+                        }
                         return false;
                     }
 
-                    currentValueIndex = dictionaryNode.previous;
+                    currentValueIndex = dictionaryNode.Previous;
                 } while (currentValueIndex != -1); //-1 means no more values with key with the same hash
 
                 ResizeIfNeeded();
@@ -680,7 +717,11 @@ namespace Trecs.Collections
                 _collisions++;
                 //create a new node which previous index points to node currently pointed in the bucket (valueIndex)
                 //_freeValueCellIndex = valueIndex + 1
-                _valuesInfo[_freeValueCellIndex] = new Node(key, hash, valueIndex);
+                _valuesInfo[_freeValueCellIndex] = new DenseDictionaryNode<TKey>(
+                    key,
+                    hash,
+                    valueIndex
+                );
                 //Important: the new node is always the one that will be pointed by the bucket cell
                 //so I can assume that the one pointed by the bucket is always the last value added
             }
@@ -705,6 +746,10 @@ namespace Trecs.Collections
                     RecomputeBuckets(HashHelpers.Expand(_collisions));
                 }
             }
+            unchecked
+            {
+                _version++;
+            }
 
             return true;
         }
@@ -726,7 +771,7 @@ namespace Trecs.Collections
                 //get the original hash code and find the new bucketIndex due to the new length
                 ref var valueInfoNode = ref _valuesInfo[newValueIndex];
                 var bucketIndex = Reduce(
-                    (uint)valueInfoNode.hashcode,
+                    (uint)valueInfoNode.HashCode,
                     bucketsCapacity,
                     _fastModBucketsMultiplier
                 );
@@ -743,7 +788,7 @@ namespace Trecs.Collections
                 {
                     //ok nothing was indexed, the bucket was empty. We need to update the previous
                     //values of next and previous
-                    valueInfoNode.previous = -1;
+                    valueInfoNode.Previous = -1;
                 }
                 else
                 {
@@ -752,7 +797,7 @@ namespace Trecs.Collections
                     _collisions++;
                     //the bucket will point to this value, so
                     //the previous index will be used as previous for the new value.
-                    valueInfoNode.previous = existingValueIndex;
+                    valueInfoNode.Previous = existingValueIndex;
                 }
             }
         }
@@ -782,59 +827,6 @@ namespace Trecs.Collections
                 );
 
             return (int)hashcode;
-        }
-
-        public readonly struct KeyEnumerable
-        {
-            readonly DenseDictionary<TKey, TValue> _dic;
-
-            public KeyEnumerable(DenseDictionary<TKey, TValue> dic)
-            {
-                _dic = dic;
-            }
-
-            public int Count
-            {
-                [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get => _dic.Count;
-            }
-
-            public KeyEnumerator GetEnumerator() => new(_dic);
-        }
-
-        public struct KeyEnumerator
-        {
-            public KeyEnumerator(DenseDictionary<TKey, TValue> dic)
-                : this()
-            {
-                _dic = dic;
-                _index = -1;
-                _count = dic.Count;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool MoveNext()
-            {
-                TrecsAssert.That(
-                    _count == _dic.Count,
-                    "can't modify a dictionary during its iteration"
-                );
-
-                if (_index < _count - 1)
-                {
-                    ++_index;
-                    return true;
-                }
-
-                return false;
-            }
-
-            public readonly TKey Current => _dic._valuesInfo[_index].key;
-
-            readonly DenseDictionary<TKey, TValue> _dic;
-            readonly int _count;
-
-            int _index;
         }
 
         /// <summary>
@@ -868,6 +860,7 @@ namespace Trecs.Collections
             DenseDictionary<TKey, TValue> _dic;
 #if DEBUG
             int _startCount;
+            ushort _expectedVersion;
 #endif
             int _count;
 
@@ -881,10 +874,11 @@ namespace Trecs.Collections
                 _count = dic.Count;
 #if DEBUG
                 _startCount = dic.Count;
+                _expectedVersion = dic._version;
 #endif
             }
 
-            public KvPair Current => new(_dic._valuesInfo[_index].key, _dic._values, _index);
+            public KvPair Current => new(_dic._valuesInfo[_index].Key, _dic._values, _index);
 
             object IEnumerator.Current => Current;
 
@@ -892,9 +886,9 @@ namespace Trecs.Collections
             public bool MoveNext()
             {
 #if DEBUG
-                TrecsAssert.That(
-                    _count == _startCount,
-                    "can't modify a dictionary while it is iterated"
+                TrecsDebugAssert.That(
+                    _dic._version == _expectedVersion,
+                    "DenseDictionary modified during iteration"
                 );
 #endif
                 if (_index < _count - 1)
@@ -922,33 +916,13 @@ namespace Trecs.Collections
                 _index = startIndex - 1;
                 _count = count;
 #if DEBUG
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     _count <= _startCount,
                     "can't set a count greater than the starting one"
                 );
                 _startCount = count;
+                _expectedVersion = _dic._version;
 #endif
-            }
-        }
-
-        public struct Node
-        {
-            public int hashcode;
-            public int previous;
-            public TKey key;
-
-            public Node(in TKey key, int hash, int previousNode)
-            {
-                this.key = key;
-                hashcode = hash;
-                previous = previousNode;
-            }
-
-            public Node(in TKey key, int hash)
-            {
-                this.key = key;
-                hashcode = hash;
-                previous = -1;
             }
         }
 
@@ -987,7 +961,7 @@ namespace Trecs.Collections
             if (valuesCount > _valuesInfo.Length)
             {
                 var newCapacity = HashHelpers.Expand(valuesCount);
-                _valuesInfo = new Node[newCapacity];
+                _valuesInfo = new DenseDictionaryNode<TKey>[newCapacity];
                 _values = new TValue[newCapacity];
             }
 

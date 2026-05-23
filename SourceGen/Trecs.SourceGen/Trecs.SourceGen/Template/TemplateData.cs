@@ -1,111 +1,66 @@
-using System.Collections.Immutable;
+using Trecs.SourceGen.Shared;
 
 namespace Trecs.SourceGen.Template
 {
     /// <summary>
-    /// Parsed data for a single component field in a template struct
+    /// Parsed data for a single component field in a template struct. Equatable record so it
+    /// can flow through the incremental-generator pipeline without breaking the cache.
     /// </summary>
-    internal class TemplateComponentData
-    {
-        public string FieldName { get; }
-        public string ComponentTypeFullName { get; }
-        public bool IsInterpolated { get; }
-        public bool IsVariableUpdateOnly { get; }
-        public bool IsConstant { get; }
-        public bool IsInput { get; }
-        public string OnMissing { get; }
-        public bool HasExplicitDefault { get; }
-
-        public TemplateComponentData(
-            string fieldName,
-            string componentTypeFullName,
-            bool isInterpolated,
-            bool isVariableUpdateOnly,
-            bool isConstant,
-            bool isInput,
-            string inputFrameBehaviour,
-            bool hasExplicitDefault
-        )
-        {
-            FieldName = fieldName;
-            ComponentTypeFullName = componentTypeFullName;
-            IsInterpolated = isInterpolated;
-            IsVariableUpdateOnly = isVariableUpdateOnly;
-            IsConstant = isConstant;
-            IsInput = isInput;
-            OnMissing = inputFrameBehaviour;
-            HasExplicitDefault = hasExplicitDefault;
-        }
-    }
+    internal sealed record TemplateComponentData(
+        string FieldName,
+        string ComponentTypeFullName,
+        bool IsInterpolated,
+        bool IsVariableUpdateOnly,
+        bool IsConstant,
+        bool IsInput,
+        string OnMissing,
+        bool HasExplicitDefault
+    );
 
     /// <summary>
-    /// Parsed data for a single IPartitionedBy interface on a template — one partition
+    /// Parsed data for a single <c>IPartitionedBy</c> interface on a template — one partition
     /// dimension whose variant tags are mutually exclusive. Arity 1 = presence/absence
-    /// (the dim has the tag or doesn't); arity ≥ 2 = explicit-variants (one tag is
-    /// active per dim).
+    /// (the dim has the tag or doesn't); arity ≥ 2 = explicit-variants (one tag is active
+    /// per dim).
     /// </summary>
-    internal class TemplateDimensionData
+    internal sealed record TemplateDimensionData(EquatableArray<string> VariantTagTypeNames)
     {
-        public ImmutableArray<string> VariantTagTypeNames { get; }
-
         /// <summary>
-        /// True for arity-1 dimensions (<c>IPartitionedBy&lt;T&gt;</c>), where the tag
-        /// is either present or absent on the entity. False for explicit-variants
-        /// dimensions (<c>IPartitionedBy&lt;T1, T2, ...&gt;</c>).
+        /// True for arity-1 dimensions (<c>IPartitionedBy&lt;T&gt;</c>), where the tag is
+        /// either present or absent on the entity. False for explicit-variants dimensions
+        /// (<c>IPartitionedBy&lt;T1, T2, ...&gt;</c>).
         /// </summary>
         public bool IsPresenceAbsence => VariantTagTypeNames.Length == 1;
-
-        public TemplateDimensionData(ImmutableArray<string> variantTagTypeNames)
-        {
-            VariantTagTypeNames = variantTagTypeNames;
-        }
     }
 
     /// <summary>
-    /// Complete parsed data for a template struct or class declaration
+    /// Complete parsed data for a template struct or class declaration. Holds only strings,
+    /// bools, and value-equatable arrays — no symbols or syntax — so the cache survives.
     /// </summary>
-    internal class TemplateDefinitionData
-    {
-        public string TypeName { get; }
-        public string NamespaceName { get; }
-        public string Accessibility { get; }
-        public bool IsClass { get; }
-        public bool IsAbstract { get; }
-        public bool IsGlobals { get; }
-        public bool IsVariableUpdateOnly { get; }
-        public ImmutableArray<string> ContainingTypes { get; }
-        public ImmutableArray<string> TagTypeNames { get; }
-        public ImmutableArray<string> BaseTemplateTypeNames { get; }
-        public ImmutableArray<TemplateComponentData> Components { get; }
-        public ImmutableArray<TemplateDimensionData> Dimensions { get; }
+    internal sealed record TemplateDefinitionData(
+        string TypeName,
+        string NamespaceName,
+        string Accessibility,
+        bool IsClass,
+        bool IsAbstract,
+        bool IsGlobals,
+        bool IsVariableUpdateOnly,
+        EquatableArray<string> ContainingTypes,
+        EquatableArray<string> TagTypeNames,
+        EquatableArray<string> BaseTemplateTypeNames,
+        EquatableArray<TemplateComponentData> Components,
+        EquatableArray<TemplateDimensionData> Dimensions
+    );
 
-        public TemplateDefinitionData(
-            string typeName,
-            string namespaceName,
-            string accessibility,
-            bool isClass,
-            bool isAbstract,
-            bool isGlobals,
-            bool isVariableUpdateOnly,
-            ImmutableArray<string> containingTypes,
-            ImmutableArray<string> tagTypeNames,
-            ImmutableArray<string> baseTemplateTypeNames,
-            ImmutableArray<TemplateComponentData> components,
-            ImmutableArray<TemplateDimensionData> dimensions
-        )
-        {
-            TypeName = typeName;
-            NamespaceName = namespaceName;
-            Accessibility = accessibility;
-            IsClass = isClass;
-            IsAbstract = isAbstract;
-            IsGlobals = isGlobals;
-            IsVariableUpdateOnly = isVariableUpdateOnly;
-            ContainingTypes = containingTypes;
-            TagTypeNames = tagTypeNames;
-            BaseTemplateTypeNames = baseTemplateTypeNames;
-            Components = components;
-            Dimensions = dimensions;
-        }
-    }
+    /// <summary>
+    /// Pipeline-boundary model produced by <see cref="TemplateModelBuilder"/>. Carries the
+    /// parsed definition plus any validation diagnostics; the terminal stage emits source
+    /// only when <see cref="IsValid"/>, but always replays diagnostics.
+    /// </summary>
+    internal sealed record TemplateModel(
+        TemplateDefinitionData Data,
+        string HintFileName,
+        bool IsValid,
+        EquatableArray<DiagnosticInfo> Diagnostics
+    );
 }

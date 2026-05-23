@@ -4,6 +4,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Unity.Jobs;
+#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+using Unity.Profiling.LowLevel.Unsafe;
+#endif
 
 namespace Trecs.Internal
 {
@@ -22,15 +25,58 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class RuntimeJobScheduler
     {
+        // Bundle of (handle, name) stored everywhere we used to store just JobHandle.
+        // Name is the logical job identifier used for the per-job "Wait:" profiling
+        // span inside CompleteAllOutstanding. May be null; null names skip the span.
+        readonly struct JobEntry
+        {
+            public readonly JobHandle Handle;
+            public readonly string Name;
+
+            public JobEntry(JobHandle handle, string name)
+            {
+                Handle = handle;
+                Name = name;
+            }
+        }
+
+#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+        // Per-job worker-execution timing buffer attached to a handle by
+        // source-generated auto-job code via RegisterJobTimings. Separate from the
+        // writer/reader/untracked buckets so that auto-jobs registering the same
+        // handle under multiple (resource, group) keys still get a single
+        // unambiguous timing entry.
+        //
+        // Buffer layout (per thread, 3 longs each), values written from inside the
+        // Burst-compiled Execute shim using ProfilerUnsafeUtility.Timestamp ticks:
+        //     [thread*3 + 0] = first timestamp seen by that worker, 0 if untouched
+        //     [thread*3 + 1] = last  timestamp seen by that worker
+        //     [thread*3 + 2] = sum of (end-start) deltas across that worker's batches
+        // Sized to JobsUtility.MaxJobThreadCount * 3 longs.
+        readonly struct JobTimingEntry
+        {
+            public readonly string Name;
+            public readonly NativeArray<long> Timings;
+
+            public JobTimingEntry(string name, NativeArray<long> timings)
+            {
+                Name = name;
+                Timings = timings;
+            }
+        }
+
+        readonly Dictionary<JobHandle, JobTimingEntry> _jobTimingsByHandle = new();
+#endif
+
         // Key: composite of (ResourceId, GroupIndex) packed into a long.
         // Writer: the last outstanding job that writes this (resource, group) pair.
         // Readers: outstanding jobs that read (but don't write) this (resource, group) pair.
-        readonly Dictionary<long, JobHandle> _writers = new();
-        readonly Dictionary<long, List<JobHandle>> _readers = new();
+        readonly Dictionary<long, JobEntry> _writers = new();
+        readonly Dictionary<long, List<JobEntry>> _readers = new();
 
         // Jobs without specific component access (e.g. NativeWorldAccessor spawn jobs).
         // Just need to complete at phase boundary.
-        readonly List<JobHandle> _untrackedJobs = new();
+        readonly List<JobEntry> _untrackedJobs = new();
 
         // Disposables (typically TempJob-allocated lookups created by source-generated
         // job scheduling code) that must be disposed once their owning jobs have
@@ -42,7 +88,26 @@ namespace Trecs.Internal
         readonly List<IDisposable> _pendingDisposes = new();
 
         // Pool of reader lists to avoid allocation
-        readonly Stack<List<JobHandle>> _listPool = new();
+        readonly Stack<List<JobEntry>> _listPool = new();
+
+#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+        // Pool of per-job timing buffers. Each buffer is a NativeArray<long> sized
+        // JobsUtility.MaxJobThreadCount * 3 (see JobTimingEntry doc for layout).
+        // Rent zero-fills before returning to the caller; Return parks the array
+        // for reuse. Buffers are Persistent-allocated so they survive across
+        // schedule/complete cycles.
+        readonly Stack<NativeArray<long>> _timingBufferPool = new();
+#endif
+
+        // Reused across CompleteAllOutstanding calls to dedupe the same JobHandle
+        // appearing under multiple (resource, group) keys, so each unique job's wait
+        // is profiled and Complete()-d exactly once. A single scheduled job is
+        // tracked once per (resource, group) pair its aspect touches — e.g. a job
+        // that reads CPosition and writes CVelocity lands in both _readers and
+        // _writers; one writing CPosition across Fish and Meal groups lands under
+        // two writer keys — so the same handle naturally shows up in multiple
+        // buckets here.
+        readonly HashSet<JobHandle> _completedThisCall = new();
 
         int _outstandingJobCount;
 
@@ -61,7 +126,7 @@ namespace Trecs.Internal
         [Conditional("DEBUG")]
         static void AssertMainThread()
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "RuntimeJobScheduler is main-thread only"
             );
@@ -80,9 +145,9 @@ namespace Trecs.Internal
         {
             var key = MakeKey(resourceType, group);
 
-            if (_writers.TryGetValue(key, out var writerHandle))
+            if (_writers.TryGetValue(key, out var writer))
             {
-                return JobHandle.CombineDependencies(baseDeps, writerHandle);
+                return JobHandle.CombineDependencies(baseDeps, writer.Handle);
             }
 
             return baseDeps;
@@ -100,16 +165,16 @@ namespace Trecs.Internal
         {
             var key = MakeKey(resourceType, group);
 
-            if (_writers.TryGetValue(key, out var writerHandle))
+            if (_writers.TryGetValue(key, out var writer))
             {
-                baseDeps = JobHandle.CombineDependencies(baseDeps, writerHandle);
+                baseDeps = JobHandle.CombineDependencies(baseDeps, writer.Handle);
             }
 
             if (_readers.TryGetValue(key, out var readerList))
             {
                 for (int i = 0; i < readerList.Count; i++)
                 {
-                    baseDeps = JobHandle.CombineDependencies(baseDeps, readerList[i]);
+                    baseDeps = JobHandle.CombineDependencies(baseDeps, readerList[i].Handle);
                 }
             }
 
@@ -118,9 +183,17 @@ namespace Trecs.Internal
 
         /// <summary>
         /// Register a scheduled job as a reader of a (resource, group) pair. Main thread only.
+        /// <paramref name="name"/> is a short identifier (e.g. <c>"IdleBobSystem.BobAspectJob"</c>)
+        /// used as the per-job profiling span label inside <see cref="CompleteAllOutstanding"/>.
+        /// May be null; null names skip the per-job span.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TrackJobRead(JobHandle handle, ResourceId resourceType, GroupIndex group)
+        public void TrackJobRead(
+            JobHandle handle,
+            ResourceId resourceType,
+            GroupIndex group,
+            string name = null
+        )
         {
             AssertMainThread();
             var key = MakeKey(resourceType, group);
@@ -131,15 +204,21 @@ namespace Trecs.Internal
                 _readers[key] = readerList;
             }
 
-            readerList.Add(handle);
+            readerList.Add(new JobEntry(handle, name));
             _outstandingJobCount++;
         }
 
         /// <summary>
         /// Register a scheduled job as a writer of a (resource, group) pair.
         /// Replaces any previous writer and clears readers for this pair. Main thread only.
+        /// See <see cref="TrackJobRead"/> for the <paramref name="name"/> contract.
         /// </summary>
-        public void TrackJobWrite(JobHandle handle, ResourceId resourceType, GroupIndex group)
+        public void TrackJobWrite(
+            JobHandle handle,
+            ResourceId resourceType,
+            GroupIndex group,
+            string name = null
+        )
         {
             AssertMainThread();
             var key = MakeKey(resourceType, group);
@@ -157,7 +236,7 @@ namespace Trecs.Internal
                 _outstandingJobCount++;
             }
 
-            _writers[key] = handle;
+            _writers[key] = new JobEntry(handle, name);
         }
 
         /// <summary>
@@ -170,9 +249,9 @@ namespace Trecs.Internal
             AssertMainThread();
             var key = MakeKey(resourceType, group);
 
-            if (_writers.TryGetValue(key, out var writerHandle))
+            if (_writers.TryGetValue(key, out var writer))
             {
-                writerHandle.Complete();
+                CompleteWithSpan(writer);
                 _writers.Remove(key);
                 _outstandingJobCount--;
                 return true;
@@ -192,9 +271,9 @@ namespace Trecs.Internal
             var key = MakeKey(resourceType, group);
             bool synced = false;
 
-            if (_writers.TryGetValue(key, out var writerHandle))
+            if (_writers.TryGetValue(key, out var writer))
             {
-                writerHandle.Complete();
+                CompleteWithSpan(writer);
                 _writers.Remove(key);
                 _outstandingJobCount--;
                 synced = true;
@@ -204,7 +283,7 @@ namespace Trecs.Internal
             {
                 for (int i = 0; i < readerList.Count; i++)
                 {
-                    readerList[i].Complete();
+                    CompleteWithSpan(readerList[i]);
                 }
 
                 _outstandingJobCount -= readerList.Count;
@@ -221,14 +300,48 @@ namespace Trecs.Internal
         /// Track a job handle that doesn't have specific component access patterns.
         /// Used for jobs that perform structural operations (e.g. NativeWorldAccessor)
         /// or other work that just needs to complete at the next phase boundary. Main thread only.
+        /// See <see cref="TrackJobRead"/> for the <paramref name="name"/> contract.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TrackJob(JobHandle handle)
+        public void TrackJob(JobHandle handle, string name = null)
         {
             AssertMainThread();
-            _untrackedJobs.Add(handle);
+            _untrackedJobs.Add(new JobEntry(handle, name));
             _outstandingJobCount++;
         }
+
+#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+        /// <summary>
+        /// Attach a per-worker timing buffer to a scheduled job handle. The buffer
+        /// is decoded by <see cref="CompleteAllOutstanding"/> after the handle
+        /// completes; the resulting wall-clock and total-CPU worker-execution
+        /// timings are forwarded to the profiler via
+        /// <see cref="TrecsProfiling.RecordWorkerJob"/>. The buffer is returned
+        /// to the internal pool by the same call.
+        /// <para>
+        /// Source-generated auto-job scheduling code calls this exactly once per
+        /// scheduled handle, in addition to its <c>TrackJobRead/Write/Job</c>
+        /// dependency registrations. Calling more than once for the same handle
+        /// overwrites the prior entry (and leaks the prior buffer). Main thread only.
+        /// </para>
+        /// </summary>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RegisterJobTimings(JobHandle handle, string name, NativeArray<long> timings)
+        {
+            AssertMainThread();
+            // Collision = caller is reusing the same handle for two timing buffers
+            // in one phase; the prior buffer would be silently overwritten and leak.
+            // Source-gen emits exactly one call per scheduled handle, so any
+            // collision is a bug.
+            TrecsDebugAssert.That(
+                !_jobTimingsByHandle.ContainsKey(handle),
+                "RegisterJobTimings called twice for the same JobHandle; the prior "
+                    + "timing buffer would leak"
+            );
+            _jobTimingsByHandle[handle] = new JobTimingEntry(name, timings);
+        }
+#endif
 
         /// <summary>
         /// Register a disposable (typically a TempJob-allocated NativeComponentLookup
@@ -248,15 +361,31 @@ namespace Trecs.Internal
         /// <summary>
         /// Complete all outstanding jobs and clear tracking state.
         /// Called at phase boundaries. Main thread only.
+        /// <para>
+        /// Per-job profiling: each unique JobHandle is timed via a <c>"Wait: {name}"</c>
+        /// child span. The same handle can be tracked under multiple (resource, group)
+        /// keys for one Schedule call, so we dedupe via <see cref="_completedThisCall"/>;
+        /// only the first completion in this call gets the wait span (the rest are no-op
+        /// completes on already-completed handles).
+        /// </para>
+        /// <para>
+        /// <b>Attribution caveat:</b> <c>JobHandle.Complete()</c> waits for the handle's
+        /// transitive dependencies too. Whichever handle in a dependency chain we
+        /// complete first absorbs the upstream wait — its <c>Wait:</c> span will look
+        /// inflated relative to its own on-thread work. Spans on later-completed
+        /// handles in the same chain show clean wait times.
+        /// </para>
         /// </summary>
         public void CompleteAllOutstanding()
         {
             AssertMainThread();
+            _completedThisCall.Clear();
+
             using (TrecsProfiling.Start("Complete Writers"))
             {
                 foreach (var kvp in _writers)
                 {
-                    kvp.Value.Complete();
+                    CompleteOnceWithSpan(kvp.Value);
                 }
 
                 _writers.Clear();
@@ -268,7 +397,7 @@ namespace Trecs.Internal
                 {
                     for (int i = 0; i < kvp.Value.Count; i++)
                     {
-                        kvp.Value[i].Complete();
+                        CompleteOnceWithSpan(kvp.Value[i]);
                     }
 
                     kvp.Value.Clear();
@@ -282,11 +411,20 @@ namespace Trecs.Internal
             {
                 for (int i = 0; i < _untrackedJobs.Count; i++)
                 {
-                    _untrackedJobs[i].Complete();
+                    CompleteOnceWithSpan(_untrackedJobs[i]);
                 }
 
                 _untrackedJobs.Clear();
             }
+
+#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+            // Per-job worker-execution timings: decode each timing buffer, publish
+            // wall-clock + total-CPU ms to the profiler, return buffer to the pool.
+            if (_jobTimingsByHandle.Count > 0)
+            {
+                PublishWorkerTimings();
+            }
+#endif
 
             // Synchronous dispose runs AFTER all jobs have completed above so that
             // disposing the underlying native containers is safe (no in-flight readers
@@ -304,19 +442,171 @@ namespace Trecs.Internal
             _outstandingJobCount = 0;
         }
 
-        List<JobHandle> RentList()
+#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+        // Drain _jobTimingsByHandle, decoding each per-worker timing buffer into
+        // (wallClockMs, totalCpuMs) and forwarding to the profiler. Returns each
+        // buffer to the pool. Called once near the end of CompleteAllOutstanding,
+        // after all handles have been Complete()-d (so worker writes are visible).
+        void PublishWorkerTimings()
+        {
+            var ratio = ProfilerUnsafeUtility.TimestampToNanosecondsConversionRatio;
+            int threadCount = JobsUtility.MaxJobThreadCount;
+
+            foreach (var kvp in _jobTimingsByHandle)
+            {
+                var entry = kvp.Value;
+                var timings = entry.Timings;
+                if (!timings.IsCreated)
+                {
+                    continue;
+                }
+
+                long minStart = long.MaxValue;
+                long maxEnd = long.MinValue;
+                long totalCpuTicks = 0;
+                bool anyTouched = false;
+                for (int t = 0; t < threadCount; t++)
+                {
+                    long first = timings[t * 3];
+                    if (first == 0)
+                    {
+                        continue;
+                    }
+                    long last = timings[t * 3 + 1];
+                    long cpu = timings[t * 3 + 2];
+                    if (first < minStart)
+                        minStart = first;
+                    if (last > maxEnd)
+                        maxEnd = last;
+                    totalCpuTicks += cpu;
+                    anyTouched = true;
+                }
+
+                if (anyTouched)
+                {
+                    // ticks → nanoseconds → milliseconds. Matches Unity DOTS's own
+                    // StructuralChangesProfiler.GetElapsedNanoseconds: multiply by
+                    // Numerator then divide by Denominator. The 64-bit headroom is
+                    // ample for Trecs job durations — at typical timestamp rates an
+                    // overflow would require a single job to occupy workers for
+                    // many seconds, which a per-fixed-tick job will never do.
+                    long wallNs = (maxEnd - minStart) * ratio.Numerator / ratio.Denominator;
+                    long cpuNs = totalCpuTicks * ratio.Numerator / ratio.Denominator;
+                    float wallMs = wallNs / 1_000_000f;
+                    float cpuMs = cpuNs / 1_000_000f;
+                    TrecsProfiling.RecordWorkerJob(entry.Name, wallMs, cpuMs);
+                }
+
+                ReturnTimingBuffer(timings);
+            }
+
+            _jobTimingsByHandle.Clear();
+        }
+#endif
+
+        // Complete a single entry on a non-CompleteAllOutstanding sync path (no
+        // cross-bucket dedup needed). Adds the per-job span if name is non-null.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void CompleteWithSpan(JobEntry entry)
+        {
+            if (entry.Name == null)
+            {
+                entry.Handle.Complete();
+                return;
+            }
+
+            using (TrecsProfiling.Start("Wait: {0}", entry.Name))
+            {
+                entry.Handle.Complete();
+            }
+        }
+
+        // Complete an entry during CompleteAllOutstanding, deduping across the
+        // writer/reader/untracked buckets via _completedThisCall. Already-completed
+        // handles skip both the span and the (no-op) Complete() call.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void CompleteOnceWithSpan(JobEntry entry)
+        {
+            if (!_completedThisCall.Add(entry.Handle))
+            {
+                return;
+            }
+
+            CompleteWithSpan(entry);
+        }
+
+        List<JobEntry> RentList()
         {
             if (_listPool.Count > 0)
             {
                 return _listPool.Pop();
             }
 
-            return new List<JobHandle>(4);
+            return new List<JobEntry>(4);
         }
 
-        void ReturnList(List<JobHandle> list)
+        void ReturnList(List<JobEntry> list)
         {
             _listPool.Push(list);
         }
+
+#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+        /// <summary>
+        /// Rent a zero-filled per-job timing buffer. Source-generated auto-job
+        /// scheduling code assigns this to the job struct's timing field before
+        /// scheduling, then passes the same array to the matching
+        /// <c>TrackJob*</c> overload. Returned to the pool by
+        /// <c>CompleteAllOutstanding</c> after the job's worker timings have been
+        /// published. Main thread only.
+        /// </summary>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public NativeArray<long> RentTimingBuffer()
+        {
+            AssertMainThread();
+
+            if (_timingBufferPool.Count > 0)
+            {
+                var buf = _timingBufferPool.Pop();
+                // Zero so the per-worker "first start, 0 if untouched" sentinel is honest.
+                for (int i = 0; i < buf.Length; i++)
+                {
+                    buf[i] = 0;
+                }
+                return buf;
+            }
+
+            return new NativeArray<long>(
+                JobsUtility.MaxJobThreadCount * 3,
+                Allocator.Persistent,
+                NativeArrayOptions.ClearMemory
+            );
+        }
+
+        void ReturnTimingBuffer(NativeArray<long> buffer)
+        {
+            if (!buffer.IsCreated)
+            {
+                return;
+            }
+            _timingBufferPool.Push(buffer);
+        }
+
+        /// <summary>
+        /// Dispose all pooled native timing buffers. Called when the world is torn
+        /// down. Main thread only.
+        /// </summary>
+        public void DisposeTimingBuffers()
+        {
+            AssertMainThread();
+            while (_timingBufferPool.Count > 0)
+            {
+                var buf = _timingBufferPool.Pop();
+                if (buf.IsCreated)
+                {
+                    buf.Dispose();
+                }
+            }
+        }
+#endif
     }
 }

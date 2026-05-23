@@ -16,7 +16,7 @@ namespace Trecs.Serialization
         public void Deserialize(ref Dictionary<TKey, TValue> dict, ISerializationReader reader)
         {
             var numItems = reader.Read<int>("Count");
-            TrecsAssert.That(numItems >= 0);
+            TrecsDebugAssert.That(numItems >= 0);
 
             if (dict == null)
             {
@@ -24,7 +24,7 @@ namespace Trecs.Serialization
             }
             else
             {
-                TrecsAssert.That(dict.Count == 0);
+                TrecsDebugAssert.That(dict.Count == 0);
 
                 dict.Clear();
                 dict.EnsureCapacity(numItems);

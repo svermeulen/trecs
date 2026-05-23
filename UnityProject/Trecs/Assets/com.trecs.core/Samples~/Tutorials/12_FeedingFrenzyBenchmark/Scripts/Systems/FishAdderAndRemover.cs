@@ -11,7 +11,6 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
     public class FishAdderAndRemoverSettings
     {
         public float FishYOffset = -2f;
-        public float AddSpeed = 1f;
         public float2 FishSpeedRange = new(15f, 4f);
         public float2 FishSizeRange = new(1f, 2f);
     }
@@ -40,26 +39,20 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             Assert.That(presetIndex >= 0);
 
             int desiredFishCount = _presets[math.clamp(presetIndex, 0, _presets.Length - 1)];
-            globals.DesiredFishCount = (int)
-                math.lerp(
-                    globals.DesiredFishCount,
-                    desiredFishCount,
-                    math.saturate(_settings.AddSpeed * World.DeltaTime)
-                );
-
-            int desiredMealCount = (int)(globals.DesiredFishCount * _commonSettings.MealCountRatio);
-            globals.DesiredMealCount = desiredMealCount;
+            globals.DesiredFishCount = desiredFishCount;
+            globals.DesiredMealCount = (int)(desiredFishCount * _commonSettings.MealCountRatio);
 
             int currentCount = World.CountEntitiesWithTags<FrenzyTags.Fish>();
-            int delta = globals.DesiredFishCount - currentCount;
+            int delta = desiredFishCount - currentCount;
+            int maxChanges = math.max(1, _commonSettings.MaxChangesPerFrame);
 
             if (delta > 0)
             {
-                SpawnFish(delta, globals);
+                SpawnFish(math.min(delta, maxChanges), globals);
             }
             else if (delta < 0)
             {
-                RemoveFish(-delta, globals);
+                RemoveFish(math.min(-delta, maxChanges), globals);
             }
         }
 

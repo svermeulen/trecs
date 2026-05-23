@@ -19,9 +19,9 @@ namespace Trecs
     /// pre-existing set contents are cleared and the queued add/remove bags are drained
     /// without applying — analogous to deferred-clear semantics at submission time.
     ///
-    /// When <see cref="RequireDeterministic"/> is true, entries are collected, sorted by
-    /// (GroupIndex, Index), then applied — ensuring deterministic iteration order regardless
-    /// of thread scheduling. Removes are always processed before adds.
+    /// Entries are collected, sorted by (GroupIndex, Index), then applied — ensuring
+    /// deterministic iteration order regardless of thread scheduling. Removes are
+    /// always processed before adds.
     /// </summary>
     [BurstCompile]
     unsafe struct SetFlushJob : IJob
@@ -39,8 +39,6 @@ namespace Trecs
         [NativeDisableUnsafePtrRestriction]
         public int* ClearRequested;
 
-        public bool RequireDeterministic;
-
         public void Execute()
         {
             if (*ClearRequested != 0)
@@ -49,39 +47,6 @@ namespace Trecs
                 return;
             }
 
-            if (RequireDeterministic)
-            {
-                FlushDeterministic();
-            }
-            else
-            {
-                FlushNonDeterministic();
-            }
-        }
-
-        void FlushClear()
-        {
-            *ClearRequested = 0;
-            for (int i = 0; i < RegisteredGroups.Length; i++)
-            {
-                EntriesPerGroup[RegisteredGroups[i].Index].Clear();
-            }
-            DrainBag(RemoveQueue);
-            DrainBag(AddQueue);
-        }
-
-        static void DrainBag(AtomicNativeBags bags)
-        {
-            for (int i = 0; i < bags.ThreadSlotCount; i++)
-            {
-                ref var bag = ref bags.GetBag(i);
-                while (!bag.IsEmpty)
-                    bag.Dequeue<EntityIndex>();
-            }
-        }
-
-        void FlushDeterministic()
-        {
             var allRemoves = new NativeList<EntityIndex>(64, Allocator.Temp);
             for (int i = 0; i < RemoveQueue.ThreadSlotCount; i++)
             {
@@ -113,26 +78,24 @@ namespace Trecs
             allAdds.Dispose();
         }
 
-        void FlushNonDeterministic()
+        void FlushClear()
         {
-            for (int i = 0; i < RemoveQueue.ThreadSlotCount; i++)
+            *ClearRequested = 0;
+            for (int i = 0; i < RegisteredGroups.Length; i++)
             {
-                ref var bag = ref RemoveQueue.GetBag(i);
-                while (!bag.IsEmpty)
-                {
-                    var entityIndex = bag.Dequeue<EntityIndex>();
-                    EntriesPerGroup[entityIndex.GroupIndex.Index].Remove(entityIndex.Index);
-                }
+                EntriesPerGroup[RegisteredGroups[i].Index].Clear();
             }
+            DrainBag(RemoveQueue);
+            DrainBag(AddQueue);
+        }
 
-            for (int i = 0; i < AddQueue.ThreadSlotCount; i++)
+        static void DrainBag(AtomicNativeBags bags)
+        {
+            for (int i = 0; i < bags.ThreadSlotCount; i++)
             {
-                ref var bag = ref AddQueue.GetBag(i);
+                ref var bag = ref bags.GetBag(i);
                 while (!bag.IsEmpty)
-                {
-                    var entityIndex = bag.Dequeue<EntityIndex>();
-                    EntriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
-                }
+                    bag.Dequeue<EntityIndex>();
             }
         }
     }

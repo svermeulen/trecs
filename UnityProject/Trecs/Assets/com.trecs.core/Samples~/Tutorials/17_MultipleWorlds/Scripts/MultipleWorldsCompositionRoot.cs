@@ -14,11 +14,6 @@ namespace Trecs.Samples.MultipleWorlds
         public float SpawnRadius = 2f;
         public float WorldSeparation = 3f;
 
-        World _worldA;
-        World _worldB;
-        bool _pausedA;
-        bool _pausedB;
-
         // All we do here is call constructors and set up dependencies
         // between classes.  No initialization logic otherwise
         public override void Construct(
@@ -33,7 +28,7 @@ namespace Trecs.Samples.MultipleWorlds
             // 1:1 with a World. GameObjectId values are world-local now,
             // not shared. Either world can be snapshotted independently
             // and its GameObjects will be rebuilt from its entity set.
-            _worldA = new WorldBuilder()
+            var worldA = new WorldBuilder()
                 .SetDebugName("World A — Red Spheres")
                 .AddTemplates(
                     new[]
@@ -44,9 +39,9 @@ namespace Trecs.Samples.MultipleWorlds
                 )
                 .Build();
 
-            var goManagerA = new RenderableGameObjectManager(_worldA);
+            var goManagerA = new RenderableGameObjectManager(worldA);
 
-            _worldA.AddSystems(
+            worldA.AddSystems(
                 new ISystem[]
                 {
                     new SpawnSystem(
@@ -60,7 +55,7 @@ namespace Trecs.Samples.MultipleWorlds
                 }
             );
 
-            _worldB = new WorldBuilder()
+            var worldB = new WorldBuilder()
                 .SetDebugName("World B — Blue Cubes")
                 .AddTemplates(
                     new[]
@@ -71,9 +66,9 @@ namespace Trecs.Samples.MultipleWorlds
                 )
                 .Build();
 
-            var goManagerB = new RenderableGameObjectManager(_worldB);
+            var goManagerB = new RenderableGameObjectManager(worldB);
 
-            _worldB.AddSystems(
+            worldB.AddSystems(
                 new ISystem[]
                 {
                     new SpawnSystem(
@@ -92,75 +87,23 @@ namespace Trecs.Samples.MultipleWorlds
 
             initializables = new()
             {
-                _worldA.Initialize,
-                _worldB.Initialize,
+                worldA.Initialize,
+                worldB.Initialize,
                 sceneInitA.Initialize,
                 sceneInitB.Initialize,
             };
 
-            tickables = new()
-            {
-                ReadInput,
-                () =>
-                {
-                    if (!_pausedA)
-                        _worldA.Tick();
-                },
-                () =>
-                {
-                    if (!_pausedB)
-                        _worldB.Tick();
-                },
-            };
+            tickables = new() { worldA.Tick, worldB.Tick };
 
-            lateTickables = new()
-            {
-                () =>
-                {
-                    if (!_pausedA)
-                        _worldA.LateTick();
-                },
-                () =>
-                {
-                    if (!_pausedB)
-                        _worldB.LateTick();
-                },
-            };
+            lateTickables = new() { worldA.LateTick, worldB.LateTick };
 
             disposables = new()
             {
                 goManagerA.Dispose,
                 goManagerB.Dispose,
-                _worldA.Dispose,
-                _worldB.Dispose,
+                worldA.Dispose,
+                worldB.Dispose,
             };
-        }
-
-        void ReadInput()
-        {
-            if (Input.GetKeyDown(KeyCode.Alpha1))
-                _pausedA = !_pausedA;
-            if (Input.GetKeyDown(KeyCode.Alpha2))
-                _pausedB = !_pausedB;
-        }
-
-        void OnGUI()
-        {
-            if (_worldA == null)
-                return;
-
-            GUI.Label(
-                new Rect(10, 10, 400, 20),
-                $"World A: {(_pausedA ? "PAUSED" : "running")}  (press 1 to toggle)"
-            );
-            GUI.Label(
-                new Rect(10, 30, 400, 20),
-                $"World B: {(_pausedB ? "PAUSED" : "running")}  (press 2 to toggle)"
-            );
-            GUI.Label(
-                new Rect(10, 60, 400, 20),
-                $"WorldRegistry.ActiveWorlds.Count = {WorldRegistry.ActiveWorlds.Count}"
-            );
         }
     }
 }

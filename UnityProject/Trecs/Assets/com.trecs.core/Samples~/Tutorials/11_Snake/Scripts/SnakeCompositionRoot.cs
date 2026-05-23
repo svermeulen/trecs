@@ -24,13 +24,7 @@ namespace Trecs.Samples.Snake
             Application.targetFrameRate = 2000;
 
             var world = new WorldBuilder()
-                .SetSettings(
-                    new WorldSettings
-                    {
-                        RandomSeed = Settings.RandomSeed,
-                        RequireDeterministicSubmission = true,
-                    }
-                )
+                .SetSettings(new WorldSettings { RandomSeed = Settings.RandomSeed })
                 .AddTemplates(
                     new[]
                     {

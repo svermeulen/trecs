@@ -47,8 +47,8 @@ namespace Trecs.Tests
             var deserializedList = _cacheHelper.ReadAll<FastList<int>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserializedList);
-            TrecsAssert.That(deserializedList.Count == 0);
+            TrecsDebugAssert.IsNotNull(deserializedList);
+            TrecsDebugAssert.That(deserializedList.Count == 0);
         }
 
         [Test]
@@ -70,11 +70,11 @@ namespace Trecs.Tests
             var deserializedList = _cacheHelper.ReadAll<FastList<int>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserializedList);
-            TrecsAssert.That(deserializedList.Count == originalList.Count);
+            TrecsDebugAssert.IsNotNull(deserializedList);
+            TrecsDebugAssert.That(deserializedList.Count == originalList.Count);
             for (int i = 0; i < originalList.Count; i++)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     deserializedList[i] == originalList[i],
                     $"Element at index {i} should match. Expected: {originalList[i]}, Actual: {deserializedList[i]}"
                 );
@@ -111,11 +111,11 @@ namespace Trecs.Tests
             var deserializedList = _cacheHelper.ReadAll<FastList<float>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserializedList);
-            TrecsAssert.That(deserializedList.Count == originalList.Count);
+            TrecsDebugAssert.IsNotNull(deserializedList);
+            TrecsDebugAssert.That(deserializedList.Count == originalList.Count);
             for (int i = 0; i < originalList.Count; i++)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     deserializedList[i] == originalList[i],
                     $"Float at index {i} should match. Expected: {originalList[i]}, Actual: {deserializedList[i]}"
                 );
@@ -150,11 +150,11 @@ namespace Trecs.Tests
             var deserializedList = _cacheHelper.ReadAll<FastList<Vector3>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserializedList);
-            TrecsAssert.That(deserializedList.Count == originalList.Count);
+            TrecsDebugAssert.IsNotNull(deserializedList);
+            TrecsDebugAssert.That(deserializedList.Count == originalList.Count);
             for (int i = 0; i < originalList.Count; i++)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     deserializedList[i] == originalList[i],
                     $"Vector3 at index {i} should match. Expected: {originalList[i]}, Actual: {deserializedList[i]}"
                 );
@@ -187,11 +187,11 @@ namespace Trecs.Tests
             var deserializedList = _cacheHelper.ReadAll<FastList<int2>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserializedList);
-            TrecsAssert.That(deserializedList.Count == originalList.Count);
+            TrecsDebugAssert.IsNotNull(deserializedList);
+            TrecsDebugAssert.That(deserializedList.Count == originalList.Count);
             for (int i = 0; i < originalList.Count; i++)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     deserializedList[i].Equals(originalList[i]),
                     $"int2 at index {i} should match. Expected: {originalList[i]}, Actual: {deserializedList[i]}"
                 );
@@ -221,19 +221,19 @@ namespace Trecs.Tests
             var deserializedList = _cacheHelper.ReadAll<FastList<int>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserializedList);
-            TrecsAssert.That(deserializedList.Count == originalList.Count);
+            TrecsDebugAssert.IsNotNull(deserializedList);
+            TrecsDebugAssert.That(deserializedList.Count == originalList.Count);
 
             // Check first, middle, and last elements
-            TrecsAssert.That(deserializedList[0] == originalList[0]);
-            TrecsAssert.That(deserializedList[5000] == originalList[5000]);
-            TrecsAssert.That(deserializedList[9999] == originalList[9999]);
+            TrecsDebugAssert.That(deserializedList[0] == originalList[0]);
+            TrecsDebugAssert.That(deserializedList[5000] == originalList[5000]);
+            TrecsDebugAssert.That(deserializedList[9999] == originalList[9999]);
 
             // Spot check some elements
             for (int i = 0; i < 100; i++)
             {
                 int index = i * 100; // Every 100th element
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     deserializedList[index] == originalList[index],
                     $"Element at index {index} should match"
                 );
@@ -259,9 +259,9 @@ namespace Trecs.Tests
             var deserializedList = _cacheHelper.ReadAll<FastList<int>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserializedList);
-            TrecsAssert.That(deserializedList.Count == 1);
-            TrecsAssert.That(deserializedList[0] == 42);
+            TrecsDebugAssert.IsNotNull(deserializedList);
+            TrecsDebugAssert.That(deserializedList.Count == 1);
+            TrecsDebugAssert.That(deserializedList[0] == 42);
         }
 
         [Test]
@@ -288,11 +288,14 @@ namespace Trecs.Tests
             var deserializedList = _cacheHelper.ReadAll<FastList<byte>>();
 
             // Assert
-            TrecsAssert.IsNotNull(deserializedList);
-            TrecsAssert.That(deserializedList.Count == 256);
+            TrecsDebugAssert.IsNotNull(deserializedList);
+            TrecsDebugAssert.That(deserializedList.Count == 256);
             for (int i = 0; i < 256; i++)
             {
-                TrecsAssert.That(deserializedList[i] == (byte)i, $"Byte at index {i} should match");
+                TrecsDebugAssert.That(
+                    deserializedList[i] == (byte)i,
+                    $"Byte at index {i} should match"
+                );
             }
         }
 
@@ -319,11 +322,11 @@ namespace Trecs.Tests
             _cacheHelper.ReadAll(ref deserializedList);
 
             // Assert
-            TrecsAssert.IsNotNull(deserializedList);
-            TrecsAssert.That(deserializedList.Count == originalList.Count);
+            TrecsDebugAssert.IsNotNull(deserializedList);
+            TrecsDebugAssert.That(deserializedList.Count == originalList.Count);
             for (int i = 0; i < originalList.Count; i++)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     deserializedList[i] == originalList[i],
                     $"Element at index {i} should match after deserializing into pre-allocated list"
                 );
@@ -372,11 +375,11 @@ namespace Trecs.Tests
             var regularListTime = stopwatch.ElapsedTicks;
 
             // Verify correctness
-            TrecsAssert.That(deserializedSvList.Count == elementCount);
-            TrecsAssert.That(deserializedRegularList.Count == elementCount);
+            TrecsDebugAssert.That(deserializedSvList.Count == elementCount);
+            TrecsDebugAssert.That(deserializedRegularList.Count == elementCount);
             for (int i = 0; i < elementCount; i++)
             {
-                TrecsAssert.That(deserializedSvList[i] == deserializedRegularList[i]);
+                TrecsDebugAssert.That(deserializedSvList[i] == deserializedRegularList[i]);
             }
 
             // Log performance comparison (not a strict assertion since it can vary)

@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Trecs.Collections;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 
 namespace Trecs.Internal
@@ -24,6 +25,14 @@ namespace Trecs.Internal
         readonly FastList<EntityRange> _cachedRangeOfSubmittedIndices;
         readonly DenseDictionary<int, int> _transientEntityIDsAffectedByRemoveAtSwapBack;
         NativeList<int> _cachedSortedDescendingRemoveIndices;
+
+        // Submission-order copy of the per-group remove indices (cleared and
+        // re-filled each per-group apply pass). Native so the
+        // RemoveRefsCaptureJob Burst job can iterate it without crossing the
+        // managed-FastList boundary. ExecuteRemoveForGroup populates both this
+        // scratch and _cachedSortedDescendingRemoveIndices from the same
+        // FastList<int> entityHandlesToRemove in one pass.
+        NativeList<int> _cachedRemoveIndicesSubmissionOrderNative;
         readonly FastList<IComponentArray> _cachedSrcArrays;
         readonly FastList<IComponentArray> _cachedDstArrays;
 
@@ -34,12 +43,22 @@ namespace Trecs.Internal
         // list, so EntityIndex.ToHandle works inside OnRemoved callbacks. The
         // real free + TrimGroupList happens after FireRemoveCallbacks
         // completes.
-        readonly FastList<(GroupIndex Group, int Id, int TailSlot)> _cachedDeferredHandleFrees;
+        // Native so the Remove Refs Burst jobs (steps a and c) can populate
+        // and read it directly. The list is one-shot per submission — built
+        // by step (a) in submission order, then read by step (c) and finally
+        // drained by FinalizeDeferredHandleFrees after the OnRemoved fan-out.
+        NativeList<DeferredHandleFreeEntry> _cachedDeferredHandleFrees;
         readonly FastList<(GroupIndex Group, int PostRemoveCount)> _cachedDeferredHandleTrims;
-        readonly DenseDictionary<int, int> _cachedTailSlotByOriginalSlot;
 
-        // Cached array for native add component lookups to avoid per-frame allocation
-        IComponentArray[] _cachedNativeAddComponentArrays;
+        // Per-removed-entity originalSlot → tailSlot lookup table. NativeHashMap
+        // (vs the prior DenseDictionary) because step (a)'s Burst job needs
+        // native data; insertion order doesn't matter here — every lookup is
+        // by exact originalSlot key.
+        NativeHashMap<int, int> _cachedTailSlotByOriginalSlot;
+
+        // Cached array for fast-path AddEntity per-group component lookups, reused
+        // across submissions in DrainFastAddBags to avoid per-frame allocation.
+        IComponentArray[] _cachedFastAddComponentArrays;
 
         // Minimum entities * components to justify parallel job scheduling overhead.
         // At small batch sizes (DoofusDemo: ~10 entities × 5 components = 50), the job
@@ -50,7 +69,7 @@ namespace Trecs.Internal
         const int ParallelJobThreshold = 500;
 
         static readonly Action<
-            DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>[],
+            DenseDictionary<GroupIndex, FastList<MoveInfoEntry>>[],
             DenseDictionary<EntityIndex, (EntityIndex, GroupIndex)>,
             EntitySubmitter
         > _moveEntities;
@@ -67,19 +86,28 @@ namespace Trecs.Internal
 
         internal readonly SetStore _setStore;
 
-        readonly SimpleSubject _submitCompleteEvent = new();
-        readonly SimpleSubject _submitStartedEvent = new();
-
         readonly NativeSharedHeap _nativeSharedHeap;
-        readonly NativeUniqueHeap _nativeUniqueHeap;
-        readonly TrecsListHeap _trecsListHeap;
-        readonly FrameScopedNativeUniqueHeap _frameScopedNativeUniqueHeap;
+        readonly NativeChunkStore _nativeUniqueChunkStore;
 
         readonly RuntimeJobScheduler _jobScheduler;
 
-        readonly AtomicNativeBags _nativeAddOperationQueue;
         readonly AtomicNativeBags _nativeRemoveOperationQueue;
         readonly AtomicNativeBags _nativeMoveOperationQueue;
+
+        // Fast-path AddEntity staging bags — per-thread × per-group raw-byte slots.
+        // Written by NativeWorldAccessor.AddEntity from Burst jobs; drained by
+        // DrainFastAddBags during FlushNativeOperations.
+        PerGroupAddBags _perGroupAddBags;
+
+        internal PerGroupAddBags PerGroupAddBags => _perGroupAddBags;
+
+        // Scratch buffers reused across submissions for the FastAddFillJob inputs.
+        // Allocator.Persistent so they survive across frames; Clear()'d each
+        // submission rather than recreated to avoid registering a new safety
+        // handle every frame.
+        NativeList<FastAddFillSlotWork> _cachedFastAddSlots;
+        NativeList<FastAddComponentDest> _cachedFastAddDests;
+        NativeList<int> _cachedFastAddGroupDestStartIdx;
 
         // Managed-side queue for SetTag/UnsetTag ops. Both managed and native ops
         // feed into the per-entity coalescing pipeline at submission. Cleared
@@ -104,8 +132,18 @@ namespace Trecs.Internal
         // fresh — each NativeList construction registers an AtomicSafetyHandle
         // and allocates list metadata that adds up over high-frequency submits.
         // Allocator.Persistent because their lifetime is the EntitySubmitter's.
-        NativeList<(EntityIndex, int)> _removalsScratch;
-        NativeList<(EntityIndex, GroupIndex, int)> _swapsScratch;
+        // Managed buffer (FastList, not NativeList) for the per-submission
+        // native-remove dequeue. Same reasoning as _swapsScratch — NativeList's
+        // per-Add safety-handle checks aren't free in editor playmode at the
+        // 5k+ items/frame scale, and nothing downstream wants Burst access.
+        FastList<(EntityIndex, int)> _removalsScratch;
+
+        // Managed buffer (FastList, not NativeList) for accumulating coalesced
+        // swap output. NativeList's per-Add AtomicSafetyHandle checks dominated
+        // the 100k+ swap workload in editor playmode — switching to a managed
+        // FastList eliminates that overhead. Nothing downstream needs Burst
+        // access to this buffer.
+        FastList<(EntityIndex, GroupIndex, int)> _swapsScratch;
 
         // Per-set deferred bags are now on EntitySetStorage; no centralized set queues needed.
         readonly WorldInfo _worldInfo;
@@ -131,17 +169,20 @@ namespace Trecs.Internal
             _swapGroup = SwapGroup;
         }
 
-        public ISimpleObservable SubmissionCompletedEvent
+        static unsafe PerGroupAddBags CreatePerGroupAddBags(WorldInfo worldInfo)
         {
-            get { return _submitCompleteEvent; }
+            int groupsCount = worldInfo.AllGroups.Count;
+            int headerSize = sizeof(FastAddSlotHeader);
+            var slotSizes = new int[groupsCount];
+            var headers = worldInfo.ComponentLayouts.Headers;
+            for (int g = 0; g < groupsCount; g++)
+            {
+                slotSizes[g] = headerSize + headers[g].TotalEntityBytes;
+            }
+            return PerGroupAddBags.Create(slotSizes, Allocator.Persistent);
         }
 
-        public ISimpleObservable SubmissionStartedEvent
-        {
-            get { return _submitStartedEvent; }
-        }
-
-        public EntitySubmitter(
+        internal EntitySubmitter(
             TrecsLog log,
             WorldInfo worldInfo,
             WorldAccessorRegistry accessorRegistry,
@@ -151,9 +192,7 @@ namespace Trecs.Internal
             WorldSettings trecsSettings,
             EntityQuerier entitiesQuerier,
             NativeSharedHeap nativeSharedHeap,
-            NativeUniqueHeap nativeUniqueHeap,
-            FrameScopedNativeUniqueHeap frameScopedNativeUniqueHeap,
-            TrecsListHeap trecsListHeap,
+            NativeChunkStore nativeUniqueChunkStore,
             RuntimeJobScheduler jobScheduler
         )
         {
@@ -162,30 +201,36 @@ namespace Trecs.Internal
 
             _jobScheduler = jobScheduler;
             _nativeSharedHeap = nativeSharedHeap;
-            _nativeUniqueHeap = nativeUniqueHeap;
-            _frameScopedNativeUniqueHeap = frameScopedNativeUniqueHeap;
-            _trecsListHeap = trecsListHeap;
+            _nativeUniqueChunkStore = nativeUniqueChunkStore;
             _cachedRangeOfSubmittedIndices = new FastList<EntityRange>();
             _transientEntityIDsAffectedByRemoveAtSwapBack = new DenseDictionary<int, int>();
             _cachedSortedDescendingRemoveIndices = new NativeList<int>(16, Allocator.Persistent);
-            _removalsScratch = new NativeList<(EntityIndex, int)>(16, Allocator.Persistent);
-            _swapsScratch = new NativeList<(EntityIndex, GroupIndex, int)>(
+            _cachedRemoveIndicesSubmissionOrderNative = new NativeList<int>(
                 16,
                 Allocator.Persistent
             );
+            _removalsScratch = new FastList<(EntityIndex, int)>(16);
+            _swapsScratch = new FastList<(EntityIndex, GroupIndex, int)>(16);
             _cachedSrcArrays = new FastList<IComponentArray>();
             _cachedDstArrays = new FastList<IComponentArray>();
-            _cachedDeferredHandleFrees = new FastList<(GroupIndex, int, int)>();
+            _cachedDeferredHandleFrees = new NativeList<DeferredHandleFreeEntry>(
+                16,
+                Allocator.Persistent
+            );
             _cachedDeferredHandleTrims = new FastList<(GroupIndex, int)>();
-            _cachedTailSlotByOriginalSlot = new DenseDictionary<int, int>();
+            _cachedTailSlotByOriginalSlot = new NativeHashMap<int, int>(64, Allocator.Persistent);
             _worldInfo = worldInfo;
             _accessorRegistry = accessorRegistry;
             _trecsSettings = trecsSettings ?? new WorldSettings();
 
             InitStructuralChangeChecks();
-            _nativeAddOperationQueue = AtomicNativeBags.Create(Allocator.Persistent);
             _nativeRemoveOperationQueue = AtomicNativeBags.Create(Allocator.Persistent);
             _nativeMoveOperationQueue = AtomicNativeBags.Create(Allocator.Persistent);
+
+            _perGroupAddBags = CreatePerGroupAddBags(worldInfo);
+            _cachedFastAddSlots = new NativeList<FastAddFillSlotWork>(16, Allocator.Persistent);
+            _cachedFastAddDests = new NativeList<FastAddComponentDest>(16, Allocator.Persistent);
+            _cachedFastAddGroupDestStartIdx = new NativeList<int>(16, Allocator.Persistent);
             // Per-set deferred bags are allocated in EntitySetStorage.
             _eventsManager = eventsManager;
 
@@ -211,11 +256,9 @@ namespace Trecs.Internal
             _accessRecorder = recorder;
         }
 
-        public void SubmitEntities()
+        public void Submit()
         {
-            _submitStartedEvent.Invoke();
-            SubmitEntitiesImpl();
-            _submitCompleteEvent.Invoke();
+            SubmitImpl();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -230,7 +273,7 @@ namespace Trecs.Internal
             // jobs may have been reading from via the resolver. Catch misuse
             // (flush called mid-job) loudly in DEBUG rather than producing
             // corrupted reads.
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 !_jobScheduler.HasOutstandingJobs,
                 "FlushAllDeferredOps called while jobs are still outstanding. "
                     + "Call scheduler.CompleteAllOutstanding() first."
@@ -243,7 +286,7 @@ namespace Trecs.Internal
 
             using (TrecsProfiling.Start("Deferred Set Operations"))
             {
-                _setStore.FlushAllDeferredOps(_trecsSettings.RequireDeterministicSubmission);
+                _setStore.FlushAllDeferredOps();
             }
 
             FlushNativeOperations();
@@ -258,7 +301,7 @@ namespace Trecs.Internal
         //     get processed in the *next* iteration of this while loop —
         //     SingleSubmission never reenters itself. _isRunningSubmit catches
         //     the only remaining re-entrancy hazard (an observer that calls
-        //     SubmitEntities() directly).
+        //     Submit() directly).
         //   - The cascade is bounded by MaxSubmissionIterations (default 10).
         //     Hitting the cap throws "possible circular submission detected"
         //     in DEBUG; in release the loop just exits with structural
@@ -267,20 +310,19 @@ namespace Trecs.Internal
         //     GroupIndex.FromIndex(i) order and observers per group in the
         //     priority order set up by InsertSorted, so within an iteration
         //     observer fire order is fixed. Native-queued ops are sorted at
-        //     the boundary when RequireDeterministicSubmission is enabled;
-        //     managed ops inherit the determinism of the user code that
-        //     queued them (same as ordinary system Execute).
+        //     the boundary; managed ops inherit the determinism of the user
+        //     code that queued them (same as ordinary system Execute).
         //   - The strict-accessor rule (WorldAccessor.AssertIsCurrentlyExecutingAccessor)
         //     short-circuits inside observer callbacks because SystemRunner
         //     resets _currentlyExecutingAccessorId to 0 before calling
-        //     SubmitEntities(). Observers may therefore use a separately-
+        //     Submit(). Observers may therefore use a separately-
         //     created service accessor (e.g. the OnRemoved pointer-cleanup
         //     pattern in samples/10_Pointers) without tripping the assert.
-        void SubmitEntitiesImpl()
+        void SubmitImpl()
         {
             _eventsManager.NotifyOnSubmissionStarted();
 
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 !_isRunningSubmit,
                 "A submission started while the previous one was still flushing"
             );
@@ -325,14 +367,14 @@ namespace Trecs.Internal
                 // (or any other mid-submission throw) does not wedge the
                 // submitter for the rest of the World's lifetime via the
                 // "A submission started while the previous one was still
-                // flushing" assert on the next SubmitEntities() call.
+                // flushing" assert on the next Submit() call.
                 _isRunningSubmit = false;
             }
         }
 
         public void Dispose()
         {
-            TrecsAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!_isDisposed);
             _isDisposed = true;
 
             using (TrecsProfiling.Start("Final Dispose"))
@@ -341,9 +383,15 @@ namespace Trecs.Internal
 
                 _setStore.Dispose();
 
-                _nativeAddOperationQueue.Dispose();
                 _nativeRemoveOperationQueue.Dispose();
                 _nativeMoveOperationQueue.Dispose();
+                _perGroupAddBags.Dispose();
+                if (_cachedFastAddSlots.IsCreated)
+                    _cachedFastAddSlots.Dispose();
+                if (_cachedFastAddDests.IsCreated)
+                    _cachedFastAddDests.Dispose();
+                if (_cachedFastAddGroupDestStartIdx.IsCreated)
+                    _cachedFastAddGroupDestStartIdx.Dispose();
                 // Per-set deferred bags are disposed by SetStore.
 
                 _eventsManager.Dispose();
@@ -353,11 +401,9 @@ namespace Trecs.Internal
                 _entitiesQuerier._entityLocator.Dispose();
 
                 _cachedSortedDescendingRemoveIndices.Dispose();
-                _removalsScratch.Dispose();
-                _swapsScratch.Dispose();
-
-                TrecsAssert.That(_submitCompleteEvent.NumObservers == 0);
-                TrecsAssert.That(_submitStartedEvent.NumObservers == 0);
+                _cachedRemoveIndicesSubmissionOrderNative.Dispose();
+                _cachedDeferredHandleFrees.Dispose();
+                _cachedTailSlotByOriginalSlot.Dispose();
 
 #if DEBUG && !TRECS_IS_PROFILING
                 _initTracker.Clear();
@@ -454,7 +500,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal DenseDictionary<ComponentId, IComponentArray> GetDBGroup(GroupIndex fromIdGroupId)
+        internal DenseDictionary<TypeId, IComponentArray> GetDBGroup(GroupIndex fromIdGroupId)
         {
             return _componentStore.GetDBGroup(fromIdGroupId);
         }
@@ -627,17 +673,30 @@ namespace Trecs.Internal
             // eliminating chain resolution. The plan is identical for all component types
             // since they are parallel arrays of the same length.
             var sortedIndices = ecsRoot._cachedSortedDescendingRemoveIndices;
+            var submissionOrderNative = ecsRoot._cachedRemoveIndicesSubmissionOrderNative;
             sortedIndices.Clear();
+            submissionOrderNative.Clear();
             for (int i = 0; i < entityHandlesToRemove.Count; i++)
             {
-                sortedIndices.Add(entityHandlesToRemove[i]);
+                var idx = entityHandlesToRemove[i];
+                sortedIndices.Add(idx);
+                submissionOrderNative.Add(idx);
             }
 
             var originalCount = GetGroupEntityCount(fromGroupDictionary);
 
             using (TrecsProfiling.Start("Remove Sort+Plan"))
             {
-                SortDescending(sortedIndices);
+                // Burst the sort itself (NativeList<int> with a descending
+                // comparer); leave the swap-back plan in managed code because
+                // its output map must preserve insertion order (chain semantics
+                // for scattered-removal swap-backs and the Move pipeline's
+                // chain-following). DenseDictionary preserves insertion order
+                // on iteration; NativeHashMap does not, so a native swap-back
+                // map would have to be a NativeList<int2> with a sidecar
+                // hashmap for the Move-side lookups — bigger lift than this
+                // phase intends.
+                new SortIntsDescendingJob { Indices = sortedIndices }.Run();
 
                 ecsRoot._transientEntityIDsAffectedByRemoveAtSwapBack.Recycle();
                 ComputeSwapBackPlanDescending(
@@ -778,7 +837,7 @@ namespace Trecs.Internal
             var postRemoveCount = originalCount - numRemovals;
             using (TrecsProfiling.Start("Remove Refs"))
             {
-                var locator = ecsRoot._entitiesQuerier._entityLocator;
+                ref var locator = ref ecsRoot._entitiesQuerier._entityLocator;
 
                 // Build (originalSlot → tailSlot) so we can capture in
                 // entityHandlesToRemove (submission) order. This bridge
@@ -799,19 +858,17 @@ namespace Trecs.Internal
                 // recording on the first multi-entity remove. The dict +
                 // submission-order capture preserves the pre-spike
                 // BatchRemoveEntityHandles ordering exactly.
-                var tailMap = ecsRoot._cachedTailSlotByOriginalSlot;
-                tailMap.Recycle();
-                for (int i = 0; i < numRemovals; i++)
-                {
-                    tailMap[sortedIndices[i]] = originalCount - 1 - i;
-                }
-
-                // (a) Clear-and-capture in submission order.
-                var deferredBaseCount = ecsRoot._cachedDeferredHandleFrees.Count;
+                // (a) Clear-and-capture in submission order. The tailMap
+                // populate is fused into the Burst job (RemoveRefsCaptureJob)
+                // so it runs hot in cache adjacent to the per-entity capture
+                // loop instead of as a separate managed pass.
+                var deferredBaseCount = ecsRoot._cachedDeferredHandleFrees.Length;
                 locator.BatchClearAndCaptureRemovedHandles(
-                    entityHandlesToRemove,
+                    submissionOrderNative,
+                    sortedIndices,
+                    originalCount,
                     fromGroup,
-                    tailMap,
+                    ecsRoot._cachedTailSlotByOriginalSlot,
                     ecsRoot._cachedDeferredHandleFrees
                 );
 
@@ -842,10 +899,10 @@ namespace Trecs.Internal
         // back down to its post-remove count.
         static void FinalizeDeferredHandleFrees(EntitySubmitter ecsRoot)
         {
-            var locator = ecsRoot._entitiesQuerier._entityLocator;
+            ref var locator = ref ecsRoot._entitiesQuerier._entityLocator;
 
             var frees = ecsRoot._cachedDeferredHandleFrees;
-            for (int i = 0; i < frees.Count; i++)
+            for (int i = 0; i < frees.Length; i++)
             {
                 var entry = frees[i];
                 locator.FreeHandleAtTailSlot(entry.Group, entry.Id, entry.TailSlot);
@@ -866,6 +923,9 @@ namespace Trecs.Internal
         /// <summary>
         /// Compute the swap-back mapping for removals processed in descending index order.
         /// For each removal, the entity at the current last index swaps into the removed slot.
+        /// Insertion order is preserved on iteration (consumer
+        /// <see cref="Trecs.Internal.EntityHandleMap.BatchUpdateIndexAfterSwapBack"/>
+        /// depends on it for chains).
         /// </summary>
         static void ComputeSwapBackPlanDescending(
             NativeList<int> sortedDescendingIndices,
@@ -932,48 +992,33 @@ namespace Trecs.Internal
                     // _cachedRangeOfSubmittedIndices per group reaching this
                     // point. A divergence here would silently misalign the
                     // enumerator with the wrong group's range; fail loud.
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         fromGroupDictionary.Count > 0,
                         "FireRemoveCallbacks invariant broken: group {0} has pending removes but no component types",
                         group
                     );
 
                     var advanced = rangeEnumerator.MoveNext();
-                    TrecsAssert.That(advanced);
+                    TrecsDebugAssert.That(advanced);
 
                     if (
                         ecsRoot._eventsManager.ReactiveOnRemovedObservers.TryGetValue(
                             group,
-                            out var groupRemovedObservers
+                            out var groupRemovedSubject
                         )
                     )
                     {
-                        for (var k = 0; k < groupRemovedObservers.Count; k++)
-                        {
-                            groupRemovedObservers[k].Observer(group, rangeEnumerator.Current);
-                        }
+                        groupRemovedSubject.Invoke(rangeEnumerator.Current);
                     }
                 }
             }
-        }
-
-        static void SortDescending(NativeList<int> list)
-        {
-            list.Sort(new DescendingIntComparer());
-        }
-
-        struct DescendingIntComparer : IComparer<int>
-        {
-            public int Compare(int a, int b) => b.CompareTo(a);
         }
 
         /// <summary>
         /// Get the entity count for a group from any of its component arrays
         /// (all component types are parallel arrays with the same count).
         /// </summary>
-        static int GetGroupEntityCount(
-            DenseDictionary<ComponentId, IComponentArray> groupDictionary
-        )
+        static int GetGroupEntityCount(DenseDictionary<TypeId, IComponentArray> groupDictionary)
         {
             foreach (var (_, componentArray) in groupDictionary)
             {
@@ -984,7 +1029,7 @@ namespace Trecs.Internal
         }
 
         static void MoveEntities(
-            DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>>[] moveEntitiesOperations,
+            DenseDictionary<GroupIndex, FastList<MoveInfoEntry>>[] moveEntitiesOperations,
             DenseDictionary<EntityIndex, (EntityIndex, GroupIndex)> entitiesIdSwaps,
             EntitySubmitter ecsRoot
         )
@@ -1009,7 +1054,7 @@ namespace Trecs.Internal
                         ecsRoot._transientEntityIDsAffectedByRemoveAtSwapBack.Recycle();
                     }
 
-                    DenseDictionary<ComponentId, IComponentArray> fromGroupDictionary =
+                    DenseDictionary<TypeId, IComponentArray> fromGroupDictionary =
                         ecsRoot.GetDBGroup(fromGroup);
 
                     var sourceCount = GetGroupEntityCount(fromGroupDictionary);
@@ -1079,17 +1124,17 @@ namespace Trecs.Internal
         /// the component-type loop can skip chain resolution entirely.
         /// </summary>
         static void PrecomputeMoveResolvedIndices(
-            DenseDictionary<int, MoveInfo> fromEntityToEntityIDs,
+            FastList<MoveInfoEntry> fromEntityToEntityIDs,
             ref int sourceCount,
             DenseDictionary<int, int> swapBackDict
         )
         {
-            var keys = fromEntityToEntityIDs.UnsafeKeys;
-            var values = fromEntityToEntityIDs.UnsafeValues;
+            var entries = fromEntityToEntityIDs._buffer;
+            var count = fromEntityToEntityIDs._count;
 
-            for (int i = 0; i < fromEntityToEntityIDs.Count; i++)
+            for (int i = 0; i < count; i++)
             {
-                var originalIndex = keys[i].key;
+                var originalIndex = entries[i].EntityIndex;
 
                 // Resolve chain: follow swap-back entries to find where this entity actually is
                 var resolvedIndex = originalIndex;
@@ -1098,7 +1143,7 @@ namespace Trecs.Internal
                     resolvedIndex = updated;
                 }
 
-                values[i].ResolvedFromIndex = resolvedIndex;
+                entries[i].Info.ResolvedFromIndex = resolvedIndex;
 
                 // Record swap-back for subsequent entities
                 sourceCount--;
@@ -1112,14 +1157,14 @@ namespace Trecs.Internal
         static void ExecuteMoveForToGroup(
             GroupIndex fromGroup,
             GroupIndex toGroup,
-            DenseDictionary<int, MoveInfo> fromEntityToEntityIDs,
-            DenseDictionary<ComponentId, IComponentArray> fromGroupDictionary,
+            FastList<MoveInfoEntry> fromEntityToEntityIDs,
+            DenseDictionary<TypeId, IComponentArray> fromGroupDictionary,
             EntitySubmitter ecsRoot
         )
         {
             var numEntities = fromEntityToEntityIDs.Count;
 #if DEBUG && TRECS_INTERNAL_CHECKS
-            TrecsAssert.That(numEntities > 0, "something went wrong, no entities to swap");
+            TrecsDebugAssert.That(numEntities > 0, "something went wrong, no entities to swap");
 #endif
 
             var toGroupDB = ecsRoot.GetDBGroup(toGroup);
@@ -1149,7 +1194,7 @@ namespace Trecs.Internal
                         fromComponentsDictionaryDB
                     );
 
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         toComponentsDictionaryDB != null,
                         "something went wrong with the creation of dictionaries"
                     );
@@ -1164,7 +1209,7 @@ namespace Trecs.Internal
 
                     if (toGroupIndexRange.HasValue)
                     {
-                        TrecsAssert.That(toGroupIndexRange.Value == componentIndexRange);
+                        TrecsDebugAssert.That(toGroupIndexRange.Value == componentIndexRange);
                     }
                     else
                     {
@@ -1187,17 +1232,17 @@ namespace Trecs.Internal
 
                 // Build resolved indices array for the Burst job
                 var resolvedFromIndices = new NativeArray<int>(numEntities, Allocator.TempJob);
-                var swapValues = fromEntityToEntityIDs.UnsafeValues;
+                var swapEntries = fromEntityToEntityIDs._buffer;
                 for (int i = 0; i < numEntities; i++)
                 {
-                    resolvedFromIndices[i] = swapValues[i].ResolvedFromIndex;
+                    resolvedFromIndices[i] = swapEntries[i].Info.ResolvedFromIndex;
                 }
 
                 // Pre-set toIndex on MoveInfo (sequential from destBase, known before data movement)
                 var destBase = toGroupIndexRange.Value.Start;
                 for (int i = 0; i < numEntities; i++)
                 {
-                    swapValues[i].ToIndex = destBase + i;
+                    swapEntries[i].Info.ToIndex = destBase + i;
                 }
 
                 // Phase 2: Burst job(s) for data movement
@@ -1251,7 +1296,7 @@ namespace Trecs.Internal
                     ecsRoot._cachedDstArrays[ci].SetCount(dstBaseCounts[ci] + numEntities);
                 }
 
-                TrecsAssert.That(toGroupIndexRange.HasValue);
+                TrecsDebugAssert.That(toGroupIndexRange.HasValue);
                 ecsRoot._cachedRangeOfSubmittedIndices.Add(toGroupIndexRange.Value);
 
                 srcPtrs.Dispose();
@@ -1289,7 +1334,7 @@ namespace Trecs.Internal
 
         static void FireMoveCallbacks(
             GroupIndex fromGroup,
-            DenseDictionary<GroupIndex, DenseDictionary<int, MoveInfo>> toGroupMoveInfos,
+            DenseDictionary<GroupIndex, FastList<MoveInfoEntry>> toGroupMoveInfos,
             EntitySubmitter ecsRoot
         )
         {
@@ -1303,20 +1348,16 @@ namespace Trecs.Internal
                         continue;
 
                     var advanced = rangeEnumerator.MoveNext();
-                    TrecsAssert.That(advanced);
+                    TrecsDebugAssert.That(advanced);
 
                     if (
                         ecsRoot._eventsManager.ReactiveOnMovedObservers.TryGetValue(
                             toGroup,
-                            out var groupSwappedObservers
+                            out var groupSwappedSubject
                         )
                     )
                     {
-                        for (var i = 0; i < groupSwappedObservers.Count; i++)
-                        {
-                            groupSwappedObservers[i]
-                                .Observer(fromGroup, toGroup, rangeEnumerator.Current);
-                        }
+                        groupSwappedSubject.Invoke(fromGroup, rangeEnumerator.Current);
                     }
                 }
             }
@@ -1372,7 +1413,9 @@ namespace Trecs.Internal
 
                                     if (addedIndices.HasValue)
                                     {
-                                        TrecsAssert.That(addedIndices == componentAddedIndices);
+                                        TrecsDebugAssert.That(
+                                            addedIndices == componentAddedIndices
+                                        );
                                     }
                                     else
                                     {
@@ -1383,7 +1426,7 @@ namespace Trecs.Internal
                                     fromDictionary.AddEntitiesToDictionary(toDictionary, groupId);
                                 }
 
-                                TrecsAssert.That(addedIndices.HasValue);
+                                TrecsDebugAssert.That(addedIndices.HasValue);
 
                                 // Now that entities are in the DB, set up EntityHandleMap with correct DB indices
                                 if (
@@ -1427,20 +1470,16 @@ namespace Trecs.Internal
                                 var groupDB = GetDBGroup(groupId);
 
                                 var advanced = enumerator.MoveNext();
-                                TrecsAssert.That(advanced);
+                                TrecsDebugAssert.That(advanced);
 
                                 if (
                                     _eventsManager.ReactiveOnAddedObservers.TryGetValue(
                                         groupId,
-                                        out var groupAddedObservers
+                                        out var groupAddedSubject
                                     )
                                 )
                                 {
-                                    for (var i = 0; i < groupAddedObservers.Count; i++)
-                                    {
-                                        groupAddedObservers[i]
-                                            .Observer(groupId, enumerator.Current);
-                                    }
+                                    groupAddedSubject.Invoke(enumerator.Current);
                                 }
                             }
                         }
@@ -1457,7 +1496,7 @@ namespace Trecs.Internal
             }
         }
 
-        // Drives the cascade loop in SubmitEntitiesImpl: returns true while
+        // Drives the cascade loop in SubmitImpl: returns true while
         // there's still entity-level work to apply. Deferred set ops
         // (Set<T>().DeferredAdd / .DeferredRemove / .DeferredClear) are intentionally excluded here.
         // They get drained by FlushAllDeferredOps at the end of each loop
@@ -1480,17 +1519,12 @@ namespace Trecs.Internal
             if (
                 _eventsManager.ReactiveOnRemovedObservers.TryGetValue(
                     groupId,
-                    out var groupRemovedObservers
+                    out var groupRemovedSubject
                 )
             )
             {
                 var count = _entitiesQuerier.CountEntitiesInGroup(groupId);
-                var rangeValues = new EntityRange(0, count);
-
-                for (var i = 0; i < groupRemovedObservers.Count; i++)
-                {
-                    groupRemovedObservers[i].Observer(groupId, rangeValues);
-                }
+                groupRemovedSubject.Invoke(new EntityRange(0, count));
             }
 
             var dictionariesOfEntities = _componentStore.GroupEntityComponentsDB[groupId.Index];
@@ -1503,8 +1537,8 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void SwapEntitiesBetweenGroups(GroupIndex fromGroupId, GroupIndex toGroupId)
         {
-            DenseDictionary<ComponentId, IComponentArray> fromGroup = GetDBGroup(fromGroupId);
-            DenseDictionary<ComponentId, IComponentArray> toGroup = GetDBGroup(toGroupId);
+            DenseDictionary<TypeId, IComponentArray> fromGroup = GetDBGroup(fromGroupId);
+            DenseDictionary<TypeId, IComponentArray> toGroup = GetDBGroup(toGroupId);
 
             _entitiesQuerier._entityLocator.UpdateAllGroupReferenceLocators(fromGroupId, toGroupId);
 
@@ -1527,17 +1561,12 @@ namespace Trecs.Internal
             if (
                 _eventsManager.ReactiveOnMovedObservers.TryGetValue(
                     toGroupId,
-                    out var groupSwappedObservers
+                    out var groupSwappedSubject
                 )
             )
             {
                 var count = _entitiesQuerier.CountEntitiesInGroup(fromGroupId);
-                var rangeValues = new EntityRange(0, count);
-
-                for (var i = 0; i < groupSwappedObservers.Count; i++)
-                {
-                    groupSwappedObservers[i].Observer(fromGroupId, toGroupId, rangeValues);
-                }
+                groupSwappedSubject.Invoke(fromGroupId, new EntityRange(0, count));
             }
 
             //remove entities from dictionaries
@@ -1550,8 +1579,8 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         IComponentArray GetOrAddTypeSafeDictionary(
             GroupIndex groupId,
-            DenseDictionary<ComponentId, IComponentArray> groupPerComponentType,
-            ComponentId typeId,
+            DenseDictionary<TypeId, IComponentArray> groupPerComponentType,
+            TypeId typeId,
             IComponentArray fromDictionary
         )
         {
@@ -1563,30 +1592,49 @@ namespace Trecs.Internal
             );
         }
 
-        internal NativeWorldAccessor ProvideNativeWorldAccessor(
+        internal unsafe NativeWorldAccessor ProvideNativeWorldAccessor(
             int accessorId,
-            bool canMakeStructuralChanges,
+            bool canMutateSimulation,
             float deltaTime,
             float elapsedTime
         )
         {
             var flags = NativeWorldAccessorFlags.None;
-            if (canMakeStructuralChanges)
-                flags |= NativeWorldAccessorFlags.AllowStructuralChanges;
-            if (_trecsSettings.RequireDeterministicSubmission)
-                flags |= NativeWorldAccessorFlags.RequireDeterministicIds;
+            if (canMutateSimulation)
+                flags |= NativeWorldAccessorFlags.AllowSimulationMutation;
+
+            // Stamp the chunk-store resolver with the same role bit so the Burst-job
+            // Write paths reachable through it (TrecsList.Write, NativeUniquePtr.Write)
+            // reject Variable-role callers at Open time. Reads stay unaffected.
+            var chunkStoreResolver = new NativeChunkStoreResolver(
+                in _nativeUniqueChunkStore.Resolver,
+                canMutateHeap: canMutateSimulation
+            );
+
+            var layouts = _worldInfo.ComponentLayouts;
+            var headersPtr = (NativeTemplateLayoutHeader*)
+                NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(layouts.Headers);
+            var entriesPtr = (NativeComponentLayoutEntry*)
+                NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(layouts.Entries);
+
+            var fastAdd = new FastAddNativeInfo(
+                _perGroupAddBags,
+                _worldInfo.TagSetIdToGroupNative,
+                headersPtr,
+                entriesPtr,
+                layouts.TypeIdToCi
+            );
 
             return new NativeWorldAccessor(
-                _nativeAddOperationQueue,
                 _nativeMoveOperationQueue,
                 _nativeRemoveOperationQueue,
                 accessorId,
                 _entitiesQuerier._entityLocator,
                 flags,
                 _nativeSharedHeap.Resolver,
-                _nativeUniqueHeap.Resolver,
-                _trecsListHeap.Resolver,
+                chunkStoreResolver,
                 _setStore.DeferredQueues,
+                fastAdd,
                 deltaTime,
                 elapsedTime
             );
@@ -1595,42 +1643,6 @@ namespace Trecs.Internal
         internal NativeArray<EntityHandle> BatchClaimIds(int count, Allocator allocator)
         {
             return _entitiesQuerier._entityLocator.BatchClaimIds(count, allocator);
-        }
-
-        static TagSet DequeueTagSet(ref NativeBag buffer)
-        {
-            var tagCount = buffer.Dequeue<int>();
-
-            if (tagCount == -1)
-                return new TagSet(buffer.Dequeue<int>());
-
-            switch (tagCount)
-            {
-                case 1:
-                    return TagSet.FromTags(new Tag(buffer.Dequeue<int>()));
-                case 2:
-                    return TagSet.FromTags(
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>())
-                    );
-                case 3:
-                    return TagSet.FromTags(
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>())
-                    );
-                case 4:
-                    return TagSet.FromTags(
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>()),
-                        new Tag(buffer.Dequeue<int>())
-                    );
-                default:
-                    throw new TrecsException(
-                        $"Unexpected tag count {tagCount} in native operation queue"
-                    );
-            }
         }
 
         // Per-entity coalescing state used in FlushNativeOperations. Accumulates
@@ -1680,7 +1692,7 @@ namespace Trecs.Internal
                             ? _extraContribListPool.Pop()
                             : new FastList<int>();
 #if DEBUG && TRECS_INTERNAL_CHECKS
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         extras.Count == 0,
                         "Pooled FastList<int> popped with stale Count={0} — recycle path failed to Clear()",
                         extras.Count
@@ -1692,7 +1704,7 @@ namespace Trecs.Internal
             }
 
             if (!p.Template.TryGetDimForTag(tag, out var dimIdx, out var dim))
-                throw TrecsAssert.CreateException(
+                throw TrecsDebugAssert.CreateException(
                     "Tag {0} is not part of any partition dimension on template {1}",
                     tag,
                     p.Template.DebugName
@@ -1702,7 +1714,7 @@ namespace Trecs.Internal
             // ResolvedTemplate.BuildDimensionCaches — no runtime check needed.
             ulong bit = 1UL << dimIdx;
             if ((p.TouchedDimsMask & bit) != 0)
-                throw TrecsAssert.CreateException(
+                throw TrecsDebugAssert.CreateException(
                     "Multiple SetTag/UnsetTag calls on the same partition dimension for entity in group {0} (last tag: {1}). Within one submission an entity can have at most one structural change per dimension — combine them into a single op or coordinate across systems.",
                     from.GroupIndex,
                     tag
@@ -1718,7 +1730,7 @@ namespace Trecs.Internal
             else
             {
                 if (dim.Tags.Count != 1)
-                    throw TrecsAssert.CreateException(
+                    throw TrecsDebugAssert.CreateException(
                         "Cannot UnsetTag<{0}>: it is a variant in a multi-variant dimension on template {1}. Use SetTag to switch variants.",
                         tag,
                         p.Template.DebugName
@@ -1729,7 +1741,7 @@ namespace Trecs.Internal
 #if DEBUG && TRECS_INTERNAL_CHECKS
             // Catch XOR-math bugs and tag-guid collisions at the source rather
             // than as a downstream miss in GetSingleGroupWithTags.
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 p.Template.IsRegisteredGroupTagSet(p.FinalTagSet),
                 "Coalesced FinalTagSet {0} is not a registered GroupTagSet of template {1} — XOR-direct dim math produced an unregistered id",
                 p.FinalTagSet,
@@ -1742,7 +1754,7 @@ namespace Trecs.Internal
         {
             return HasAnyNonEmpty(_nativeRemoveOperationQueue)
                 || HasAnyNonEmpty(_nativeMoveOperationQueue)
-                || HasAnyNonEmpty(_nativeAddOperationQueue)
+                || HasAnyFastAddSlots(_perGroupAddBags)
                 || _managedTagOps.Count > 0;
 
             static bool HasAnyNonEmpty(AtomicNativeBags queue)
@@ -1751,6 +1763,21 @@ namespace Trecs.Internal
                 {
                     if (!queue.GetBag(i).IsEmpty)
                         return true;
+                }
+                return false;
+            }
+
+            static bool HasAnyFastAddSlots(PerGroupAddBags bags)
+            {
+                int threads = bags.ThreadSlotCount;
+                int groups = bags.GroupCount;
+                for (int t = 0; t < threads; t++)
+                {
+                    for (int g = 0; g < groups; g++)
+                    {
+                        if (bags.GetCell(t, g).Length > 0)
+                            return true;
+                    }
                 }
                 return false;
             }
@@ -1797,11 +1824,22 @@ namespace Trecs.Internal
                     }
                 }
 
-                if (_trecsSettings.RequireDeterministicSubmission)
+                using (TrecsProfiling.Start("NatRemove Sort"))
                 {
-                    using (TrecsProfiling.Start("NatRemove Sort"))
+                    var removalsBuf = removals.ToArrayFast(out var removalsCount);
+                    if (removalsCount > 0)
                     {
-                        removals.Sort();
+                        unsafe
+                        {
+                            fixed ((EntityIndex, int)* ptr = &removalsBuf[0])
+                            {
+                                new SortRemovalsJob
+                                {
+                                    Ptr = (long)ptr,
+                                    Count = removalsCount,
+                                }.Run();
+                            }
+                        }
                     }
                 }
 
@@ -1866,39 +1904,83 @@ namespace Trecs.Internal
                 var swaps = _swapsScratch;
                 swaps.Clear();
 
-                foreach (var kvp in _pendingChanges)
+                using (TrecsProfiling.Start("NatSwap Coalesce"))
                 {
-                    var from = kvp.Key;
-                    ref var p = ref kvp.Value;
-                    var toGroup = _worldInfo.GetSingleGroupWithTags(p.FinalTagSet);
+                    // Direct array iteration — DenseDictionary's enumerator
+                    // builds a KvPair per step and runs a version-check in
+                    // DEBUG, both of which add measurable overhead at the
+                    // 100k+ swap shape.
+                    int pendingCount = _pendingChanges.Count;
+                    var pendingKeys = _pendingChanges.UnsafeKeys;
+                    var pendingValues = _pendingChanges.UnsafeValues;
 
-                    // Skip if every touched dim's net change was a no-op (e.g.
-                    // SetTag<T> when T was already this dim's active variant).
-                    if (toGroup == from.GroupIndex)
-                        continue;
+                    // 1-entry lookup cache for FinalTagSet → GroupIndex. The
+                    // structural-swap workloads we care about typically funnel
+                    // every entity into one of a handful of target groups
+                    // (often just two for partition flips), so the entries
+                    // that follow each other in insertion order tend to share
+                    // a destination. A single-slot cache avoids the per-entry
+                    // Dictionary<TagSet, TagSetInfo> lookup inside
+                    // GetSingleGroupWithTags on every hit.
+                    TagSet cachedTagSet = TagSet.Null;
+                    GroupIndex cachedToGroup = default;
 
-                    _log.Trace(
-                        "Coalesced move: entity {0} from group {1} to {2}",
-                        from.Index,
-                        from.GroupIndex,
-                        toGroup
-                    );
+                    // Pre-grow the swap buffer once and write via direct array
+                    // index — bypasses the per-element capacity check in
+                    // FastList.Add. Hoist the recorder null check too;
+                    // the recorder is opt-in dev tooling.
+                    swaps.EnsureCapacity(pendingCount);
+                    var swapsBuf = swaps._buffer;
+                    int swapsCount = 0;
+                    bool hasRecorder = _accessRecorder != null;
 
-                    swaps.Add((from, toGroup, p.PrimaryAccessorId));
-
-                    if (_accessRecorder != null)
+                    for (int i = 0; i < pendingCount; i++)
                     {
-                        // Primary contributor first, then any extras tracked while
-                        // the recorder was active. Each accessor that contributed
-                        // to the final coalesced move gets one OnEntityMoved event.
+                        var from = pendingKeys[i].Key;
+                        ref var p = ref pendingValues[i];
+
+                        GroupIndex toGroup;
+                        if (p.FinalTagSet == cachedTagSet)
+                        {
+                            toGroup = cachedToGroup;
+                        }
+                        else
+                        {
+                            toGroup = _worldInfo.GetSingleGroupWithTags(p.FinalTagSet);
+                            cachedTagSet = p.FinalTagSet;
+                            cachedToGroup = toGroup;
+                        }
+
+                        // Skip if every touched dim's net change was a no-op
+                        // (e.g. SetTag<T> when T was already this dim's
+                        // active variant).
+                        if (toGroup == from.GroupIndex)
+                            continue;
+
+                        _log.Trace(
+                            "Coalesced move: entity {0} from group {1} to {2}",
+                            from.Index,
+                            from.GroupIndex,
+                            toGroup
+                        );
+
+                        swapsBuf[swapsCount++] = (from, toGroup, p.PrimaryAccessorId);
+
+                        if (!hasRecorder)
+                            continue;
+
+                        // Primary contributor first, then any extras tracked
+                        // while the recorder was active. Each accessor that
+                        // contributed to the final coalesced move gets one
+                        // OnEntityMoved event.
                         var primary = _accessorRegistry.GetAccessorById(p.PrimaryAccessorId);
                         _accessRecorder.OnEntityMoved(primary.DebugName, from.GroupIndex, toGroup);
                         if (_pendingExtraContributors.TryGetValue(from, out var extras))
                         {
                             int extrasCount = extras.Count;
-                            for (int i = 0; i < extrasCount; i++)
+                            for (int ix = 0; ix < extrasCount; ix++)
                             {
-                                var accessor = _accessorRegistry.GetAccessorById(extras[i]);
+                                var accessor = _accessorRegistry.GetAccessorById(extras[ix]);
                                 _accessRecorder.OnEntityMoved(
                                     accessor.DebugName,
                                     from.GroupIndex,
@@ -1907,33 +1989,52 @@ namespace Trecs.Internal
                             }
                         }
                     }
+                    swaps._count = swapsCount;
                 }
 
-                _pendingChanges.Recycle();
+                using (TrecsProfiling.Start("NatSwap Cleanup"))
+                {
+                    _pendingChanges.Recycle();
 #if DEBUG && TRECS_INTERNAL_CHECKS
-                // No-recorder path should never deposit extras; if it did, the
-                // dict would silently leak entries across submissions.
-                TrecsAssert.That(
-                    _accessRecorder != null || _pendingExtraContributors.Count == 0,
-                    "_pendingExtraContributors has {0} entries but _accessRecorder is null — extras leaked into the no-recorder path",
-                    _pendingExtraContributors.Count
-                );
+                    // No-recorder path should never deposit extras; if it did, the
+                    // dict would silently leak entries across submissions.
+                    TrecsDebugAssert.That(
+                        _accessRecorder != null || _pendingExtraContributors.Count == 0,
+                        "_pendingExtraContributors has {0} entries but _accessRecorder is null — extras leaked into the no-recorder path",
+                        _pendingExtraContributors.Count
+                    );
 #endif
-                // Return each per-entity FastList to the pool, then recycle the
-                // outer dict. Empty in the typical case (no recorder, or recorder
-                // with single-accessor entities).
-                foreach (var kvp in _pendingExtraContributors)
-                {
-                    kvp.Value.Clear();
-                    _extraContribListPool.Push(kvp.Value);
-                }
-                _pendingExtraContributors.Recycle();
-
-                if (_trecsSettings.RequireDeterministicSubmission)
-                {
-                    using (TrecsProfiling.Start("NatSwap Sort"))
+                    // Return each per-entity FastList to the pool, then recycle the
+                    // outer dict. Empty in the typical case (no recorder, or recorder
+                    // with single-accessor entities).
+                    foreach (var kvp in _pendingExtraContributors)
                     {
-                        swaps.Sort();
+                        kvp.Value.Clear();
+                        _extraContribListPool.Push(kvp.Value);
+                    }
+                    _pendingExtraContributors.Recycle();
+                }
+
+                using (TrecsProfiling.Start("NatSwap Sort"))
+                {
+                    var swapsBuf = swaps.ToArrayFast(out var swapsCount);
+                    // Sort the FastList's backing array in place via a
+                    // Burst-compiled IJob. .Run() executes synchronously on
+                    // the main thread but routes through Burst's AOT code,
+                    // which beats IL2CPP-generated managed calls on the
+                    // generic-struct-comparer introsort. EntityIndex is
+                    // unique post-coalesce so the secondary keys are
+                    // unreachable, but the comparer keeps them as defensive
+                    // tie-breakers.
+                    if (swapsCount > 0)
+                    {
+                        unsafe
+                        {
+                            fixed ((EntityIndex, GroupIndex, int)* ptr = &swapsBuf[0])
+                            {
+                                new SortSwapsJob { Ptr = (long)ptr, Count = swapsCount }.Run();
+                            }
+                        }
                     }
                 }
 
@@ -1957,153 +2058,226 @@ namespace Trecs.Internal
                         CheckMoveEntityHandle(fromEntityIndex, toGroup, cachedTemplate.DebugName);
                     }
 #endif
-                    _entitiesOperations.QueueNativeMoveOperations(swaps, _worldInfo);
+                    // _removalsScratch is the same list NatRemove Queue saw —
+                    // sorted by EntityIndex.CompareTo, still untouched since
+                    // NatRemove Queue returned. QueueNativeMoveOperations walks
+                    // it in lockstep with sortedSwaps to gate "remove
+                    // supersedes swap" without a per-swap hashset probe.
+                    _entitiesOperations.QueueNativeMoveOperations(
+                        swaps,
+                        _removalsScratch,
+                        _worldInfo
+                    );
                 }
             }
 
-            //todo: it feels weird that these builds in the transient entities database while it could build directly to the final one
             using (TrecsProfiling.Start("Native Add Operations"))
             {
-                var requireDeterministicAdds = _trecsSettings.RequireDeterministicSubmission;
-
-                using (TrecsProfiling.Start("NatAdd Dequeue+Build"))
+                using (TrecsProfiling.Start("FastAdd Drain"))
                 {
-                    // Cache group dict + per-component arrays to avoid redundant dictionary
-                    // lookups for consecutive entities in the same group (common pattern).
-                    GroupIndex cachedAddGroup = default;
-                    DenseDictionary<ComponentId, IComponentArray> cachedGroupDict = null;
-                    IComponentBuilder[] cachedComponents = null;
-                    var cachedComponentArrays = _cachedNativeAddComponentArrays;
-
-                    var addBuffersCount = _nativeAddOperationQueue.ThreadSlotCount;
-                    for (int i = 0; i < addBuffersCount; i++)
-                    {
-                        ref var buffer = ref _nativeAddOperationQueue.GetBag(i);
-                        while (!buffer.IsEmpty)
-                        {
-                            // accessorId is always present for adds (needed for deterministic composite sort key)
-                            var accessorId = buffer.Dequeue<int>();
-                            var tagSet = DequeueTagSet(ref buffer);
-                            var group = _worldInfo.GetSingleGroupWithTags(tagSet);
-                            var reference = buffer.Dequeue<EntityHandle>();
-                            var sortKey = buffer.Dequeue<uint>();
-                            var componentCounts = buffer.Dequeue<uint>();
-
-                            _log.Trace(
-                                "Adding new entity to group {0} (from native operation)",
-                                group
-                            );
-
-                            if (_accessRecorder != null)
-                            {
-                                var accessor = _accessorRegistry.GetAccessorById(accessorId);
-                                _accessRecorder.OnEntityAdded(accessor.DebugName, group);
-                            }
-
-#if TRECS_INTERNAL_CHECKS && DEBUG
-                            CheckNativeOpsCanAdd(accessorId, group);
-#endif
-
-                            if (group != cachedAddGroup)
-                            {
-                                cachedAddGroup = group;
-                                cachedComponents = _worldInfo
-                                    .GetResolvedTemplateForGroup(group)
-                                    .ComponentBuilders;
-
-                                // Cache the group's component dictionaries
-                                cachedGroupDict =
-                                    _groupedEntityToAdd.GetOrCreateCurrentComponentsForGroup(group);
-
-                                // Cache per-component arrays (avoid GetOrAdd per entity)
-                                if (
-                                    cachedComponentArrays == null
-                                    || cachedComponentArrays.Length < cachedComponents.Length
-                                )
-                                {
-                                    cachedComponentArrays = new IComponentArray[
-                                        cachedComponents.Length
-                                    ];
-                                    _cachedNativeAddComponentArrays = cachedComponentArrays;
-                                }
-
-                                for (int ci = 0; ci < cachedComponents.Length; ci++)
-                                {
-                                    var cb = cachedComponents[ci];
-                                    cachedComponentArrays[ci] = cachedGroupDict.GetOrAdd(
-                                        cb.ComponentId,
-                                        (ref IComponentBuilder builder) =>
-                                            builder.CreateDictionary(1),
-                                        ref cb
-                                    );
-                                }
-                            }
-
-                            // Record native add start index for this group (first time we see it)
-                            if (requireDeterministicAdds)
-                            {
-                                _groupedEntityToAdd.MarkNativeAddStartIfNeeded(
-                                    group,
-                                    cachedComponentArrays[0].Count
-                                );
-                            }
-
-                            // Increment entity count for this group
-                            _groupedEntityToAdd.IncrementEntityCount(group);
-
-                            // Add prototype values to each component array (no dictionary lookups)
-                            for (int ci = 0; ci < cachedComponents.Length; ci++)
-                            {
-                                cachedComponents[ci]
-                                    .BuildEntityAndAddToList(cachedComponentArrays[ci]);
-                            }
-
-                            // Get insertion index from the first component array
-                            int insertionIndex = cachedComponentArrays[0].Count - 1;
-
-                            // Defer SetEntityHandle to submission time
-                            _groupedEntityToAdd.AddPendingReference(group, reference);
-
-                            // Track composite sort key for deterministic ordering
-                            if (requireDeterministicAdds)
-                            {
-                                _groupedEntityToAdd.AddPendingNativeAddSortKey(
-                                    group,
-                                    accessorId,
-                                    sortKey
-                                );
-                            }
-
-                            //only called if Init is called on the initialized (there is something to init)
-                            while (componentCounts > 0)
-                            {
-                                componentCounts--;
-
-                                var typeId = buffer.Dequeue<ComponentId>();
-
-                                IFiller componentBuilder = EntityComponentIdMap.GetBuilderFromId(
-                                    typeId
-                                );
-                                //after the typeId, I expect the serialized component
-                                componentBuilder.FillFromByteArray(
-                                    cachedGroupDict,
-                                    insertionIndex,
-                                    buffer
-                                );
-                            }
-                        }
-                    }
+                    DrainFastAddBags();
                 }
 
                 // Sort native adds by composite sort key for determinism
-                if (requireDeterministicAdds)
+                using (TrecsProfiling.Start("NatAdd Sort"))
                 {
-                    using (TrecsProfiling.Start("NatAdd Sort"))
+                    _groupedEntityToAdd.SortNativeAdds();
+                }
+
+                // Claim ids for fire-and-forget native adds (void-handle
+                // overloads on NativeWorldAccessor) post-sort, so the
+                // assigned ids land in deterministic sort-key order rather
+                // than bag-thread arrival order. Pre-reserved handles are
+                // left as-is.
+                using (TrecsProfiling.Start("NatAdd Claim"))
+                {
+                    _groupedEntityToAdd.ClaimDeferredHandlesForNativeAdds(
+                        ref _entitiesQuerier._entityLocator
+                    );
+                }
+            }
+        }
+
+        // Drains the per-group fast-path AddEntity bags into the
+        // _groupedEntityToAdd transient buffers. The shared NatAdd Sort + Claim
+        // runs immediately after, applying deterministic sort-key ordering and
+        // claiming handles for fire-and-forget adds.
+        //
+        // Slot layout per cell: [FastAddSlotHeader (48 bytes)][componentBytes per template].
+        //
+        // Passes:
+        //   Pass 1a (managed, sequential): pre-sweep to total per-group slot counts.
+        //          Lets Pass 1b resize the slot scratch list exactly once instead
+        //          of per-slot Add() calls (the bounds-check cost dominated at
+        //          high spike sizes).
+        //   Pass 1b (managed, sequential): resize destination component arrays,
+        //          build the flat FastAddFillSlotWork + FastAddComponentDest tables
+        //          that drive the parallel fill job (indexed pointer writes).
+        //   Pass 2  (Burst, parallel):     FastAddFillJob — one iteration per slot,
+        //          decodes the slot header, branches per component on SetMask /
+        //          ZeroDefaultMask, MemCpy / MemClear into the resized component
+        //          arrays.
+        //   Pass 3  (managed, sequential): bookkeeping — AddPendingReference,
+        //          AddPendingNativeAddSortKey, IncrementEntityCount, OnEntityAdded
+        //          recorder hook. Reads slot headers a second time (cells are not
+        //          cleared until after this pass).
+        unsafe void DrainFastAddBags()
+        {
+            var bags = _perGroupAddBags;
+            int groupCount = bags.GroupCount;
+            int threadCount = bags.ThreadSlotCount;
+            var layouts = _worldInfo.ComponentLayouts;
+
+            int headerSize = sizeof(FastAddSlotHeader);
+            bool hasRecorder = _accessRecorder != null;
+
+            // Pass 1a (pre-sweep): tally per-group slot counts so the scratch lists
+            // can be sized exactly once. The previous per-slot _cachedFastAddSlots.Add
+            // pattern hit NativeList's safety-handle bounds check on every append,
+            // which dominated drain time at the 100k+ spike scale.
+            int* slotsPerGroup = stackalloc int[groupCount];
+            int totalSlots = 0;
+            for (int gi = 0; gi < groupCount; gi++)
+            {
+                int slotSize = bags.SlotSize(gi);
+                int totalSlotsForGroup = 0;
+                for (int t = 0; t < threadCount; t++)
+                {
+                    totalSlotsForGroup += bags.GetCell(t, gi).Length / slotSize;
+                }
+                slotsPerGroup[gi] = totalSlotsForGroup;
+                totalSlots += totalSlotsForGroup;
+            }
+
+            _cachedFastAddSlots.Clear();
+            _cachedFastAddDests.Clear();
+            _cachedFastAddGroupDestStartIdx.Clear();
+            _cachedFastAddGroupDestStartIdx.Resize(
+                groupCount,
+                NativeArrayOptions.UninitializedMemory
+            );
+            if (totalSlots == 0)
+                return;
+            _cachedFastAddSlots.Resize(totalSlots, NativeArrayOptions.UninitializedMemory);
+
+            var slotsBase = (FastAddFillSlotWork*)_cachedFastAddSlots.GetUnsafePtr();
+            int slotWriteIdx = 0;
+
+            // Pass 1b: resize destination component arrays, build dest table, and
+            // write fill-work entries via direct indexed pointer writes.
+            for (int gi = 0; gi < groupCount; gi++)
+            {
+                int totalSlotsForGroup = slotsPerGroup[gi];
+                // Record the per-group dest table start index even when the group
+                // is empty — keeps GroupComponentDestStartIdx[gi] always valid.
+                _cachedFastAddGroupDestStartIdx[gi] = _cachedFastAddDests.Length;
+                if (totalSlotsForGroup == 0)
+                    continue;
+
+                int slotSize = bags.SlotSize(gi);
+                var group = GroupIndex.FromIndex(gi);
+                var resolvedTemplate = _worldInfo.GetResolvedTemplateForGroup(group);
+                var components = resolvedTemplate.ComponentBuilders;
+
+                var groupDict = _groupedEntityToAdd.GetOrCreateCurrentComponentsForGroup(group);
+                var componentArrays = _cachedFastAddComponentArrays;
+                if (componentArrays == null || componentArrays.Length < components.Length)
+                {
+                    componentArrays = new IComponentArray[components.Length];
+                    _cachedFastAddComponentArrays = componentArrays;
+                }
+                for (int ci = 0; ci < components.Length; ci++)
+                {
+                    var cb = components[ci];
+                    componentArrays[ci] = groupDict.GetOrAdd(
+                        cb.TypeId,
+                        (ref IComponentBuilder builder) => builder.CreateDictionary(1),
+                        ref cb
+                    );
+                }
+
+                int baseIndex = componentArrays[0].Count;
+                _groupedEntityToAdd.MarkNativeAddStartIfNeeded(group, baseIndex);
+
+                int newCount = baseIndex + totalSlotsForGroup;
+                for (int ci = 0; ci < components.Length; ci++)
+                {
+                    componentArrays[ci].EnsureCapacity(newCount);
+                    componentArrays[ci].SetCount(newCount);
+                    _cachedFastAddDests.Add(
+                        new FastAddComponentDest
+                        {
+                            ArrayPtr = (long)componentArrays[ci].GetUnsafePtr(),
+                            ElementSize = componentArrays[ci].ElementSize,
+                        }
+                    );
+                }
+
+                int destOffsetInGroup = 0;
+                for (int t = 0; t < threadCount; t++)
+                {
+                    int cellLen = bags.GetCell(t, gi).Length;
+                    int slotCount = cellLen / slotSize;
+                    if (slotCount == 0)
+                        continue;
+                    byte* basePtr = bags.GetCell(t, gi).Ptr;
+                    for (int s = 0; s < slotCount; s++)
                     {
-                        _groupedEntityToAdd.SortNativeAdds();
+                        slotsBase[slotWriteIdx++] = new FastAddFillSlotWork
+                        {
+                            SlotPtr = (long)(basePtr + s * slotSize),
+                            DestIdx = baseIndex + destOffsetInGroup,
+                            GroupIdx = gi,
+                        };
+                        destOffsetInGroup++;
                     }
                 }
             }
+
+            TrecsDebugAssert.That(slotWriteIdx == totalSlots);
+
+            // Pass 2: parallel Burst fill.
+            var job = new FastAddFillJob
+            {
+                Slots = _cachedFastAddSlots.AsArray(),
+                LayoutHeaders = layouts.Headers,
+                LayoutEntries = layouts.Entries,
+                ComponentDests = _cachedFastAddDests.AsArray(),
+                GroupComponentDestStartIdx = _cachedFastAddGroupDestStartIdx.AsArray(),
+                DefaultBytesBase = (long)layouts.DefaultBytes.GetUnsafeReadOnlyPtr(),
+                HeaderSize = headerSize,
+            };
+            // Batch size tuned for ~10ns per Execute call. Larger batches dilute
+            // worker scheduling overhead; smaller batches improve load balance
+            // when work-per-slot varies (it doesn't much here, so larger is fine).
+            const int batchSize = 256;
+            job.Schedule(totalSlots, batchSize).Complete();
+
+            // Pass 3: sequential bookkeeping. Walks the same slots in the same
+            // order they were enqueued, so AddPendingReference/sortKey ordering
+            // matches the destination buffer write order from Pass 2.
+            for (int i = 0; i < totalSlots; i++)
+            {
+                var work = _cachedFastAddSlots[i];
+                var hdr = (FastAddSlotHeader*)work.SlotPtr;
+                var group = GroupIndex.FromIndex(work.GroupIdx);
+                int accessorId = hdr->AccessorId;
+
+#if TRECS_INTERNAL_CHECKS && DEBUG
+                CheckNativeOpsCanAdd(accessorId, group);
+#endif
+                if (hasRecorder)
+                {
+                    var accessor = _accessorRegistry.GetAccessorById(accessorId);
+                    _accessRecorder.OnEntityAdded(accessor.DebugName, group);
+                }
+
+                _groupedEntityToAdd.IncrementEntityCount(group);
+                _groupedEntityToAdd.AddPendingReference(group, hdr->ReservedRef);
+                _groupedEntityToAdd.AddPendingNativeAddSortKey(group, accessorId, hdr->SortKey);
+            }
+
+            bags.Clear();
         }
 
         // Native structural-change checks fire at submission time, after each op

@@ -17,7 +17,7 @@ namespace Trecs.Serialization
 
         public void Serialize(in TElem[] value, ISerializationWriter writer)
         {
-            TrecsAssert.IsNotNull(value);
+            TrecsDebugAssert.IsNotNull(value);
 
             writer.Write("Count", value.Length);
 

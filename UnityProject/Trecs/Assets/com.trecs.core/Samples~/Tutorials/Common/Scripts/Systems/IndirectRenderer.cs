@@ -51,7 +51,7 @@ namespace Trecs.Samples
 
         public void RegisterRenderable(TagSet tags, Mesh mesh, Material material, int maxAmount)
         {
-            TrecsAssert.That(!_renderables.Where(info => info.Tags == tags).Any());
+            Assert.That(!_renderables.Where(info => info.Tags == tags).Any());
 
             var matProps = new MaterialPropertyBlock();
             var info = new RenderableInfo { Tags = tags, Mesh = mesh };
@@ -103,7 +103,7 @@ namespace Trecs.Samples
                 foreach (var group in World.WorldInfo.GetGroupsWithTags(info.Tags))
                 {
                     var wasAdded = groupsProcessed.Add(group);
-                    TrecsAssert.That(
+                    Assert.That(
                         wasAdded,
                         "Attempted to register multiple renderables with overlapping groups"
                     );
@@ -115,7 +115,7 @@ namespace Trecs.Samples
             )
             {
                 var wasRemoved = groupsProcessed.Remove(group);
-                TrecsAssert.That(wasRemoved, "No renderable registered for group {0}", group);
+                Assert.That(wasRemoved, "No renderable registered for group {0}", group);
             }
         }
 
@@ -152,7 +152,7 @@ namespace Trecs.Samples
                     continue;
                 }
 
-                TrecsAssert.That(info.InstanceBuffer.count >= total);
+                Assert.That(info.InstanceBuffer.count >= total);
 
                 combined = JobHandle.CombineDependencies(
                     combined,
@@ -214,7 +214,7 @@ namespace Trecs.Samples
                     continue;
                 }
 
-                TrecsAssert.That(info.InstanceNative.Length >= total);
+                Assert.That(info.InstanceNative.Length >= total);
 
                 combined = JobHandle.CombineDependencies(
                     combined,

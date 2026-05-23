@@ -53,15 +53,6 @@ namespace Trecs
         public bool RemoveAllEntitiesOnDispose { get; init; } = true;
 
         /// <summary>
-        /// When true, native operations (adds, removes, moves) are sorted before processing
-        /// to ensure fully deterministic submission order regardless of thread scheduling.
-        /// Required for deterministic replay/recording. When false, native operations are
-        /// processed in bag order (per-thread FIFO), which is faster but not deterministic
-        /// across runs with different thread counts or scheduling.
-        /// </summary>
-        public bool RequireDeterministicSubmission { get; init; }
-
-        /// <summary>
         /// When true, logs a warning if fixed updates fall behind and the simulation
         /// has to skip forward (when <see cref="MaxSecondsForFixedUpdatePerFrame"/> is set)
         /// or is at risk of entering the spiral of death (when it is null).

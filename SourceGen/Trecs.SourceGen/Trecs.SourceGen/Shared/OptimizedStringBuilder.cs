@@ -159,18 +159,28 @@ namespace Trecs.SourceGen.Shared
         }
 
         /// <summary>
-        /// Appends a property with getter using optimized formatting
+        /// Appends a property with getter using optimized formatting.
+        /// When <paramref name="attributeLine"/> is non-empty it is emitted on
+        /// the line immediately above the property declaration (so callers can
+        /// stamp <c>[GeneratedCode]</c> on per-member output emitted into a
+        /// partial re-open of a user-authored type).
         /// </summary>
         public OptimizedStringBuilder AppendProperty(
             string returnType,
             string propertyName,
             string getterExpression,
             int indentLevel = 0,
-            bool isInlined = true
+            bool isInlined = true,
+            string attributeLine = ""
         )
         {
             var indent = new string(' ', indentLevel * SpacesPerIndent);
             var innerIndent = new string(' ', (indentLevel + 1) * SpacesPerIndent);
+
+            if (!string.IsNullOrEmpty(attributeLine))
+            {
+                _sb.Append(indent).AppendLine(attributeLine);
+            }
 
             _sb.Append(indent)
                 .Append("public ")

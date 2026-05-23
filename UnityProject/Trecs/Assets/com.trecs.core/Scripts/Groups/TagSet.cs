@@ -10,21 +10,32 @@ namespace Trecs
     /// a <see cref="GroupIndex"/>. Two tag sets containing the same tags always resolve to the same
     /// <see cref="Id"/>, regardless of the order the tags were specified. Use the generic helpers
     /// (e.g. <c>TagSet&lt;Red, Fast&gt;.Value</c>) for zero-allocation access in hot paths.
+    /// Wraps a <see cref="TypeIdSet"/> — tag identities and component-type identities share the
+    /// same intern table.
     /// </summary>
     [TypeId(912438516)]
     public readonly struct TagSet : IEquatable<TagSet>, IComparable<TagSet>
     {
-        public readonly int Id;
+        readonly TypeIdSet _inner;
+
+        public int Id => _inner.Id;
 
         /// <summary>
         /// Sentinel value representing an empty tag set.
         /// </summary>
         public static readonly TagSet Null; //must stay here because of Burst
 
-        public TagSet(int id)
-            : this()
+        // Internal: external callers should never need to construct from a raw int —
+        // use FromTags / CombineWith / TagSet<T...>. The ctor exists for serialization
+        // round-trips of an already-interned id.
+        internal TagSet(int id)
         {
-            Id = id;
+            _inner = new TypeIdSet(id);
+        }
+
+        internal TagSet(TypeIdSet inner)
+        {
+            _inner = inner;
         }
 
         /// <summary>
@@ -33,28 +44,28 @@ namespace Trecs
         /// </summary>
         public readonly IReadOnlyList<Tag> Tags
         {
-            get { return TagSetRegistry.TagSetToTags(this); }
+            get { return TagSetCache.GetTags(_inner); }
         }
 
-        public readonly bool IsNull => this == Null;
+        public readonly bool IsNull => _inner.IsNull;
 
         // Stable hash across sessions.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override readonly int GetHashCode()
         {
-            return Id;
+            return _inner.Id;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator ==(TagSet c1, TagSet c2)
         {
-            return c1.Equals(c2);
+            return c1._inner == c2._inner;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator !=(TagSet c1, TagSet c2)
         {
-            return !c1.Equals(c2);
+            return c1._inner != c2._inner;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -66,64 +77,165 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly bool Equals(TagSet other)
         {
-            return other.Id == Id;
+            return _inner == other._inner;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly int CompareTo(TagSet other)
         {
-            return other.Id.CompareTo(Id);
+            return other._inner.Id.CompareTo(_inner.Id);
         }
 
+        // Routes through TagSetCache, which renders each member's name via
+        // Tag.ToString → TypeIdReverseLookup so error messages and logs read as
+        // e.g. "TagSet(McAlive-McDead (1234))" rather than "TagSet(-9876-1234 (1234))".
+        // Cached in TagSetCache after the first call per set.
         public override readonly string ToString()
         {
-            return TagSetRegistry.TagSetToString(this);
+            return $"TagSet({TagSetCache.GetDisplayString(_inner)})";
         }
 
         public static TagSet FromTags(IReadOnlyList<Tag> tags)
         {
-            return TagSetRegistry.TagsToTagSet(tags);
+            if (tags.Count == 0)
+            {
+                return Null;
+            }
+
+            var set = TypeIdSet.FromMember(new TypeId(tags[0].Value));
+            for (int i = 1; i < tags.Count; i++)
+            {
+                set = set.Add(new TypeId(tags[i].Value));
+            }
+            return new TagSet(set);
         }
 
-        public static TagSet FromTags(Tag t1)
-        {
-            return TagSetRegistry.TagsToTagSet(t1);
-        }
+        public static TagSet FromTags(Tag t1) => new(TypeIdSet.FromMember(new TypeId(t1.Value)));
 
-        public static TagSet FromTags(Tag t1, Tag t2)
-        {
-            return TagSetRegistry.TagsToTagSet(t1, t2);
-        }
+        public static TagSet FromTags(Tag t1, Tag t2) =>
+            new(TypeIdSet.FromMember(new TypeId(t1.Value)).Add(new TypeId(t2.Value)));
 
-        public static TagSet FromTags(Tag t1, Tag t2, Tag t3)
-        {
-            return TagSetRegistry.TagsToTagSet(t1, t2, t3);
-        }
+        public static TagSet FromTags(Tag t1, Tag t2, Tag t3) =>
+            new(
+                TypeIdSet
+                    .FromMember(new TypeId(t1.Value))
+                    .Add(new TypeId(t2.Value))
+                    .Add(new TypeId(t3.Value))
+            );
 
-        public static TagSet FromTags(Tag t1, Tag t2, Tag t3, Tag t4)
-        {
-            return TagSetRegistry.TagsToTagSet(t1, t2, t3, t4);
-        }
+        public static TagSet FromTags(Tag t1, Tag t2, Tag t3, Tag t4) =>
+            new(
+                TypeIdSet
+                    .FromMember(new TypeId(t1.Value))
+                    .Add(new TypeId(t2.Value))
+                    .Add(new TypeId(t3.Value))
+                    .Add(new TypeId(t4.Value))
+            );
 
         /// <summary>
         /// Returns a new <see cref="TagSet"/> containing the union of this set's tags and
         /// <paramref name="other"/>'s tags. Returns <c>this</c> unchanged if <paramref name="other"/>
         /// is null or identical.
         /// </summary>
-        public readonly TagSet CombineWith(TagSet other)
-        {
-            if (other.IsNull)
-                return this;
-            if (IsNull)
-                return other;
-            if (this == other)
-                return this;
-            return TagSetRegistry.CombineTagSets(this, other);
-        }
+        public readonly TagSet CombineWith(TagSet other) => new(_inner.CombineWith(other._inner));
 
         public static implicit operator TagSet(Tag tag)
         {
             return FromTags(tag);
+        }
+
+        // ── Burst-safe type-parameterised factories ──────────────────────────
+        //
+        // The <see cref="TagSet{T1}"/> family caches its value in a
+        // `static readonly TagSet Value` field whose initializer calls
+        // <see cref="Tag{T}.Value"/>. Burst's IL interpreter tries to
+        // AOT-evaluate that initializer when a Burst job references it, and
+        // <c>Tag&lt;T&gt;._value</c> is non-readonly (its managed
+        // <c>[BurstDiscard]</c> Init writes to it), so Burst rejects the read
+        // with BC1040.
+        //
+        // These factories sidestep that by computing the resulting TagSet.Id
+        // at runtime via XOR of each member's <see cref="TypeId{T}"/>.Value
+        // — TypeId&lt;T&gt;._value is `static readonly` with a
+        // Burst-AOT-evaluable cctor (BurstRuntime.GetHashCode32 is a Burst
+        // intrinsic; the reverse-lookup registration is BurstDiscard'd), so
+        // Burst constant-folds the read.
+        //
+        // The XOR matches what
+        // <see cref="Trecs.Internal.TypeIdSetRegistry"/> produces for the
+        // same inputs (XOR with the same `id == 0 → 1` normalization), so
+        // the result is a valid intern-table key as long as the world's
+        // managed init has registered each tag — true by construction
+        // during world construction.
+        //
+        // Caller contract: the type arguments must be distinct ITag types.
+        // Duplicates would XOR-cancel and yield a different id than the
+        // managed-side dedup path produces. Asserted in DEBUG.
+
+        public static TagSet BurstableFromTags<T1>()
+            where T1 : struct, ITag
+        {
+            int id = TypeId<T1>.Value.Value;
+            // TypeId values come from BurstRuntime.GetHashCode32 normalized to
+            // non-zero at TypeId construction, so id is guaranteed non-zero
+            // here. Re-asserting matches TypeIdSetRegistry.FromSingle exactly.
+            if (id == 0)
+                id = 1;
+            return new TagSet(id);
+        }
+
+        public static TagSet BurstableFromTags<T1, T2>()
+            where T1 : struct, ITag
+            where T2 : struct, ITag
+        {
+            int id1 = TypeId<T1>.Value.Value;
+            int id2 = TypeId<T2>.Value.Value;
+            TrecsDebugAssert.That(
+                id1 != id2,
+                "BurstableFromTags called with duplicate tag types — XOR would cancel and produce an incorrect TagSet id"
+            );
+            int id = id1 ^ id2;
+            if (id == 0)
+                id = 1;
+            return new TagSet(id);
+        }
+
+        public static TagSet BurstableFromTags<T1, T2, T3>()
+            where T1 : struct, ITag
+            where T2 : struct, ITag
+            where T3 : struct, ITag
+        {
+            int id1 = TypeId<T1>.Value.Value;
+            int id2 = TypeId<T2>.Value.Value;
+            int id3 = TypeId<T3>.Value.Value;
+            TrecsDebugAssert.That(
+                id1 != id2 && id1 != id3 && id2 != id3,
+                "BurstableFromTags called with duplicate tag types — XOR would cancel and produce an incorrect TagSet id"
+            );
+            int id = id1 ^ id2 ^ id3;
+            if (id == 0)
+                id = 1;
+            return new TagSet(id);
+        }
+
+        public static TagSet BurstableFromTags<T1, T2, T3, T4>()
+            where T1 : struct, ITag
+            where T2 : struct, ITag
+            where T3 : struct, ITag
+            where T4 : struct, ITag
+        {
+            int id1 = TypeId<T1>.Value.Value;
+            int id2 = TypeId<T2>.Value.Value;
+            int id3 = TypeId<T3>.Value.Value;
+            int id4 = TypeId<T4>.Value.Value;
+            TrecsDebugAssert.That(
+                id1 != id2 && id1 != id3 && id1 != id4 && id2 != id3 && id2 != id4 && id3 != id4,
+                "BurstableFromTags called with duplicate tag types — XOR would cancel and produce an incorrect TagSet id"
+            );
+            int id = id1 ^ id2 ^ id3 ^ id4;
+            if (id == 0)
+                id = 1;
+            return new TagSet(id);
         }
     }
 

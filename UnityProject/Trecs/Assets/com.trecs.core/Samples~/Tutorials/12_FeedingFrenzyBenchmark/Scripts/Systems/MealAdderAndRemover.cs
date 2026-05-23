@@ -21,13 +21,15 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             var currentCount = World.CountEntitiesWithTags(TagSet<FrenzyTags.Meal>.Value);
             var config = World.GlobalComponent<FrenzyConfig>().Read;
 
+            int maxChanges = math.max(1, _settings.MaxChangesPerFrame);
+
             if (currentCount < maxMeals)
             {
-                SpawnMeals(maxMeals - currentCount, config);
+                SpawnMeals(math.min(maxMeals - currentCount, maxChanges), config);
             }
             else if (currentCount > maxMeals)
             {
-                DespawnMeals(currentCount - maxMeals, config);
+                DespawnMeals(math.min(currentCount - maxMeals, maxChanges), config);
             }
         }
 

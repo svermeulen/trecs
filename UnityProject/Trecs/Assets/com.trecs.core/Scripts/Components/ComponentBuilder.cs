@@ -14,7 +14,7 @@ namespace Trecs.Internal
 
         bool HasUserProvidedPrototype { get; }
 
-        ComponentId ComponentId { get; }
+        ComponentTypeId TypeId { get; }
 
         Type ComponentType { get; }
     }
@@ -32,7 +32,7 @@ namespace Trecs.Internal
             _ = TypeMeta<T>.IsUnmanaged;
             if (TypeMeta<T>.IsUnmanaged)
                 EntityComponentIdMap.Register<T>(new Filler<T>());
-            ComponentTypeId<T>.Init();
+            TypeId<T>.Warmup();
         }
 
         public ComponentBuilder(T? prototype)
@@ -54,7 +54,7 @@ namespace Trecs.Internal
             get { return _hasUserProvidedPrototype; }
         }
 
-        public ComponentId ComponentId => ComponentTypeId<T>.Value;
+        public ComponentTypeId TypeId => ComponentTypeId<T>.Value;
 
         public void BuildEntityAndAddToList(IComponentArray dictionary)
         {

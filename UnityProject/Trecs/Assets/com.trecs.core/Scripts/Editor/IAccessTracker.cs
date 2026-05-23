@@ -8,7 +8,7 @@ namespace Trecs
     /// <see cref="TrecsAccessTracker"/>; cache mode wraps the pre-recorded
     /// data on <see cref="TrecsSchema.Access"/>. Both flavours key by
     /// component / template <i>display name</i> rather than runtime
-    /// <see cref="Internal.ComponentId"/> so cache mode (which has no
+    /// <see cref="Internal.TypeId"/> so cache mode (which has no
     /// TypeIdProvider) can answer the same questions.
     /// </summary>
     public interface IAccessTracker

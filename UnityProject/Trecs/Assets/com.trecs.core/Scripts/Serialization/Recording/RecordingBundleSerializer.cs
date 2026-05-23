@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using Trecs.Collections;
 
 namespace Trecs.Internal
@@ -48,39 +49,12 @@ namespace Trecs.Internal
                 _buffer.StartWrite(version: bundle.Header.Version, includeTypeChecks: true);
 
                 _buffer.Write("Header", bundle.Header);
-                _buffer.WriteBytes(
-                    "initialSnapshot",
-                    bundle.InitialSnapshot,
-                    0,
-                    bundle.InitialSnapshot.Length
-                );
-                _buffer.Write("InitialSnapshotChecksum", bundle.InitialSnapshotChecksum);
-                _buffer.WriteBytes("inputQueue", bundle.InputQueue, 0, bundle.InputQueue.Length);
+                WriteMemoryBytes("initialSnapshot", bundle.InitialSnapshot);
+                WriteMemoryBytes("inputQueue", bundle.InputQueue);
                 _buffer.Write("Checksums", bundle.Checksums);
 
-                _buffer.Write("AnchorCount", bundle.Anchors.Count);
-                for (int i = 0; i < bundle.Anchors.Count; i++)
-                {
-                    var anchor = bundle.Anchors[i];
-                    _buffer.Write("AnchorFrame", anchor.FixedFrame);
-                    _buffer.Write("AnchorChecksum", anchor.Checksum);
-                    _buffer.WriteBytes("anchorPayload", anchor.Payload, 0, anchor.Payload.Length);
-                }
-
-                _buffer.Write("SnapshotCount", bundle.Snapshots.Count);
-                for (int i = 0; i < bundle.Snapshots.Count; i++)
-                {
-                    var snapshot = bundle.Snapshots[i];
-                    _buffer.Write("SnapshotFrame", snapshot.FixedFrame);
-                    _buffer.Write("SnapshotChecksum", snapshot.Checksum);
-                    _buffer.WriteString("SnapshotLabel", snapshot.Label);
-                    _buffer.WriteBytes(
-                        "snapshotPayload",
-                        snapshot.Payload,
-                        0,
-                        snapshot.Payload.Length
-                    );
-                }
+                WriteSnapshotList("Anchor", bundle.Anchors, writeLabel: false);
+                WriteSnapshotList("Bookmark", bundle.Bookmarks, writeLabel: true);
 
                 _buffer.Write<int>("BundleSentinel", TrecsConstants.RecordingSentinelValue);
                 totalBytes = _buffer.EndWrite();
@@ -95,10 +69,10 @@ namespace Trecs.Internal
             _buffer.MemoryStream.CopyTo(stream);
 
             _log.Debug(
-                "Bundle serialized ({0:0.00} kb): {1} anchors, {2} snapshots",
+                "Bundle serialized ({0:0.00} kb): {1} anchors, {2} bookmarks",
                 totalBytes / 1024f,
                 bundle.Anchors.Count,
-                bundle.Snapshots.Count
+                bundle.Bookmarks.Count
             );
         }
 
@@ -143,46 +117,32 @@ namespace Trecs.Internal
 
                 var header = _buffer.Read<BundleHeader>("Header");
                 var initialSnapshot = ReadByteArray("initialSnapshot");
-                var initialSnapshotChecksum = _buffer.Read<uint>("InitialSnapshotChecksum");
                 var inputQueue = ReadByteArray("inputQueue");
-                var checksums = _buffer.Read<DenseDictionary<int, uint>>("checksums");
+                var checksums = _buffer.Read<DenseDictionary<int, ulong>>("checksums");
 
-                var anchorCount = _buffer.Read<int>("AnchorCount");
-                var anchors = new List<BundleAnchor>(anchorCount);
-                for (int i = 0; i < anchorCount; i++)
-                {
-                    var frame = _buffer.Read<int>("AnchorFrame");
-                    var checksum = _buffer.Read<uint>("AnchorChecksum");
-                    anchors.Add(
-                        new BundleAnchor
-                        {
-                            FixedFrame = frame,
-                            Checksum = checksum,
-                            Payload = ReadByteArray("anchorPayload"),
-                        }
-                    );
-                }
-
-                var snapshotCount = _buffer.Read<int>("SnapshotCount");
-                var snapshots = new List<BundleSnapshot>(snapshotCount);
-                for (int i = 0; i < snapshotCount; i++)
-                {
-                    var frame = _buffer.Read<int>("SnapshotFrame");
-                    var checksum = _buffer.Read<uint>("SnapshotChecksum");
-                    var label = _buffer.ReadString("SnapshotLabel");
-                    snapshots.Add(
-                        new BundleSnapshot
-                        {
-                            FixedFrame = frame,
-                            Checksum = checksum,
-                            Label = label,
-                            Payload = ReadByteArray("snapshotPayload"),
-                        }
-                    );
-                }
+                var anchors = ReadSnapshotList("Anchor", SnapshotKind.Anchor, readLabel: false);
+                var bookmarks = ReadSnapshotList(
+                    "Bookmark",
+                    SnapshotKind.Bookmark,
+                    readLabel: true
+                );
 
                 var sentinel = _buffer.Read<int>("BundleSentinel");
-                TrecsAssert.IsEqual(sentinel, TrecsConstants.RecordingSentinelValue);
+                if (sentinel != TrecsConstants.RecordingSentinelValue)
+                {
+                    // Bundle-level sentinel (an int) is distinct from the
+                    // Layer-1 EndOfPayloadMarker (a byte) verified by the
+                    // StopRead call below: this one catches bundle-format
+                    // drift where the trailing payload marker is intact
+                    // but the bundle's own structure has been corrupted
+                    // (e.g. truncated anchors/snapshots list mid-write).
+                    // Release-strict — must fire in release builds too.
+                    throw new SerializationException(
+                        $"Bundle sentinel mismatch: expected "
+                            + $"{TrecsConstants.RecordingSentinelValue}, got {sentinel}. "
+                            + "Bundle is truncated or corrupt."
+                    );
+                }
 
                 _buffer.StopRead(verifySentinel: true);
 
@@ -190,11 +150,10 @@ namespace Trecs.Internal
                 {
                     Header = header,
                     InitialSnapshot = initialSnapshot,
-                    InitialSnapshotChecksum = initialSnapshotChecksum,
                     InputQueue = inputQueue,
                     Checksums = checksums,
                     Anchors = anchors,
-                    Snapshots = snapshots,
+                    Bookmarks = bookmarks,
                 };
             }
             catch
@@ -282,35 +241,92 @@ namespace Trecs.Internal
         {
             if (bundle.Header == null)
                 throw new ArgumentNullException(nameof(bundle) + ".Header");
-            if (bundle.InitialSnapshot == null)
-                throw new ArgumentNullException(nameof(bundle) + ".InitialSnapshot");
-            if (bundle.InputQueue == null)
-                throw new ArgumentNullException(nameof(bundle) + ".InputQueue");
+            if (bundle.InitialSnapshot.IsEmpty)
+                throw new ArgumentException(
+                    "InitialSnapshot must be a non-empty payload",
+                    nameof(bundle)
+                );
             if (bundle.Checksums == null)
                 throw new ArgumentNullException(nameof(bundle) + ".Checksums");
             if (bundle.Anchors == null)
                 throw new ArgumentNullException(nameof(bundle) + ".Anchors");
-            if (bundle.Snapshots == null)
-                throw new ArgumentNullException(nameof(bundle) + ".Snapshots");
+            if (bundle.Bookmarks == null)
+                throw new ArgumentNullException(nameof(bundle) + ".Bookmarks");
         }
 
         // Read a length-prefixed byte[] payload, returning an exact-length
-        // array. ReadBytes can hand back a buffer larger than the actual
-        // payload when reusing pooled storage, so we slice when needed.
-        byte[] ReadByteArray(string name)
+        // ReadOnlyMemory<byte>. ReadBytes can hand back a buffer larger than
+        // the actual payload when reusing pooled storage, so we slice to
+        // exact length before wrapping.
+        ReadOnlyMemory<byte> ReadByteArray(string name)
         {
             byte[] buffer = null;
             var length = _buffer.ReadBytes(name, ref buffer);
-            if (buffer == null)
+            if (buffer == null || length == 0)
             {
-                return Array.Empty<byte>();
+                return ReadOnlyMemory<byte>.Empty;
             }
-            if (buffer.Length == length)
+            return new ReadOnlyMemory<byte>(buffer, 0, length);
+        }
+
+        // Length-prefixed write of a ReadOnlyMemory payload. The underlying
+        // ISerializationWriter API is byte[]+offset+count; we extract the
+        // backing array via MemoryMarshal so pooled / oversized buffers
+        // don't trigger an intermediate copy.
+        void WriteMemoryBytes(string name, ReadOnlyMemory<byte> payload)
+        {
+            if (payload.IsEmpty)
             {
-                return buffer;
+                _buffer.WriteBytes(name, Array.Empty<byte>(), 0, 0);
+                return;
             }
-            var result = new byte[length];
-            Buffer.BlockCopy(buffer, 0, result, 0, length);
+            if (!MemoryMarshal.TryGetArray(payload, out var seg))
+            {
+                throw new InvalidOperationException(
+                    $"Cannot serialize '{name}': payload is backed by non-array memory."
+                );
+            }
+            _buffer.WriteBytes(name, seg.Array, seg.Offset, seg.Count);
+        }
+
+        void WriteSnapshotList(
+            string namePrefix,
+            IReadOnlyList<WorldSnapshot> list,
+            bool writeLabel
+        )
+        {
+            _buffer.Write($"{namePrefix}Count", list.Count);
+            for (int i = 0; i < list.Count; i++)
+            {
+                var entry = list[i];
+                _buffer.Write($"{namePrefix}Frame", entry.FixedFrame);
+                if (writeLabel)
+                {
+                    _buffer.WriteString($"{namePrefix}Label", entry.Label);
+                }
+                WriteMemoryBytes($"{namePrefix.ToLowerInvariant()}Payload", entry.Payload);
+            }
+        }
+
+        List<WorldSnapshot> ReadSnapshotList(string namePrefix, SnapshotKind kind, bool readLabel)
+        {
+            var count = _buffer.Read<int>($"{namePrefix}Count");
+            var result = new List<WorldSnapshot>(count);
+            for (int i = 0; i < count; i++)
+            {
+                var frame = _buffer.Read<int>($"{namePrefix}Frame");
+                var label = readLabel ? _buffer.ReadString($"{namePrefix}Label") : "";
+                var payload = ReadByteArray($"{namePrefix.ToLowerInvariant()}Payload");
+                result.Add(
+                    new WorldSnapshot
+                    {
+                        FixedFrame = frame,
+                        Kind = kind,
+                        Label = label,
+                        Payload = payload,
+                    }
+                );
+            }
             return result;
         }
 

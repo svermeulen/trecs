@@ -44,7 +44,7 @@ namespace Trecs.Internal
         /// </summary>
         public void RegisterSet(EntitySet entitySet, WorldInfo worldInfo)
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 !EntitySets.ContainsKey(entitySet.Id),
                 "Set '{0}' is already registered",
                 entitySet.DebugName
@@ -53,7 +53,7 @@ namespace Trecs.Internal
             var groups = entitySet.Tags.IsNull
                 ? worldInfo.AllGroups
                 : worldInfo.GetGroupsWithTags(entitySet.Tags);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 groups.Count > 0,
                 "Set '{0}' matched no groups. Are the tags used by a template added to the WorldBuilder?",
                 entitySet.DebugName
@@ -88,7 +88,7 @@ namespace Trecs.Internal
         internal ref EntitySetStorage GetSet(SetId setId)
         {
             var success = EntitySets.TryGetIndex(setId, out var index);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 success,
                 "Set with ID '{0}' not registered. Add it to the WorldBuilder via AddSet<T>().",
                 setId
@@ -123,22 +123,21 @@ namespace Trecs.Internal
         /// <summary>
         /// Flush all pending deferred Add/Remove operations on all sets.
         /// Handles both main-thread and job-side deferred ops (unified into
-        /// shared per-thread bags). Called during SubmitEntities.
+        /// shared per-thread bags). Called during Submit.
         /// </summary>
-        public void FlushAllDeferredOps(bool requireDeterministic)
+        public void FlushAllDeferredOps()
         {
             foreach (var entry in DeferredQueues)
             {
                 ref var set = ref EntitySets.GetValueByRef(entry.Key);
                 ref var queues = ref DeferredQueues.GetValueByRef(entry.Key);
-                FlushDeferredOpsForSet(ref set, ref queues, requireDeterministic);
+                FlushDeferredOpsForSet(ref set, ref queues);
             }
         }
 
         static void FlushDeferredOpsForSet(
             ref EntitySetStorage set,
-            ref NativeSetDeferredQueues queues,
-            bool requireDeterministic
+            ref NativeSetDeferredQueues queues
         )
         {
             // Clear supersedes pending Add/Remove for this set, regardless of
@@ -156,37 +155,6 @@ namespace Trecs.Internal
                 return;
             }
 
-            if (requireDeterministic)
-                FlushDeferredOpsDeterministic(ref set, ref queues);
-            else
-                FlushDeferredOpsNonDeterministic(ref set, ref queues);
-        }
-
-        static void FlushDeferredOpsNonDeterministic(
-            ref EntitySetStorage set,
-            ref NativeSetDeferredQueues queues
-        )
-        {
-            for (int i = 0; i < queues.RemoveQueue.ThreadSlotCount; i++)
-            {
-                ref var bag = ref queues.RemoveQueue.GetBag(i);
-                while (!bag.IsEmpty)
-                    set.RemoveUnchecked(bag.Dequeue<EntityIndex>());
-            }
-
-            for (int i = 0; i < queues.AddQueue.ThreadSlotCount; i++)
-            {
-                ref var bag = ref queues.AddQueue.GetBag(i);
-                while (!bag.IsEmpty)
-                    set.AddUnchecked(bag.Dequeue<EntityIndex>());
-            }
-        }
-
-        static void FlushDeferredOpsDeterministic(
-            ref EntitySetStorage set,
-            ref NativeSetDeferredQueues queues
-        )
-        {
             var allRemoves = new NativeList<EntityIndex>(64, Allocator.Temp);
             for (int i = 0; i < queues.RemoveQueue.ThreadSlotCount; i++)
             {
@@ -284,7 +252,7 @@ namespace Trecs.Internal
         }
 
         public void SwapEntityBetweenSets(
-            DenseDictionary<int, MoveInfo> fromEntityToEntityIDs,
+            FastList<MoveInfoEntry> fromEntityToEntityIDs,
             GroupIndex fromGroup,
             GroupIndex toGroup,
             DenseDictionary<int, int> entityIdsAffectedByRemoveAtSwapBack
@@ -310,13 +278,12 @@ namespace Trecs.Internal
                 bool resolvedToGroup = false;
 
                 var countOfEntitiesToSwap = fromEntityToEntityIDs.Count;
-                MoveInfo[] moveInfosOfEntitiesToSwap = fromEntityToEntityIDs.UnsafeValues;
-                var keysOfEntitiesToSwap = fromEntityToEntityIDs.UnsafeKeys;
+                MoveInfoEntry[] entriesOfEntitiesToSwap = fromEntityToEntityIDs._buffer;
 
                 for (var index = 0; index < countOfEntitiesToSwap; index++)
                 {
-                    int fromEntityIndex = keysOfEntitiesToSwap[index].key;
-                    int toIndex = (int)moveInfosOfEntitiesToSwap[index].ToIndex;
+                    int fromEntityIndex = entriesOfEntitiesToSwap[index].EntityIndex;
+                    int toIndex = entriesOfEntitiesToSwap[index].Info.ToIndex;
 
                     if (fromGroupEntry.Remove(fromEntityIndex))
                     {

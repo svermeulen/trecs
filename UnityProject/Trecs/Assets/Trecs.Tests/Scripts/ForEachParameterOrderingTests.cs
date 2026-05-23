@@ -43,7 +43,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = i })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _interspersedResults.Clear();
             RunInterspersedCustomArgs(a, multiplier: 10, bias: 0.5f);
@@ -77,7 +77,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = i })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _entityIndexFirstIndices.Clear();
             RunEntityIndexFirst(a);
@@ -119,7 +119,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = i })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _loopIndexValues.Clear();
             _userIndexValues.Clear();
@@ -169,7 +169,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = i })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _altAccessorObservedValues.Clear();
             _altAccessorIsSame = false;
@@ -208,7 +208,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = i })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             _aspectAfterCustomArgResults.Clear();
             RunAspectAfterCustomArg(a, offset: 100);

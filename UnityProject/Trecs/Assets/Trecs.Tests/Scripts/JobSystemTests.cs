@@ -260,7 +260,7 @@ namespace Trecs.Tests
                     .AssertComplete()
                     .Handle;
             }
-            a.SubmitEntities();
+            a.Submit();
 
             env.StepFixedFrames(1);
 
@@ -292,7 +292,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
         }
 
         /// <summary>

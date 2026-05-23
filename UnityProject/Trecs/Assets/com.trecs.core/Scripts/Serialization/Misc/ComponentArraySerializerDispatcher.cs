@@ -63,7 +63,7 @@ namespace Trecs.Internal
             // place, resize-and-clear, dispose-and-rebuild, etc.).
             list.Resize(typed.Count, NativeArrayOptions.UninitializedMemory);
             _user.Deserialize(list, requiredCount, reader);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 list.Length == requiredCount,
                 "IComponentArraySerializer<{0}>.Deserialize left values.Length == {1}, but the group requires {2}. Every component array in a group must share the same length on return.",
                 typeof(T).Name,

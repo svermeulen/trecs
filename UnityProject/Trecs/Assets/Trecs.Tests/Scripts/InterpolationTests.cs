@@ -61,7 +61,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha)
                 .SetInterpolated(new TestInt { Value = 42 })
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();
 
@@ -80,7 +80,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).SetInterpolated(new TestInt { Value = 7 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();
             var current = entity.Component<TestInt>(a).Read.Value;
@@ -105,7 +105,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).SetInterpolated(new TestInt { Value = 1 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Mutate current to simulate a fixed tick advancing state.
             var entity = a.Query().WithTags(TestTags.Alpha).SingleHandle();

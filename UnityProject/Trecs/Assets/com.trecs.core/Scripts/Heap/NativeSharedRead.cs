@@ -49,22 +49,49 @@ namespace Trecs
         }
 #endif
 
-        // DO NOT change to `ref readonly T`.
-        //
-        // Calling any non-`readonly` instance method through a readonly-rooted reference
-        // (`ref readonly`, `in`, a `readonly` field, etc.) forces the C# compiler to spill
-        // the receiver to a fresh stack local first and dispatch the call against the
-        // local — because the method could otherwise mutate state the caller promised
-        // wouldn't change. So a `ref readonly` return here would silently hand callers a
-        // stack copy the moment they call any non-readonly method on the value, with no
-        // compile error, no exception, no Burst warning — the code typechecks and runs,
-        // just against the wrong bytes.
-        //
-        // The wrapper is [NativeContainerIsReadOnly] at the Unity safety-system layer,
-        // so concurrent readers are fine and writes-while-readers conflicts are caught
-        // at Schedule time. "Don't mutate shared data" stays a convention rather than a
-        // C# language-level guarantee, intentionally.
-        public ref T Value
+        /// <summary>
+        /// A <c>ref readonly</c> into the shared blob. Callers get a true reference into the
+        /// underlying memory, with a compile-time guarantee they cannot use it to mutate it.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <b>Preferred read pattern.</b> For most call sites — reading one or more getters on
+        /// the value, passing the value (or one of its fields) to a method that takes the
+        /// value or a <c>ref readonly</c> — bind a <c>ref readonly</c> local and use it
+        /// directly:
+        /// <code>
+        /// ref readonly var x = ref ptr.Read(ecs).Value;
+        /// // ... use x.SomeProperty, x.SomeMethod(), pass x to helpers ...
+        /// </code>
+        /// Or, for one-shot reads, fold inline:
+        /// <code>
+        /// DoSomething(ptr.Read(ecs).Value.SomeProperty);
+        /// </code>
+        /// </para>
+        /// <para>
+        /// <b>Anti-pattern.</b> Do <i>not</i> launder the <c>ref readonly</c> through
+        /// <c>Unsafe.AsRef</c> + <c>UnsafeUtility.AddressOf</c> to get a raw
+        /// <c>T*</c> just to satisfy CS8329 ("cannot pass <c>ref readonly</c> as <c>ref</c>"):
+        /// <code>
+        /// // BAD — only valid when you genuinely need a T*.
+        /// T* p = (T*)UnsafeUtility.AddressOf(ref Unsafe.AsRef(in ptr.Read(ecs).Value));
+        /// </code>
+        /// The pointer form is only correct when the result is <i>stored</i> as a pointer
+        /// field, <i>passed</i> across a Burst-job boundary in a struct field, or fed into
+        /// an existing pointer-typed API. For local getter reads or value passing, the
+        /// <c>ref readonly</c> local is enough.
+        /// </para>
+        /// <para>
+        /// <c>ref readonly T</c> is safe here because TRECS124
+        /// (<c>NativeSharedPtrImmutabilityAnalyzer</c>) requires <c>T</c> to be a
+        /// <c>readonly struct</c> (or a primitive / enum). On a <c>readonly struct</c>,
+        /// every instance method is implicitly <c>readonly</c>, so the C# compiler never
+        /// has to spill the receiver to a stack local to defend against a mutating call —
+        /// the defensive-copy footgun that would otherwise motivate a pointer-laundering
+        /// rewrite cannot arise.
+        /// </para>
+        /// </remarks>
+        public ref readonly T Value
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get

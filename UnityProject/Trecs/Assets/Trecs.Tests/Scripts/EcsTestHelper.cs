@@ -52,10 +52,7 @@ namespace Trecs.Tests
     {
         public static BlobStoreInMemory CreateBlobStore()
         {
-            return new BlobStoreInMemory(
-                new BlobStoreInMemorySettings { MaxMemoryCacheMb = 100 },
-                null
-            );
+            return new BlobStoreInMemory(BlobStoreInMemorySettings.Default, null);
         }
 
         public static TestEnvironment CreateEnvironment(params Template[] templates)

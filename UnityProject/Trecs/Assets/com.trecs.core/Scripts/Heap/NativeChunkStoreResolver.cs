@@ -114,21 +114,58 @@ namespace Trecs.Internal
         [NativeDisableContainerSafetyRestriction]
         readonly NativeArray<IntPtr> _chunkDirectory;
 
-        public NativeChunkStoreResolver(NativeArray<IntPtr> chunkDirectory)
+        // 1 if this resolver may be passed to a heap-mutating Write open
+        // (TrecsList, NativeUniquePtr); 0 if Read-only. Stamped from the role
+        // when HeapAccessor / NativeWorldAccessor hand the resolver out. The
+        // raw resolver owned by NativeChunkStore itself is permissive (1)
+        // because it's only consumed by already-gated internal paths.
+        readonly byte _canMutateHeap;
+
+        // Internal: only NativeChunkStore constructs the raw resolver. Role-aware
+        // copies for the user-facing surface go through the (in source, bool)
+        // overload below.
+        internal NativeChunkStoreResolver(NativeArray<IntPtr> chunkDirectory)
         {
             _chunkDirectory = chunkDirectory;
+            _canMutateHeap = 1;
+        }
+
+        // Role-aware copy: same backing directory, override the mutation bit.
+        // Used by HeapAccessor and NativeWorldAccessor to produce a Variable-role
+        // resolver that fails fast at Write-open time inside Burst jobs.
+        internal NativeChunkStoreResolver(in NativeChunkStoreResolver source, bool canMutateHeap)
+        {
+            _chunkDirectory = source._chunkDirectory;
+            _canMutateHeap = canMutateHeap ? (byte)1 : (byte)0;
+        }
+
+        /// <summary>
+        /// Burst-job-side gate for heap mutation through this resolver. Called from
+        /// <see cref="NativeUniquePtr{T}"/>'s <c>Write(in NativeChunkStoreResolver)</c>
+        /// and from <see cref="TrecsList{T}"/>'s <c>Write(in NativeChunkStoreResolver)</c>.
+        /// The flag is stamped from the originating accessor's role.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AssertCanMutateHeap()
+        {
+            TrecsAssert.That(
+                _canMutateHeap == 1,
+                "Attempted heap mutation (Write) on a heap pointer through a "
+                    + "Variable-role NativeChunkStoreResolver. Heap mutation is "
+                    + "only allowed from Fixed-role and Unrestricted-role accessors. "
+                    + "Read access is always allowed."
+            );
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public NativeChunkStoreEntry ResolveEntry(PtrHandle handle)
         {
-            if (!TryResolveEntry(handle, out var entry))
-            {
-                throw new TrecsException(
-                    $"Could not resolve PtrHandle {handle.Value} through chunk store "
-                        + "(null, out of range, freed, or stale generation)"
-                );
-            }
+            TrecsAssert.That(
+                TryResolveEntry(handle, out var entry),
+                "Could not resolve PtrHandle {0} through chunk store "
+                    + "(null, out of range, freed, or stale generation)",
+                handle.Value
+            );
             return entry;
         }
 
@@ -175,15 +212,89 @@ namespace Trecs.Internal
             return ResolveEntry(handle).Address.ToPointer();
         }
 
+        /// <summary>
+        /// Resolves a handle and returns the address of the backing
+        /// <see cref="NativeChunkStoreEntry"/> slot in the side table, in addition
+        /// to a copy of the entry's current state. Used by Read/Write wrappers
+        /// that need a stable pointer to the slot so they can re-check the
+        /// slot's <see cref="NativeChunkStoreEntry.Generation"/> on every
+        /// access — the shipping-build use-after-dispose guard. Chunks never
+        /// move once allocated, so the returned pointer is stable for the
+        /// chunk store's lifetime.
+        ///
+        /// <para>Throws if the handle is null, the chunk hasn't been
+        /// materialised yet, the slot's InUse bit is 0, or the slot's
+        /// generation doesn't match the handle's encoded generation — same
+        /// validity rules as <see cref="ResolveEntry"/>.</para>
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe NativeChunkStoreEntry ResolveEntryWithSlotPtr(
+            PtrHandle handle,
+            out NativeChunkStoreEntry* slotPtr
+        )
+        {
+            TrecsAssert.That(
+                TryResolveEntryWithSlotPtr(handle, out var entry, out slotPtr),
+                "Could not resolve PtrHandle {0} through chunk store "
+                    + "(null, out of range, freed, or stale generation)",
+                handle.Value
+            );
+            return entry;
+        }
+
+        /// <summary>
+        /// Non-throwing counterpart to <see cref="ResolveEntryWithSlotPtr"/>.
+        /// On success returns true and populates both <paramref name="entry"/>
+        /// (the entry's value at resolve time) and <paramref name="slotPtr"/>
+        /// (the address of that entry in the side-table chunk; stable for the
+        /// chunk store's lifetime). On failure both outs are zeroed.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe bool TryResolveEntryWithSlotPtr(
+            PtrHandle handle,
+            out NativeChunkStoreEntry entry,
+            out NativeChunkStoreEntry* slotPtr
+        )
+        {
+            if (handle.IsNull)
+            {
+                entry = default;
+                slotPtr = null;
+                return false;
+            }
+
+            DecodeHandle(handle, out var index, out var generation);
+
+            var chunkIdx = (int)index >> ChunkSizeBits;
+            if (chunkIdx >= _chunkDirectory.Length)
+            {
+                entry = default;
+                slotPtr = null;
+                return false;
+            }
+
+            var chunkPtr = (NativeChunkStoreEntry*)_chunkDirectory[chunkIdx].ToPointer();
+            if (chunkPtr == null)
+            {
+                entry = default;
+                slotPtr = null;
+                return false;
+            }
+
+            slotPtr = chunkPtr + ((int)index & ChunkIndexMask);
+            entry = *slotPtr;
+            return entry.InUse == 1 && entry.Generation == generation;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static uint EncodeHandleValue(uint generation, uint index)
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 index >= 1 && index <= MaxIndex,
                 "Side-table index {0} out of range",
                 index
             );
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 generation >= 1 && generation <= 0xFF,
                 "Generation {0} out of range",
                 generation

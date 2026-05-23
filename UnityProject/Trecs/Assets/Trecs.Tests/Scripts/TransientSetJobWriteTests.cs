@@ -149,7 +149,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Schedule a job that writes to the transient set
             new FlagEntitiesJob().ScheduleParallel(a);
@@ -163,11 +163,11 @@ namespace Trecs.Tests
             // Every other entity (0, 2, 4, 6, 8) should be in the set
             NAssert.AreEqual(5, read.Count, "Job should have flagged 5 entities (every other one)");
 
-            NAssert.IsTrue(read.Exists(new EntityIndex(0, group)));
-            NAssert.IsTrue(read.Exists(new EntityIndex(2, group)));
-            NAssert.IsTrue(read.Exists(new EntityIndex(4, group)));
-            NAssert.IsFalse(read.Exists(new EntityIndex(1, group)));
-            NAssert.IsFalse(read.Exists(new EntityIndex(3, group)));
+            NAssert.IsTrue(read.Contains(new EntityIndex(0, group)));
+            NAssert.IsTrue(read.Contains(new EntityIndex(2, group)));
+            NAssert.IsTrue(read.Contains(new EntityIndex(4, group)));
+            NAssert.IsFalse(read.Contains(new EntityIndex(1, group)));
+            NAssert.IsFalse(read.Contains(new EntityIndex(3, group)));
         }
 
         [Test]
@@ -183,7 +183,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Schedule a job that writes to the set
             new FlagAllEntitiesJob().ScheduleParallel(a);
@@ -214,7 +214,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -252,7 +252,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -291,7 +291,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -303,13 +303,13 @@ namespace Trecs.Tests
 
             // Verify via SetAccessor
             var read = set.Read;
-            NAssert.IsTrue(read.Exists(new EntityIndex(0, group)), "Entity 0 should be in set");
-            NAssert.IsTrue(read.Exists(new EntityIndex(2, group)), "Entity 2 should be in set");
+            NAssert.IsTrue(read.Contains(new EntityIndex(0, group)), "Entity 0 should be in set");
+            NAssert.IsTrue(read.Contains(new EntityIndex(2, group)), "Entity 2 should be in set");
             NAssert.AreEqual(2, read.Count, "Should have 2 entities total");
         }
 
         [Test]
-        public void TransientSet_DirectAdd_ExistsAndCountCorrect()
+        public void TransientSet_DirectAdd_ContainsAndCountCorrect()
         {
             using var env = CreateEnv();
             var a = env.Accessor;
@@ -321,7 +321,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -332,9 +332,9 @@ namespace Trecs.Tests
 
             var read = set.Read;
             NAssert.AreEqual(2, read.Count);
-            NAssert.IsTrue(read.Exists(new EntityIndex(0, group)));
-            NAssert.IsFalse(read.Exists(new EntityIndex(1, group)));
-            NAssert.IsTrue(read.Exists(new EntityIndex(3, group)));
+            NAssert.IsTrue(read.Contains(new EntityIndex(0, group)));
+            NAssert.IsFalse(read.Contains(new EntityIndex(1, group)));
+            NAssert.IsTrue(read.Contains(new EntityIndex(3, group)));
         }
 
         [Test]
@@ -350,7 +350,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -378,7 +378,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 1 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
 
@@ -407,7 +407,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Schedule a job that writes to the transient set
             new FlagAllEntitiesJob().ScheduleParallel(a);
@@ -438,7 +438,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<TFJTestTransientSet>();
@@ -469,7 +469,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Job calls Add then Clear on each entity. Clear supersedes regardless of order.
             new AddThenClearJob().ScheduleParallel(a);
@@ -491,7 +491,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Even when Clear is called BEFORE Add on each thread, semantics are
             // order-insensitive (matching deferred-clear semantics): Clear wins,
@@ -515,7 +515,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<TFJTestTransientSet>();
@@ -532,10 +532,10 @@ namespace Trecs.Tests
 
             // Every other entity (0, 2, 4) flagged by the second job.
             NAssert.AreEqual(3, set.Read.Count);
-            NAssert.IsTrue(set.Read.Exists(new EntityIndex(0, group)));
-            NAssert.IsTrue(set.Read.Exists(new EntityIndex(2, group)));
-            NAssert.IsTrue(set.Read.Exists(new EntityIndex(4, group)));
-            NAssert.IsFalse(set.Read.Exists(new EntityIndex(1, group)));
+            NAssert.IsTrue(set.Read.Contains(new EntityIndex(0, group)));
+            NAssert.IsTrue(set.Read.Contains(new EntityIndex(2, group)));
+            NAssert.IsTrue(set.Read.Contains(new EntityIndex(4, group)));
+            NAssert.IsFalse(set.Read.Contains(new EntityIndex(1, group)));
         }
 
         [Test]
@@ -551,7 +551,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             new AddByHandleJob().ScheduleParallel(a);
 
@@ -576,7 +576,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             // Pre-populate via main thread
             var set = a.Set<TFJTestTransientSet>();
@@ -605,7 +605,7 @@ namespace Trecs.Tests
                     .Set(new TestFloat())
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
             var set = a.Set<TFJTestTransientSet>();
@@ -618,10 +618,10 @@ namespace Trecs.Tests
             new RemoveEvenJob().ScheduleParallel(a);
 
             NAssert.AreEqual(3, set.Read.Count, "Three odd-indexed entities should remain");
-            NAssert.IsFalse(set.Read.Exists(new EntityIndex(0, group)));
-            NAssert.IsTrue(set.Read.Exists(new EntityIndex(1, group)));
-            NAssert.IsFalse(set.Read.Exists(new EntityIndex(2, group)));
-            NAssert.IsTrue(set.Read.Exists(new EntityIndex(3, group)));
+            NAssert.IsFalse(set.Read.Contains(new EntityIndex(0, group)));
+            NAssert.IsTrue(set.Read.Contains(new EntityIndex(1, group)));
+            NAssert.IsFalse(set.Read.Contains(new EntityIndex(2, group)));
+            NAssert.IsTrue(set.Read.Contains(new EntityIndex(3, group)));
         }
     }
 }

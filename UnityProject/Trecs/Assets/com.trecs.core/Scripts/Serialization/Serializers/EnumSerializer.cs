@@ -11,7 +11,7 @@ namespace Trecs.Serialization
     /// a compact byte index into the declared value set, so enums must declare
     /// at most 256 distinct values and must not declare aliases (duplicate
     /// values). Register via
-    /// <c>SerializerRegistry.RegisterSerializer(new EnumSerializer&lt;T&gt;())</c>.
+    /// <c>SerializerRegistry.RegisterSerializer&lt;EnumSerializer&lt;T&gt;&gt;()</c>.
     /// </summary>
     public sealed class EnumSerializer<T> : ISerializer<T>, ISerializerDelta<T>
         where T : unmanaged
@@ -39,14 +39,14 @@ namespace Trecs.Serialization
 
         static EnumSerializer()
         {
-            TrecsAssert.That(typeof(T).IsEnum, "Expected type {0} to be an enum", typeof(T));
+            TrecsDebugAssert.That(typeof(T).IsEnum, "Expected type {0} to be an enum", typeof(T));
             _underlyingKind = ResolveUnderlyingKind(typeof(T).GetEnumUnderlyingType());
             _isFlags = typeof(T).IsDefined(typeof(FlagsAttribute), false);
 
             if (!_isFlags)
             {
                 var values = (T[])Enum.GetValues(typeof(T));
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     values.Length <= MaxDeltaValues,
                     "Enum {0} declares {1} values; delta encoding supports at most {2}",
                     typeof(T),
@@ -59,7 +59,7 @@ namespace Trecs.Serialization
 
                 for (int i = 0; i < values.Length; i++)
                 {
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         !_valueToIndex.ContainsKey(values[i]),
                         "Enum {0} has aliased values (multiple names mapping to the same numeric value); delta encoding cannot round-trip these — declare distinct values or remove EnumSerializer's delta registration",
                         typeof(T)

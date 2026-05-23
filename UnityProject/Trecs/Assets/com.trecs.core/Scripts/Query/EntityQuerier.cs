@@ -145,7 +145,7 @@ namespace Trecs.Internal
 
         public int CountEntitiesInGroup(GroupIndex group)
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 !group.IsNull && group.Index < _componentStore.GroupEntityComponentsDB.Length,
                 "Attempted to get count for unrecognized group {0}",
                 group
@@ -173,7 +173,7 @@ namespace Trecs.Internal
                 }
                 else
                 {
-                    TrecsAssert.IsEqual(count, value.Count);
+                    TrecsDebugAssert.IsEqual(count, value.Count);
                 }
             }
 
@@ -371,17 +371,12 @@ namespace Trecs.Internal
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool SafeQueryEntityDictionary<T>(
-            DenseDictionary<ComponentId, IComponentArray> entitiesInGroupPerType,
+            DenseDictionary<TypeId, IComponentArray> entitiesInGroupPerType,
             out IComponentArray typeSafeDictionary
         )
             where T : unmanaged, IEntityComponent
         {
-            if (
-                !entitiesInGroupPerType.TryGetValue(
-                    ComponentTypeId<T>.Value,
-                    out var safeDictionary
-                )
-            )
+            if (!entitiesInGroupPerType.TryGetValue(TypeId<T>.Value, out var safeDictionary))
             {
                 typeSafeDictionary = default;
                 return false;
@@ -402,12 +397,7 @@ namespace Trecs.Internal
         {
             var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
 
-            if (
-                !entitiesInGroupPerType.TryGetValue(
-                    ComponentTypeId<T>.Value,
-                    out var safeDictionary
-                )
-            )
+            if (!entitiesInGroupPerType.TryGetValue(TypeId<T>.Value, out var safeDictionary))
             {
                 typeSafeDictionary = default;
                 return false;
@@ -428,11 +418,11 @@ namespace Trecs.Internal
             // has an inner dict (initially empty).
             var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
 
-            var componentId = ComponentTypeId<T>.Value;
+            var componentId = TypeId<T>.Value;
 
             if (!entitiesInGroupPerType.TryGetValue(componentId, out typeSafeDictionary))
             {
-                TrecsAssert.That(!_componentStore.ConfigurationFrozen);
+                TrecsDebugAssert.That(!_componentStore.ConfigurationFrozen);
 
                 typeSafeDictionary = new ComponentArray<T>(0);
                 entitiesInGroupPerType.Add(componentId, typeSafeDictionary);
@@ -499,7 +489,7 @@ namespace Trecs.Internal
             return true;
         }
 
-        bool GroupHasAllComponents(GroupIndex group, ComponentId[] componentIds)
+        bool GroupHasAllComponents(GroupIndex group, TypeId[] componentIds)
         {
             var componentMap = _componentStore.GroupEntityComponentsDB[group.Index];
             for (int i = 0; i < componentIds.Length; i++)
@@ -510,7 +500,7 @@ namespace Trecs.Internal
             return true;
         }
 
-        IComponentArray GetComponentArrayUntyped(GroupIndex group, ComponentId componentId)
+        IComponentArray GetComponentArrayUntyped(GroupIndex group, TypeId componentId)
         {
             var componentMap = _componentStore.GroupEntityComponentsDB[group.Index];
             if (!componentMap.TryGetValue(componentId, out var arr))

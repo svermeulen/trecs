@@ -142,7 +142,7 @@ namespace Trecs.Internal
             }
         }
 
-        public ISimpleObservable<bool> FixedIsPausedChangedEvent => _fixedIsPausedChangedEvent;
+        public SimpleSubject<bool> FixedIsPausedChangedEvent => _fixedIsPausedChangedEvent;
 
         /// <summary>
         /// Note that this is different from unity's Time.timeScale
@@ -152,12 +152,12 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _timeScale;
             }
             set
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 _timeScale = value;
             }
         }
@@ -178,12 +178,12 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _pendingFastForwardRequest;
             }
             set
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 _pendingFastForwardRequest = value;
             }
         }
@@ -192,14 +192,13 @@ namespace Trecs.Internal
         public WorldSafetyManager SafetyManager => _safetyManager;
         internal int CurrentlyExecutingAccessorId => _currentlyExecutingAccessorId;
         internal bool WarnOnJobSyncPoints => _settings.WarnOnJobSyncPoints;
-        internal bool RequireDeterministicSubmission => _settings.RequireDeterministicSubmission;
         internal bool AssertNoTimeInFixedPhase => _settings.AssertNoTimeInFixedPhase;
 
         public bool IsExecutingSystems
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _isExecutingSystems;
             }
         }
@@ -208,12 +207,12 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _variableDeltaTime.Value;
             }
             set
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 _variableDeltaTime = value;
                 _variableDeltaTimeChangeEvent.Invoke(value);
             }
@@ -223,7 +222,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _variableDeltaTimeChangeEvent;
             }
         }
@@ -232,12 +231,12 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _elapsedVariableTime;
             }
             set
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
 
                 if (_elapsedVariableTime != value)
                 {
@@ -251,7 +250,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _elapsedVariableTimeChangeEvent;
             }
         }
@@ -260,12 +259,12 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _variableFrameCount;
             }
             set
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
 
                 if (_variableFrameCount != value)
                 {
@@ -279,7 +278,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _variableFrameCountChangeEvent;
             }
         }
@@ -288,7 +287,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _settings.FixedTimeStep;
             }
         }
@@ -297,12 +296,12 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _elapsedFixedTime;
             }
             set
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 if (_elapsedFixedTime != value)
                 {
                     _elapsedFixedTime = value;
@@ -315,7 +314,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _fixedElapsedTimeChangeEvent;
             }
         }
@@ -324,12 +323,12 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _currentFixedFrameCount;
             }
             set
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 if (_currentFixedFrameCount != value)
                 {
                     _currentFixedFrameCount = value;
@@ -342,7 +341,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _fixedCurrentFrameChangeEvent;
             }
         }
@@ -351,7 +350,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _systems;
             }
         }
@@ -360,7 +359,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _sortedFixedSystems;
             }
         }
@@ -369,7 +368,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _sortedInputSystems;
             }
         }
@@ -378,7 +377,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _sortedEarlyPresentationSystems;
             }
         }
@@ -387,7 +386,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _sortedPresentationSystems;
             }
         }
@@ -396,17 +395,17 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_hasDisposed);
+                TrecsDebugAssert.That(!_hasDisposed);
                 return _sortedLatePresentationSystems;
             }
         }
 
         internal void SetEventSubjects(EventsManager eventsManager)
         {
-            TrecsAssert.IsNull(_fixedUpdateStarted);
-            TrecsAssert.IsNull(_fixedUpdateCompleted);
-            TrecsAssert.IsNull(_variableUpdateStarted);
-            TrecsAssert.IsNull(_variableUpdateCompleted);
+            TrecsDebugAssert.IsNull(_fixedUpdateStarted);
+            TrecsDebugAssert.IsNull(_fixedUpdateCompleted);
+            TrecsDebugAssert.IsNull(_variableUpdateStarted);
+            TrecsDebugAssert.IsNull(_variableUpdateCompleted);
 
             _fixedUpdateStarted = eventsManager.FixedUpdateStartedEvent;
             _fixedUpdateCompleted = eventsManager.FixedUpdateCompletedEvent;
@@ -416,21 +415,24 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            TrecsAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(!_hasDisposed);
             _hasDisposed = true;
 
             // Drain any remaining tracked jobs before releasing the safety pool, otherwise
             // EnforceAllBufferJobsHaveCompletedAndRelease would block on Burst code that
             // still references handles we're about to release.
             _jobScheduler.CompleteAllOutstanding();
+#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+            _jobScheduler.DisposeTimingBuffers();
+#endif
             _safetyManager.Dispose();
 
-            TrecsAssert.That(_variableDeltaTimeChangeEvent.NumObservers == 0);
-            TrecsAssert.That(_fixedCurrentFrameChangeEvent.NumObservers == 0);
-            TrecsAssert.That(_elapsedVariableTimeChangeEvent.NumObservers == 0);
-            TrecsAssert.That(_variableFrameCountChangeEvent.NumObservers == 0);
-            TrecsAssert.That(_fixedElapsedTimeChangeEvent.NumObservers == 0);
-            TrecsAssert.That(_fixedIsPausedChangedEvent.NumObservers == 0);
+            TrecsDebugAssert.That(_variableDeltaTimeChangeEvent.NumObservers == 0);
+            TrecsDebugAssert.That(_fixedCurrentFrameChangeEvent.NumObservers == 0);
+            TrecsDebugAssert.That(_elapsedVariableTimeChangeEvent.NumObservers == 0);
+            TrecsDebugAssert.That(_variableFrameCountChangeEvent.NumObservers == 0);
+            TrecsDebugAssert.That(_fixedElapsedTimeChangeEvent.NumObservers == 0);
+            TrecsDebugAssert.That(_fixedIsPausedChangedEvent.NumObservers == 0);
         }
 
         // Note that there are two categories of systems - fixed and variable
@@ -438,8 +440,8 @@ namespace Trecs.Internal
         // So it only makes sense to compare sort indices within each group
         public int GetSystemSortIndex(int i)
         {
-            TrecsAssert.That(!_hasDisposed);
-            TrecsAssert.That(i >= 0 && i < _systemSortIndex.Length);
+            TrecsDebugAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(i >= 0 && i < _systemSortIndex.Length);
             return _systemSortIndex[i];
         }
 
@@ -449,27 +451,27 @@ namespace Trecs.Internal
             SystemEnableState enableState
         )
         {
-            TrecsAssert.That(!_hasDisposed);
-            TrecsAssert.IsNotNull(
+            TrecsDebugAssert.That(!_hasDisposed);
+            TrecsDebugAssert.IsNotNull(
                 _fixedUpdateStarted,
                 "SetEventSubjects must be called before Initialize"
             );
-            TrecsAssert.IsNotNull(enableState);
+            TrecsDebugAssert.IsNotNull(enableState);
 
             _enableState = enableState;
-            TrecsAssert.IsNull(_systems);
+            TrecsDebugAssert.IsNull(_systems);
             _systems = new List<SystemEntry>(loadInfo.Systems.Count);
-            TrecsAssert.IsNull(_systemRuntimeInfos);
+            TrecsDebugAssert.IsNull(_systemRuntimeInfos);
             _systemRuntimeInfos = new List<SystemRuntimeInfo>(loadInfo.Systems.Count);
-            TrecsAssert.IsNull(_sortedInputSystems);
+            TrecsDebugAssert.IsNull(_sortedInputSystems);
             _sortedInputSystems = loadInfo.SortedInputSystems;
-            TrecsAssert.IsNull(_sortedFixedSystems);
+            TrecsDebugAssert.IsNull(_sortedFixedSystems);
             _sortedFixedSystems = loadInfo.SortedFixedSystems;
-            TrecsAssert.IsNull(_sortedEarlyPresentationSystems);
+            TrecsDebugAssert.IsNull(_sortedEarlyPresentationSystems);
             _sortedEarlyPresentationSystems = loadInfo.SortedEarlyPresentationSystems;
-            TrecsAssert.IsNull(_sortedPresentationSystems);
+            TrecsDebugAssert.IsNull(_sortedPresentationSystems);
             _sortedPresentationSystems = loadInfo.SortedPresentationSystems;
-            TrecsAssert.IsNull(_sortedLatePresentationSystems);
+            TrecsDebugAssert.IsNull(_sortedLatePresentationSystems);
             _sortedLatePresentationSystems = loadInfo.SortedLatePresentationSystems;
             _systemSortIndex = new int[loadInfo.Systems.Count];
 
@@ -478,7 +480,7 @@ namespace Trecs.Internal
                 for (int i = 0; i < sorted.Count; i++)
                 {
                     var globalIndex = sorted[i];
-                    TrecsAssert.That(_systemSortIndex[globalIndex] == 0);
+                    TrecsDebugAssert.That(_systemSortIndex[globalIndex] == 0);
                     _systemSortIndex[globalIndex] = i;
                 }
             }
@@ -501,20 +503,20 @@ namespace Trecs.Internal
             );
         }
 
-        public void SubmitEntities()
+        public void Submit()
         {
-            TrecsAssert.That(!_hasDisposed);
-            TrecsAssert.That(!_isExecutingSystems);
+            TrecsDebugAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(!_isExecutingSystems);
 
-            using (TrecsProfiling.Start("SubmitEntities"))
+            using (TrecsProfiling.Start("Submit"))
             {
-                _entitySubmitter.SubmitEntities();
+                _entitySubmitter.Submit();
             }
         }
 
         void FixedUpdateSystemExecute()
         {
-            TrecsAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(!_hasDisposed);
 
             if (_fixedIsPaused && !_stepFixedFrame)
             {
@@ -542,7 +544,7 @@ namespace Trecs.Internal
             var skipForward = false;
 
             var fixedTimeStep = _settings.FixedTimeStep;
-            TrecsAssert.That(fixedTimeStep > 0);
+            TrecsDebugAssert.That(fixedTimeStep > 0);
 
             // Keep running until the physics time exceeds the current time
             // so we can interpolate to get the current time
@@ -585,7 +587,7 @@ namespace Trecs.Internal
                     SyncJobsAndFlushWrites();
                 }
 
-                TrecsAssert.That(_isExecutingSystems);
+                TrecsDebugAssert.That(_isExecutingSystems);
                 _isExecutingSystems = false;
 
                 // Save interpolated values asap so that we interpolate changes
@@ -606,12 +608,12 @@ namespace Trecs.Internal
                     _entityInputQueue.ApplyInputs(_currentFixedFrameCount);
                 }
 
-                // We can't add "TrecsAssert.That(allFixedJobs.IsCompleted)" because it seems that
+                // We can't add "TrecsDebugAssert.That(allFixedJobs.IsCompleted)" because it seems that
                 // IsCompleted doesn't return the most up-to-date information
 
                 using (TrecsProfiling.Start("FixedTick"))
                 {
-                    TrecsAssert.That(!_isExecutingSystems);
+                    TrecsDebugAssert.That(!_isExecutingSystems);
                     _isExecutingSystems = true;
 
                     ExecuteSystemGroup(_sortedFixedSystems);
@@ -629,7 +631,7 @@ namespace Trecs.Internal
 
                     // For example, we might have a group that processes all Foos and then moves
                     // them into another group
-                    // Without this SubmitEntities call, if we run fixed update again, they would
+                    // Without this Submit call, if we run fixed update again, they would
                     // be processed multiple times resulting in bugs
 
                     // Another example is a case where we remove an entity then immediately
@@ -642,9 +644,9 @@ namespace Trecs.Internal
                     // order to actually enable the linked game objects
                     SyncJobsAndFlushWrites();
 
-                    TrecsAssert.That(_isExecutingSystems);
+                    TrecsDebugAssert.That(_isExecutingSystems);
                     _isExecutingSystems = false;
-                    SubmitEntities();
+                    Submit();
                 }
 
                 _elapsedFixedTime += fixedTimeStep;
@@ -661,7 +663,7 @@ namespace Trecs.Internal
                     }
                 }
 
-                TrecsAssert.That(!_isExecutingSystems);
+                TrecsDebugAssert.That(!_isExecutingSystems);
                 _isExecutingSystems = true;
             }
 
@@ -710,7 +712,7 @@ namespace Trecs.Internal
 
         void ExecuteSystem(int globalIndex)
         {
-            TrecsAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(!_hasDisposed);
 
             var systemInfo = _systems[globalIndex];
             var systemRuntimeInfo = _systemRuntimeInfos[globalIndex];
@@ -782,7 +784,7 @@ namespace Trecs.Internal
         /// </summary>
         public void StepFixedFrame()
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 _desiredFixedIsPaused,
                 "StepFixedFrame requires FixedIsPaused to be true"
             );
@@ -792,7 +794,7 @@ namespace Trecs.Internal
 
         public void Tick()
         {
-            TrecsAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(!_hasDisposed);
             // _dbg.Text("IsPaused: {}", _isPaused);
             // _dbg.Text("FixedIsPaused: {}", _fixedIsPaused);
 
@@ -804,8 +806,14 @@ namespace Trecs.Internal
             _lastTickFrame = Time.frameCount;
             _variableFrameCount += 1;
             _variableDeltaTime = Time.deltaTime * _timeScale;
-            _variableFrameCountChangeEvent.Invoke(_variableFrameCount);
-            _variableDeltaTimeChangeEvent.Invoke(_variableDeltaTime.Value);
+            using (TrecsProfiling.Start("VariableFrameCountChange Handlers"))
+            {
+                _variableFrameCountChangeEvent.Invoke(_variableFrameCount);
+            }
+            using (TrecsProfiling.Start("VariableDeltaTimeChange Handlers"))
+            {
+                _variableDeltaTimeChangeEvent.Invoke(_variableDeltaTime.Value);
+            }
 
             if (_fixedIsPaused != _desiredFixedIsPaused)
             {
@@ -868,30 +876,39 @@ namespace Trecs.Internal
                 // This way, initialization code can schedule add long lived entities
                 // and thereafter assume they exist in every execute
                 _hasRunFirstTick = true;
-                SubmitEntities();
+                Submit();
             }
 
-            TrecsAssert.That(!_isExecutingSystems);
+            TrecsDebugAssert.That(!_isExecutingSystems);
             _isExecutingSystems = true;
 
             try
             {
-                ExecuteSystemGroup(_sortedEarlyPresentationSystems);
+                using (TrecsProfiling.Start("Early Presentation"))
+                {
+                    ExecuteSystemGroup(_sortedEarlyPresentationSystems);
+                }
 
                 // Drives the Input + Fixed loop, running 0..N times based on
                 // accumulated variable time and the fixed time step. Manages
                 // _isExecutingSystems internally around its inner phases and
                 // restores it to true on exit.
-                FixedUpdateSystemExecute();
+                using (TrecsProfiling.Start("Fixed Update"))
+                {
+                    FixedUpdateSystemExecute();
+                }
 
-                ExecuteSystemGroup(_sortedPresentationSystems);
+                using (TrecsProfiling.Start("Presentation"))
+                {
+                    ExecuteSystemGroup(_sortedPresentationSystems);
+                }
             }
             finally
             {
                 SyncJobsAndFlushWrites();
 
                 // Don't shadow other exceptions here
-                // TrecsAssert.That(_isExecutingSystems);
+                // TrecsDebugAssert.That(_isExecutingSystems);
 
                 _isExecutingSystems = false;
             }
@@ -901,7 +918,7 @@ namespace Trecs.Internal
 
         public void LateTick()
         {
-            TrecsAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(!_hasDisposed);
 
             if (_lastTickFrame != Time.frameCount)
             {
@@ -909,7 +926,7 @@ namespace Trecs.Internal
                 return;
             }
 
-            TrecsAssert.That(!_isExecutingSystems);
+            TrecsDebugAssert.That(!_isExecutingSystems);
             _isExecutingSystems = true;
 
             try
@@ -921,12 +938,12 @@ namespace Trecs.Internal
                 SyncJobsAndFlushWrites();
 
                 // Don't shadow other exceptions here
-                // TrecsAssert.That(_isExecutingSystems);
+                // TrecsDebugAssert.That(_isExecutingSystems);
 
                 _isExecutingSystems = false;
             }
 
-            SubmitEntities();
+            Submit();
 
             _elapsedVariableTime += _variableDeltaTime.Value;
             _elapsedVariableTimeChangeEvent.Invoke(_elapsedVariableTime);
@@ -939,7 +956,7 @@ namespace Trecs.Internal
 
         internal void OnEcsDeserializeCompleted()
         {
-            TrecsAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(!_hasDisposed);
 
             _variableFrameCount = 0;
             // This is necessary because fixed update is always catching up to whatever this is

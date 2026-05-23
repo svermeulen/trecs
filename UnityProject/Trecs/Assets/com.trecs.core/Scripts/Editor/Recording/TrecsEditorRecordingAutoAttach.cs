@@ -4,8 +4,8 @@ using System.Collections.Generic;
 namespace Trecs.Internal
 {
     /// <summary>
-    /// Refcounted helper that constructs a <see cref="TrecsAutoRecorder"/> +
-    /// <see cref="TrecsGameStateController"/> pair for every active
+    /// Refcounted helper that constructs a <see cref="TrecsRewindBuffer"/> +
+    /// <see cref="TrecsRecordingSession"/> pair for every active
     /// <see cref="World"/> while at least one <see cref="TrecsPlayerWindow"/>
     /// is open, and disposes them when the last window closes.
     ///
@@ -26,13 +26,29 @@ namespace Trecs.Internal
 
         struct AttachedSet
         {
-            public TrecsAutoRecorder Recorder;
-            public TrecsGameStateController Controller;
+            public TrecsRewindBuffer Recorder;
+            public TrecsRecordingSession Session;
+            public TrecsSnapshotLibrary SnapshotLibrary;
 
             // SnapshotSerializer is IDisposable; we own the instance here so
             // we have to dispose it on detach. WorldStateSerializer is not
             // IDisposable so it doesn't need tracking.
             public SnapshotSerializer Snapshots;
+        }
+
+        /// <summary>
+        /// Look up the snapshot library for <paramref name="world"/>, or
+        /// null if no world is attached. Editor windows fetch the library
+        /// through here rather than constructing their own — the lifetime
+        /// is owned by the attach refcount.
+        /// </summary>
+        public static TrecsSnapshotLibrary GetSnapshotLibrary(World world)
+        {
+            if (world == null || !_attached.TryGetValue(world, out var attached))
+            {
+                return null;
+            }
+            return attached.SnapshotLibrary;
         }
 
         /// <summary>
@@ -64,7 +80,7 @@ namespace Trecs.Internal
         /// </summary>
         public static void Deactivate()
         {
-            TrecsAssert.That(_activationCount > 0, "Deactivate without matching Activate");
+            TrecsDebugAssert.That(_activationCount > 0, "Deactivate without matching Activate");
             _activationCount--;
             if (_activationCount > 0)
             {
@@ -75,7 +91,7 @@ namespace Trecs.Internal
             WorldRegistry.WorldUnregistered -= DetachForWorld;
             foreach (var attached in _attached.Values)
             {
-                attached.Controller.Dispose();
+                attached.Session.Dispose();
                 attached.Recorder.Dispose();
                 attached.Snapshots.Dispose();
             }
@@ -91,53 +107,56 @@ namespace Trecs.Internal
 
             var registry = world.SerializerRegistry;
             var stateSerializer = new WorldStateSerializer(world);
-            var snapshots = new SnapshotSerializer(stateSerializer, registry, world);
-            var recorder = new TrecsAutoRecorder(
-                world,
-                stateSerializer,
-                registry,
-                new TrecsAutoRecorderSettings(),
-                snapshots
-            );
-            var controller = new TrecsGameStateController(world, recorder, snapshots);
+            SnapshotSerializer snapshots = null;
+            TrecsRewindBuffer recorder = null;
+            TrecsRecordingSession session = null;
             try
             {
-                recorder.Initialize();
-                // Controller.Initialize fires TrecsGameStateRegistry.ControllerRegistered,
+                snapshots = new SnapshotSerializer(stateSerializer, registry, world);
+                recorder = new TrecsRewindBuffer(
+                    world,
+                    stateSerializer,
+                    registry,
+                    new TrecsRewindBufferSettings(),
+                    snapshots
+                );
+                // Constructor fires TrecsRecordingSessionRegistry.ControllerRegistered,
                 // which TrecsGameStateActivator listens to so that auto-record-on-open
                 // kicks in without any extra wiring from us.
-                controller.Initialize();
+                session = new TrecsRecordingSession(world, recorder);
             }
             catch (Exception e)
             {
-                // Partial init — dispose in reverse order (matching
-                // DetachForWorld). The Dispose paths tolerate not-yet-
-                // initialized state, so this is safe even if the throw
-                // came from recorder.Initialize() before controller was
-                // touched. Swallow further failures so a Dispose-throw
-                // doesn't mask the original error.
+                // Partial init — dispose whatever did construct. Swallow
+                // further failures so a Dispose-throw doesn't mask the
+                // original error.
                 try
                 {
-                    controller.Dispose();
+                    session?.Dispose();
                 }
                 catch { }
                 try
                 {
-                    recorder.Dispose();
+                    recorder?.Dispose();
                 }
                 catch { }
                 try
                 {
-                    snapshots.Dispose();
+                    snapshots?.Dispose();
                 }
                 catch { }
                 _log.Error("Failed to auto-attach Trecs Player to world {0}: {1}", world, e);
                 return;
             }
+            // SnapshotLibrary depends on a fully-constructed session (it
+            // calls Stop/Start on it during LoadSnapshot), so construct it
+            // last. Stateless apart from its dependency refs.
+            var snapshotLibrary = new TrecsSnapshotLibrary(world, snapshots, session);
             _attached[world] = new AttachedSet
             {
                 Recorder = recorder,
-                Controller = controller,
+                Session = session,
+                SnapshotLibrary = snapshotLibrary,
                 Snapshots = snapshots,
             };
             _log.Trace("Auto-attached Trecs Player to world {0}", world);
@@ -150,7 +169,7 @@ namespace Trecs.Internal
                 return;
             }
             _attached.Remove(world);
-            attached.Controller.Dispose();
+            attached.Session.Dispose();
             attached.Recorder.Dispose();
             attached.Snapshots.Dispose();
             _log.Trace("Auto-detached Trecs Player from world {0}", world);

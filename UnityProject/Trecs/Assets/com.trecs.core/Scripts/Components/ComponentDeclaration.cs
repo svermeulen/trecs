@@ -64,7 +64,7 @@ namespace Trecs.Internal
             string templateContext
         )
         {
-            TrecsAssert.That(declarations.Contains(this));
+            TrecsDebugAssert.That(declarations.Contains(this));
 
             bool? variableUpdateOnly = null;
             bool? isInput = null;
@@ -81,7 +81,7 @@ namespace Trecs.Internal
                 {
                     if (variableUpdateOnly.HasValue)
                     {
-                        TrecsAssert.That(
+                        TrecsDebugAssert.That(
                             variableUpdateOnly.Value == dec.VariableUpdateOnly.Value,
                             "Found conflicting VariableUpdateOnly declarations for component type {0} while processing template {1}",
                             _componentType,
@@ -98,7 +98,7 @@ namespace Trecs.Internal
                 {
                     if (isInput.HasValue)
                     {
-                        TrecsAssert.That(
+                        TrecsDebugAssert.That(
                             isInput.Value == dec.IsInput.Value,
                             "Found conflicting IsInput declarations for component type {0} while processing template {1}",
                             _componentType,
@@ -115,7 +115,7 @@ namespace Trecs.Internal
                 {
                     if (isConstant.HasValue)
                     {
-                        TrecsAssert.That(
+                        TrecsDebugAssert.That(
                             isConstant.Value == dec.IsConstant.Value,
                             "Found conflicting IsConstant declarations for component type {0} while processing template {1}",
                             _componentType,
@@ -132,7 +132,7 @@ namespace Trecs.Internal
                 {
                     if (isInterpolated.HasValue)
                     {
-                        TrecsAssert.That(
+                        TrecsDebugAssert.That(
                             isInterpolated.Value == dec.IsInterpolated.Value,
                             "Found conflicting IsInterpolated declarations for component type {0} while processing template {1}",
                             _componentType,
@@ -149,7 +149,7 @@ namespace Trecs.Internal
                 {
                     if (inputFrameBehaviour.HasValue)
                     {
-                        TrecsAssert.That(
+                        TrecsDebugAssert.That(
                             inputFrameBehaviour.Value == dec.MissingInputBehavior.Value,
                             "Found conflicting MissingInputBehavior declarations for component type {0} while processing template {1}",
                             _componentType,
@@ -166,7 +166,7 @@ namespace Trecs.Internal
                 {
                     if (defaultValue.HasValue)
                     {
-                        TrecsAssert.That(
+                        TrecsDebugAssert.That(
                             UnmanagedUtil.BlittableEquals(dec.Default.Value, defaultValue.Value),
                             "Found multiple non-equal default values for component type {0} while processing template {1}",
                             _componentType,
@@ -185,7 +185,7 @@ namespace Trecs.Internal
             bool isConstantChoice = isConstant ?? false;
             bool isInterpolatedChoice = isInterpolated ?? false;
 
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 !isInterpolatedChoice || !isConstantChoice,
                 "Component type {0} cannot be both Interpolated and Constant while processing template {1}",
                 _componentType,
@@ -194,8 +194,8 @@ namespace Trecs.Internal
 
             if (isInputChoice)
             {
-                TrecsAssert.That(inputFrameBehaviour.HasValue);
-                TrecsAssert.That(
+                TrecsDebugAssert.That(inputFrameBehaviour.HasValue);
+                TrecsDebugAssert.That(
                     !isConstantChoice,
                     "Component type {0} cannot be both Input and Constant while processing template {1}",
                     _componentType,
@@ -205,11 +205,11 @@ namespace Trecs.Internal
                 // This actually is valid sometimes
                 // In one case - we send camera transform as input, but then we want interpolated values for it which we
                 // use when playing recording
-                // TrecsAssert.That(
+                // TrecsDebugAssert.That(
                 //     !isInterpolatedChoice,
                 //     "Component type {} cannot be both Input and Interpolated while processing template {}", _componentType, templateContext);
 
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     !variableUpdateOnlyChoice,
                     "Component type {0} cannot be both Input and VariableUpdateOnly while processing template {1}",
                     _componentType,
@@ -231,7 +231,7 @@ namespace Trecs.Internal
 
             if (isInterpolatedChoice)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     !variableUpdateOnlyChoice,
                     "Component type {0} cannot be both Interpolated and VariableUpdateOnly while processing template {1}",
                     _componentType,

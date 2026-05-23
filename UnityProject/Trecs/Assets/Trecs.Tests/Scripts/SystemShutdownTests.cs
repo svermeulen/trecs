@@ -161,7 +161,7 @@ namespace Trecs.Tests
         partial void OnReady()
         {
             TestShutdownLog.GlobalGroupOnRemovedSubscription = World
-                .Events.InGroup(World.WorldInfo.GlobalGroup)
+                .Events.EntitiesInGroup(World.WorldInfo.GlobalGroup)
                 .OnRemoved(
                     (GroupIndex _, EntityRange _) => TestShutdownLog.GlobalGroupOnRemovedCalls++
                 );
@@ -295,7 +295,7 @@ namespace Trecs.Tests
             // hadn't logically cleared the world before the shutdown hook ran.
             var a = env.Accessor;
             a.AddEntity(TestTags.Alpha).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
             NAssert.AreEqual(1, a.CountEntitiesWithTags(TestTags.Alpha));
 
             env.Dispose();
@@ -415,7 +415,7 @@ namespace Trecs.Tests
 
             var env = new TestEnvironment(world);
             env.Accessor.AddEntity(TestTags.Alpha).AssertComplete();
-            env.Accessor.SubmitEntities();
+            env.Accessor.Submit();
 
             NAssert.DoesNotThrow(() => env.Dispose());
             NAssert.IsTrue(

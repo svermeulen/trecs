@@ -11,7 +11,23 @@ namespace Trecs.SourceGen.Shared
 {
     internal static class FromWorldEmitter
     {
-        internal const string GenPrefix = "_trecs_";
+        /// <summary>
+        /// Prefix applied to generator-internal locals and other names that only appear
+        /// inside generated method bodies the user never sees. Double-underscore signals
+        /// "framework-internal" while leaving room for the shorter <see cref="JobFieldPrefix"/>
+        /// on names users can encounter in the debugger or by reading .g.cs.
+        /// </summary>
+        internal const string GenPrefix = "__trecs_";
+
+        /// <summary>
+        /// Prefix applied to fields and nested types declared on generated job structs
+        /// (e.g. <c>__pt_{Name}</c>, <c>__fw_{Name}</c>, <c>__GroupIndex</c>,
+        /// <c>__buf{i}</c>, <c>__SparseShim</c>). The job struct itself is nested inside
+        /// the user's class, so its members are more likely to surface in the debugger
+        /// or in generated source the user inspects — kept short and prefix-free of the
+        /// "trecs" token to reduce line noise there.
+        /// </summary>
+        internal const string JobFieldPrefix = "__";
 
         /// <summary>
         /// Emits TagSet resolution and group hoisting for [FromWorld] fields before the iteration loop.
@@ -19,18 +35,13 @@ namespace Trecs.SourceGen.Shared
         internal static void EmitFromWorldHoistedSetup(
             StringBuilder sb,
             string body,
-            List<FromWorldFieldEmit> emits
+            List<FromWorldFieldEmitModel> emits
         )
         {
-            // For fields with inline tags, resolve the final TagSet by combining inline
-            // and optional runtime tags. For fields without inline tags, the schedule
-            // param is used directly.
             foreach (var e in emits)
             {
                 if (e.InlineTagSetExpression.Length > 0)
                 {
-                    // Emit: var _trecs_fishPositions_tags = TagSet<Fish>.Value;
-                    // if (fishPositionsTags != null) _trecs_fishPositions_tags = _trecs_fishPositions_tags.CombineWith(fishPositionsTags.Value);
                     sb.AppendLine($"{body}var {e.TagSetExpression} = {e.InlineTagSetExpression};");
                     if (e.HasScheduleParam)
                     {
@@ -41,9 +52,6 @@ namespace Trecs.SourceGen.Shared
                 }
             }
 
-            // Hoist cross-group lookups (NativeComponentLookup) and single-group resolutions
-            // (ComponentBuffer / NativeEntitySetIndices) outside the iteration loop. Their
-            // group resolution is per-tagset, not per-iteration-group.
             foreach (var e in emits)
             {
                 if (e.NeedsHoistedGroups)
@@ -61,13 +69,10 @@ namespace Trecs.SourceGen.Shared
             }
         }
 
-        /// <summary>
-        /// Emits per-field dependency registration (IncludeReadDep/IncludeWriteDep) for [FromWorld] fields.
-        /// </summary>
         internal static void EmitFromWorldDepRegistration(
             StringBuilder sb,
             string body,
-            List<FromWorldFieldEmit> emits
+            List<FromWorldFieldEmitModel> emits
         )
         {
             foreach (var e in emits)
@@ -78,7 +83,7 @@ namespace Trecs.SourceGen.Shared
                     case FromWorldFieldKind.NativeComponentBufferRead:
                     case FromWorldFieldKind.NativeComponentBufferWrite:
                     {
-                        var rid = $"ResourceId.Component(ComponentTypeId<{t}>.Value)";
+                        var rid = $"ResourceId.Component(TypeId<{t}>.Value)";
                         var method =
                             e.Kind == FromWorldFieldKind.NativeComponentBufferRead
                                 ? "IncludeReadDep"
@@ -91,7 +96,7 @@ namespace Trecs.SourceGen.Shared
                     case FromWorldFieldKind.NativeComponentRead:
                     case FromWorldFieldKind.NativeComponentWrite:
                     {
-                        var rid = $"ResourceId.Component(ComponentTypeId<{t}>.Value)";
+                        var rid = $"ResourceId.Component(TypeId<{t}>.Value)";
                         var method =
                             e.Kind == FromWorldFieldKind.NativeComponentRead
                                 ? "IncludeReadDep"
@@ -104,7 +109,7 @@ namespace Trecs.SourceGen.Shared
                     case FromWorldFieldKind.NativeComponentLookupRead:
                     case FromWorldFieldKind.NativeComponentLookupWrite:
                     {
-                        var rid = $"ResourceId.Component(ComponentTypeId<{t}>.Value)";
+                        var rid = $"ResourceId.Component(TypeId<{t}>.Value)";
                         var method =
                             e.Kind == FromWorldFieldKind.NativeComponentLookupRead
                                 ? "IncludeReadDep"
@@ -147,54 +152,45 @@ namespace Trecs.SourceGen.Shared
                     case FromWorldFieldKind.NativeWorldAccessor:
                     case FromWorldFieldKind.GroupIndex:
                     case FromWorldFieldKind.NativeEntityHandleBuffer:
-                        // No dependency registration — these are passive identifiers.
                         break;
                 }
             }
         }
 
-        /// <summary>
-        /// Emit per-(component, group) dep registration for a NativeFactory field.
-        /// For each component in the aspect, emits IncludeReadDep/IncludeWriteDep
-        /// (scheduling) or TrackJobRead/TrackJobWrite (tracking) inside a foreach
-        /// over the factory's hoisted groups list.
-        /// </summary>
         internal static void EmitNativeFactoryDeps(
             StringBuilder sb,
             string body,
-            FromWorldFieldEmit e,
+            in FromWorldFieldEmitModel e,
             bool isTracking
         )
         {
-            var aspectData = e.AspectData;
-            if (aspectData == null)
+            if (!e.HasAspectData)
                 return;
+            var aspectData = e.AspectData;
 
             sb.AppendLine($"{body}foreach (var {GenPrefix}lg in {e.HoistedGroupsLocal})");
             sb.AppendLine($"{body}{{");
             string innerBody = body + "    ";
-            foreach (var comp in aspectData.ReadTypes)
+            foreach (var compName in aspectData.ReadTypeDisplays)
             {
-                var compName = PerformanceCache.GetDisplayString(comp);
-                var rid = $"ResourceId.Component(ComponentTypeId<{compName}>.Value)";
+                var rid = $"ResourceId.Component(TypeId<{compName}>.Value)";
                 var method = isTracking ? "TrackJobRead" : "IncludeReadDep";
                 if (isTracking)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {GenPrefix}lg);"
+                        $"{innerBody}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {GenPrefix}lg, {GenPrefix}jobName);"
                     );
                 else
                     sb.AppendLine(
                         $"{innerBody}{GenPrefix}deps = {GenPrefix}scheduler.{method}({GenPrefix}deps, {rid}, {GenPrefix}lg);"
                     );
             }
-            foreach (var comp in aspectData.WriteTypes)
+            foreach (var compName in aspectData.WriteTypeDisplays)
             {
-                var compName = PerformanceCache.GetDisplayString(comp);
-                var rid = $"ResourceId.Component(ComponentTypeId<{compName}>.Value)";
+                var rid = $"ResourceId.Component(TypeId<{compName}>.Value)";
                 var method = isTracking ? "TrackJobWrite" : "IncludeWriteDep";
                 if (isTracking)
                     sb.AppendLine(
-                        $"{innerBody}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {GenPrefix}lg);"
+                        $"{innerBody}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {GenPrefix}lg, {GenPrefix}jobName);"
                     );
                 else
                     sb.AppendLine(
@@ -204,34 +200,26 @@ namespace Trecs.SourceGen.Shared
             sb.AppendLine($"{body}}}");
         }
 
-        /// <summary>
-        /// Emit the field assignment for a NativeFactory field. Creates individual
-        /// NativeComponentLookup instances for each aspect component, registers them for
-        /// disposal, and constructs the NativeFactory from them.
-        /// </summary>
         internal static void EmitNativeFactoryFieldAssignment(
             StringBuilder sb,
             string body,
-            FromWorldFieldEmit e
+            in FromWorldFieldEmitModel e
         )
         {
-            var aspectData = e.AspectData;
-            if (aspectData == null)
+            if (!e.HasAspectData)
                 return;
+            var aspectData = e.AspectData;
 
-            var allTypes = aspectData.AllComponentTypes;
+            var allTypes = aspectData.AllComponentDisplays;
             var lookupLocals = new List<string>(allTypes.Length);
 
             for (int i = 0; i < allTypes.Length; i++)
             {
-                var compName = PerformanceCache.GetDisplayString(allTypes[i]);
-                var isReadOnly =
-                    aspectData.ReadTypes.Any(r =>
-                        SymbolEqualityComparer.Default.Equals(r, allTypes[i])
-                    )
-                    && !aspectData.WriteTypes.Any(w =>
-                        SymbolEqualityComparer.Default.Equals(w, allTypes[i])
-                    );
+                var compName = allTypes[i];
+                // A component is read-only iff it appears in reads and NOT in writes.
+                // The model's IsWrite check covers the "in writes" half; the rest of
+                // AllComponentDisplays must be reads-only by construction.
+                var isReadOnly = !aspectData.IsWrite(compName);
                 var createMethod = isReadOnly
                     ? "CreateNativeComponentLookupReadForJob"
                     : "CreateNativeComponentLookupWriteForJob";
@@ -244,7 +232,6 @@ namespace Trecs.SourceGen.Shared
                 sb.AppendLine($"{body}{GenPrefix}scheduler.RegisterPendingDispose({local});");
             }
 
-            // Construct the NativeFactory from the individual lookups
             sb.Append($"{body}{GenPrefix}job.{e.FieldName} = new {e.GenericArgDisplay}(");
             for (int i = 0; i < lookupLocals.Count; i++)
             {
@@ -255,13 +242,10 @@ namespace Trecs.SourceGen.Shared
             sb.AppendLine(");");
         }
 
-        /// <summary>
-        /// Emits field value creation and assignment for [FromWorld] fields on the job instance.
-        /// </summary>
         internal static void EmitFromWorldFieldAssignments(
             StringBuilder sb,
             string body,
-            List<FromWorldFieldEmit> emits
+            List<FromWorldFieldEmitModel> emits
         )
         {
             foreach (var e in emits)
@@ -350,13 +334,10 @@ namespace Trecs.SourceGen.Shared
             }
         }
 
-        /// <summary>
-        /// Emits post-schedule dependency tracking (TrackJobRead/TrackJobWrite) for [FromWorld] fields.
-        /// </summary>
         internal static void EmitFromWorldTracking(
             StringBuilder sb,
             string body,
-            List<FromWorldFieldEmit> emits
+            List<FromWorldFieldEmitModel> emits
         )
         {
             foreach (var e in emits)
@@ -367,33 +348,33 @@ namespace Trecs.SourceGen.Shared
                     case FromWorldFieldKind.NativeComponentBufferRead:
                     case FromWorldFieldKind.NativeComponentBufferWrite:
                     {
-                        var rid = $"ResourceId.Component(ComponentTypeId<{t}>.Value)";
+                        var rid = $"ResourceId.Component(TypeId<{t}>.Value)";
                         var method =
                             e.Kind == FromWorldFieldKind.NativeComponentBufferRead
                                 ? "TrackJobRead"
                                 : "TrackJobWrite";
                         sb.AppendLine(
-                            $"{body}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {e.HoistedSingleGroupLocal});"
+                            $"{body}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {e.HoistedSingleGroupLocal}, {GenPrefix}jobName);"
                         );
                         break;
                     }
                     case FromWorldFieldKind.NativeComponentRead:
                     case FromWorldFieldKind.NativeComponentWrite:
                     {
-                        var rid = $"ResourceId.Component(ComponentTypeId<{t}>.Value)";
+                        var rid = $"ResourceId.Component(TypeId<{t}>.Value)";
                         var method =
                             e.Kind == FromWorldFieldKind.NativeComponentRead
                                 ? "TrackJobRead"
                                 : "TrackJobWrite";
                         sb.AppendLine(
-                            $"{body}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {e.ScheduleParamName}.GroupIndex);"
+                            $"{body}{GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {e.ScheduleParamName}.GroupIndex, {GenPrefix}jobName);"
                         );
                         break;
                     }
                     case FromWorldFieldKind.NativeComponentLookupRead:
                     case FromWorldFieldKind.NativeComponentLookupWrite:
                     {
-                        var rid = $"ResourceId.Component(ComponentTypeId<{t}>.Value)";
+                        var rid = $"ResourceId.Component(TypeId<{t}>.Value)";
                         var method =
                             e.Kind == FromWorldFieldKind.NativeComponentLookupRead
                                 ? "TrackJobRead"
@@ -402,7 +383,7 @@ namespace Trecs.SourceGen.Shared
                             $"{body}foreach (var {GenPrefix}lg in {e.HoistedGroupsLocal})"
                         );
                         sb.AppendLine(
-                            $"{body}    {GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {GenPrefix}lg);"
+                            $"{body}    {GenPrefix}scheduler.{method}({GenPrefix}handle, {rid}, {GenPrefix}lg, {GenPrefix}jobName);"
                         );
                         break;
                     }
@@ -420,7 +401,7 @@ namespace Trecs.SourceGen.Shared
                     {
                         var rid = $"ResourceId.Set(EntitySet<{t}>.Value.Id)";
                         sb.AppendLine(
-                            $"{body}{GenPrefix}scheduler.TrackJobRead({GenPrefix}handle, {rid}, {e.HoistedSingleGroupLocal});"
+                            $"{body}{GenPrefix}scheduler.TrackJobRead({GenPrefix}handle, {rid}, {e.HoistedSingleGroupLocal}, {GenPrefix}jobName);"
                         );
                         break;
                     }
@@ -430,14 +411,12 @@ namespace Trecs.SourceGen.Shared
                         );
                         break;
                     case FromWorldFieldKind.NativeWorldAccessor:
-                        // NativeWorldAccessor performs structural operations (add/remove/move)
-                        // that write to shared native queues. The job must complete before
-                        // SubmitEntities processes those queues at the next phase boundary.
-                        sb.AppendLine($"{body}{GenPrefix}scheduler.TrackJob({GenPrefix}handle);");
+                        sb.AppendLine(
+                            $"{body}{GenPrefix}scheduler.TrackJob({GenPrefix}handle, {GenPrefix}jobName);"
+                        );
                         break;
                     case FromWorldFieldKind.GroupIndex:
                     case FromWorldFieldKind.NativeEntityHandleBuffer:
-                        // No tracking — these are passive identifiers.
                         break;
                 }
             }

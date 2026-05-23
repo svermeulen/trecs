@@ -25,27 +25,39 @@ namespace Trecs.SourceGen.Shared
             bool needsEntityHandleBuffer
         )
         {
-            var p = FromWorldEmitter.GenPrefix;
+            var f = FromWorldEmitter.JobFieldPrefix;
 
             // GroupIndex — needed for aspect (for EntityIndex ctor) or for components when an
             // EntityIndex parameter is present.
             if (needsGroupField)
-                sb.AppendLine($"{indent}{visibility} GroupIndex {p}GroupIndex;");
+            {
+                sb.AppendLine($"{indent}{GeneratedCodeAttributes.Line}");
+                sb.AppendLine($"{indent}{visibility} GroupIndex {f}GroupIndex;");
+            }
 
             // GlobalIndexOffset — the per-call offset assigned per group by the schedule
             // overload; the Execute shim adds it to `i` before forwarding.
             if (needsGlobalIndexOffset)
-                sb.AppendLine($"{indent}{visibility} int {p}GlobalIndexOffset;");
+            {
+                sb.AppendLine($"{indent}{GeneratedCodeAttributes.Line}");
+                sb.AppendLine($"{indent}{visibility} int {f}GlobalIndexOffset;");
+            }
 
             // NativeWorldAccessor.
             if (hasNativeWorldAccessor)
-                sb.AppendLine($"{indent}{visibility} NativeWorldAccessor {p}nwa;");
+            {
+                sb.AppendLine($"{indent}{GeneratedCodeAttributes.Line}");
+                sb.AppendLine($"{indent}{visibility} NativeWorldAccessor {f}nwa;");
+            }
 
             // NativeEntityHandleBuffer — populated per-group at schedule time so the Execute
-            // shim can materialize the user's EntityHandle parameter as `_trecs_EntityHandles[i]`
+            // shim can materialize the user's EntityHandle parameter as `__EntityHandles[i]`
             // (no dictionary lookup, just an indexed read).
             if (needsEntityHandleBuffer)
-                sb.AppendLine($"{indent}{visibility} NativeEntityHandleBuffer {p}EntityHandles;");
+            {
+                sb.AppendLine($"{indent}{GeneratedCodeAttributes.Line}");
+                sb.AppendLine($"{indent}{visibility} NativeEntityHandleBuffer {f}EntityHandles;");
+            }
         }
 
         /// <summary>
@@ -64,20 +76,24 @@ namespace Trecs.SourceGen.Shared
             bool needsEntityHandleBuffer
         )
         {
+            // GenPrefix targets are *locals* in the surrounding emit scope (job, group,
+            // world, queryIndexOffset). JobFieldPrefix targets are *fields* on the
+            // generated job struct (GroupIndex, GlobalIndexOffset, nwa, EntityHandles).
             var p = FromWorldEmitter.GenPrefix;
+            var f = FromWorldEmitter.JobFieldPrefix;
 
             if (needsGroupField)
-                sb.AppendLine($"{indent}{p}job.{p}GroupIndex = {p}group;");
+                sb.AppendLine($"{indent}{p}job.{f}GroupIndex = {p}group;");
 
             if (needsGlobalIndexOffset)
-                sb.AppendLine($"{indent}{p}job.{p}GlobalIndexOffset = {p}queryIndexOffset;");
+                sb.AppendLine($"{indent}{p}job.{f}GlobalIndexOffset = {p}queryIndexOffset;");
 
             if (hasNativeWorldAccessor)
-                sb.AppendLine($"{indent}{p}job.{p}nwa = {p}world.ToNative();");
+                sb.AppendLine($"{indent}{p}job.{f}nwa = {p}world.ToNative();");
 
             if (needsEntityHandleBuffer)
                 sb.AppendLine(
-                    $"{indent}{p}job.{p}EntityHandles = {p}world.GetEntityHandleBufferForJob({p}group);"
+                    $"{indent}{p}job.{f}EntityHandles = {p}world.GetEntityHandleBufferForJob({p}group);"
                 );
         }
     }

@@ -168,7 +168,7 @@ namespace Trecs
         // TrecsSchemaTag entry — the same shape the cache stores on disk.
         static TrecsSchemaTag BuildEntryFromLive(World world, Tag tag)
         {
-            var entry = new TrecsSchemaTag { Name = tag.ToString(), Guid = tag.Guid };
+            var entry = new TrecsSchemaTag { Name = tag.ToString(), Guid = tag.Value };
             var info = world.WorldInfo;
             var seenTemplates = new HashSet<Template>();
             foreach (var rt in info.ResolvedTemplates)
@@ -195,7 +195,7 @@ namespace Trecs
             {
                 if (TagSetContains(entitySet.Tags, tag))
                 {
-                    entry.SetNames.Add(entitySet.DebugName ?? $"#{entitySet.Id.Id}");
+                    entry.SetNames.Add(entitySet.DebugName ?? $"#{entitySet.Id.Value}");
                 }
             }
             entry.SetNames.Sort(StringComparer.OrdinalIgnoreCase);
@@ -227,7 +227,7 @@ namespace Trecs
                 break;
             }
 
-            if (world == null || world.IsDisposed || tag.Guid == 0)
+            if (world == null || world.IsDisposed || tag.Value == 0)
             {
                 if (_lastAccessorHash != -1)
                 {
@@ -341,7 +341,7 @@ namespace Trecs
 
         static bool TagSetContains(TagSet ts, Tag tag)
         {
-            if (ts.IsNull || tag.Guid == 0)
+            if (ts.IsNull || tag.Value == 0)
             {
                 return false;
             }

@@ -26,12 +26,12 @@ namespace Trecs.Internal
         public ref T Entity(int index)
         {
 #if DEBUG
-            if (_map == null)
-                throw new TrecsException(
-                    $"Not initialized EntityIndexMapper in this group {typeof(T)}"
-                );
-            if (index >= _map.Count)
-                throw new TrecsException($"Entity not found in this group {typeof(T)}");
+            TrecsAssert.That(
+                _map != null,
+                "Not initialized EntityIndexMapper in this group {0}",
+                typeof(T)
+            );
+            TrecsAssert.That(index < _map.Count, "Entity not found in this group {0}", typeof(T));
 #endif
             return ref _map.GetValueAtIndexByRef(index);
         }

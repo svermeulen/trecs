@@ -83,14 +83,14 @@ namespace Trecs.Internal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void AddUnchecked(EntityIndex entityIndex)
         {
-            TrecsAssert.That(!entityIndex.GroupIndex.IsNull);
+            TrecsDebugAssert.That(!entityIndex.GroupIndex.IsNull);
             _entriesPerGroup[entityIndex.GroupIndex.Index].Add(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void RemoveUnchecked(EntityIndex entityIndex)
         {
-            TrecsAssert.That(!entityIndex.GroupIndex.IsNull);
+            TrecsDebugAssert.That(!entityIndex.GroupIndex.IsNull);
             var entry = _entriesPerGroup[entityIndex.GroupIndex.Index];
             if (entry.IsValid)
             {
@@ -101,13 +101,13 @@ namespace Trecs.Internal
         // ── Queries ────────────────────────────────────────────────────
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Exists(EntityIndex entityIndex)
+        public bool Contains(EntityIndex entityIndex)
         {
             var group = entityIndex.GroupIndex;
             if (group.IsNull)
                 return false;
             var entry = _entriesPerGroup[group.Index];
-            return entry.IsValid && entry.Exists(entityIndex.Index);
+            return entry.IsValid && entry.Contains(entityIndex.Index);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -151,7 +151,7 @@ namespace Trecs.Internal
         /// </summary>
         internal void FlushJobWrites()
         {
-            TrecsAssert.That(
+            TrecsDebugAssert.That(
                 *_jobClearRequested == 0,
                 "FlushJobWrites called with a pending clear flag — a code path filled "
                     + "the job bags without going through a SetFlushJob, leaving the flag "

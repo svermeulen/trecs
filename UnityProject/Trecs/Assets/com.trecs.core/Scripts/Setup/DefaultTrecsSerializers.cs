@@ -32,31 +32,29 @@ namespace Trecs.Internal
             RegisterBlit<Vector3>(registry, includeDelta: true);
             RegisterBlit<Vector4>(registry, includeDelta: true);
 
-            registry.RegisterSerializer(new BoolSerializer());
-            registry.RegisterSerializer(new TypeSerializer());
-            registry.RegisterSerializer(new StringSerializer());
+            registry.RegisterSerializer<BoolSerializer>();
+            registry.RegisterSerializer<TypeSerializer>();
+            registry.RegisterSerializer<StringSerializer>();
         }
 
         static void RegisterTrecsSerializers(SerializerRegistry registry)
         {
-            RegisterBlit<ComponentId>(registry);
+            RegisterBlit<TypeId>(registry);
 
             // Heap serializers
-            registry.RegisterSerializer(
-                new DenseDictionarySerializer<BlobId, NativeSharedHeap.BlobInfo>()
-            );
-            registry.RegisterSerializer(new DenseDictionarySerializer<PtrHandle, BlobId>());
+            registry.RegisterSerializer<
+                DenseDictionarySerializer<BlobId, NativeSharedHeap.BlobInfo>
+            >();
+            registry.RegisterSerializer<DenseDictionarySerializer<PtrHandle, BlobId>>();
             RegisterBlit<PtrHandle>(registry);
             RegisterBlit<NativeSharedHeap.BlobInfo>(registry);
 
-            registry.RegisterSerializer(
-                new DenseDictionarySerializer<BlobId, SharedHeap.BlobInfo>()
-            );
+            registry.RegisterSerializer<DenseDictionarySerializer<BlobId, SharedHeap.BlobInfo>>();
             RegisterBlit<SharedHeap.BlobInfo>(registry);
 
-            registry.RegisterSerializer(new ListSerializer<object>());
+            registry.RegisterSerializer<ListSerializer<object>>();
             registry.RegisterSerializer(new BlobManifest.Serializer());
-            registry.RegisterSerializer(new DenseDictionarySerializer<BlobId, BlobMetadata>());
+            registry.RegisterSerializer<DenseDictionarySerializer<BlobId, BlobMetadata>>();
             registry.RegisterSerializer(new BlobMetadata.Serializer());
             RegisterBlit<BlobId>(registry);
 
@@ -64,22 +62,28 @@ namespace Trecs.Internal
             RegisterBlit<EntityHandleMapElement>(registry);
             RegisterBlit<EntityHandle>(registry);
             RegisterBlit<TagSet>(registry);
-            // SetId is written by WorldStateSerializer.WriteSets /
-            // WriteSetRoutingIndex unconditionally — register it here so
-            // any world serialization works without callers having to
-            // remember to register it themselves. Same for the per-set
-            // entity-id-to-dense-index dictionary, written for each
-            // group's entries.
+            // SetId and the per-set entity-id-to-dense-index dictionary
+            // are written by WorldStateSerializer.WriteSets /
+            // WriteSetRoutingIndex unconditionally.
             RegisterBlit<SetId>(registry);
-            registry.RegisterSerializer(new NativeDenseDictionarySerializer<int, int>());
+            registry.RegisterSerializer<NativeDenseDictionarySerializer<int, int>>();
 
             // For EntityInputQueue
-            registry.RegisterSerializer(new DenseHashSetSerializer<EntityHandle>());
+            registry.RegisterSerializer<DenseHashSetSerializer<EntityHandle>>();
 
-            registry.RegisterSerializer(new RngSerializer());
+            registry.RegisterSerializer<RngSerializer>();
 
-            registry.RegisterSerializer(new NativeDenseDictionarySerializer<uint, uint>());
-            registry.RegisterSerializer(new NativeArraySerializer<uint>());
+            registry.RegisterSerializer<NativeDenseDictionarySerializer<uint, uint>>();
+            registry.RegisterSerializer<NativeArraySerializer<uint>>();
+
+            // Per-group Refs list in WorldStateSerializer's
+            // EntityIndexToReferenceMap.
+            registry.RegisterSerializer<UnsafeListSerializer<int>>();
+            // Per-group SetIds list in WorldStateSerializer's set routing
+            // index.
+            registry.RegisterSerializer<UnsafeListSerializer<SetId>>();
+            // Entity-handle map backing buffer in WorldStateSerializer.
+            registry.RegisterSerializer<NativeListSerializer<EntityHandleMapElement>>();
 
             SnapshotMetadata.RegisterSerializers(registry);
             BundleHeader.RegisterSerializers(registry);
@@ -88,11 +92,10 @@ namespace Trecs.Internal
         static void RegisterBlit<T>(SerializerRegistry registry, bool includeDelta = false)
             where T : unmanaged
         {
-            var serializer = new BlitSerializer<T>();
-            registry.RegisterSerializer(serializer);
+            registry.RegisterSerializer<BlitSerializer<T>>();
             if (includeDelta)
             {
-                registry.RegisterSerializerDelta(serializer);
+                registry.RegisterSerializerDelta<BlitSerializer<T>>();
             }
         }
     }

@@ -41,7 +41,7 @@ namespace Trecs.Serialization
             var nodesBuffer = dict.UnsafeKeys;
             unsafe
             {
-                fixed (DenseDictionary<TKey, TValue>.Node* ptr = nodesBuffer)
+                fixed (DenseDictionaryNode<TKey>* ptr = nodesBuffer)
                 {
                     writer.BlitWriteArrayPtr("ValuesInfo", ptr, count);
                 }
@@ -81,10 +81,10 @@ namespace Trecs.Serialization
 
             int bucketsCapacity = 0;
             reader.BlitRead("BucketsCapacity", ref bucketsCapacity);
-            TrecsAssert.That(bucketsCapacity >= 0);
+            TrecsDebugAssert.That(bucketsCapacity >= 0);
 
             var count = dict.UnsafeFreeValueCellIndex;
-            TrecsAssert.That(count >= 0);
+            TrecsDebugAssert.That(count >= 0);
 
             // Ensure arrays are large enough before reading into them
             dict.UnsafeEnsureCapacityForDeserialization(count, bucketsCapacity);
@@ -92,7 +92,7 @@ namespace Trecs.Serialization
             // Blit read directly into the internal arrays
             unsafe
             {
-                fixed (DenseDictionary<TKey, TValue>.Node* ptr = dict.UnsafeKeys)
+                fixed (DenseDictionaryNode<TKey>* ptr = dict.UnsafeKeys)
                 {
                     reader.BlitReadArrayPtr("ValuesInfo", ptr, count);
                 }
@@ -136,7 +136,7 @@ namespace Trecs.Serialization
             CanUseBlit =
                 TypeMeta<TKey>.IsUnmanaged
                 && TypeMeta<TValue>.IsUnmanaged
-                && TypeMeta<DenseDictionary<TKey, TValue>.Node>.IsUnmanaged;
+                && TypeMeta<DenseDictionaryNode<TKey>>.IsUnmanaged;
 
             if (CanUseBlit)
             {

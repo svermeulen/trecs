@@ -7,10 +7,7 @@ namespace Trecs.Internal
     /// For cases where you are serializing / deserializing multiple times
     /// you can use this class to re-use the same buffers etc. and avoid allocs
     /// </summary>
-    public sealed class SerializationBuffer
-        : IDisposable,
-            ISerializationReader,
-            ISerializationWriter
+    public sealed class SerializationBuffer : IDisposable
     {
         readonly MemoryStream _memoryStream;
         readonly BinaryReader _binaryReader;
@@ -41,7 +38,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_state == State.Idle);
+                TrecsDebugAssert.That(_state == State.Idle);
                 return _memoryStream;
             }
         }
@@ -53,7 +50,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_state == State.Idle);
+                TrecsDebugAssert.That(_state == State.Idle);
                 return _binaryReader;
             }
         }
@@ -62,7 +59,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_state == State.Writing);
+                TrecsDebugAssert.That(_state == State.Writing);
                 return _writer;
             }
         }
@@ -71,7 +68,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_state == State.Reading);
+                TrecsDebugAssert.That(_state == State.Reading);
                 return _reader;
             }
         }
@@ -80,7 +77,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_state == State.Idle);
+                TrecsDebugAssert.That(_state == State.Idle);
                 return _binaryWriter;
             }
         }
@@ -89,7 +86,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_state == State.Idle);
+                TrecsDebugAssert.That(_state == State.Idle);
                 return _memoryStream.Position;
             }
         }
@@ -98,7 +95,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_state == State.Idle);
+                TrecsDebugAssert.That(_state == State.Idle);
                 return _memoryStream.Length;
             }
         }
@@ -116,9 +113,9 @@ namespace Trecs.Internal
             bool allowUnclearedMemory = false
         )
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(allowUnclearedMemory || MemoryIsCleared);
+            TrecsDebugAssert.That(allowUnclearedMemory || MemoryIsCleared);
 
             try
             {
@@ -142,9 +139,9 @@ namespace Trecs.Internal
 
         public object ReadAllObjectDelta(object baseValue)
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(MemoryPosition == 0);
+            TrecsDebugAssert.That(MemoryPosition == 0);
 
             try
             {
@@ -163,13 +160,13 @@ namespace Trecs.Internal
 
         public T Read<T>(string path)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             return _reader.Read<T>(path);
         }
 
         public void Write<T>(string path, in T value)
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.Write(path, value);
         }
 
@@ -180,9 +177,9 @@ namespace Trecs.Internal
             bool enableMemoryTracking = false
         )
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(MemoryPosition == 0);
+            TrecsDebugAssert.That(MemoryPosition == 0);
 
             _state = State.Writing;
             _writer.Start(
@@ -200,13 +197,13 @@ namespace Trecs.Internal
 
         public void ResetMemoryPosition()
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
             _memoryStream.Position = 0;
         }
 
         public void ClearMemoryStream()
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
             _memoryStream.Position = 0;
             _memoryStream.SetLength(0);
         }
@@ -229,9 +226,9 @@ namespace Trecs.Internal
 
         public void StartRead()
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(MemoryPosition == 0);
+            TrecsDebugAssert.That(MemoryPosition == 0);
 
             _state = State.Reading;
             _reader.Start(_binaryReader);
@@ -245,13 +242,13 @@ namespace Trecs.Internal
         /// </summary>
         public PayloadHeader PeekHeader()
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
             return PayloadHeader.Peek(_memoryStream);
         }
 
         public void StopRead(bool verifySentinel)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
 
             _state = State.Idle;
             _reader.Stop(verifySentinel: verifySentinel);
@@ -259,7 +256,7 @@ namespace Trecs.Internal
 
         public long EndWrite()
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _state = State.Idle;
 
             _writer.Complete(_binaryWriter);
@@ -270,9 +267,9 @@ namespace Trecs.Internal
 
         public void SaveMemoryToFile(string path)
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(MemoryPosition == 0);
+            TrecsDebugAssert.That(MemoryPosition == 0);
 
             // Then write the memory stream to file
             using var fileStream = new FileStream(
@@ -298,9 +295,9 @@ namespace Trecs.Internal
             bool allowUnclearedMemory = false
         )
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(allowUnclearedMemory || MemoryIsCleared);
+            TrecsDebugAssert.That(allowUnclearedMemory || MemoryIsCleared);
 
             try
             {
@@ -324,9 +321,9 @@ namespace Trecs.Internal
 
         public object ReadAllObject()
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(MemoryPosition == 0);
+            TrecsDebugAssert.That(MemoryPosition == 0);
 
             try
             {
@@ -351,9 +348,9 @@ namespace Trecs.Internal
             bool enableMemoryTracking = false
         )
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(MemoryIsCleared);
+            TrecsDebugAssert.That(MemoryIsCleared);
 
             try
             {
@@ -375,30 +372,23 @@ namespace Trecs.Internal
             return _memoryStream.Position;
         }
 
-        // NOTE: this hash is not suitable as a guid
-        // For that, use GetMemoryStreamCollisionResistantGuid instead
-        [Obsolete("Use ComputeChecksum() instead — same hash, returned as uint.")]
-        public int GetMemoryStreamHash()
-        {
-            return unchecked((int)ComputeChecksum());
-        }
-
         /// <summary>
-        /// Compute a checksum over the currently-written bytes. Safely handles
-        /// the <see cref="MemoryStream.GetBuffer"/> / <see cref="MemoryStream.Length"/>
-        /// discipline so callers cannot accidentally hash uninitialized trailing
-        /// bytes (which would produce a non-deterministic checksum and break
-        /// replay / desync detection).
+        /// Compute a 64-bit xxHash checksum over the currently-written bytes.
+        /// Safely handles the <see cref="MemoryStream.GetBuffer"/> /
+        /// <see cref="MemoryStream.Length"/> discipline so callers cannot
+        /// accidentally hash uninitialized trailing bytes (which would
+        /// produce a non-deterministic checksum and break replay / desync
+        /// detection).
         /// </summary>
-        public uint ComputeChecksum()
+        public ulong ComputeChecksum()
         {
-            TrecsAssert.That(!_hasDisposed);
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(_state == State.Idle);
 
             int length = (int)_memoryStream.Length;
             byte[] buffer = _memoryStream.GetBuffer();
 
-            return ByteHashCalculator.Run(buffer, length);
+            return CollisionResistantHashCalculator.ComputeXxHash64(buffer, length);
         }
 
         /// <summary>
@@ -406,9 +396,9 @@ namespace Trecs.Internal
         /// </summary>
         public T ReadAll<T>(bool allowNonZeroMemoryPosition = false)
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(allowNonZeroMemoryPosition || MemoryPosition == 0);
+            TrecsDebugAssert.That(allowNonZeroMemoryPosition || MemoryPosition == 0);
 
             try
             {
@@ -427,9 +417,9 @@ namespace Trecs.Internal
 
         public void ReadAll<T>(ref T value, bool allowNonZeroMemoryPosition = false)
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(allowNonZeroMemoryPosition || MemoryPosition == 0);
+            TrecsDebugAssert.That(allowNonZeroMemoryPosition || MemoryPosition == 0);
 
             try
             {
@@ -454,9 +444,9 @@ namespace Trecs.Internal
             bool enableMemoryTracking = false
         )
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(MemoryIsCleared);
+            TrecsDebugAssert.That(MemoryIsCleared);
 
             try
             {
@@ -485,26 +475,26 @@ namespace Trecs.Internal
 
         public void LoadMemoryStreamFromBytes(byte[] bytes, int length)
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(MemoryIsCleared);
+            TrecsDebugAssert.That(MemoryIsCleared);
 
             _binaryWriter.Write(bytes, 0, length);
         }
 
         public void LoadMemoryStreamFromArraySegment(ArraySegment<byte> segment, int length)
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(MemoryIsCleared);
+            TrecsDebugAssert.That(MemoryIsCleared);
 
             _binaryWriter.Write(segment.Array, segment.Offset, length);
         }
 
         public void LoadMemoryFromFile(string path)
         {
-            TrecsAssert.That(_state == State.Idle);
-            TrecsAssert.That(MemoryIsCleared);
+            TrecsDebugAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(MemoryIsCleared);
 
             using var fileStream = new FileStream(
                 path,
@@ -522,9 +512,9 @@ namespace Trecs.Internal
         /// </summary>
         public T ReadAllDelta<T>(in T baseValue, bool allowNonZeroMemoryPosition = false)
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
 
-            TrecsAssert.That(allowNonZeroMemoryPosition || MemoryPosition == 0);
+            TrecsDebugAssert.That(allowNonZeroMemoryPosition || MemoryPosition == 0);
 
             try
             {
@@ -542,8 +532,12 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            TrecsAssert.That(_state == State.Idle, "Expected state to be Idle but was {0}", _state);
-            TrecsAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(
+                _state == State.Idle,
+                "Expected state to be Idle but was {0}",
+                _state
+            );
+            TrecsDebugAssert.That(!_hasDisposed);
             _hasDisposed = true;
 
             _memoryStream.Dispose();
@@ -555,152 +549,152 @@ namespace Trecs.Internal
         public void BlitRead<T>(string name, ref T value)
             where T : unmanaged
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             _reader.BlitRead<T>(name, ref value);
         }
 
         public void BlitReadArray<T>(string name, T[] buffer, int count)
             where T : unmanaged
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             _reader.BlitReadArray<T>(name, buffer, count);
         }
 
         public unsafe void BlitReadArrayPtr<T>(string name, T* value, int length)
             where T : unmanaged
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             _reader.BlitReadArrayPtr<T>(name, value, length);
         }
 
         public bool ReadBit()
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             return _reader.ReadBit();
         }
 
         public void Read<T>(string name, ref T value)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             _reader.Read(name, ref value);
         }
 
         public void ReadObject(string name, ref object value)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             _reader.ReadObject(name, ref value);
         }
 
         public string ReadString(string name)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             return _reader.ReadString(name);
         }
 
         public Type ReadTypeId(string name)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             return _reader.ReadTypeId(name);
         }
 
         public void BlitReadDelta<T>(string name, ref T value, in T baseValue)
             where T : unmanaged
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             _reader.BlitReadDelta<T>(name, ref value, baseValue);
         }
 
         public void ReadDelta<T>(string name, ref T value, in T baseValue)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             _reader.ReadDelta(name, ref value, baseValue);
         }
 
         public void ReadObjectDelta(string name, ref object value, object baseValue)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             _reader.ReadObjectDelta(name, ref value, baseValue);
         }
 
         public string ReadStringDelta(string name, string baseValue)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             return _reader.ReadStringDelta(name, baseValue);
         }
 
         public void WriteBit(bool value)
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.WriteBit(value);
         }
 
         public void WriteObject(string name, object value)
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.WriteObject(name, value);
         }
 
         public void WriteString(string name, string value)
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.WriteString(name, value);
         }
 
         public void BlitWrite<T>(string name, in T value)
             where T : unmanaged
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.BlitWrite(name, value);
         }
 
         public unsafe void BlitWriteArrayPtr<T>(string name, T* value, int length)
             where T : unmanaged
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.BlitWriteArrayPtr(name, value, length);
         }
 
         public void BlitWriteArray<T>(string name, T[] value, int count)
             where T : unmanaged
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.BlitWriteArray(name, value, count);
         }
 
         public void WriteTypeId(string name, Type type)
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.WriteTypeId(name, type);
         }
 
         public void WriteDelta<T>(string name, in T value, in T baseValue)
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.WriteDelta(name, value, baseValue);
         }
 
         public void WriteObjectDelta(string name, object value, object baseValue)
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.WriteObjectDelta(name, value, baseValue);
         }
 
         public void WriteStringDelta(string name, string value, string baseValue)
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.WriteStringDelta(name, value, baseValue);
         }
 
         public string GetMemoryReport()
         {
-            TrecsAssert.That(_state == State.Idle);
+            TrecsDebugAssert.That(_state == State.Idle);
             return _writer.GetMemoryReport();
         }
 
         public void BlitWriteDelta<T>(string name, in T value, in T baseValue)
             where T : unmanaged
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.BlitWriteDelta(name, value, baseValue);
         }
 
@@ -718,39 +712,39 @@ namespace Trecs.Internal
             throw new InvalidOperationException("Cannot access Flags when not reading or writing.");
         }
 
-        long ISerializationReader.Flags
+        public long Flags
         {
             get
             {
-                TrecsAssert.That(_state == State.Reading);
-                return _reader.Flags;
+                if (_state == State.Reading)
+                {
+                    return _reader.Flags;
+                }
+                else if (_state == State.Writing)
+                {
+                    return _writer.Flags;
+                }
+                throw new InvalidOperationException(
+                    "Cannot access Flags when not reading or writing."
+                );
             }
         }
 
-        long ISerializationWriter.Flags
+        public int Version
         {
             get
             {
-                TrecsAssert.That(_state == State.Writing);
-                return _writer.Flags;
-            }
-        }
-
-        int ISerializationReader.Version
-        {
-            get
-            {
-                TrecsAssert.That(_state == State.Reading);
-                return _reader.Version;
-            }
-        }
-
-        int ISerializationWriter.Version
-        {
-            get
-            {
-                TrecsAssert.That(_state == State.Writing);
-                return _writer.Version;
+                if (_state == State.Reading)
+                {
+                    return _reader.Version;
+                }
+                else if (_state == State.Writing)
+                {
+                    return _writer.Version;
+                }
+                throw new InvalidOperationException(
+                    "Cannot access Version when not reading or writing."
+                );
             }
         }
 
@@ -758,32 +752,32 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(_state == State.Writing);
+                TrecsDebugAssert.That(_state == State.Writing);
                 return _writer.NumBytesWritten;
             }
         }
 
         public void WriteBytes(string name, byte[] buffer, int offset, int count)
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.WriteBytes(name, buffer, offset, count);
         }
 
         public int ReadBytes(string name, ref byte[] buffer)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             return _reader.ReadBytes(name, ref buffer);
         }
 
         public unsafe void BlitWriteRawBytes(string name, void* ptr, int numBytes)
         {
-            TrecsAssert.That(_state == State.Writing);
+            TrecsDebugAssert.That(_state == State.Writing);
             _writer.BlitWriteRawBytes(name, ptr, numBytes);
         }
 
         public unsafe void BlitReadRawBytes(string name, void* ptr, int numBytes)
         {
-            TrecsAssert.That(_state == State.Reading);
+            TrecsDebugAssert.That(_state == State.Reading);
             _reader.BlitReadRawBytes(name, ptr, numBytes);
         }
 

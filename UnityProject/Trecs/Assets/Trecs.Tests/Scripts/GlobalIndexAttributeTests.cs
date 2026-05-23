@@ -103,7 +103,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = 100 + i })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Sanity: the QCatA query must see both groups (otherwise the test isn't
             // exercising the offset-accumulation path it claims to).
@@ -169,7 +169,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = -1 })
                     .Set(new TestFloat())
                     .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             int total = CountA + CountAB;
             // Sanity: the QCatA query must see both groups.

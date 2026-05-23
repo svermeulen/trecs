@@ -2521,8 +2521,8 @@ namespace Trecs
                 {
                     foreach (var t in rt.AllTags.Tags)
                     {
-                        if (t.Guid != 0)
-                            scratch.Add(t.Guid);
+                        if (t.Value != 0)
+                            scratch.Add(t.Value);
                     }
                 }
                 foreach (var p in rt.Partitions)
@@ -2531,8 +2531,8 @@ namespace Trecs
                         continue;
                     foreach (var t in p.Tags)
                     {
-                        if (t.Guid != 0)
-                            scratch.Add(t.Guid);
+                        if (t.Value != 0)
+                            scratch.Add(t.Value);
                     }
                 }
             }
@@ -2542,8 +2542,8 @@ namespace Trecs
                     continue;
                 foreach (var t in entitySet.Tags.Tags)
                 {
-                    if (t.Guid != 0)
-                        scratch.Add(t.Guid);
+                    if (t.Value != 0)
+                        scratch.Add(t.Value);
                 }
             }
             return scratch.Count;

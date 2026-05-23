@@ -4,23 +4,34 @@ using System.Text;
 using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Collections.LowLevel.Unsafe;
-using UnityEngine;
 
 namespace Trecs
 {
     /// <summary>
-    /// Configuration for the <see cref="BlobCache"/> cleanup interval and serialization version.
+    /// Configuration for the <see cref="BlobCache"/> cleanup trigger and serialization version.
     /// </summary>
+    /// <remarks>
+    /// Eviction is driven inline by every allocation and handle-dispose: when the
+    /// running estimate of inactive bytes / count in any store exceeds the
+    /// store's configured cap multiplied by <see cref="HighWaterMarkMultiplier"/>,
+    /// a clean pass runs immediately and drains back down to the configured cap.
+    /// There is no periodic tick — see <see cref="BlobCache"/>.
+    /// </remarks>
     public sealed class BlobCacheSettings
     {
-        public float CleanIntervalSeconds;
-        public int SerializationVersion;
+        /// <summary>
+        /// Multiplier applied to each store's <c>MaxInactiveNativeBlobsMb</c> /
+        /// <c>MaxInactiveManagedBlobsCount</c> to derive the high-water mark that
+        /// triggers an inline eviction pass. Values closer to <c>1.0</c> keep memory
+        /// tighter to the cap at the cost of more frequent eviction passes; higher
+        /// values amortize the eviction cost over more allocations at the cost of
+        /// larger transient overshoot. Must be &gt;= <c>1.0</c>.
+        /// </summary>
+        public float HighWaterMarkMultiplier { get; init; } = 1.5f;
 
-        public static BlobCacheSettings Default = new()
-        {
-            CleanIntervalSeconds = 5,
-            SerializationVersion = 1,
-        };
+        public int SerializationVersion { get; init; } = 1;
+
+        public static readonly BlobCacheSettings Default = new();
     }
 
     /// <summary>
@@ -35,25 +46,170 @@ namespace Trecs
     }
 
     /// <summary>
+    /// Per-store snapshot of in-memory cache occupancy, returned by
+    /// <see cref="IBlobStore.GetStats"/>. Useful for tuning each store's
+    /// <c>MaxInactiveNativeBlobsMb</c> / <c>MaxInactiveManagedBlobsCount</c>
+    /// caps and for diagnosing which store in a multi-store setup is filling up.
+    /// <para>
+    /// "Total" and "Inactive" cover only entries currently <i>resident in the
+    /// store's in-memory cache</i>. Blobs that are known to the store's manifest
+    /// but not currently loaded (e.g. a file-backed blob that has been evicted
+    /// from memory but still has bytes on disk) do not contribute to either total.
+    /// </para>
+    /// </summary>
+    public readonly struct BlobStoreStats
+    {
+        /// <summary>
+        /// Total bytes of native (unmanaged) blobs currently resident in the
+        /// store's in-memory cache, including both active (pinned by a handle)
+        /// and inactive (evictable) entries.
+        /// </summary>
+        public readonly long TotalNativeMemoryBytes;
+
+        /// <summary>
+        /// Bytes of native blobs in the store's in-memory cache that are not
+        /// currently pinned by any handle and could be evicted by the next
+        /// clean pass. The slack between this and the store's configured
+        /// <c>MaxInactiveNativeBlobsMb</c> indicates how much native cache
+        /// budget remains before the high-water-mark trigger fires.
+        /// </summary>
+        public readonly long InactiveNativeMemoryBytes;
+
+        /// <summary>
+        /// Total number of managed (class) blobs currently resident in the
+        /// store's in-memory cache, including both active and inactive entries.
+        /// </summary>
+        public readonly int TotalManagedEntries;
+
+        /// <summary>
+        /// Number of managed blobs in the store's in-memory cache that are
+        /// not currently pinned by any handle. The slack between this and
+        /// the store's configured <c>MaxInactiveManagedBlobsCount</c> indicates
+        /// how much managed cache budget remains before eviction fires.
+        /// </summary>
+        public readonly int InactiveManagedEntries;
+
+        public BlobStoreStats(
+            long totalNativeMemoryBytes,
+            long inactiveNativeMemoryBytes,
+            int totalManagedEntries,
+            int inactiveManagedEntries
+        )
+        {
+            TotalNativeMemoryBytes = totalNativeMemoryBytes;
+            InactiveNativeMemoryBytes = inactiveNativeMemoryBytes;
+            TotalManagedEntries = totalManagedEntries;
+            InactiveManagedEntries = inactiveManagedEntries;
+        }
+    }
+
+    /// <summary>
+    /// Aggregate snapshot of <see cref="BlobCache"/> occupancy across every
+    /// registered <see cref="IBlobStore"/>. Returned by
+    /// <see cref="BlobCache.GetStats"/>. Use this to tune the cache's configured
+    /// caps (<c>MaxInactiveNativeBlobsMb</c> / <c>MaxInactiveManagedBlobsCount</c>)
+    /// in production and to diagnose cache thrashing.
+    /// <para>
+    /// "Total" and "Inactive" cover only entries currently resident in some store's
+    /// in-memory cache. See <see cref="BlobStoreStats"/> for the per-entry
+    /// definitions; the only field that exists at the cache level (not the
+    /// store level) is <see cref="ActiveHandleCount"/>, since handles are tracked
+    /// in <see cref="BlobCache"/> itself, not per-store.
+    /// </para>
+    /// </summary>
+    public readonly struct BlobCacheStats
+    {
+        /// <summary>
+        /// Total bytes of native blobs currently resident in any store's
+        /// in-memory cache, including both active and inactive entries.
+        /// </summary>
+        public readonly long TotalNativeMemoryBytes;
+
+        /// <summary>
+        /// Bytes of native blobs in some store's in-memory cache that are not
+        /// currently pinned by any handle. This is the figure compared against
+        /// the aggregate <c>MaxInactiveNativeBlobsMb</c> cap to decide whether
+        /// an inline eviction pass needs to fire.
+        /// </summary>
+        public readonly long InactiveNativeMemoryBytes;
+
+        /// <summary>
+        /// Total number of managed (class) blobs currently resident in any
+        /// store's in-memory cache, including both active and inactive entries.
+        /// </summary>
+        public readonly int TotalManagedEntries;
+
+        /// <summary>
+        /// Number of managed blobs in some store's in-memory cache that are
+        /// not currently pinned by any handle. Compared against the aggregate
+        /// <c>MaxInactiveManagedBlobsCount</c> cap on the eviction-trigger path.
+        /// </summary>
+        public readonly int InactiveManagedEntries;
+
+        /// <summary>
+        /// Number of outstanding pinning handles (<see cref="BlobPtr{T}"/>,
+        /// <see cref="NativeBlobPtr{T}"/>, <see cref="IBlobAnchor"/>) currently
+        /// alive. Each handle keeps its referenced blob in the active set until
+        /// disposed; a chronically rising count over time is a leak signal.
+        /// </summary>
+        public readonly int ActiveHandleCount;
+
+        public BlobCacheStats(
+            long totalNativeMemoryBytes,
+            long inactiveNativeMemoryBytes,
+            int totalManagedEntries,
+            int inactiveManagedEntries,
+            int activeHandleCount
+        )
+        {
+            TotalNativeMemoryBytes = totalNativeMemoryBytes;
+            InactiveNativeMemoryBytes = inactiveNativeMemoryBytes;
+            TotalManagedEntries = totalManagedEntries;
+            InactiveManagedEntries = inactiveManagedEntries;
+            ActiveHandleCount = activeHandleCount;
+        }
+    }
+
+    /// <summary>
     /// Central cache that unifies one or more <see cref="IBlobStore"/> backends, providing
-    /// handle-based access to managed and native blobs. Manages reference counting, periodic
-    /// cache cleanup, and asynchronous blob loading. Register blob stores via
+    /// handle-based access to managed and native blobs. Manages reference counting,
+    /// inline cache cleanup, and asynchronous blob loading. Register blob stores via
     /// <see cref="WorldBuilder.AddBlobStore"/>.
+    /// <para>
+    /// Eviction is driven by the alloc / handle-dispose hot path: a running estimate of
+    /// inactive bytes / count is updated incrementally, and when it crosses the
+    /// high-water mark (see <see cref="BlobCacheSettings.HighWaterMarkMultiplier"/>)
+    /// a clean pass runs immediately and drains back down to the configured cap.
+    /// </para>
     /// </summary>
     public sealed class BlobCache
     {
         readonly TrecsLog _log;
 
-        readonly DenseHashSet<BlobId> _cleanBuffer1 = new();
         readonly DenseDictionary<PtrHandle, BlobId> _handles = new();
+        readonly DenseDictionary<BlobId, int> _blobRefCounts = new();
         readonly BlobCacheSettings _settings;
         readonly List<IBlobStore> _stores;
         readonly IBlobStore _writableStore;
         readonly NativeBlobBoxPool _nativeBlobBoxPool;
 
+        // High-water marks derived from each store's configured cap × multiplier.
+        // Aggregated across all stores so a single compare suffices on the hot path.
+        // When the running estimator below crosses either, an inline CleanCaches pass
+        // runs and re-anchors the estimator to truth (see RecomputeInactiveTotals).
+        readonly long _nativeBytesHighWaterMark;
+        readonly int _managedCountHighWaterMark;
+
+        // Running estimate of inactive native bytes / inactive managed blob count
+        // across all stores' memory caches. Only grows between cleans (we add on
+        // 1→0 ref-count transitions but never subtract on 0→1 transitions to avoid
+        // racing with lazy-loaded blobs). Recounted exactly inside RecomputeInactiveTotals
+        // after every CleanCaches pass so the over-estimate is bounded.
+        long _inactiveNativeBytesEstimate;
+        int _inactiveManagedCountEstimate;
+
         uint _handleIdCounter = 1;
         bool _hasDisposed;
-        float _cleanCountdown;
 
         public BlobCache(
             TrecsLog log,
@@ -62,11 +218,20 @@ namespace Trecs
             NativeBlobBoxPool nativeBlobBoxPool
         )
         {
-            TrecsAssert.IsNotNull(nativeBlobBoxPool);
+            TrecsDebugAssert.IsNotNull(nativeBlobBoxPool);
             _log = log;
             _stores = stores;
             _settings = settings ?? BlobCacheSettings.Default;
             _nativeBlobBoxPool = nativeBlobBoxPool;
+
+            TrecsAssert.That(
+                _settings.HighWaterMarkMultiplier >= 1f,
+                "BlobCacheSettings.HighWaterMarkMultiplier must be >= 1.0, was {0}",
+                _settings.HighWaterMarkMultiplier
+            );
+
+            long totalNativeBytes = 0;
+            int totalManagedCount = 0;
 
             foreach (var store in stores)
             {
@@ -76,10 +241,31 @@ namespace Trecs
 
                 if (!store.IsReadOnly)
                 {
-                    TrecsAssert.IsNull(_writableStore);
+                    TrecsDebugAssert.IsNull(_writableStore);
                     _writableStore = store;
                 }
+
+                totalNativeBytes += store.MaxInactiveNativeBytes;
+                totalManagedCount += store.MaxInactiveManagedCount;
             }
+
+            // Aggregate across stores: any store hitting its own cap will be drained
+            // by CleanCaches, but we only need a single compare to decide whether to
+            // run that pass. Using the sum is a conservative trigger — at worst we
+            // run CleanCaches a touch earlier than strictly necessary, which is fine
+            // since per-store CleanCache is a no-op when under cap.
+            // Compute in double so we don't lose precision for large caps (long-to-float
+            // round-trips at ~7 significant digits), and clamp before narrowing.
+            _nativeBytesHighWaterMark = (long)
+                Math.Min(
+                    (double)totalNativeBytes * _settings.HighWaterMarkMultiplier,
+                    long.MaxValue
+                );
+            _managedCountHighWaterMark = (int)
+                Math.Min(
+                    (double)totalManagedCount * _settings.HighWaterMarkMultiplier,
+                    int.MaxValue
+                );
         }
 
         public IReadOnlyList<IBlobStore> BlobStores
@@ -89,7 +275,7 @@ namespace Trecs
 
         IBlobStore RequireWritableStore()
         {
-            TrecsAssert.IsNotNull(_writableStore, "No writable blob store found");
+            TrecsDebugAssert.IsNotNull(_writableStore, "No writable blob store found");
             return _writableStore;
         }
 
@@ -98,30 +284,8 @@ namespace Trecs
         // misuse from a job surfaces immediately instead of corrupting state.
         void AssertMainThreadAndNotDisposed()
         {
-            TrecsAssert.That(!_hasDisposed);
-            TrecsAssert.That(UnityThreadHelper.IsMainThread, "BlobCache is main-thread only");
-        }
-
-        /// <summary>
-        /// Drive periodic cache cleanup. <b>Main-thread only</b> and must be
-        /// called outside any active job execution — a concurrent
-        /// <c>BlobStore.CleanCache</c> removes entries that jobs may be reading
-        /// via <see cref="NativeSharedPtrResolver"/>, so calling <c>Tick</c>
-        /// mid-job can corrupt those reads. Typical call site: once per frame
-        /// between phases, from the world owner.
-        /// </summary>
-        public void Tick()
-        {
-            AssertMainThreadAndNotDisposed();
-
-            _cleanCountdown -= Time.deltaTime;
-
-            if (_cleanCountdown <= 0)
-            {
-                _cleanCountdown = _settings.CleanIntervalSeconds;
-
-                CleanCaches();
-            }
+            TrecsDebugAssert.That(!_hasDisposed);
+            TrecsDebugAssert.That(UnityThreadHelper.IsMainThread, "BlobCache is main-thread only");
         }
 
         bool TryGetManifestEntry(BlobId id, out BlobMetadata manifestEntry, bool updateAccessTime)
@@ -152,8 +316,8 @@ namespace Trecs
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime))
             {
-                TrecsAssert.That(!manifestEntry.IsNative);
-                TrecsAssert.That(manifestEntry.Type.IsClass);
+                TrecsDebugAssert.That(!manifestEntry.IsNative);
+                TrecsDebugAssert.That(manifestEntry.Type.IsClass);
                 return manifestEntry.Type;
             }
 
@@ -163,7 +327,7 @@ namespace Trecs
         internal Type GetManagedBlobType(BlobId id, bool updateAccessTime = true)
         {
             var result = TryGetManagedBlobType(id, updateAccessTime);
-            TrecsAssert.IsNotNull(result);
+            TrecsDebugAssert.IsNotNull(result);
             return result;
         }
 
@@ -173,7 +337,7 @@ namespace Trecs
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime))
             {
-                TrecsAssert.That(manifestEntry.IsNative);
+                TrecsDebugAssert.That(manifestEntry.IsNative);
                 return manifestEntry.Type;
             }
 
@@ -183,58 +347,196 @@ namespace Trecs
         internal Type GetNativeBlobType(BlobId id, bool updateAccessTime = true)
         {
             var result = TryGetNativeBlobType(id, updateAccessTime);
-            TrecsAssert.IsNotNull(result);
+            TrecsDebugAssert.IsNotNull(result);
             return result;
         }
 
+        /// <summary>
+        /// Copy every <see cref="BlobId"/> currently pinned by at least one outstanding
+        /// handle into <paramref name="blobIds"/>. The output is the deduplicated set
+        /// of active blobs — multiple handles for the same blob contribute one entry.
+        /// O(active blobs); maintained incrementally on every handle create/dispose,
+        /// not by walking the full handle table.
+        /// </summary>
         public void GetAllActiveBlobIds(DenseHashSet<BlobId> blobIds)
         {
             AssertMainThreadAndNotDisposed();
 
-            foreach (var (_, blobId) in _handles)
+            foreach (var blobId in _blobRefCounts.Keys)
             {
                 blobIds.Add(blobId);
             }
         }
 
-        void CleanCaches()
+        /// <summary>
+        /// Run an eviction pass across every registered <see cref="IBlobStore"/> and
+        /// re-anchor the inactive-bytes / inactive-count estimators to truth. Called
+        /// inline from the alloc / handle-dispose hot path when either estimator
+        /// crosses the high-water mark derived from
+        /// <see cref="BlobCacheSettings.HighWaterMarkMultiplier"/>.
+        /// <para><b>Main-thread only</b> and must not be called while a job is
+        /// reading from any store's memory cache — a concurrent eviction can free
+        /// entries that jobs may be reading via <see cref="NativeSharedPtrResolver"/>.
+        /// The hot-path trigger paths (<c>AllocXxxBlob</c>, handle-dispose) all
+        /// already satisfy <see cref="AssertMainThreadAndNotDisposed"/>.</para>
+        /// </summary>
+        public void CleanCaches()
         {
-            var activeBlobs = _cleanBuffer1;
-            activeBlobs.Clear();
-            GetAllActiveBlobIds(activeBlobs);
+            AssertMainThreadAndNotDisposed();
 
-            // _dbg.Text(
-            //     displayTime: _settings.CleanIntervalSeconds,
-            //     "Num Active Blobs: {}",
-            //     activeBlobs.Count
-            // );
+            // The ref-count dictionary's keyset is the active-blob set: a blob is
+            // active iff at least one handle pins it, which is exactly when the
+            // dictionary has an entry for it. Wrapping it directly avoids the
+            // O(handles) walk a separate DenseHashSet rebuild would cost on every
+            // eviction pass.
+            var activeBlobs = new ReadOnlyBlobIdSet(_blobRefCounts);
 
             foreach (var store in _stores)
             {
                 store.CleanCache(activeBlobs);
             }
+
+            RecomputeInactiveTotals(activeBlobs);
         }
 
-        public bool HasBlob(BlobId id, bool updateAccessTime = true)
+        // Re-anchor the running inactive estimators to truth by scanning each
+        // store's manifest. Called after CleanCaches so the estimators absorb the
+        // evicted bytes (and any drift from skipped 0→1 subtractions); also called
+        // opportunistically if either estimator goes negative due to a transient
+        // accounting mismatch.
+        void RecomputeInactiveTotals(ReadOnlyBlobIdSet activeBlobs)
+        {
+            long nativeBytes = 0;
+            int managedCount = 0;
+
+            foreach (var store in _stores)
+            {
+                store.SumInMemoryInactiveTotals(activeBlobs, ref nativeBytes, ref managedCount);
+            }
+
+            _inactiveNativeBytesEstimate = nativeBytes;
+            _inactiveManagedCountEstimate = managedCount;
+        }
+
+        /// <summary>
+        /// Aggregate cache occupancy snapshot. Walks every registered
+        /// <see cref="IBlobStore"/>'s in-memory cache and sums per-store totals,
+        /// then adds <c>ActiveHandleCount</c> from the cache's own handle table.
+        /// <para>
+        /// Cost: O(in-memory entries across all stores). Intended for
+        /// observability — diagnostics overlays, profiler markers, eviction-tuning
+        /// dashboards — not for the eviction hot path. Eviction uses a separate
+        /// incrementally-maintained estimator (see remarks on
+        /// <see cref="BlobCacheSettings.HighWaterMarkMultiplier"/>); calling
+        /// <c>GetStats</c> never participates in eviction decisions.
+        /// </para>
+        /// </summary>
+        public BlobCacheStats GetStats()
+        {
+            AssertMainThreadAndNotDisposed();
+
+            var activeBlobs = new ReadOnlyBlobIdSet(_blobRefCounts);
+
+            long totalNativeBytes = 0;
+            long inactiveNativeBytes = 0;
+            int totalManagedEntries = 0;
+            int inactiveManagedEntries = 0;
+
+            foreach (var store in _stores)
+            {
+                var storeStats = store.GetStats(activeBlobs);
+                totalNativeBytes += storeStats.TotalNativeMemoryBytes;
+                inactiveNativeBytes += storeStats.InactiveNativeMemoryBytes;
+                totalManagedEntries += storeStats.TotalManagedEntries;
+                inactiveManagedEntries += storeStats.InactiveManagedEntries;
+            }
+
+            return new BlobCacheStats(
+                totalNativeMemoryBytes: totalNativeBytes,
+                inactiveNativeMemoryBytes: inactiveNativeBytes,
+                totalManagedEntries: totalManagedEntries,
+                inactiveManagedEntries: inactiveManagedEntries,
+                activeHandleCount: _handles.Count
+            );
+        }
+
+        /// <summary>
+        /// Per-store cache occupancy snapshot. <paramref name="output"/> is cleared
+        /// and then populated with one <see cref="BlobStoreStats"/> entry per
+        /// registered <see cref="IBlobStore"/>, in the same order as
+        /// <see cref="BlobStores"/>. Useful when a project has multiple stores
+        /// (e.g. <see cref="BlobStoreInMemory"/> plus a file-backed store) and
+        /// you want to see which one is filling up.
+        /// <para>
+        /// <see cref="BlobCacheStats.ActiveHandleCount"/> is not exposed per-store,
+        /// since handles are tracked at the cache level rather than per-store.
+        /// </para>
+        /// </summary>
+        public void GetStatsPerStore(List<BlobStoreStats> output)
+        {
+            TrecsDebugAssert.IsNotNull(output);
+            AssertMainThreadAndNotDisposed();
+
+            output.Clear();
+
+            var activeBlobs = new ReadOnlyBlobIdSet(_blobRefCounts);
+
+            foreach (var store in _stores)
+            {
+                output.Add(store.GetStats(activeBlobs));
+            }
+        }
+
+        void MaybeRunInlineEviction()
+        {
+            if (
+                _inactiveNativeBytesEstimate > _nativeBytesHighWaterMark
+                || _inactiveManagedCountEstimate > _managedCountHighWaterMark
+            )
+            {
+                _log.Trace(
+                    "Inline blob-cache eviction triggered: inactive native bytes "
+                        + "estimate {0} > {1} OR inactive managed count estimate "
+                        + "{2} > {3}",
+                    _inactiveNativeBytesEstimate,
+                    _nativeBytesHighWaterMark,
+                    _inactiveManagedCountEstimate,
+                    _managedCountHighWaterMark
+                );
+                CleanCaches();
+            }
+        }
+
+        /// <summary>
+        /// Returns true if any registered <see cref="IBlobStore"/> knows about
+        /// <paramref name="id"/>, regardless of whether the bytes are managed or native.
+        /// </summary>
+        public bool Contains(BlobId id, bool updateAccessTime = true)
         {
             AssertMainThreadAndNotDisposed();
             return TryGetManifestEntry(id, out var _, updateAccessTime: updateAccessTime);
         }
 
-        public bool HasManagedBlob(BlobId id, bool updateAccessTime = true)
+        public bool ContainsManagedBlob(BlobId id, bool updateAccessTime = true)
         {
             AssertMainThreadAndNotDisposed();
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime: updateAccessTime))
             {
-                TrecsAssert.That(!manifestEntry.IsNative);
+                TrecsDebugAssert.That(!manifestEntry.IsNative);
                 return true;
             }
 
             return false;
         }
 
-        public bool HasManagedBlob<T>(BlobId id, bool updateAccessTime = true)
+        /// <summary>
+        /// Returns true if a managed blob exists at <paramref name="id"/> whose stored
+        /// type is assignable to <typeparamref name="T"/> (interfaces and base classes
+        /// match). Asymmetric with <see cref="ContainsNativeBlob{T}"/>, which requires
+        /// exact equality because unmanaged structs cannot have inheritance.
+        /// </summary>
+        public bool ContainsManagedBlob<T>(BlobId id, bool updateAccessTime = true)
             where T : class
         {
             AssertMainThreadAndNotDisposed();
@@ -247,7 +549,7 @@ namespace Trecs
             return false;
         }
 
-        public bool HasNativeBlob(BlobId id, bool updateAccessTime = true)
+        public bool ContainsNativeBlob(BlobId id, bool updateAccessTime = true)
         {
             AssertMainThreadAndNotDisposed();
 
@@ -259,7 +561,14 @@ namespace Trecs
             return false;
         }
 
-        public bool HasNativeBlob<T>(BlobId id, bool updateAccessTime = true)
+        /// <summary>
+        /// Returns true if a native blob exists at <paramref name="id"/> whose stored
+        /// type is <i>exactly</i> <typeparamref name="T"/>. Asymmetric with
+        /// <see cref="ContainsManagedBlob{T}"/>, which allows base-class / interface
+        /// matches — unmanaged structs cannot have inheritance, so exact equality is
+        /// the only meaningful comparison.
+        /// </summary>
+        public bool ContainsNativeBlob<T>(BlobId id, bool updateAccessTime = true)
             where T : unmanaged
         {
             AssertMainThreadAndNotDisposed();
@@ -281,8 +590,8 @@ namespace Trecs
                 return false;
             }
 
-            TrecsAssert.That(!metadata.IsNative);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!metadata.IsNative);
+            TrecsDebugAssert.That(
                 typeof(T).IsAssignableFrom(metadata.Type),
                 "Expected blob assignable to type {0}, but found type {1}",
                 typeof(T),
@@ -300,13 +609,18 @@ namespace Trecs
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
-            TrecsAssert.That(!metadata.IsNative);
-            TrecsAssert.That(typeof(T).IsAssignableFrom(metadata.Type));
+            TrecsDebugAssert.That(!metadata.IsNative);
+            TrecsDebugAssert.That(typeof(T).IsAssignableFrom(metadata.Type));
 
             return (T)blob;
         }
 
-        public BlobPtr<T> CreateBlobPtr<T>(BlobId id, T blob)
+        /// <summary>
+        /// Allocates a new managed blob under <paramref name="id"/> in the writable
+        /// store and returns a pinning <see cref="BlobPtr{T}"/>. Fails if a blob
+        /// already exists at this id.
+        /// </summary>
+        public BlobPtr<T> AllocManagedBlob<T>(BlobId id, T blob)
             where T : class
         {
             AssertMainThreadAndNotDisposed();
@@ -314,14 +628,20 @@ namespace Trecs
             return new BlobPtr<T>(CreateHandle(id), id);
         }
 
-        public bool TryCreateBlobPtr<T>(
+        /// <summary>
+        /// If a managed blob exists at <paramref name="blobId"/> assignable to
+        /// <typeparamref name="T"/>, returns a fresh handle that pins it in the cache;
+        /// otherwise returns false. The blob itself must already exist — this is the
+        /// lookup path, not an alloc.
+        /// </summary>
+        public bool TryAcquireBlobPtr<T>(
             BlobId blobId,
             out BlobPtr<T> ptr,
             bool updateAccessTime = true
         )
             where T : class
         {
-            if (!HasManagedBlob<T>(blobId, updateAccessTime: updateAccessTime))
+            if (!ContainsManagedBlob<T>(blobId, updateAccessTime: updateAccessTime))
             {
                 ptr = default;
                 return false;
@@ -331,10 +651,10 @@ namespace Trecs
             return true;
         }
 
-        public bool TryCreateNativeBlobPtr<T>(BlobId blobId, out NativeBlobPtr<T> ptr)
+        public bool TryAcquireNativeBlobPtr<T>(BlobId blobId, out NativeBlobPtr<T> ptr)
             where T : unmanaged
         {
-            if (!HasNativeBlob<T>(blobId))
+            if (!ContainsNativeBlob<T>(blobId))
             {
                 ptr = default;
                 return false;
@@ -344,33 +664,43 @@ namespace Trecs
             return true;
         }
 
-        public BlobPtr<T> CreateBlobPtr<T>(BlobId blobId)
+        /// <summary>
+        /// Returns a fresh pinning <see cref="BlobPtr{T}"/> for the managed blob at
+        /// <paramref name="blobId"/>, throwing if the blob doesn't exist. The blob
+        /// itself must already be present — this is the lookup path, not an alloc.
+        /// </summary>
+        public BlobPtr<T> AcquireBlobPtr<T>(BlobId blobId)
             where T : class
         {
-            if (!TryCreateBlobPtr<T>(blobId, out var ptr))
+            if (!TryAcquireBlobPtr<T>(blobId, out var ptr))
             {
-                throw TrecsAssert.CreateException(
-                    "Attempted to get ptr for unrecognized managed blob {0}",
+                throw TrecsDebugAssert.CreateException(
+                    "Attempted to acquire ptr for unrecognized managed blob {0}",
                     blobId
                 );
             }
             return ptr;
         }
 
-        public NativeBlobPtr<T> CreateNativeBlobPtr<T>(BlobId blobId)
+        public NativeBlobPtr<T> AcquireNativeBlobPtr<T>(BlobId blobId)
             where T : unmanaged
         {
-            if (!TryCreateNativeBlobPtr<T>(blobId, out var ptr))
+            if (!TryAcquireNativeBlobPtr<T>(blobId, out var ptr))
             {
-                throw TrecsAssert.CreateException(
-                    "Attempted to get ptr for unrecognized native blob {0}",
+                throw TrecsDebugAssert.CreateException(
+                    "Attempted to acquire ptr for unrecognized native blob {0}",
                     blobId
                 );
             }
             return ptr;
         }
 
-        public IBlobAnchor CreateBlobAnchor(BlobId blobId, bool updateAccessTime = true)
+        /// <summary>
+        /// Returns a type-erased pinning anchor for <paramref name="blobId"/>. Use
+        /// this when you only need to keep the blob bytes alive in the cache and
+        /// don't care about typed access (e.g. async preload, debug inspectors).
+        /// </summary>
+        public IBlobAnchor AcquireBlobAnchor(BlobId blobId, bool updateAccessTime = true)
         {
             AssertMainThreadAndNotDisposed();
 
@@ -382,7 +712,7 @@ namespace Trecs
                 )
             )
             {
-                throw TrecsAssert.CreateException(
+                throw TrecsDebugAssert.CreateException(
                     "Attempted to get blob anchor for unrecognized native blob {0}",
                     blobId
                 );
@@ -412,8 +742,8 @@ namespace Trecs
                 return false;
             }
 
-            TrecsAssert.That(metadata.IsNative);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(metadata.IsNative);
+            TrecsDebugAssert.That(
                 metadata.Type == typeof(T),
                 "Type mismatch retrieving native blob: stored {0}, requested {1}",
                 metadata.Type,
@@ -432,8 +762,8 @@ namespace Trecs
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
-            TrecsAssert.That(TypeIdProvider.GetTypeId(metadata.Type) == innerTypeId);
-            TrecsAssert.That(metadata.IsNative);
+            TrecsDebugAssert.That(TypeId.FromType(metadata.Type).Value == innerTypeId);
+            TrecsDebugAssert.That(metadata.IsNative);
 
             return ((NativeBlobBox)blob).Ptr;
         }
@@ -445,8 +775,8 @@ namespace Trecs
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
-            TrecsAssert.That(metadata.Type == typeof(T));
-            TrecsAssert.That(metadata.IsNative);
+            TrecsDebugAssert.That(metadata.Type == typeof(T));
+            TrecsDebugAssert.That(metadata.IsNative);
 
             return ref UnsafeUtility.AsRef<T>(((NativeBlobBox)blob).Ptr.ToPointer());
         }
@@ -469,7 +799,7 @@ namespace Trecs
         )
         {
             var result = TryGetBlobAndMetadata(id, out var blob, out metadata, updateAccessTime);
-            TrecsAssert.That(result, "Attempted to get unrecognized blob id {0}", id);
+            TrecsDebugAssert.That(result, "Attempted to get unrecognized blob id {0}", id);
             return blob;
         }
 
@@ -486,14 +816,14 @@ namespace Trecs
 
             foreach (var store in _stores)
             {
-                if (store.HasBlob(id))
+                if (store.Contains(id))
                 {
                     store.WarmUpBlob(id);
                     return;
                 }
             }
 
-            throw TrecsAssert.CreateException("No blob store found for id {0}", id);
+            throw TrecsDebugAssert.CreateException("No blob store found for id {0}", id);
         }
 
         public BlobLoadingState GetBlobLoadingState(BlobId id)
@@ -502,13 +832,13 @@ namespace Trecs
 
             foreach (var store in _stores)
             {
-                if (store.HasBlob(id))
+                if (store.Contains(id))
                 {
                     return store.GetBlobLoadingState(id);
                 }
             }
 
-            throw TrecsAssert.CreateException("No blob store found for id {0}", id);
+            throw TrecsDebugAssert.CreateException("No blob store found for id {0}", id);
         }
 
         internal PtrHandle CreateHandle(BlobId blobId)
@@ -516,12 +846,68 @@ namespace Trecs
             var id = new PtrHandle(_handleIdCounter);
             _handleIdCounter += 1;
             _handles.Add(id, blobId);
+
+            // Ref-count bookkeeping. Two roles:
+            //   1. Detect the 1→0 transition in DisposeHandle that turns a blob
+            //      inactive (the high-water-mark estimator update site).
+            //   2. The dictionary's keyset *is* the active-blob set used by
+            //      GetAllActiveBlobIds and the CleanCaches pass — wrapped as
+            //      ReadOnlyBlobIdSet so per-clean rebuild is unnecessary.
+            //
+            // We deliberately do *not* attempt to subtract from the inactive
+            // estimators on a 0→1 transition: at this point we don't yet know
+            // whether the blob is actually loaded in any store's memory cache
+            // (file/addressable stores load lazily on first
+            // TryGetBlobAndMetadata), and over-subtracting would push the
+            // estimators below zero. The estimators are re-anchored to truth by
+            // RecomputeInactiveTotals after every CleanCaches pass; that bounds
+            // any drift to one eviction cycle's worth of churn.
+            if (_blobRefCounts.TryGetIndex(blobId, out var idx))
+            {
+                _blobRefCounts.GetValueAtIndexByRef(idx) += 1;
+            }
+            else
+            {
+                _blobRefCounts.Add(blobId, 1);
+            }
+
             return id;
         }
 
         internal void DisposeHandle(PtrHandle handleId)
         {
+            AssertMainThreadAndNotDisposed();
+
+            var blobId = _handles[handleId];
             _handles.RemoveMustExist(handleId);
+
+            ref var refCount = ref _blobRefCounts.GetValueByRef(blobId);
+            refCount -= 1;
+            TrecsAssert.That(refCount >= 0, "BlobCache ref count went negative for {0}", blobId);
+
+            if (refCount == 0)
+            {
+                _blobRefCounts.RemoveMustExist(blobId);
+
+                // Last handle released: the blob just transitioned active → inactive
+                // (it's still in memory cache; CleanCache is what would actually
+                // evict it). Pessimistically add its native bytes / managed count
+                // to the running estimators so the high-water check can fire as
+                // soon as inline pressure crosses the configured threshold.
+                if (TryGetManifestEntry(blobId, out var metadata, updateAccessTime: false))
+                {
+                    if (metadata.IsNative)
+                    {
+                        _inactiveNativeBytesEstimate += metadata.NativeBytes;
+                    }
+                    else
+                    {
+                        _inactiveManagedCountEstimate += 1;
+                    }
+                }
+
+                MaybeRunInlineEviction();
+            }
         }
 
         internal bool ContainsHandle(PtrHandle handleId)
@@ -562,7 +948,12 @@ namespace Trecs
             return false;
         }
 
-        public NativeBlobPtr<T> CreateNativeBlobPtr<T>(BlobId id, in T value)
+        /// <summary>
+        /// Allocates a new native blob under <paramref name="id"/> in the writable
+        /// store and returns a pinning <see cref="NativeBlobPtr{T}"/>. Fails if a
+        /// blob already exists at this id.
+        /// </summary>
+        public NativeBlobPtr<T> AllocNativeBlob<T>(BlobId id, in T value)
             where T : unmanaged
         {
             AssertMainThreadAndNotDisposed();
@@ -585,9 +976,9 @@ namespace Trecs
         /// The caller must provide the exact allocation size and alignment so the blob
         /// can be freed correctly. This is critical for variable-sized types where the
         /// allocation is larger than sizeof(T).
-        /// See <see cref="NativeUniqueHeap.AllocTakingOwnership{T}"/> for the ownership contract.
+        /// See <see cref="NativeUniquePtr.AllocTakingOwnership{T}(HeapAccessor, NativeBlobAllocation, string, int)"/> for the ownership contract.
         /// </summary>
-        public NativeBlobPtr<T> CreateNativeBlobPtrTakingOwnership<T>(
+        public NativeBlobPtr<T> AllocNativeBlobTakingOwnership<T>(
             BlobId id,
             NativeBlobAllocation alloc
         )

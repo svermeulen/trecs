@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -15,37 +14,40 @@ using Trecs.SourceGen.Shared;
 namespace Trecs.SourceGen
 {
     /// <summary>
-    /// Source generator that generates efficient iteration methods for the
-    /// aspect-iteration mode of <c>[ForEachEntity]</c> (i.e. methods whose
-    /// loop parameter is an <c>IAspect</c> rather than a component). Uses
-    /// incremental generation for better performance.
+    /// Source generator for the aspect-iteration mode of <c>[ForEachEntity]</c>
+    /// (methods whose loop parameter is an <c>IAspect</c>). The component-iteration
+    /// mode is handled by <c>ForEachGenerator</c>; routing is decided by
+    /// <see cref="IterationAttributeRouting"/>.
+    ///
+    /// <para>Pipeline shape mirrors <see cref="ForEachGenerator"/>: the transform
+    /// produces a value-equatable <see cref="ForEachAspectModel"/> (strings +
+    /// EquatableArrays, zero symbols / syntax / raw Diagnostic), and the terminal
+    /// stage materializes diagnostics + emits source. The compilation's
+    /// global-namespace name folds in via a lightweight string Combine.</para>
     /// </summary>
     [Generator]
     public class ForEachEntityAspectGenerator : IIncrementalGenerator
     {
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            // Validation runs in the transform, so the terminal stage doesn't need a full
-            // Compilation — only the global-namespace display string. See
-            // ForEachGenerator for the caching rationale.
-            var forEachMethodProvider = context
+            var modelsRaw = context
                 .SyntaxProvider.CreateSyntaxProvider(
                     predicate: static (s, _) => IsMethodWithForEachEntityAttribute(s),
-                    transform: static (ctx, _) => GetForEachEntityAspectData(ctx)
+                    transform: static (ctx, _) => BuildModel(ctx)
                 )
-                .Where(static m => m is not null);
+                .Where(static m => m is not null)
+                .Select(static (m, _) => m!.Value);
 
             var globalNsProvider = context.CompilationProvider.Select(
                 static (c, _) =>
                     PerformanceCache.GetDisplayString(c.GlobalNamespace) ?? string.Empty
             );
 
-            var forEachWithGlobalNs = forEachMethodProvider.Combine(globalNsProvider);
+            var withGlobalNs = modelsRaw.Combine(globalNsProvider);
 
             context.RegisterSourceOutput(
-                forEachWithGlobalNs,
-                static (spc, source) =>
-                    GenerateForEachEntityAspectSource(spc, source.Left!, source.Right)
+                withGlobalNs,
+                static (spc, source) => GenerateForEachSource(spc, source.Left, source.Right)
             );
         }
 
@@ -61,18 +63,14 @@ namespace Trecs.SourceGen
                     );
         }
 
-        private static ForEachEntityAspectData? GetForEachEntityAspectData(
-            GeneratorSyntaxContext context
-        )
+        private static ForEachAspectModel? BuildModel(GeneratorSyntaxContext context)
         {
             var methodDecl = (MethodDeclarationSyntax)context.Node;
 
-            // [ForEachEntity] on a method of a struct is the JobGenerator's
-            // responsibility (it generates IJobFor scheduling). Skip those here.
+            // [ForEachEntity] on a struct method is the JobGenerator's responsibility.
             if (methodDecl.Parent is StructDeclarationSyntax)
                 return null;
 
-            // Find the containing class
             var classDecl = methodDecl.FirstAncestorOrSelf<ClassDeclarationSyntax>();
             if (classDecl == null)
                 return null;
@@ -81,9 +79,6 @@ namespace Trecs.SourceGen
             if (methodSymbol == null)
                 return null;
 
-            // [ForEachEntity] only routes to this generator when the method has at
-            // least one IAspect parameter — otherwise the components-side generator
-            // (ForEachGenerator) takes it.
             if (!IterationAttributeRouting.HasEntityFilter(methodSymbol))
                 return null;
             if (IterationAttributeRouting.HasWrapAsJobAttribute(methodSymbol))
@@ -91,28 +86,28 @@ namespace Trecs.SourceGen
             if (!IterationAttributeRouting.RoutesToAspectGenerator(methodSymbol))
                 return null;
 
-            // Validation runs here so the terminal stage doesn't need a Compilation /
-            // SemanticModel; captured diagnostics round-trip through value-equality
-            // pipeline state and are replayed downstream. Unexpected exceptions surface
-            // as a SourceGenerationError diagnostic rather than a generator crash.
-            var diagnostics = new List<Diagnostic>();
-            ValidatedMethodInfo? validated = null;
+            var classSymbol = methodSymbol.ContainingType;
+            var className = classDecl.Identifier.Text;
+            var methodName = methodDecl.Identifier.Text;
+            var diagnostics = new List<DiagnosticInfo>();
+            ForEachAspectValidation validation = ForEachAspectValidation.Empty;
             bool isValid;
+
             try
             {
                 isValid = ValidateMethod(
                     classDecl,
                     methodDecl,
                     methodSymbol,
-                    diagnostics.Add,
                     context.SemanticModel,
-                    out validated
+                    diagnostics,
+                    out validation
                 );
             }
             catch (Exception ex)
             {
                 diagnostics.Add(
-                    Diagnostic.Create(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.SourceGenerationError,
                         methodDecl.GetLocation(),
                         "ForEachEntity (aspect mode) method validation",
@@ -120,173 +115,125 @@ namespace Trecs.SourceGen
                     )
                 );
                 isValid = false;
-                validated = null;
+                validation = ForEachAspectValidation.Empty;
             }
 
-            return new ForEachEntityAspectData(
-                classDecl,
-                methodDecl,
-                methodSymbol,
-                isValid,
-                validated,
-                diagnostics.ToImmutableArray()
+            var containingTypes = SymbolAnalyzer
+                .GetContainingTypeChainInfo(classSymbol)
+                .ToEquatableArray();
+            var visibility = SymbolAnalyzer.GetMethodVisibility(methodDecl);
+
+            return new ForEachAspectModel(
+                ClassName: className,
+                MethodName: methodName,
+                Namespace: SymbolAnalyzer.GetNamespace(classDecl),
+                Visibility: visibility,
+                HintFileName: SymbolAnalyzer.GetSafeFileName(
+                    classSymbol,
+                    $"{methodName}_ForEachEntityAspect"
+                ),
+                ContainingTypes: containingTypes,
+                IsValid: isValid,
+                Validation: validation,
+                Diagnostics: diagnostics.ToEquatableArray()
             );
         }
 
-        private static void GenerateForEachEntityAspectSource(
+        private static void GenerateForEachSource(
             SourceProductionContext context,
-            ForEachEntityAspectData data,
+            ForEachAspectModel model,
             string globalNamespaceName
         )
         {
-            var location = data.MethodDecl.GetLocation();
-            var className = data.ClassDecl.Identifier.Text;
-            var methodName = data.MethodDecl.Identifier.Text;
-            var fileName = SymbolAnalyzer.GetSafeFileName(
-                data.MethodSymbol.ContainingType,
-                $"{methodName}_ForEachEntityAspect"
-            );
+            foreach (var diag in model.Diagnostics)
+                context.ReportDiagnostic(diag.ToDiagnostic());
 
-            // Replay diagnostics collected in the transform phase.
-            foreach (var diag in data.Diagnostics)
-            {
-                context.ReportDiagnostic(diag);
-            }
-
-            if (!data.IsValid || data.ValidatedInfo == null)
-            {
+            if (!model.IsValid)
                 return;
-            }
 
             try
             {
-                using var _ = SourceGenTimer.Time("ForEachEntityAspectGenerator.Total");
+                using var _timer_ = SourceGenTimer.Time("ForEachEntityAspectGenerator.Total");
                 SourceGenLogger.Log(
-                    $"[ForEachEntityAspectGenerator] Processing {className}.{methodName}"
+                    $"[ForEachEntityAspectGenerator] Processing {model.ClassName}.{model.MethodName}"
                 );
 
                 var source = ErrorRecovery.TryExecute(
-                    () =>
-                        GenerateSource(
-                            data.ClassDecl,
-                            data.MethodDecl,
-                            data.MethodSymbol.ContainingType,
-                            data.ValidatedInfo,
-                            globalNamespaceName
-                        ),
+                    () => GenerateSource(model, globalNamespaceName),
                     context,
-                    location,
+                    Location.None,
                     "ForEachEntity (aspect mode) code generation"
                 );
 
                 if (source != null)
                 {
-                    context.AddSource(fileName, source);
-                    SourceGenLogger.WriteGeneratedFile(fileName, source);
+                    context.AddSource(model.HintFileName, source);
+                    SourceGenLogger.WriteGeneratedFile(model.HintFileName, source);
                 }
                 else
                 {
-                    // Generation failed - report error but don't generate fallback
-                    // (partial methods don't need fallback)
-                    var diagnostic = Diagnostic.Create(
-                        DiagnosticDescriptors.CouldNotResolveSymbol,
-                        location,
-                        $"{className}.{methodName}"
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                            DiagnosticDescriptors.CouldNotResolveSymbol,
+                            Location.None,
+                            $"{model.ClassName}.{model.MethodName}"
+                        )
                     );
-                    context.ReportDiagnostic(diagnostic);
                 }
             }
             catch (Exception ex)
             {
-                // Report error for any unhandled exceptions
                 ErrorRecovery.ReportError(
                     context,
-                    location,
-                    $"ForEachEntity (aspect mode) {className}.{methodName}",
+                    Location.None,
+                    $"ForEachEntity (aspect mode) {model.ClassName}.{model.MethodName}",
                     ex
                 );
             }
         }
 
-        private static string GenerateSource(
-            ClassDeclarationSyntax classDec,
-            MethodDeclarationSyntax methodDec,
-            INamedTypeSymbol classSymbol,
-            ValidatedMethodInfo validatedMethodInfo,
-            string globalNamespaceName
-        )
+        // ─────────────────────────────────────────────────────────────────────
+        // Code emission (all from the equatable model — no symbol access)
+        // ─────────────────────────────────────────────────────────────────────
+
+        private static string GenerateSource(ForEachAspectModel model, string globalNamespaceName)
         {
-            var customArgsDecStr = "";
-            var customArgsCallStr = "";
+            var v = model.Validation;
 
-            if (validatedMethodInfo.CustomParameters.Any())
+            var sb = OptimizedStringBuilder.ForAspect(v.AspectComponents.Length);
+
+            var namespaces = new HashSet<string>(CommonUsings.Namespaces) { "Unity.Jobs" };
+            foreach (var ns in v.Namespaces)
             {
-                customArgsDecStr +=
-                    ", "
-                    + string.Join(
-                        ", ",
-                        validatedMethodInfo.CustomParameters.Select(p =>
-                            $"{(p.IsRef ? "ref " : p.IsIn ? "in " : "")}{(p.TypeSymbol != null ? PerformanceCache.GetDisplayString(p.TypeSymbol) : p.Type)} {p.Name}"
-                        )
-                    );
-                customArgsCallStr +=
-                    ", "
-                    + string.Join(
-                        ", ",
-                        validatedMethodInfo.CustomParameters.Select(p =>
-                            $"{(p.IsRef ? "ref " : p.IsIn ? "in " : "")}{p.Name}"
-                        )
-                    );
+                if (ns != globalNamespaceName)
+                    namespaces.Add(ns);
             }
-
-            var namespaceName = SymbolAnalyzer.GetNamespace(classDec);
-            var className = classDec.Identifier.Text;
-            var methodName = methodDec.Identifier.Text;
-            var aspectTypeName = validatedMethodInfo.AspectTypeName;
-
-            // Extract visibility modifier from the original method
-            var visibility = SymbolAnalyzer.GetMethodVisibility(methodDec);
-
-            var componentCount = validatedMethodInfo.ComponentTypes.Count;
-            var sb = OptimizedStringBuilder.ForAspect(componentCount);
-
-            // Add required namespaces
-            var requiredNamespaces = NamespaceCollector.Collect(
-                globalNamespaceName,
-                validatedMethodInfo
+            HoistedSingleEmitter.CollectNamespaces(
+                namespaces,
+                v.HoistedSingletons,
+                globalNamespaceName
             );
-
-            sb.AppendUsings(requiredNamespaces.ToArray());
-
-            // Walk the system class's containing-type chain so the emitted partial merges
-            // with a nested system class. Without these wrappers, `partial class InnerSystem`
-            // would land at namespace scope rather than under `partial class Outer`, and the
-            // emitted overloads would shadow (rather than augment) the user's method.
-            var containingTypes = SymbolAnalyzer.GetContainingTypeChainInfo(classSymbol);
+            sb.AppendUsings(namespaces.ToArray());
 
             return sb.WrapInNamespace(
-                    namespaceName,
+                    model.Namespace,
                     (builder) =>
                     {
                         builder.WrapInContainingTypes(
-                            containingTypes,
+                            model.ContainingTypes.ToArray(),
                             0,
                             (b, indent) =>
                                 b.WrapInType(
                                     "public",
                                     "class",
-                                    className,
+                                    model.ClassName,
                                     (classBuilder) =>
                                     {
-                                        // Generate single overload based on Aspect attribute properties
                                         GenerateSingleOverload(
                                             classBuilder,
-                                            methodName,
-                                            aspectTypeName,
-                                            validatedMethodInfo,
-                                            customArgsDecStr,
-                                            customArgsCallStr,
-                                            visibility
+                                            model.MethodName,
+                                            v,
+                                            model.Visibility
                                         );
                                     },
                                     indent
@@ -300,27 +247,43 @@ namespace Trecs.SourceGen
         private static void GenerateSingleOverload(
             OptimizedStringBuilder sb,
             string methodName,
-            string aspectTypeName,
-            ValidatedMethodInfo info,
-            string customArgsDecStr,
-            string customArgsCallStr,
+            ForEachAspectValidation v,
             string visibility
         )
         {
-            bool hasSets = info.HasSet;
-            bool hasAnyAttributeCriteria =
-                hasSets || info.HasAttributeTags || info.MatchByComponents;
+            string customArgsDecStr = "";
+            string customArgsCallStr = "";
+
+            if (v.CustomParameters.Length > 0)
+            {
+                customArgsDecStr =
+                    ", "
+                    + string.Join(
+                        ", ",
+                        v.CustomParameters.Select(p =>
+                            $"{(p.IsRef ? "ref " : p.IsIn ? "in " : "")}{p.Type} {p.Name}"
+                        )
+                    );
+                customArgsCallStr =
+                    ", "
+                    + string.Join(
+                        ", ",
+                        v.CustomParameters.Select(p =>
+                            $"{(p.IsRef ? "ref " : p.IsIn ? "in " : "")}{p.Name}"
+                        )
+                    );
+            }
+
+            bool hasSets = v.HasSet;
+            bool hasAnyAttributeCriteria = hasSets || v.HasAttributeTags || v.MatchByComponents;
 
             // (1) Convenience overload — only when the attribute supplies at least one criterion.
-            // For empty attributes we deliberately do NOT emit this; callers must explicitly pass
-            // a builder so iteration cannot accidentally walk every group in the world.
             if (hasAnyAttributeCriteria)
             {
                 GenerateConvenienceOverload(
                     sb,
                     methodName,
-                    aspectTypeName,
-                    info,
+                    v,
                     customArgsDecStr,
                     customArgsCallStr,
                     visibility
@@ -328,83 +291,47 @@ namespace Trecs.SourceGen
             }
 
             // (2) Public dense entry — only when the attribute imposes no Set/Sets.
-            // (When the attribute has Sets, the iteration is forced through the sparse path.)
             if (!hasSets)
             {
-                GenerateQueryBuilderEntry(
-                    sb,
-                    methodName,
-                    aspectTypeName,
-                    info,
-                    customArgsDecStr,
-                    visibility
-                );
+                GenerateQueryBuilderEntry(sb, methodName, v, customArgsDecStr, visibility);
             }
 
             // (3) Public sparse entry — only when the attribute has no set baked in.
             if (!hasSets)
             {
-                GenerateSparseQueryBuilderEntry(
-                    sb,
-                    methodName,
-                    aspectTypeName,
-                    info,
-                    customArgsDecStr,
-                    visibility
-                );
+                GenerateSparseQueryBuilderEntry(sb, methodName, v, customArgsDecStr, visibility);
             }
 
-            // (4) Range overload for event handlers — always emitted (event observers may forward
-            // their callback args + custom event args).
-            GenerateRangeOverload(
-                sb,
-                methodName,
-                aspectTypeName,
-                info,
-                customArgsDecStr,
-                visibility
-            );
+            // (4) Range overload for event handlers — always emitted.
+            GenerateRangeOverload(sb, methodName, v, customArgsDecStr, visibility);
         }
 
-        /// <summary>
-        /// Builds an attribute-criteria chain that's appended to a builder expression. The chain
-        /// is exactly the criteria the attribute imposes — tags, MatchByComponents components,
-        /// and Set/Sets. The caller is responsible for prefixing it with the builder expression.
-        /// </summary>
         private static void GenerateConvenienceOverload(
             OptimizedStringBuilder sb,
             string methodName,
-            string aspectTypeName,
-            ValidatedMethodInfo info,
+            ForEachAspectValidation v,
             string customArgsDecStr,
             string customArgsCallStr,
             string visibility
         )
         {
+            sb.AppendLine(2, GeneratedCodeAttributes.Line);
             sb.AppendLine(
                 2,
                 $"{visibility} void {methodName}(WorldAccessor __world{customArgsDecStr})"
             );
             sb.AppendLine(2, "{");
 
-            if (info.HasSet)
+            if (v.HasSet)
             {
-                // Sparse path. Build the full SparseQueryBuilder inline.
-                var firstSetName = PerformanceCache.GetDisplayString(info.SetTypes[0]);
-                var attributeChain = QueryBuilderHelper.BuildAttributeCriteriaChain(
-                    info.AttributeTagTypes,
-                    info.MatchByComponents,
-                    info.ComponentTypes
-                );
                 sb.AppendLine(
                     3,
-                    $"var __builder = __world.Query(){attributeChain}.InSet<{firstSetName}>();"
+                    $"var __builder = __world.Query(){v.AttributeCriteriaChainNoWithouts}.InSet<{v.FirstSetTypeDisplay}>();"
                 );
                 EmitSparseIterationBody(
                     sb,
                     methodName,
-                    aspectTypeName,
-                    info,
+                    v,
                     indentLevel: 3,
                     builderVar: "__builder",
                     worldVar: "__world"
@@ -412,8 +339,6 @@ namespace Trecs.SourceGen
             }
             else
             {
-                // Dense path. Just delegate to the (QueryBuilder) entry — no set criteria means
-                // no duplication risk, so the typed entry can do the merging.
                 sb.AppendLine(3, $"{methodName}(__world.Query(){customArgsCallStr});");
             }
 
@@ -424,40 +349,30 @@ namespace Trecs.SourceGen
         private static void GenerateQueryBuilderEntry(
             OptimizedStringBuilder sb,
             string methodName,
-            string aspectTypeName,
-            ValidatedMethodInfo info,
+            ForEachAspectValidation v,
             string customArgsDecStr,
             string visibility
         )
         {
+            sb.AppendLine(2, GeneratedCodeAttributes.Line);
             sb.AppendLine(
                 2,
                 $"{visibility} void {methodName}(QueryBuilder __builder{customArgsDecStr})"
             );
             sb.AppendLine(2, "{");
 
-            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
-                info.AttributeTagTypes,
-                info.MatchByComponents,
-                info.ComponentTypes,
-                info.AttributeWithoutTagTypes
-            );
-            if (chain.Length > 0)
-                sb.AppendLine(3, $"__builder = __builder{chain};");
+            if (v.AttributeCriteriaChainFull.Length > 0)
+                sb.AppendLine(3, $"__builder = __builder{v.AttributeCriteriaChainFull};");
 
-            // Fail loud rather than walk every group in the world. The runtime check covers both
-            // the empty-attribute case (no chain merged in) and the case where the caller passed
-            // an empty builder.
             sb.AppendLine(
                 3,
-                $"TrecsAssert.That(__builder.HasAnyCriteria, \"{methodName} requires query criteria — pass a builder with at least one tag, component, or set constraint, or specify Tag/Set/MatchByComponents on the [ForEachEntity] attribute.\");"
+                $"TrecsDebugAssert.That(__builder.HasAnyCriteria, \"{methodName} requires query criteria — pass a builder with at least one tag, component, or set constraint, or specify Tag/Set/MatchByComponents on the [ForEachEntity] attribute.\");"
             );
 
             EmitDenseIterationBody(
                 sb,
                 methodName,
-                aspectTypeName,
-                info,
+                v,
                 indentLevel: 3,
                 builderVar: "__builder",
                 worldVar: null
@@ -470,32 +385,25 @@ namespace Trecs.SourceGen
         private static void GenerateSparseQueryBuilderEntry(
             OptimizedStringBuilder sb,
             string methodName,
-            string aspectTypeName,
-            ValidatedMethodInfo info,
+            ForEachAspectValidation v,
             string customArgsDecStr,
             string visibility
         )
         {
+            sb.AppendLine(2, GeneratedCodeAttributes.Line);
             sb.AppendLine(
                 2,
                 $"{visibility} void {methodName}(SparseQueryBuilder __builder{customArgsDecStr})"
             );
             sb.AppendLine(2, "{");
 
-            var chain = QueryBuilderHelper.BuildAttributeCriteriaChain(
-                info.AttributeTagTypes,
-                info.MatchByComponents,
-                info.ComponentTypes,
-                info.AttributeWithoutTagTypes
-            );
-            if (chain.Length > 0)
-                sb.AppendLine(3, $"__builder = __builder{chain};");
+            if (v.AttributeCriteriaChainFull.Length > 0)
+                sb.AppendLine(3, $"__builder = __builder{v.AttributeCriteriaChainFull};");
 
             EmitSparseIterationBody(
                 sb,
                 methodName,
-                aspectTypeName,
-                info,
+                v,
                 indentLevel: 3,
                 builderVar: "__builder",
                 worldVar: null
@@ -505,20 +413,210 @@ namespace Trecs.SourceGen
             sb.AppendLine();
         }
 
+        private static void GenerateRangeOverload(
+            OptimizedStringBuilder sb,
+            string methodName,
+            ForEachAspectValidation v,
+            string customArgsDecStr,
+            string visibility
+        )
+        {
+            sb.AppendLine(2, GeneratedCodeAttributes.Line);
+            sb.AppendLine(
+                2,
+                $"{visibility} void {methodName}(GroupIndex __group, EntityRange __indices, WorldAccessor __world{customArgsDecStr})"
+            );
+            sb.AppendLine(2, "{");
+
+            EmitSetAccessorDeclarations(sb, v, indentLevel: 3, worldVar: "__world");
+            HoistedSingleEmitter.Emit(sb, 3, "__world", v.HoistedSingletons);
+
+            EmitPerGroupBufferFetch(
+                sb,
+                v,
+                indentLevel: 3,
+                groupVar: "__group",
+                worldVar: "__world"
+            );
+            sb.AppendLine();
+
+            var constructorArgs = string.Join(", ", v.AspectComponents.Select(c => c.VarName));
+            sb.AppendLine(3, $"var __view = new {v.AspectTypeName}(__group, {constructorArgs});");
+            sb.AppendLine(3, "for (int __i = __indices.Start; __i < __indices.End; __i++)");
+            sb.AppendLine(3, "{");
+            sb.AppendLine(4, "__view.SetIndex(__i);");
+
+            EmitEntityRefDeclarations(
+                sb,
+                v,
+                indentLevel: 4,
+                indexExpr: "new EntityIndex(__i, __group)",
+                worldVar: "__world"
+            );
+
+            EmitUserBodyOrCall(sb, indentLevel: 4, methodName, v, "__world");
+
+            sb.AppendLine(3, "}");
+            sb.AppendLine(2, "}");
+            sb.AppendLine();
+        }
+
+        /// <summary>
+        /// Emits the inline dense iteration loop: foreach DenseGroupSlice → fetch buffers →
+        /// for-loop over entities. <paramref name="worldVar"/>: if null, declares a local
+        /// <c>__world = {builderVar}.World;</c>; otherwise uses the supplied name (so the
+        /// convenience overload's parameter doesn't shadow).
+        /// </summary>
+        private static void EmitDenseIterationBody(
+            OptimizedStringBuilder sb,
+            string methodName,
+            ForEachAspectValidation v,
+            int indentLevel,
+            string builderVar,
+            string? worldVar
+        )
+        {
+            string worldName = worldVar ?? "__world";
+            if (worldVar == null)
+                sb.AppendLine(indentLevel, $"var {worldName} = {builderVar}.World;");
+
+            EmitSetAccessorDeclarations(sb, v, indentLevel, worldName);
+            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, v.HoistedSingletons);
+
+            sb.AppendLine(indentLevel, $"foreach (var __slice in {builderVar}.GroupSlices())");
+            sb.AppendLine(indentLevel, "{");
+
+            EmitPerGroupBufferFetch(
+                sb,
+                v,
+                indentLevel + 1,
+                groupVar: "__slice.GroupIndex",
+                worldVar: worldName
+            );
+            sb.AppendLine();
+
+            var constructorArgs = string.Join(", ", v.AspectComponents.Select(c => c.VarName));
+            sb.AppendLine(
+                indentLevel + 1,
+                $"var __view = new {v.AspectTypeName}(__slice.GroupIndex, {constructorArgs});"
+            );
+            sb.AppendLine(indentLevel + 1, "for (int __i = 0; __i < __slice.Count; __i++)");
+            sb.AppendLine(indentLevel + 1, "{");
+            sb.AppendLine(indentLevel + 2, "__view.SetIndex(__i);");
+
+            EmitEntityRefDeclarations(
+                sb,
+                v,
+                indentLevel + 2,
+                indexExpr: "new EntityIndex(__i, __slice.GroupIndex)",
+                worldVar: worldName
+            );
+
+            EmitUserBodyOrCall(sb, indentLevel + 2, methodName, v, worldName);
+
+            sb.AppendLine(indentLevel + 1, "}");
+            sb.AppendLine(indentLevel, "}");
+        }
+
+        /// <summary>
+        /// Emits the inline sparse iteration loop. Same <paramref name="worldVar"/>
+        /// semantics as <see cref="EmitDenseIterationBody"/>.
+        /// </summary>
+        private static void EmitSparseIterationBody(
+            OptimizedStringBuilder sb,
+            string methodName,
+            ForEachAspectValidation v,
+            int indentLevel,
+            string builderVar,
+            string? worldVar
+        )
+        {
+            string worldName = worldVar ?? "__world";
+            if (worldVar == null)
+                sb.AppendLine(indentLevel, $"var {worldName} = {builderVar}.World;");
+
+            EmitSetAccessorDeclarations(sb, v, indentLevel, worldName);
+            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, v.HoistedSingletons);
+
+            sb.AppendLine(indentLevel, $"foreach (var __slice in {builderVar}.GroupSlices())");
+            sb.AppendLine(indentLevel, "{");
+
+            EmitPerGroupBufferFetch(
+                sb,
+                v,
+                indentLevel + 1,
+                groupVar: "__slice.GroupIndex",
+                worldVar: worldName
+            );
+            sb.AppendLine();
+
+            var constructorArgs = string.Join(", ", v.AspectComponents.Select(c => c.VarName));
+            sb.AppendLine(
+                indentLevel + 1,
+                $"var __view = new {v.AspectTypeName}(__slice.GroupIndex, {constructorArgs});"
+            );
+            sb.AppendLine(indentLevel + 1, "foreach (var __idx in __slice.Indices)");
+            sb.AppendLine(indentLevel + 1, "{");
+            sb.AppendLine(indentLevel + 2, "__view.SetIndex(__idx);");
+
+            EmitEntityRefDeclarations(
+                sb,
+                v,
+                indentLevel + 2,
+                indexExpr: "new EntityIndex(__idx, __slice.GroupIndex)",
+                worldVar: worldName
+            );
+
+            EmitUserBodyOrCall(sb, indentLevel + 2, methodName, v, worldName);
+
+            sb.AppendLine(indentLevel + 1, "}");
+            sb.AppendLine(indentLevel, "}");
+        }
+
+        private static void EmitUserBodyOrCall(
+            OptimizedStringBuilder sb,
+            int indentLevel,
+            string methodName,
+            ForEachAspectValidation v,
+            string worldName
+        )
+        {
+            var callArgs = BuildUserMethodCallArgs(v, "__view", worldName, "__entityIndex");
+            sb.AppendLine(indentLevel, $"{methodName}({callArgs});");
+        }
+
+        private static void EmitPerGroupBufferFetch(
+            OptimizedStringBuilder sb,
+            ForEachAspectValidation v,
+            int indentLevel,
+            string groupVar,
+            string worldVar
+        )
+        {
+            foreach (var entry in v.AspectComponents)
+            {
+                var bufferSuffix = entry.IsWrite ? "Write" : "Read";
+                sb.AppendLine(
+                    indentLevel,
+                    $"var {entry.VarName} = {worldVar}.ComponentBuffer<{entry.TypeDisplay}>({groupVar}).{bufferSuffix};"
+                );
+            }
+        }
+
         /// <summary>
         /// Builds the comma-separated argument list for the call to the user's
         /// aspect-mode <c>[ForEachEntity]</c> method, preserving the user's
-        /// declaration order via <see cref="ValidatedMethodInfo.ParameterSlots"/>.
+        /// declaration order via <see cref="ForEachAspectValidation.ParameterSlots"/>.
         /// </summary>
         private static string BuildUserMethodCallArgs(
-            ValidatedMethodInfo info,
+            ForEachAspectValidation v,
             string aspectVar,
             string worldVar,
             string entityIndexVar
         )
         {
-            var args = new List<string>(info.ParameterSlots.Count);
-            foreach (var slot in info.ParameterSlots)
+            var args = new List<string>(v.ParameterSlots.Length);
+            foreach (var slot in v.ParameterSlots)
             {
                 switch (slot.Kind)
                 {
@@ -535,19 +633,19 @@ namespace Trecs.SourceGen
                         args.Add(worldVar);
                         break;
                     case ParamSlotKind.LoopSetAccessor:
-                        var sa = info.SetAccessorParameters[slot.Index];
+                        var sa = v.SetAccessorParameters[slot.Index];
                         args.Add(sa.IsIn ? $"in {sa.ParamName}" : sa.ParamName);
                         break;
                     case ParamSlotKind.LoopSetRead:
-                        var sr = info.SetReadParameters[slot.Index];
+                        var sr = v.SetReadParameters[slot.Index];
                         args.Add($"in {sr.ParamName}");
                         break;
                     case ParamSlotKind.LoopSetWrite:
-                        var sw = info.SetWriteParameters[slot.Index];
+                        var sw = v.SetWriteParameters[slot.Index];
                         args.Add($"in {sw.ParamName}");
                         break;
                     case ParamSlotKind.Custom:
-                        var p = info.CustomParameters[slot.Index];
+                        var p = v.CustomParameters[slot.Index];
                         var prefix =
                             p.IsRef ? "ref "
                             : p.IsIn ? "in "
@@ -555,7 +653,7 @@ namespace Trecs.SourceGen
                         args.Add($"{prefix}{p.Name}");
                         break;
                     case ParamSlotKind.HoistedSingleton:
-                        var hs = info.HoistedSingletons[slot.Index];
+                        var hs = v.HoistedSingletons[slot.Index];
                         args.Add(hs.IsRef ? $"ref __{hs.ParamName}" : $"in __{hs.ParamName}");
                         break;
                 }
@@ -563,238 +661,68 @@ namespace Trecs.SourceGen
             return string.Join(", ", args);
         }
 
-        /// <summary>
-        /// Emits the inline dense iteration loop: foreach DenseGroupSlice → fetch buffers → for-loop
-        /// over entities. The slice already carries GroupIndex + Count from a single lookup so we don't
-        /// need a separate CountEntitiesInGroup call per group.
-        /// If <paramref name="worldVar"/> is null, declares a local <c>__world</c>; otherwise uses
-        /// the supplied variable name (so the convenience overload's parameter doesn't shadow).
-        /// </summary>
-        private static void EmitDenseIterationBody(
+        private static void EmitSetAccessorDeclarations(
             OptimizedStringBuilder sb,
-            string methodName,
-            string aspectTypeName,
-            ValidatedMethodInfo info,
+            ForEachAspectValidation v,
             int indentLevel,
-            string builderVar,
-            string? worldVar
-        )
-        {
-            string worldName = worldVar ?? "__world";
-            if (worldVar == null)
-                sb.AppendLine(indentLevel, $"var {worldName} = {builderVar}.World;");
-
-            NamespaceCollector.EmitSetAccessorDeclarations(sb, info, indentLevel, worldName);
-            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, info.HoistedSingletons);
-
-            sb.AppendLine(indentLevel, $"foreach (var __slice in {builderVar}.GroupSlices())");
-            sb.AppendLine(indentLevel, "{");
-
-            EmitPerGroupBufferFetch(
-                sb,
-                info,
-                indentLevel + 1,
-                groupVar: "__slice.GroupIndex",
-                worldVar: worldName
-            );
-            sb.AppendLine();
-
-            var constructorArgs = string.Join(", ", BufferVarNamesFor(info));
-            sb.AppendLine(
-                indentLevel + 1,
-                $"var __view = new {aspectTypeName}(__slice.GroupIndex, {constructorArgs});"
-            );
-            sb.AppendLine(indentLevel + 1, "for (int __i = 0; __i < __slice.Count; __i++)");
-            sb.AppendLine(indentLevel + 1, "{");
-            sb.AppendLine(indentLevel + 2, "__view.SetIndex(__i);");
-
-            EntityRefEmitter.EmitDeclarations(
-                sb,
-                info,
-                indentLevel + 2,
-                indexExpr: "new EntityIndex(__i, __slice.GroupIndex)",
-                worldVar: worldName
-            );
-
-            EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
-
-            sb.AppendLine(indentLevel + 1, "}");
-            sb.AppendLine(indentLevel, "}");
-        }
-
-        /// <summary>
-        /// Emits the inline sparse iteration loop. Same <paramref name="worldVar"/> behaviour as
-        /// <see cref="EmitDenseIterationBody"/>.
-        /// </summary>
-        private static void EmitSparseIterationBody(
-            OptimizedStringBuilder sb,
-            string methodName,
-            string aspectTypeName,
-            ValidatedMethodInfo info,
-            int indentLevel,
-            string builderVar,
-            string? worldVar
-        )
-        {
-            string worldName = worldVar ?? "__world";
-            if (worldVar == null)
-                sb.AppendLine(indentLevel, $"var {worldName} = {builderVar}.World;");
-
-            NamespaceCollector.EmitSetAccessorDeclarations(sb, info, indentLevel, worldName);
-            HoistedSingleEmitter.Emit(sb, indentLevel, worldName, info.HoistedSingletons);
-
-            sb.AppendLine(indentLevel, $"foreach (var __slice in {builderVar}.GroupSlices())");
-            sb.AppendLine(indentLevel, "{");
-
-            EmitPerGroupBufferFetch(
-                sb,
-                info,
-                indentLevel + 1,
-                groupVar: "__slice.GroupIndex",
-                worldVar: worldName
-            );
-            sb.AppendLine();
-
-            var constructorArgs = string.Join(", ", BufferVarNamesFor(info));
-            sb.AppendLine(
-                indentLevel + 1,
-                $"var __view = new {aspectTypeName}(__slice.GroupIndex, {constructorArgs});"
-            );
-            sb.AppendLine(indentLevel + 1, "foreach (var __idx in __slice.Indices)");
-            sb.AppendLine(indentLevel + 1, "{");
-            sb.AppendLine(indentLevel + 2, "__view.SetIndex(__idx);");
-
-            EntityRefEmitter.EmitDeclarations(
-                sb,
-                info,
-                indentLevel + 2,
-                indexExpr: "new EntityIndex(__idx, __slice.GroupIndex)",
-                worldVar: worldName
-            );
-
-            EmitUserBodyOrCall(sb, indentLevel + 2, methodName, info, worldName);
-
-            sb.AppendLine(indentLevel + 1, "}");
-            sb.AppendLine(indentLevel, "}");
-        }
-
-        private static void EmitUserBodyOrCall(
-            OptimizedStringBuilder sb,
-            int indentLevel,
-            string methodName,
-            ValidatedMethodInfo info,
-            string worldName
-        )
-        {
-            var callArgs = BuildUserMethodCallArgs(info, "__view", worldName, "__entityIndex");
-            sb.AppendLine(indentLevel, $"{methodName}({callArgs});");
-        }
-
-        private static void EmitPerGroupBufferFetch(
-            OptimizedStringBuilder sb,
-            ValidatedMethodInfo info,
-            int indentLevel,
-            string groupVar,
             string worldVar
         )
         {
-            foreach (var type in info.ComponentTypes)
-            {
-                var varName = ComponentTypeHelper.GetComponentVariableName(type);
-                var typeDisplay = PerformanceCache.GetDisplayString(type);
-                var bufferSuffix = info.IsReadOnly(type) ? "Read" : "Write";
+            foreach (var sa in v.SetAccessorParameters)
                 sb.AppendLine(
                     indentLevel,
-                    $"var {varName} = {worldVar}.ComponentBuffer<{typeDisplay}>({groupVar}).{bufferSuffix};"
+                    $"var {sa.ParamName} = {worldVar}.Set<{sa.SetTypeArg}>();"
                 );
-            }
+            foreach (var sr in v.SetReadParameters)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var {sr.ParamName} = {worldVar}.Set<{sr.SetTypeArg}>().Read;"
+                );
+            foreach (var sw in v.SetWriteParameters)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var {sw.ParamName} = {worldVar}.Set<{sw.SetTypeArg}>().Write;"
+                );
         }
 
-        private static List<string> BufferVarNamesFor(ValidatedMethodInfo info)
-        {
-            var names = new List<string>(info.ComponentTypes.Count);
-            foreach (var type in info.ComponentTypes)
-                names.Add(ComponentTypeHelper.GetComponentVariableName(type));
-            return names;
-        }
-
-        private static void GenerateRangeOverload(
+        private static void EmitEntityRefDeclarations(
             OptimizedStringBuilder sb,
-            string methodName,
-            string aspectTypeName,
-            ValidatedMethodInfo info,
-            string customArgsDecStr,
-            string visibility
+            ForEachAspectValidation v,
+            int indentLevel,
+            string indexExpr,
+            string worldVar
         )
         {
-            sb.AppendLine(
-                2,
-                $"{visibility} void {methodName}(GroupIndex __group, EntityRange __indices, WorldAccessor __world{customArgsDecStr})"
-            );
-            sb.AppendLine(2, "{");
-
-            NamespaceCollector.EmitSetAccessorDeclarations(
-                sb,
-                info,
-                indentLevel: 3,
-                worldVar: "__world"
-            );
-            HoistedSingleEmitter.Emit(
-                sb,
-                indentLevel: 3,
-                worldVar: "__world",
-                info.HoistedSingletons
-            );
-
-            EmitPerGroupBufferFetch(
-                sb,
-                info,
-                indentLevel: 3,
-                groupVar: "__group",
-                worldVar: "__world"
-            );
-            sb.AppendLine();
-
-            var constructorArgs = string.Join(", ", BufferVarNamesFor(info));
-            sb.AppendLine(3, $"var __view = new {aspectTypeName}(__group, {constructorArgs});");
-            sb.AppendLine(3, "for (int __i = __indices.Start; __i < __indices.End; __i++)");
-            sb.AppendLine(3, "{");
-            sb.AppendLine(4, "__view.SetIndex(__i);");
-
-            EntityRefEmitter.EmitDeclarations(
-                sb,
-                info,
-                indentLevel: 4,
-                indexExpr: "new EntityIndex(__i, __group)",
-                worldVar: "__world"
-            );
-
-            EmitUserBodyOrCall(sb, indentLevel: 4, methodName, info, "__world");
-
-            sb.AppendLine(3, "}");
-            sb.AppendLine(2, "}");
-            sb.AppendLine();
+            bool needsIndex = v.HasEntityIndexParameter || v.HasEntityHandleParameter;
+            if (needsIndex)
+                sb.AppendLine(indentLevel, $"var __entityIndex = {indexExpr};");
+            if (v.HasEntityHandleParameter)
+                sb.AppendLine(
+                    indentLevel,
+                    $"var __entityHandle = __entityIndex.ToHandle({worldVar});"
+                );
         }
 
-        // GetComponentVariableName consolidated into ComponentTypeHelper.GetComponentVariableName
+        // ─────────────────────────────────────────────────────────────────────
+        // Validation
+        // ─────────────────────────────────────────────────────────────────────
 
         private static bool ValidateMethod(
             ClassDeclarationSyntax classDec,
             MethodDeclarationSyntax methodDec,
             IMethodSymbol methodSymbol,
-            System.Action<Diagnostic> reportDiagnostic,
             SemanticModel semanticModel,
-            out ValidatedMethodInfo? validatedMethodInfo
+            List<DiagnosticInfo> diagnostics,
+            out ForEachAspectValidation validation
         )
         {
-            validatedMethodInfo = null;
+            validation = ForEachAspectValidation.Empty;
             bool isValid = true;
 
-            // Check if the class is partial
             if (!classDec.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword)))
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.NotPartialClass,
                         classDec.Identifier.GetLocation(),
                         classDec.Identifier.Text
@@ -803,11 +731,10 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
 
-            // Check return type
             if (methodDec.ReturnType.ToString() != "void")
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.InvalidReturnType,
                         methodDec.ReturnType.GetLocation()
                     )
@@ -815,13 +742,11 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
 
-            // Validate parameters
             var parameters = methodDec.ParameterList.Parameters;
-
             if (parameters.Count == 0)
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.EmptyParameters,
                         methodDec.ParameterList.GetLocation()
                     )
@@ -829,8 +754,8 @@ namespace Trecs.SourceGen
                 return false;
             }
 
-            // Locate the (single) aspect parameter — anywhere in the parameter list,
-            // marked 'in', and implementing IAspect (without [PassThroughArgument]).
+            // Locate the (single) aspect parameter — anywhere in the list, marked 'in',
+            // implementing IAspect, no [PassThroughArgument] / [SingleEntity].
             ParameterSyntax? aspectParam = null;
             ITypeSymbol? aspectParamType = null;
             for (int pi = 0; pi < parameters.Count; pi++)
@@ -851,10 +776,6 @@ namespace Trecs.SourceGen
                 if (pIsPassThrough)
                     continue;
 
-                // [SingleEntity] aspects are hoisted out of the iteration loop, not
-                // the iteration target — skip them here so they don't get mis-detected
-                // as the loop aspect. ParameterClassifier records them as
-                // ParamSlotKind.HoistedSingleton.
                 bool pHasSingleEntity =
                     pSymbol != null
                     && PerformanceCache.HasAttributeByName(
@@ -870,9 +791,8 @@ namespace Trecs.SourceGen
 
                 if (aspectParam != null)
                 {
-                    // Two non-pass-through aspect params is ambiguous.
-                    reportDiagnostic(
-                        Diagnostic.Create(
+                    diagnostics.Add(
+                        DiagnosticInfo.Create(
                             DiagnosticDescriptors.DuplicateLoopParameter,
                             p.GetLocation(),
                             p.Identifier.Text,
@@ -888,8 +808,8 @@ namespace Trecs.SourceGen
 
             if (aspectParam == null || aspectParamType == null)
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.InvalidParameterList,
                         methodDec.ParameterList.GetLocation(),
                         "[ForEachEntity] method on a system class with an aspect parameter must take exactly one aspect parameter (implementing IAspect, declared 'in')"
@@ -898,11 +818,10 @@ namespace Trecs.SourceGen
                 return false;
             }
 
-            // Aspect must use 'in' modifier (not 'ref', not bare).
             if (aspectParam.Modifiers.Any(m => m.IsKind(SyntaxKind.RefKeyword)))
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.AspectParamMustBeIn,
                         aspectParam.GetLocation(),
                         aspectParam.Identifier.Text
@@ -912,8 +831,8 @@ namespace Trecs.SourceGen
             }
             if (!aspectParam.Modifiers.Any(m => m.IsKind(SyntaxKind.InKeyword)))
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.InvalidParameterModifiers,
                         aspectParam.GetLocation(),
                         aspectParam.Identifier.Text
@@ -922,28 +841,24 @@ namespace Trecs.SourceGen
                 return false;
             }
 
-            // Get component types from the aspect
-            var componentTypes = new List<ITypeSymbol>();
+            var aspectTypeName = aspectParam.Type?.ToString() ?? "UnknownType";
+
+            // Parse the aspect's read/write components.
             var firstParamNamedType = aspectParamType as INamedTypeSymbol;
-            var attributeData =
+            AspectAttributeData? aspectData =
                 firstParamNamedType != null
                     ? AspectAttributeParser.ParseAspectData(firstParamNamedType)
                     : null;
 
-            if (attributeData != null)
-            {
-                componentTypes.AddRange(attributeData.ReadTypes);
-                componentTypes.AddRange(attributeData.WriteTypes);
-                var distinctComponentTypes = PerformanceCache.GetDistinctTypes(componentTypes);
-                componentTypes = distinctComponentTypes.ToList();
-            }
-
-            var readComponentTypes = attributeData?.ReadTypes.ToList() ?? new List<ITypeSymbol>();
-            var writeComponentTypes = attributeData?.WriteTypes.ToList() ?? new List<ITypeSymbol>();
+            // ParameterClassifier emits already-substituted Diagnostic objects via its
+            // Action<Diagnostic> callback; stash them as preformatted DiagnosticInfo so
+            // the descriptor's MessageFormat isn't applied a second time.
+            System.Action<Diagnostic> reportDiag = d =>
+                diagnostics.Add(DiagnosticInfo.FromDiagnostic(d));
 
             // Extract tag types, set types, and MatchByComponents from the iteration attribute.
             var criteria = IterationCriteriaParser.ParseIterationAttribute(
-                reportDiagnostic,
+                reportDiag,
                 methodDec,
                 methodSymbol,
                 classDec.Identifier.Text,
@@ -956,30 +871,25 @@ namespace Trecs.SourceGen
             var attributeTagTypes = criteria?.TagTypes ?? new List<ITypeSymbol>();
             var attributeWithoutTagTypes = criteria?.WithoutTagTypes ?? new List<ITypeSymbol>();
             var setTypes = criteria?.SetTypes ?? new List<ITypeSymbol>();
-            bool attributeMatchByComponents = criteria?.MatchByComponents ?? false;
+            bool matchByComponents = criteria?.MatchByComponents ?? false;
 
-            // Walk all parameters in declaration order via shared classifier.
             var classified = ParameterClassifier.Classify(
                 parameters,
                 semanticModel,
                 IterationMode.Aspect,
-                reportDiagnostic,
+                reportDiag,
                 methodDec.Identifier.Text,
                 aspectParam: aspectParam,
                 isValid: ref isValid
             );
-            var customParameters = classified.CustomParameters;
-            var setAccessorParameters = classified.SetAccessorParameters;
-            var setReadParameters = classified.SetReadParameters;
-            var setWriteParameters = classified.SetWriteParameters;
-            var paramSlots = classified.ParameterSlots;
-            bool hasEntityIndexParameter = classified.HasEntityIndex;
-            bool hasEntityHandleParameter = classified.HasEntityHandle;
 
-            if (componentTypes.Count == 0)
+            // Component count must be > 0 for the aspect to be useful.
+            int componentCount =
+                (aspectData?.ReadTypes.Length ?? 0) + (aspectData?.WriteTypes.Length ?? 0);
+            if (componentCount == 0)
             {
-                reportDiagnostic(
-                    Diagnostic.Create(
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
                         DiagnosticDescriptors.AspectNoComponents,
                         aspectParam.GetLocation(),
                         aspectParam.Type?.ToString() ?? "UnknownType"
@@ -988,67 +898,292 @@ namespace Trecs.SourceGen
                 isValid = false;
             }
 
-            var effectiveSetTypes = new List<ITypeSymbol>(setTypes);
+            if (!isValid)
+                return false;
 
-            if (isValid)
+            validation = BuildValidationResult(
+                aspectTypeName,
+                aspectData,
+                aspectParamType,
+                classified,
+                attributeTagTypes,
+                attributeWithoutTagTypes,
+                setTypes,
+                matchByComponents
+            );
+            return true;
+        }
+
+        /// <summary>
+        /// Materializes a value-equatable validation result from the symbol-bearing
+        /// classification + aspect data. Pre-computes the QueryBuilder criteria chains
+        /// and the namespace set so the codegen path touches no symbols.
+        /// </summary>
+        private static ForEachAspectValidation BuildValidationResult(
+            string aspectTypeName,
+            AspectAttributeData? aspectData,
+            ITypeSymbol aspectParamType,
+            ClassifiedParameters classified,
+            List<ITypeSymbol> attributeTagTypes,
+            List<ITypeSymbol> attributeWithoutTagTypes,
+            List<ITypeSymbol> setTypes,
+            bool matchByComponents
+        )
+        {
+            // Build the aspect-component buffer entries in canonical AllComponentTypes
+            // order (reads first, then writes not already in reads), with precomputed
+            // buffer variable names and a write flag for the buffer suffix.
+            var aspectComponents = BuildAspectComponentEntries(aspectData);
+
+            var customParams = classified
+                .CustomParameters.Select(p => new ParameterInfoModel(
+                    Type: p.TypeSymbol != null
+                        ? PerformanceCache.GetDisplayString(p.TypeSymbol)
+                        : p.Type,
+                    Name: p.Name,
+                    IsRef: p.IsRef,
+                    IsIn: p.IsIn
+                ))
+                .ToEquatableArray();
+
+            var setAccessorParams = classified
+                .SetAccessorParameters.Select(sa => new SetAccessorParameterModel(
+                    sa.SetTypeArg,
+                    sa.ParamName,
+                    sa.IsIn
+                ))
+                .ToEquatableArray();
+            var setReadParams = classified
+                .SetReadParameters.Select(sr => new SetAccessorParameterModel(
+                    sr.SetTypeArg,
+                    sr.ParamName,
+                    sr.IsIn
+                ))
+                .ToEquatableArray();
+            var setWriteParams = classified
+                .SetWriteParameters.Select(sw => new SetAccessorParameterModel(
+                    sw.SetTypeArg,
+                    sw.ParamName,
+                    sw.IsIn
+                ))
+                .ToEquatableArray();
+
+            var hoistedSingletons = classified
+                .HoistedSingletons.Select(HoistedSingletonModelBuilder.FromInfo)
+                .ToEquatableArray();
+
+            var parameterSlots = classified.ParameterSlots.ToArray().ToEquatableArray();
+
+            // Pre-compute both query-criteria chains. The convenience overload uses the
+            // no-withouts variant; the QueryBuilder / SparseQueryBuilder entries use the
+            // full chain.
+            var allComponentSymbols =
+                aspectData != null
+                    ? aspectData.AllComponentTypes.AsEnumerable()
+                    : Enumerable.Empty<ITypeSymbol>();
+            var chainNoWithouts = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                attributeTagTypes,
+                matchByComponents,
+                allComponentSymbols
+            );
+            var chainFull = QueryBuilderHelper.BuildAttributeCriteriaChain(
+                attributeTagTypes,
+                matchByComponents,
+                allComponentSymbols,
+                attributeWithoutTagTypes
+            );
+
+            var firstSetDisplay =
+                setTypes.Count > 0 ? PerformanceCache.GetDisplayString(setTypes[0]) : string.Empty;
+
+            var namespaces = CollectNamespaces(
+                aspectData,
+                aspectParamType,
+                classified,
+                attributeTagTypes,
+                attributeWithoutTagTypes,
+                setTypes
+            );
+
+            return new ForEachAspectValidation(
+                AspectTypeName: aspectTypeName,
+                AspectComponents: aspectComponents,
+                CustomParameters: customParams,
+                SetAccessorParameters: setAccessorParams,
+                SetReadParameters: setReadParams,
+                SetWriteParameters: setWriteParams,
+                HoistedSingletons: hoistedSingletons,
+                ParameterSlots: parameterSlots,
+                HasEntityIndexParameter: classified.HasEntityIndex,
+                HasEntityHandleParameter: classified.HasEntityHandle,
+                HasAttributeTags: attributeTagTypes.Count > 0,
+                MatchByComponents: matchByComponents,
+                HasSet: setTypes.Count > 0,
+                FirstSetTypeDisplay: firstSetDisplay,
+                AttributeCriteriaChainNoWithouts: chainNoWithouts,
+                AttributeCriteriaChainFull: chainFull,
+                Namespaces: namespaces
+            );
+        }
+
+        private static EquatableArray<AspectBufferEntry> BuildAspectComponentEntries(
+            AspectAttributeData? aspectData
+        )
+        {
+            if (aspectData == null)
+                return EquatableArray<AspectBufferEntry>.Empty;
+
+            var all = aspectData.AllComponentTypes;
+            var entries = new AspectBufferEntry[all.Length];
+            for (int i = 0; i < all.Length; i++)
             {
-                validatedMethodInfo = new ValidatedMethodInfo
-                {
-                    AspectTypeName = aspectParam.Type?.ToString() ?? "UnknownType",
-                    AspectTypeSymbol = aspectParamType as INamedTypeSymbol,
+                var t = all[i];
+                bool isWrite = aspectData.WriteTypes.Any(w =>
+                    SymbolEqualityComparer.Default.Equals(w, t)
+                );
+                entries[i] = new AspectBufferEntry(
+                    TypeDisplay: PerformanceCache.GetDisplayString(t),
+                    VarName: ComponentTypeHelper.GetComponentVariableName(t),
+                    IsWrite: isWrite
+                );
+            }
+            return new EquatableArray<AspectBufferEntry>(entries);
+        }
 
-                    ComponentTypes = componentTypes,
-                    ReadComponentTypes = readComponentTypes,
-                    WriteComponentTypes = writeComponentTypes,
-                    CustomParameters = customParameters,
-                    ParameterSlots = paramSlots,
-                    AttributeTagTypes = attributeTagTypes,
-                    AttributeWithoutTagTypes = attributeWithoutTagTypes,
-                    HasEntityIndexParameter = hasEntityIndexParameter,
-                    HasEntityHandleParameter = hasEntityHandleParameter,
-                    SetTypes = effectiveSetTypes,
-                    MatchByComponents = attributeMatchByComponents,
-                    SetAccessorParameters = setAccessorParameters,
-                    SetReadParameters = setReadParameters,
-                    SetWriteParameters = setWriteParameters,
-                    HoistedSingletons = classified.HoistedSingletons,
-                };
+        private static EquatableArray<string> CollectNamespaces(
+            AspectAttributeData? aspectData,
+            ITypeSymbol aspectParamType,
+            ClassifiedParameters classified,
+            List<ITypeSymbol> attributeTagTypes,
+            List<ITypeSymbol> attributeWithoutTagTypes,
+            List<ITypeSymbol> setTypes
+        )
+        {
+            var ns = new HashSet<string>();
+
+            void Add(ITypeSymbol? sym)
+            {
+                if (sym == null)
+                    return;
+                var s = PerformanceCache.GetDisplayString(sym.ContainingNamespace);
+                if (!string.IsNullOrEmpty(s) && s != "System" && !s.StartsWith("System."))
+                    ns.Add(s);
             }
 
-            return isValid;
+            void AddTagWithContaining(ITypeSymbol sym)
+            {
+                Add(sym);
+                if (sym.ContainingType != null)
+                    Add(sym.ContainingType);
+            }
+
+            // Aspect type itself.
+            Add(aspectParamType);
+
+            // Aspect's components.
+            if (aspectData != null)
+            {
+                foreach (var t in aspectData.ReadTypes)
+                    Add(t);
+                foreach (var t in aspectData.WriteTypes)
+                    Add(t);
+            }
+
+            foreach (var p in classified.CustomParameters)
+                Add(p.TypeSymbol);
+            foreach (var t in attributeTagTypes)
+                AddTagWithContaining(t);
+            foreach (var t in attributeWithoutTagTypes)
+                AddTagWithContaining(t);
+            foreach (var t in setTypes)
+                AddTagWithContaining(t);
+            foreach (var sa in classified.SetAccessorParameters)
+                AddTagWithContaining(sa.SetTypeArgSymbol);
+            foreach (var sr in classified.SetReadParameters)
+                AddTagWithContaining(sr.SetTypeArgSymbol);
+            foreach (var sw in classified.SetWriteParameters)
+                AddTagWithContaining(sw.SetTypeArgSymbol);
+
+            return ns.ToEquatableArray();
         }
     }
 
     /// <summary>
-    /// Data structure for aspect-mode <c>[ForEachEntity]</c> information used in incremental generation.
-    /// Carries validation results + diagnostics forward from the transform phase so that
-    /// the terminal stage doesn't need access to a <see cref="Compilation"/> or
-    /// <see cref="SemanticModel"/>.
+    /// Top-level value-equatable model carried through the
+    /// ForEachEntityAspectGenerator pipeline. Holds everything the terminal stage
+    /// needs to materialize diagnostics and emit source — no Roslyn symbols, syntax,
+    /// or raw <see cref="Diagnostic"/> objects.
     /// </summary>
-    internal class ForEachEntityAspectData
-    {
-        public ClassDeclarationSyntax ClassDecl { get; }
-        public MethodDeclarationSyntax MethodDecl { get; }
-        public IMethodSymbol MethodSymbol { get; }
-        public bool IsValid { get; }
-        public ValidatedMethodInfo? ValidatedInfo { get; }
-        public ImmutableArray<Diagnostic> Diagnostics { get; }
+    internal readonly record struct ForEachAspectModel(
+        string ClassName,
+        string MethodName,
+        string Namespace,
+        string Visibility,
+        string HintFileName,
+        EquatableArray<ContainingTypeInfo> ContainingTypes,
+        bool IsValid,
+        ForEachAspectValidation Validation,
+        EquatableArray<DiagnosticInfo> Diagnostics
+    );
 
-        public ForEachEntityAspectData(
-            ClassDeclarationSyntax classDecl,
-            MethodDeclarationSyntax methodDecl,
-            IMethodSymbol methodSymbol,
-            bool isValid,
-            ValidatedMethodInfo? validatedInfo,
-            ImmutableArray<Diagnostic> diagnostics
-        )
-        {
-            ClassDecl = classDecl;
-            MethodDecl = methodDecl;
-            MethodSymbol = methodSymbol;
-            IsValid = isValid;
-            ValidatedInfo = validatedInfo;
-            Diagnostics = diagnostics;
-        }
+    /// <summary>
+    /// All the codegen-time inputs the aspect-iteration emit functions need. Built
+    /// once at transform time from the classified parameters + aspect data;
+    /// thereafter pure data.
+    /// </summary>
+    internal readonly record struct ForEachAspectValidation(
+        string AspectTypeName,
+        EquatableArray<AspectBufferEntry> AspectComponents,
+        EquatableArray<ParameterInfoModel> CustomParameters,
+        EquatableArray<SetAccessorParameterModel> SetAccessorParameters,
+        EquatableArray<SetAccessorParameterModel> SetReadParameters,
+        EquatableArray<SetAccessorParameterModel> SetWriteParameters,
+        EquatableArray<HoistedSingletonModel> HoistedSingletons,
+        EquatableArray<ParamSlot> ParameterSlots,
+        bool HasEntityIndexParameter,
+        bool HasEntityHandleParameter,
+        bool HasAttributeTags,
+        bool MatchByComponents,
+        bool HasSet,
+        string FirstSetTypeDisplay,
+        string AttributeCriteriaChainNoWithouts,
+        string AttributeCriteriaChainFull,
+        EquatableArray<string> Namespaces
+    )
+    {
+        public static ForEachAspectValidation Empty { get; } =
+            new(
+                string.Empty,
+                EquatableArray<AspectBufferEntry>.Empty,
+                EquatableArray<ParameterInfoModel>.Empty,
+                EquatableArray<SetAccessorParameterModel>.Empty,
+                EquatableArray<SetAccessorParameterModel>.Empty,
+                EquatableArray<SetAccessorParameterModel>.Empty,
+                EquatableArray<HoistedSingletonModel>.Empty,
+                EquatableArray<ParamSlot>.Empty,
+                false,
+                false,
+                false,
+                false,
+                false,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                EquatableArray<string>.Empty
+            );
     }
+
+    /// <summary>
+    /// One slot in <see cref="ForEachAspectValidation.AspectComponents"/>, in
+    /// canonical AllComponentTypes order (reads first, then writes not already in
+    /// reads). <see cref="VarName"/> is precomputed via
+    /// <c>ComponentTypeHelper.GetComponentVariableName</c> at transform time, since
+    /// that helper reads <c>SourceGenSettingsProvider</c> via the symbol — not safe
+    /// to defer to the terminal stage.
+    /// </summary>
+    internal readonly record struct AspectBufferEntry(
+        string TypeDisplay,
+        string VarName,
+        bool IsWrite
+    );
 }

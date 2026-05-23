@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel;
 using Trecs.Collections;
-using Unity.Collections;
 
 namespace Trecs.Internal
 {
@@ -43,7 +42,7 @@ namespace Trecs.Internal
         /// position after accounting for prior swap-backs (precomputed by the caller).
         /// </summary>
         void SwapEntitiesBetweenDictionaries(
-            in DenseDictionary<int, MoveInfo> infosToProcess,
+            FastList<MoveInfoEntry> infosToProcess,
             GroupIndex fromGroup,
             GroupIndex toGroup,
             IComponentArray toComponentsDictionary
@@ -51,13 +50,6 @@ namespace Trecs.Internal
 
         void EnsureCapacity(int size);
         void Clear();
-
-        /// <summary>
-        /// Reorder a contiguous range of elements [startIndex, startIndex+count) according
-        /// to the given permutation. permutation[i] gives the source index (relative to
-        /// startIndex) for destination position startIndex+i.
-        /// </summary>
-        void ReorderRange(int startIndex, int count, NativeList<int> permutation);
 
         /// <summary>
         /// Returns the element size in bytes and the unsafe pointer to the underlying

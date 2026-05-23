@@ -1,7 +1,7 @@
 namespace Trecs.Internal
 {
     /// <summary>
-    /// Result from a single <see cref="BundlePlayer.Tick"/> call. When the
+    /// Result from a single <see cref="BundleReplayer.Tick"/> call. When the
     /// current tick had a recorded checksum, both <see cref="ExpectedChecksum"/>
     /// and <see cref="ActualChecksum"/> are populated and <see cref="ChecksumVerified"/>
     /// is true; otherwise both are null and the other flags are false.
@@ -9,17 +9,18 @@ namespace Trecs.Internal
     public struct PlaybackTickResult
     {
         /// <summary>
-        /// Checksum that the recording expected at this frame. Null when this
-        /// tick had no recorded checksum (most frames — checksums are sampled
-        /// at a configured interval when the recording was made).
+        /// 64-bit xxHash checksum that the recording expected at this frame.
+        /// Null when this tick had no recorded checksum (most frames —
+        /// checksums are sampled at a configured interval when the recording
+        /// was made).
         /// </summary>
-        public uint? ExpectedChecksum { get; init; }
+        public ulong? ExpectedChecksum { get; init; }
 
         /// <summary>
-        /// Checksum calculated from the live world after this tick. Null when
-        /// this tick had no recorded checksum.
+        /// 64-bit xxHash checksum calculated from the live world after this
+        /// tick. Null when this tick had no recorded checksum.
         /// </summary>
-        public uint? ActualChecksum { get; init; }
+        public ulong? ActualChecksum { get; init; }
 
         /// <summary>
         /// True when this tick had a recorded checksum and was therefore

@@ -1,24 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using Trecs.Collections;
 
 namespace Trecs.Internal
 {
-    internal readonly struct PrioritizedObserver<T>
-    {
-        public readonly int Priority;
-        public readonly T Observer;
-        public readonly string DebugName;
-
-        public PrioritizedObserver(int priority, T observer, string debugName)
-        {
-            Priority = priority;
-            Observer = observer;
-            DebugName = debugName;
-        }
-    }
-
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class EventsManager : IDisposable
     {
@@ -34,19 +19,14 @@ namespace Trecs.Internal
         readonly SimpleSubject _variableUpdateCompletedEvent = new();
         readonly SimpleSubject _inputsAppliedEvent = new();
 
+        readonly DenseDictionary<GroupIndex, SimpleSubject<EntityRange>> _reactiveOnAddedObservers;
         readonly DenseDictionary<
             GroupIndex,
-            FastList<PrioritizedObserver<EntitiesAddedObserver>>
-        > _reactiveOnAddedObservers;
-
-        readonly DenseDictionary<
-            GroupIndex,
-            FastList<PrioritizedObserver<EntitiesMovedObserver>>
+            SimpleSubject<GroupIndex, EntityRange>
         > _reactiveOnMovedObservers;
-
         readonly DenseDictionary<
             GroupIndex,
-            FastList<PrioritizedObserver<EntitiesRemovedObserver>>
+            SimpleSubject<EntityRange>
         > _reactiveOnRemovedObservers;
 
         internal SimpleSubject DeserializeStartedEvent => _deserializeStartedEvent;
@@ -59,19 +39,17 @@ namespace Trecs.Internal
         internal SimpleSubject VariableUpdateCompletedEvent => _variableUpdateCompletedEvent;
         internal SimpleSubject InputsAppliedEvent => _inputsAppliedEvent;
 
-        internal DenseDictionary<
-            GroupIndex,
-            FastList<PrioritizedObserver<EntitiesAddedObserver>>
-        > ReactiveOnAddedObservers => _reactiveOnAddedObservers;
+        internal DenseDictionary<GroupIndex, SimpleSubject<EntityRange>> ReactiveOnAddedObservers =>
+            _reactiveOnAddedObservers;
 
         internal DenseDictionary<
             GroupIndex,
-            FastList<PrioritizedObserver<EntitiesMovedObserver>>
+            SimpleSubject<GroupIndex, EntityRange>
         > ReactiveOnMovedObservers => _reactiveOnMovedObservers;
 
         internal DenseDictionary<
             GroupIndex,
-            FastList<PrioritizedObserver<EntitiesRemovedObserver>>
+            SimpleSubject<EntityRange>
         > ReactiveOnRemovedObservers => _reactiveOnRemovedObservers;
 
         public EventsManager(TrecsLog log)
@@ -82,128 +60,65 @@ namespace Trecs.Internal
             _reactiveOnRemovedObservers = new();
         }
 
-        internal void ObserveEntitiesAddedEvent(
+        internal IDisposable ObserveEntitiesAddedEvent(
             GroupIndex group,
             EntitiesAddedObserver observer,
             int priority = 0,
             string debugName = null
         )
         {
-            if (!_reactiveOnAddedObservers.TryGetValue(group, out var list))
+            if (!_reactiveOnAddedObservers.TryGetValue(group, out var subject))
             {
-                list = new FastList<PrioritizedObserver<EntitiesAddedObserver>>();
-                _reactiveOnAddedObservers.Add(group, list);
+                subject = new SimpleSubject<EntityRange>();
+                _reactiveOnAddedObservers.Add(group, subject);
             }
 
-            InsertSorted(
-                list,
-                new PrioritizedObserver<EntitiesAddedObserver>(priority, observer, debugName)
-            );
+            return subject.Subscribe(indices => observer(group, indices), priority, debugName);
         }
 
-        internal void UnobserveEntitiesAddedEvent(GroupIndex group, EntitiesAddedObserver observer)
-        {
-            if (_reactiveOnAddedObservers.TryGetValue(group, out var list))
-            {
-                bool wasRemoved = RemoveByObserver(list, observer);
-                TrecsAssert.That(wasRemoved);
-            }
-        }
-
-        internal void ObserveEntitiesMovedEvent(
-            GroupIndex group,
+        internal IDisposable ObserveEntitiesMovedEvent(
+            GroupIndex toGroup,
             EntitiesMovedObserver observer,
             int priority = 0,
             string debugName = null
         )
         {
-            if (!_reactiveOnMovedObservers.TryGetValue(group, out var list))
+            if (!_reactiveOnMovedObservers.TryGetValue(toGroup, out var subject))
             {
-                list = new FastList<PrioritizedObserver<EntitiesMovedObserver>>();
-                _reactiveOnMovedObservers.Add(group, list);
+                subject = new SimpleSubject<GroupIndex, EntityRange>();
+                _reactiveOnMovedObservers.Add(toGroup, subject);
             }
 
-            InsertSorted(
-                list,
-                new PrioritizedObserver<EntitiesMovedObserver>(priority, observer, debugName)
+            return subject.Subscribe(
+                (fromGroup, indices) => observer(fromGroup, toGroup, indices),
+                priority,
+                debugName
             );
         }
 
-        internal void UnobserveEntitiesMovedEvent(GroupIndex group, EntitiesMovedObserver observer)
-        {
-            if (_reactiveOnMovedObservers.TryGetValue(group, out var list))
-            {
-                bool wasRemoved = RemoveByObserver(list, observer);
-                TrecsAssert.That(wasRemoved);
-            }
-        }
-
-        internal void ObserveEntitiesRemovedEvent(
+        internal IDisposable ObserveEntitiesRemovedEvent(
             GroupIndex group,
             EntitiesRemovedObserver observer,
             int priority = 0,
             string debugName = null
         )
         {
-            if (!_reactiveOnRemovedObservers.TryGetValue(group, out var list))
+            if (!_reactiveOnRemovedObservers.TryGetValue(group, out var subject))
             {
-                list = new FastList<PrioritizedObserver<EntitiesRemovedObserver>>();
-                _reactiveOnRemovedObservers.Add(group, list);
-
-                _log.Trace("Added to observe removes for group {0}", group);
+                subject = new SimpleSubject<EntityRange>();
+                _reactiveOnRemovedObservers.Add(group, subject);
             }
 
-            InsertSorted(
-                list,
-                new PrioritizedObserver<EntitiesRemovedObserver>(priority, observer, debugName)
-            );
+            return subject.Subscribe(indices => observer(group, indices), priority, debugName);
         }
 
-        internal void UnobserveEntitiesRemovedEvent(
-            GroupIndex group,
-            EntitiesRemovedObserver observer
+        public EntityEventsBuilder Events(
+            WorldInfo worldInfo,
+            WorldAccessor world,
+            SystemRunner systemRunner
         )
         {
-            if (_reactiveOnRemovedObservers.TryGetValue(group, out var list))
-            {
-                bool wasRemoved = RemoveByObserver(list, observer);
-                TrecsAssert.That(wasRemoved);
-            }
-        }
-
-        static void InsertSorted<T>(
-            FastList<PrioritizedObserver<T>> list,
-            PrioritizedObserver<T> item
-        )
-        {
-            for (int i = 0; i < list.Count; i++)
-            {
-                if (list[i].Priority > item.Priority)
-                {
-                    list.InsertAt(i, item);
-                    return;
-                }
-            }
-            list.Add(item);
-        }
-
-        static bool RemoveByObserver<T>(FastList<PrioritizedObserver<T>> list, T observer)
-            where T : Delegate
-        {
-            for (int i = 0; i < list.Count; i++)
-            {
-                if (list[i].Observer == observer)
-                {
-                    list.RemoveAt(i);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        public EntityEventsBuilder Events(WorldInfo worldInfo, WorldAccessor world)
-        {
-            return new EntityEventsBuilder(this, worldInfo, world);
+            return new EntityEventsBuilder(this, worldInfo, world, systemRunner);
         }
 
         internal void NotifyOnSubmissionStarted()
@@ -222,88 +137,87 @@ namespace Trecs.Internal
             {
                 if (_deserializeStartedEvent.NumObservers > 0)
                     _log.Warning(
-                        "DeserializeStarted observers not cleaned up (count: {0})",
+                        "DeserializeStarted observers not cleaned up by accessors {0} (count: {1})",
+                        _deserializeStartedEvent.GetDebugNamesSummary(),
                         _deserializeStartedEvent.NumObservers
                     );
                 if (_deserializeCompletedEvent.NumObservers > 0)
                     _log.Warning(
-                        "DeserializeCompleted observers not cleaned up (count: {0})",
+                        "DeserializeCompleted observers not cleaned up by accessors {0} (count: {1})",
+                        _deserializeCompletedEvent.GetDebugNamesSummary(),
                         _deserializeCompletedEvent.NumObservers
                     );
                 if (_submissionStartedEvent.NumObservers > 0)
                     _log.Warning(
-                        "SubmissionStarted observers not cleaned up (count: {0})",
+                        "SubmissionStarted observers not cleaned up by accessors {0} (count: {1})",
+                        _submissionStartedEvent.GetDebugNamesSummary(),
                         _submissionStartedEvent.NumObservers
                     );
                 if (_submissionCompletedEvent.NumObservers > 0)
                     _log.Warning(
-                        "SubmissionCompleted observers not cleaned up (count: {0})",
+                        "SubmissionCompleted observers not cleaned up by accessors {0} (count: {1})",
+                        _submissionCompletedEvent.GetDebugNamesSummary(),
                         _submissionCompletedEvent.NumObservers
                     );
                 if (_fixedUpdateStartedEvent.NumObservers > 0)
                     _log.Warning(
-                        "FixedUpdateStarted observers not cleaned up (count: {0})",
+                        "FixedUpdateStarted observers not cleaned up by accessors {0} (count: {1})",
+                        _fixedUpdateStartedEvent.GetDebugNamesSummary(),
                         _fixedUpdateStartedEvent.NumObservers
                     );
                 if (_fixedUpdateCompletedEvent.NumObservers > 0)
                     _log.Warning(
-                        "FixedUpdateCompleted observers not cleaned up (count: {0})",
+                        "FixedUpdateCompleted observers not cleaned up by accessors {0} (count: {1})",
+                        _fixedUpdateCompletedEvent.GetDebugNamesSummary(),
                         _fixedUpdateCompletedEvent.NumObservers
                     );
                 if (_variableUpdateStartedEvent.NumObservers > 0)
                     _log.Warning(
-                        "VariableUpdateStarted observers not cleaned up (count: {0})",
+                        "VariableUpdateStarted observers not cleaned up by accessors {0} (count: {1})",
+                        _variableUpdateStartedEvent.GetDebugNamesSummary(),
                         _variableUpdateStartedEvent.NumObservers
                     );
                 if (_variableUpdateCompletedEvent.NumObservers > 0)
                     _log.Warning(
-                        "VariableUpdateCompleted observers not cleaned up (count: {0})",
+                        "VariableUpdateCompleted observers not cleaned up by accessors {0} (count: {1})",
+                        _variableUpdateCompletedEvent.GetDebugNamesSummary(),
                         _variableUpdateCompletedEvent.NumObservers
                     );
                 if (_inputsAppliedEvent.NumObservers > 0)
                     _log.Warning(
-                        "InputsApplied observers not cleaned up (count: {0})",
+                        "InputsApplied observers not cleaned up by accessors {0} (count: {1})",
+                        _inputsAppliedEvent.GetDebugNamesSummary(),
                         _inputsAppliedEvent.NumObservers
                     );
-                foreach (var (group, observers) in _reactiveOnAddedObservers)
-                    if (observers.Count > 0)
+                foreach (var (group, subject) in _reactiveOnAddedObservers)
+                    if (subject.NumObservers > 0)
                         _log.Warning(
                             "Entity added observers not cleaned up by accessors {0} for group {1} (count: {2})",
-                            GetDebugNames(observers),
+                            subject.GetDebugNamesSummary(),
                             group,
-                            observers.Count
+                            subject.NumObservers
                         );
-                foreach (var (group, observers) in _reactiveOnRemovedObservers)
-                    if (observers.Count > 0)
+                foreach (var (group, subject) in _reactiveOnRemovedObservers)
+                    if (subject.NumObservers > 0)
                         _log.Warning(
                             "Entity removed observers not cleaned up by accessors {0} for group {1} (count: {2})",
-                            GetDebugNames(observers),
+                            subject.GetDebugNamesSummary(),
                             group,
-                            observers.Count
+                            subject.NumObservers
                         );
-                foreach (var (group, observers) in _reactiveOnMovedObservers)
-                    if (observers.Count > 0)
+                foreach (var (group, subject) in _reactiveOnMovedObservers)
+                    if (subject.NumObservers > 0)
                         _log.Warning(
                             "Entity moved observers not cleaned up by accessors {0} for group {1} (count: {2})",
-                            GetDebugNames(observers),
+                            subject.GetDebugNamesSummary(),
                             group,
-                            observers.Count
+                            subject.NumObservers
                         );
             }
 
             _reactiveOnAddedObservers.Clear();
             _reactiveOnMovedObservers.Clear();
             _reactiveOnRemovedObservers.Clear();
-        }
-
-        static string GetDebugNames<T>(FastList<PrioritizedObserver<T>> observers)
-        {
-            var names = new HashSet<string>();
-            for (int i = 0; i < observers.Count; i++)
-            {
-                names.Add(observers[i].DebugName ?? "<unknown>");
-            }
-            return string.Join(", ", names);
         }
     }
 }

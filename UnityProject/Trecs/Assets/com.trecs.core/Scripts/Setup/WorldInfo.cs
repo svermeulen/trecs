@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Trecs.Collections;
 using Trecs.Internal;
+using Unity.Collections;
 
 namespace Trecs
 {
@@ -11,7 +12,7 @@ namespace Trecs
     /// Use to discover which groups exist, resolve tag sets to groups, and inspect component layouts.
     /// Accessed via <see cref="WorldAccessor.WorldInfo"/> or <see cref="World.WorldInfo"/>.
     /// </summary>
-    public sealed class WorldInfo
+    public sealed class WorldInfo : IDisposable
     {
         readonly TrecsLog _log;
 
@@ -20,7 +21,7 @@ namespace Trecs
         readonly GroupInfo[] _groupInfos;
         readonly Dictionary<Template, FastList<GroupIndex>> _templateGroupsMap;
         readonly ReadOnlyFastList<GroupIndex> _allGroups;
-        readonly Dictionary<TagSet, GroupIndex> _tagSetToIndex;
+        readonly DenseDictionary<TagSet, GroupIndex> _tagSetToIndex;
         readonly TagSet[] _indexToTagSet;
         readonly ReadOnlyFastList<ResolvedTemplate> _resolvedTemplates;
         readonly HashSet<Template> _resolvedTemplateSet = new();
@@ -35,6 +36,23 @@ namespace Trecs
         readonly GroupIndex _globalGroup;
         readonly EntityIndex _globalEntityIndex;
         readonly ReadOnlyFastList<GroupIndex> _globalGroups;
+
+        // Native-side mirror of the permissive TagSet→GroupIndex resolution for
+        // Burst-job consumption. Built once in the constructor and read-only for
+        // the world's lifetime. Contains both:
+        //   (a) every group's exact (full) tag set as a key → that group, and
+        //   (b) every partial subset of any group's tag set that uniquely resolves
+        //       via WorldQueryEngine.GetSingleGroupWithTags.
+        // Burst-path AddEntity does the same lookup managed AddEntity does, without
+        // going through managed code.
+        NativeHashMap<int, GroupIndex> _tagSetIdToGroupNative;
+
+        // Per-group component layout: slot size, per-component offsets and sizes, and
+        // default-bytes prototype. Built once and read-only for the world's lifetime.
+        // Consumed by the Burst-friendly AddEntity fast path and the parallel-fill
+        // drain pipeline.
+        WorldComponentLayouts _componentLayouts;
+        bool _isDisposed;
 
         public WorldInfo(
             TrecsLog log,
@@ -61,7 +79,7 @@ namespace Trecs
 
             // Pass 1: assign a sequential GroupIndex to each unique TagSet that
             // appears as a group on any resolved template.
-            var tagSetToIndex = new Dictionary<TagSet, GroupIndex>();
+            var tagSetToIndex = new DenseDictionary<TagSet, GroupIndex>();
             var indexToTagSet = new List<TagSet>();
 
             foreach (var resolvedTemplate in resolvedTemplatesList)
@@ -73,7 +91,7 @@ namespace Trecs
                         // GroupIndex is 1-based; 0 is Null. Real groups occupy
                         // raw values 1..ushort.MaxValue, so at most 65535 real
                         // groups can exist (0-based indices 0..65534).
-                        TrecsAssert.That(
+                        TrecsDebugAssert.That(
                             indexToTagSet.Count < ushort.MaxValue,
                             "GroupIndex exhausted — world cannot have more than {0} groups",
                             ushort.MaxValue
@@ -119,7 +137,7 @@ namespace Trecs
 
             foreach (var resolvedTemplate in resolvedTemplatesList)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     resolvedTemplate.AllTags.Tags.Count > 0,
                     "Template {0} must have at least one tag",
                     resolvedTemplate.DebugName
@@ -130,17 +148,17 @@ namespace Trecs
                     || resolvedTemplate.AllBaseTemplates.Contains(TrecsTemplates.Globals.Template)
                 )
                 {
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         globalTemplate == null,
                         "Found multiple global templates.  There can only be one."
                     );
                     globalTemplate = resolvedTemplate;
 
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         resolvedTemplate.Groups.Count == 1,
                         "Global template must only be in one group"
                     );
-                    TrecsAssert.That(!globalGroup.HasValue);
+                    TrecsDebugAssert.That(!globalGroup.HasValue);
                     globalGroup = resolvedTemplate.Groups[0];
                 }
 
@@ -151,7 +169,7 @@ namespace Trecs
                     var group = resolvedTemplate.Groups[i];
                     var groupTagSet = resolvedTemplate.GroupTagSets[i];
 
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         groupInfos[group.Index] == null,
                         "Found same group {0} added multiple times.  Groups must be unique.",
                         group
@@ -171,7 +189,7 @@ namespace Trecs
                 }
 
                 var wasAdded = _resolvedTemplateSet.Add(resolvedTemplate.Template);
-                TrecsAssert.That(wasAdded);
+                TrecsDebugAssert.That(wasAdded);
             }
 
             foreach (var resolvedTemplate in resolvedTemplatesList)
@@ -222,7 +240,7 @@ namespace Trecs
                     //    boundaries (subset-order regardless of template).
                     //    Silently resolves real ambiguity, hiding
                     //    misconfigurations behind plausible-looking spawns.
-                    TrecsAssert.That(
+                    TrecsDebugAssert.That(
                         !_resolvedTemplateSet.Contains(baseType),
                         "Registered templates must not be base templates of other registered templates.  Found {0} as a base template of {1}",
                         baseType,
@@ -236,7 +254,7 @@ namespace Trecs
                 }
             }
 
-            TrecsAssert.IsNotNull(globalTemplate);
+            TrecsDebugAssert.IsNotNull(globalTemplate);
 
             _globalTemplate = globalTemplate;
             _globalGroup = globalGroup.Value;
@@ -253,6 +271,87 @@ namespace Trecs
             _tagSetToIndex = tagSetToIndex;
 
             _queryEngine = new WorldQueryEngine(_allGroups, _groupInfos, this);
+
+            BuildTagSetIdToGroupNative();
+            _componentLayouts = new WorldComponentLayouts(_allGroups, this);
+        }
+
+        // Maximum tags-per-group supported by the fast-path subset enumeration.
+        // The enumeration explores 2^N subsets per group, so this is also the
+        // upper bound on per-group enumeration cost. Far above realistic Trecs
+        // template tag counts (typically ≤6 including partition variants).
+        const int MaxTagsPerGroupForFastPath = 16;
+
+        // Populates _tagSetIdToGroupNative with two layers:
+        //   (1) every group's exact (full) tag set as a key → that group
+        //   (2) every partial subset of any group's tag set that uniquely resolves
+        //       via the managed permissive resolver (WorldQueryEngine.GetSingleGroupWithTags)
+        // The map thus accepts the same set of TagSets the managed resolver does, so
+        // the Burst-path AddEntity can resolve any TagSet a caller could legally pass.
+        //
+        // Cost is O(|groups| × 2^|tags-per-group|) resolver calls at world init.
+        // Realistic Trecs templates have ≤6 tags per group, putting this well under
+        // a millisecond in practice. The cap above asserts to catch pathological cases
+        // before they blow up init time.
+        void BuildTagSetIdToGroupNative()
+        {
+            _tagSetIdToGroupNative = new NativeHashMap<int, GroupIndex>(
+                _tagSetToIndex.Count * 4,
+                Allocator.Persistent
+            );
+
+            // Pass 1: exact (full) tag sets.
+            foreach (var (tagSet, group) in _tagSetToIndex)
+            {
+                _tagSetIdToGroupNative.Add(tagSet.Id, group);
+            }
+
+            // Pass 2: partial subsets that uniquely resolve to a single group.
+            var scratch = new List<Tag>(MaxTagsPerGroupForFastPath);
+            foreach (var (fullTagSet, group) in _tagSetToIndex)
+            {
+                var tags = fullTagSet.Tags;
+                int n = tags.Count;
+
+                TrecsDebugAssert.That(
+                    n <= MaxTagsPerGroupForFastPath,
+                    "Group {0} has {1} tags, exceeding the fast-path subset-enumeration cap of {2}. "
+                        + "Raise MaxTagsPerGroupForFastPath if this is intentional, but be aware "
+                        + "init cost grows as 2^N per group.",
+                    group,
+                    n,
+                    MaxTagsPerGroupForFastPath
+                );
+
+                // Skip mask=0 (empty set) and mask=(1<<n)-1 (full set, already added).
+                int fullMask = (1 << n) - 1;
+                for (int mask = 1; mask < fullMask; mask++)
+                {
+                    scratch.Clear();
+                    for (int i = 0; i < n; i++)
+                    {
+                        if ((mask & (1 << i)) != 0)
+                            scratch.Add(tags[i]);
+                    }
+                    var subset = TagSet.FromTags(scratch);
+
+                    // Already in the map (some other group's exact match, or a subset
+                    // already claimed in an earlier group's iteration).
+                    if (_tagSetIdToGroupNative.ContainsKey(subset.Id))
+                        continue;
+
+                    // Try* form avoids the throw-and-unwind cost on the "ambiguous"
+                    // and "no match" paths, which are the common case as we sweep
+                    // 2^n subsets per group.
+                    if (
+                        _queryEngine.TryGetSingleGroupWithTags(subset, out var resolved)
+                        && resolved == group
+                    )
+                    {
+                        _tagSetIdToGroupNative.Add(subset.Id, group);
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -266,7 +365,7 @@ namespace Trecs
                 return index;
             }
 
-            throw TrecsAssert.CreateException("No group registered for tag set {0}", tagSet);
+            throw TrecsDebugAssert.CreateException("No group registered for tag set {0}", tagSet);
         }
 
         /// <summary>
@@ -274,8 +373,8 @@ namespace Trecs
         /// </summary>
         public TagSet ToTagSet(GroupIndex groupIndex)
         {
-            TrecsAssert.That(!groupIndex.IsNull, "Cannot resolve Null GroupIndex to a TagSet");
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!groupIndex.IsNull, "Cannot resolve Null GroupIndex to a TagSet");
+            TrecsDebugAssert.That(
                 groupIndex.Index < _indexToTagSet.Length,
                 "GroupIndex {0} out of range [0, {1})",
                 groupIndex.Index,
@@ -346,7 +445,7 @@ namespace Trecs
             while (!baseTypeProcessQueue.IsEmpty())
             {
                 var baseType = baseTypeProcessQueue.Dequeue();
-                TrecsAssert.That(enqueuedBaseTypes.Contains(baseType));
+                TrecsDebugAssert.That(enqueuedBaseTypes.Contains(baseType));
                 allBaseTypesList.Add(baseType);
                 _log.Trace(
                     "Added base type {0} to entity {1}",
@@ -398,7 +497,7 @@ namespace Trecs
 
             foreach (var (componentType, componentDecs) in allComponentDecMap)
             {
-                TrecsAssert.That(componentDecs.Count > 0);
+                TrecsDebugAssert.That(componentDecs.Count > 0);
 
                 var resolvedDecs = componentDecs[0]
                     .MergeAsConcrete(componentDecs, template.DebugName);
@@ -413,7 +512,7 @@ namespace Trecs
 
             foreach (var baseType in template.LocalBaseTemplates)
             {
-                TrecsAssert.That(
+                TrecsDebugAssert.That(
                     baseType.Partitions.IsEmpty(),
                     "Partitions must only be specified on the concrete template, not on a base template"
                 );
@@ -531,7 +630,7 @@ namespace Trecs
                 return groups;
             }
 
-            throw TrecsAssert.CreateException("No groups found for template {0}", template);
+            throw TrecsDebugAssert.CreateException("No groups found for template {0}", template);
         }
 
         public ReadOnlyDenseHashSet<Tag> GetGroupTags(GroupIndex group)
@@ -541,7 +640,7 @@ namespace Trecs
                 return _groupInfos[group.Index].Tags;
             }
 
-            throw TrecsAssert.CreateException("Unrecognized group {0}", group);
+            throw TrecsDebugAssert.CreateException("Unrecognized group {0}", group);
         }
 
         public Template GetSingleTemplateForTags(TagSet tags) =>
@@ -554,7 +653,7 @@ namespace Trecs
                 return _groupInfos[group.Index].ResolvedTemplate;
             }
 
-            throw TrecsAssert.CreateException("No template found for group {0}", group);
+            throw TrecsDebugAssert.CreateException("No template found for group {0}", group);
         }
 
         public ResolvedTemplate GetResolvedTemplateForTags(TagSet tags) =>
@@ -578,9 +677,9 @@ namespace Trecs
 #if DEBUG && TRECS_INTERNAL_CHECKS
             AssertActiveVariantIsActuallyActive(current, activeVariant);
 #endif
-            // XOR by 0 is identity, so default(Tag).Guid==0 handles the
+            // XOR by 0 is identity, so default(Tag).Value==0 handles the
             // "no active variant" case without a branch.
-            int newId = current.Id ^ activeVariant.Guid ^ replacement.Guid;
+            int newId = current.Id ^ activeVariant.Value ^ replacement.Value;
             if (newId == 0)
                 newId = 1;
             return new TagSet(newId);
@@ -594,7 +693,7 @@ namespace Trecs
 #if DEBUG && TRECS_INTERNAL_CHECKS
             AssertActiveVariantIsActuallyActive(current, activeVariant);
 #endif
-            int newId = current.Id ^ activeVariant.Guid;
+            int newId = current.Id ^ activeVariant.Value;
             if (newId == 0)
                 newId = 1;
             return new TagSet(newId);
@@ -603,16 +702,16 @@ namespace Trecs
 #if DEBUG && TRECS_INTERNAL_CHECKS
         static void AssertActiveVariantIsActuallyActive(TagSet current, Tag activeVariant)
         {
-            if (activeVariant.Guid == 0)
+            if (activeVariant.Value == 0)
                 return;
             var tags = current.Tags;
             int count = tags.Count;
             for (int i = 0; i < count; i++)
             {
-                if (tags[i].Guid == activeVariant.Guid)
+                if (tags[i].Value == activeVariant.Value)
                     return;
             }
-            throw TrecsAssert.CreateException(
+            throw TrecsDebugAssert.CreateException(
                 "ReplaceDimensionTags / RemoveDimensionTags called with activeVariant {0} that is not in current TagSet {1} — XOR math would produce an unregistered TagSet id",
                 activeVariant,
                 current
@@ -1280,6 +1379,36 @@ namespace Trecs
         {
             var template = GetResolvedTemplateForGroup(group);
             return template.HasComponent<T>();
+        }
+
+        /// <summary>
+        /// Burst-readable lookup of <see cref="TagSet"/>.Id → <see cref="GroupIndex"/>.
+        /// Built once at world construction; read-only for the world's lifetime. Contains
+        /// both every group's exact (full) tag set and every partial subset that uniquely
+        /// resolves to a single group via <see cref="GetSingleGroupWithTags(TagSet)"/>,
+        /// so any TagSet a managed caller could pass to AddEntity also works from Burst.
+        /// </summary>
+        internal NativeHashMap<int, GroupIndex> TagSetIdToGroupNative => _tagSetIdToGroupNative;
+
+        /// <summary>
+        /// Per-group component layout metadata (slot sizes, offsets, default bytes).
+        /// Read-only for the world's lifetime. Consumed by the Burst-friendly AddEntity
+        /// fast path and the parallel-fill drain pipeline.
+        /// </summary>
+        internal WorldComponentLayouts ComponentLayouts => _componentLayouts;
+
+        public void Dispose()
+        {
+            if (_isDisposed)
+            {
+                return;
+            }
+            if (_tagSetIdToGroupNative.IsCreated)
+            {
+                _tagSetIdToGroupNative.Dispose();
+            }
+            _componentLayouts?.Dispose();
+            _isDisposed = true;
         }
 
         internal class GroupInfo

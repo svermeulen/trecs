@@ -7,10 +7,7 @@ namespace Trecs.Tests
     [TestFixture]
     public class NativeAddDeterminismTests
     {
-        static readonly WorldSettings DeterministicSettings = new()
-        {
-            RequireDeterministicSubmission = true,
-        };
+        static readonly WorldSettings DeterministicSettings = new();
 
         [Test]
         public void NativeAdd_SortKeyOrder_EntitiesAreSortedBySortKey()
@@ -33,7 +30,7 @@ namespace Trecs.Tests
             }
             refs.Dispose();
 
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(5, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -75,7 +72,7 @@ namespace Trecs.Tests
             init3.Set(new TestInt { Value = 0 });
 
             refs.Dispose();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(4, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -109,7 +106,7 @@ namespace Trecs.Tests
             }
             refs.Dispose();
 
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(5, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -148,7 +145,7 @@ namespace Trecs.Tests
             init2.Set(new TestInt { Value = 10 });
 
             refs.Dispose();
-            a.SubmitEntities();
+            a.Submit();
 
             NAssert.AreEqual(5, a.CountEntitiesWithTags(TestTags.Alpha));
 
@@ -184,7 +181,7 @@ namespace Trecs.Tests
             var init2 = nativeEcs.AddEntity(TestTags.Alpha, sortKey: 1, refs[2]);
             init2.Set(new TestInt { Value = 10 });
 
-            a.SubmitEntities();
+            a.Submit();
 
             // Each reserved ref should resolve to the entity created with it
             NAssert.AreEqual(20, a.Component<TestInt>(refs[0]).Read.Value);
@@ -220,7 +217,7 @@ namespace Trecs.Tests
 
                 var result = new EntityHandle[] { refs[0], refs[1], refs[2] };
                 refs.Dispose();
-                a.SubmitEntities();
+                a.Submit();
                 return result;
             }
 

@@ -21,7 +21,7 @@ namespace Trecs.Tests
                     .Set(new TestInt { Value = (i + 1) * 10 })
                     .AssertComplete();
             }
-            a.SubmitEntities();
+            a.Submit();
 
             using var lookup = a.CreateNativeComponentLookupRead<TestInt>(
                 TestTags.Alpha,
@@ -57,7 +57,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 200 })
                 .Set(new TestVec())
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Lookup by Gamma tag — matches both state groups
             using var lookup = a.CreateNativeComponentLookupRead<TestInt>(
@@ -83,7 +83,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 10 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(TestTags.Alpha);
 
@@ -109,7 +109,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 42 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             using var lookup = a.CreateNativeComponentLookupRead<TestInt>(
                 TestTags.Alpha,
@@ -137,7 +137,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 2 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Lookup only covers Alpha group
             using var lookup = a.CreateNativeComponentLookupRead<TestInt>(
@@ -162,7 +162,7 @@ namespace Trecs.Tests
             var a = env.Accessor;
 
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 1 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             using var lookup = a.CreateNativeComponentLookupRead<TestInt>(
                 TestTags.Alpha,
@@ -187,7 +187,7 @@ namespace Trecs.Tests
                 .Set(new TestInt { Value = 2 })
                 .Set(new TestFloat())
                 .AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             using var lookup = a.CreateNativeComponentLookupRead<TestInt>(
                 TestTags.Alpha,
@@ -213,11 +213,11 @@ namespace Trecs.Tests
                 .AssertComplete()
                 .Handle;
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 20 }).AssertComplete();
-            a.SubmitEntities();
+            a.Submit();
 
             // Remove first entity
             a.RemoveEntity(handle);
-            a.SubmitEntities();
+            a.Submit();
 
             using var lookup = a.CreateNativeComponentLookupRead<TestInt>(
                 TestTags.Alpha,

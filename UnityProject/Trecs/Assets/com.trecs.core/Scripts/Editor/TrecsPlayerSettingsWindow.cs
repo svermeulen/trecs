@@ -171,13 +171,13 @@ namespace Trecs.Internal
             Close();
         }
 
-        // Refill the visible fields with TrecsAutoRecorderSettings's POCO
+        // Refill the visible fields with TrecsRewindBufferSettings's POCO
         // defaults. Pre-Save so the user can still Cancel without
         // committing — matches "factory reset" gestures elsewhere in
         // editor windows.
         void ResetToDefaults()
         {
-            var defaults = new TrecsAutoRecorderSettings();
+            var defaults = new TrecsRewindBufferSettings();
             _autoRecordOnStartField.value = true; // matches AutoRecordEnabled's default in TrecsGameStateActivator
             _anchorIntervalField.value = defaults.AnchorIntervalSeconds;
             _scrubCacheIntervalField.value = defaults.ScrubCacheIntervalSeconds;

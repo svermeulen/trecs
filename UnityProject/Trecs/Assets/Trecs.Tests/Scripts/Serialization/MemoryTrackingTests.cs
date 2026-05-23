@@ -1,7 +1,12 @@
 #if TRECS_INTERNAL_CHECKS
+using System.Collections.Generic;
+using System.IO;
+using NUnit.Framework;
+using UnityEngine;
 using Trecs;
 using Trecs.Internal;
 using Trecs.Collections;
+using Trecs.Serialization;
 using Svkj;
 
 namespace Trecs.Tests

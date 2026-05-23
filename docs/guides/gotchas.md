@@ -38,7 +38,7 @@ Using an immediate `Add` / `Remove` / `Clear` on the same set in the group you'r
 
 Pointers must be manually disposed. DEBUG builds catch leaks at world shutdown and report them; release builds leak silently.
 
-**Fix.** Dispose entity-owned pointers in an `OnRemoved` handler. See [Cleanup is manual for entity-owned pointers](../advanced/heap.md#cleanup-is-manual-for-entity-owned-pointers).
+**Fix.** Dispose entity-owned pointers in an `OnRemoved` handler. See [Cleanup is manual for entity-owned pointers](../experimental/pointers.md#cleanup-is-manual-for-entity-owned-pointers).
 
 ## Cleaning up an entity inline at the `Remove` call site
 
@@ -66,13 +66,13 @@ Component serialization copies the raw struct bytes (the blit fast-path). A `Nat
 
 `NativeUniquePtr<NativeList<T>>` avoids the trap: the unique ptr is a heap-key, not a raw memory pointer, and Trecs's serializer walks the inner collection's contents through the heap rather than blitting the struct.
 
-**Fix.** Wrap any native collection that needs to survive serialization in a `NativeUniquePtr` (or `NativeSharedPtr`). See [Storing native collections](../advanced/heap.md#storing-native-collections).
+**Fix.** Wrap any native collection that needs to survive serialization in a `NativeUniquePtr` (or `NativeSharedPtr`). See [Storing native collections](../experimental/pointers.md#storing-native-collections).
 
 ## `NativeUniquePtr<NativeList<T>>` — inner storage must be disposed first
 
 The wrapped collection's storage is allocated in Unity's allocator, not Trecs's heap. Disposing the `NativeUniquePtr` only frees the heap slot holding the `NativeList` header — the underlying allocation leaks.
 
-**Fix.** Dispose the inner collection, then the unique ptr. See [Storing native collections](../advanced/heap.md#storing-native-collections).
+**Fix.** Dispose the inner collection, then the unique ptr. See [Storing native collections](../experimental/pointers.md#storing-native-collections).
 
 ## Mutating a `NativeUniquePtr<T>` needs write access to the owning component
 
@@ -141,7 +141,7 @@ class PaletteService
     }
 
     public SharedPtr<ColorPalette> GetWarm() =>
-        SharedPtr.Alloc<ColorPalette>(_world.Heap, AssetIds.WarmPalette);
+        SharedPtr.Acquire<ColorPalette>(_world.Heap, AssetIds.WarmPalette);
 }
 
 // ✅ Service takes the accessor in; the calling Fixed system passes its own.
@@ -152,7 +152,7 @@ class PaletteService
 }
 ```
 
-Variable-cadence phases (`EarlyPresentation` / `Presentation` / `LatePresentation`) and observer callbacks (`OnAdded` / `OnRemoved` / `OnMoved`) don't enforce this — services may use their own accessors there. Callbacks fire from inside `SubmitEntities`, which runs *between* Fixed-system executes rather than inside one.
+Variable-cadence phases (`EarlyPresentation` / `Presentation` / `LatePresentation`) and observer callbacks (`OnAdded` / `OnRemoved` / `OnMoved`) don't enforce this — services may use their own accessors there. Callbacks fire from inside `Submit`, which runs *between* Fixed-system executes rather than inside one.
 
 **Fix.** Pass the calling system's `WorldAccessor` into the service rather than holding a separate one.
 

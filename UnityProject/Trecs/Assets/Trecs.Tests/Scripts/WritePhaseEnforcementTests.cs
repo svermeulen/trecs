@@ -37,9 +37,12 @@ namespace Trecs.Tests
     /// <summary>
     /// Class payload for the <see cref="SharedPtr.AllocFrameScoped{T}(HeapAccessor, BlobId, T)"/>
     /// positive-case test. Only needed because that overload constrains <c>T</c> to
-    /// <c>class</c>; the body is empty.
+    /// <c>class</c>; the body is empty. Marked <c>[Immutable]</c> to satisfy
+    /// TRECS125 — the class has no state to mutate, so the contract is
+    /// trivially upheld.
     /// </summary>
-    class WritePhaseHeapPayload { }
+    [Immutable]
+    sealed class WritePhaseHeapPayload { }
 
     [ExecuteIn(SystemPhase.Presentation)]
     partial class PresentationSimWriter : ISystem
@@ -356,7 +359,7 @@ namespace Trecs.Tests
     //   - AddEntity / RemoveEntity / MoveTo / SetAdd → rejected
     //   - FixedRng                → rejected
     //
-    // See AssertCanAddInputsSystem / AssertCanAllocatePersistent in
+    // See AssertCanAddInputsSystem / AssertCanMutateHeap in
     // HeapAccessor and AssertCanWriteComponent / AssertCanMakeStructuralChanges
     // in WorldAccessor for the source-of-truth rules.
 
@@ -392,7 +395,7 @@ namespace Trecs.Tests
                 return;
             }
             _hasAllocated = true;
-            var _ = SharedPtr.AllocFrameScoped<WritePhaseHeapPayload>(
+            var _ = InputSharedPtr.Alloc<WritePhaseHeapPayload>(
                 World.Heap,
                 BlobIdGenerator.FromKey(1),
                 new WritePhaseHeapPayload()
@@ -666,7 +669,7 @@ namespace Trecs.Tests
 
             var env = new TestEnvironment(world);
             env.Accessor.AddEntity(TestTags.Alpha).AssertComplete();
-            env.Accessor.SubmitEntities();
+            env.Accessor.Submit();
             return env;
         }
 
@@ -945,7 +948,7 @@ namespace Trecs.Tests
         public void AllocShared_FromInput_Throws()
         {
             // Persistent-heap allocation is the most-used Alloc overload to
-            // gate; AssertCanAllocatePersistent has a dedicated Input branch
+            // gate; AssertCanMutateHeap has a dedicated Input branch
             // that points at the FrameScoped variant in its message.
             using var env = CreateEnvWithSystem(new InputAllocSharedSystem());
             NAssert.Throws<TrecsException>(() => env.World.Tick());

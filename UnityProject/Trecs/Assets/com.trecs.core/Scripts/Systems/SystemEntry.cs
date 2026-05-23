@@ -37,9 +37,9 @@ namespace Trecs
             int? executionPriority
         )
         {
-            TrecsAssert.IsNotNull(system);
-            TrecsAssert.IsNotNull(debugName);
-            TrecsAssert.IsNotNull(systemDependencies);
+            TrecsDebugAssert.IsNotNull(system);
+            TrecsDebugAssert.IsNotNull(debugName);
+            TrecsDebugAssert.IsNotNull(systemDependencies);
 
             System = system;
             SystemDependencies = systemDependencies;

@@ -15,7 +15,7 @@ namespace Trecs.Serialization
 
         public void Serialize(in TElem[] value, ISerializationWriter writer)
         {
-            TrecsAssert.IsNotNull(value);
+            TrecsDebugAssert.IsNotNull(value);
 
             writer.Write("Count", value.Length);
             writer.BlitWriteArray("Value", value, value.Length);
@@ -24,7 +24,7 @@ namespace Trecs.Serialization
         public void Deserialize(ref TElem[] value, ISerializationReader reader)
         {
             var length = reader.Read<int>("Count");
-            TrecsAssert.That(length >= 0);
+            TrecsDebugAssert.That(length >= 0);
 
             if (length == 0)
             {

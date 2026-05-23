@@ -21,8 +21,10 @@ namespace Trecs.Internal
     ///     transparently checks <c>_pendingAdds</c> and works on freshly-created blobs.</description></item>
     ///   <item><description><see cref="NativeSharedPtrResolver"/> inside a Burst job only sees flushed
     ///     entries. Scheduling a job that resolves a <c>NativeSharedPtr</c> created in the same frame
-    ///     before submission will fail at resolution time. Schedule such jobs after submission or defer
-    ///     creation until the previous frame.</description></item>
+    ///     before submission will fail at resolution time. The submission pipeline flushes before
+    ///     scheduling native submission jobs, so the common case is handled automatically; user code
+    ///     scheduling its own jobs mid-frame should defer creation until the previous frame or run
+    ///     after submission.</description></item>
     /// </list>
     /// </summary>
     public sealed class NativeSharedHeap
@@ -50,7 +52,8 @@ namespace Trecs.Internal
         readonly Dictionary<BlobId, AtomicSafetyHandle> _safetyHandles = new();
 #endif
 
-        readonly HeapIdCounter _idCounter = new(1, 2);
+        // Skip 0 — PtrHandle reserves 0 as the null sentinel.
+        uint _nextHandleId = 1;
         bool _isDisposed;
         NativeSharedPtrResolver _resolver;
 
@@ -70,7 +73,7 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_isDisposed);
+                TrecsDebugAssert.That(!_isDisposed);
                 return _activeBlobs.Count;
             }
         }
@@ -79,22 +82,10 @@ namespace Trecs.Internal
         {
             get
             {
-                TrecsAssert.That(!_isDisposed);
+                TrecsDebugAssert.That(!_isDisposed);
                 return ref _resolver;
             }
         }
-
-        /// <summary>
-        /// Number of newly-created blobs staged for insertion into
-        /// <c>_allEntries</c> at the next <c>FlushPendingOperations</c>. While
-        /// non-zero, Burst jobs that resolve those specific blobs via
-        /// <see cref="NativeSharedPtrResolver"/> will fail. The submission
-        /// pipeline flushes before scheduling native submission jobs, so the
-        /// common case is handled automatically — this property is useful for
-        /// user code that wants to schedule its own jobs mid-frame and needs
-        /// to check the invariant itself.
-        /// </summary>
-        public int PendingAddCount => _pendingAdds.Count;
 
         /// <summary>
         /// Opens a safety-checked read view over the given <see cref="NativeSharedPtr{T}"/>.
@@ -116,21 +107,21 @@ namespace Trecs.Internal
         internal NativeSharedHeapEntry ResolveEntry<T>(BlobId address)
             where T : unmanaged
         {
-            TrecsAssert.That(!_isDisposed);
-            TrecsAssert.That(
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "NativeSharedHeap.ResolveEntry is main-thread only. "
                     + "Burst jobs must use NativeSharedPtrResolver instead."
             );
-            TrecsAssert.That(!address.IsNull, "Attempted to resolve null blob address");
+            TrecsDebugAssert.That(!address.IsNull, "Attempted to resolve null blob address");
 
             if (_pendingAdds.TryGetValue(address, out var entry))
             {
-                if (entry.TypeHash != TypeHash<T>.Value)
+                if (entry.TypeHash != TypeId<T>.Value.Value)
                 {
                     throw new TrecsException(
                         $"Type hash mismatch resolving NativeSharedPtr<{typeof(T).Name}>: "
-                            + $"stored hash {entry.TypeHash}, requested {TypeHash<T>.Value}"
+                            + $"stored hash {entry.TypeHash}, requested {TypeId<T>.Value.Value}"
                     );
                 }
                 return entry;
@@ -148,14 +139,14 @@ namespace Trecs.Internal
         unsafe NativeSharedPtr<T> AddBlobEntry<T>(BlobId blobId, PtrHandle blobCacheHandleId)
             where T : unmanaged
         {
-            var burstTypeHash = TypeHash<T>.Value;
+            var burstTypeHash = TypeId<T>.Value.Value;
 
             _activeBlobs.Add(
                 blobId,
                 new BlobInfo
                 {
                     RefCount = 0,
-                    InnerTypeId = TypeIdProvider.GetTypeId<T>(),
+                    InnerTypeId = TypeId<T>.Value,
                     BurstTypeHash = burstTypeHash,
                 }
             );
@@ -165,7 +156,7 @@ namespace Trecs.Internal
 
             // Defer adding to _allEntries until FlushPendingOperations,
             // since jobs may be reading _allEntries via NativeSharedPtrResolver
-            var ptr = _store.GetNativeBlobPtr(blobId, TypeIdProvider.GetTypeId<T>());
+            var ptr = _store.GetNativeBlobPtr(blobId, TypeId<T>.Value.Value);
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             var safety = AtomicSafetyHandle.Create();
@@ -189,14 +180,14 @@ namespace Trecs.Internal
         public NativeSharedPtr<T> CreateBlob<T>(BlobId blobId, in T blob)
             where T : unmanaged
         {
-            TrecsAssert.That(!_isDisposed);
-            var handle = _store.CreateNativeBlobPtr(blobId, in blob);
+            TrecsDebugAssert.That(!_isDisposed);
+            var handle = _store.AllocNativeBlob(blobId, in blob);
             return AddBlobEntry<T>(blobId, handle.Handle);
         }
 
         /// <summary>
         /// Takes ownership of an existing native pointer and creates a blob from it without copying.
-        /// See <see cref="NativeUniqueHeap.AllocTakingOwnership{T}"/> for the ownership contract.
+        /// See <see cref="NativeUniquePtr.AllocTakingOwnership{T}(HeapAccessor, NativeBlobAllocation, string, int)"/> for the ownership contract.
         /// </summary>
         public NativeSharedPtr<T> CreateBlobTakingOwnership<T>(
             BlobId blobId,
@@ -204,8 +195,8 @@ namespace Trecs.Internal
         )
             where T : unmanaged
         {
-            TrecsAssert.That(!_isDisposed);
-            var handle = _store.CreateNativeBlobPtrTakingOwnership<T>(blobId, alloc);
+            TrecsDebugAssert.That(!_isDisposed);
+            var handle = _store.AllocNativeBlobTakingOwnership<T>(blobId, alloc);
             return AddBlobEntry<T>(blobId, handle.Handle);
         }
 
@@ -218,7 +209,7 @@ namespace Trecs.Internal
         public bool TryGetBlob<T>(BlobId blobId, out NativeSharedPtr<T> ptr)
             where T : unmanaged
         {
-            TrecsAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!_isDisposed);
 
             _log.Trace("Looking up native blob with id {0}", blobId);
 
@@ -228,7 +219,7 @@ namespace Trecs.Internal
                 return true;
             }
 
-            if (_store.HasNativeBlob<T>(blobId, updateAccessTime: true))
+            if (_store.ContainsNativeBlob<T>(blobId, updateAccessTime: true))
             {
                 var blobCacheHandleId = _store.CreateHandle(blobId);
                 ptr = AddBlobEntry<T>(blobId, blobCacheHandleId);
@@ -244,7 +235,7 @@ namespace Trecs.Internal
         {
             if (!TryGetBlob<T>(blobId, out var ptr))
             {
-                throw TrecsAssert.CreateException(
+                throw TrecsDebugAssert.CreateException(
                     "Attempted to get an unrecognized blob {0}",
                     blobId
                 );
@@ -257,11 +248,11 @@ namespace Trecs.Internal
             where T : unmanaged
         {
             ref var info = ref _activeBlobs.GetValueByRef(blobId);
-            TrecsAssert.That(info.InnerTypeId == TypeIdProvider.GetTypeId<T>());
-            TrecsAssert.That(info.BurstTypeHash == TypeHash<T>.Value);
+            TrecsDebugAssert.That(info.InnerTypeId == TypeId<T>.Value);
+            TrecsDebugAssert.That(info.BurstTypeHash == TypeId<T>.Value.Value);
             info.RefCount += 1;
 
-            var newHandle = new PtrHandle(_idCounter.Alloc());
+            var newHandle = new PtrHandle(_nextHandleId++);
             _activeHandles.Add(newHandle, blobId);
             _log.Trace("Added blob handle {0}", newHandle);
 
@@ -271,7 +262,7 @@ namespace Trecs.Internal
         public bool TryClone<T>(PtrHandle handle, out NativeSharedPtr<T> result)
             where T : unmanaged
         {
-            TrecsAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!_isDisposed);
 
             if (!_activeHandles.TryGetValue(handle, out var blobId))
             {
@@ -285,7 +276,7 @@ namespace Trecs.Internal
 
         public void ClearAll(bool warnUndisposed)
         {
-            TrecsAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!_isDisposed);
             if (_activeHandles.Count > 0)
             {
                 if (warnUndisposed)
@@ -340,10 +331,10 @@ namespace Trecs.Internal
             _safetyHandles.Clear();
 #endif
 
-            TrecsAssert.That(_activeBlobs.Count == 0);
-            TrecsAssert.That(_activeHandles.Count == 0);
-            TrecsAssert.That(_blobCacheHandles.Count == 0);
-            TrecsAssert.That(_allEntries.Count == 0);
+            TrecsDebugAssert.That(_activeBlobs.Count == 0);
+            TrecsDebugAssert.That(_activeHandles.Count == 0);
+            TrecsDebugAssert.That(_blobCacheHandles.Count == 0);
+            TrecsDebugAssert.That(_allEntries.Count == 0);
         }
 
         /// <summary>
@@ -378,7 +369,7 @@ namespace Trecs.Internal
 
         internal void Dispose()
         {
-            TrecsAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!_isDisposed);
             ClearAll(warnUndisposed: true);
 
             _allEntries.Dispose();
@@ -388,11 +379,11 @@ namespace Trecs.Internal
 
         public void DisposeHandle(in PtrHandle id)
         {
-            TrecsAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!_isDisposed);
 
             if (!_activeHandles.TryGetValue(id, out var blobId))
             {
-                throw TrecsAssert.CreateException(
+                throw TrecsDebugAssert.CreateException(
                     "Attempted to dispose unrecognized native shared blob handle {0} "
                         + "(double-dispose or handle from a different heap?)",
                     id
@@ -405,7 +396,7 @@ namespace Trecs.Internal
             ref var info = ref _activeBlobs.GetValueByRef(blobId);
             info.RefCount -= 1;
 
-            TrecsAssert.That(info.RefCount >= 0);
+            TrecsDebugAssert.That(info.RefCount >= 0);
 
             if (info.RefCount == 0)
             {
@@ -423,10 +414,10 @@ namespace Trecs.Internal
         public void Serialize(ISerializationWriter writer)
         {
             FlushPendingOperations();
-            TrecsAssert.That(_allEntries.Count == _activeBlobs.Count);
+            TrecsDebugAssert.That(_allEntries.Count == _activeBlobs.Count);
 
             writer.Write<int>("NumEntries", _allEntries.Count);
-            writer.Write<uint>("HandleCounter", _idCounter.Value);
+            writer.Write<uint>("HandleCounter", _nextHandleId);
             writer.Write<DenseDictionary<BlobId, BlobInfo>>("ActiveBlobs", _activeBlobs);
             writer.Write<DenseDictionary<PtrHandle, BlobId>>("ActiveHandles", _activeHandles);
 
@@ -435,25 +426,31 @@ namespace Trecs.Internal
 
         public void Deserialize(ISerializationReader reader)
         {
-            TrecsAssert.That(_allEntries.Count == 0);
-            TrecsAssert.That(_pendingAdds.Count == 0);
-            TrecsAssert.That(_pendingRemoves.Count == 0);
-            TrecsAssert.That(_activeBlobs.Count == 0);
-            TrecsAssert.That(_activeHandles.Count == 0);
+            TrecsDebugAssert.That(!_isDisposed);
+            // Defensive: callers contract is ClearAll() before Deserialize, but
+            // a wrong-order call would silently corrupt state — warn-then-clean
+            // so the contract violation is observable in dev builds while still
+            // recoverable in release. ClearAll calls FlushPendingOperations
+            // internally, so _pendingAdds / _pendingRemoves are emptied too.
+            ClearAll(warnUndisposed: true);
 
             var numEntries = reader.Read<int>("NumEntries");
 
-            _idCounter.Value = reader.Read<uint>("HandleCounter");
+            _nextHandleId = reader.Read<uint>("HandleCounter");
             reader.ReadInPlace<DenseDictionary<BlobId, BlobInfo>>("ActiveBlobs", _activeBlobs);
             reader.ReadInPlace<DenseDictionary<PtrHandle, BlobId>>("ActiveHandles", _activeHandles);
 
             _log.Debug("Deserialized {0} native blob handles", _activeHandles.Count);
 
-            TrecsAssert.IsEqual(_activeBlobs.Count, numEntries);
+            TrecsDebugAssert.IsEqual(_activeBlobs.Count, numEntries);
 
             foreach (var (blobId, info) in _activeBlobs)
             {
-                var ptr = _store.GetNativeBlobPtr(blobId, info.InnerTypeId, updateAccessTime: true);
+                var ptr = _store.GetNativeBlobPtr(
+                    blobId,
+                    info.InnerTypeId.Value,
+                    updateAccessTime: true
+                );
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 var safety = AtomicSafetyHandle.Create();
                 AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(safety, true);
@@ -469,7 +466,7 @@ namespace Trecs.Internal
         internal struct BlobInfo
         {
             public int RefCount;
-            public int InnerTypeId;
+            public TypeId InnerTypeId;
             public int BurstTypeHash;
         }
     }
