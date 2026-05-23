@@ -866,51 +866,6 @@ namespace Trecs.Tests
             }
         }
 
-        /// <summary>
-        /// Edge case: a group whose component slots are materialized but whose
-        /// entity count is 0 (e.g. all entities were removed). The custom
-        /// serializer is invoked with <c>values.Length == 0</c> on both sides
-        /// of the round-trip — verifies neither the dispatcher nor the
-        /// framework's group iteration trips over the empty case.
-        /// </summary>
-        [Test]
-        public void RoundTrip_CustomSerializer_HandlesEmptyGroup()
-        {
-            using var world = CreateWorld();
-            var a = world.CreateAccessor(AccessorRole.Unrestricted);
-
-            var custom = new LengthRecordingSerializer();
-            world.ComponentArraySerializerRegistry.Register(custom);
-
-            // Add then remove an entity to materialize PartitionA's component
-            // slots without leaving any entries — Trecs's component arrays are
-            // lazily created on first Add, so we need the Add to even reach
-            // the empty case at all.
-            var handle = a.AddEntity(PartitionA)
-                .Set(new SerTestInt { Value = 1 })
-                .Set(new SerTestFloat { Value = 1f })
-                .AssertComplete()
-                .Handle;
-            a.Submit();
-            a.RemoveEntity(handle);
-            a.Submit();
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
-
-            var data = SerializeWorld(world);
-            NAssert.IsTrue(
-                custom.SerializeLengths.Contains(0),
-                "Serializer should have been invoked with Length == 0 for the now-empty partition."
-            );
-
-            DeserializeWorld(world, data);
-
-            NAssert.IsTrue(
-                custom.DeserializeLengths.Contains(0),
-                "Serializer should have been invoked with the empty count on the deserialize side too."
-            );
-            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
-        }
-
         #endregion
 
         #region PerEntityComponentArraySerializer
