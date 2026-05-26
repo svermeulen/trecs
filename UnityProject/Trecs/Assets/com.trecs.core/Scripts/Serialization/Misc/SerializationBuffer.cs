@@ -120,7 +120,7 @@ namespace Trecs.Internal
 
             try
             {
-                _reader.Start(_memoryStream);
+                _reader.Start(GetMemoryStreamAsReadOnlyMemory());
                 var result = _reader.ReadObjectDelta("Value", baseValue);
                 _reader.Stop(verifySentinel: true);
 
@@ -199,6 +199,15 @@ namespace Trecs.Internal
             _writer.ResetForErrorRecovery();
         }
 
+        ReadOnlyMemory<byte> GetMemoryStreamAsReadOnlyMemory()
+        {
+            return new ReadOnlyMemory<byte>(
+                _memoryStream.GetBuffer(),
+                0,
+                (int)_memoryStream.Length
+            );
+        }
+
         public void StartRead()
         {
             TrecsDebugAssert.That(_state == State.Idle);
@@ -206,7 +215,7 @@ namespace Trecs.Internal
             TrecsDebugAssert.That(MemoryPosition == 0);
 
             _state = State.Reading;
-            _reader.Start(_memoryStream);
+            _reader.Start(GetMemoryStreamAsReadOnlyMemory());
         }
 
         /// <summary>
@@ -302,7 +311,7 @@ namespace Trecs.Internal
 
             try
             {
-                _reader.Start(_memoryStream);
+                _reader.Start(GetMemoryStreamAsReadOnlyMemory());
                 var result = _reader.ReadObject("Value");
                 _reader.Stop(verifySentinel: true);
                 return result;
@@ -377,7 +386,7 @@ namespace Trecs.Internal
 
             try
             {
-                _reader.Start(_memoryStream);
+                _reader.Start(GetMemoryStreamAsReadOnlyMemory());
                 var result = _reader.Read<T>("Value");
                 _reader.Stop(verifySentinel: true);
 
@@ -398,7 +407,7 @@ namespace Trecs.Internal
 
             try
             {
-                _reader.Start(_memoryStream);
+                _reader.Start(GetMemoryStreamAsReadOnlyMemory());
                 _reader.Read<T>("Value", ref value);
                 _reader.Stop(verifySentinel: true);
             }
@@ -493,7 +502,7 @@ namespace Trecs.Internal
 
             try
             {
-                _reader.Start(_memoryStream);
+                _reader.Start(GetMemoryStreamAsReadOnlyMemory());
                 var result = _reader.ReadDelta<T>("Value", baseValue);
                 _reader.Stop(verifySentinel: true);
                 return result;

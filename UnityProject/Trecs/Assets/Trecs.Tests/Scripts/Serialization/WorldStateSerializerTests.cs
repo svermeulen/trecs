@@ -111,9 +111,8 @@ namespace Trecs.Tests
         void DeserializeWorld(World world, byte[] data)
         {
             var serializer = new WorldStateSerializer(world);
-            using var inputStream = new MemoryStream(data);
             var reader = new BinarySerializationReader(_serializerRegistry);
-            reader.Start(inputStream);
+            reader.Start(data);
             serializer.DeserializeState(reader);
         }
 
@@ -820,10 +819,9 @@ namespace Trecs.Tests
             // Mutate so a no-op Deserialize would fail.
             a.Query().WithTags(PartitionA).SingleHandle().Component<SerTestInt>(a).Write.Value = 0;
 
-            using (var inputStream = new MemoryStream(data))
             {
                 var reader = new BinarySerializationReader(_serializerRegistry);
-                reader.Start(inputStream);
+                reader.Start(data);
                 wsRead.DeserializeState(reader);
             }
 

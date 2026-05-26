@@ -348,7 +348,13 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+                using var pool = new SnapshotPayloadPool();
+                using var snapshots = new SnapshotSerializer(
+                    worldStateSer,
+                    registry,
+                    env.World,
+                    pool
+                );
 
                 using var ms = new MemoryStream();
                 snapshots.SaveSnapshot(version: 1, stream: ms);
@@ -379,9 +385,15 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+                using var pool = new SnapshotPayloadPool();
+                using var snapshots = new SnapshotSerializer(
+                    worldStateSer,
+                    registry,
+                    env.World,
+                    pool
+                );
 
-                snapshots.LoadSnapshot(loadedBundle.InitialSnapshot.Span);
+                snapshots.LoadSnapshot(loadedBundle.InitialSnapshot);
 
                 NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
             }
@@ -415,10 +427,12 @@ namespace Trecs.Tests
                     var registry = new SerializerRegistry();
                     DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                     var worldStateSer = new WorldStateSerializer(env.World);
+                    using var pool = new SnapshotPayloadPool();
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
                         registry,
-                        env.World
+                        env.World,
+                        pool
                     );
                     var settings = new TrecsRewindBufferSettings
                     {
@@ -432,7 +446,8 @@ namespace Trecs.Tests
                         worldStateSer,
                         registry,
                         settings,
-                        snapshots
+                        snapshots,
+                        pool
                     );
                     recorder.Start();
 
@@ -463,10 +478,12 @@ namespace Trecs.Tests
                     var registry = new SerializerRegistry();
                     DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                     var worldStateSer = new WorldStateSerializer(env.World);
+                    using var pool = new SnapshotPayloadPool();
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
                         registry,
-                        env.World
+                        env.World,
+                        pool
                     );
                     var settings = new TrecsRewindBufferSettings { Version = 1 };
                     using var recorder = new TrecsRewindBuffer(
@@ -474,7 +491,8 @@ namespace Trecs.Tests
                         worldStateSer,
                         registry,
                         settings,
-                        snapshots
+                        snapshots,
+                        pool
                     );
 
                     NAssert.IsTrue(recorder.LoadRecordingFromFile(path));
@@ -533,10 +551,12 @@ namespace Trecs.Tests
                     var registry = new SerializerRegistry();
                     DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                     var worldStateSer = new WorldStateSerializer(env.World);
+                    using var pool = new SnapshotPayloadPool();
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
                         registry,
-                        env.World
+                        env.World,
+                        pool
                     );
                     var settings = new TrecsRewindBufferSettings
                     {
@@ -548,7 +568,8 @@ namespace Trecs.Tests
                         worldStateSer,
                         registry,
                         settings,
-                        snapshots
+                        snapshots,
+                        pool
                     );
                     recorder.Start();
 
@@ -576,10 +597,12 @@ namespace Trecs.Tests
                     var registry = new SerializerRegistry();
                     DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                     var worldStateSer = new WorldStateSerializer(env.World);
+                    using var pool = new SnapshotPayloadPool();
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
                         registry,
-                        env.World
+                        env.World,
+                        pool
                     );
                     var settings = new TrecsRewindBufferSettings { Version = 1 };
                     using var recorder = new TrecsRewindBuffer(
@@ -587,7 +610,8 @@ namespace Trecs.Tests
                         worldStateSer,
                         registry,
                         settings,
-                        snapshots
+                        snapshots,
+                        pool
                     );
 
                     NAssert.IsTrue(recorder.LoadRecordingFromFile(path));
@@ -624,7 +648,8 @@ namespace Trecs.Tests
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            using var pool = new SnapshotPayloadPool();
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World, pool);
             var settings = new TrecsRewindBufferSettings
             {
                 AnchorIntervalSeconds = 0.05f,
@@ -635,7 +660,8 @@ namespace Trecs.Tests
                 worldStateSer,
                 registry,
                 settings,
-                snapshots
+                snapshots,
+                pool
             );
             recorder.Start();
 
@@ -664,7 +690,8 @@ namespace Trecs.Tests
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            using var pool = new SnapshotPayloadPool();
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World, pool);
             var settings = new TrecsRewindBufferSettings
             {
                 // Long enough that the only auto-anchor is the forced first.
@@ -677,7 +704,8 @@ namespace Trecs.Tests
                 worldStateSer,
                 registry,
                 settings,
-                snapshots
+                snapshots,
+                pool
             );
             recorder.Start();
 
@@ -710,7 +738,8 @@ namespace Trecs.Tests
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            using var pool = new SnapshotPayloadPool();
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World, pool);
             var settings = new TrecsRewindBufferSettings
             {
                 AnchorIntervalSeconds = 1000f,
@@ -722,7 +751,8 @@ namespace Trecs.Tests
                 worldStateSer,
                 registry,
                 settings,
-                snapshots
+                snapshots,
+                pool
             );
             recorder.Start();
 
@@ -752,7 +782,8 @@ namespace Trecs.Tests
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            using var pool = new SnapshotPayloadPool();
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World, pool);
             var settings = new BundleRecorderSettings
             {
                 Version = 1,
@@ -796,7 +827,8 @@ namespace Trecs.Tests
             var registry = new SerializerRegistry();
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
-            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+            using var pool = new SnapshotPayloadPool();
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World, pool);
             var settings = new TrecsRewindBufferSettings
             {
                 AnchorIntervalSeconds = 1000f, // effectively never except the forced first
@@ -808,7 +840,8 @@ namespace Trecs.Tests
                 worldStateSer,
                 registry,
                 settings,
-                snapshots
+                snapshots,
+                pool
             );
             recorder.Start();
 
@@ -849,10 +882,12 @@ namespace Trecs.Tests
                     var registry = new SerializerRegistry();
                     DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                     var worldStateSer = new WorldStateSerializer(env.World);
+                    using var pool = new SnapshotPayloadPool();
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
                         registry,
-                        env.World
+                        env.World,
+                        pool
                     );
                     var settings = new TrecsRewindBufferSettings
                     {
@@ -865,7 +900,8 @@ namespace Trecs.Tests
                         worldStateSer,
                         registry,
                         settings,
-                        snapshots
+                        snapshots,
+                        pool
                     );
                     recorder.Start();
 
@@ -887,10 +923,12 @@ namespace Trecs.Tests
                     var registry = new SerializerRegistry();
                     DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                     var worldStateSer = new WorldStateSerializer(env.World);
+                    using var pool = new SnapshotPayloadPool();
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
                         registry,
-                        env.World
+                        env.World,
+                        pool
                     );
                     var settings = new TrecsRewindBufferSettings { Version = 1 };
                     using var recorder = new TrecsRewindBuffer(
@@ -898,7 +936,8 @@ namespace Trecs.Tests
                         worldStateSer,
                         registry,
                         settings,
-                        snapshots
+                        snapshots,
+                        pool
                     );
 
                     NAssert.IsTrue(recorder.LoadRecordingFromFile(path));
@@ -948,10 +987,12 @@ namespace Trecs.Tests
                     var registry = new SerializerRegistry();
                     DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                     var worldStateSer = new WorldStateSerializer(env.World);
+                    using var pool = new SnapshotPayloadPool();
                     using var snapshots = new SnapshotSerializer(
                         worldStateSer,
                         registry,
-                        env.World
+                        env.World,
+                        pool
                     );
                     var settings = new TrecsRewindBufferSettings
                     {
@@ -967,7 +1008,8 @@ namespace Trecs.Tests
                         worldStateSer,
                         registry,
                         settings,
-                        snapshots
+                        snapshots,
+                        pool
                     );
                     recorder.Start();
 

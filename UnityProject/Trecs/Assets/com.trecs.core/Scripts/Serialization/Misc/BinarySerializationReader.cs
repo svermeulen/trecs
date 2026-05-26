@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Text;
 using Trecs.Internal;
 
@@ -16,11 +15,8 @@ namespace Trecs
         int _version;
         bool _includesTypeChecks;
 
-        // MemoryStream backing the data section. MemoryBlitter reads
-        // directly from its underlying byte[] for the blit fast-path;
-        // string/type-id/byte-array reads also go through this stream
-        // without a BinaryReader intermediary.
-        MemoryStream _memoryStream;
+        ReadOnlyMemory<byte> _data;
+        int _offset;
         bool _hasStarted;
 
         public BinarySerializationReader(SerializerRegistry serializerManager)
@@ -34,16 +30,6 @@ namespace Trecs
             {
                 TrecsDebugAssert.That(_hasStarted);
                 return _flags;
-            }
-        }
-
-        public MemoryStream DataStream
-        {
-            get
-            {
-                TrecsDebugAssert.That(_hasStarted);
-                TrecsDebugAssert.IsNotNull(_memoryStream);
-                return _memoryStream;
             }
         }
 
@@ -62,30 +48,30 @@ namespace Trecs
             return (_flags & flag) != 0;
         }
 
-        public void Start(MemoryStream memoryStream)
+        public void Start(ReadOnlyMemory<byte> data)
         {
             TrecsDebugAssert.That(!_hasStarted);
 
             _hasStarted = true;
-            _memoryStream = memoryStream;
+            _data = data;
+            _offset = 0;
 
+            var span = _data.Span;
             (_version, _flags, _includesTypeChecks) = SerializationHeaderUtil.ReadHeader(
-                _memoryStream
+                span,
+                ref _offset
             );
 
-            _log.Trace("Completed reading header at byte {0}", _memoryStream.Position);
+            _log.Trace("Completed reading header at offset {0}", _offset);
 
-            var positionBefore = _memoryStream.Position;
-            _bitReader.Reset(_memoryStream);
-            _log.Trace("Bit fields read in {0} bytes", _memoryStream.Position - positionBefore);
+            var offsetBefore = _offset;
+            _bitReader.Reset(span, ref _offset);
+            _log.Trace("Bit fields read in {0} bytes", _offset - offsetBefore);
         }
 
         /// <summary>
         /// Finish reading. When <paramref name="verifySentinel"/> is true, the
-        /// sentinel is read and validated, leaving the underlying stream
-        /// positioned just past it. When false, the underlying stream
-        /// position is left undefined — callers in this mode (e.g. peek paths)
-        /// must reset the stream themselves before any subsequent read.
+        /// sentinel is read and validated. When false, no further reads occur.
         /// </summary>
         public void Stop(bool verifySentinel)
         {
@@ -97,13 +83,14 @@ namespace Trecs
             {
                 VerifySentinel();
             }
-            _memoryStream = null;
+            _data = default;
         }
 
         public void ResetForErrorRecovery()
         {
             _hasStarted = false;
-            _memoryStream = null;
+            _data = default;
+            _offset = 0;
             _flags = 0;
             _version = 0;
             _includesTypeChecks = false;
@@ -123,8 +110,8 @@ namespace Trecs
             // corrupt streams and must fire in release builds too. Stripping
             // the check in release would let downstream code silently consume
             // an incomplete payload as if it were valid.
-            int b = _memoryStream.ReadByte();
-            if (b < 0)
+            var span = _data.Span;
+            if (_offset >= span.Length)
             {
                 throw new SerializationException(
                     "Data corruption detected — missing end-of-payload marker. "
@@ -132,7 +119,8 @@ namespace Trecs
                 );
             }
 
-            byte sentinel = (byte)b;
+            byte sentinel = span[_offset];
+            _offset++;
             if (sentinel != SerializationConstants.EndOfPayloadMarker)
             {
                 throw new SerializationException(
@@ -161,7 +149,7 @@ namespace Trecs
                 "Delta serialization doesn't support null base values"
             );
 
-            var concreteType = TypeIdSerializer.Read(_memoryStream);
+            var concreteType = TypeIdSerializer.Read(_data.Span, ref _offset);
 
             // Note that we don't do equality checks here, so it's up to
             // the serializer to do delta optimization logic
@@ -182,7 +170,7 @@ namespace Trecs
 
             if (isChanged)
             {
-                MemoryBlitter.Read(ref value, _memoryStream);
+                MemoryBlitter.Read(ref value, _data.Span, ref _offset);
             }
             else
             {
@@ -220,7 +208,7 @@ namespace Trecs
 
             if (_includesTypeChecks)
             {
-                var savedType = TypeIdSerializer.Read(_memoryStream);
+                var savedType = TypeIdSerializer.Read(_data.Span, ref _offset);
                 TrecsDebugAssert.That(
                     savedType == type,
                     "Expected type {0} but found '{1}'",
@@ -250,7 +238,7 @@ namespace Trecs
 
             if (isChanged)
             {
-                return ReadStringFromStream();
+                return ReadStringFromData();
             }
             else
             {
@@ -262,7 +250,7 @@ namespace Trecs
         {
             TrecsDebugAssert.That(_hasStarted);
 
-            return TypeIdSerializer.Read(_memoryStream);
+            return TypeIdSerializer.Read(_data.Span, ref _offset);
         }
 
         public void ReadObject(string name, ref object value)
@@ -277,7 +265,7 @@ namespace Trecs
                 return;
             }
 
-            var concreteType = TypeIdSerializer.Read(_memoryStream);
+            var concreteType = TypeIdSerializer.Read(_data.Span, ref _offset);
 
             var serializer = _serializerManager.GetSerializer(concreteType);
             serializer.DeserializeObject(ref value, this);
@@ -289,21 +277,21 @@ namespace Trecs
             where T : unmanaged
         {
             TrecsDebugAssert.That(_hasStarted);
-            MemoryBlitter.Read(ref value, _memoryStream);
+            MemoryBlitter.Read(ref value, _data.Span, ref _offset);
         }
 
         public unsafe void BlitReadArrayPtr<T>(string name, T* value, int length)
             where T : unmanaged
         {
             TrecsDebugAssert.That(_hasStarted);
-            MemoryBlitter.ReadArrayPtr(value, length, _memoryStream);
+            MemoryBlitter.ReadArrayPtr(value, length, _data.Span, ref _offset);
         }
 
         public unsafe void BlitReadArray<T>(string name, T[] buffer, int count)
             where T : unmanaged
         {
             TrecsDebugAssert.That(_hasStarted);
-            MemoryBlitter.ReadArray(buffer, count, _memoryStream);
+            MemoryBlitter.ReadArray(buffer, count, _data.Span, ref _offset);
         }
 
         public void Read<T>(string name, ref T value)
@@ -342,7 +330,7 @@ namespace Trecs
 
             if (_includesTypeChecks)
             {
-                var savedType = TypeIdSerializer.Read(_memoryStream);
+                var savedType = TypeIdSerializer.Read(_data.Span, ref _offset);
                 TrecsDebugAssert.That(
                     savedType == type,
                     "Expected type {0} but found '{1}'",
@@ -366,45 +354,36 @@ namespace Trecs
                 return null;
             }
 
-            return ReadStringFromStream();
+            return ReadStringFromData();
         }
 
-        string ReadStringFromStream()
+        string ReadStringFromData()
         {
             int byteCount = 0;
-            MemoryBlitter.Read(ref byteCount, _memoryStream);
+            MemoryBlitter.Read(ref byteCount, _data.Span, ref _offset);
 
             if (byteCount == 0)
             {
                 return string.Empty;
             }
 
-            int pos = (int)_memoryStream.Position;
-
-            if (_memoryStream.TryGetBuffer(out ArraySegment<byte> seg))
+            var span = _data.Span;
+            if (_offset + byteCount > span.Length)
             {
-                var result = Encoding.UTF8.GetString(seg.Array, seg.Offset + pos, byteCount);
-                _memoryStream.Position = pos + byteCount;
-                return result;
-            }
-            else
-            {
-                var bytes = new byte[byteCount];
-                int bytesRead = _memoryStream.Read(bytes, 0, byteCount);
-                TrecsDebugAssert.That(
-                    bytesRead == byteCount,
-                    "Truncated stream: expected {0} string bytes, got {1}",
-                    byteCount,
-                    bytesRead
+                throw new SerializationException(
+                    $"Truncated data: expected {byteCount} string bytes at offset {_offset} but data length is only {span.Length}"
                 );
-                return Encoding.UTF8.GetString(bytes);
             }
+
+            var result = Encoding.UTF8.GetString(span.Slice(_offset, byteCount));
+            _offset += byteCount;
+            return result;
         }
 
         public unsafe void BlitReadRawBytes(string name, void* ptr, int numBytes)
         {
             TrecsDebugAssert.That(_hasStarted);
-            MemoryBlitter.ReadRaw(ptr, numBytes, _memoryStream);
+            MemoryBlitter.ReadRaw(ptr, numBytes, _data.Span, ref _offset);
         }
 
         public int ReadBytes(string name, ref byte[] buffer)
@@ -412,7 +391,7 @@ namespace Trecs
             TrecsDebugAssert.That(_hasStarted);
 
             int length = 0;
-            MemoryBlitter.Read(ref length, _memoryStream);
+            MemoryBlitter.Read(ref length, _data.Span, ref _offset);
 
             if (buffer == null || buffer.Length < length)
             {
@@ -421,13 +400,15 @@ namespace Trecs
 
             if (length > 0)
             {
-                int bytesRead = _memoryStream.Read(buffer, 0, length);
-                TrecsDebugAssert.That(
-                    bytesRead == length,
-                    "Truncated stream: expected {0} bytes, got {1}",
-                    length,
-                    bytesRead
-                );
+                var span = _data.Span;
+                if (_offset + length > span.Length)
+                {
+                    throw new SerializationException(
+                        $"Truncated data: expected {length} bytes at offset {_offset} but data length is only {span.Length}"
+                    );
+                }
+                span.Slice(_offset, length).CopyTo(buffer);
+                _offset += length;
             }
 
             return length;

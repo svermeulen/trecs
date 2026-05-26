@@ -25,7 +25,7 @@ namespace Trecs.Internal
     /// </summary>
     internal sealed class SnapshotStore : IDisposable
     {
-        readonly SnapshotSerializer _snapshotSerializer;
+        readonly SnapshotPayloadPool _pool;
 
         // Sparse, capacity-capped (drop-oldest). Sorted by FixedFrame
         // ascending. Doubles as the desync-recovery + scrub backbone for
@@ -53,10 +53,9 @@ namespace Trecs.Internal
         long _scrubCacheBytes;
         bool _disposed;
 
-        public SnapshotStore(SnapshotSerializer snapshotSerializer)
+        public SnapshotStore(SnapshotPayloadPool pool)
         {
-            _snapshotSerializer =
-                snapshotSerializer ?? throw new ArgumentNullException(nameof(snapshotSerializer));
+            _pool = pool ?? throw new ArgumentNullException(nameof(pool));
         }
 
         public IReadOnlyList<WorldSnapshot> Anchors => _anchors;
@@ -157,7 +156,7 @@ namespace Trecs.Internal
                 if (_anchors[i].FixedFrame == snapshot.FixedFrame)
                 {
                     _totalAnchorBytes -= _anchors[i].Payload.Length;
-                    _snapshotSerializer.ReturnPayloadBuffer(_anchors[i].Payload);
+                    _pool.Return(_anchors[i].Payload);
                     _anchors[i] = snapshot;
                     _totalAnchorBytes += snapshot.Payload.Length;
                     return;
@@ -182,7 +181,7 @@ namespace Trecs.Internal
             {
                 if (_bookmarks[i].FixedFrame == snapshot.FixedFrame)
                 {
-                    _snapshotSerializer.ReturnPayloadBuffer(_bookmarks[i].Payload);
+                    _pool.Return(_bookmarks[i].Payload);
                     _bookmarks[i] = snapshot;
                     return;
                 }
@@ -221,7 +220,7 @@ namespace Trecs.Internal
             {
                 if (_bookmarks[i].FixedFrame == frame)
                 {
-                    _snapshotSerializer.ReturnPayloadBuffer(_bookmarks[i].Payload);
+                    _pool.Return(_bookmarks[i].Payload);
                     _bookmarks.RemoveAt(i);
                     return true;
                 }
@@ -240,7 +239,7 @@ namespace Trecs.Internal
             {
                 var last = _anchors[_anchors.Count - 1];
                 _totalAnchorBytes -= last.Payload.Length;
-                _snapshotSerializer.ReturnPayloadBuffer(last.Payload);
+                _pool.Return(last.Payload);
                 _anchors.RemoveAt(_anchors.Count - 1);
                 dropped++;
             }
@@ -264,7 +263,7 @@ namespace Trecs.Internal
             for (int i = 0; i < keepFrom; i++)
             {
                 _totalAnchorBytes -= _anchors[i].Payload.Length;
-                _snapshotSerializer.ReturnPayloadBuffer(_anchors[i].Payload);
+                _pool.Return(_anchors[i].Payload);
             }
             _anchors.RemoveRange(0, keepFrom);
             return keepFrom;
@@ -274,7 +273,7 @@ namespace Trecs.Internal
         {
             while (_bookmarks.Count > 0 && _bookmarks[_bookmarks.Count - 1].FixedFrame > frame)
             {
-                _snapshotSerializer.ReturnPayloadBuffer(_bookmarks[_bookmarks.Count - 1].Payload);
+                _pool.Return(_bookmarks[_bookmarks.Count - 1].Payload);
                 _bookmarks.RemoveAt(_bookmarks.Count - 1);
             }
         }
@@ -284,7 +283,7 @@ namespace Trecs.Internal
             int removeCount = 0;
             while (removeCount < _bookmarks.Count && _bookmarks[removeCount].FixedFrame < frame)
             {
-                _snapshotSerializer.ReturnPayloadBuffer(_bookmarks[removeCount].Payload);
+                _pool.Return(_bookmarks[removeCount].Payload);
                 removeCount++;
             }
             if (removeCount > 0)
@@ -299,7 +298,7 @@ namespace Trecs.Internal
             {
                 var last = _scrubCache[_scrubCache.Count - 1];
                 _scrubCacheBytes -= last.Payload.Length;
-                _snapshotSerializer.ReturnPayloadBuffer(last.Payload);
+                _pool.Return(last.Payload);
                 _scrubCache.RemoveAt(_scrubCache.Count - 1);
             }
         }
@@ -310,7 +309,7 @@ namespace Trecs.Internal
             while (removeCount < _scrubCache.Count && _scrubCache[removeCount].FixedFrame < frame)
             {
                 _scrubCacheBytes -= _scrubCache[removeCount].Payload.Length;
-                _snapshotSerializer.ReturnPayloadBuffer(_scrubCache[removeCount].Payload);
+                _pool.Return(_scrubCache[removeCount].Payload);
                 removeCount++;
             }
             if (removeCount > 0)
@@ -409,7 +408,7 @@ namespace Trecs.Internal
             {
                 var oldest = _anchors[0];
                 _totalAnchorBytes -= oldest.Payload.Length;
-                _snapshotSerializer.ReturnPayloadBuffer(oldest.Payload);
+                _pool.Return(oldest.Payload);
                 _anchors.RemoveAt(0);
                 evicted++;
             }
@@ -431,7 +430,7 @@ namespace Trecs.Internal
             {
                 var oldest = _scrubCache[0];
                 _scrubCacheBytes -= oldest.Payload.Length;
-                _snapshotSerializer.ReturnPayloadBuffer(oldest.Payload);
+                _pool.Return(oldest.Payload);
                 _scrubCache.RemoveAt(0);
             }
         }
@@ -551,7 +550,7 @@ namespace Trecs.Internal
         {
             for (int i = 0; i < list.Count; i++)
             {
-                _snapshotSerializer.ReturnPayloadBuffer(list[i].Payload);
+                _pool.Return(list[i].Payload);
             }
             list.Clear();
         }

@@ -38,6 +38,12 @@ namespace Trecs.Internal
             }
         }
 
+        public int ComputeOutputSize()
+        {
+            int byteCount = _bytes.Count + (_bitPosition > 0 ? 1 : 0);
+            return sizeof(int) * 2 + byteCount;
+        }
+
         public void Complete(Stream stream)
         {
             TrecsDebugAssert.That(_hasStarted);
@@ -56,6 +62,27 @@ namespace Trecs.Internal
             foreach (var b in _bytes)
             {
                 stream.WriteByte(b);
+            }
+        }
+
+        public void CompleteTo(Span<byte> dest, ref int offset)
+        {
+            TrecsDebugAssert.That(_hasStarted);
+            _hasStarted = false;
+
+            if (_bitPosition > 0)
+            {
+                _bytes.Add(_currentByte);
+            }
+
+            BinaryPrimitives.WriteInt32LittleEndian(dest.Slice(offset), _totalBits);
+            offset += sizeof(int);
+            BinaryPrimitives.WriteInt32LittleEndian(dest.Slice(offset), _bytes.Count);
+            offset += sizeof(int);
+
+            for (int i = 0; i < _bytes.Count; i++)
+            {
+                dest[offset++] = _bytes[i];
             }
         }
 

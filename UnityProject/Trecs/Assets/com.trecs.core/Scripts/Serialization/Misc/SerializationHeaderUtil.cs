@@ -26,6 +26,8 @@ namespace Trecs.Internal
         // magic0 (1) + magic1 (1) + formatVersion (1) + version (4) + flags (8) + includeTypeChecks (1)
         const int HeaderSize = 16;
 
+        public const int Size = HeaderSize;
+
         public static void WriteHeader(
             Stream stream,
             int version,
@@ -34,13 +36,29 @@ namespace Trecs.Internal
         )
         {
             Span<byte> header = stackalloc byte[HeaderSize];
+            FormatHeader(header, version, flags, includeTypeChecks);
+            stream.Write(header);
+        }
+
+        public static void WriteHeader(
+            Span<byte> dest,
+            int version,
+            long flags,
+            bool includeTypeChecks
+        )
+        {
+            TrecsDebugAssert.That(dest.Length >= HeaderSize);
+            FormatHeader(dest, version, flags, includeTypeChecks);
+        }
+
+        static void FormatHeader(Span<byte> header, int version, long flags, bool includeTypeChecks)
+        {
             header[0] = MagicByte0;
             header[1] = MagicByte1;
             header[2] = FormatVersion;
             BinaryPrimitives.WriteInt32LittleEndian(header.Slice(3), version);
             BinaryPrimitives.WriteInt64LittleEndian(header.Slice(7), flags);
             header[15] = includeTypeChecks ? (byte)1 : (byte)0;
-            stream.Write(header);
         }
 
         public static (int version, long flags, bool includeTypeChecks) ReadHeader(Stream stream)
@@ -55,6 +73,30 @@ namespace Trecs.Internal
                 );
             }
 
+            return ParseHeader(header);
+        }
+
+        public static (int version, long flags, bool includeTypeChecks) ReadHeader(
+            ReadOnlySpan<byte> data,
+            ref int offset
+        )
+        {
+            if (offset + HeaderSize > data.Length)
+            {
+                throw new SerializationException(
+                    $"Truncated header — expected {HeaderSize} bytes at offset {offset} but data length is only {data.Length}."
+                );
+            }
+
+            var result = ParseHeader(data.Slice(offset, HeaderSize));
+            offset += HeaderSize;
+            return result;
+        }
+
+        static (int version, long flags, bool includeTypeChecks) ParseHeader(
+            ReadOnlySpan<byte> header
+        )
+        {
             // Magic + format-version checks throw SerializationException, not
             // TrecsDebugAssert, because they need to fire in release builds.
             var magic0 = header[0];

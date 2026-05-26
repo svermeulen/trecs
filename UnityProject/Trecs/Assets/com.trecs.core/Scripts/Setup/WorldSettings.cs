@@ -39,20 +39,6 @@ namespace Trecs
         public bool StartPaused { get; init; }
 
         /// <summary>
-        /// When true (the default), <see cref="World.Dispose"/> calls <c>RemoveAllEntities</c>
-        /// before invoking system <c>OnShutdown</c> hooks. Reactive <c>OnRemoved</c> observers
-        /// fire for every non-global entity and per-group entity counts are zeroed out, so
-        /// queries from inside <c>OnShutdown</c> see an empty world. The global singleton
-        /// entity is intentionally left intact and remains queryable and mutable.
-        /// <para>
-        /// Set to false if you need to run logic after all entities are removed but before
-        /// <see cref="World.Dispose"/> tears down the accessor — in that case, call
-        /// <see cref="World.RemoveAllEntities"/> yourself at the right moment.
-        /// </para>
-        /// </summary>
-        public bool RemoveAllEntitiesOnDispose { get; init; } = true;
-
-        /// <summary>
         /// When true, logs a warning if fixed updates fall behind and the simulation
         /// has to skip forward (when <see cref="MaxSecondsForFixedUpdatePerFrame"/> is set)
         /// or is at risk of entering the spiral of death (when it is null).

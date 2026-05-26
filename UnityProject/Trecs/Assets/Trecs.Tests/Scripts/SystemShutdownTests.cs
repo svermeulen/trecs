@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -168,34 +167,28 @@ namespace Trecs.Tests
         }
     }
 
+    public partial class ShutdownInputGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
+    {
+        [Input(MissingInputBehavior.Retain)]
+        WritePhaseInputComp InputComp = default;
+    }
+
     /// <summary>
     /// Input-phase system whose <c>OnShutdown</c> exercises the input queue via
     /// <see cref="WorldAccessor.AddInput{T}"/>. Regression coverage for the
     /// World.Dispose() teardown order: the queue must outlive system shutdown
     /// hooks so any input-write call from OnShutdown doesn't hit a disposed queue.
-    /// Uses the entity handle captured in OnReady so the test doesn't depend on
-    /// any entity remaining queryable after RemoveAllEntities runs — the queue
-    /// itself is what we're exercising.
+    /// Uses the global entity (which survives RemoveAllEntities) so the handle
+    /// is still valid in OnShutdown — the queue itself is what we're exercising.
     /// </summary>
     [ExecuteIn(SystemPhase.Input)]
     partial class ShutdownInputAddInputSystem : ISystem
     {
-        EntityHandle _target;
-
         public void Execute() { }
-
-        partial void OnReady()
-        {
-            foreach (var handle in World.Query().WithTags(TestTags.Alpha).Handles())
-            {
-                _target = handle;
-                return;
-            }
-        }
 
         partial void OnShutdown()
         {
-            World.AddInput(_target, new WritePhaseInputComp { Value = 42 });
+            World.AddInput(World.GlobalEntityHandle, new WritePhaseInputComp { Value = 42 });
             TestShutdownLog.AddInputFromShutdownCompleted = true;
         }
     }
@@ -371,42 +364,16 @@ namespace Trecs.Tests
             CollectionAssert.IsEmpty(TestShutdownLog.ShutdownOrder);
         }
 
-        // Template carrying an [Input] component so an Input-phase system can
-        // call AddInput<T> against an Alpha entity. Mirrors the input wiring
-        // in WritePhaseEnforcementTests.MakeTemplate.
-        static Template MakeAlphaInputTemplate()
-        {
-            return new Template(
-                debugName: "ShutdownInputTemplate",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: Array.Empty<TagSet>(),
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<WritePhaseInputComp>(
-                        null,
-                        isInput: true,
-                        inputFrameBehaviour: MissingInputBehavior.Retain,
-                        null,
-                        null,
-                        default(WritePhaseInputComp)
-                    ),
-                },
-                localTags: new Tag[] { TestTags.Alpha }
-            );
-        }
-
         [Test]
         public void OnShutdown_InputPhase_CanCallAddInput()
         {
             // Regression: the input queue must outlive system OnShutdown hooks
             // so an Input-phase system can still enqueue values during teardown.
-            // Disable RemoveAllEntitiesOnDispose so the captured EntityHandle is
-            // still valid in OnShutdown — we're exercising the queue, not entity
-            // lifecycle.
+            // Uses the global entity (survives RemoveAllEntities) with an input
+            // component so we're exercising the queue, not entity lifecycle.
             var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings { RemoveAllEntitiesOnDispose = false })
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(MakeAlphaInputTemplate())
+                .SetSettings(new WorldSettings())
+                .AddTemplate(ShutdownInputGlobals.Template)
                 .AddBlobStore(EcsTestHelper.CreateBlobStore());
 
             var world = builder.Build();
@@ -414,8 +381,6 @@ namespace Trecs.Tests
             world.Initialize();
 
             var env = new TestEnvironment(world);
-            env.Accessor.AddEntity(TestTags.Alpha).AssertComplete();
-            env.Accessor.Submit();
 
             NAssert.DoesNotThrow(() => env.Dispose());
             NAssert.IsTrue(

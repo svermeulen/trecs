@@ -18,6 +18,7 @@ namespace Trecs.Internal
         readonly SimpleSubject _variableUpdateStartedEvent = new();
         readonly SimpleSubject _variableUpdateCompletedEvent = new();
         readonly SimpleSubject _inputsAppliedEvent = new();
+        readonly SimpleSubject _shutdownEvent = new();
 
         readonly IterableDictionary<
             GroupIndex,
@@ -41,6 +42,7 @@ namespace Trecs.Internal
         internal SimpleSubject VariableUpdateStartedEvent => _variableUpdateStartedEvent;
         internal SimpleSubject VariableUpdateCompletedEvent => _variableUpdateCompletedEvent;
         internal SimpleSubject InputsAppliedEvent => _inputsAppliedEvent;
+        internal SimpleSubject ShutdownEvent => _shutdownEvent;
 
         internal IterableDictionary<
             GroupIndex,
@@ -193,6 +195,12 @@ namespace Trecs.Internal
                         "InputsApplied observers not cleaned up by accessors {0} (count: {1})",
                         _inputsAppliedEvent.GetDebugNamesSummary(),
                         _inputsAppliedEvent.NumObservers
+                    );
+                if (_shutdownEvent.NumObservers > 0)
+                    _log.Warning(
+                        "Shutdown observers not cleaned up by accessors {0} (count: {1})",
+                        _shutdownEvent.GetDebugNamesSummary(),
+                        _shutdownEvent.NumObservers
                     );
                 foreach (var (group, subject) in _reactiveOnAddedObservers)
                     if (subject.NumObservers > 0)

@@ -327,6 +327,39 @@ namespace Trecs
             _log.Trace("Wrote sentinel value at byte {0}", outputStream.Position);
         }
 
+        public int ComputeOutputSize()
+        {
+            TrecsDebugAssert.That(_hasStarted);
+            return SerializationHeaderUtil.Size
+                + _bitWriter.ComputeOutputSize()
+                + _dataBuffer.WrittenCount
+                + 1;
+        }
+
+        public void CompleteTo(byte[] buffer)
+        {
+            TrecsDebugAssert.That(_hasStarted);
+            _hasStarted = false;
+
+            int offset = 0;
+            SerializationHeaderUtil.WriteHeader(
+                new Span<byte>(buffer, 0, SerializationHeaderUtil.Size),
+                _version,
+                _flags,
+                _includeTypeChecks
+            );
+            offset += SerializationHeaderUtil.Size;
+
+            _bitWriter.CompleteTo(buffer, ref offset);
+
+            _dataBuffer.WrittenSpan.CopyTo(
+                new Span<byte>(buffer, offset, _dataBuffer.WrittenCount)
+            );
+            offset += _dataBuffer.WrittenCount;
+
+            buffer[offset] = SerializationConstants.EndOfPayloadMarker;
+        }
+
         public void ResetForErrorRecovery()
         {
             _hasStarted = false;

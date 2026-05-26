@@ -147,7 +147,7 @@ namespace Trecs.Internal
 
             // Restore initial state from the bundle's embedded snapshot.
             // Past this point, world has been mutated and we can't roll back.
-            _snapshotSerializer.LoadSnapshot(bundle.InitialSnapshot.Span);
+            _snapshotSerializer.LoadSnapshot(bundle.InitialSnapshot);
 
             try
             {
@@ -246,7 +246,10 @@ namespace Trecs.Internal
                 return default;
             }
 
-            var actual = _snapshotSerializer.ComputeChecksum(_bundle.Header.Version);
+            var actual = _snapshotSerializer.ComputeChecksum(
+                _bundle.Header.Version,
+                includeTypeChecks: true
+            );
             if (expected != actual)
             {
                 _log.Warning(
@@ -316,7 +319,10 @@ namespace Trecs.Internal
             {
                 return;
             }
-            var actual = _snapshotSerializer.ComputeChecksum(bundle.Header.Version);
+            var actual = _snapshotSerializer.ComputeChecksum(
+                bundle.Header.Version,
+                includeTypeChecks: true
+            );
             if (actual != expected)
             {
                 throw new SerializationException(

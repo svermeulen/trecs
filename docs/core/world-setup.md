@@ -70,9 +70,6 @@ var settings = new WorldSettings
     // Startup
     StartPaused = false,
 
-    // Events
-    RemoveAllEntitiesOnDispose = true,
-
     // Debug warnings
     WarnOnFixedUpdateFallingBehind = true,
     WarnOnJobSyncPoints = false,

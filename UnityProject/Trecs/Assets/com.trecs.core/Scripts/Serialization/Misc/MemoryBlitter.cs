@@ -1,14 +1,13 @@
 using System;
 using System.Buffers;
 using System.ComponentModel;
-using System.IO;
 
 namespace Trecs.Internal
 {
     // Main-thread only — every public method asserts
     // UnityThreadHelper.IsMainThread. The class itself holds no shared
     // mutable state (everything flows through the caller-supplied
-    // ArrayBufferWriter / MemoryStream), so the contract is enforced at
+    // ArrayBufferWriter / ReadOnlySpan), so the contract is enforced at
     // call boundaries rather than by locking.
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static class MemoryBlitter
@@ -25,68 +24,46 @@ namespace Trecs.Internal
             );
         }
 
-        // Direct-from-MemoryStream reads — symmetric counterpart to the
-        // ArrayBufferWriter-targeted writes above. BinaryReader-based reads
-        // walk the BinaryReader.Read(byte[], int, int) → Stream.Read chain
-        // (two virtual dispatches in IL2CPP) plus a memcpy through a static
-        // staging buffer. The MemoryStream overload skips both — it reads
-        // the underlying byte[] directly via GetBuffer() and advances
-        // Position manually, so subsequent BinaryReader.ReadString /
-        // ReadInt32 calls on the same stream still find the right offset.
-        public static unsafe void ReadRaw(void* valuePtr, int numBytes, MemoryStream stream)
+        public static unsafe void ReadRaw(
+            void* valuePtr,
+            int numBytes,
+            ReadOnlySpan<byte> data,
+            ref int offset
+        )
         {
             TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
 
-            int pos = (int)stream.Position;
-            // Unconditional throw: a short read on a blit path silently blits
-            // stale buffer content into the caller's memory, which corrupts
-            // components rather than failing. Must trip in release too.
-            if (pos + numBytes > stream.Length)
+            if (offset + numBytes > data.Length)
             {
                 throw new SerializationException(
-                    $"Truncated stream: expected {numBytes} bytes at position {pos} but stream length is only {stream.Length}"
+                    $"Truncated data: expected {numBytes} bytes at offset {offset} but data length is only {data.Length}"
                 );
             }
 
-            if (stream.TryGetBuffer(out ArraySegment<byte> seg))
+            fixed (byte* srcPtr = &data[offset])
             {
-                // Resizable / publicly-visible MemoryStream — read straight
-                // from the internal buffer. No virtual dispatch.
-                fixed (byte* bufferPtr = &seg.Array[seg.Offset + pos])
-                {
-                    Buffer.MemoryCopy(bufferPtr, valuePtr, numBytes, numBytes);
-                }
-                stream.Position = pos + numBytes;
+                Buffer.MemoryCopy(srcPtr, valuePtr, numBytes, numBytes);
             }
-            else
-            {
-                // Fallback for `new MemoryStream(byte[])` and friends, where
-                // GetBuffer is not accessible. Still cheaper than the old
-                // BinaryReader.Read → Stream.Read(byte[], …) chain — this is
-                // one virtual call on MemoryStream.Read(Span<byte>) and the
-                // copy goes straight to the caller's buffer.
-                int bytesRead = stream.Read(new Span<byte>(valuePtr, numBytes));
-                if (bytesRead != numBytes)
-                {
-                    throw new SerializationException(
-                        $"Truncated stream: expected {numBytes} bytes, got {bytesRead} at position {pos}"
-                    );
-                }
-            }
+            offset += numBytes;
         }
 
-        public static unsafe void Read<T>(ref T value, MemoryStream stream)
+        public static unsafe void Read<T>(ref T value, ReadOnlySpan<byte> data, ref int offset)
             where T : unmanaged
         {
             TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
 
             fixed (void* valuePtr = &value)
             {
-                ReadRaw(valuePtr, sizeof(T), stream);
+                ReadRaw(valuePtr, sizeof(T), data, ref offset);
             }
         }
 
-        public static unsafe void ReadArray<T>(T[] value, int count, MemoryStream stream)
+        public static unsafe void ReadArray<T>(
+            T[] value,
+            int count,
+            ReadOnlySpan<byte> data,
+            ref int offset
+        )
             where T : unmanaged
         {
             TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
@@ -95,16 +72,21 @@ namespace Trecs.Internal
 
             fixed (void* valuePtr = value)
             {
-                ReadRaw(valuePtr, sizeof(T) * count, stream);
+                ReadRaw(valuePtr, sizeof(T) * count, data, ref offset);
             }
         }
 
-        public static unsafe void ReadArrayPtr<T>(T* valuePtr, int length, MemoryStream stream)
+        public static unsafe void ReadArrayPtr<T>(
+            T* valuePtr,
+            int length,
+            ReadOnlySpan<byte> data,
+            ref int offset
+        )
             where T : unmanaged
         {
             TrecsDebugAssert.That(UnityThreadHelper.IsMainThread);
 
-            ReadRaw(valuePtr, sizeof(T) * length, stream);
+            ReadRaw(valuePtr, sizeof(T) * length, data, ref offset);
         }
 
         // Direct-to-buffer writes used by BinarySerializationWriter's blit path.

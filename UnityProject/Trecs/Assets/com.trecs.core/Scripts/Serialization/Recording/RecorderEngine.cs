@@ -72,7 +72,7 @@ namespace Trecs.Internal
         /// </summary>
         public ulong ComputeChecksum(int version)
         {
-            return _snapshotSerializer.ComputeChecksum(version);
+            return _snapshotSerializer.ComputeChecksum(version, includeTypeChecks: true);
         }
 
         /// <summary>

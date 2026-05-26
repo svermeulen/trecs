@@ -102,7 +102,7 @@ namespace Trecs.Samples.DynamicCollections
                     systems.Add(new TrecsArrayTrailPresenter(goManager));
                     break;
             }
-            world.AddSystems(systems.ToArray());
+            world.AddSystems(systems);
 
             var sceneLifecycle = new SceneLifecycle(world, Settings, goManager);
 
@@ -110,7 +110,7 @@ namespace Trecs.Samples.DynamicCollections
 
             tickables = new() { world.Tick };
             lateTickables = new() { world.LateTick };
-            disposables = new() { sceneLifecycle.Dispose, goManager.Dispose, world.Dispose };
+            disposables = new() { goManager.Dispose, world.Dispose };
         }
     }
 }

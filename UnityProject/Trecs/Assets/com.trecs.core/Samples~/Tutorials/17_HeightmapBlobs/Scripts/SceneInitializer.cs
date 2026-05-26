@@ -13,12 +13,13 @@ namespace Trecs.Samples.HeightmapBlobs
     /// that each hold their own handle to the same blob. The shared blob
     /// lives once on the heap regardless of how many characters reference it.
     /// </summary>
-    public class SceneInitializer : IDisposable
+    public partial class SceneInitializer : IDisposable
     {
         readonly World _world;
         readonly SampleSettings _settings;
         readonly RenderableGameObjectManager _goManager;
         readonly UniqueHashGenerator _hashGenerator;
+        readonly DisposeCollection _subscriptions = new();
 
         // Anchor handles — held for the lifetime of the scene so the cache
         // doesn't evict the blob between init and the first frame. Without
@@ -34,6 +35,8 @@ namespace Trecs.Samples.HeightmapBlobs
         // Visual representation of the surface, owned by the scene rather
         // than an entity since it's a one-off.
         GameObject _surface;
+
+        WorldAccessor _accessor;
 
         public SceneInitializer(
             World world,
@@ -58,6 +61,7 @@ namespace Trecs.Samples.HeightmapBlobs
             _goManager.RegisterFactory(HeightmapBlobsPrefabs.Character, CreateCharacter);
 
             var world = _world.CreateAccessor(AccessorRole.Unrestricted);
+            _accessor = world;
 
             var descriptor = new HeightmapDescriptor
             {
@@ -92,6 +96,36 @@ namespace Trecs.Samples.HeightmapBlobs
 
             _surface = HeightmapBuilder.CreateSurfaceVisual(descriptor);
             SpawnCharacters(world);
+
+            switch (_settings.Flavor)
+            {
+                case HeightmapFlavor.ManagedSharedPtr:
+                    world
+                        .Events.EntitiesWithTags<SampleTags.ManagedFollower>()
+                        .OnRemoved(OnManagedRemoved)
+                        .AddTo(_subscriptions);
+                    break;
+                case HeightmapFlavor.NativeSharedPtrInline:
+                    world
+                        .Events.EntitiesWithTags<SampleTags.NativeFollower>()
+                        .OnRemoved(OnNativeRemoved)
+                        .AddTo(_subscriptions);
+                    break;
+                case HeightmapFlavor.NativeSharedPtrTakingOwnership:
+                    world
+                        .Events.EntitiesWithTags<SampleTags.NativeFollowerLarge>()
+                        .OnRemoved(OnNativeLargeRemoved)
+                        .AddTo(_subscriptions);
+                    break;
+                case HeightmapFlavor.ManagedSharedPtrInterface:
+                    world
+                        .Events.EntitiesWithTags<SampleTags.InterfaceFollower>()
+                        .OnRemoved(OnInterfaceRemoved)
+                        .AddTo(_subscriptions);
+                    break;
+            }
+
+            world.Events.OnShutdown(() => _subscriptions.Dispose()).AddTo(_subscriptions);
         }
 
         void InitializeManaged(WorldAccessor world, HeightmapDescriptor descriptor, BlobId blobId)
@@ -273,6 +307,30 @@ namespace Trecs.Samples.HeightmapBlobs
                 .Set(new NoiseOffset(offset))
                 .Set(new InterfaceHeightmapRef(_interfaceAnchor.Clone(world)))
                 .AssertComplete();
+        }
+
+        [ForEachEntity]
+        void OnManagedRemoved(in ManagedHeightmapRef heightmapRef)
+        {
+            heightmapRef.Value.Dispose(_accessor);
+        }
+
+        [ForEachEntity]
+        void OnNativeRemoved(in NativeHeightmapRef heightmapRef)
+        {
+            heightmapRef.Value.Dispose(_accessor);
+        }
+
+        [ForEachEntity]
+        void OnNativeLargeRemoved(in NativeHeightmapRefLarge heightmapRef)
+        {
+            heightmapRef.Value.Dispose(_accessor);
+        }
+
+        [ForEachEntity]
+        void OnInterfaceRemoved(in InterfaceHeightmapRef heightmapRef)
+        {
+            heightmapRef.Value.Dispose(_accessor);
         }
 
         GameObject CreateCharacter()

@@ -440,10 +440,9 @@ namespace Trecs.Tests
             // Mutate state to confirm restore actually overwrites.
             env.Accessor.Component<VuoTemplateRenderComp>(entityIdx).Write.Value = 99;
 
-            using (var inputStream = new MemoryStream(snapshotBytes))
             {
                 var reader = new BinarySerializationReader(registry);
-                reader.Start(inputStream);
+                reader.Start(snapshotBytes);
                 serializer.DeserializeState(reader);
             }
 
@@ -487,9 +486,8 @@ namespace Trecs.Tests
 
             NAssert.DoesNotThrow(() =>
             {
-                using var inputStream = new MemoryStream(snapshotBytes);
                 var reader = new BinarySerializationReader(registry);
-                reader.Start(inputStream);
+                reader.Start(snapshotBytes);
                 serializer.DeserializeState(reader);
             });
         }

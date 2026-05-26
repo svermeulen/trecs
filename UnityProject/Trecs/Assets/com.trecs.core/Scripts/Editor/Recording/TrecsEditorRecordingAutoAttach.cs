@@ -114,13 +114,15 @@ namespace Trecs.Internal
             TrecsRecordingSession session = null;
             try
             {
-                snapshots = new SnapshotSerializer(stateSerializer, registry, world);
+                var pool = new SnapshotPayloadPool();
+                snapshots = new SnapshotSerializer(stateSerializer, registry, world, pool);
                 recorder = new TrecsRewindBuffer(
                     world,
                     stateSerializer,
                     registry,
                     new TrecsRewindBufferSettings(),
-                    snapshots
+                    snapshots,
+                    pool
                 );
                 // Constructor fires TrecsRecordingSessionRegistry.ControllerRegistered,
                 // which TrecsGameStateActivator listens to so that auto-record-on-open

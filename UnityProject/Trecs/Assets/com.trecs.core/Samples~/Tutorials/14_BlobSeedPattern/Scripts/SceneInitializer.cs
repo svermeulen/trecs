@@ -9,10 +9,12 @@ namespace Trecs.Samples.BlobSeedPattern
     /// blob — the palette's managed data lives once in the shared heap, and
     /// every entity holds just a 12-byte <see cref="SharedPtr{T}"/> handle.
     /// </summary>
-    public class SceneInitializer
+    public partial class SceneInitializer
     {
         readonly World _world;
         readonly RenderableGameObjectManager _goManager;
+        readonly DisposeCollection _subscriptions = new();
+        WorldAccessor _accessor;
 
         public SceneInitializer(World world, RenderableGameObjectManager goManager)
         {
@@ -25,6 +27,7 @@ namespace Trecs.Samples.BlobSeedPattern
             _goManager.RegisterFactory(BlobSeedPatternPrefabs.Swatch, CreateSwatch);
 
             var world = _world.CreateAccessor(AccessorRole.Fixed);
+            _accessor = world;
             const int gridSize = 6;
             const float spacing = 1.5f;
             float halfExtent = spacing * (gridSize - 1) * 0.5f;
@@ -60,6 +63,19 @@ namespace Trecs.Samples.BlobSeedPattern
                         .AssertComplete();
                 }
             }
+
+            world
+                .Events.EntitiesWithTags<SampleTags.Swatch>()
+                .OnRemoved(OnSwatchRemoved)
+                .AddTo(_subscriptions);
+
+            world.Events.OnShutdown(() => _subscriptions.Dispose()).AddTo(_subscriptions);
+        }
+
+        [ForEachEntity]
+        void OnSwatchRemoved(in PaletteRef palette)
+        {
+            palette.Value.Dispose(_accessor);
         }
 
         static GameObject CreateSwatch()

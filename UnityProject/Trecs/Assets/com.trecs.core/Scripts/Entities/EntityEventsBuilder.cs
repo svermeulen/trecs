@@ -215,6 +215,18 @@ namespace Trecs
 
         public IDisposable OnFixedPauseChanged(Action<bool> cb, int priority) =>
             _systemRunner.FixedIsPausedChangedEvent.Subscribe(cb, priority);
+
+        /// <summary>
+        /// Fires during <see cref="World.Dispose"/>, after <see cref="World.RemoveAllEntities"/>
+        /// and system <c>OnShutdown</c> hooks have run but before infrastructure teardown.
+        /// Use this to dispose event subscriptions from non-system code at the right point in
+        /// the shutdown sequence.
+        /// </summary>
+        public IDisposable OnShutdown(Action cb) =>
+            _eventsManager.ShutdownEvent.Subscribe(cb, 0, _world.DebugName);
+
+        public IDisposable OnShutdown(Action cb, int priority) =>
+            _eventsManager.ShutdownEvent.Subscribe(cb, priority, _world.DebugName);
     }
 
     /// <summary>

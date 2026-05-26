@@ -66,9 +66,8 @@ namespace Trecs.Tests
         void DeserializeWorld(World world, byte[] data)
         {
             var serializer = new WorldStateSerializer(world);
-            using var inputStream = new MemoryStream(data);
             var reader = new BinarySerializationReader(_serializerRegistry);
-            reader.Start(inputStream);
+            reader.Start(data);
             serializer.DeserializeState(reader);
         }
 

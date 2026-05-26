@@ -1,7 +1,6 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using NUnit.Framework;
 using Trecs.Internal;
 
@@ -72,32 +71,35 @@ namespace Trecs.Tests
             _cacheHelper.WriteAll(list1, TestConstants.Version, includeTypeChecks: true, flags);
             var serializedData = _cacheHelper.MemoryStream.ToArray();
 
-            using (var stream = new MemoryStream(serializedData))
             {
-                var (version, _, includesTypeChecks) = SerializationHeaderUtil.ReadHeader(stream);
+                int offset = 0;
+                ReadOnlySpan<byte> span = serializedData;
+                var (version, _, includesTypeChecks) = SerializationHeaderUtil.ReadHeader(
+                    span,
+                    ref offset
+                );
 
                 BitReader bitReader = new();
-                bitReader.Reset(stream);
+                bitReader.Reset(span, ref offset);
                 bitReader.Complete();
 
                 if (includesTypeChecks)
                 {
-                    Span<byte> intBuf = stackalloc byte[sizeof(int)];
-
-                    stream.Read(intBuf);
-                    var listTypeId = BinaryPrimitives.ReadInt32LittleEndian(intBuf);
+                    var listTypeId = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(offset));
+                    offset += sizeof(int);
                     TrecsDebugAssert.IsEqual(listTypeId, TypeId<List<int>>.Value.Value);
 
-                    stream.Read(intBuf);
-                    var intTypeId = BinaryPrimitives.ReadInt32LittleEndian(intBuf);
+                    var intTypeId = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(offset));
+                    offset += sizeof(int);
                     TrecsDebugAssert.IsEqual(intTypeId, TypeId<int>.Value.Value);
                 }
 
                 // This is currently 3 but let's change to 0
                 // This should cause the sentinel to not be in correct place
-                Span<byte> corruptBuf = stackalloc byte[sizeof(int)];
-                BinaryPrimitives.WriteInt32LittleEndian(corruptBuf, 0);
-                stream.Write(corruptBuf);
+                BinaryPrimitives.WriteInt32LittleEndian(
+                    new Span<byte>(serializedData, offset, sizeof(int)),
+                    0
+                );
             }
 
             var newCacheHelper = new SerializationBuffer(_serializerRegistry);
@@ -126,31 +128,34 @@ namespace Trecs.Tests
             _cacheHelper.WriteAll(list1, TestConstants.Version, includeTypeChecks: true, flags);
             var serializedData = _cacheHelper.MemoryStream.ToArray();
 
-            using (var stream = new MemoryStream(serializedData))
             {
-                var (version, _, includesTypeChecks) = SerializationHeaderUtil.ReadHeader(stream);
+                int offset = 0;
+                ReadOnlySpan<byte> span = serializedData;
+                var (version, _, includesTypeChecks) = SerializationHeaderUtil.ReadHeader(
+                    span,
+                    ref offset
+                );
 
                 BitReader bitReader = new();
-                bitReader.Reset(stream);
+                bitReader.Reset(span, ref offset);
                 bitReader.Complete();
 
                 if (includesTypeChecks)
                 {
-                    Span<byte> intBuf = stackalloc byte[sizeof(int)];
-
-                    stream.Read(intBuf);
-                    var listTypeId = BinaryPrimitives.ReadInt32LittleEndian(intBuf);
+                    var listTypeId = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(offset));
+                    offset += sizeof(int);
                     TrecsDebugAssert.IsEqual(listTypeId, TypeId<List<int>>.Value.Value);
 
-                    stream.Read(intBuf);
-                    var intTypeId = BinaryPrimitives.ReadInt32LittleEndian(intBuf);
+                    var intTypeId = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(offset));
+                    offset += sizeof(int);
                     TrecsDebugAssert.IsEqual(intTypeId, TypeId<int>.Value.Value);
                 }
 
                 // This is currently 1 but let's change to 10
-                Span<byte> corruptBuf = stackalloc byte[sizeof(int)];
-                BinaryPrimitives.WriteInt32LittleEndian(corruptBuf, 10);
-                stream.Write(corruptBuf);
+                BinaryPrimitives.WriteInt32LittleEndian(
+                    new Span<byte>(serializedData, offset, sizeof(int)),
+                    10
+                );
             }
 
             var newCacheHelper = new SerializationBuffer(_serializerRegistry);

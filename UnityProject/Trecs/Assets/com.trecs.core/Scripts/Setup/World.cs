@@ -435,10 +435,10 @@ namespace Trecs
         /// and mutable from <c>OnShutdown</c>.
         /// </para>
         /// <para>
-        /// Called automatically from <see cref="Dispose"/> when
-        /// <see cref="WorldSettings.RemoveAllEntitiesOnDispose"/> is true. Call it
-        /// manually when that setting is false and you need cleanup callbacks to run
-        /// while accessors are still valid.
+        /// Called automatically from <see cref="Dispose"/> before system
+        /// <c>OnShutdown</c> hooks run. Can also be called manually earlier if you
+        /// need cleanup callbacks to fire at a specific point while accessors are
+        /// still valid — calling it twice is guarded by an assertion.
         /// </para>
         /// </summary>
         public void RemoveAllEntities()
@@ -509,7 +509,7 @@ namespace Trecs
             }
 #endif
 
-            if (_settings.RemoveAllEntitiesOnDispose && _initializeCompleted)
+            if (_initializeCompleted)
             {
                 RemoveAllEntities();
             }
@@ -518,6 +518,8 @@ namespace Trecs
             {
                 CallSystemShutdownHooks();
             }
+
+            _eventsManager.ShutdownEvent.Invoke();
 
             // The input queue is a peer of the heaps and component store, not
             // a leaf that should die first. Keep it alive across SystemRunner

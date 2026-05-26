@@ -58,17 +58,16 @@ namespace Trecs.Internal
     }
 
     /// <summary>
-    /// Wire-format twin of <see cref="NativeHeapEntry"/> with the process-local
-    /// <c>AtomicSafetyHandle</c> field stripped. Used as the on-disk shape for each live
-    /// side-table entry in <see cref="NativeHeap"/>'s direct serialization path —
-    /// keeping the layout independent of <c>ENABLE_UNITY_COLLECTIONS_CHECKS</c> means
-    /// the byte stream is identical between editor and release builds, and avoids leaking
-    /// non-deterministic safety-handle byte patterns into snapshots.
+    /// Wire-format twin of <see cref="NativeHeapEntry"/> with process-local fields
+    /// (<c>Address</c>, <c>AtomicSafetyHandle</c>) stripped. Used as the on-disk shape
+    /// for each live side-table entry in <see cref="NativeHeap"/>'s direct serialization
+    /// path — keeping the layout independent of <c>ENABLE_UNITY_COLLECTIONS_CHECKS</c>
+    /// means the byte stream is identical between editor and release builds, and avoids
+    /// leaking non-deterministic pointer / safety-handle byte patterns into snapshots.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     internal struct NativeHeapEntryPayload
     {
-        public IntPtr Address;
         public int TypeHash;
         public byte Generation;
         public byte InUse;

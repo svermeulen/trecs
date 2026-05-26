@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Trecs.Internal
@@ -43,6 +44,19 @@ namespace Trecs.Internal
         public static ulong ComputeXxHash64(byte[] buffer, int length)
         {
             return XxHash64.Hash(buffer, length);
+        }
+
+        public static ulong ComputeXxHash64(ReadOnlyMemory<byte> data)
+        {
+            return ComputeXxHash64(data.Span);
+        }
+
+        public static unsafe ulong ComputeXxHash64(ReadOnlySpan<byte> data)
+        {
+            fixed (byte* ptr = data)
+            {
+                return XxHash64.HashInternal(ptr, data.Length, 0);
+            }
         }
 
         /// <summary>

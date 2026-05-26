@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using Trecs.Collections;
 using Unity.Jobs;
 #if TRECS_IS_PROFILING
+using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Profiling.LowLevel.Unsafe;
 #endif
 

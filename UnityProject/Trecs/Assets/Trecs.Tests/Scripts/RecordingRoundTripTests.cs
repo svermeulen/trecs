@@ -72,7 +72,13 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+                using var pool = new SnapshotPayloadPool();
+                using var snapshots = new SnapshotSerializer(
+                    worldStateSer,
+                    registry,
+                    env.World,
+                    pool
+                );
                 var settings = new BundleRecorderSettings
                 {
                     Version = Version,
@@ -86,7 +92,10 @@ namespace Trecs.Tests
                 using var sub = env.Accessor.Events.OnFixedUpdateCompleted(() =>
                 {
                     var fixedFrame = env.World.FixedFrame;
-                    manualChecksums[fixedFrame] = snapshots.ComputeChecksum(Version);
+                    manualChecksums[fixedFrame] = snapshots.ComputeChecksum(
+                        Version,
+                        includeTypeChecks: true
+                    );
                 });
 
                 env.StepFixedFrames(FramesToRun);
@@ -128,7 +137,13 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+                using var pool = new SnapshotPayloadPool();
+                using var snapshots = new SnapshotSerializer(
+                    worldStateSer,
+                    registry,
+                    env.World,
+                    pool
+                );
                 using var bundleSer = new RecordingBundleSerializer(registry);
                 using var replayer = new BundleReplayer(env.World, registry, snapshots);
                 replayer.Initialize();
@@ -185,7 +200,13 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+                using var pool = new SnapshotPayloadPool();
+                using var snapshots = new SnapshotSerializer(
+                    worldStateSer,
+                    registry,
+                    env.World,
+                    pool
+                );
                 var settings = new BundleRecorderSettings
                 {
                     Version = Version,
@@ -197,7 +218,10 @@ namespace Trecs.Tests
                 using var sub = env.Accessor.Events.OnFixedUpdateCompleted(() =>
                 {
                     var fixedFrame = env.World.FixedFrame;
-                    manualChecksums[fixedFrame] = snapshots.ComputeChecksum(Version);
+                    manualChecksums[fixedFrame] = snapshots.ComputeChecksum(
+                        Version,
+                        includeTypeChecks: true
+                    );
                 });
 
                 env.StepFixedFrames(FramesToRun);
@@ -221,7 +245,13 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+                using var pool = new SnapshotPayloadPool();
+                using var snapshots = new SnapshotSerializer(
+                    worldStateSer,
+                    registry,
+                    env.World,
+                    pool
+                );
                 using var bundleSer = new RecordingBundleSerializer(registry);
                 using var replayer = new BundleReplayer(env.World, registry, snapshots);
                 replayer.Initialize();
@@ -279,7 +309,13 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+                using var pool = new SnapshotPayloadPool();
+                using var snapshots = new SnapshotSerializer(
+                    worldStateSer,
+                    registry,
+                    env.World,
+                    pool
+                );
                 var settings = new BundleRecorderSettings
                 {
                     Version = Version,
@@ -353,7 +389,7 @@ namespace Trecs.Tests
                         env.World
                     );
 
-                    var meta = snapshots.LoadSnapshot(loaded.Bookmarks[0].Payload.Span);
+                    var meta = snapshots.LoadSnapshot(loaded.Bookmarks[0].Payload);
                     NAssert.AreEqual(firstSnapshotFrame, meta.FixedFrame);
                     NAssert.AreEqual(
                         firstSnapshotEntityCount,
@@ -371,7 +407,7 @@ namespace Trecs.Tests
                         env.World
                     );
 
-                    var meta = snapshots.LoadSnapshot(loaded.Bookmarks[1].Payload.Span);
+                    var meta = snapshots.LoadSnapshot(loaded.Bookmarks[1].Payload);
                     NAssert.AreEqual(secondSnapshotFrame, meta.FixedFrame);
                     NAssert.AreEqual(
                         secondSnapshotEntityCount,
@@ -403,7 +439,13 @@ namespace Trecs.Tests
                 var registry = new SerializerRegistry();
                 DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
                 var worldStateSer = new WorldStateSerializer(env.World);
-                using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+                using var pool = new SnapshotPayloadPool();
+                using var snapshots = new SnapshotSerializer(
+                    worldStateSer,
+                    registry,
+                    env.World,
+                    pool
+                );
                 var settings = new BundleRecorderSettings
                 {
                     Version = Version,
@@ -472,7 +514,7 @@ namespace Trecs.Tests
 
                     NAssert.AreEqual(0, env.Accessor.CountEntitiesWithTags(Tag<QId1>.Value));
 
-                    var meta = snapshots.LoadSnapshot(loaded.Anchors[0].Payload.Span);
+                    var meta = snapshots.LoadSnapshot(loaded.Anchors[0].Payload);
                     NAssert.AreEqual(firstAnchorFrame, meta.FixedFrame);
                     NAssert.AreEqual(
                         firstAnchorEntityCount,

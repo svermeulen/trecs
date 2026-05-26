@@ -33,6 +33,7 @@ namespace Trecs.Internal
         // checksums. Owns payload-pool return discipline and byte accounting
         // so the recorder doesn't have to.
         readonly SnapshotStore _store;
+        readonly SnapshotPayloadPool _pool;
 
         IDisposable _frameSubscription;
 
@@ -100,17 +101,19 @@ namespace Trecs.Internal
             IWorldStateSerializer stateSerializer,
             SerializerRegistry serializerRegistry,
             TrecsRewindBufferSettings settings,
-            SnapshotSerializer snapshotSerializer
+            SnapshotSerializer snapshotSerializer,
+            SnapshotPayloadPool pool
         )
         {
             _settings = settings;
+            _pool = pool ?? throw new ArgumentNullException(nameof(pool));
             _core = new RecorderEngine(
                 world,
                 serializerRegistry,
                 snapshotSerializer,
                 accessorLabel: nameof(TrecsRewindBuffer)
             );
-            _store = new SnapshotStore(snapshotSerializer);
+            _store = new SnapshotStore(pool);
             _bundleSerializer = new RecordingBundleSerializer(serializerRegistry);
 #if DEBUG
             _stateSerializer = stateSerializer;
@@ -460,7 +463,7 @@ namespace Trecs.Internal
 
             try
             {
-                _core.SnapshotSerializer.LoadSnapshot(anchorPayload.Span);
+                _core.SnapshotSerializer.LoadSnapshot(anchorPayload);
 
                 // NOTE: we deliberately do NOT clear future inputs here.
                 // Those inputs ARE the recording's content — clearing them
@@ -727,7 +730,7 @@ namespace Trecs.Internal
             {
                 // Restore world state to the earliest loaded snapshot.
                 var earliest = loadedAnchors[0];
-                _core.SnapshotSerializer.LoadSnapshot(earliest.Payload.Span);
+                _core.SnapshotSerializer.LoadSnapshot(earliest.Payload);
 
                 // Wipe the live queue and replace it with the recording's
                 // serialized inputs. ClearAllInputs (vs. ClearFutureInputsAfterOrAt)
@@ -1459,7 +1462,7 @@ namespace Trecs.Internal
         {
             if (_desyncLiveSnapshot != null)
             {
-                _core.SnapshotSerializer.ReturnPayloadBuffer(_desyncLiveSnapshot.Payload);
+                _pool.Return(_desyncLiveSnapshot.Payload);
                 _desyncLiveSnapshot = null;
             }
         }
@@ -1549,7 +1552,7 @@ namespace Trecs.Internal
 
         void DumpSnapshotToFlatPath(ReadOnlyMemory<byte> payload, string path)
         {
-            _core.SnapshotSerializer.LoadSnapshot(payload.Span);
+            _core.SnapshotSerializer.LoadSnapshot(payload);
 
             using var fileStream = File.Create(path);
             using var streamWriter = new StreamWriter(fileStream);

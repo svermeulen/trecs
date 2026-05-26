@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.IO;
 
 namespace Trecs.Internal
 {
@@ -51,24 +50,25 @@ namespace Trecs.Internal
             }
         }
 
-        public void Reset(MemoryStream stream)
+        public void Reset(ReadOnlySpan<byte> data, ref int offset)
         {
             TrecsDebugAssert.That(!_hasStarted);
             _hasStarted = true;
 
             _totalBits = 0;
-            MemoryBlitter.Read(ref _totalBits, stream);
+            MemoryBlitter.Read(ref _totalBits, data, ref offset);
             int byteCount = 0;
-            MemoryBlitter.Read(ref byteCount, stream);
+            MemoryBlitter.Read(ref byteCount, data, ref offset);
             EnsureCapacity(byteCount);
 
-            int bytesRead = stream.Read(_bytes, 0, byteCount);
-            TrecsDebugAssert.That(
-                bytesRead == byteCount,
-                "Truncated stream: expected {0} bit-field bytes, got {1}",
-                byteCount,
-                bytesRead
-            );
+            if (offset + byteCount > data.Length)
+            {
+                throw new SerializationException(
+                    $"Truncated data: expected {byteCount} bit-field bytes at offset {offset} but data length is only {data.Length}"
+                );
+            }
+            data.Slice(offset, byteCount).CopyTo(_bytes);
+            offset += byteCount;
 
             _byteIndex = 0;
             _bitPosition = 0;

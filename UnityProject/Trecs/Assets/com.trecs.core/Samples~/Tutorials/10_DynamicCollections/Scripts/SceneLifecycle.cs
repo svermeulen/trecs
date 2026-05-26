@@ -1,16 +1,15 @@
-using System;
 using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 
 namespace Trecs.Samples.DynamicCollections
 {
-    public partial class SceneLifecycle : IDisposable
+    public partial class SceneLifecycle
     {
         readonly WorldAccessor _world;
         readonly SampleSettings _settings;
         readonly RenderableGameObjectManager _goManager;
-        readonly DisposeCollection _disposables = new();
+        readonly DisposeCollection _subscriptions = new();
 
         public SceneLifecycle(
             World world,
@@ -32,21 +31,23 @@ namespace Trecs.Samples.DynamicCollections
                     _world
                         .Events.EntitiesWithTags<DynamicCollectionsTags.QueueTrail>()
                         .OnRemoved(OnQueueRemoved)
-                        .AddTo(_disposables);
+                        .AddTo(_subscriptions);
                     break;
                 case TrailCollectionType.TrecsListAppend:
                     _world
                         .Events.EntitiesWithTags<DynamicCollectionsTags.TrecsListTrail>()
                         .OnRemoved(OnTrecsListRemoved)
-                        .AddTo(_disposables);
+                        .AddTo(_subscriptions);
                     break;
                 case TrailCollectionType.TrecsArrayRingBuffer:
                     _world
                         .Events.EntitiesWithTags<DynamicCollectionsTags.TrecsArrayTrail>()
                         .OnRemoved(OnTrecsArrayRemoved)
-                        .AddTo(_disposables);
+                        .AddTo(_subscriptions);
                     break;
             }
+
+            _world.Events.OnShutdown(() => _subscriptions.Dispose()).AddTo(_subscriptions);
         }
 
         [ForEachEntity]
@@ -193,11 +194,6 @@ namespace Trecs.Samples.DynamicCollections
                         Count = 0,
                     }
                 );
-        }
-
-        public void Dispose()
-        {
-            _disposables.Dispose();
         }
 
         static GameObject CreateCharacter()

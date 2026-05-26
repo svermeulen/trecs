@@ -110,7 +110,7 @@ namespace Trecs.Samples.HeightmapBlobs
                     break;
             }
             systems.Add(new CharacterPresenter(goManager));
-            world.AddSystems(systems.ToArray());
+            world.AddSystems(systems);
 
             var sceneInitializer = new SceneInitializer(world, Settings, goManager);
 

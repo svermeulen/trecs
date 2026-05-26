@@ -1,7 +1,6 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.IO;
 using Trecs.Internal;
 
 namespace Trecs
@@ -21,10 +20,10 @@ namespace Trecs
             writer.Advance(sizeof(int));
         }
 
-        public static Type Read(MemoryStream stream)
+        public static Type Read(ReadOnlySpan<byte> data, ref int offset)
         {
             int id = 0;
-            MemoryBlitter.Read(ref id, stream);
+            MemoryBlitter.Read(ref id, data, ref offset);
             return TypeId.ToType(new TypeId(id));
         }
     }
