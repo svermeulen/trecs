@@ -6,7 +6,6 @@ using UnityEngine;
 using Trecs;
 using Trecs.Internal;
 using Trecs.Collections;
-using Svkj;
 
 namespace Trecs.Tests
 {
@@ -23,7 +22,6 @@ namespace Trecs.Tests
 
             // Create output stream
             using (var memoryStream = new MemoryStream())
-            using (var binaryWriter = new BinaryWriter(memoryStream))
             {
                 // Reset the writer
                 writer.Start(
@@ -54,7 +52,7 @@ namespace Trecs.Tests
                 writer.Write("Stats", stats);
 
                 // Finalize the write - this will output the memory report
-                writer.Complete(binaryWriter);
+                writer.Complete(memoryStream);
 
                 // You can also get the report manually
                 var report = writer.GetMemoryReport();
@@ -72,7 +70,6 @@ namespace Trecs.Tests
             var writer = new BinarySerializationWriter(serializerRegistry);
 
             using (var memoryStream = new MemoryStream())
-            using (var binaryWriter = new BinaryWriter(memoryStream))
             {
                 writer.Start(
                     TestConstants.Version,
@@ -96,14 +93,12 @@ namespace Trecs.Tests
                 }
                 writer.Write("LargeDataSet", largeList);
 
-                writer.Complete(binaryWriter);
+                writer.Complete(memoryStream);
 
                 // The report will show which fields are consuming the most memory
                 var report = writer.GetMemoryReport();
                 Debug.Log($"Large data serialization breakdown:\n{report}");
             }
-
-            writer.Dispose();
         }
     }
 }

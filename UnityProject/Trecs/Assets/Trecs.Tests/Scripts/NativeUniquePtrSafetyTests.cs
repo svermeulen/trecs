@@ -23,9 +23,9 @@ namespace Trecs.Tests
     [TestFixture]
     public class NativeUniquePtrSafetyTests
     {
-        static NativeChunkStore CreateHeap()
+        static NativeHeap CreateHeap()
         {
-            var chunkStore = new NativeChunkStore(TrecsLog.Default);
+            var chunkStore = new NativeHeap(TrecsLog.Default);
 
             return chunkStore;
         }
@@ -194,7 +194,7 @@ namespace Trecs.Tests
         [Test]
         public void ResolverRead_TypeHashMismatch_Throws()
         {
-            // Parity test: NativeUniquePtr.Read(in NativeChunkStoreResolver) must reject
+            // Parity test: NativeUniquePtr.Read(in NativeHeapResolver) must reject
             // mismatched type-hashes the same way the main-thread Read path does.
             var chunkStore = CreateHeap();
 

@@ -6,17 +6,14 @@ using Trecs.Collections;
 
 namespace Trecs.Internal
 {
-    /// <summary>
-    /// Implementation Notes:
-    /// - We need to use the serialization manager type id instead of burst type hash, or .net type hash, because
-    ///   this value needs to be persistent across runs, and these latter ones use things like assembly name
-    /// </summary>
+    // Uses TypeId (serialization-stable) instead of Burst/CLR type hashes
+    // because the value must be persistent across application runs.
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class UniqueHeap
     {
         readonly TrecsLog _log;
 
-        readonly DenseDictionary<uint, HeapEntry> _entries = new();
+        readonly IterableDictionary<uint, HeapEntry> _entries = new();
         readonly ITrecsPoolManager _poolManager;
 
         // Skip 0 — PtrHandle reserves 0 as the null sentinel.
@@ -150,8 +147,6 @@ namespace Trecs.Internal
         internal void Dispose()
         {
             TrecsDebugAssert.That(!_isDisposed);
-            // Explicit dispose on world shutdown catches leaked heap pointers (warns about undisposed entries).
-            // Serialization/rollback paths handle cleanup automatically as bulk operations.
             ClearAll(warnUndisposed: true);
             _isDisposed = true;
         }
@@ -231,10 +226,12 @@ namespace Trecs.Internal
 
             foreach (var (address, entry) in _entries)
             {
+                writer.PushScope("{0}_{1}", entry.Type.Name, address);
                 writer.Write<uint>("Address", address);
 
                 TrecsDebugAssert.That(entry.Type == entry.Value.GetType());
                 writer.WriteObject("Obj", entry.Value);
+                writer.PopScope();
             }
         }
 

@@ -4,11 +4,10 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Trecs.Collections;
-using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
-namespace Trecs
+namespace Trecs.Internal
 {
     // One entry per component on a template, in the same order as
     // ResolvedTemplate.ComponentDeclarations. ByteOffset is the running offset within
@@ -74,7 +73,7 @@ namespace Trecs
         public NativeArray<byte> DefaultBytes => _defaultBytes;
         public UnsafeHashMap<long, int> TypeIdToCi => _typeIdToCi;
 
-        public WorldComponentLayouts(ReadOnlyFastList<GroupIndex> allGroups, WorldInfo worldInfo)
+        public WorldComponentLayouts(ReadOnlyList<GroupIndex> allGroups, WorldInfo worldInfo)
         {
             // Two-pass build: pass 1 counts entries and bytes to size the arrays;
             // pass 2 fills them. Avoids per-group resize churn.

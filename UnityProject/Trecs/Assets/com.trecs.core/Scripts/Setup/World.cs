@@ -67,7 +67,7 @@ namespace Trecs
             EntityInputQueue entityInputQueue,
             SystemRunner systemRunner,
             UniqueHeap uniqueHeap,
-            NativeChunkStore nativeUniqueChunkStore,
+            NativeHeap nativeUniqueChunkStore,
             InputNativeUniqueHeap inputNativeUniqueHeap,
             InputNativeSharedHeap inputNativeSharedHeap,
             InputSharedHeap inputSharedHeap,
@@ -206,13 +206,12 @@ namespace Trecs
 
         internal WorldAccessor GetAccessorById(int id) => _accessorRegistry.GetAccessorById(id);
 
-        internal ReadOnlyDenseDictionary<ISystem, WorldAccessor> ExecuteAccessors =>
+        internal Dictionary<ISystem, WorldAccessor> ExecuteAccessors =>
             _accessorRegistry.ExecuteAccessors;
 
-        internal ReadOnlyDenseDictionary<int, WorldAccessor> AccessorsById =>
+        internal ReadOnlyIterableDictionary<int, WorldAccessor> AccessorsById =>
             _accessorRegistry.AccessorsById;
 
-        // Expose WorldInfo since this is often needed inside the accessor declaration method
         public WorldInfo WorldInfo
         {
             get { return _worldInfo; }
@@ -373,7 +372,7 @@ namespace Trecs
             }
         }
 
-        internal NativeChunkStore NativeUniqueChunkStore
+        internal NativeHeap NativeUniqueChunkStore
         {
             get
             {
@@ -503,7 +502,7 @@ namespace Trecs
 
             WorldRegistry.Unregister(this);
 
-#if DEBUG && TRECS_IS_PROFILING
+#if DEBUG && !TRECS_IS_PROFILING
             if (_settings.WarnOnUnusedTemplates)
             {
                 WarnOnUnusedTemplates();
@@ -549,7 +548,7 @@ namespace Trecs
             GC.SuppressFinalize(this);
         }
 
-#if DEBUG && TRECS_IS_PROFILING
+#if DEBUG && !TRECS_IS_PROFILING
         void WarnOnUnusedTemplates()
         {
             var usedGroups = _entitySubmitter._groupsWithEntitiesEverAdded;
@@ -604,7 +603,8 @@ namespace Trecs
             }
         }
 
-        // NOTE: Usually should not need to call this
+        // Prefer letting SystemRunner call Submit() automatically between system phases.
+        // Manual calls are only needed for pre-Initialize entity setup or test harnesses.
         public void Submit()
         {
             TrecsDebugAssert.That(!_isDisposed);
@@ -1016,7 +1016,7 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        internal static NativeChunkStore GetNativeUniqueChunkStore(this World world)
+        internal static NativeHeap GetNativeUniqueChunkStore(this World world)
         {
             return world.NativeUniqueChunkStore;
         }
@@ -1028,15 +1028,15 @@ namespace Trecs.Internal
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static ReadOnlyDenseDictionary<ISystem, WorldAccessor> GetExecuteAccessors(
-            this World world
-        )
+        public static Dictionary<ISystem, WorldAccessor> GetExecuteAccessors(this World world)
         {
             return world.ExecuteAccessors;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public static ReadOnlyDenseDictionary<int, WorldAccessor> GetAccessorsById(this World world)
+        public static ReadOnlyIterableDictionary<int, WorldAccessor> GetAccessorsById(
+            this World world
+        )
         {
             return world.AccessorsById;
         }

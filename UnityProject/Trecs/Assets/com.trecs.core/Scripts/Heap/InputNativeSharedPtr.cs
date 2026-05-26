@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Trecs.Internal;
 
 namespace Trecs
 {
@@ -12,39 +13,22 @@ namespace Trecs
     /// </summary>
     public static class InputNativeSharedPtr
     {
-        public static InputNativeSharedPtr<T> Alloc<T>(HeapAccessor heap, BlobId blobId, in T value)
-            where T : unmanaged
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.InputNativeSharedHeap.Alloc<T>(heap.FixedFrame, blobId, in value);
-        }
-
         public static InputNativeSharedPtr<T> Alloc<T>(
             WorldAccessor world,
             BlobId blobId,
             in T value
         )
-            where T : unmanaged => Alloc<T>(world.Heap, blobId, in value);
-
-        public static InputNativeSharedPtr<T> Acquire<T>(HeapAccessor heap, BlobId blobId)
             where T : unmanaged
         {
-            heap.AssertCanAddInputsSystem();
-            return heap.InputNativeSharedHeap.Acquire<T>(heap.FixedFrame, blobId);
+            world.AssertCanAddInputsHeap();
+            return world.InputNativeSharedHeap.Alloc<T>(world.FixedFrame, blobId, in value);
         }
 
         public static InputNativeSharedPtr<T> Acquire<T>(WorldAccessor world, BlobId blobId)
-            where T : unmanaged => Acquire<T>(world.Heap, blobId);
-
-        public static bool TryAcquire<T>(
-            HeapAccessor heap,
-            BlobId blobId,
-            out InputNativeSharedPtr<T> ptr
-        )
             where T : unmanaged
         {
-            heap.AssertCanAddInputsSystem();
-            return heap.InputNativeSharedHeap.TryAcquire<T>(heap.FixedFrame, blobId, out ptr);
+            world.AssertCanAddInputsHeap();
+            return world.InputNativeSharedHeap.Acquire<T>(world.FixedFrame, blobId);
         }
 
         public static bool TryAcquire<T>(
@@ -52,7 +36,11 @@ namespace Trecs
             BlobId blobId,
             out InputNativeSharedPtr<T> ptr
         )
-            where T : unmanaged => TryAcquire<T>(world.Heap, blobId, out ptr);
+            where T : unmanaged
+        {
+            world.AssertCanAddInputsHeap();
+            return world.InputNativeSharedHeap.TryAcquire<T>(world.FixedFrame, blobId, out ptr);
+        }
     }
 
     /// <summary>
@@ -87,9 +75,9 @@ namespace Trecs
             get { return BlobId.IsNull; }
         }
 
-        public readonly NativeSharedRead<T> Read(HeapAccessor heap)
+        public readonly NativeSharedRead<T> Read(WorldAccessor world)
         {
-            var entry = heap.NativeSharedHeap.ResolveEntry<T>(BlobId);
+            var entry = world.NativeSharedHeap.ResolveEntry<T>(BlobId);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             return new NativeSharedRead<T>(entry.Ptr.ToPointer(), entry.Safety);
 #else
@@ -97,11 +85,9 @@ namespace Trecs
 #endif
         }
 
-        public readonly NativeSharedRead<T> Read(WorldAccessor world) => Read(world.Heap);
-
-        public readonly NativeSharedRead<T> Read(in NativeSharedPtrResolver resolver)
+        public readonly NativeSharedRead<T> Read(in NativeWorldAccessor world)
         {
-            var entry = resolver.ResolveEntry<T>(BlobId);
+            var entry = world.SharedPtrResolver.ResolveEntry<T>(BlobId);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             return new NativeSharedRead<T>(entry.Ptr.ToPointer(), entry.Safety);
 #else

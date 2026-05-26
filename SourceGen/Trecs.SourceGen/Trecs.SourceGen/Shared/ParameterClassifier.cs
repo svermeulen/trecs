@@ -501,7 +501,7 @@ namespace Trecs.SourceGen.Shared
         /// <summary>
         /// Validates and records a by-value loop parameter (no <c>ref</c> / <c>in</c>,
         /// at most one per method). Used by every entity-shaped slot
-        /// (<c>EntityIndex</c> / <c>EntityHandle</c> / <c>EntityAccessor</c> /
+        /// (<c>EntityIndex</c> / <c>EntityHandle</c> /
         /// <c>WorldAccessor</c>) since they share the same shape: validate
         /// modifiers, reject duplicates, register a <see cref="ParamSlot"/>.
         /// Returns <c>true</c> if the slot was successfully registered (caller

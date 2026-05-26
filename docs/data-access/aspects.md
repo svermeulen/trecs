@@ -8,13 +8,13 @@ An aspect is a `partial struct` that bundles related component access into one r
 partial struct Boid : IAspect, IRead<Velocity, Speed>, IWrite<Position> { }
 ```
 
-This generates:
+This generates properties:
 
 - `ref readonly float3 Velocity` (read-only, unwrapped)
 - `ref readonly float Speed` (read-only, unwrapped)
 - `ref float3 Position` (read-write, unwrapped)
 
-Aspects also pick up entity-level methods that work the same way they do on a raw `EntityHandle`: `aspect.Handle(World)` resolves the iterated entity to a stable `EntityHandle`, and `aspect.Remove(World)` / `aspect.SetTag<T>(World)` / `aspect.UnsetTag<T>(World)` perform structural ops. `Handle` / `Remove` come from `AspectExtensions`; `SetTag` / `UnsetTag` are source-generated per aspect, with overloads for both `WorldAccessor` and `NativeWorldAccessor`. The native overloads work inside Burst jobs.
+Aspects also pick up entity-level methods that work the same way they do on a raw `EntityHandle`: `aspect.Handle(World)` resolves the iterated entity to a stable `EntityHandle`, and `aspect.Remove(World)` / `aspect.SetTag<T>(World)` / `aspect.UnsetTag<T>(World)` perform structural ops.
 
 A component marked `[Unwrap]` (single-field struct) exposes its inner value through the property. Without `[Unwrap]`, the property returns the wrapping struct (`ref Position` instead of `ref float3`).
 
@@ -96,4 +96,4 @@ A system can declare multiple aspects — typically one per query.
 
 - [Sample 03 — Aspects](../samples/03-aspects.md): a minimal aspect with `IRead` / `IWrite` parameters.
 - [Aspect Interfaces](../advanced/aspect-interfaces.md): polymorphic helpers across multiple aspects sharing the same access surface.
-- [Sample 14 — Aspect Interfaces](../samples/14-aspect-interfaces.md): complete example.
+- [Sample 13 — Aspect Interfaces](../samples/13-aspect-interfaces.md): complete example.

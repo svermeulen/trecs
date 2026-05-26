@@ -8,9 +8,9 @@ using Unity.Jobs;
 
 namespace Trecs
 {
-    // The EntityLocatorMap provides a bidirectional map to help locate entities without using an EntityIndex which might
-    // change at runtime. The Entity Locator map uses a reusable unique identifier struct called EntityLocator to
-    // find the last known EntityIndex from last entity submission.
+    // Bidirectional map between stable EntityHandles and transient EntityIndex values.
+    // EntityHandle ids are reused via a free list; the Version field distinguishes
+    // generations so stale handles are detected.
     internal struct EntityHandleMap : IDisposable
     {
         internal int _nextFreeIndex;
@@ -20,11 +20,6 @@ namespace Trecs
 
         bool _configurationFrozen;
 
-        // Reserved hook for post-Init configuration-change asserts. Mirrors
-        // ComponentStore.ConfigurationFrozen, which EntityQuerier reads to
-        // guard against late reconfiguration. No live readers yet here; left
-        // wired so future add-config-shaped methods can assert against it
-        // without having to re-introduce the plumbing.
         internal bool ConfigurationFrozen => _configurationFrozen;
 
         // Reverse map: per-group list of forward-map unique IDs (1-based),
@@ -147,7 +142,7 @@ namespace Trecs
 
             if (reference.index >= _entityHandleMap.Length)
             {
-#if TRECS_INTERNAL_CHECKS && DEBUG //THIS IS TO VALIDATE DATE DBC LIKE
+#if TRECS_INTERNAL_CHECKS && DEBUG
                 for (var i = _entityHandleMap.Length; i <= reference.index; i++)
                 {
                     _entityHandleMap.Add(new EntityHandleMapElement(default, 0));
@@ -158,7 +153,6 @@ namespace Trecs
             }
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            // These debug tests should be enough to detect if indices are being used correctly under native factories
             ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(reference.index);
             if (
                 entityHandleMapElement.Version != reference.Version
@@ -227,88 +221,64 @@ namespace Trecs
                 entityIndex.GroupIndex.Index
             );
             var id = groupList[entityIndex.Index];
+            TrecsDebugAssert.That(
+                id != 0,
+                "RemoveEntityHandle: null handle at index {0}",
+                entityIndex
+            );
             groupList[entityIndex.Index] = 0;
 
-            // Invalidate the entity locator element by bumping its version and setting the entityIndex to point to a not existing element.
+            // Invalidate by bumping version and linking the slot into the free list.
             ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(id - 1);
-            entityHandleMapElement.Index = _nextFreeIndex; //keep the free linked list updated
+            entityHandleMapElement.Index = _nextFreeIndex; // free-list link
             entityHandleMapElement.GroupIndex = default;
             entityHandleMapElement.BumpVersion();
 
-            // Mark the element as the last element used.
             _nextFreeIndex = id - 1;
         }
 
-        // OPTIMIZATION OPPORTUNITY: The three Batch* methods below are candidates for Burst compilation.
-        // The inner loops are simple array-indexed reads/writes on native data (NativeList<int>,
-        // NativeList<EntityHandleMapElement>). The main blocker is that input collections (FastList,
-        // DenseDictionary) are managed — need marshaling to NativeArrays.
-        // See docs/maintainer-docs/optimization_notes.md for detailed plan and proposed Burst job structs.
-
         /// <summary>
         /// Batch update entity references for a set of entities moving between groups.
-        /// Looks up the from/to group lists once instead of per entity.
+        /// Burst-compiled: the inner loop operates entirely on native data
+        /// (UnsafeList, NativeList) so it runs through AOT codegen via .Run().
         /// </summary>
         internal void BatchUpdateEntityHandles(
-            FastList<MoveInfoEntry> entitiesToMove,
+            NativeList<MoveInfoEntry> entitiesToMove,
             GroupIndex fromGroup,
             GroupIndex toGroup
         )
         {
-            ref var fromGroupList = ref _entityIndexToReferenceMap.ElementAt(fromGroup.Index);
             ref var toGroupList = ref GetGroupList(toGroup);
 
-            var entries = entitiesToMove._buffer;
-            var count = entitiesToMove.Count;
+            var count = entitiesToMove.Length;
 
-            // Ensure toGroupList is large enough for the largest destination index
             if (count > 0)
             {
-                var maxToIndex = entries[0].Info.ToIndex;
-                for (int i = 1; i < count; i++)
+                unsafe
                 {
-                    if (entries[i].Info.ToIndex > maxToIndex)
+                    var entriesPtr = (MoveInfoEntry*)entitiesToMove.GetUnsafeReadOnlyPtr();
+                    var maxToIndex = entriesPtr[0].Info.ToIndex;
+                    for (int i = 1; i < count; i++)
                     {
-                        maxToIndex = entries[i].Info.ToIndex;
+                        if (entriesPtr[i].Info.ToIndex > maxToIndex)
+                        {
+                            maxToIndex = entriesPtr[i].Info.ToIndex;
+                        }
                     }
+                    EnsureGroupListSize(ref toGroupList, maxToIndex + 1);
                 }
-                EnsureGroupListSize(ref toGroupList, maxToIndex + 1);
             }
 
-            for (int i = 0; i < count; i++)
+            new BatchUpdateEntityHandlesJob
             {
-                var fromIndex = entries[i].EntityIndex;
-                var toIndex = entries[i].Info.ToIndex;
-
-                var id = fromGroupList[fromIndex];
-#if TRECS_INTERNAL_CHECKS && DEBUG
-                TrecsDebugAssert.That(
-                    id != 0,
-                    "BatchUpdateEntityHandles: null EntityHandle at fromIndex {0} in group {1}",
-                    fromIndex,
-                    fromGroup
-                );
-#endif
-                fromGroupList[fromIndex] = 0;
-
-                ref var element = ref _entityHandleMap.ElementAt(id - 1);
-                element.Index = toIndex;
-                element.GroupIndex = toGroup;
-
-                toGroupList[toIndex] = id;
-            }
+                FromGroupList = _entityIndexToReferenceMap.ElementAt(fromGroup.Index),
+                ToGroupList = toGroupList,
+                EntityHandleMap = _entityHandleMap,
+                EntriesToMove = entitiesToMove,
+                ToGroup = toGroup,
+            }.Run();
         }
 
-        /// <summary>
-        /// Step (a) of the deferred-handle-free pipeline used during entity
-        /// removal: zeroes each removed entity's original reverse-map slot
-        /// and captures (id, tailSlot) tuples — keyed by the caller-supplied
-        /// originalSlot→tailSlot map — into <paramref name="deferredFreesOut"/>
-        /// for the post-callback finalize. The capture iterates
-        /// <paramref name="entityHandlesToRemove"/> in submission order so
-        /// free-list ordering matches the prior BatchRemoveEntityHandles
-        /// behaviour.
-        /// </summary>
         /// <summary>
         /// Step (a) of the Remove Refs apply phase. Schedules
         /// <see cref="Trecs.Internal.RemoveRefsCaptureJob"/> (Burst): builds the
@@ -341,21 +311,15 @@ namespace Trecs
         }
 
         /// <summary>
-        /// Step (c): for each entry added in step (a) for this group, write
-        /// the captured handle id into its tail slot in the reverse-map and
-        /// repoint the forward-map entry at the tail slot. The handle's
-        /// Version is intentionally NOT bumped here — any handle a user
-        /// observer obtains via ToHandle during the OnRemoved fan-out must
-        /// match the version that was visible before submission.
-        /// </summary>
-        /// <summary>
         /// Step (c) of the Remove Refs apply phase. Schedules
         /// <see cref="Trecs.Internal.RemoveRefsRelocateJob"/> (Burst). Walks the
         /// per-group slice <c>[sliceStart, Length)</c> of
         /// <paramref name="deferredFrees"/> and writes each (id, tailSlot)
         /// capture into the reverse-map's tail position plus the forward
         /// handle map, so <c>EntityIndex.ToHandle</c> resolves removed entities
-        /// during the OnRemoved fan-out.
+        /// during the OnRemoved fan-out. The handle's Version is intentionally
+        /// NOT bumped here — handles obtained via ToHandle during OnRemoved must
+        /// match the version visible before submission.
         /// </summary>
         internal void BatchRelocateRemovedHandlesToTail(
             GroupIndex fromGroup,
@@ -398,7 +362,7 @@ namespace Trecs
         /// Looks up the group list once instead of per entry.
         /// </summary>
         internal void BatchUpdateIndexAfterSwapBack(
-            DenseDictionary<int, int> swapBackMapping,
+            IterableDictionary<int, int> swapBackMapping,
             GroupIndex group
         )
         {
@@ -552,8 +516,6 @@ namespace Trecs
                 return false;
             }
 
-            // Make sure we are querying for the current version of the locator.
-            // Otherwise the locator is pointing to a removed entity.
             ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(reference.index);
             if (entityHandleMapElement.Version == reference.Version)
             {
@@ -575,8 +537,6 @@ namespace Trecs
                 reference.index < _entityHandleMap.Length,
                 "Attempting to get EntityIndex from EntityHandle with index out of bounds"
             );
-            // Make sure we are querying for the current version of the locator.
-            // Otherwise the locator is pointing to a removed entity.
             ref var entityHandleMapElement = ref _entityHandleMap.ElementAt(reference.index);
             TrecsDebugAssert.That(
                 entityHandleMapElement.Version == reference.Version,

@@ -61,11 +61,11 @@ float fixedRand = World.FixedRng.Next();
 float varRand = World.VariableRng.Next();
 ```
 
-Fork the RNG for sub-sequences that don't affect the parent stream:
+Fork the RNG for independent sub-sequences:
 
 ```csharp
 var forked = World.Rng.Fork();
-// forked produces independent values without advancing the main RNG
+// forked produces an independent stream; the call itself advances the parent by one step
 ```
 
 Set the seed for reproducible results:

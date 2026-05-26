@@ -29,13 +29,15 @@ namespace Trecs.Internal
 
         static TypeIdSetRegistry()
         {
-            _entries = new()
-            {
+            _entries = new Dictionary<int, SetEntry>(
+                new Dictionary<int, SetEntry>
                 {
-                    TypeIdSet.Null.Id,
-                    new SetEntry { Members = Array.Empty<TypeId>(), DebugString = "Null" }
-                },
-            };
+                    {
+                        TypeIdSet.Null.Id,
+                        new SetEntry { Members = Array.Empty<TypeId>(), DebugString = "Null" }
+                    },
+                }
+            );
         }
 
         public static TypeIdSet FromSingle(TypeId member)
@@ -50,7 +52,7 @@ namespace Trecs.Internal
 
             if (_entries.TryGetValue(id, out var existing))
             {
-#if DEBUG || TRECS_INTERNAL_CHECKS
+#if DEBUG
                 AssertMembersMatch(id, existing.Members, stackalloc int[] { member.Value });
 #endif
                 return new TypeIdSet(id);
@@ -83,7 +85,7 @@ namespace Trecs.Internal
 
             if (_entries.TryGetValue(newId, out var existingNewEntry))
             {
-#if DEBUG || TRECS_INTERNAL_CHECKS
+#if DEBUG
                 AssertCombinedMembersMatch(
                     newId,
                     existingNewEntry.Members,
@@ -148,7 +150,7 @@ namespace Trecs.Internal
 
             if (_entries.TryGetValue(hash, out var existing))
             {
-#if DEBUG || TRECS_INTERNAL_CHECKS
+#if DEBUG
                 var merged = MergeSorted(membersA, membersB);
                 AssertMembersMatch(hash, existing.Members, MemberValuesSpan(merged));
 #endif

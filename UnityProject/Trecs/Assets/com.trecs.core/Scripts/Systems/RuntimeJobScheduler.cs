@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Trecs.Collections;
 using Unity.Jobs;
-#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+#if TRECS_IS_PROFILING
 using Unity.Profiling.LowLevel.Unsafe;
 #endif
 
@@ -40,7 +41,7 @@ namespace Trecs.Internal
             }
         }
 
-#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+#if TRECS_IS_PROFILING
         // Per-job worker-execution timing buffer attached to a handle by
         // source-generated auto-job code via RegisterJobTimings. Separate from the
         // writer/reader/untracked buckets so that auto-jobs registering the same
@@ -65,14 +66,14 @@ namespace Trecs.Internal
             }
         }
 
-        readonly Dictionary<JobHandle, JobTimingEntry> _jobTimingsByHandle = new();
+        readonly IterableDictionary<JobHandle, JobTimingEntry> _jobTimingsByHandle = new();
 #endif
 
         // Key: composite of (ResourceId, GroupIndex) packed into a long.
         // Writer: the last outstanding job that writes this (resource, group) pair.
         // Readers: outstanding jobs that read (but don't write) this (resource, group) pair.
-        readonly Dictionary<long, JobEntry> _writers = new();
-        readonly Dictionary<long, List<JobEntry>> _readers = new();
+        readonly IterableDictionary<long, JobEntry> _writers = new();
+        readonly IterableDictionary<long, List<JobEntry>> _readers = new();
 
         // Jobs without specific component access (e.g. NativeWorldAccessor spawn jobs).
         // Just need to complete at phase boundary.
@@ -90,7 +91,7 @@ namespace Trecs.Internal
         // Pool of reader lists to avoid allocation
         readonly Stack<List<JobEntry>> _listPool = new();
 
-#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+#if TRECS_IS_PROFILING
         // Pool of per-job timing buffers. Each buffer is a NativeArray<long> sized
         // JobsUtility.MaxJobThreadCount * 3 (see JobTimingEntry doc for layout).
         // Rent zero-fills before returning to the caller; Return parks the array
@@ -228,7 +229,7 @@ namespace Trecs.Internal
                 _outstandingJobCount -= readerList.Count;
                 readerList.Clear();
                 ReturnList(readerList);
-                _readers.Remove(key);
+                _readers.TryRemove(key);
             }
 
             if (!_writers.ContainsKey(key))
@@ -252,7 +253,7 @@ namespace Trecs.Internal
             if (_writers.TryGetValue(key, out var writer))
             {
                 CompleteWithSpan(writer);
-                _writers.Remove(key);
+                _writers.TryRemove(key);
                 _outstandingJobCount--;
                 return true;
             }
@@ -274,7 +275,7 @@ namespace Trecs.Internal
             if (_writers.TryGetValue(key, out var writer))
             {
                 CompleteWithSpan(writer);
-                _writers.Remove(key);
+                _writers.TryRemove(key);
                 _outstandingJobCount--;
                 synced = true;
             }
@@ -289,7 +290,7 @@ namespace Trecs.Internal
                 _outstandingJobCount -= readerList.Count;
                 readerList.Clear();
                 ReturnList(readerList);
-                _readers.Remove(key);
+                _readers.TryRemove(key);
                 synced = true;
             }
 
@@ -310,7 +311,7 @@ namespace Trecs.Internal
             _outstandingJobCount++;
         }
 
-#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+#if TRECS_IS_PROFILING
         /// <summary>
         /// Attach a per-worker timing buffer to a scheduled job handle. The buffer
         /// is decoded by <see cref="CompleteAllOutstanding"/> after the handle
@@ -417,7 +418,7 @@ namespace Trecs.Internal
                 _untrackedJobs.Clear();
             }
 
-#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+#if TRECS_IS_PROFILING
             // Per-job worker-execution timings: decode each timing buffer, publish
             // wall-clock + total-CPU ms to the profiler, return buffer to the pool.
             if (_jobTimingsByHandle.Count > 0)
@@ -442,7 +443,7 @@ namespace Trecs.Internal
             _outstandingJobCount = 0;
         }
 
-#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+#if TRECS_IS_PROFILING
         // Drain _jobTimingsByHandle, decoding each per-worker timing buffer into
         // (wallClockMs, totalCpuMs) and forwarding to the profiler. Returns each
         // buffer to the pool. Called once near the end of CompleteAllOutstanding,
@@ -550,7 +551,7 @@ namespace Trecs.Internal
             _listPool.Push(list);
         }
 
-#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+#if TRECS_IS_PROFILING
         /// <summary>
         /// Rent a zero-filled per-job timing buffer. Source-generated auto-job
         /// scheduling code assigns this to the job struct's timing field before

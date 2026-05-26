@@ -44,10 +44,10 @@ namespace Trecs.Tests
     /// which is defined on Standalone, so we can't rely on the recorder to populate
     /// <see cref="RecordingBundle.Checksums"/> on every build. To keep these tests
     /// running regardless of build flags, the tests subscribe to
-    /// <c>OnFixedUpdateCompleted</c> themselves, capture checksums via the same
-    /// <see cref="RecordingChecksumCalculator"/> the recorder uses, and merge
-    /// the results into the bundle before playback. This mirrors the workaround
-    /// in <see cref="BundleRecorderReplayerTests"/>.
+    /// <c>OnFixedUpdateCompleted</c> themselves, capture checksums via
+    /// <see cref="SnapshotSerializer.ComputeChecksum"/>, and merge the results into
+    /// the bundle before playback. This mirrors the workaround in
+    /// <see cref="BundleRecorderReplayerTests"/>.
     /// </para>
     /// </summary>
     [TestFixture]
@@ -78,30 +78,14 @@ namespace Trecs.Tests
                     // Anchors aren't needed for this short-frame round-trip;
                     // a long interval keeps the produced bundle minimal.
                     AnchorIntervalSeconds = 1000f,
-                    // Recorder's own per-frame cadence is irrelevant — we
-                    // capture every frame manually below to sidestep the
-                    // TRECS_IS_PROFILING gate.
-                    ChecksumFrameInterval = 1000,
                 };
-                using var recorder = new BundleRecorder(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    settings,
-                    snapshots
-                );
+                using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
                 recorder.Start();
 
-                using var checksumBuffer = new SerializationBuffer(registry);
                 using var sub = env.Accessor.Events.OnFixedUpdateCompleted(() =>
                 {
                     var fixedFrame = env.World.FixedFrame;
-                    manualChecksums[fixedFrame] = RecordingChecksumCalculator.Calculate(
-                        worldStateSer,
-                        version: Version,
-                        checksumBuffer,
-                        SerializationFlags.IsForChecksum
-                    );
+                    manualChecksums[fixedFrame] = snapshots.ComputeChecksum(Version);
                 });
 
                 env.StepFixedFrames(FramesToRun);
@@ -145,12 +129,7 @@ namespace Trecs.Tests
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);
-                using var replayer = new BundleReplayer(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    snapshots
-                );
+                using var replayer = new BundleReplayer(env.World, registry, snapshots);
                 replayer.Initialize();
 
                 using var stream = new MemoryStream(bundleBytes);
@@ -210,27 +189,14 @@ namespace Trecs.Tests
                 {
                     Version = Version,
                     AnchorIntervalSeconds = 1000f,
-                    ChecksumFrameInterval = 1000,
                 };
-                using var recorder = new BundleRecorder(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    settings,
-                    snapshots
-                );
+                using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
                 recorder.Start();
 
-                using var checksumBuffer = new SerializationBuffer(registry);
                 using var sub = env.Accessor.Events.OnFixedUpdateCompleted(() =>
                 {
                     var fixedFrame = env.World.FixedFrame;
-                    manualChecksums[fixedFrame] = RecordingChecksumCalculator.Calculate(
-                        worldStateSer,
-                        version: Version,
-                        checksumBuffer,
-                        SerializationFlags.IsForChecksum
-                    );
+                    manualChecksums[fixedFrame] = snapshots.ComputeChecksum(Version);
                 });
 
                 env.StepFixedFrames(FramesToRun);
@@ -256,12 +222,7 @@ namespace Trecs.Tests
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);
-                using var replayer = new BundleReplayer(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    snapshots
-                );
+                using var replayer = new BundleReplayer(env.World, registry, snapshots);
                 replayer.Initialize();
 
                 using var stream = new MemoryStream(bundleBytes);
@@ -322,15 +283,8 @@ namespace Trecs.Tests
                 {
                     Version = Version,
                     AnchorIntervalSeconds = 1000f,
-                    ChecksumFrameInterval = 1000,
                 };
-                using var recorder = new BundleRecorder(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    settings,
-                    snapshots
-                );
+                using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
                 recorder.Start();
 
                 env.StepFixedFrames(5);
@@ -456,15 +410,8 @@ namespace Trecs.Tests
                     // 3 / 60 = 0.05s. Stepping FramesToRun (24) frames should
                     // produce ~8 anchors, plenty to verify the round-trip.
                     AnchorIntervalSeconds = 3f / 60f,
-                    ChecksumFrameInterval = 1000,
                 };
-                using var recorder = new BundleRecorder(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    settings,
-                    snapshots
-                );
+                using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
                 recorder.Start();
 
                 env.StepFixedFrames(FramesToRun);

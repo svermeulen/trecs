@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Trecs.Internal;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -8,7 +9,7 @@ namespace Trecs
 {
     /// <summary>
     /// Read-only safety-checked view over a <see cref="NativeSharedPtr{T}"/> allocation.
-    /// Obtain via <see cref="NativeSharedPtr{T}.Read(HeapAccessor)"/> on the main thread,
+    /// Obtain via <see cref="NativeSharedPtr{T}.Read(WorldAccessor)"/> on the main thread,
     /// or <see cref="NativeSharedPtr{T}.Read(in NativeSharedPtrResolver)"/> in Burst jobs. Shared native data is
     /// immutable by design — there is no <c>Write</c> counterpart; multiple jobs may concurrently
     /// hold readers over the same blob without conflict, since the per-blob

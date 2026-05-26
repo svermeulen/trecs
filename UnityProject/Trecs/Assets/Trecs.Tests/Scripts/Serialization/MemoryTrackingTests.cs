@@ -1,4 +1,4 @@
-#if TRECS_INTERNAL_CHECKS
+#if TRECS_INTERNAL_CHECKS && DEBUG
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
@@ -7,7 +7,6 @@ using Trecs;
 using Trecs.Internal;
 using Trecs.Collections;
 using Trecs.Serialization;
-using Svkj;
 
 namespace Trecs.Tests
 {
@@ -17,7 +16,6 @@ namespace Trecs.Tests
         SerializerRegistry _serializerRegistry;
         BinarySerializationWriter _writer;
         MemoryStream _memoryStream;
-        BinaryWriter _binaryWriter;
 
         [SetUp]
         public void Setup()
@@ -31,14 +29,11 @@ namespace Trecs.Tests
 
             _writer = new BinarySerializationWriter(_serializerRegistry);
             _memoryStream = new MemoryStream();
-            _binaryWriter = new BinaryWriter(_memoryStream);
         }
 
         [TearDown]
         public void TearDown()
         {
-            _writer?.Dispose();
-            _binaryWriter?.Dispose();
             _memoryStream?.Dispose();
         }
 
@@ -72,7 +67,7 @@ namespace Trecs.Tests
             _writer.Write("PlayerStats", stats);
 
             // Finalize the write
-            _writer.Complete(_binaryWriter);
+            _writer.Complete(_memoryStream);
 
             // Get the memory report
             var report = _writer.GetMemoryReport();
@@ -109,7 +104,7 @@ namespace Trecs.Tests
                 enableMemoryTracking: false
             );
             _writer.Write("Test", 42);
-            _writer.Complete(_binaryWriter);
+            _writer.Complete(_memoryStream);
 
             var report = _writer.GetMemoryReport();
             NUnit.Framework.Assert.That(report, Is.EqualTo("Memory tracking is disabled"));
@@ -137,7 +132,7 @@ namespace Trecs.Tests
             _writer.WriteDelta("Rotation", Vector3.zero, Vector3.zero);
 
             // Finalize
-            _writer.Complete(_binaryWriter);
+            _writer.Complete(_memoryStream);
 
             // Get report
             var report = _writer.GetMemoryReport();
@@ -169,7 +164,7 @@ namespace Trecs.Tests
             _writer.Write("NormalField", 42);
 
             // Finalize
-            _writer.Complete(_binaryWriter);
+            _writer.Complete(_memoryStream);
 
             // Get report
             var report = _writer.GetMemoryReport();

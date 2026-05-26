@@ -48,7 +48,7 @@ public partial class PlayerInputSystem : ISystem
     public void Execute()
     {
         var dir = new float2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-        World.GlobalEntityHandle.AddInput(World, new MoveInput { Direction = dir });
+        World.GlobalEntityHandle.AddInput(World, new MoveInput { RequestedDirection = dir });
     }
 }
 ```
@@ -84,7 +84,7 @@ public partial class SnakeInputSystem : ISystem
 }
 ```
 
-Call `handle.AddInput<T>(World, value)` (or the matching method on `EntityIndex` / aspect) to target a specific entity. The same method exists inside an `[ForEachEntity]` callback that takes an `EntityHandle` parameter.
+Call `handle.AddInput<T>(World, value)` (or the matching method on aspect) to target a specific entity.
 
 ## Reading input
 

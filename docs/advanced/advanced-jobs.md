@@ -81,22 +81,7 @@ ref Velocity vel = ref velocities[i];
 
 ### Lookups — Cross-Group
 
-For accessing components on arbitrary entities across groups. Lookups are an advanced job-side primitive — indexing is by transient entity index (resolved from a stored `EntityHandle` via `handle.ToIndex(world)`):
-
-```csharp
-NativeComponentLookupRead<Health> healthLookup;
-NativeComponentLookupWrite<Damage> damageLookup;
-
-var entityIndex = targetHandle.ToIndex(world);
-
-ref readonly Health hp = ref healthLookup[entityIndex];
-ref Damage dmg = ref damageLookup[entityIndex];
-
-if (healthLookup.Exists(entityIndex)) { ... }
-if (healthLookup.TryGet(entityIndex, out Health hp)) { ... }
-```
-
-For more complex cross-group reads in a job, prefer the higher-level `<Aspect>.NativeFactory` pattern (see [Aspects](../data-access/aspects.md)) — it hides the lookup plumbing.
+For accessing components on arbitrary entities across groups. Lookups are wired into the job struct via `[FromWorld]` and consumed by generated aspect code — you rarely index into them directly. Prefer the higher-level `<Aspect>.NativeFactory` pattern (see [Aspects](../data-access/aspects.md)), which hides the lookup plumbing behind the same aspect interface you use on the main thread.
 
 ## Native set operations
 
@@ -138,8 +123,17 @@ accessor.SyncMainThread<Position>(group);
 
 Note that this is very low level operation that shouldn't be necessary in most cases.
 
+## Thread-safety cheat sheet
+
+| Operation | Main thread | Jobs |
+|-----------|-------------|------|
+| Read a single component | `handle.Component<T>(world).Read` | `NativeComponentRead<T>` (single entity), `NativeComponentBufferRead<T>` (one group), `NativeComponentLookupRead<T>` (across groups) |
+| Write a single component | `handle.Component<T>(world).Write` | `NativeComponentWrite<T>`, `NativeComponentBufferWrite<T>`, `NativeComponentLookupWrite<T>` |
+| Add / remove / partition-transition entity | `world.AddEntity<T>()` / `handle.Remove(world)` / `handle.SetTag<T>(world)` / `handle.UnsetTag<T>(world)` | `NativeWorldAccessor` (queued until next submission; pass `sortKey` for deterministic ordering) |
+| Read a set | `world.Set<T>().Read` | `NativeSetRead<T>` |
+| Mutate a set | `world.Set<T>().Write` | `NativeSetCommandBuffer<T>` (deferred but only until job completion) |
+
 ## See also
 
 - [Sample 05 — Job System](../samples/05-job-system.md): the basic `[WrapAsJob]` pattern with structural changes.
 - [Sample 07 — Feeding Frenzy](../samples/07-feeding-frenzy.md): multiple iteration styles compared side by side, all using jobs.
-- [Sample 13 — Fixed Array](../samples/13-fixed-array.md): blittable inline `FixedArray32<T>` mutated inside a `[WrapAsJob]` Burst job.

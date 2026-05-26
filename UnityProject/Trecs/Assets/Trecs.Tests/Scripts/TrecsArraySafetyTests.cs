@@ -21,7 +21,7 @@ namespace Trecs.Tests
     [TestFixture]
     public class TrecsArraySafetyTests
     {
-        static NativeChunkStore CreateChunkStore() => new NativeChunkStore(TrecsLog.Default);
+        static NativeHeap CreateChunkStore() => new NativeHeap(TrecsLog.Default);
 
         [BurstCompile]
         struct ReadJob : IJob
@@ -320,7 +320,7 @@ namespace Trecs.Tests
         {
             // Parity with the mismatch test in TrecsArrayTests, on the Burst-side
             // resolver path: a wrong-T handle is rejected by the TypeId check inside
-            // TrecsArray<T>.Read(in NativeChunkStoreResolver).
+            // TrecsArray<T>.Read(in NativeHeapResolver).
             var chunkStore = CreateChunkStore();
             var arr = TrecsArray.Alloc<int>(chunkStore, 4);
 

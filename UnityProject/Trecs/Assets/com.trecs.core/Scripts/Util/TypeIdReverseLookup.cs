@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading;
@@ -10,8 +11,8 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     internal static class TypeIdReverseLookup
     {
-        static readonly DenseDictionary<TypeId, Type> _idToType = new();
-        static readonly DenseDictionary<Type, TypeId> _typeToId = new();
+        static readonly IterableDictionary<TypeId, Type> _idToType = new();
+        static readonly Dictionary<Type, TypeId> _typeToId = new();
 
         public static void Register(Type type, TypeId id)
         {

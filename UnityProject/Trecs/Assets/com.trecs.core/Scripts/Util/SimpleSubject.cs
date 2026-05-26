@@ -3,18 +3,18 @@ using System.Collections.Generic;
 
 namespace Trecs.Internal
 {
-    // Here we implement a super lightweight version of reactive x observerables
-    // Where there are no streams or LINQ and instead all we retain is the concept
-    // of subscriptions as disposables
+    // Lightweight observable — subscriptions as disposables, no streams or LINQ
 
     public sealed class SimpleSubject : ISimpleObservable
     {
         readonly List<Action> _observers = new();
         readonly List<int> _priorities = new();
         readonly List<string> _debugNames = new();
-        readonly List<Action> _removeQueue = new();
+        readonly List<int> _subscriptionIds = new();
+        readonly List<int> _removeQueue = new();
 
         bool _isInvoking;
+        int _nextSubscriptionId;
 
         public int NumObservers
         {
@@ -34,11 +34,13 @@ namespace Trecs.Internal
         public IDisposable Subscribe(Action handler, int priority, string debugName)
         {
             TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
+            int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, handler);
             _priorities.Insert(index, priority);
             _debugNames.Insert(index, debugName);
-            return new ActionDisposable(() => Unsubscribe(handler));
+            _subscriptionIds.Insert(index, subscriptionId);
+            return new ActionDisposable(() => UnsubscribeById(subscriptionId));
         }
 
         public IDisposable Subscribe(SimpleReactiveBuffer buffer, Action handler)
@@ -60,11 +62,13 @@ namespace Trecs.Internal
         {
             TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             Action bufferedHandler = () => buffer.AddAction(handler);
+            int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, bufferedHandler);
             _priorities.Insert(index, priority);
             _debugNames.Insert(index, debugName);
-            return new ActionDisposable(() => Unsubscribe(bufferedHandler));
+            _subscriptionIds.Insert(index, subscriptionId);
+            return new ActionDisposable(() => UnsubscribeById(subscriptionId));
         }
 
         int FindInsertionIndex(int priority)
@@ -77,21 +81,22 @@ namespace Trecs.Internal
             return _priorities.Count;
         }
 
-        void Unsubscribe(Action handler)
+        void UnsubscribeById(int subscriptionId)
         {
             if (_isInvoking)
             {
-                _removeQueue.Add(handler);
+                _removeQueue.Add(subscriptionId);
             }
             else
             {
                 TrecsDebugAssert.That(_removeQueue.Count == 0);
-                int index = _observers.IndexOf(handler);
+                int index = _subscriptionIds.IndexOf(subscriptionId);
                 if (index >= 0)
                 {
                     _observers.RemoveAt(index);
                     _priorities.RemoveAt(index);
                     _debugNames.RemoveAt(index);
+                    _subscriptionIds.RemoveAt(index);
                 }
             }
         }
@@ -113,14 +118,15 @@ namespace Trecs.Internal
 
                 if (_removeQueue.Count > 0)
                 {
-                    foreach (var observer in _removeQueue)
+                    foreach (var subscriptionId in _removeQueue)
                     {
-                        int index = _observers.IndexOf(observer);
+                        int index = _subscriptionIds.IndexOf(subscriptionId);
                         if (index >= 0)
                         {
                             _observers.RemoveAt(index);
                             _priorities.RemoveAt(index);
                             _debugNames.RemoveAt(index);
+                            _subscriptionIds.RemoveAt(index);
                         }
                     }
 
@@ -145,9 +151,11 @@ namespace Trecs.Internal
         readonly List<Action<T1>> _observers = new();
         readonly List<int> _priorities = new();
         readonly List<string> _debugNames = new();
-        readonly List<Action<T1>> _removeQueue = new();
+        readonly List<int> _subscriptionIds = new();
+        readonly List<int> _removeQueue = new();
 
         bool _isInvoking;
+        int _nextSubscriptionId;
 
         public int NumObservers
         {
@@ -167,11 +175,13 @@ namespace Trecs.Internal
         public IDisposable Subscribe(Action<T1> handler, int priority, string debugName)
         {
             TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
+            int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, handler);
             _priorities.Insert(index, priority);
             _debugNames.Insert(index, debugName);
-            return new ActionDisposable(() => Unsubscribe(handler));
+            _subscriptionIds.Insert(index, subscriptionId);
+            return new ActionDisposable(() => UnsubscribeById(subscriptionId));
         }
 
         public IDisposable Subscribe(SimpleReactiveBuffer buffer, Action<T1> handler)
@@ -193,11 +203,13 @@ namespace Trecs.Internal
         {
             TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             Action<T1> bufferedHandler = arg1 => buffer.AddAction(() => handler(arg1));
+            int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, bufferedHandler);
             _priorities.Insert(index, priority);
             _debugNames.Insert(index, debugName);
-            return new ActionDisposable(() => Unsubscribe(bufferedHandler));
+            _subscriptionIds.Insert(index, subscriptionId);
+            return new ActionDisposable(() => UnsubscribeById(subscriptionId));
         }
 
         int FindInsertionIndex(int priority)
@@ -210,21 +222,22 @@ namespace Trecs.Internal
             return _priorities.Count;
         }
 
-        void Unsubscribe(Action<T1> handler)
+        void UnsubscribeById(int subscriptionId)
         {
             if (_isInvoking)
             {
-                _removeQueue.Add(handler);
+                _removeQueue.Add(subscriptionId);
             }
             else
             {
                 TrecsDebugAssert.That(_removeQueue.Count == 0);
-                int index = _observers.IndexOf(handler);
+                int index = _subscriptionIds.IndexOf(subscriptionId);
                 if (index >= 0)
                 {
                     _observers.RemoveAt(index);
                     _priorities.RemoveAt(index);
                     _debugNames.RemoveAt(index);
+                    _subscriptionIds.RemoveAt(index);
                 }
             }
         }
@@ -246,14 +259,15 @@ namespace Trecs.Internal
 
                 if (_removeQueue.Count > 0)
                 {
-                    foreach (var observer in _removeQueue)
+                    foreach (var subscriptionId in _removeQueue)
                     {
-                        int index = _observers.IndexOf(observer);
+                        int index = _subscriptionIds.IndexOf(subscriptionId);
                         if (index >= 0)
                         {
                             _observers.RemoveAt(index);
                             _priorities.RemoveAt(index);
                             _debugNames.RemoveAt(index);
+                            _subscriptionIds.RemoveAt(index);
                         }
                     }
 
@@ -278,9 +292,11 @@ namespace Trecs.Internal
         readonly List<Action<T1, T2>> _observers = new();
         readonly List<int> _priorities = new();
         readonly List<string> _debugNames = new();
-        readonly List<Action<T1, T2>> _removeQueue = new();
+        readonly List<int> _subscriptionIds = new();
+        readonly List<int> _removeQueue = new();
 
         bool _isInvoking;
+        int _nextSubscriptionId;
 
         public int NumObservers
         {
@@ -300,11 +316,13 @@ namespace Trecs.Internal
         public IDisposable Subscribe(Action<T1, T2> handler, int priority, string debugName)
         {
             TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
+            int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, handler);
             _priorities.Insert(index, priority);
             _debugNames.Insert(index, debugName);
-            return new ActionDisposable(() => Unsubscribe(handler));
+            _subscriptionIds.Insert(index, subscriptionId);
+            return new ActionDisposable(() => UnsubscribeById(subscriptionId));
         }
 
         public IDisposable Subscribe(SimpleReactiveBuffer buffer, Action<T1, T2> handler)
@@ -331,11 +349,13 @@ namespace Trecs.Internal
             TrecsDebugAssert.That(!_isInvoking, "Cannot subscribe during invocation");
             Action<T1, T2> bufferedHandler = (arg1, arg2) =>
                 buffer.AddAction(() => handler(arg1, arg2));
+            int subscriptionId = _nextSubscriptionId++;
             int index = FindInsertionIndex(priority);
             _observers.Insert(index, bufferedHandler);
             _priorities.Insert(index, priority);
             _debugNames.Insert(index, debugName);
-            return new ActionDisposable(() => Unsubscribe(bufferedHandler));
+            _subscriptionIds.Insert(index, subscriptionId);
+            return new ActionDisposable(() => UnsubscribeById(subscriptionId));
         }
 
         int FindInsertionIndex(int priority)
@@ -348,21 +368,22 @@ namespace Trecs.Internal
             return _priorities.Count;
         }
 
-        void Unsubscribe(Action<T1, T2> handler)
+        void UnsubscribeById(int subscriptionId)
         {
             if (_isInvoking)
             {
-                _removeQueue.Add(handler);
+                _removeQueue.Add(subscriptionId);
             }
             else
             {
                 TrecsDebugAssert.That(_removeQueue.Count == 0);
-                int index = _observers.IndexOf(handler);
+                int index = _subscriptionIds.IndexOf(subscriptionId);
                 if (index >= 0)
                 {
                     _observers.RemoveAt(index);
                     _priorities.RemoveAt(index);
                     _debugNames.RemoveAt(index);
+                    _subscriptionIds.RemoveAt(index);
                 }
             }
         }
@@ -384,14 +405,15 @@ namespace Trecs.Internal
 
                 if (_removeQueue.Count > 0)
                 {
-                    foreach (var observer in _removeQueue)
+                    foreach (var subscriptionId in _removeQueue)
                     {
-                        int index = _observers.IndexOf(observer);
+                        int index = _subscriptionIds.IndexOf(subscriptionId);
                         if (index >= 0)
                         {
                             _observers.RemoveAt(index);
                             _priorities.RemoveAt(index);
                             _debugNames.RemoveAt(index);
+                            _subscriptionIds.RemoveAt(index);
                         }
                     }
 

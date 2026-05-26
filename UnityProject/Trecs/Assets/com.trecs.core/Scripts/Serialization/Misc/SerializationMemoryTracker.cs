@@ -7,7 +7,6 @@ using System.Text;
 using Trecs.Internal;
 using Trecs.Collections;
 using Trecs;
-using Svkj;
 
 namespace Trecs.Internal
 {
@@ -41,8 +40,8 @@ namespace Trecs.Internal
         private int _headerBytes;
         private int _bitFieldBytes;
         private int _sentinelBytes;
-        private readonly DenseDictionary<string, int> _typeIdCounts = new();
-        private readonly DenseDictionary<string, int> _typeIdSizes = new();
+        private readonly IterableDictionary<RefKey<string>, int> _typeIdCounts = new();
+        private readonly IterableDictionary<RefKey<string>, int> _typeIdSizes = new();
         private bool _isEnabled;
 
         public SerializationMemoryTracker() { }

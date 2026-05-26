@@ -13,25 +13,19 @@ namespace Trecs
     /// </summary>
     public static class InputNativeUniquePtr
     {
-        public static InputNativeUniquePtr<T> Alloc<T>(HeapAccessor heap, in T value)
-            where T : unmanaged
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.InputNativeUniqueHeap.Alloc<T>(heap.FixedFrame, in value);
-        }
-
-        public static InputNativeUniquePtr<T> Alloc<T>(HeapAccessor heap)
-            where T : unmanaged
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.InputNativeUniqueHeap.Alloc<T>(heap.FixedFrame);
-        }
-
         public static InputNativeUniquePtr<T> Alloc<T>(WorldAccessor world, in T value)
-            where T : unmanaged => Alloc<T>(world.Heap, in value);
+            where T : unmanaged
+        {
+            world.AssertCanAddInputsHeap();
+            return world.InputNativeUniqueHeap.Alloc<T>(world.FixedFrame, in value);
+        }
 
         public static InputNativeUniquePtr<T> Alloc<T>(WorldAccessor world)
-            where T : unmanaged => Alloc<T>(world.Heap);
+            where T : unmanaged
+        {
+            world.AssertCanAddInputsHeap();
+            return world.InputNativeUniqueHeap.Alloc<T>(world.FixedFrame);
+        }
     }
 
     /// <summary>
@@ -80,14 +74,11 @@ namespace Trecs
         /// <see cref="Read(in InputNativeUniqueResolver)"/>.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly ref readonly T Read(HeapAccessor heap)
+        public readonly ref readonly T Read(WorldAccessor world)
         {
-            var ptr = heap.InputNativeUniqueHeap.ResolveUnsafePtr<T>(Handle);
+            var ptr = world.InputNativeUniqueHeap.ResolveUnsafePtr<T>(Handle);
             return ref UnsafeUtility.AsRef<T>(ptr);
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly ref readonly T Read(WorldAccessor world) => ref Read(world.Heap);
 
         /// <summary>
         /// Burst-compatible read view. Pass a resolver obtained via

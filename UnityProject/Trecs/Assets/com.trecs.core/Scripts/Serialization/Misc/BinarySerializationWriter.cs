@@ -1,11 +1,13 @@
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.IO;
+using System.Text;
 using Trecs.Internal;
 
 namespace Trecs
 {
-    public sealed class BinarySerializationWriter : ISerializationWriter, IDisposable
+    public sealed class BinarySerializationWriter : ISerializationWriter
     {
         static readonly TrecsLog _log = TrecsLog.Default;
 
@@ -18,15 +20,11 @@ namespace Trecs
         readonly SerializerRegistry _serializerManager;
 
         // Data section (post-header, post-bit-fields) is accumulated into an
-        // ArrayBufferWriter<byte> rather than a MemoryStream so Complete() can
-        // flush the bytes via a single span write into the outer stream
-        // instead of MemoryStream.CopyTo's chunked copy loop. BinaryWriter
-        // still drives the per-call writes via a thin BufferWriterStream
-        // adapter, keeping MemoryBlitter / TypeIdSerializer call sites
-        // unchanged.
+        // ArrayBufferWriter<byte> so Complete() can flush the bytes via a
+        // single span write into the outer stream. All per-call writes
+        // (strings, bytes, type ids) go directly into this buffer without
+        // a BinaryWriter/Stream intermediary.
         readonly ArrayBufferWriter<byte> _dataBuffer;
-        readonly BufferWriterStream _dataBufferStream;
-        readonly BinaryWriter _dataWriter;
         readonly BitWriter _bitWriter = new();
 #if TRECS_INTERNAL_CHECKS && DEBUG
         readonly SerializationMemoryTracker _memoryTracker = new();
@@ -40,8 +38,6 @@ namespace Trecs
         {
             _serializerManager = serializerManager;
             _dataBuffer = new ArrayBufferWriter<byte>(InitialDataBufferCapacity);
-            _dataBufferStream = new BufferWriterStream(_dataBuffer);
-            _dataWriter = new BinaryWriter(_dataBufferStream);
         }
 
         public long Flags
@@ -62,9 +58,13 @@ namespace Trecs
             }
         }
 
-        public BinaryWriter BinaryWriter
+        public IBufferWriter<byte> DataBuffer
         {
-            get { return _dataWriter; }
+            get
+            {
+                TrecsDebugAssert.That(_hasStarted);
+                return _dataBuffer;
+            }
         }
 
         public bool HasFlag(long flag)
@@ -106,9 +106,6 @@ namespace Trecs
             _flags = flags;
             _includeTypeChecks = includeTypeChecks;
             _version = version;
-            // ArrayBufferWriter.Clear is O(1) — just resets WrittenCount and
-            // zeroes the previously-written slice so subsequent geometric
-            // growth never copies stale bytes into a new larger buffer.
             _dataBuffer.Clear();
             _bitWriter.Reset();
 
@@ -165,7 +162,7 @@ namespace Trecs
 #if TRECS_INTERNAL_CHECKS && DEBUG
             long typeIdStartPos = _dataBuffer.WrittenCount;
 #endif
-            TypeIdSerializer.Write(concreteValueType, _dataWriter);
+            TypeIdSerializer.Write(concreteValueType, _dataBuffer);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackTypeId(
                 concreteValueType,
@@ -240,7 +237,7 @@ namespace Trecs
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 long typeIdStartPos = _dataBuffer.WrittenCount;
 #endif
-                TypeIdSerializer.Write(type, _dataWriter);
+                TypeIdSerializer.Write(type, _dataBuffer);
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 typeIdBytes = _dataBuffer.WrittenCount - typeIdStartPos;
 #endif
@@ -280,64 +277,54 @@ namespace Trecs
 
             if (isChanged)
             {
-                _dataWriter.Write(value);
+                WriteStringToBuffer(value);
             }
         }
 
-        public void Complete(BinaryWriter outputWriter)
+        public void Complete(Stream outputStream)
         {
             TrecsDebugAssert.That(_hasStarted);
             _hasStarted = false;
 
             // Track header bytes
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long headerStartPos = outputWriter.BaseStream.Position;
+            long headerStartPos = outputStream.Position;
 #endif
-            SerializationHeaderUtil.WriteHeader(outputWriter, _version, _flags, _includeTypeChecks);
+            SerializationHeaderUtil.WriteHeader(outputStream, _version, _flags, _includeTypeChecks);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackHeaderBytes(
-                (int)(outputWriter.BaseStream.Position - headerStartPos),
+                (int)(outputStream.Position - headerStartPos),
                 "Version/Flags"
             );
 #endif
 
-            _log.Trace("Writing bit fields starting at byte {0}", outputWriter.BaseStream.Position);
+            _log.Trace("Writing bit fields starting at byte {0}", outputStream.Position);
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long bitFieldStartPos = outputWriter.BaseStream.Position;
+            long bitFieldStartPos = outputStream.Position;
 #endif
-            _bitWriter.Complete(outputWriter);
+            _bitWriter.Complete(outputStream);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackHeaderBytes(
-                (int)(outputWriter.BaseStream.Position - bitFieldStartPos),
+                (int)(outputStream.Position - bitFieldStartPos),
                 "BitFields"
             );
 #endif
-            _log.Trace(
-                "Completed writing bit fields at byte {0}",
-                outputWriter.BaseStream.Position
-            );
+            _log.Trace("Completed writing bit fields at byte {0}", outputStream.Position);
 
-            // Span write: single Stream.Write(ReadOnlySpan<byte>) into the
-            // outer stream. Replaces the MemoryStream.CopyTo chunked loop
-            // and avoids the temporary read buffer it allocates.
-            outputWriter.BaseStream.Write(_dataBuffer.WrittenSpan);
-            _log.Trace(
-                "Completed writing data buffer at byte {0}",
-                outputWriter.BaseStream.Position
-            );
+            outputStream.Write(_dataBuffer.WrittenSpan);
+            _log.Trace("Completed writing data buffer at byte {0}", outputStream.Position);
 
-            // Write sentinel value to mark end of valid data and detect stream corruption
 #if TRECS_INTERNAL_CHECKS && DEBUG
-            long sentinelStartPos = outputWriter.BaseStream.Position;
+            long sentinelStartPos = outputStream.Position;
 #endif
-            outputWriter.Write(SerializationConstants.EndOfPayloadMarker);
+            outputStream.WriteByte(SerializationConstants.EndOfPayloadMarker);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackHeaderBytes(
-                (int)(outputWriter.BaseStream.Position - sentinelStartPos),
+                (int)(outputStream.Position - sentinelStartPos),
                 "Sentinel"
             );
 #endif
-            _log.Trace("Wrote sentinel value at byte {0}", outputWriter.BaseStream.Position);
+            _log.Trace("Wrote sentinel value at byte {0}", outputStream.Position);
         }
 
         public void ResetForErrorRecovery()
@@ -350,14 +337,26 @@ namespace Trecs
             _bitWriter.ResetForErrorRecovery();
         }
 
-        public void Dispose()
+        void WriteStringToBuffer(string value)
         {
-            // ArrayBufferWriter<byte> doesn't implement IDisposable — the
-            // backing array becomes eligible for GC once the writer is no
-            // longer referenced. The BufferWriterStream adapter is also
-            // stateless beyond its reference to the buffer; just disposing
-            // _dataWriter (which closes the adapter stream) is sufficient.
-            _dataWriter?.Dispose();
+            int byteCount = Encoding.UTF8.GetByteCount(value);
+
+            var countSpan = _dataBuffer.GetSpan(sizeof(int));
+            BinaryPrimitives.WriteInt32LittleEndian(countSpan, byteCount);
+            _dataBuffer.Advance(sizeof(int));
+
+            if (byteCount > 0)
+            {
+                var span = _dataBuffer.GetSpan(byteCount);
+                int written = Encoding.UTF8.GetBytes(value, span);
+                TrecsDebugAssert.That(
+                    written == byteCount,
+                    "UTF-8 encode mismatch: expected {0} bytes, wrote {1}",
+                    byteCount,
+                    written
+                );
+                _dataBuffer.Advance(byteCount);
+            }
         }
 
         public long NumBytesWritten
@@ -399,7 +398,7 @@ namespace Trecs
         {
             TrecsDebugAssert.That(_hasStarted);
 
-            TypeIdSerializer.Write(type, _dataWriter);
+            TypeIdSerializer.Write(type, _dataBuffer);
         }
 
         public void WriteObject(string name, object value)
@@ -425,7 +424,7 @@ namespace Trecs
 #if TRECS_INTERNAL_CHECKS && DEBUG
             long typeIdStartPos = _dataBuffer.WrittenCount;
 #endif
-            TypeIdSerializer.Write(type, _dataWriter);
+            TypeIdSerializer.Write(type, _dataBuffer);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackTypeId(type, (int)(_dataBuffer.WrittenCount - typeIdStartPos));
 #endif
@@ -497,7 +496,7 @@ namespace Trecs
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 long typeIdStartPos = _dataBuffer.WrittenCount;
 #endif
-                TypeIdSerializer.Write(type, _dataWriter);
+                TypeIdSerializer.Write(type, _dataBuffer);
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 _memoryTracker.TrackTypeId(type, (int)(_dataBuffer.WrittenCount - typeIdStartPos));
 #endif
@@ -527,7 +526,7 @@ namespace Trecs
 #if TRECS_INTERNAL_CHECKS && DEBUG
             long startPos = _dataBuffer.WrittenCount;
 #endif
-            _dataWriter.Write(value);
+            WriteStringToBuffer(value);
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackDirectWrite(
                 name,
@@ -549,11 +548,15 @@ namespace Trecs
 #if TRECS_INTERNAL_CHECKS && DEBUG
             long startPos = _dataBuffer.WrittenCount;
 #endif
-            _dataWriter.Write(count);
+            var countSpan = _dataBuffer.GetSpan(sizeof(int));
+            BinaryPrimitives.WriteInt32LittleEndian(countSpan, count);
+            _dataBuffer.Advance(sizeof(int));
 
             if (count > 0)
             {
-                _dataWriter.Write(buffer, offset, count);
+                var dest = _dataBuffer.GetSpan(count);
+                new ReadOnlySpan<byte>(buffer, offset, count).CopyTo(dest);
+                _dataBuffer.Advance(count);
             }
 #if TRECS_INTERNAL_CHECKS && DEBUG
             _memoryTracker.TrackDirectWrite(

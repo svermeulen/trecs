@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Concurrent;
 using Trecs.Internal;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -14,31 +12,7 @@ namespace Trecs
     /// </summary>
     public interface IWorldStateSerializer
     {
-        /// <summary>
-        /// Serialize the world's full state for a snapshot or recording —
-        /// round-trip-capable bytes that <see cref="DeserializeState"/> can
-        /// restore from. The writer must NOT have
-        /// <see cref="SerializationFlags.IsForChecksum"/> set (that flag
-        /// strips VUO template arrays and is incompatible with restore).
-        /// </summary>
         void SerializeFullState(ISerializationWriter writer);
-
-        /// <summary>
-        /// Serialize a deterministic-only view of the world's state for
-        /// xxHash desync detection. VUO template arrays and other
-        /// non-deterministic fields are stripped via the
-        /// <see cref="SerializationFlags.IsForChecksum"/> flag. The bytes
-        /// are one-way — there is no symmetric Deserialize because the
-        /// missing fields would corrupt the live world.
-        /// </summary>
-        void SerializeForChecksum(ISerializationWriter writer);
-
-        /// <summary>
-        /// Restore world state from bytes produced by
-        /// <see cref="SerializeFullState"/>. Reader's
-        /// <see cref="SerializationFlags.IsForChecksum"/> flag must be
-        /// unset.
-        /// </summary>
         void DeserializeState(ISerializationReader reader);
     }
 
@@ -149,23 +123,7 @@ namespace Trecs
 
         public void SerializeFullState(ISerializationWriter writer)
         {
-            TrecsDebugAssert.That(
-                !writer.HasFlag(SerializationFlags.IsForChecksum),
-                "SerializeFullState requires the writer NOT to have SerializationFlags.IsForChecksum. Use SerializeForChecksum if you want the stripped checksum payload."
-            );
             using (TrecsProfiling.Start("Serializing game state"))
-            {
-                SerializeImpl(writer);
-            }
-        }
-
-        public void SerializeForChecksum(ISerializationWriter writer)
-        {
-            TrecsDebugAssert.That(
-                writer.HasFlag(SerializationFlags.IsForChecksum),
-                "SerializeForChecksum requires the writer to be started with flags: SerializationFlags.IsForChecksum so app-side serializers can branch on the flag and strip non-deterministic fields."
-            );
-            using (TrecsProfiling.Start("Computing world state checksum"))
             {
                 SerializeImpl(writer);
             }
@@ -173,17 +131,6 @@ namespace Trecs
 
         void DeserializeStateImpl(ISerializationReader reader)
         {
-            // Checksum streams strip VUO template component arrays via
-            // ShouldSkip on the write side. The interface's Serialize/
-            // Deserialize split makes the checksum-then-deserialize misuse
-            // structurally impossible, but the flag still drives custom
-            // IComponentArraySerializer dispatchers, so cross-check that the
-            // reader's flag is consistent with the round-trip expectation.
-            TrecsDebugAssert.That(
-                !reader.HasFlag(SerializationFlags.IsForChecksum),
-                "DeserializeState requires the reader NOT to have SerializationFlags.IsForChecksum — checksum streams are one-way."
-            );
-
             var eventsManager = _world.GetEventsManager();
 
             using (TrecsProfiling.Start("Triggering OnEcsDeserializeStarted listeners"))
@@ -196,7 +143,7 @@ namespace Trecs
             _world.GetNativeSharedHeap().ClearAll(warnUndisposed: false);
             // Persistent NativeUniquePtr / TrecsList allocations live entirely in
             // the chunk store. The chunk-store wipe inside
-            // NativeChunkStore.Deserialize is sufficient to reset their state
+            // NativeHeap.Deserialize is sufficient to reset their state
             // before re-populating from the snapshot. Input-allocated unmanaged
             // data lives in InputNativeUniqueHeap's own per-allocation buffers,
             // not this chunk store, so no cleanup is needed here for that heap.
@@ -219,19 +166,19 @@ namespace Trecs
             }
         }
 
-        void WriteSets(
-            in NativeDenseDictionary<SetId, EntitySetStorage> sets,
-            ISerializationWriter writer
-        )
+        void WriteSets(SetStore setStore, ISerializationWriter writer)
         {
-            var numSets = sets.Count;
+            var setIds = setStore.SetIds;
+            var sets = setStore.EntitySets;
+            var numSets = setIds.Length;
             writer.Write("NumSets", numSets);
 
             for (int i = 0; i < numSets; i++)
             {
-                writer.Write("SetId", sets.UnsafeKeys[i]);
+                writer.PushScope("Set{0}", i);
+                writer.Write("SetId", setIds[i]);
 
-                ref readonly var set = ref sets.UnsafeValues[i];
+                var set = sets[setIds[i]];
                 var registeredGroups = set._registeredGroups;
                 var entriesPerGroup = set._entriesPerGroup;
 
@@ -240,13 +187,16 @@ namespace Trecs
 
                 for (int k = 0; k < numGroups; k++)
                 {
+                    writer.PushScope("Group{0}", k);
                     var group = registeredGroups[k];
                     writer.Write("Group", _worldDef.ToTagSet(group));
 
                     var groupEntities = entriesPerGroup[group.Index];
 
                     writer.Write("EntityIdToDenseIndex", groupEntities._entityIdToDenseIndex);
+                    writer.PopScope();
                 }
+                writer.PopScope();
             }
         }
 
@@ -261,10 +211,12 @@ namespace Trecs
 
             for (int i = 0; i < count; i++)
             {
+                writer.PushScope("Ref{0}", i);
                 var tagSet = _worldDef.ToTagSet(GroupIndex.FromIndex(i));
                 writer.Write("Group", tagSet);
 
                 writer.Write("Refs", entityIndexToReferenceMap[i]);
+                writer.PopScope();
             }
         }
 
@@ -273,58 +225,21 @@ namespace Trecs
             ref var entityHandlesMap = ref _world.GetEntityQuerier()._entityLocator;
 
             writer.Write("EntityIdMap", in entityHandlesMap._entityHandleMap);
+
+            writer.PushScope("ReferenceMap");
             WriteEntityIndexToReferenceMap(entityHandlesMap._entityIndexToReferenceMap, writer);
+            writer.PopScope();
 
             int nextFreeIndex = entityHandlesMap._nextFreeIndex;
             writer.Write("NextFreeIndex", nextFreeIndex);
         }
 
-        // Per-componentType cache for ChecksumIgnoreAttribute lookups —
-        // reflection in a frame-rate-sensitive checksum loop would dominate
-        // its own cost. ConcurrentDictionary because WorldStateSerializer is
-        // shared but the lookups themselves are read-mostly and lock-free in
-        // the common case.
-        readonly ConcurrentDictionary<Type, bool> _hasChecksumIgnore = new();
-
-        /// <remarks>
-        /// Variable-update components are skipped only when serializing for a
-        /// checksum (they would always desync between runs). Snapshots and
-        /// recordings include them, since otherwise the component arrays are
-        /// left in an invalid state on the read side.
-        ///
-        /// Checksum data is only ever byte-compared, never deserialized, so
-        /// the read path has no symmetric guard. If that ever changes, this
-        /// guard's twin must be added there to keep the bit stream aligned.
-        /// </remarks>
-        bool ShouldSkip(GroupIndex group, TypeId componentId, ISerializationWriter writer)
+        bool ShouldSkip(GroupIndex group, TypeId componentId)
         {
-            if (!writer.HasFlag(SerializationFlags.IsForChecksum))
-            {
-                return false;
-            }
-
             var componentType = TypeId.ToType(new TypeId(componentId.Value));
-
-            // (a) User opt-out via [ChecksumIgnore].
-            if (HasChecksumIgnore(componentType))
-            {
-                return true;
-            }
-
-            // (b) Framework decision: variable-update-only component arrays
-            // are skipped from checksums since their contents would otherwise
-            // always desync between runs.
             var template = _worldDef.GetResolvedTemplateForGroup(group);
             var componentDec = template.GetComponentDeclaration(componentType);
             return template.IsVariableUpdateOnly(componentDec);
-        }
-
-        bool HasChecksumIgnore(Type componentType)
-        {
-            return _hasChecksumIgnore.GetOrAdd(
-                componentType,
-                static t => t.IsDefined(typeof(ChecksumIgnoreAttribute), inherit: false)
-            );
         }
 
         void WriteGroupEntityComponentsDB(ISerializationWriter writer)
@@ -337,6 +252,7 @@ namespace Trecs
 
             for (int i = 0; i < numItems; i++)
             {
+                writer.PushScope("Group{0}", i);
                 var bytesBefore = writer.NumBytesWritten;
 
                 var group = GroupIndex.FromIndex(i);
@@ -349,37 +265,47 @@ namespace Trecs
                 // Component-array slots are materialized lazily on first
                 // entity. A group can end up with populated slots but zero
                 // entities (e.g. after deserialization preallocates the
-                // schema). For checksum serialization this materialization
-                // state is a non-observable implementation detail — treat
-                // an all-empty group identically to a never-materialized
-                // one so checksums stay stable across recording/playback.
-                var allEmpty = true;
-                for (int k = 0; k < numComponents; k++)
+                // schema). This materialization state is a non-observable
+                // implementation detail — treat an all-empty group
+                // identically to a never-materialized one so serialized
+                // bytes stay stable across recording/playback.
+                if (numComponents > 0)
                 {
-                    if (subMap.UnsafeValues[k].Count > 0)
+                    var allEmpty = true;
+                    for (int k = 0; k < numComponents; k++)
                     {
-                        allEmpty = false;
-                        break;
+                        if (subMap.UnsafeValues[k].Count > 0)
+                        {
+                            allEmpty = false;
+                            break;
+                        }
                     }
-                }
 
-                if (allEmpty)
-                {
-                    numComponents = 0;
+                    if (allEmpty)
+                    {
+                        numComponents = 0;
+                    }
                 }
 
                 writer.Write("NumComponents", numComponents);
 
                 for (int k = 0; k < numComponents; k++)
                 {
+                    writer.PushScope("Component{0}", k);
                     TypeId componentId = subMap.UnsafeKeys[k].Key;
                     writer.Write("TypeId", componentId);
 
-                    if (!ShouldSkip(group, componentId, writer))
+                    IComponentArray componentArray = subMap.UnsafeValues[k];
+
+                    if (ShouldSkip(group, componentId))
                     {
-                        IComponentArray componentArray = subMap.UnsafeValues[k];
+                        writer.Write("Count", componentArray.Count);
+                    }
+                    else
+                    {
                         WriteComponentArray(componentArray, writer);
                     }
+                    writer.PopScope();
                 }
 
                 _log.Trace(
@@ -387,11 +313,14 @@ namespace Trecs
                     group,
                     (writer.NumBytesWritten - bytesBefore) / 1024f
                 );
+                writer.PopScope();
             }
         }
 
         void SerializeImpl(ISerializationWriter writer)
         {
+            writer.PushScope("World");
+
             writer.Write("RngSeed", _world.FixedRng);
             writer.Write("FixedFrameCount", _world.SystemRunner._currentFixedFrameCount);
             writer.Write("FixedElapsedTime", _world.SystemRunner._elapsedFixedTime);
@@ -399,10 +328,12 @@ namespace Trecs
 
             var bytesBefore = writer.NumBytesWritten;
 
+            writer.PushScope("ComponentArrays");
             using (TrecsProfiling.Start("Writing component arrays"))
             {
                 WriteGroupEntityComponentsDB(writer);
             }
+            writer.PopScope();
             WriteSectionGuard(WorldStateSection.AfterComponentArrays, writer);
 
             _log.Trace(
@@ -411,10 +342,12 @@ namespace Trecs
             );
             bytesBefore = writer.NumBytesWritten;
 
+            writer.PushScope("EntityHandles");
             using (TrecsProfiling.Start("Writing entity references map"))
             {
                 WriteEntityHandlesMap(writer);
             }
+            writer.PopScope();
             WriteSectionGuard(WorldStateSection.AfterEntityHandles, writer);
 
             _log.Trace(
@@ -423,13 +356,15 @@ namespace Trecs
             );
 
             bytesBefore = writer.NumBytesWritten;
+            writer.PushScope("EntitySets");
             using (TrecsProfiling.Start("Writing entity sets"))
             {
                 var setStore = _world.GetSetStore();
 
-                WriteSets(setStore.EntitySets, writer);
+                WriteSets(setStore, writer);
                 WriteSetRoutingIndex(setStore.SetIdsByGroup, writer);
             }
+            writer.PopScope();
             WriteSectionGuard(WorldStateSection.AfterEntitySets, writer);
             _log.Trace(
                 "Entity sets serialized in {0} kb",
@@ -438,20 +373,23 @@ namespace Trecs
 
             bytesBefore = writer.NumBytesWritten;
 
+            writer.PushScope("Heaps");
             using (TrecsProfiling.Start("Writing heap memory"))
             {
+                writer.PushScope("UniqueHeap");
                 _world.GetUniqueHeap().Serialize(writer);
+                writer.PopScope();
+                writer.PushScope("SharedHeap");
                 _world.GetSharedHeap().Serialize(writer);
+                writer.PopScope();
+                writer.PushScope("NativeSharedHeap");
                 _world.GetNativeSharedHeap().Serialize(writer);
-                // Chunk store bulk-dumps pages + side-table state. Persistent
-                // NativeUniquePtr / TrecsList allocations live entirely in the chunk
-                // store, so their slots round-trip through this dump and re-resolve
-                // naturally on read (per-slot TypeIds tell each collection which slots
-                // it owns). Input-allocated unmanaged data (InputNativeUniquePtr) is
-                // owned by InputNativeUniqueHeap and serializes separately as part
-                // of EntityInputQueue.
+                writer.PopScope();
+                writer.PushScope("NativeUniqueChunkStore");
                 _world.GetNativeUniqueChunkStore().Serialize(writer);
+                writer.PopScope();
             }
+            writer.PopScope();
             WriteSectionGuard(WorldStateSection.AfterHeaps, writer);
 
             _log.Trace(
@@ -459,14 +397,15 @@ namespace Trecs
                 (writer.NumBytesWritten - bytesBefore) / 1024f
             );
 
-            // Per-system deterministic paused state. Channel state (Editor /
-            // Playback / User) is intentionally not serialized — those are
-            // ephemeral, app-side concerns.
+            writer.PushScope("SystemEnableState");
             using (TrecsProfiling.Start("Writing system enable state"))
             {
                 _world.SystemEnableState.Serialize(writer);
             }
+            writer.PopScope();
             WriteSectionGuard(WorldStateSection.AfterSystemEnable, writer);
+
+            writer.PopScope();
         }
 
         void WriteSetRoutingIndex(
@@ -474,6 +413,7 @@ namespace Trecs
             ISerializationWriter writer
         )
         {
+            writer.PushScope("RoutingIndex");
             // Emit only non-empty slots, keeping the wire format sparse.
             int nonEmptyCount = 0;
             for (int i = 0; i < routingIndex.Length; i++)
@@ -483,14 +423,19 @@ namespace Trecs
             }
             writer.Write("NumRoutingEntries", nonEmptyCount);
 
+            int entryIndex = 0;
             for (int i = 0; i < routingIndex.Length; i++)
             {
                 var list = routingIndex[i];
                 if (list.Length == 0)
                     continue;
+                writer.PushScope("Entry{0}", entryIndex);
                 writer.Write("Group", _worldDef.ToTagSet(GroupIndex.FromIndex(i)));
                 writer.Write("SetIds", in list);
+                writer.PopScope();
+                entryIndex++;
             }
+            writer.PopScope();
         }
 
         void ReadSetRoutingIndex(
@@ -518,24 +463,23 @@ namespace Trecs
             }
         }
 
-        void ReadSets(
-            NativeDenseDictionary<SetId, EntitySetStorage> sets,
-            ISerializationReader reader
-        )
+        void ReadSets(SetStore setStore, ISerializationReader reader)
         {
+            var setIds = setStore.SetIds;
+            var sets = setStore.EntitySets;
             var numSets = reader.Read<int>("NumSets");
             TrecsDebugAssert.That(numSets >= 0);
 
-            TrecsDebugAssert.IsEqual(sets.Count, numSets);
+            TrecsDebugAssert.IsEqual(setIds.Length, numSets);
 
             for (int i = 0; i < numSets; i++)
             {
                 var setId = reader.Read<SetId>("SetId");
 
-                var currentSetId = sets.UnsafeKeys[i];
+                var currentSetId = setIds[i];
                 TrecsDebugAssert.IsEqual(setId, currentSetId);
 
-                ref readonly var groupMap = ref sets.GetValueByRef(setId);
+                var groupMap = sets[setId];
 
                 var numGroups = reader.Read<int>("NumGroups");
                 groupMap.Clear();
@@ -644,6 +588,15 @@ namespace Trecs
                 {
                     var componentId = reader.Read<TypeId>("TypeId");
                     TrecsDebugAssert.IsEqual(subMap.UnsafeKeys[k].Key, componentId);
+
+                    if (ShouldSkip(group, componentId))
+                    {
+                        var count = reader.Read<int>("Count");
+                        var arr = subMap.UnsafeValues[k];
+                        arr.ResetToDefaultValuesWithCount(count);
+                        continue;
+                    }
+
                     ReadComponentArray(subMap.UnsafeValues[k], reader);
                 }
             }
@@ -672,7 +625,7 @@ namespace Trecs
             {
                 var setStore = _world.GetSetStore();
 
-                ReadSets(setStore.EntitySets, reader);
+                ReadSets(setStore, reader);
                 ReadSetRoutingIndex(setStore.SetIdsByGroup, reader);
             }
             ReadSectionGuard(WorldStateSection.AfterEntitySets, reader);

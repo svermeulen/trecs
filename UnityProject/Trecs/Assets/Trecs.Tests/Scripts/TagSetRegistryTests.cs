@@ -127,6 +127,46 @@ namespace Trecs.Tests
             );
         }
 
+        [Test]
+        public void CompareTo_ReturnsCorrectOrdering()
+        {
+            var tagSetA = TagSet<TestAlpha>.Value;
+            var tagSetB = TagSet<TestBeta>.Value;
+
+            if (tagSetA.Id < tagSetB.Id)
+            {
+                NAssert.Less(
+                    tagSetA.CompareTo(tagSetB),
+                    0,
+                    "CompareTo should return negative when this.Id < other.Id"
+                );
+                NAssert.Greater(
+                    tagSetB.CompareTo(tagSetA),
+                    0,
+                    "CompareTo should return positive when this.Id > other.Id"
+                );
+            }
+            else
+            {
+                NAssert.Greater(
+                    tagSetA.CompareTo(tagSetB),
+                    0,
+                    "CompareTo should return positive when this.Id > other.Id"
+                );
+                NAssert.Less(
+                    tagSetB.CompareTo(tagSetA),
+                    0,
+                    "CompareTo should return negative when this.Id < other.Id"
+                );
+            }
+
+            NAssert.AreEqual(
+                0,
+                tagSetA.CompareTo(tagSetA),
+                "CompareTo should return 0 for equal TagSets"
+            );
+        }
+
 #if DEBUG
         [Test]
         public void BurstableFromTags_DuplicateTypeArgs_AssertsInDebug()

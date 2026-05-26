@@ -31,9 +31,9 @@ All set mutations go through `World.Set<T>()`, which exposes three timing modes:
 |---|---|---|
 | `.DeferredAdd` / `.DeferredRemove` / `.DeferredClear` | Submission-deferred | Next call to `Submit()` |
 | `.Write` | Synchronous | Immediately (main thread, syncs outstanding jobs) |
-| `.Read`  | Synchronous read | Immediately (main thread, syncs outstanding writers) |
+| `.Read`  | Synchronous | Immediately (main thread, syncs outstanding writers) |
 
-### Deferred (default)
+### Deferred
 
 Queued during system execution; applied at the next submission. Safe during iteration:
 
@@ -45,7 +45,7 @@ World.Set<HighlightedParticle>().DeferredClear();
 
 A queued `DeferredClear()` **supersedes** any `DeferredAdd` / `DeferredRemove` queued for the same set in the same submission, regardless of call order. For sequential semantics within a single frame ("clear, then add these"), use the immediate APIs below.
 
-From a Burst job, `NativeWorldAccessor.Set<T>()` returns a `NativeSetAccessor<T>` with the same `DeferredAdd` / `DeferredRemove` / `DeferredClear` methods. There's no native `.Read` / `.Write` counterpart — Burst can't sync — so all native set mutations are deferred.
+From a Burst job, `NativeWorldAccessor.Set<T>()` returns a `NativeSetAccessor<T>` with the same `DeferredAdd` / `DeferredRemove` / `DeferredClear` methods. For non-deferred mutations from jobs, use a `NativeSetCommandBuffer<T>` instead — see the [immediate section below](#immediate).
 
 ### Immediate
 
@@ -64,9 +64,7 @@ highlighted.Remove(handle, world);
 ```
 
 !!! warning "Don't mutate a set while iterating it"
-    An immediate `Add` / `Remove` / `Clear` on the **same set in the same group** you're iterating throws in DEBUG builds. In release builds (assertion compiled out) iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
-
-    Safe: mutating a different set, mutating the same set in a different group, or using the deferred API (`Set<T>().DeferredAdd` / `DeferredRemove` / `DeferredClear`) on the iterated set (applies at the next submission).
+    An immediate `Add` / `Remove` / `Clear` on the **same set in the same group** you're iterating throws in debug builds. In release builds iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
 
     To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `NativeList<EntityHandle>` and apply them after the loop.
 
@@ -123,19 +121,18 @@ public partial class RenderSystem : ISystem
 
 Notes:
 
-- Sets are **not auto-cleared** between frames. Clear them in the producer system if that's the contract you want.
 - Cache the `SetWrite<T>` returned by `Set<T>().Write` outside the loop. Each `.Write` access syncs outstanding job writes; caching syncs once, then writes hit the buffer directly.
 - From a Burst job, capture a `NativeSetCommandBuffer<T>` as a field for thread-safe `Add` / `Remove` / `Clear`. Job-side `Clear` wipes pre-existing contents and supersedes any `Add` / `Remove` queued in the same writer-job-cycle — analogous to `Set<T>().DeferredClear()`.
 
-## Sets vs tags
+## Sets vs Partitions
 
-| | Tags | Sets |
+| | Partitions | Sets |
 |---|---|---|
-| **Cost of change** | Structural change (deferred, moves data) | Lightweight add/remove from index |
+| **Cost of change** | All memory move to new buffer | Lightweight add/remove from index |
 | **Iteration** | All entities with that tag are contiguous in memory | Sparse — only set members are visited |
 | **Best for** | Core identity, maximum cache locality | Dynamic membership, temporary flags, filtering |
 
-Both tags (via [partitions](../core/templates.md#partitions)) and sets can represent state. Tag changes move entity data in memory, giving dense iteration. Set changes are cheap but iteration is sparse. See [Entity Subset Patterns](../guides/entity-subset-patterns.md) for a deeper comparison.
+Both [partitions](../core/templates.md#partitions) and sets can represent state. Tag changes move entity data in memory, giving dense iteration. Set changes are cheap but iteration is sparse. See [Entity Subset Patterns](../guides/entity-subset-patterns.md) for a deeper comparison.
 
 ## See also
 

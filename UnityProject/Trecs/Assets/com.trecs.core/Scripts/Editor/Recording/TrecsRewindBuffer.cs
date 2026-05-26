@@ -15,17 +15,6 @@ namespace Trecs.Internal
     /// </summary>
     internal class TrecsRewindBuffer : IDisposable, IInputHistoryLocker
     {
-#if DEBUG
-        // Flat-path text snapshots for diff-driven desync diagnosis. One
-        // file per captured live snapshot and one per replay verification.
-        // Diff workflow: `diff recording_snapshot<frame>.txt
-        // playback_snapshot<frame>.txt` after the first reported desync.
-        public readonly string SnapshotsDirName = Path.Combine(
-            TrecsPaths.LibraryRoot,
-            "rewind_snapshots"
-        );
-#endif
-
         static readonly TrecsLog _log = TrecsLog.Default;
 
         // Lifecycle / IO primitives (accessor + checksum calculator + reusable
@@ -36,9 +25,6 @@ namespace Trecs.Internal
         readonly TrecsRewindBufferSettings _settings;
         readonly RecordingBundleSerializer _bundleSerializer;
 #if DEBUG
-        // Only kept for the OutputDesyncState path; in normal builds the
-        // RecorderEngine holds the same references and these fields are
-        // strictly unused, so they're behind the same conditional.
         readonly IWorldStateSerializer _stateSerializer;
         readonly SerializerRegistry _serializerRegistry;
 #endif
@@ -67,15 +53,6 @@ namespace Trecs.Internal
         // Same idea for the transient scrub cache, on a separate (denser)
         // cadence.
         int? _lastScrubCacheFrame;
-
-        // Frame of the most recent per-frame checksum capture, used to drive
-        // the "every ChecksumFrameInterval frames" cadence in
-        // CaptureSnapshotIfDue. Null means "no prior checksum since the
-        // current capture started" — forces an immediate checksum on the
-        // next eligible frame. Reset to null on Start/Reset/Trim/Load so the
-        // cadence rebases on each restart rather than skewing from a moved
-        // _startFrame.
-        int? _lastChecksumFrame;
 
         // Frame the playhead is paused at after a scrub. Valid in
         // BufferState.Scrubbed and BufferState.LoadedPlayback. In Scrubbed
@@ -112,6 +89,12 @@ namespace Trecs.Internal
         // (every scrub gets a fresh chance to verify), and load-from-file.
         int? _desyncedFrame;
 
+        // Full-state snapshot of the live (diverged) world captured at the
+        // moment a desync is detected. Lets the user later compare the
+        // recording's snapshot at that frame vs. the diverged live state.
+        // Cleared wherever _desyncedFrame is cleared.
+        WorldSnapshot _desyncLiveSnapshot;
+
         public TrecsRewindBuffer(
             World world,
             IWorldStateSerializer stateSerializer,
@@ -120,19 +103,9 @@ namespace Trecs.Internal
             SnapshotSerializer snapshotSerializer
         )
         {
-            if (settings.ChecksumFrameInterval < 1)
-                throw new ArgumentOutOfRangeException(
-                    nameof(settings)
-                        + "."
-                        + nameof(TrecsRewindBufferSettings.ChecksumFrameInterval),
-                    settings.ChecksumFrameInterval,
-                    "ChecksumFrameInterval must be >= 1"
-                );
-
             _settings = settings;
             _core = new RecorderEngine(
                 world,
-                stateSerializer,
                 serializerRegistry,
                 snapshotSerializer,
                 accessorLabel: nameof(TrecsRewindBuffer)
@@ -177,14 +150,11 @@ namespace Trecs.Internal
         public IReadOnlyList<WorldSnapshot> Bookmarks => _store.Bookmarks;
 
         /// <summary>
-        /// Per-frame world-state checksums. Single source of truth for both
-        /// the per-frame cadence captures (<see cref="TrecsRewindBufferSettings.ChecksumFrameInterval"/>)
-        /// and anchor / bookmark capture frames — verify-on-replay and
-        /// desync detection key on this dict. Empty under TRECS_IS_PROFILING
-        /// (callers gate the SetChecksum writes); reads stay safe and return
-        /// "no checksum at this frame".
+        /// World-state checksums at snapshot capture frames. Single source of
+        /// truth for anchor and bookmark capture frames — verify-on-replay and
+        /// desync detection key on this dict.
         /// </summary>
-        public DenseDictionary<int, ulong> Checksums => _store.Checksums;
+        public IterableDictionary<int, ulong> Checksums => _store.Checksums;
 
         public long TotalBytes => _store.TotalAnchorBytes;
 
@@ -336,6 +306,15 @@ namespace Trecs.Internal
         /// </summary>
         public int? DesyncedFrame => _desyncedFrame;
 
+        /// <summary>
+        /// Full-state snapshot of the live (diverged) world captured at the
+        /// instant a checksum mismatch was detected. Null when no desync has
+        /// occurred. Paired with the recording's snapshot at
+        /// <see cref="DesyncedFrame"/> to let external tooling diff the two
+        /// states.
+        /// </summary>
+        public WorldSnapshot DesyncLiveSnapshot => _desyncLiveSnapshot;
+
         /// <summary>True iff a desync has been detected.</summary>
         public bool HasDesynced => _desyncedFrame.HasValue;
 
@@ -390,30 +369,16 @@ namespace Trecs.Internal
             // finished their own init.
             _lastAnchorFrame = null;
             _lastScrubCacheFrame = null;
-            _lastChecksumFrame = null;
             _scrubbedFrame = null;
             _fastForwardTarget = null;
             _loopPlayback = false;
+            ClearDesyncLiveSnapshot();
             _desyncedFrame = null;
             _state = BufferState.LiveCapture;
             // Fresh recording — discard any prior backing-file name so a
             // subsequent "Save" prompts for a new name rather than
             // overwriting the previously-loaded slot.
             LoadedRecordingPath = null;
-
-#if DEBUG
-            if (_settings.EnableDesyncSnapshots)
-            {
-                // Wipe stale snapshots from a previous run so the diff
-                // workflow doesn't accidentally compare frames from
-                // different sessions.
-                if (Directory.Exists(SnapshotsDirName))
-                {
-                    Directory.Delete(SnapshotsDirName, true);
-                }
-                Directory.CreateDirectory(SnapshotsDirName);
-            }
-#endif
 
             // Lock input history at-or-after _startFrame so the queue's
             // periodic cleanup doesn't prune frames the user might want to
@@ -539,6 +504,7 @@ namespace Trecs.Internal
                 // The previous desync (if any) was tied to the prior walk;
                 // clear it so the user can scrub past the suspected frame
                 // and watch for it again, or jump elsewhere and observe.
+                ClearDesyncLiveSnapshot();
                 _desyncedFrame = null;
 
                 // Re-subscribe so further frames continue to snapshot normally.
@@ -614,7 +580,7 @@ namespace Trecs.Internal
             }
 
             var fixedDeltaTime = _core.Accessor.GetSystemRunner().FixedDeltaTime;
-            var blobs = new DenseHashSet<BlobId>();
+            var blobs = new IterableHashSet<BlobId>();
             _core.World.BlobCache.GetAllActiveBlobIds(blobs);
 
             // EntityInputQueue is serialized via its own SerializationBuffer
@@ -800,11 +766,11 @@ namespace Trecs.Internal
                 // Cadence rebases at the load point — the bundle's own
                 // Checksums dict already covers the playback range; live
                 // capture (if any) starts checksumming again from here.
-                _lastChecksumFrame = null;
                 _scrubbedFrame = earliest.FixedFrame;
                 _fastForwardTarget = null;
                 _state = BufferState.LoadedPlayback;
                 _loopPlayback = false;
+                ClearDesyncLiveSnapshot();
                 _desyncedFrame = null;
                 LoadedRecordingPath = filePath;
 
@@ -827,6 +793,7 @@ namespace Trecs.Internal
                 _state = BufferState.Idle;
                 _fastForwardTarget = null;
                 _scrubbedFrame = null;
+                ClearDesyncLiveSnapshot();
                 _desyncedFrame = null;
                 LoadedRecordingPath = null;
                 EnsureLockerRegistered(false);
@@ -885,15 +852,13 @@ namespace Trecs.Internal
                 _store.ScrubCache.Count > 0
                     ? _store.ScrubCache[_store.ScrubCache.Count - 1].FixedFrame
                     : _lastAnchorFrame;
-            // Past-fork checksums may have been trimmed; rebase the cadence
-            // so the next captured frame writes one rather than waiting on a
-            // stale _lastChecksumFrame.
-            _lastChecksumFrame = null;
+            // Past-fork checksums may have been trimmed.
             DropAbandonedTimelineInputs();
             _scrubbedFrame = null;
             _fastForwardTarget = null;
             _state = BufferState.LiveCapture;
             _loopPlayback = false;
+            ClearDesyncLiveSnapshot();
             _desyncedFrame = null;
             // Keep LoadedRecordingPath attached so a subsequent plain Save
             // overwrites the original file — fork is the "edit this recording
@@ -967,10 +932,6 @@ namespace Trecs.Internal
                 _store.ScrubCache.Count > 0
                     ? _store.ScrubCache[_store.ScrubCache.Count - 1].FixedFrame
                     : _lastAnchorFrame;
-            // The checksum at _lastChecksumFrame may have been dropped; force
-            // the next captured frame to write one rather than waiting on a
-            // stale cadence anchor.
-            _lastChecksumFrame = null;
             if (dropped == 0)
             {
                 return 0;
@@ -1010,11 +971,11 @@ namespace Trecs.Internal
             _startFrame = _core.Accessor.FixedFrame;
             _lastAnchorFrame = null;
             _lastScrubCacheFrame = null;
-            _lastChecksumFrame = null;
             _scrubbedFrame = null;
             _fastForwardTarget = null;
             _state = BufferState.LiveCapture;
             _loopPlayback = false;
+            ClearDesyncLiveSnapshot();
             _desyncedFrame = null;
             LoadedRecordingPath = null;
             DropAbandonedTimelineInputs();
@@ -1049,11 +1010,8 @@ namespace Trecs.Internal
             _core.SnapshotSerializer.SaveSnapshot(
                 _settings.Version,
                 out var payload,
+                out var checksum,
                 includeTypeChecks: true
-            );
-            var checksum = _core.ComputeChecksum(
-                _settings.Version,
-                SerializationFlags.IsForChecksum
             );
             var bookmark = new WorldSnapshot
             {
@@ -1096,11 +1054,8 @@ namespace Trecs.Internal
             var metadata = _core.SnapshotSerializer.SaveSnapshot(
                 _settings.Version,
                 out var payload,
+                out var checksum,
                 includeTypeChecks: true
-            );
-            var checksum = _core.ComputeChecksum(
-                _settings.Version,
-                SerializationFlags.IsForChecksum
             );
             var anchor = new WorldSnapshot
             {
@@ -1435,15 +1390,13 @@ namespace Trecs.Internal
                 .ClearFutureInputsAfterOrAt(_core.Accessor.FixedFrame);
         }
 
-        // Three independent cadences fire from this single tick handler:
-        // anchors (sparse, persisted), scrub-cache (dense, transient), and
-        // per-frame checksums (dense, persisted into the saved bundle for
-        // playback desync detection). When the world-state hash is needed by
-        // multiple cadences on the same frame it's computed once and shared.
-        // When both anchor and scrub are due the snapshot bytes go to the
-        // anchor list; the entry there serves both navigation roles, so
-        // adding it to the scrub cache too would just duplicate bytes for
-        // no win.
+        // Two independent cadences fire from this single tick handler:
+        // anchors (sparse, persisted) and scrub-cache (dense, transient).
+        // Checksums are derived from the snapshot bytes produced here —
+        // no separate checksum cadence. When both anchor and scrub are
+        // due the snapshot bytes go to the anchor list; the entry there
+        // serves both navigation roles, so adding it to the scrub cache
+        // too would just duplicate bytes for no win.
         void CaptureSnapshotIfDue()
         {
             if (_core.World.IsDisposed)
@@ -1453,9 +1406,6 @@ namespace Trecs.Internal
 
             var fixedDeltaTime = _core.Accessor.GetSystemRunner().FixedDeltaTime;
             var now = _core.Accessor.FixedFrame;
-            // Null last-frame means "no prior capture in this cadence" → due
-            // immediately. Used after Start/Reset/Trim so the first tick
-            // captures rather than waiting an entire cadence interval.
             var anchorDue =
                 !_lastAnchorFrame.HasValue
                 || (now - _lastAnchorFrame.Value) * fixedDeltaTime
@@ -1464,47 +1414,6 @@ namespace Trecs.Internal
                 !_lastScrubCacheFrame.HasValue
                 || (now - _lastScrubCacheFrame.Value) * fixedDeltaTime
                     >= _settings.ScrubCacheIntervalSeconds;
-#if !TRECS_IS_PROFILING
-            // Per-frame checksum cadence — sparse compared to fixed frames,
-            // dense compared to anchors. Catches desyncs close to where they
-            // happen during BundleReplayer playback. Mirrors BundleRecorder so
-            // editor-saved bundles have the same coverage runtime-saved ones
-            // do. Skipped under TRECS_IS_PROFILING so editor profiling builds
-            // don't pay the per-frame hash cost. Same null-or-distance shape
-            // as anchor/scrub cadence above — driven by _lastChecksumFrame
-            // rather than _startFrame so trim/load operations don't pivot the
-            // cadence.
-            var checksumDue =
-                !_lastChecksumFrame.HasValue
-                || (now - _lastChecksumFrame.Value) >= _settings.ChecksumFrameInterval;
-#else
-            var checksumDue = false;
-#endif
-            if (!anchorDue && !scrubDue && !checksumDue)
-            {
-                return;
-            }
-
-            // Compute the world-state checksum once and share across the
-            // cadences that need it. Snapshot bytes themselves include
-            // type-check tags and other transient framing, so we use the
-            // IsForChecksum-flavored serialization which strips those.
-            var checksum = _core.ComputeChecksum(
-                _settings.Version,
-                SerializationFlags.IsForChecksum
-            );
-
-            if (checksumDue)
-            {
-                _store.SetChecksum(now, checksum);
-                _lastChecksumFrame = now;
-#if DEBUG
-                if (_settings.EnableDesyncSnapshots)
-                {
-                    OutputDesyncState($"recording_snapshot{now}.txt");
-                }
-#endif
-            }
 
             if (!anchorDue && !scrubDue)
             {
@@ -1516,12 +1425,9 @@ namespace Trecs.Internal
             var metadata = _core.SnapshotSerializer.SaveSnapshot(
                 _settings.Version,
                 out var payload,
+                out var checksum,
                 includeTypeChecks: true
             );
-            // The checksum is stored in _store.Checksums so a future re-run of
-            // this frame (after JumpToFrame) can verify the world reached the
-            // same state. We may have already written it above on a checksum-
-            // due tick; overwriting is idempotent.
             _store.SetChecksum(metadata.FixedFrame, checksum);
             var anchor = new WorldSnapshot
             {
@@ -1535,8 +1441,6 @@ namespace Trecs.Internal
             {
                 _store.AppendAnchor(anchor);
                 _lastAnchorFrame = metadata.FixedFrame;
-                // Anchor counts as a scrub-cache update too — the entry is
-                // searched alongside the cache during JumpToFrame.
                 _lastScrubCacheFrame = metadata.FixedFrame;
             }
             else
@@ -1545,39 +1449,20 @@ namespace Trecs.Internal
                 _lastScrubCacheFrame = metadata.FixedFrame;
             }
 
-#if DEBUG
-            if (_settings.EnableDesyncSnapshots)
-            {
-                OutputDesyncState($"recording_snapshot{metadata.FixedFrame}.txt");
-            }
-#endif
-
             EnforceCapacityLimits();
         }
 
-#if DEBUG
-        // Dump the current world state as flat path/value text for desync
-        // diffing. Uses the same IWorldStateSerializer + IsForChecksum
-        // flag the checksum calculator uses, so the capture covers exactly
-        // the field set the desync detection compares — diffing two files
-        // reveals which field drifted.
-        void OutputDesyncState(string outputFileName)
+        // Return the desync live snapshot's payload buffer to the pool and
+        // clear the field. Called wherever _desyncedFrame is cleared so the
+        // two stay in lockstep.
+        void ClearDesyncLiveSnapshot()
         {
-            // Idempotent — covers the case where EnableDesyncSnapshots was
-            // flipped on mid-session so the create-on-Start path was
-            // skipped. Microsecond-scale stat call vs. risking a
-            // DirectoryNotFoundException on the next File.Create.
-            Directory.CreateDirectory(SnapshotsDirName);
-
-            using var fileStream = File.Create(Path.Combine(SnapshotsDirName, outputFileName));
-            using var streamWriter = new StreamWriter(fileStream);
-
-            var writer = new FlatPathSerializationWriter(streamWriter, _serializerRegistry);
-            writer.Start(version: _settings.Version, flags: SerializationFlags.IsForChecksum);
-            _stateSerializer.SerializeForChecksum(writer);
-            writer.Complete();
+            if (_desyncLiveSnapshot != null)
+            {
+                _core.SnapshotSerializer.ReturnPayloadBuffer(_desyncLiveSnapshot.Payload);
+                _desyncLiveSnapshot = null;
+            }
         }
-#endif
 
         // Verify the simulation produced the same world state we captured
         // at this frame. Called from OnFixedFrameChange while the user is
@@ -1590,23 +1475,33 @@ namespace Trecs.Internal
             {
                 return;
             }
-            // _store.Checksums holds entries for every anchor frame plus the
-            // per-frame cadence; absent key = "no checksum to verify against
-            // at this frame" (between cadence points), value 0 = legacy
-            // sentinel preserved for back-compat with the rare hash-equals-0.
+            // _store.Checksums holds entries for snapshot capture frames
+            // (anchors + scrub-cache); absent key = "no checksum at this
+            // frame", value 0 = legacy sentinel.
             if (!_store.Checksums.TryGetValue(frame, out var expected) || expected == 0UL)
             {
                 return;
             }
-            var actual = _core.ComputeChecksum(_settings.Version, SerializationFlags.IsForChecksum);
-#if DEBUG
-            if (_settings.EnableDesyncSnapshots)
-            {
-                OutputDesyncState($"playback_snapshot{frame}.txt");
-            }
-#endif
+            var actual = _core.ComputeChecksum(_settings.Version);
             if (actual != expected)
             {
+                // Capture the live (diverged) world state before setting the
+                // desync marker so the user can later compare it against the
+                // recording's snapshot at this frame.
+                _core.SnapshotSerializer.SaveSnapshot(
+                    _settings.Version,
+                    out var livePayload,
+                    out _,
+                    includeTypeChecks: true
+                );
+                _desyncLiveSnapshot = new WorldSnapshot
+                {
+                    FixedFrame = frame,
+                    Kind = SnapshotKind.Bookmark,
+                    Label = "desync-live",
+                    Payload = livePayload,
+                };
+
                 _desyncedFrame = frame;
                 _log.Warning(
                     "Desync at frame {0}: expected checksum {1} but got {2} "
@@ -1616,8 +1511,55 @@ namespace Trecs.Internal
                     expected,
                     actual
                 );
+                EditorApplication.isPaused = true;
             }
         }
+
+#if DEBUG
+        /// <summary>
+        /// Dump both the recorded and live (diverged) world states at the
+        /// desynced frame as flat-path text files and open them. Diff the two
+        /// files to see exactly which fields diverged.
+        /// </summary>
+        public (string recordedPath, string livePath)? DumpDesyncDiff()
+        {
+            if (!_desyncedFrame.HasValue)
+                return null;
+
+            var frame = _desyncedFrame.Value;
+            var dir = Path.Combine(TrecsPaths.LibraryRoot, "desync_diff");
+            Directory.CreateDirectory(dir);
+
+            var recordedPath = Path.Combine(dir, $"recorded_frame{frame}.txt");
+            var livePath = Path.Combine(dir, $"live_frame{frame}.txt");
+
+            var recordedSnapshot = _store.FindNearestAtOrBefore(frame);
+            if (recordedSnapshot == null)
+            {
+                _log.Warning("No recorded snapshot found at or before frame {0}", frame);
+                return null;
+            }
+
+            DumpSnapshotToFlatPath(_desyncLiveSnapshot.Payload, livePath);
+            DumpSnapshotToFlatPath(recordedSnapshot.Value.payload, recordedPath);
+
+            _log.Info("Desync diff dumped:\n  recorded: {0}\n  live: {1}", recordedPath, livePath);
+            return (recordedPath, livePath);
+        }
+
+        void DumpSnapshotToFlatPath(ReadOnlyMemory<byte> payload, string path)
+        {
+            _core.SnapshotSerializer.LoadSnapshot(payload.Span);
+
+            using var fileStream = File.Create(path);
+            using var streamWriter = new StreamWriter(fileStream);
+
+            var writer = new FlatPathSerializationWriter(streamWriter, _serializerRegistry);
+            writer.Start(version: _settings.Version, flags: SerializationFlags.DesyncFriendlyHeaps);
+            _stateSerializer.SerializeFullState(writer);
+            writer.Complete();
+        }
+#endif
 
         // Anchors are sparse so they're capped by count; scrub cache is
         // dense so it's capped by bytes. Bookmarks are user-controlled and

@@ -8,7 +8,7 @@ namespace Trecs
         readonly UniqueHeap _uniqueHeap;
         readonly SharedHeap _sharedHeap;
         readonly NativeSharedHeap _nativeSharedHeap;
-        readonly NativeChunkStore _nativeUniqueChunkStore;
+        readonly NativeHeap _nativeUniqueChunkStore;
         readonly InputNativeUniqueHeap _inputNativeUniqueHeap;
         readonly InputNativeSharedHeap _inputNativeSharedHeap;
         readonly InputSharedHeap _inputSharedHeap;
@@ -20,7 +20,7 @@ namespace Trecs
             UniqueHeap uniqueHeap,
             SharedHeap sharedHeap,
             NativeSharedHeap nativeSharedHeap,
-            NativeChunkStore nativeUniqueChunkStore,
+            NativeHeap nativeUniqueChunkStore,
             InputNativeUniqueHeap inputNativeUniqueHeap,
             InputNativeSharedHeap inputNativeSharedHeap,
             InputSharedHeap inputSharedHeap,
@@ -106,7 +106,7 @@ namespace Trecs
         /// data lives in <see cref="InputNativeUniqueHeap"/>'s own per-frame
         /// arenas (not this store).
         /// </summary>
-        internal NativeChunkStore NativeUniqueChunkStore
+        internal NativeHeap NativeUniqueChunkStore
         {
             get
             {
@@ -115,7 +115,7 @@ namespace Trecs
             }
         }
 
-        internal ref NativeChunkStoreResolver NativeChunkStoreResolver
+        internal ref NativeHeapResolver NativeHeapResolver
         {
             get
             {

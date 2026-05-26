@@ -1,4 +1,5 @@
 using System;
+using Unity.Mathematics;
 
 namespace Trecs
 {
@@ -46,7 +47,8 @@ namespace Trecs
         public override bool Equals(object obj) => obj is EntityRange other && Equals(other);
 
         /// <inheritdoc/>
-        public override int GetHashCode() => HashCode.Combine(Start, End);
+        // Deterministic across restarts (HashCode.Combine is not).
+        public override int GetHashCode() => unchecked((int)math.hash(new int2(Start, End)));
 
         /// <inheritdoc/>
         public override string ToString() => $"EntityRange({Start}, {End})";

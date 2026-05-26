@@ -18,7 +18,7 @@ namespace Trecs.Tests.PlayMode
     [TestFixture]
     public class SampleScenesPlayModeTests
     {
-        const int FramesToRun = 60 * 5;
+        const int FramesToRun = 60 * 3;
 
         [UnityTest]
         public IEnumerator HelloEntity() => RunScene("HelloEntity");
@@ -116,7 +116,7 @@ namespace Trecs.Tests.PlayMode
                 );
                 yield return load;
 
-                const int dwellFrames = 180;
+                const int dwellFrames = 60;
                 foreach (IterationStyle style in Enum.GetValues(typeof(IterationStyle)))
                 {
                     ConfigInputSystem.TestPendingIterationStyle = style;

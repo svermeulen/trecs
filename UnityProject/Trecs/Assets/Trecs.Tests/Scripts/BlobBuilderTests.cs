@@ -12,7 +12,7 @@ namespace Trecs.Tests
     /// Most tests build a blob, read it back through an
     /// <see cref="UnsafeUtility.AsRef{T}"/> over the returned
     /// <see cref="NativeBlobAllocation"/>, and free the result manually.
-    /// One test runs the full <see cref="BlobBuilder.Build{T}(HeapAccessor, BlobId)"/>
+    /// One test runs the full <see cref="BlobBuilder.Build{T}(WorldAccessor, BlobId)"/>
     /// path through a real world / heap to confirm the integration.
     /// </summary>
     [TestFixture]
@@ -1534,7 +1534,7 @@ namespace Trecs.Tests
                         values[i] = i + 1000;
                     }
 
-                    anchor = builder.Build<RootWithSingleArray>(accessor.Heap, blobId);
+                    anchor = builder.Build<RootWithSingleArray>(accessor, blobId);
                 }
 
                 try
@@ -1542,7 +1542,7 @@ namespace Trecs.Tests
                     NAssert.IsFalse(anchor.IsNull);
                     NAssert.AreEqual(blobId, anchor.BlobId);
 
-                    ref readonly var view = ref anchor.Read(accessor.Heap).Value;
+                    ref readonly var view = ref anchor.Read(accessor).Value;
                     NAssert.AreEqual(0x55AA55AA, view.Header);
                     NAssert.AreEqual(count, view.Values.Length);
                     for (int i = 0; i < count; i++)
@@ -1552,7 +1552,7 @@ namespace Trecs.Tests
                 }
                 finally
                 {
-                    anchor.Dispose(accessor.Heap);
+                    anchor.Dispose(accessor);
                 }
             }
             finally

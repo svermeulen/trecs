@@ -73,7 +73,7 @@ namespace Trecs.Internal
                 {
                     var entry = LayoutEntries[layoutHeader.FirstComponentIndex + ci];
                     var dest = ComponentDests[compDestBase + ci];
-                    byte* destPtr = (byte*)dest.ArrayPtr + work.DestIdx * dest.ElementSize;
+                    byte* destPtr = (byte*)dest.ArrayPtr + (long)work.DestIdx * dest.ElementSize;
 
                     if (setMask.IsSet(ci))
                     {
@@ -100,31 +100,21 @@ namespace Trecs.Internal
         }
     }
 
-    // Mirror of the SwapTupleStructComparer used previously inline at the
-    // NatSwap Sort call site. Lifted to namespace scope so the Burst job
-    // below can name it as a generic argument.
-    readonly struct SwapTupleStructComparer : IComparer<(EntityIndex, GroupIndex, int)>
+    readonly struct SwapEntryComparer : IComparer<SwapEntry>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Compare((EntityIndex, GroupIndex, int) x, (EntityIndex, GroupIndex, int) y)
+        public int Compare(SwapEntry x, SwapEntry y)
         {
-            int c = x.Item1.CompareTo(y.Item1);
+            int c = x.EntityIndex.CompareTo(y.EntityIndex);
             if (c != 0)
                 return c;
-            c = x.Item2.CompareTo(y.Item2);
+            c = x.ToGroup.CompareTo(y.ToGroup);
             if (c != 0)
                 return c;
-            return x.Item3.CompareTo(y.Item3);
+            return x.AccessorId.CompareTo(y.AccessorId);
         }
     }
 
-    /// <summary>
-    /// Burst-compiled sort of the NatSwap (from, toGroup, accessorId) buffer.
-    /// .Run() on the main thread so Burst's AOT code runs in place of the
-    /// IL2CPP-generated managed call. EntityIndex is unique post-coalesce
-    /// so the secondary keys are unreachable but kept as defensive
-    /// tie-breakers.
-    /// </summary>
     [BurstCompile]
     struct SortSwapsJob : IJob
     {
@@ -136,27 +126,45 @@ namespace Trecs.Internal
         {
             unsafe
             {
-                NativeSortExtension.Sort(
-                    ((EntityIndex, GroupIndex, int)*)Ptr,
-                    Count,
-                    new SwapTupleStructComparer()
-                );
+                NativeSortExtension.Sort((SwapEntry*)Ptr, Count, new SwapEntryComparer());
             }
         }
     }
 
-    // Mirror of the RemoveTupleStructComparer used previously inline at the
-    // NatRemove Sort call site. Lifted to namespace scope so the Burst job
-    // below can name it as a generic argument.
-    readonly struct RemoveTupleStructComparer : IComparer<(EntityIndex, int)>
+    readonly struct NativeTagOpComparer : IComparer<NativeTagOp>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Compare((EntityIndex, int) x, (EntityIndex, int) y)
+        public int Compare(NativeTagOp x, NativeTagOp y)
         {
-            int c = x.Item1.CompareTo(y.Item1);
+            return x.EntityIndex.CompareTo(y.EntityIndex);
+        }
+    }
+
+    [BurstCompile]
+    struct SortTagOpsJob : IJob
+    {
+        [NativeDisableUnsafePtrRestriction]
+        public long Ptr;
+        public int Count;
+
+        public void Execute()
+        {
+            unsafe
+            {
+                NativeSortExtension.Sort((NativeTagOp*)Ptr, Count, new NativeTagOpComparer());
+            }
+        }
+    }
+
+    readonly struct RemovalEntryComparer : IComparer<RemovalEntry>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int Compare(RemovalEntry x, RemovalEntry y)
+        {
+            int c = x.EntityIndex.CompareTo(y.EntityIndex);
             if (c != 0)
                 return c;
-            return x.Item2.CompareTo(y.Item2);
+            return x.AccessorId.CompareTo(y.AccessorId);
         }
     }
 
@@ -202,10 +210,6 @@ namespace Trecs.Internal
         }
     }
 
-    /// <summary>
-    /// Burst-compiled sort of the NatRemove (entityIndex, accessorId) buffer.
-    /// Mechanical mirror of <see cref="SortSwapsJob"/> for the remove path.
-    /// </summary>
     [BurstCompile]
     struct SortRemovalsJob : IJob
     {
@@ -217,11 +221,7 @@ namespace Trecs.Internal
         {
             unsafe
             {
-                NativeSortExtension.Sort(
-                    ((EntityIndex, int)*)Ptr,
-                    Count,
-                    new RemoveTupleStructComparer()
-                );
+                NativeSortExtension.Sort((RemovalEntry*)Ptr, Count, new RemovalEntryComparer());
             }
         }
     }
@@ -237,7 +237,7 @@ namespace Trecs.Internal
     /// Used by Remove Sort+Plan to drop the managed comparer-based sort cost
     /// on bulk-spike workloads. The accompanying swap-back plan build
     /// (ComputeSwapBackPlanDescending) intentionally stays managed because
-    /// its output is a <c>DenseDictionary&lt;int,int&gt;</c> — insertion
+    /// its output is a <c>IterableDictionary&lt;int,int&gt;</c> — insertion
     /// order matters for the consumer
     /// <see cref="Trecs.Internal.EntityHandleMap.BatchUpdateIndexAfterSwapBack"/>,
     /// and NativeHashMap iterates in bucket order rather than insertion order.
@@ -396,16 +396,16 @@ namespace Trecs.Internal
                         var dstIdx = DstBaseCounts[compIdx] + entityIdx;
 
                         UnsafeUtility.MemCpy(
-                            dst + dstIdx * elemSize,
-                            src + fromIdx * elemSize,
+                            dst + (long)dstIdx * elemSize,
+                            src + (long)fromIdx * elemSize,
                             elemSize
                         );
 
                         if (fromIdx != currentSourceCount)
                         {
                             UnsafeUtility.MemCpy(
-                                src + fromIdx * elemSize,
-                                src + currentSourceCount * elemSize,
+                                src + (long)fromIdx * elemSize,
+                                src + (long)currentSourceCount * elemSize,
                                 elemSize
                             );
                         }
@@ -450,16 +450,16 @@ namespace Trecs.Internal
                     currentSourceCount--;
 
                     UnsafeUtility.MemCpy(
-                        dst + (DstBaseCount + entityIdx) * ElementSize,
-                        src + fromIdx * ElementSize,
+                        dst + (long)(DstBaseCount + entityIdx) * ElementSize,
+                        src + (long)fromIdx * ElementSize,
                         ElementSize
                     );
 
                     if (fromIdx != currentSourceCount)
                     {
                         UnsafeUtility.MemCpy(
-                            src + fromIdx * ElementSize,
-                            src + currentSourceCount * ElementSize,
+                            src + (long)fromIdx * ElementSize,
+                            src + (long)currentSourceCount * ElementSize,
                             ElementSize
                         );
                     }
@@ -505,8 +505,8 @@ namespace Trecs.Internal
                         var ptr = (byte*)ArrayPtrs[compIdx];
                         var elemSize = ElementSizes[compIdx];
 
-                        var removedSlot = ptr + indexToRemove * elemSize;
-                        var lastSlot = ptr + currentCount * elemSize;
+                        var removedSlot = ptr + (long)indexToRemove * elemSize;
+                        var lastSlot = ptr + (long)currentCount * elemSize;
 
                         if (indexToRemove != currentCount)
                         {
@@ -554,8 +554,8 @@ namespace Trecs.Internal
                     var indexToRemove = SortedDescendingIndices[removalIdx];
                     currentCount--;
 
-                    var removedSlot = ptr + indexToRemove * ElementSize;
-                    var lastSlot = ptr + currentCount * ElementSize;
+                    var removedSlot = ptr + (long)indexToRemove * ElementSize;
+                    var lastSlot = ptr + (long)currentCount * ElementSize;
 
                     if (indexToRemove != currentCount)
                     {
@@ -566,6 +566,40 @@ namespace Trecs.Internal
                 }
 
                 UnsafeUtility.Free(temp, Allocator.Temp);
+            }
+        }
+    }
+
+    [BurstCompile]
+    struct BatchUpdateEntityHandlesJob : IJob
+    {
+        public UnsafeList<int> FromGroupList;
+        public UnsafeList<int> ToGroupList;
+
+        [NativeDisableContainerSafetyRestriction]
+        public NativeList<EntityHandleMapElement> EntityHandleMap;
+
+        [ReadOnly]
+        public NativeList<MoveInfoEntry> EntriesToMove;
+
+        public GroupIndex ToGroup;
+
+        public void Execute()
+        {
+            for (int i = 0; i < EntriesToMove.Length; i++)
+            {
+                var entry = EntriesToMove[i];
+                var fromIndex = entry.EntityIndex;
+                var toIndex = entry.Info.ToIndex;
+
+                var id = FromGroupList[fromIndex];
+                FromGroupList[fromIndex] = 0;
+
+                ref var element = ref EntityHandleMap.ElementAt(id - 1);
+                element.Index = toIndex;
+                element.GroupIndex = ToGroup;
+
+                ToGroupList[toIndex] = id;
             }
         }
     }

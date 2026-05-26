@@ -32,7 +32,7 @@ namespace Trecs.Tests
                 Header = MakeHeader(version: 7, startFrame: 0, endFrame: 60),
                 InitialSnapshot = new byte[] { 1, 2, 3, 4, 5 },
                 InputQueue = Array.Empty<byte>(),
-                Checksums = new DenseDictionary<int, ulong>(),
+                Checksums = new IterableDictionary<int, ulong>(),
                 Anchors = Array.Empty<WorldSnapshot>(),
                 Bookmarks = Array.Empty<WorldSnapshot>(),
             };
@@ -58,7 +58,7 @@ namespace Trecs.Tests
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             using var ser = new RecordingBundleSerializer(registry);
 
-            var checksums = new DenseDictionary<int, ulong>();
+            var checksums = new IterableDictionary<int, ulong>();
             checksums.Add(0, 0xDEADBEEFDEADBEEFul);
             checksums.Add(30, 0xCAFEF00DCAFEF00Dul);
             checksums.Add(60, 0xFEEDFACEFEEDFACEul);
@@ -142,7 +142,7 @@ namespace Trecs.Tests
                 Header = MakeHeader(version: 1, startFrame: 100, endFrame: 200),
                 InitialSnapshot = MakeBytes(seed: 7, length: 64),
                 InputQueue = MakeBytes(seed: 8, length: 32),
-                Checksums = new DenseDictionary<int, ulong>(),
+                Checksums = new IterableDictionary<int, ulong>(),
                 Anchors = Array.Empty<WorldSnapshot>(),
                 Bookmarks = Array.Empty<WorldSnapshot>(),
             };
@@ -189,7 +189,7 @@ namespace Trecs.Tests
                 ),
                 InitialSnapshot = MakeBytes(seed: 9, length: 1024),
                 InputQueue = MakeBytes(seed: 10, length: 2048),
-                Checksums = new DenseDictionary<int, ulong>(),
+                Checksums = new IterableDictionary<int, ulong>(),
                 Anchors = Array.Empty<WorldSnapshot>(),
                 Bookmarks = Array.Empty<WorldSnapshot>(),
             };
@@ -239,7 +239,7 @@ namespace Trecs.Tests
                 },
                 InitialSnapshot = new byte[] { 1 },
                 InputQueue = Array.Empty<byte>(),
-                Checksums = new DenseDictionary<int, ulong>(),
+                Checksums = new IterableDictionary<int, ulong>(),
                 Anchors = Array.Empty<WorldSnapshot>(),
                 Bookmarks = Array.Empty<WorldSnapshot>(),
             };
@@ -273,7 +273,7 @@ namespace Trecs.Tests
                 Header = MakeHeader(version: 1, startFrame: 0, endFrame: 10),
                 InitialSnapshot = new byte[] { 1, 2, 3, 4, 5 },
                 InputQueue = Array.Empty<byte>(),
-                Checksums = new DenseDictionary<int, ulong>(),
+                Checksums = new IterableDictionary<int, ulong>(),
                 Anchors = Array.Empty<WorldSnapshot>(),
                 Bookmarks = Array.Empty<WorldSnapshot>(),
             };
@@ -364,7 +364,7 @@ namespace Trecs.Tests
                 Header = MakeHeader(version: 1, startFrame: 0, endFrame: 0),
                 InitialSnapshot = snapshotBytes,
                 InputQueue = Array.Empty<byte>(),
-                Checksums = new DenseDictionary<int, ulong>(),
+                Checksums = new IterableDictionary<int, ulong>(),
                 Anchors = Array.Empty<WorldSnapshot>(),
                 Bookmarks = Array.Empty<WorldSnapshot>(),
             };
@@ -757,15 +757,8 @@ namespace Trecs.Tests
             {
                 Version = 1,
                 AnchorIntervalSeconds = 1000f,
-                ChecksumFrameInterval = 1000,
             };
-            using var recorder = new BundleRecorder(
-                env.World,
-                worldStateSer,
-                registry,
-                settings,
-                snapshots
-            );
+            using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
             recorder.Start();
 
             env.StepFixedFrames(4);
@@ -962,14 +955,11 @@ namespace Trecs.Tests
                     );
                     var settings = new TrecsRewindBufferSettings
                     {
-                        // Sparse anchors so the per-frame cadence is the dominant
-                        // checksum source. Sparse scrub cache for the same reason.
+                        // Sparse anchors so scrub-cache entries are the dominant
+                        // checksum source (checksums are derived from snapshot
+                        // capture frames).
                         AnchorIntervalSeconds = 1000f,
-                        ScrubCacheIntervalSeconds = 1000f,
-                        // Capture every other frame — small enough to produce
-                        // multiple captures over the test's StepFixedFrames(20)
-                        // window without being so dense as to slow the test.
-                        ChecksumFrameInterval = 2,
+                        ScrubCacheIntervalSeconds = 0.01f,
                         Version = 1,
                     };
                     using var recorder = new TrecsRewindBuffer(
@@ -1045,7 +1035,7 @@ namespace Trecs.Tests
                 StartFixedFrame = startFrame,
                 EndFixedFrame = endFrame,
                 FixedDeltaTime = fixedDelta,
-                BlobIds = new DenseHashSet<BlobId>(),
+                BlobIds = new IterableHashSet<BlobId>(),
             };
         }
 

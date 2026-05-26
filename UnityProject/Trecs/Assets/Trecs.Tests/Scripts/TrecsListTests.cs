@@ -16,7 +16,7 @@ namespace Trecs.Tests
     [TestFixture]
     public class TrecsListTests
     {
-        static NativeChunkStore CreateChunkStore() => new NativeChunkStore(TrecsLog.Default);
+        static NativeHeap CreateChunkStore() => new NativeHeap(TrecsLog.Default);
 
         [Test]
         public void Default_IsNull()
@@ -381,59 +381,59 @@ namespace Trecs.Tests
             NAssert.AreEqual(4, Marshal.SizeOf<TrecsList<double>>());
         }
 
-        // ── End-to-end through HeapAccessor ───────────────────────────────
+        // ── End-to-end through WorldAccessor ───────────────────────────────
         //
         // The tests above exercise TrecsList against a bare chunk store. These
-        // walk the full World → EcsHeapAllocator → HeapAccessor → chunk store
+        // walk the full World → EcsHeapAllocator → WorldAccessor → chunk store
         // chain so the wiring stays honest.
 
         [Test]
-        public void HeapAccessor_AllocReadWriteDispose_RoundTrips()
+        public void WorldAccessor_AllocReadWriteDispose_RoundTrips()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 8);
+            var list = TrecsList.Alloc<int>(world, 8);
             NAssert.IsFalse(list.IsNull);
 
-            var write = list.Write(heap);
+            var write = list.Write(world);
             write.Add(1);
             write.Add(2);
             write.Add(3);
 
-            var read = list.Read(heap);
+            var read = list.Read(world);
             NAssert.AreEqual(3, read.Count);
             NAssert.AreEqual(1, read[0]);
             NAssert.AreEqual(2, read[1]);
             NAssert.AreEqual(3, read[2]);
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
-        public void HeapAccessor_AllocTrecsList_DefaultCapacityIsZero()
+        public void WorldAccessor_AllocTrecsList_DefaultCapacityIsZero()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap);
-            var read = list.Read(heap);
+            var list = TrecsList.Alloc<int>(world);
+            var read = list.Read(world);
             NAssert.AreEqual(0, read.Count);
             NAssert.AreEqual(0, read.Capacity);
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
         public void ManagedWrite_Add_AutoGrows_FromZeroCapacity()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap);
-            NAssert.AreEqual(0, list.Read(heap).Capacity);
+            var list = TrecsList.Alloc<int>(world);
+            NAssert.AreEqual(0, list.Read(world).Capacity);
 
-            var write = list.Write(heap);
+            var write = list.Write(world);
             for (int i = 0; i < 100; i++)
             {
                 write.Add(i);
@@ -445,7 +445,7 @@ namespace Trecs.Tests
                 NAssert.AreEqual(i, write[i], $"value at index {i}");
             }
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
@@ -456,10 +456,10 @@ namespace Trecs.Tests
             // buffer. (The native wrapper, by contrast, caches at Open time and
             // requires re-opening after a handle-side EnsureCapacity.)
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 2);
-            var write = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 2);
+            var write = list.Write(world);
             write.Add(11);
             write.Add(22);
 
@@ -477,17 +477,17 @@ namespace Trecs.Tests
                 NAssert.AreEqual(i * 7, write[i], $"value at index {i}");
             }
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
         public void ManagedWrite_EnsureCapacity_GrowsInPlace()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var write = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var write = list.Write(world);
             write.Add(1);
             write.Add(2);
             write.Add(3);
@@ -510,20 +510,24 @@ namespace Trecs.Tests
                 NAssert.AreEqual(i * 11, write[i], $"value at index {i}");
             }
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         // ── Version-stamp staleness detection ─────────────────────────
         //
         // The header carries a ushort Version bumped on every data-slot reallocation.
-        // Wrappers capture at Open and check on every data-touching op, so any wrapper
-        // that didn't perform the grow itself throws on next use instead of dereferencing
-        // a freed buffer. This is plain integer compare — not gated on
-        // ENABLE_UNITY_COLLECTIONS_CHECKS — so it holds in shipping builds where the
-        // AtomicSafetyHandle is compiled out.
+        // Managed (ref struct) wrappers check version on every data-touching op, so any
+        // managed wrapper that didn't perform the grow itself throws on next use instead
+        // of dereferencing a freed buffer. This is plain integer compare — not gated on
+        // ENABLE_UNITY_COLLECTIONS_CHECKS — so it holds in shipping builds.
+        //
+        // Native wrappers validate version at construction only (matching NativeList
+        // semantics). Staleness after construction is caught by the AtomicSafetyHandle
+        // at schedule time in editor builds; in release it's the caller's responsibility
+        // to not mutate a collection while a native wrapper from a prior state is in use.
 
         [Test]
-        public void NativeRead_StaleAfterHandleSideEnsureCapacity_Throws()
+        public void NativeRead_NoPerAccessVersionCheck_MatchesNativeListSemantics()
         {
             var chunkStore = CreateChunkStore();
             var list = TrecsList.Alloc<int>(chunkStore, 4);
@@ -533,12 +537,16 @@ namespace Trecs.Tests
             var read = list.Read(chunkStore.Resolver);
             NAssert.AreEqual(7, read[0]);
 
-            // Bump version through the handle-side EnsureCapacity (reallocates data slot).
             list.EnsureCapacity(chunkStore, 64);
 
-            NAssert.Throws<TrecsException>(() =>
+            // Native wrappers validate at construction only, matching NativeList
+            // semantics. Per-access version/slot-alive checks are editor-only
+            // (AtomicSafetyHandle). The stale read still "works" — the old data
+            // pointer is freed memory, but no runtime check fires in release.
+            // In real usage, the job safety walker catches this at schedule time.
+            NAssert.DoesNotThrow(() =>
             {
-                var _ = read[0];
+                var _ = read.Count;
             });
 
             list.Dispose(chunkStore);
@@ -546,7 +554,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void NativeWrite_StaleAfterHandleSideEnsureCapacity_Throws()
+        public void NativeWrite_NoPerAccessVersionCheck_MatchesNativeListSemantics()
         {
             var chunkStore = CreateChunkStore();
             var list = TrecsList.Alloc<int>(chunkStore, 4);
@@ -555,7 +563,11 @@ namespace Trecs.Tests
 
             list.EnsureCapacity(chunkStore, 64);
 
-            NAssert.Throws<TrecsException>(() => write.Add(99));
+            // Same as read: native wrappers don't per-access version check.
+            NAssert.DoesNotThrow(() =>
+            {
+                var _ = write.Count;
+            });
 
             list.Dispose(chunkStore);
             chunkStore.Dispose();
@@ -567,10 +579,10 @@ namespace Trecs.Tests
             // The growing wrapper re-syncs _capturedVersion. Subsequent ops on the same
             // wrapper see the bumped version match and proceed normally.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 2);
-            var write = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 2);
+            var write = list.Write(world);
             for (int i = 0; i < 50; i++)
             {
                 write.Add(i);
@@ -581,7 +593,7 @@ namespace Trecs.Tests
                 NAssert.AreEqual(i, write[i]);
             }
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
@@ -591,13 +603,13 @@ namespace Trecs.Tests
             // EnsureCapacity, which bumps the header version. First wrapper's next op
             // catches the version mismatch.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var w1 = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var w1 = list.Write(world);
             w1.Add(1);
 
-            var w2 = list.Write(heap);
+            var w2 = list.Write(world);
             w2.EnsureCapacity(64); // bumps version; w2 re-syncs, w1 doesn't
 
             // w1 is a ref struct so we can't capture it in NAssert.Throws's lambda —
@@ -617,7 +629,7 @@ namespace Trecs.Tests
             w2.Add(2);
             NAssert.AreEqual(2, w2.Count);
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
@@ -626,13 +638,13 @@ namespace Trecs.Tests
             // Every Add bumps version, matching List<T> enumerator semantics — even
             // without a grow, a sibling wrapper that opened earlier is invalidated.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 16);
-            var w1 = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 16);
+            var w1 = list.Write(world);
             w1.Add(1);
 
-            var w2 = list.Write(heap);
+            var w2 = list.Write(world);
             w2.Add(2); // bumps; capacity 16, no grow
 
             bool threw = false;
@@ -646,7 +658,7 @@ namespace Trecs.Tests
             }
             NAssert.IsTrue(threw, "w1 should throw after w2.Add bumped the version");
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
@@ -655,19 +667,19 @@ namespace Trecs.Tests
             // RemoveAt shifts elements down — any other wrapper holding a stale
             // interpretation of indices is invalidated.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 8);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 8);
+            var w = list.Write(world);
             w.Add(10);
             w.Add(20);
             w.Add(30);
 
-            var r = list.Read(heap);
+            var r = list.Read(world);
             NAssert.AreEqual(20, r[1]);
 
             // RemoveAt bumps version.
-            var w2 = list.Write(heap);
+            var w2 = list.Write(world);
             w2.RemoveAt(0);
 
             bool threw = false;
@@ -681,23 +693,23 @@ namespace Trecs.Tests
             }
             NAssert.IsTrue(threw, "r should throw after w2.RemoveAt bumped the version");
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
         public void ManagedRead_OtherWrapperCleared_StaleReadThrows()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 8);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 8);
+            var w = list.Write(world);
             w.Add(42);
 
-            var r = list.Read(heap);
+            var r = list.Read(world);
             NAssert.AreEqual(42, r[0]);
 
-            var w2 = list.Write(heap);
+            var w2 = list.Write(world);
             w2.Clear();
 
             bool threw = false;
@@ -711,15 +723,12 @@ namespace Trecs.Tests
             }
             NAssert.IsTrue(threw, "r should throw after w2.Clear bumped the version");
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
-        public void NativeWrite_Add_BumpsVersion_InvalidatesSiblingWrapper()
+        public void NativeWrite_Add_SiblingMutation_NoPerAccessCheck()
         {
-            // Mirrors the managed-wrapper test for sibling-mutation invalidation.
-            // Catches in-job patterns like opening two NativeTrecsListWrite views on
-            // the same list and mutating through one while the other holds cached state.
             var chunkStore = CreateChunkStore();
             var list = TrecsList.Alloc<int>(chunkStore, 16);
 
@@ -729,14 +738,16 @@ namespace Trecs.Tests
             var w2 = list.Write(chunkStore.Resolver);
             w2.Add(2);
 
-            NAssert.Throws<TrecsException>(() => w1.Add(3));
+            // Native wrappers don't per-access version check. In real usage the
+            // job safety walker prevents two concurrent writers at schedule time.
+            NAssert.DoesNotThrow(() => w1.Add(3));
 
             list.Dispose(chunkStore);
             chunkStore.Dispose();
         }
 
         [Test]
-        public void NativeWrite_RemoveAt_BumpsVersion_InvalidatesSiblingRead()
+        public void NativeWrite_RemoveAt_SiblingRead_NoPerAccessCheck()
         {
             var chunkStore = CreateChunkStore();
             var list = TrecsList.Alloc<int>(chunkStore, 8);
@@ -750,9 +761,9 @@ namespace Trecs.Tests
             var w2 = list.Write(chunkStore.Resolver);
             w2.RemoveAt(0);
 
-            NAssert.Throws<TrecsException>(() =>
+            NAssert.DoesNotThrow(() =>
             {
-                var _ = r[0];
+                var _ = r.Count;
             });
 
             list.Dispose(chunkStore);
@@ -760,7 +771,7 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void NativeWrite_Clear_BumpsVersion_InvalidatesSiblingRead()
+        public void NativeWrite_Clear_SiblingRead_NoPerAccessCheck()
         {
             var chunkStore = CreateChunkStore();
             var list = TrecsList.Alloc<int>(chunkStore, 4);
@@ -772,7 +783,7 @@ namespace Trecs.Tests
             var w2 = list.Write(chunkStore.Resolver);
             w2.Clear();
 
-            NAssert.Throws<TrecsException>(() =>
+            NAssert.DoesNotThrow(() =>
             {
                 var _ = r.Count;
             });
@@ -817,16 +828,16 @@ namespace Trecs.Tests
         public void ManagedRead_Foreach_VisitsAllElements()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var write = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var write = list.Write(world);
             for (int i = 0; i < 10; i++)
             {
                 write.Add(i * 3);
             }
 
-            var read = list.Read(heap);
+            var read = list.Read(world);
             int seen = 0;
             int sum = 0;
             foreach (var v in read)
@@ -838,17 +849,17 @@ namespace Trecs.Tests
             NAssert.AreEqual(10, seen);
             NAssert.AreEqual(0 + 3 + 6 + 9 + 12 + 15 + 18 + 21 + 24 + 27, sum);
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
         public void ManagedRead_Foreach_EmptyList_NoIterations()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var read = list.Read(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var read = list.Read(world);
             int seen = 0;
             foreach (var _ in read)
             {
@@ -856,7 +867,7 @@ namespace Trecs.Tests
             }
             NAssert.AreEqual(0, seen);
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
@@ -884,11 +895,10 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void NativeRead_Foreach_ThrowsOnSiblingMutationMidIteration()
+        public void NativeRead_Foreach_NoPerAccessVersionCheck()
         {
-            // A sibling Write mid-iteration bumps the version; the next MoveNext or
-            // Current access through the enumerator triggers the version check and
-            // throws. Catches the classic "mutated during enumeration" bug.
+            // Native wrappers don't per-access version check. The enumerator
+            // uses raw pointers cached at construction, matching NativeList.
             var chunkStore = CreateChunkStore();
             var list = TrecsList.Alloc<int>(chunkStore, 16);
             var w = list.Write(chunkStore.Resolver);
@@ -899,15 +909,14 @@ namespace Trecs.Tests
 
             var r = list.Read(chunkStore.Resolver);
             var iter = r.GetEnumerator();
-            // First MoveNext advances to index 0 — passes (version still matches).
             NAssert.IsTrue(iter.MoveNext());
             var _ = iter.Current;
 
-            // Sibling mutation bumps the version.
             var w2 = list.Write(chunkStore.Resolver);
             w2.Add(999);
 
-            NAssert.Throws<TrecsException>(() => iter.MoveNext());
+            // No throw — native enumerator doesn't re-check version.
+            NAssert.DoesNotThrow(() => iter.MoveNext());
 
             list.Dispose(chunkStore);
             chunkStore.Dispose();
@@ -1095,16 +1104,17 @@ namespace Trecs.Tests
             // within an existing list's capacity. The heap is simulation
             // state; mutating it at variable cadence would desync.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var unrestrictedHeap = env.Accessor.Heap;
-            var variableHeap = env
-                .World.CreateAccessor(AccessorRole.Variable, debugName: "VariableHeapTest")
-                .Heap;
+            var unrestrictedWorld = env.Accessor;
+            var variableWorld = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                debugName: "VariableHeapTest"
+            );
 
-            var list = TrecsList.Alloc<int>(unrestrictedHeap, 4);
+            var list = TrecsList.Alloc<int>(unrestrictedWorld, 4);
 
-            NAssert.Throws<TrecsException>(() => list.Write(variableHeap));
+            NAssert.Throws<TrecsException>(() => list.Write(variableWorld));
 
-            list.Dispose(unrestrictedHeap);
+            list.Dispose(unrestrictedWorld);
         }
 
         [Test]
@@ -1116,13 +1126,13 @@ namespace Trecs.Tests
             // with the matching _canMutateHeap bit. Both the world-flag check
             // and the resolver-flag check reject a Variable-role caller.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var unrestrictedHeap = env.Accessor.Heap;
+            var unrestrictedWorld = env.Accessor;
             var variableAccessor = env.World.CreateAccessor(
                 AccessorRole.Variable,
                 debugName: "VariableNativeWorldTest"
             );
 
-            var list = TrecsList.Alloc<int>(unrestrictedHeap, 4);
+            var list = TrecsList.Alloc<int>(unrestrictedWorld, 4);
             var nativeVariable = variableAccessor.ToNative();
 
             // World-flag path
@@ -1134,7 +1144,7 @@ namespace Trecs.Tests
             var resolver = nativeVariable.ChunkStoreResolver;
             NAssert.Throws<TrecsException>(() => list.Write(in resolver));
 
-            list.Dispose(unrestrictedHeap);
+            list.Dispose(unrestrictedWorld);
         }
 
         [Test]
@@ -1144,9 +1154,9 @@ namespace Trecs.Tests
             // NativeWorldAccessor's resolver has _canMutateHeap = 1 stamped,
             // so the Burst-job Write paths open normally.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var unrestrictedHeap = env.Accessor.Heap;
+            var unrestrictedWorld = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(unrestrictedHeap, 4);
+            var list = TrecsList.Alloc<int>(unrestrictedWorld, 4);
             var nativeUnrestricted = env.Accessor.ToNative();
 
             // Mutation through the role-permissive resolver is allowed.
@@ -1155,7 +1165,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, w.Count);
             NAssert.AreEqual(42, w[0]);
 
-            list.Dispose(unrestrictedHeap);
+            list.Dispose(unrestrictedWorld);
         }
 
         [Test]
@@ -1165,16 +1175,17 @@ namespace Trecs.Tests
             // gates on AssertCanMutateHeap — a Variable-role accessor (which
             // can't mutate the heap) must throw.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var unrestrictedHeap = env.Accessor.Heap;
-            var variableHeap = env
-                .World.CreateAccessor(AccessorRole.Variable, debugName: "VariableHeapTest")
-                .Heap;
+            var unrestrictedWorld = env.Accessor;
+            var variableWorld = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                debugName: "VariableHeapTest"
+            );
 
-            var list = TrecsList.Alloc<int>(unrestrictedHeap, 4);
+            var list = TrecsList.Alloc<int>(unrestrictedWorld, 4);
 
-            NAssert.Throws<TrecsException>(() => list.EnsureCapacity(variableHeap, 100));
+            NAssert.Throws<TrecsException>(() => list.EnsureCapacity(variableWorld, 100));
 
-            list.Dispose(unrestrictedHeap);
+            list.Dispose(unrestrictedWorld);
         }
 
         [Test]
@@ -1293,22 +1304,22 @@ namespace Trecs.Tests
             // Parity with the native test, but the managed enumerator is a ref struct
             // so we can't capture it in NAssert.Throws's lambda — use try/catch instead.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 16);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 16);
+            var w = list.Write(world);
             for (int i = 0; i < 5; i++)
             {
                 w.Add(i);
             }
 
-            var r = list.Read(heap);
+            var r = list.Read(world);
             var iter = r.GetEnumerator();
             NAssert.IsTrue(iter.MoveNext());
             var _ = iter.Current;
 
             // Sibling mutation bumps version.
-            var w2 = list.Write(heap);
+            var w2 = list.Write(world);
             w2.Add(999);
 
             bool threw = false;
@@ -1322,7 +1333,7 @@ namespace Trecs.Tests
             }
             NAssert.IsTrue(threw, "managed enumerator should throw on stale version");
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
@@ -1333,14 +1344,14 @@ namespace Trecs.Tests
             // visible to any reader through the shared data buffer, so there's
             // nothing stale to invalidate.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var w = list.Write(world);
             w.Add(10);
             w.Add(20);
 
-            var r = list.Read(heap);
+            var r = list.Read(world);
             NAssert.AreEqual(20, r[1]);
 
             // In-place assign through ref indexer — no version bump.
@@ -1349,17 +1360,17 @@ namespace Trecs.Tests
             // r is still valid; it sees the new value through the shared buffer.
             NAssert.AreEqual(99, r[1]);
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
         public void ManagedWrite_Foreach_VisitsAllElements()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var w = list.Write(world);
             for (int i = 0; i < 10; i++)
             {
                 w.Add(i * 3);
@@ -1376,17 +1387,17 @@ namespace Trecs.Tests
             NAssert.AreEqual(10, seen);
             NAssert.AreEqual(0 + 3 + 6 + 9 + 12 + 15 + 18 + 21 + 24 + 27, sum);
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
         public void ManagedWrite_Foreach_EmptyList_NoIterations()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var w = list.Write(world);
             int seen = 0;
             foreach (var _ in w)
             {
@@ -1394,7 +1405,7 @@ namespace Trecs.Tests
             }
             NAssert.AreEqual(0, seen);
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
@@ -1406,10 +1417,10 @@ namespace Trecs.Tests
             // assignment doesn't bump the version (same reasoning as the indexer
             // test above), so iteration completes cleanly.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var w = list.Write(world);
             for (int i = 0; i < 5; i++)
             {
                 w.Add(i);
@@ -1420,13 +1431,13 @@ namespace Trecs.Tests
                 x *= 10;
             }
 
-            var r = list.Read(heap);
+            var r = list.Read(world);
             for (int i = 0; i < 5; i++)
             {
                 NAssert.AreEqual(i * 10, r[i]);
             }
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
@@ -1438,10 +1449,10 @@ namespace Trecs.Tests
             // CheckVersion in the indexer. Mirrors the Read-view test —
             // foreach-write is not a license to bypass List<T> enumerator semantics.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 16);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 16);
+            var w = list.Write(world);
             for (int i = 0; i < 5; i++)
             {
                 w.Add(i);
@@ -1452,7 +1463,7 @@ namespace Trecs.Tests
             var _ = iter.Current;
 
             // Sibling Write mutation bumps the version.
-            var w2 = list.Write(heap);
+            var w2 = list.Write(world);
             w2.Add(999);
 
             bool threw = false;
@@ -1466,7 +1477,7 @@ namespace Trecs.Tests
             }
             NAssert.IsTrue(threw, "write enumerator should throw on stale version");
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         struct IntAscComparer : IComparer<int>
@@ -1483,10 +1494,10 @@ namespace Trecs.Tests
         public void ManagedWrite_Sort_ReordersInPlace()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 8);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 8);
+            var w = list.Write(world);
             foreach (var v in new[] { 5, 1, 4, 2, 8, 3, 7, 6 })
             {
                 w.Add(v);
@@ -1494,23 +1505,23 @@ namespace Trecs.Tests
 
             w.Sort(default(IntAscComparer));
 
-            var r = list.Read(heap);
+            var r = list.Read(world);
             for (int i = 0; i < 8; i++)
             {
                 NAssert.AreEqual(i + 1, r[i], $"index {i}");
             }
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
         public void ManagedWrite_Sort_HonoursComparerOrdering()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var w = list.Write(world);
             foreach (var v in new[] { 2, 7, 1, 4 })
             {
                 w.Add(v);
@@ -1518,29 +1529,29 @@ namespace Trecs.Tests
 
             w.Sort(default(IntDescComparer));
 
-            var r = list.Read(heap);
+            var r = list.Read(world);
             NAssert.AreEqual(7, r[0]);
             NAssert.AreEqual(4, r[1]);
             NAssert.AreEqual(2, r[2]);
             NAssert.AreEqual(1, r[3]);
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
         public void ManagedWrite_Sort_BumpsVersion_InvalidatesSiblingWrapper()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var w = list.Write(world);
             foreach (var v in new[] { 3, 1, 2 })
             {
                 w.Add(v);
             }
 
-            var r = list.Read(heap);
+            var r = list.Read(world);
             // Touch r once to confirm it's live pre-sort.
             NAssert.AreEqual(3, r[0]);
 
@@ -1557,17 +1568,17 @@ namespace Trecs.Tests
             }
             NAssert.IsTrue(threw, "sibling Read should throw after sort bumps version");
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
         public void ManagedWrite_Sort_Parameterless_UsesIComparable()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 8);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 8);
+            var w = list.Write(world);
             foreach (var v in new[] { 5, 1, 4, 2, 8, 3, 7, 6 })
             {
                 w.Add(v);
@@ -1575,28 +1586,28 @@ namespace Trecs.Tests
 
             w.Sort();
 
-            var r = list.Read(heap);
+            var r = list.Read(world);
             for (int i = 0; i < 8; i++)
             {
                 NAssert.AreEqual(i + 1, r[i], $"index {i}");
             }
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
 
         [Test]
         public void ManagedWrite_Sort_EmptyList_NoOp()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(heap, 4);
-            var w = list.Write(heap);
+            var list = TrecsList.Alloc<int>(world, 4);
+            var w = list.Write(world);
 
             w.Sort(default(IntAscComparer));
             NAssert.AreEqual(0, w.Count);
 
-            list.Dispose(heap);
+            list.Dispose(world);
         }
     }
 }

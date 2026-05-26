@@ -209,7 +209,7 @@ public partial class Enemy : ITemplate,
 
     **Rule of thumb: Before reaching for partitions, consider using the more lightweight [sets](../entity-management/sets.md).** Sets are presence/absence too but don't multiply — five "poisoned / stunned / burning / selected / targeted" sets are five sparse data structures, not 32 groups.
 
-    Partitions are a cache-locality optimization: use them when a hot system iterates one variant every frame and benefits from those entities being packed contiguously — e.g. physics over `Active` balls. States the design wants to *name* but rarely *iterates by* are cheaper as sets.
+    Partitions are a cache-locality optimization: use them when a hot system iterates one variant every frame and benefits from those entities being packed contiguously — e.g. physics over `Active` balls. For most cases prefer sets.
 
 ### Transitions
 
@@ -229,7 +229,7 @@ enemy.SetTag<MoveState.Running>(World); // switch the active variant in MoveStat
 - **Binary (presence/absence)** — turns the tag on. `UnsetTag<T>` turns it off.
 - **Multi-variant** — switches the entity to that variant of the dimension, leaving other dimensions unchanged. `UnsetTag<T>` doesn't apply (there's no "off" state) — switch variants with another `SetTag<T>` call.
 
-Multiple `SetTag` / `UnsetTag` calls on the same entity in one frame **coalesce**: changes on different dims merge into a single move at submission. Two ops on the *same* dim throw — this is a deliberate "no silent ordering" policy. To move an entity across several dims at once, just call `SetTag` for each:
+Multiple `SetTag` / `UnsetTag` calls on the same entity in one frame **coalesce**: changes on different dims merge into a single move at submission. Two ops on the *same* dim are a conflict — in debug builds this throws; in release builds the op with the highest `Tag.Value` wins deterministically and an error is logged. To move an entity across several dims at once, just call `SetTag` for each:
 
 ```csharp
 // Set Active on, switch MoveState to Running — one structural change at submit.

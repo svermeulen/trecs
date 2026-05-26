@@ -4,7 +4,7 @@ using Unity.Burst;
 
 namespace Trecs.Internal
 {
-    //Note: SharedStatic MUST always be initialised outside burst otherwise undefined behaviour will happen
+    // SharedStatic MUST always be initialized outside Burst, otherwise undefined behavior
     [EditorBrowsable(EditorBrowsableState.Never)]
     internal struct SharedStaticWrapper<T, Key>
         where T : unmanaged

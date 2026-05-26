@@ -1,3 +1,5 @@
+using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -36,22 +38,24 @@ namespace Trecs.Internal
             }
         }
 
-        public void Complete(BinaryWriter writer)
+        public void Complete(Stream stream)
         {
             TrecsDebugAssert.That(_hasStarted);
             _hasStarted = false;
-
-            writer.Write(_totalBits);
 
             if (_bitPosition > 0)
             {
                 _bytes.Add(_currentByte);
             }
 
-            writer.Write(_bytes.Count);
+            Span<byte> header = stackalloc byte[sizeof(int) * 2];
+            BinaryPrimitives.WriteInt32LittleEndian(header, _totalBits);
+            BinaryPrimitives.WriteInt32LittleEndian(header.Slice(sizeof(int)), _bytes.Count);
+            stream.Write(header);
+
             foreach (var b in _bytes)
             {
-                writer.Write(b);
+                stream.WriteByte(b);
             }
         }
 

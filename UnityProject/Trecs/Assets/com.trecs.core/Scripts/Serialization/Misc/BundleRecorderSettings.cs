@@ -21,12 +21,5 @@ namespace Trecs.Internal
         /// faster recovery.
         /// </summary>
         public float AnchorIntervalSeconds = 30f;
-
-        /// <summary>
-        /// Capture a checksum every N fixed frames during recording. Smaller
-        /// = catches desyncs closer to where they happen; larger = less
-        /// per-frame cost. Must be &gt;= 1.
-        /// </summary>
-        public int ChecksumFrameInterval = 30;
     }
 }

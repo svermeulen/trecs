@@ -11,35 +11,18 @@ namespace Trecs
     /// </summary>
     public static class InputSharedPtr
     {
-        public static InputSharedPtr<T> Alloc<T>(HeapAccessor heap, BlobId blobId, T value)
-            where T : class
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.InputSharedHeap.Alloc<T>(heap.FixedFrame, blobId, value);
-        }
-
         public static InputSharedPtr<T> Alloc<T>(WorldAccessor world, BlobId blobId, T value)
-            where T : class => Alloc<T>(world.Heap, blobId, value);
-
-        public static InputSharedPtr<T> Acquire<T>(HeapAccessor heap, BlobId blobId)
             where T : class
         {
-            heap.AssertCanAddInputsSystem();
-            return heap.InputSharedHeap.Acquire<T>(heap.FixedFrame, blobId);
+            world.AssertCanAddInputsHeap();
+            return world.InputSharedHeap.Alloc<T>(world.FixedFrame, blobId, value);
         }
 
         public static InputSharedPtr<T> Acquire<T>(WorldAccessor world, BlobId blobId)
-            where T : class => Acquire<T>(world.Heap, blobId);
-
-        public static bool TryAcquire<T>(
-            HeapAccessor heap,
-            BlobId blobId,
-            out InputSharedPtr<T> ptr
-        )
             where T : class
         {
-            heap.AssertCanAddInputsSystem();
-            return heap.InputSharedHeap.TryAcquire<T>(heap.FixedFrame, blobId, out ptr);
+            world.AssertCanAddInputsHeap();
+            return world.InputSharedHeap.Acquire<T>(world.FixedFrame, blobId);
         }
 
         public static bool TryAcquire<T>(
@@ -47,7 +30,11 @@ namespace Trecs
             BlobId blobId,
             out InputSharedPtr<T> ptr
         )
-            where T : class => TryAcquire<T>(world.Heap, blobId, out ptr);
+            where T : class
+        {
+            world.AssertCanAddInputsHeap();
+            return world.InputSharedHeap.TryAcquire<T>(world.FixedFrame, blobId, out ptr);
+        }
     }
 
     /// <summary>
@@ -84,29 +71,22 @@ namespace Trecs
         /// time, but checked at runtime too as defense in depth).
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly T Get(HeapAccessor heap)
+        public readonly T Get(WorldAccessor world)
         {
             TrecsDebugAssert.That(!IsNull, "Cannot Get on a null InputSharedPtr");
-            return heap.BlobCache.GetManagedBlob<T>(BlobId, updateAccessTime: true);
+            return world.BlobCache.GetManagedBlob<T>(BlobId, updateAccessTime: true);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly T Get(WorldAccessor world) => Get(world.Heap);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool TryGet(HeapAccessor heap, out T value)
+        public readonly bool TryGet(WorldAccessor world, out T value)
         {
             if (IsNull)
             {
                 value = null;
                 return false;
             }
-            return heap.BlobCache.TryGetManagedBlob<T>(BlobId, out value);
+            return world.BlobCache.TryGetManagedBlob<T>(BlobId, out value);
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool TryGet(WorldAccessor world, out T value) =>
-            TryGet(world.Heap, out value);
 
         public readonly bool Equals(InputSharedPtr<T> other) => BlobId.Equals(other.BlobId);
 

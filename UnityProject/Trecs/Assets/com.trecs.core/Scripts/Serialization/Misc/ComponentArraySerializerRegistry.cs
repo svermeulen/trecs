@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs
@@ -14,7 +14,10 @@ namespace Trecs
     /// </summary>
     public sealed class ComponentArraySerializerRegistry
     {
-        readonly Dictionary<Type, IComponentArraySerializerDispatcher> _byComponentType = new();
+        readonly IterableDictionary<
+            RefKey<Type>,
+            IComponentArraySerializerDispatcher
+        > _byComponentType = new();
 
         /// <summary>
         /// Register a serializer for component type <typeparamref name="T"/>.
@@ -43,7 +46,7 @@ namespace Trecs
         public bool Unregister<T>()
             where T : unmanaged, IEntityComponent
         {
-            return _byComponentType.Remove(typeof(T));
+            return _byComponentType.TryRemove(typeof(T));
         }
 
         /// <summary>
@@ -67,7 +70,7 @@ namespace Trecs
         /// Enumerate the component types that currently have a serializer
         /// registered.
         /// </summary>
-        public IEnumerable<Type> GetRegisteredComponentTypes()
+        public IterableDictionaryKeyEnumerable<RefKey<Type>> GetRegisteredComponentTypes()
         {
             return _byComponentType.Keys;
         }

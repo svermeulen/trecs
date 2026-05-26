@@ -11,7 +11,7 @@ namespace Trecs
     public readonly ref struct EntityInitializer
     {
         readonly GroupIndex _group;
-        readonly DenseDictionary<TypeId, IComponentArray> _groupDictionary;
+        readonly IterableDictionary<TypeId, IComponentArray> _groupDictionary;
         readonly int _indexInTransientBuffer;
 #if DEBUG && !TRECS_IS_PROFILING
         readonly EntityInitializationTracker _tracker;
@@ -28,7 +28,7 @@ namespace Trecs
         /// </summary>
         public EntityInitializer(
             GroupIndex group,
-            DenseDictionary<TypeId, IComponentArray> groupDictionary,
+            IterableDictionary<TypeId, IComponentArray> groupDictionary,
             in EntityHandle id,
             int indexInTransientBuffer
 #if DEBUG && !TRECS_IS_PROFILING
@@ -64,7 +64,7 @@ namespace Trecs
         /// <summary>
         /// Sets the initial value of component <typeparamref name="T"/> on this entity.
         /// </summary>
-        /// <param name="initializer">The component value to assign.</param>
+        /// <param name="component">The component value to assign.</param>
         public EntityInitializer Set<T>(in T component)
             where T : unmanaged, IEntityComponent
         {

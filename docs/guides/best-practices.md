@@ -5,7 +5,7 @@ Recommended practices for building with Trecs. Assumes determinism is a required
 ## Systems
 
 - **Declare system dependencies explicitly.** Use [`[ExecuteAfter]` / `[ExecuteBefore]`](../core/systems.md#system-ordering) instead of relying on registration order.
-- **Pick the right [phase](../core/systems.md#update-phases).** `Fixed` for simulation, `Input` for queueing inputs, `Presentation` / `LatePresentation` for rendering and transform sync. The phase determines which [Accessor Role](../advanced/accessor-roles.md) you get and what you're allowed to do in it.
+- **Pick the right [phase](../core/systems.md#update-phases).** `Fixed` for simulation, `Input` for queueing inputs, `EarlyPresentation` / `Presentation` / `LatePresentation` for rendering and transform sync. The phase determines which [Accessor Role](../advanced/accessor-roles.md) you get and what you're allowed to do in it.
 - **Keep fixed-update objects stateless.** Includes systems and service classes used by fixed-update systems. Constructor parameters for immutable configuration are fine. Mutable state belongs in components, where it's serialized, deterministic, and visible to tooling. Otherwise state diverges between record and replay. Applies less strongly to variable-update systems (desyncs aren't possible there), but storing state in components — via [`[VariableUpdateOnly]`](../advanced/accessor-roles.md#vuo-field-vs-vuo-template) entities/components — is still often best for the same reasons.
 
 ## Components

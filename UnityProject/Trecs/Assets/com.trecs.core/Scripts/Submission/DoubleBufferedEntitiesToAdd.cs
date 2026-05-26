@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Trecs.Collections;
 using Unity.Burst;
 using Unity.Collections;
@@ -12,10 +13,10 @@ namespace Trecs.Internal
         int _index;
         readonly int _length;
         readonly int[] _counts;
-        readonly DenseDictionary<TypeId, IComponentArray>[] _components;
+        readonly IterableDictionary<TypeId, IComponentArray>[] _components;
 
         public OtherComponentsToAddPerGroupEnumerator(
-            DenseDictionary<TypeId, IComponentArray>[] lastComponentsToAddPerGroup,
+            IterableDictionary<TypeId, IComponentArray>[] lastComponentsToAddPerGroup,
             int[] lastNumberEntitiesCreatedPerGroup
         )
         {
@@ -49,26 +50,28 @@ namespace Trecs.Internal
     struct GroupInfo
     {
         public GroupIndex GroupIndex;
-        public DenseDictionary<TypeId, IComponentArray> Components;
+        public IterableDictionary<TypeId, IComponentArray> Components;
     }
 
     internal class DoubleBufferedEntitiesToAdd
     {
         public DoubleBufferedEntitiesToAdd(int groupCount)
         {
-            currentComponentsToAddPerGroup = new DenseDictionary<TypeId, IComponentArray>[
+            currentComponentsToAddPerGroup = new IterableDictionary<TypeId, IComponentArray>[
                 groupCount
             ];
-            lastComponentsToAddPerGroup = new DenseDictionary<TypeId, IComponentArray>[groupCount];
+            lastComponentsToAddPerGroup = new IterableDictionary<TypeId, IComponentArray>[
+                groupCount
+            ];
 
             _currentNumberEntitiesCreatedPerGroup = new int[groupCount];
             _lastNumberEntitiesCreatedPerGroup = new int[groupCount];
 
-            _currentPendingReferences = new FastList<EntityHandle>[groupCount];
-            _lastPendingReferences = new FastList<EntityHandle>[groupCount];
+            _currentPendingReferences = new List<EntityHandle>[groupCount];
+            _lastPendingReferences = new List<EntityHandle>[groupCount];
 
-            _currentNativeAddSortKeys = new FastList<ulong>[groupCount];
-            _lastNativeAddSortKeys = new FastList<ulong>[groupCount];
+            _currentNativeAddSortKeys = new List<ulong>[groupCount];
+            _lastNativeAddSortKeys = new List<ulong>[groupCount];
 
             _currentNativeAddStartIndices = new int[groupCount];
             _lastNativeAddStartIndices = new int[groupCount];
@@ -128,7 +131,7 @@ namespace Trecs.Internal
                 _cachedReorderScratch.Dispose();
         }
 
-        static void DisposeBuffer(DenseDictionary<TypeId, IComponentArray>[] buffer)
+        static void DisposeBuffer(IterableDictionary<TypeId, IComponentArray>[] buffer)
         {
             for (int i = 0; i < buffer.Length; i++)
             {
@@ -190,14 +193,14 @@ namespace Trecs.Internal
         }
 
         static void PreallocateDictionaries(
-            DenseDictionary<TypeId, IComponentArray>[] buffer,
+            IterableDictionary<TypeId, IComponentArray>[] buffer,
             GroupIndex groupId,
             int numberOfEntities,
             IComponentBuilder[] entityComponentsToBuild
         )
         {
             ref var group = ref buffer[groupId.Index];
-            group ??= new DenseDictionary<TypeId, IComponentArray>();
+            group ??= new IterableDictionary<TypeId, IComponentArray>();
 
             foreach (var componentBuilder in entityComponentsToBuild)
             {
@@ -245,17 +248,17 @@ namespace Trecs.Internal
             );
         }
 
-        internal DenseDictionary<TypeId, IComponentArray> GetOrCreateCurrentComponentsForGroup(
+        internal IterableDictionary<TypeId, IComponentArray> GetOrCreateCurrentComponentsForGroup(
             GroupIndex group
         )
         {
             ref var slot = ref currentComponentsToAddPerGroup[group.Index];
-            return slot ??= new DenseDictionary<TypeId, IComponentArray>();
+            return slot ??= new IterableDictionary<TypeId, IComponentArray>();
         }
 
         internal bool TryGetLastPendingReferences(
             GroupIndex group,
-            out FastList<EntityHandle> pendingRefs
+            out List<EntityHandle> pendingRefs
         )
         {
             pendingRefs = _lastPendingReferences[group.Index];
@@ -265,14 +268,14 @@ namespace Trecs.Internal
         internal void AddPendingReference(GroupIndex group, EntityHandle reference)
         {
             ref var slot = ref _currentPendingReferences[group.Index];
-            slot ??= new FastList<EntityHandle>();
+            slot ??= new List<EntityHandle>();
             slot.Add(reference);
         }
 
         internal void AddPendingNativeAddSortKey(GroupIndex group, int accessorId, uint sortKey)
         {
             ref var slot = ref _currentNativeAddSortKeys[group.Index];
-            slot ??= new FastList<ulong>();
+            slot ??= new List<ulong>();
             ulong compositeKey = ((ulong)(uint)accessorId << 32) | sortKey;
             slot.Add(compositeKey);
         }
@@ -316,18 +319,17 @@ namespace Trecs.Internal
                 var count = refs.Count;
                 for (int i = startIndex; i < count; i++)
                 {
-                    ref var slot = ref refs[i];
-                    if (slot == EntityHandle.Null)
+                    if (refs[i] == EntityHandle.Null)
                     {
-                        slot = entityHandleMap.ClaimId();
+                        refs[i] = entityHandleMap.ClaimId();
                     }
                 }
             }
         }
 
-        internal DenseDictionary<TypeId, IComponentArray>[] currentComponentsToAddPerGroup;
+        internal IterableDictionary<TypeId, IComponentArray>[] currentComponentsToAddPerGroup;
 
-        DenseDictionary<TypeId, IComponentArray>[] lastComponentsToAddPerGroup;
+        IterableDictionary<TypeId, IComponentArray>[] lastComponentsToAddPerGroup;
 
         int[] _currentNumberEntitiesCreatedPerGroup;
         int[] _lastNumberEntitiesCreatedPerGroup;
@@ -335,11 +337,11 @@ namespace Trecs.Internal
         int _totalEntitiesCreatedThisFrame;
         int _totalEntitiesCreatedLastFrame;
 
-        FastList<EntityHandle>[] _currentPendingReferences;
-        FastList<EntityHandle>[] _lastPendingReferences;
+        List<EntityHandle>[] _currentPendingReferences;
+        List<EntityHandle>[] _lastPendingReferences;
 
-        FastList<ulong>[] _currentNativeAddSortKeys;
-        FastList<ulong>[] _lastNativeAddSortKeys;
+        List<ulong>[] _currentNativeAddSortKeys;
+        List<ulong>[] _lastNativeAddSortKeys;
 
         int[] _currentNativeAddStartIndices;
         int[] _lastNativeAddStartIndices;
@@ -483,7 +485,7 @@ namespace Trecs.Internal
                         maxElementSize = elemSize;
                 }
 
-                int scratchBytes = maxElementSize * count;
+                int scratchBytes = (int)((long)maxElementSize * count);
                 if (_cachedReorderScratch.Length < scratchBytes)
                     _cachedReorderScratch.Resize(
                         scratchBytes,

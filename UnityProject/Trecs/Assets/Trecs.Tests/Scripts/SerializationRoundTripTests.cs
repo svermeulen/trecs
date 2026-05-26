@@ -54,7 +54,7 @@ namespace Trecs.Tests
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 7 }).AssertComplete();
             a.AddEntity(TestTags.Alpha).Set(new TestInt { Value = 11 }).AssertComplete();
             // Toss in a native-unique allocation so the chunk-store path is exercised.
-            var ptr = NativeUniquePtr.Alloc<int>(a.Heap, 42);
+            var ptr = NativeUniquePtr.Alloc<int>(a, 42);
             a.Submit();
 
             var registry = new SerializerRegistry();
@@ -269,7 +269,7 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
 
-            var ptr = NativeUniquePtr.Alloc<int>(a.Heap, 42);
+            var ptr = NativeUniquePtr.Alloc<int>(a, 42);
             a.Submit();
             var savedHandle = ptr.Handle;
 
@@ -285,16 +285,16 @@ namespace Trecs.Tests
             // state is genuinely different at load time.
             ptr.Dispose(a);
             a.Submit();
-            var sideEffect = NativeUniquePtr.Alloc<int>(a.Heap, 99);
+            var sideEffect = NativeUniquePtr.Alloc<int>(a, 99);
             a.Submit();
-            NAssert.AreEqual(99, sideEffect.Read(a.Heap).Value);
+            NAssert.AreEqual(99, sideEffect.Read(a).Value);
 
             // Load — should restore the original handle exactly.
             stream.Position = 0;
             snapshots.LoadSnapshot(stream);
 
             var restored = new NativeUniquePtr<int>(savedHandle);
-            NAssert.AreEqual(42, restored.Read(a.Heap).Value);
+            NAssert.AreEqual(42, restored.Read(a).Value);
         }
 
         [Test]
@@ -307,7 +307,7 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(a.Heap);
+            var list = TrecsList.Alloc<int>(a);
             a.Submit();
             var savedHandle = list.Handle;
 
@@ -326,15 +326,15 @@ namespace Trecs.Tests
             snapshots.LoadSnapshot(stream);
 
             var restored = new TrecsList<int>(savedHandle);
-            var read = restored.Read(a.Heap);
+            var read = restored.Read(a);
             NAssert.AreEqual(0, read.Count);
             NAssert.AreEqual(0, read.Capacity);
 
             // Sanity: a follow-up EnsureCapacity + Add still works against the restored
             // empty list (no stale data pointer hangover).
-            restored.EnsureCapacity(a.Heap, 4);
-            restored.Write(a.Heap).Add(99);
-            NAssert.AreEqual(99, restored.Read(a.Heap)[0]);
+            restored.EnsureCapacity(a, 4);
+            restored.Write(a).Add(99);
+            NAssert.AreEqual(99, restored.Read(a)[0]);
 
             restored.Dispose(a);
         }
@@ -345,8 +345,8 @@ namespace Trecs.Tests
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
             var a = env.Accessor;
 
-            var list = TrecsList.Alloc<int>(a.Heap, 8);
-            var w = list.Write(a.Heap);
+            var list = TrecsList.Alloc<int>(a, 8);
+            var w = list.Write(a);
             w.Add(11);
             w.Add(22);
             w.Add(33);
@@ -369,7 +369,7 @@ namespace Trecs.Tests
             snapshots.LoadSnapshot(stream);
 
             var restored = new TrecsList<int>(savedHandle);
-            var read = restored.Read(a.Heap);
+            var read = restored.Read(a);
             NAssert.AreEqual(3, read.Count);
             NAssert.AreEqual(11, read[0]);
             NAssert.AreEqual(22, read[1]);

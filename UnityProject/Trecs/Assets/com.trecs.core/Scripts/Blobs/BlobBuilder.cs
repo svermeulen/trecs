@@ -28,11 +28,11 @@ namespace Trecs
     ///     root.Header = ...;
     ///     var arr = builder.Allocate(ref root.SomeArray, count);
     ///     for (int i = 0; i &lt; count; i++) arr[i] = ...;
-    ///     var ptr = builder.Build&lt;MyBlob&gt;(world.Heap, blobId);
+    ///     var ptr = builder.Build&lt;MyBlob&gt;(world, blobId);
     /// }
     /// </code>
     ///
-    /// <para><b>Build then dispose.</b> <see cref="Build{T}(HeapAccessor, BlobId)"/>
+    /// <para><b>Build then dispose.</b> <see cref="Build{T}(WorldAccessor, BlobId)"/>
     /// allocates a fresh <see cref="Allocator.Persistent"/> buffer owned by the
     /// heap and copies the blob into it. The builder's working chunks are
     /// independent of that buffer; <see cref="Dispose"/> frees just the
@@ -168,7 +168,7 @@ namespace Trecs
         /// <summary>
         /// Reserves <paramref name="length"/> elements of <typeparamref name="T"/>
         /// in the blob and records a patch so <paramref name="field"/>'s
-        /// <c>m_OffsetPtr</c> resolves to the new region at <see cref="Build{T}(HeapAccessor, BlobId)"/>
+        /// <c>m_OffsetPtr</c> resolves to the new region at <see cref="Build{T}(WorldAccessor, BlobId)"/>
         /// time. The returned <see cref="BlobBuilderArray{T}"/> is the
         /// write-side view; values written through it land in the blob.
         ///
@@ -252,7 +252,7 @@ namespace Trecs
         /// <summary>
         /// Reserves space for a single <typeparamref name="T"/> in the blob,
         /// records a patch so <paramref name="field"/>'s <c>m_OffsetPtr</c>
-        /// resolves to the new region at <see cref="Build{T}(HeapAccessor, BlobId)"/>
+        /// resolves to the new region at <see cref="Build{T}(WorldAccessor, BlobId)"/>
         /// time, and returns a writable ref so the caller can fill the value.
         ///
         /// <para>Single-value counterpart to
@@ -317,9 +317,9 @@ namespace Trecs
         /// owned by the heap, returning a fresh <see cref="NativeSharedPtr{T}"/>
         /// for the seeded entry. Convenience over
         /// <see cref="BuildNativeBlobAllocation"/> +
-        /// <see cref="NativeSharedPtr.AllocTakingOwnership{T}(HeapAccessor, BlobId, NativeBlobAllocation)"/>.
+        /// <see cref="NativeSharedPtr.AllocTakingOwnership{T}(WorldAccessor, BlobId, NativeBlobAllocation)"/>.
         /// </summary>
-        public NativeSharedPtr<T> Build<T>(HeapAccessor heap, BlobId blobId)
+        public NativeSharedPtr<T> Build<T>(WorldAccessor world, BlobId blobId)
             where T : unmanaged
         {
             var alloc = BuildNativeBlobAllocation();
@@ -330,7 +330,7 @@ namespace Trecs
             // drop the only reference to it and leak.
             try
             {
-                return NativeSharedPtr.AllocTakingOwnership<T>(heap, blobId, alloc);
+                return NativeSharedPtr.AllocTakingOwnership<T>(world, blobId, alloc);
             }
             catch
             {
@@ -345,15 +345,12 @@ namespace Trecs
             }
         }
 
-        public NativeSharedPtr<T> Build<T>(WorldAccessor world, BlobId blobId)
-            where T : unmanaged => Build<T>(world.Heap, blobId);
-
         /// <summary>
         /// Low-level finalize. Copies every chunk into a single fresh
         /// <see cref="Allocator.Persistent"/> allocation, resolves every
         /// offset-pointer patch, and returns the resulting <see cref="NativeBlobAllocation"/>.
         /// The caller is responsible for handing it to a taking-ownership API
-        /// (<see cref="NativeSharedPtr.AllocTakingOwnership{T}(HeapAccessor, BlobId, NativeBlobAllocation)"/>
+        /// (<see cref="NativeSharedPtr.AllocTakingOwnership{T}(WorldAccessor, BlobId, NativeBlobAllocation)"/>
         /// or <see cref="NativeUniquePtr.AllocTakingOwnership{T}"/>) — whichever
         /// takes it on will free it via <c>AllocatorManager.Free</c> at end-of-life.
         /// </summary>

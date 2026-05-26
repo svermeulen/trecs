@@ -13,7 +13,7 @@ namespace Trecs
     ///
     /// <para><b>No auto-grow.</b> <see cref="Add"/> throws if <c>Count == Capacity</c>;
     /// pre-size with
-    /// <see cref="TrecsListExtensions.EnsureCapacity{T}(ref TrecsList{T}, HeapAccessor, int, string, int)"/>
+    /// <see cref="TrecsListExtensions.EnsureCapacity{T}(ref TrecsList{T}, WorldAccessor, int, string, int)"/>
     /// on the main thread before scheduling the job, or use the managed
     /// <see cref="TrecsListWrite{T}"/> wrapper which auto-grows.</para>
     ///
@@ -37,12 +37,8 @@ namespace Trecs
         [NativeDisableUnsafePtrRestriction]
         readonly T* _data;
 
-        // Non-readonly so we can re-sync after our own mutation bumps the header version.
-        ushort _capturedVersion;
-
-        // See TrecsListRead<T> for the shipping-build use-after-dispose guard.
         [NativeDisableUnsafePtrRestriction]
-        readonly NativeChunkStoreEntry* _headerSlot;
+        readonly NativeHeapEntry* _headerSlot;
         readonly byte _capturedGeneration;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -58,14 +54,13 @@ namespace Trecs
         public NativeTrecsListWrite(
             TrecsListHeader* header,
             T* data,
-            NativeChunkStoreEntry* headerSlot,
+            NativeHeapEntry* headerSlot,
             byte capturedGeneration,
             AtomicSafetyHandle safety
         )
         {
             _header = header;
             _data = data;
-            _capturedVersion = header->Version;
             _headerSlot = headerSlot;
             _capturedGeneration = capturedGeneration;
             m_Safety = safety;
@@ -73,21 +68,22 @@ namespace Trecs
                 ref m_Safety,
                 ref s_staticSafetyId.Data
             );
+            CheckSlotAlive();
         }
 #else
         [EditorBrowsable(EditorBrowsableState.Never)]
         public NativeTrecsListWrite(
             TrecsListHeader* header,
             T* data,
-            NativeChunkStoreEntry* headerSlot,
+            NativeHeapEntry* headerSlot,
             byte capturedGeneration
         )
         {
             _header = header;
             _data = data;
-            _capturedVersion = header->Version;
             _headerSlot = headerSlot;
             _capturedGeneration = capturedGeneration;
+            CheckSlotAlive();
         }
 #endif
 
@@ -106,25 +102,11 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void CheckVersion()
-        {
-            TrecsAssert.That(
-                _header->Version == _capturedVersion,
-                "NativeTrecsListWrite is stale: the list was mutated through another path "
-                    + "since this wrapper was opened (captured version {0}, current {1}). "
-                    + "Any Add/Remove/Clear on a sibling wrapper or via the handle "
-                    + "invalidates other wrappers.",
-                _capturedVersion,
-                _header->Version
-            );
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void BumpVersionAndResync()
+        void BumpVersion()
         {
             unchecked
             {
-                _capturedVersion = ++_header->Version;
+                ++_header->Version;
             }
         }
 
@@ -136,8 +118,6 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-                CheckSlotAlive();
-                CheckVersion();
                 return _header->Count;
             }
         }
@@ -150,8 +130,6 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-                CheckSlotAlive();
-                CheckVersion();
                 return _header->Capacity;
             }
         }
@@ -164,8 +142,6 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-                CheckSlotAlive();
-                CheckVersion();
                 TrecsDebugAssert.That(
                     (uint)index < (uint)_header->Count,
                     "NativeTrecsListWrite index {0} out of range (Count={1})",
@@ -179,7 +155,7 @@ namespace Trecs
         /// <summary>
         /// Appends <paramref name="value"/>. Throws if <c>Count == Capacity</c> — pre-size
         /// the list with
-        /// <see cref="TrecsListExtensions.EnsureCapacity{T}(ref TrecsList{T}, HeapAccessor, int, string, int)"/>
+        /// <see cref="TrecsListExtensions.EnsureCapacity{T}(ref TrecsList{T}, WorldAccessor, int, string, int)"/>
         /// on the main thread before scheduling, or use the managed
         /// <see cref="TrecsListWrite{T}"/>.
         /// </summary>
@@ -189,8 +165,6 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-            CheckSlotAlive();
-            CheckVersion();
             TrecsDebugAssert.That(
                 _header->Count < _header->Capacity,
                 "NativeTrecsListWrite.Add: capacity exceeded (count={0}, capacity={1}). "
@@ -201,7 +175,7 @@ namespace Trecs
             );
             _data[_header->Count] = value;
             _header->Count += 1;
-            BumpVersionAndResync();
+            BumpVersion();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -210,10 +184,8 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-            CheckSlotAlive();
-            CheckVersion();
             _header->Count = 0;
-            BumpVersionAndResync();
+            BumpVersion();
         }
 
         /// <summary>Removes element at <paramref name="index"/>, shifting later elements down (O(N)).</summary>
@@ -223,8 +195,6 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-            CheckSlotAlive();
-            CheckVersion();
             TrecsDebugAssert.That(
                 (uint)index < (uint)_header->Count,
                 "NativeTrecsListWrite.RemoveAt index {0} out of range (Count={1})",
@@ -238,7 +208,7 @@ namespace Trecs
                 UnsafeUtility.MemMove(data + index, data + index + 1, (long)tail * sizeof(T));
             }
             _header->Count -= 1;
-            BumpVersionAndResync();
+            BumpVersion();
         }
 
         /// <summary>
@@ -251,8 +221,6 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
-            CheckSlotAlive();
-            CheckVersion();
             TrecsDebugAssert.That(
                 (uint)index < (uint)_header->Count,
                 "NativeTrecsListWrite.RemoveAtSwapBack index {0} out of range (Count={1})",
@@ -266,7 +234,7 @@ namespace Trecs
                 data[index] = data[last];
             }
             _header->Count -= 1;
-            BumpVersionAndResync();
+            BumpVersion();
         }
     }
 }

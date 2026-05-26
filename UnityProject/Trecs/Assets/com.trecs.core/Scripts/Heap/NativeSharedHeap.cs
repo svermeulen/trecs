@@ -10,14 +10,14 @@ namespace Trecs.Internal
     /// <summary>
     /// Manages reference-counted native (unmanaged) allocations backing <see cref="NativeSharedPtr{T}"/>.
     /// Provides a <see cref="NativeSharedPtrResolver"/> for Burst-compatible pointer resolution in jobs.
-    /// Accessed internally through <see cref="HeapAccessor"/>; not typically used directly.
+    /// Accessed internally through <see cref="WorldAccessor"/>; not typically used directly.
     ///
     /// <para><b>Pending-flush invariant.</b> New blobs created via <c>CreateBlob</c> are staged in
     /// <c>_pendingAdds</c> and do not appear in <c>_allEntries</c> (the table that
     /// <see cref="NativeSharedPtrResolver"/> reads from) until <c>FlushPendingOperations</c> runs
     /// at the next submission boundary. Consequences for callers:</para>
     /// <list type="bullet">
-    ///   <item><description>Main-thread access (e.g. via <see cref="HeapAccessor.Read{T}(in NativeSharedPtr{T})"/>)
+    ///   <item><description>Main-thread access (e.g. via <see cref="WorldAccessor.Read{T}(in NativeSharedPtr{T})"/>)
     ///     transparently checks <c>_pendingAdds</c> and works on freshly-created blobs.</description></item>
     ///   <item><description><see cref="NativeSharedPtrResolver"/> inside a Burst job only sees flushed
     ///     entries. Scheduling a job that resolves a <c>NativeSharedPtr</c> created in the same frame
@@ -32,24 +32,16 @@ namespace Trecs.Internal
         readonly TrecsLog _log;
 
         readonly BlobCache _store;
-        readonly DenseDictionary<BlobId, PtrHandle> _blobCacheHandles = new();
-        readonly NativeDenseDictionary<BlobId, NativeSharedHeapEntry> _allEntries;
-        readonly DenseDictionary<BlobId, BlobInfo> _activeBlobs = new();
-        readonly DenseDictionary<PtrHandle, BlobId> _activeHandles = new();
+        readonly IterableDictionary<BlobId, PtrHandle> _blobCacheHandles = new();
+        NativeHashMap<BlobId, NativeSharedHeapEntry> _allEntries;
+        readonly IterableDictionary<BlobId, BlobInfo> _activeBlobs = new();
+        readonly IterableDictionary<PtrHandle, BlobId> _activeHandles = new();
         readonly List<PtrHandle> _tempBuffer1 = new();
         readonly List<(BlobId blobId, PtrHandle cacheHandle)> _pendingRemoves = new();
-        readonly Dictionary<BlobId, NativeSharedHeapEntry> _pendingAdds = new();
+        readonly IterableDictionary<BlobId, NativeSharedHeapEntry> _pendingAdds = new();
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-        // Per-blob safety handles. One handle per active BlobId; shared by every
-        // NativeSharedRead wrapper opened against that blob so Unity's job-safety
-        // walker can detect cross-job conflicts. The wrappers are
-        // [NativeContainerIsReadOnly] so the only real conflict the walker catches
-        // is "blob in flight while another job is mutating it" — but the shared
-        // heap doesn't expose a Write wrapper, so in practice the handle exists
-        // mostly to support clean lifetime tracking (Release on free, throw on
-        // post-free access).
-        readonly Dictionary<BlobId, AtomicSafetyHandle> _safetyHandles = new();
+        readonly IterableDictionary<BlobId, AtomicSafetyHandle> _safetyHandles = new();
 #endif
 
         // Skip 0 — PtrHandle reserves 0 as the null sentinel.
@@ -62,10 +54,7 @@ namespace Trecs.Internal
             _log = log;
             _store = store;
 
-            _allEntries = new NativeDenseDictionary<BlobId, NativeSharedHeapEntry>(
-                1,
-                Allocator.Persistent
-            );
+            _allEntries = new NativeHashMap<BlobId, NativeSharedHeapEntry>(1, Allocator.Persistent);
             _resolver = new NativeSharedPtrResolver(_allEntries);
         }
 
@@ -187,7 +176,7 @@ namespace Trecs.Internal
 
         /// <summary>
         /// Takes ownership of an existing native pointer and creates a blob from it without copying.
-        /// See <see cref="NativeUniquePtr.AllocTakingOwnership{T}(HeapAccessor, NativeBlobAllocation, string, int)"/> for the ownership contract.
+        /// See <see cref="NativeUniquePtr.AllocTakingOwnership{T}(WorldAccessor, NativeBlobAllocation, string, int)"/> for the ownership contract.
         /// </summary>
         public NativeSharedPtr<T> CreateBlobTakingOwnership<T>(
             BlobId blobId,
@@ -324,7 +313,7 @@ namespace Trecs.Internal
             // Any handles left behind belong to blobs neither active nor pending —
             // shouldn't happen, but release them so we don't leak slots on a buggy
             // teardown.
-            foreach (var safety in _safetyHandles.Values)
+            foreach (var (_, safety) in _safetyHandles)
             {
                 AtomicSafetyHandle.EnforceAllBufferJobsHaveCompletedAndRelease(safety);
             }
@@ -340,12 +329,19 @@ namespace Trecs.Internal
         /// <summary>
         /// Applies deferred _allEntries additions and removals, plus blob cache handle disposals.
         /// Must be called when no jobs are reading from _allEntries (e.g. at submission time).
+        /// Blobs whose RefCount was bumped back above 0 (re-acquired via TryGetBlob / AddBlobHandle)
+        /// since their disposal are skipped — only entries still at RefCount 0 are actually removed.
         /// </summary>
         internal void FlushPendingOperations()
         {
+            // Adds before removes: a blob created and disposed in the same frame is in both
+            // _pendingAdds and _pendingRemoves; the add must land in _allEntries first so the
+            // remove can find and delete it.
             if (_pendingAdds.Count > 0)
             {
-                _allEntries.EnsureCapacity(_allEntries.Count + _pendingAdds.Count);
+                var needed = _allEntries.Count + _pendingAdds.Count;
+                if (_allEntries.Capacity < needed)
+                    _allEntries.Capacity = needed;
                 foreach (var (blobId, entry) in _pendingAdds)
                 {
                     _allEntries.Add(blobId, entry);
@@ -355,9 +351,17 @@ namespace Trecs.Internal
 
             foreach (var (blobId, cacheHandle) in _pendingRemoves)
             {
+                // The blob may have been re-acquired (TryGetBlob / AddBlobHandle bumped
+                // RefCount back above 0) between the dispose that enqueued this entry
+                // and now. Skip removal if the blob is still alive.
+                if (!_activeBlobs.TryGetValue(blobId, out var info) || info.RefCount > 0)
+                    continue;
+
+                _activeBlobs.RemoveMustExist(blobId);
+                _blobCacheHandles.RemoveMustExist(blobId);
                 _allEntries.Remove(blobId);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-                if (_safetyHandles.Remove(blobId, out var safety))
+                if (_safetyHandles.TryRemove(blobId, out _, out var safety))
                 {
                     AtomicSafetyHandle.EnforceAllBufferJobsHaveCompletedAndRelease(safety);
                 }
@@ -400,14 +404,13 @@ namespace Trecs.Internal
 
             if (info.RefCount == 0)
             {
-                _activeBlobs.RemoveMustExist(blobId);
-
-                var blobHandle = _blobCacheHandles.RemoveAndGet(blobId);
-
-                // Defer removing from _allEntries and disposing the cache handle until
-                // submission time, since jobs may be reading _allEntries via NativeSharedPtrResolver.
-                // Remove uses swap-back which would corrupt concurrent reads.
-                _pendingRemoves.Add((blobId, blobHandle));
+                // Keep the entry in _activeBlobs (with RefCount=0) and _blobCacheHandles
+                // so that a TryGetBlob call before the next flush finds the blob via
+                // _activeBlobs.ContainsKey and resurrects it with AddBlobHandle, rather
+                // than falling through to the store lookup which would create a duplicate
+                // _pendingAdds / _allEntries entry. FlushPendingOperations checks
+                // RefCount and skips removal if the blob was re-acquired.
+                _pendingRemoves.Add((blobId, _blobCacheHandles.GetValueByRef(blobId)));
             }
         }
 
@@ -418,8 +421,8 @@ namespace Trecs.Internal
 
             writer.Write<int>("NumEntries", _allEntries.Count);
             writer.Write<uint>("HandleCounter", _nextHandleId);
-            writer.Write<DenseDictionary<BlobId, BlobInfo>>("ActiveBlobs", _activeBlobs);
-            writer.Write<DenseDictionary<PtrHandle, BlobId>>("ActiveHandles", _activeHandles);
+            writer.Write<IterableDictionary<BlobId, BlobInfo>>("ActiveBlobs", _activeBlobs);
+            writer.Write<IterableDictionary<PtrHandle, BlobId>>("ActiveHandles", _activeHandles);
 
             _log.Trace("Serialized {0} native blob handles", _activeHandles.Count);
         }
@@ -437,8 +440,11 @@ namespace Trecs.Internal
             var numEntries = reader.Read<int>("NumEntries");
 
             _nextHandleId = reader.Read<uint>("HandleCounter");
-            reader.ReadInPlace<DenseDictionary<BlobId, BlobInfo>>("ActiveBlobs", _activeBlobs);
-            reader.ReadInPlace<DenseDictionary<PtrHandle, BlobId>>("ActiveHandles", _activeHandles);
+            reader.ReadInPlace<IterableDictionary<BlobId, BlobInfo>>("ActiveBlobs", _activeBlobs);
+            reader.ReadInPlace<IterableDictionary<PtrHandle, BlobId>>(
+                "ActiveHandles",
+                _activeHandles
+            );
 
             _log.Debug("Deserialized {0} native blob handles", _activeHandles.Count);
 

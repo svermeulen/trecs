@@ -99,7 +99,6 @@ namespace Trecs.Internal
             }
         }
 
-        // Prefer generics to object to avoid boxing and causing allocs
         [Conditional("DEBUG")]
         public static void IsEqual<T>(T expected, T actual)
         {
@@ -144,7 +143,6 @@ namespace Trecs.Internal
             }
         }
 
-        // Prefer generics to object to avoid boxing and causing allocs
         [Conditional("DEBUG")]
         public static void IsNotEqual<T>(T expected, T actual)
             where T : notnull
@@ -171,7 +169,6 @@ namespace Trecs.Internal
             }
         }
 
-        // Prefer generics to object to avoid boxing and causing allocs
         [Conditional("DEBUG")]
         public static void IsNull<T>(T value)
         {
@@ -204,7 +201,6 @@ namespace Trecs.Internal
             }
         }
 
-        // Prefer generics to object to avoid boxing and causing allocs
         [Conditional("DEBUG")]
         public static void IsNotNull<T>(T value)
             where T : class

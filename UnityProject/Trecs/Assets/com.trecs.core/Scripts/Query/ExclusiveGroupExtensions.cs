@@ -18,20 +18,7 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool FoundIn(this in GroupIndex group, FastList<GroupIndex> groups)
-        {
-            for (int i = 0; i < groups.Count; ++i)
-                if (groups[i] == group)
-                    return true;
-
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool FoundIn(
-            this in GroupIndex group,
-            LocalReadOnlyFastList<GroupIndex> groups
-        )
+        public static bool FoundIn(this in GroupIndex group, ReadOnlyList<GroupIndex> groups)
         {
             for (int i = 0; i < groups.Count; ++i)
                 if (groups[i] == group)

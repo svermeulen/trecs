@@ -118,7 +118,7 @@ namespace Trecs.Internal
                 var header = _buffer.Read<BundleHeader>("Header");
                 var initialSnapshot = ReadByteArray("initialSnapshot");
                 var inputQueue = ReadByteArray("inputQueue");
-                var checksums = _buffer.Read<DenseDictionary<int, ulong>>("checksums");
+                var checksums = _buffer.Read<IterableDictionary<int, ulong>>("checksums");
 
                 var anchors = ReadSnapshotList("Anchor", SnapshotKind.Anchor, readLabel: false);
                 var bookmarks = ReadSnapshotList(

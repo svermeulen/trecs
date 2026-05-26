@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using Trecs.Internal;
 
 namespace Trecs
@@ -14,14 +15,11 @@ namespace Trecs
         long _flags;
         int _version;
         bool _includesTypeChecks;
-        BinaryReader _binaryReader;
 
-        // MemoryStream extracted from _binaryReader.BaseStream at Start
-        // time so the blit path can read directly from its underlying
-        // byte[] without going through BinaryReader.Read → Stream.Read
-        // virtual dispatch. Sharing the same underlying MemoryStream means
-        // BinaryReader's next ReadString / ReadInt32 picks up at whatever
-        // position the blit fast-path left it at.
+        // MemoryStream backing the data section. MemoryBlitter reads
+        // directly from its underlying byte[] for the blit fast-path;
+        // string/type-id/byte-array reads also go through this stream
+        // without a BinaryReader intermediary.
         MemoryStream _memoryStream;
         bool _hasStarted;
 
@@ -39,13 +37,13 @@ namespace Trecs
             }
         }
 
-        public BinaryReader BinaryReader
+        public MemoryStream DataStream
         {
             get
             {
                 TrecsDebugAssert.That(_hasStarted);
-                TrecsDebugAssert.IsNotNull(_binaryReader);
-                return _binaryReader;
+                TrecsDebugAssert.IsNotNull(_memoryStream);
+                return _memoryStream;
             }
         }
 
@@ -64,38 +62,22 @@ namespace Trecs
             return (_flags & flag) != 0;
         }
 
-        /// <summary>
-        /// Begin reading from <paramref name="binaryReader"/>. The version and
-        /// flags are read from the payload header — they're not caller-supplied
-        /// — and become accessible via <see cref="Version"/> / <see cref="Flags"/>.
-        /// </summary>
-        public void Start(BinaryReader binaryReader)
+        public void Start(MemoryStream memoryStream)
         {
             TrecsDebugAssert.That(!_hasStarted);
 
             _hasStarted = true;
-
-            TrecsDebugAssert.IsNull(_binaryReader);
-            _binaryReader = binaryReader;
-            // All current callers wrap a MemoryStream — the bulk Heap
-            // serialization paths in particular depend on the seek-by-
-            // Position behaviour that file-backed streams cost a syscall
-            // for. If a non-MemoryStream caller appears, route it through
-            // a buffering MemoryStream upstream.
-            _memoryStream = (MemoryStream)binaryReader.BaseStream;
+            _memoryStream = memoryStream;
 
             (_version, _flags, _includesTypeChecks) = SerializationHeaderUtil.ReadHeader(
-                binaryReader
+                _memoryStream
             );
 
-            _log.Trace("Completed reading header at byte {0}", binaryReader.BaseStream.Position);
+            _log.Trace("Completed reading header at byte {0}", _memoryStream.Position);
 
-            var positionBefore = binaryReader.BaseStream.Position;
-            _bitReader.Reset(binaryReader);
-            _log.Trace(
-                "Bit fields read in {0} bytes",
-                binaryReader.BaseStream.Position - positionBefore
-            );
+            var positionBefore = _memoryStream.Position;
+            _bitReader.Reset(_memoryStream);
+            _log.Trace("Bit fields read in {0} bytes", _memoryStream.Position - positionBefore);
         }
 
         /// <summary>
@@ -111,19 +93,16 @@ namespace Trecs
             _hasStarted = false;
             _bitReader.Complete();
 
-            TrecsDebugAssert.IsNotNull(_binaryReader);
             if (verifySentinel)
             {
                 VerifySentinel();
             }
-            _binaryReader = null;
             _memoryStream = null;
         }
 
         public void ResetForErrorRecovery()
         {
             _hasStarted = false;
-            _binaryReader = null;
             _memoryStream = null;
             _flags = 0;
             _version = 0;
@@ -144,12 +123,8 @@ namespace Trecs
             // corrupt streams and must fire in release builds too. Stripping
             // the check in release would let downstream code silently consume
             // an incomplete payload as if it were valid.
-            byte sentinel;
-            try
-            {
-                sentinel = _binaryReader.ReadByte();
-            }
-            catch (EndOfStreamException)
+            int b = _memoryStream.ReadByte();
+            if (b < 0)
             {
                 throw new SerializationException(
                     "Data corruption detected — missing end-of-payload marker. "
@@ -157,6 +132,7 @@ namespace Trecs
                 );
             }
 
+            byte sentinel = (byte)b;
             if (sentinel != SerializationConstants.EndOfPayloadMarker)
             {
                 throw new SerializationException(
@@ -185,7 +161,7 @@ namespace Trecs
                 "Delta serialization doesn't support null base values"
             );
 
-            var concreteType = TypeIdSerializer.Read(_binaryReader);
+            var concreteType = TypeIdSerializer.Read(_memoryStream);
 
             // Note that we don't do equality checks here, so it's up to
             // the serializer to do delta optimization logic
@@ -244,9 +220,7 @@ namespace Trecs
 
             if (_includesTypeChecks)
             {
-                // a potential optimization here is to just skip the type id in release mode
-                // since it's only needed for verification purposes
-                var savedType = TypeIdSerializer.Read(_binaryReader);
+                var savedType = TypeIdSerializer.Read(_memoryStream);
                 TrecsDebugAssert.That(
                     savedType == type,
                     "Expected type {0} but found '{1}'",
@@ -276,7 +250,7 @@ namespace Trecs
 
             if (isChanged)
             {
-                return _binaryReader.ReadString();
+                return ReadStringFromStream();
             }
             else
             {
@@ -288,7 +262,7 @@ namespace Trecs
         {
             TrecsDebugAssert.That(_hasStarted);
 
-            return TypeIdSerializer.Read(_binaryReader);
+            return TypeIdSerializer.Read(_memoryStream);
         }
 
         public void ReadObject(string name, ref object value)
@@ -303,7 +277,7 @@ namespace Trecs
                 return;
             }
 
-            var concreteType = TypeIdSerializer.Read(_binaryReader);
+            var concreteType = TypeIdSerializer.Read(_memoryStream);
 
             var serializer = _serializerManager.GetSerializer(concreteType);
             serializer.DeserializeObject(ref value, this);
@@ -368,7 +342,7 @@ namespace Trecs
 
             if (_includesTypeChecks)
             {
-                var savedType = TypeIdSerializer.Read(_binaryReader);
+                var savedType = TypeIdSerializer.Read(_memoryStream);
                 TrecsDebugAssert.That(
                     savedType == type,
                     "Expected type {0} but found '{1}'",
@@ -392,7 +366,39 @@ namespace Trecs
                 return null;
             }
 
-            return _binaryReader.ReadString();
+            return ReadStringFromStream();
+        }
+
+        string ReadStringFromStream()
+        {
+            int byteCount = 0;
+            MemoryBlitter.Read(ref byteCount, _memoryStream);
+
+            if (byteCount == 0)
+            {
+                return string.Empty;
+            }
+
+            int pos = (int)_memoryStream.Position;
+
+            if (_memoryStream.TryGetBuffer(out ArraySegment<byte> seg))
+            {
+                var result = Encoding.UTF8.GetString(seg.Array, seg.Offset + pos, byteCount);
+                _memoryStream.Position = pos + byteCount;
+                return result;
+            }
+            else
+            {
+                var bytes = new byte[byteCount];
+                int bytesRead = _memoryStream.Read(bytes, 0, byteCount);
+                TrecsDebugAssert.That(
+                    bytesRead == byteCount,
+                    "Truncated stream: expected {0} string bytes, got {1}",
+                    byteCount,
+                    bytesRead
+                );
+                return Encoding.UTF8.GetString(bytes);
+            }
         }
 
         public unsafe void BlitReadRawBytes(string name, void* ptr, int numBytes)
@@ -405,7 +411,8 @@ namespace Trecs
         {
             TrecsDebugAssert.That(_hasStarted);
 
-            var length = _binaryReader.ReadInt32();
+            int length = 0;
+            MemoryBlitter.Read(ref length, _memoryStream);
 
             if (buffer == null || buffer.Length < length)
             {
@@ -414,7 +421,13 @@ namespace Trecs
 
             if (length > 0)
             {
-                _binaryReader.Read(buffer, 0, length);
+                int bytesRead = _memoryStream.Read(buffer, 0, length);
+                TrecsDebugAssert.That(
+                    bytesRead == length,
+                    "Truncated stream: expected {0} bytes, got {1}",
+                    length,
+                    bytesRead
+                );
             }
 
             return length;

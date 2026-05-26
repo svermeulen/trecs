@@ -88,13 +88,13 @@ public partial class WakeUpSystem : ISystem
 }
 ```
 
-### BallRendererSystem — different rendering per partition
+### BallPresenter — different rendering per partition
 
 Two `[ForEachEntity]` methods, different tag filters:
 
 ```csharp
 [ExecuteIn(SystemPhase.Presentation)]
-public partial class BallRendererSystem : ISystem
+public partial class BallPresenter : ISystem
 {
     [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
     void RenderActive(in ActiveBallView ball)

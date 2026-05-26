@@ -293,7 +293,7 @@ namespace Trecs
             return new DenseGroupSliceIterator(_world, groups);
         }
 
-        public readonly ReadOnlyFastList<GroupIndex> Groups()
+        public readonly ReadOnlyList<GroupIndex> Groups()
         {
             AssertHasAnyCriteria();
             return ResolveGroups();
@@ -385,7 +385,7 @@ namespace Trecs
             );
         }
 
-        internal readonly ReadOnlyFastList<GroupIndex> ResolveGroups()
+        internal readonly ReadOnlyList<GroupIndex> ResolveGroups()
         {
             var key = new GroupQueryKey(
                 _positiveTags,

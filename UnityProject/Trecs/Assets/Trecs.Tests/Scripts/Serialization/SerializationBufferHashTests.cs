@@ -13,8 +13,8 @@ namespace Trecs.Tests
     /// content; if it broke, blob/asset IDs would silently change.
     ///
     /// Also covers the sibling <see cref="SerializationBuffer.ComputeChecksum"/>
-    /// method, which is used by <c>RecordingChecksumCalculator</c> for replay
-    /// desync detection. The two share xxHash64 but call it through different
+    /// method, which is used by <c>SnapshotSerializer.ComputeChecksum</c> for
+    /// replay desync detection. The two share xxHash64 but call it through different
     /// surfaces, and both need to pin the "hash only the written portion of
     /// the stream, not the underlying buffer capacity" contract — the
     /// <c>MemoryStream.GetBuffer()</c> / <c>MemoryStream.Length</c> discipline

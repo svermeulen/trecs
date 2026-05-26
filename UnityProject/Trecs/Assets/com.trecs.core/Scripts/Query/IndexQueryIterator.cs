@@ -18,7 +18,7 @@ namespace Trecs
         int _entityIndex;
 
         readonly WorldAccessor _world;
-        readonly ReadOnlyFastList<GroupIndex> _groups;
+        readonly ReadOnlyList<GroupIndex> _groups;
         SetGroupLookup _singleSet;
         readonly bool _hasSet;
         int _groupIndex;
@@ -27,10 +27,7 @@ namespace Trecs
         int _slicePosition;
 
         /// <summary>No-set constructor — iterates all entities in every matched group.</summary>
-        internal IndexQueryIterator(
-            WorldAccessor world,
-            ReadOnlyFastList<GroupIndex> resolvedGroups
-        )
+        internal IndexQueryIterator(WorldAccessor world, ReadOnlyList<GroupIndex> resolvedGroups)
         {
             _done = false;
             _currentGroup = default;
@@ -48,7 +45,7 @@ namespace Trecs
         /// <summary>Single-set constructor — iterates entities belonging to the given set.</summary>
         internal IndexQueryIterator(
             WorldAccessor world,
-            ReadOnlyFastList<GroupIndex> resolvedGroups,
+            ReadOnlyList<GroupIndex> resolvedGroups,
             SetId set
         )
         {

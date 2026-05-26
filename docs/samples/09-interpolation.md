@@ -120,7 +120,7 @@ Two aspects â€” one for the interpolated wrappers, one for the raw components â€
 
 ```csharp
 [ExecuteIn(SystemPhase.Presentation)]
-public partial class OrbitRendererSystem : ISystem
+public partial class OrbitPresenter : ISystem
 {
     public void Execute()
     {

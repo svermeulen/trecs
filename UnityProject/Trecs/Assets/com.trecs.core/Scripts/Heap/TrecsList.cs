@@ -57,7 +57,7 @@ namespace Trecs
     /// per-instance operations (<c>Read</c>, <c>Write</c>, <c>EnsureCapacity</c>,
     /// <c>Dispose</c>) live on the struct itself.
     ///
-    /// <para>Two slots get allocated in the shared <see cref="NativeChunkStore"/>:
+    /// <para>Two slots get allocated in the shared <see cref="NativeHeap"/>:
     /// a stable <see cref="TrecsListHeader"/> tagged with
     /// <c>TypeId&lt;TrecsList&lt;T&gt;&gt;</c>, and (if <paramref name="initialCapacity"/>
     /// &gt; 0) a data buffer tagged with <c>TypeId&lt;TrecsListDataMarker&lt;T&gt;&gt;</c>.
@@ -67,27 +67,19 @@ namespace Trecs
     public static class TrecsList
     {
         public static TrecsList<T> Alloc<T>(
-            HeapAccessor heap,
+            WorldAccessor world,
             int initialCapacity = 0,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
         )
             where T : unmanaged
         {
-            heap.AssertCanMutateHeap();
-            return Alloc<T>(heap.NativeUniqueChunkStore, initialCapacity, callerFile, callerLine);
+            world.AssertCanMutateHeap();
+            return Alloc<T>(world.NativeUniqueChunkStore, initialCapacity, callerFile, callerLine);
         }
 
-        public static TrecsList<T> Alloc<T>(
-            WorldAccessor world,
-            int initialCapacity = 0,
-            [CallerFilePath] string callerFile = null,
-            [CallerLineNumber] int callerLine = 0
-        )
-            where T : unmanaged => Alloc<T>(world.Heap, initialCapacity, callerFile, callerLine);
-
         internal static unsafe TrecsList<T> Alloc<T>(
-            NativeChunkStore chunkStore,
+            NativeHeap chunkStore,
             int initialCapacity = 0,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
@@ -129,7 +121,7 @@ namespace Trecs
         // TrecsListDataMarker<T> so a leak warning identifies it as a list backing
         // buffer (distinct from a NativeUniquePtr<T> at the same TypeId<T>).
         static unsafe void AllocDataSlot<T>(
-            NativeChunkStore chunkStore,
+            NativeHeap chunkStore,
             TrecsListHeader* headerPtr,
             int capacity,
             string callerFile,
@@ -214,33 +206,33 @@ namespace Trecs
 
     /// <summary>
     /// A growable list of unmanaged values whose storage is owned by the world's shared
-    /// <see cref="NativeChunkStore"/>. Designed to live as a 4-byte value on ECS
+    /// <see cref="NativeHeap"/>. Designed to live as a 4-byte value on ECS
     /// components, so a component can carry a dynamically-sized collection without going
     /// through <c>NativeUniquePtr</c>.
     ///
     /// <para>The struct itself only carries a <see cref="PtrHandle"/>;
     /// allocating, growing, reading, and writing all go through
-    /// <see cref="HeapAccessor"/> / <see cref="NativeWorldAccessor"/>. Read/write
+    /// <see cref="WorldAccessor"/> / <see cref="NativeWorldAccessor"/>. Read/write
     /// surfaces come in two flavors:</para>
     ///
     /// <list type="bullet">
     /// <item><description><b>Managed</b> <see cref="TrecsListRead{T}"/> /
     ///   <see cref="TrecsListWrite{T}"/> — main-thread <c>ref struct</c> views
-    ///   returned by the <see cref="HeapAccessor"/> and <see cref="WorldAccessor"/>
+    ///   returned by the <see cref="WorldAccessor"/>
     ///   overloads. <c>TrecsListWrite.Add</c> auto-grows.</description></item>
     /// <item><description><b>Native</b> <see cref="NativeTrecsListRead{T}"/> /
     ///   <see cref="NativeTrecsListWrite{T}"/> — Burst-safe views returned by the
-    ///   <see cref="NativeWorldAccessor"/> and <see cref="NativeChunkStoreResolver"/>
+    ///   <see cref="NativeWorldAccessor"/> and <see cref="NativeHeapResolver"/>
     ///   overloads. Usable inside <c>[BurstCompile]</c> jobs; do not auto-grow
     ///   (pre-size with
-    ///   <see cref="TrecsListExtensions.EnsureCapacity{T}(ref TrecsList{T}, HeapAccessor, int, string, int)"/>
+    ///   <see cref="TrecsListExtensions.EnsureCapacity{T}(ref TrecsList{T}, WorldAccessor, int, string, int)"/>
     ///   on the main thread first). The per-allocation <c>AtomicSafetyHandle</c>
     ///   lets Unity's job walker detect cross-job conflicts at schedule
     ///   time.</description></item>
     /// </list>
     ///
-    /// <para><see cref="TrecsList.Alloc{T}(HeapAccessor, int, string, int)"/>
-    /// creates the list with an initial capacity; <see cref="Dispose(HeapAccessor)"/>
+    /// <para><see cref="TrecsList.Alloc{T}(WorldAccessor, int, string, int)"/>
+    /// creates the list with an initial capacity; <see cref="Dispose(WorldAccessor)"/>
     /// frees the backing storage. The struct is exclusive-ownership: copying it
     /// produces two handles that both refer to the same backing storage, and the
     /// per-handle safety identity catches concurrent writers on those copies.</para>
@@ -281,15 +273,13 @@ namespace Trecs
         // extension methods, which require writable access to the handle struct —
         // the compile-time gate against mutation through an IRead aspect field or
         // an `in` parameter. Same pattern as FixedList16Extensions.
-        public readonly void Dispose(HeapAccessor heap)
+        public readonly void Dispose(WorldAccessor world)
         {
-            heap.AssertCanMutateHeap();
-            Dispose(heap.NativeUniqueChunkStore);
+            world.AssertCanMutateHeap();
+            Dispose(world.NativeUniqueChunkStore);
         }
 
-        public readonly void Dispose(WorldAccessor world) => Dispose(world.Heap);
-
-        internal readonly unsafe void Dispose(NativeChunkStore chunkStore)
+        internal readonly unsafe void Dispose(NativeHeap chunkStore)
         {
             TrecsDebugAssert.That(Handle.Value != 0);
             // Validate TypeId before freeing — catches accidental cross-heap dispose
@@ -315,7 +305,7 @@ namespace Trecs
         // and the compile-time ref discipline is enforced at the extension's
         // `this ref` receiver, not at this internal method.
         internal readonly unsafe void EnsureCapacity(
-            NativeChunkStore chunkStore,
+            NativeHeap chunkStore,
             int minCapacity,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
@@ -384,20 +374,18 @@ namespace Trecs
         /// <summary>
         /// Opens a main-thread read view. For in-job access use the
         /// <see cref="Read(in NativeWorldAccessor)"/> or
-        /// <see cref="Read(in NativeChunkStoreResolver)"/> overload, which returns
+        /// <see cref="Read(in NativeHeapResolver)"/> overload, which returns
         /// the Burst-safe <see cref="NativeTrecsListRead{T}"/>.
         /// </summary>
-        public readonly TrecsListRead<T> Read(HeapAccessor heap) =>
-            Read(heap.NativeUniqueChunkStore);
-
-        public readonly TrecsListRead<T> Read(WorldAccessor world) => Read(world.Heap);
+        public readonly TrecsListRead<T> Read(WorldAccessor world) =>
+            Read(world.NativeUniqueChunkStore);
 
         // Public Write overloads live on TrecsListExtensions (this-ref extension
         // methods; see bottom of file). The implementations below are `internal
         // readonly` instance methods — extensions delegate to them. The compile-time
         // ref discipline is enforced at the extension's `this ref` receiver.
 
-        internal readonly unsafe TrecsListRead<T> Read(NativeChunkStore chunkStore)
+        internal readonly unsafe TrecsListRead<T> Read(NativeHeap chunkStore)
         {
             ResolveHeaderAndData(
                 in chunkStore.Resolver,
@@ -419,7 +407,7 @@ namespace Trecs
 #endif
         }
 
-        internal readonly unsafe TrecsListWrite<T> Write(NativeChunkStore chunkStore)
+        internal readonly unsafe TrecsListWrite<T> Write(NativeHeap chunkStore)
         {
             ResolveHeaderAndData(
                 in chunkStore.Resolver,
@@ -470,13 +458,13 @@ namespace Trecs
 
         /// <summary>
         /// Burst-compatible read view. Pass a resolver obtained via
-        /// <see cref="HeapAccessor.NativeChunkStoreResolver"/> or
+        /// <see cref="WorldAccessor.NativeHeapResolver"/> or
         /// <see cref="NativeWorldAccessor.ChunkStoreResolver"/>. Validates the header slot
         /// is tagged <c>TrecsList&lt;T&gt;</c> and the data slot is tagged
         /// <c>TrecsListDataMarker&lt;T&gt;</c>; throws on mismatch (e.g. a
         /// <see cref="NativeUniquePtr{T}"/> handle, or a wrong-T list handle).
         /// </summary>
-        public readonly unsafe NativeTrecsListRead<T> Read(in NativeChunkStoreResolver resolver)
+        public readonly unsafe NativeTrecsListRead<T> Read(in NativeHeapResolver resolver)
         {
             ResolveHeaderAndData(
                 in resolver,
@@ -504,10 +492,10 @@ namespace Trecs
         }
 
         // Internal — public access goes through TrecsListExtensions.Write(this ref,
-        // in NativeChunkStoreResolver) so the ref discipline applies. This is the
+        // in NativeHeapResolver) so the ref discipline applies. This is the
         // actual implementation. The resolver carries the originating accessor's
         // role flag, so a Variable-role caller fails fast here.
-        internal readonly unsafe NativeTrecsListWrite<T> Write(in NativeChunkStoreResolver resolver)
+        internal readonly unsafe NativeTrecsListWrite<T> Write(in NativeHeapResolver resolver)
         {
             resolver.AssertCanMutateHeap();
             ResolveHeaderAndData(
@@ -547,11 +535,11 @@ namespace Trecs
         /// guard).</para>
         /// </summary>
         readonly unsafe void ResolveHeaderAndData(
-            in NativeChunkStoreResolver resolver,
+            in NativeHeapResolver resolver,
             out TrecsListHeader* headerPtr,
             out T* dataPtr,
-            out NativeChunkStoreEntry headerEntry,
-            out NativeChunkStoreEntry* headerSlot
+            out NativeHeapEntry headerEntry,
+            out NativeHeapEntry* headerSlot
         )
         {
             headerEntry = resolver.ResolveEntryWithSlotPtr(Handle, out headerSlot);
@@ -566,7 +554,7 @@ namespace Trecs
             }
         }
 
-        readonly NativeChunkStoreEntry ResolveHeaderEntry(NativeChunkStore chunkStore)
+        readonly NativeHeapEntry ResolveHeaderEntry(NativeHeap chunkStore)
         {
             TrecsDebugAssert.That(Handle.Value != 0, "Attempted to resolve null TrecsList handle");
             var entry = chunkStore.ResolveEntry(Handle);
@@ -625,19 +613,16 @@ namespace Trecs
         /// Opens a main-thread write view. <see cref="TrecsListWrite{T}.Add"/>
         /// auto-grows. For in-job access use the
         /// <see cref="Write{T}(ref TrecsList{T}, in NativeWorldAccessor)"/> or
-        /// <see cref="Write{T}(ref TrecsList{T}, in NativeChunkStoreResolver)"/>
+        /// <see cref="Write{T}(ref TrecsList{T}, in NativeHeapResolver)"/>
         /// overload, which returns the Burst-safe <see cref="NativeTrecsListWrite{T}"/>
         /// (does not auto-grow).
         /// </summary>
-        public static TrecsListWrite<T> Write<T>(this ref TrecsList<T> list, HeapAccessor heap)
+        public static TrecsListWrite<T> Write<T>(this ref TrecsList<T> list, WorldAccessor world)
             where T : unmanaged
         {
-            heap.AssertCanMutateHeap();
-            return list.Write(heap.NativeUniqueChunkStore);
+            world.AssertCanMutateHeap();
+            return list.Write(world.NativeUniqueChunkStore);
         }
-
-        public static TrecsListWrite<T> Write<T>(this ref TrecsList<T> list, WorldAccessor world)
-            where T : unmanaged => list.Write(world.Heap);
 
         /// <summary>
         /// Burst-compatible write view. Convenience overload that pulls the resolver
@@ -651,12 +636,12 @@ namespace Trecs
 
         /// <summary>
         /// Burst-compatible write view. Pass a resolver obtained via
-        /// <see cref="HeapAccessor.NativeChunkStoreResolver"/> or
+        /// <see cref="WorldAccessor.NativeHeapResolver"/> or
         /// <see cref="NativeWorldAccessor.ChunkStoreResolver"/>.
         /// </summary>
         public static NativeTrecsListWrite<T> Write<T>(
             this ref TrecsList<T> list,
-            in NativeChunkStoreResolver resolver
+            in NativeHeapResolver resolver
         )
             where T : unmanaged => list.Write(in resolver);
 
@@ -675,31 +660,15 @@ namespace Trecs
         /// </summary>
         public static void EnsureCapacity<T>(
             this ref TrecsList<T> list,
-            HeapAccessor heap,
+            WorldAccessor world,
             int minCapacity,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
         )
             where T : unmanaged
         {
-            // EnsureCapacity allocates a fresh data slot, so match TrecsList.Alloc's
-            // accessor-role gate. Catches an Input or Variable-role accessor trying to
-            // grow a list, which would create persistent heap state from a context that
-            // isn't allowed to. (Auto-grow inside Write wrapper's Add inherits the open
-            // context but doesn't re-check the role at grow time — that's documented as
-            // a known limitation; pre-size explicitly via EnsureCapacity to surface it.)
-            heap.AssertCanMutateHeap();
-            list.EnsureCapacity(heap.NativeUniqueChunkStore, minCapacity, callerFile, callerLine);
+            world.AssertCanMutateHeap();
+            list.EnsureCapacity(world.NativeUniqueChunkStore, minCapacity, callerFile, callerLine);
         }
-
-        public static void EnsureCapacity<T>(
-            this ref TrecsList<T> list,
-            WorldAccessor world,
-            int minCapacity,
-            [CallerFilePath] string callerFile = null,
-            [CallerLineNumber] int callerLine = 0
-        )
-            where T : unmanaged =>
-            list.EnsureCapacity(world.Heap, minCapacity, callerFile, callerLine);
     }
 }

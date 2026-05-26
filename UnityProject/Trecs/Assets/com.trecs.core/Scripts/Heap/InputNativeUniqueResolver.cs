@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Unity.Collections;
 
 namespace Trecs.Internal
 {
@@ -10,7 +11,7 @@ namespace Trecs.Internal
     /// table; copy by value into job structs.
     ///
     /// <para>Resolution is a single hash-table lookup. The backing
-    /// <see cref="NativeDenseDictionary{InputPtrHandle, InputAllocation}"/> is
+    /// <see cref="NativeHashMap{InputPtrHandle,InputAllocation}"/> is
     /// owned by the heap and remains valid for the heap's lifetime — entries
     /// come and go as input frames are allocated and trimmed, but the storage
     /// handle held by this resolver does not need to be refreshed.</para>
@@ -18,10 +19,10 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public readonly struct InputNativeUniqueResolver
     {
-        readonly NativeDenseDictionary<InputPtrHandle, InputAllocation> _allocations;
+        readonly NativeHashMap<InputPtrHandle, InputAllocation> _allocations;
 
         internal InputNativeUniqueResolver(
-            NativeDenseDictionary<InputPtrHandle, InputAllocation> allocations
+            NativeHashMap<InputPtrHandle, InputAllocation> allocations
         )
         {
             _allocations = allocations;

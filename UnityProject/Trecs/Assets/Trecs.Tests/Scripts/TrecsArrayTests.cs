@@ -9,12 +9,12 @@ namespace Trecs.Tests
     /// <summary>
     /// Functional tests for <see cref="TrecsArray{T}"/>: allocation, indexing, length,
     /// foreach, lifecycle, type-hash checks, and end-to-end through
-    /// <see cref="HeapAccessor"/>.
+    /// <see cref="WorldAccessor"/>.
     /// </summary>
     [TestFixture]
     public class TrecsArrayTests
     {
-        static NativeChunkStore CreateChunkStore() => new NativeChunkStore(TrecsLog.Default);
+        static NativeHeap CreateChunkStore() => new NativeHeap(TrecsLog.Default);
 
         // ── Allocation / lifecycle ──────────────────────────────────────
 
@@ -538,64 +538,66 @@ namespace Trecs.Tests
             chunkStore.Dispose();
         }
 
-        // ── End-to-end through HeapAccessor ─────────────────────────────
+        // ── End-to-end through WorldAccessor ─────────────────────────────
 
         [Test]
-        public void HeapAccessor_AllocReadWriteDispose_RoundTrips()
+        public void WorldAccessor_AllocReadWriteDispose_RoundTrips()
         {
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var heap = env.Accessor.Heap;
+            var world = env.Accessor;
 
-            var arr = TrecsArray.Alloc<int>(heap, 8);
+            var arr = TrecsArray.Alloc<int>(world, 8);
             NAssert.IsFalse(arr.IsNull);
 
-            var w = arr.Write(heap);
+            var w = arr.Write(world);
             for (int i = 0; i < 8; i++)
                 w[i] = i + 100;
 
-            var r = arr.Read(heap);
+            var r = arr.Read(world);
             NAssert.AreEqual(8, r.Length);
             for (int i = 0; i < 8; i++)
                 NAssert.AreEqual(i + 100, r[i]);
 
-            arr.Dispose(heap);
+            arr.Dispose(world);
         }
 
         [Test]
-        public void HeapAccessor_AllocFromVariableRoleAccessor_Throws()
+        public void WorldAccessor_AllocFromVariableRoleAccessor_Throws()
         {
             // Alloc gates on AssertCanAllocatePersistent — a Variable-role accessor
             // (which can't allocate persistent state) must throw. Same gate as
             // TrecsList.Alloc.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var variableHeap = env
-                .World.CreateAccessor(AccessorRole.Variable, debugName: "VariableHeapTest")
-                .Heap;
+            var variableWorld = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                debugName: "VariableHeapTest"
+            );
 
-            NAssert.Throws<TrecsException>(() => TrecsArray.Alloc<int>(variableHeap, 4));
+            NAssert.Throws<TrecsException>(() => TrecsArray.Alloc<int>(variableWorld, 4));
         }
 
         [Test]
-        public void HeapAccessor_WriteFromVariableRoleAccessor_Works()
+        public void WorldAccessor_WriteFromVariableRoleAccessor_Works()
         {
             // Unlike TrecsList where auto-grow needs the persistent-alloc gate,
             // TrecsArrayWrite never allocates — it just gives indexed access to the
             // existing buffer. Opening from a Variable-role accessor is fine.
             using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
-            var unrestrictedHeap = env.Accessor.Heap;
-            var variableHeap = env
-                .World.CreateAccessor(AccessorRole.Variable, debugName: "VariableHeapTest")
-                .Heap;
+            var unrestrictedWorld = env.Accessor;
+            var variableWorld = env.World.CreateAccessor(
+                AccessorRole.Variable,
+                debugName: "VariableHeapTest"
+            );
 
-            var arr = TrecsArray.Alloc<int>(unrestrictedHeap, 4);
-            var w = arr.Write(variableHeap);
+            var arr = TrecsArray.Alloc<int>(unrestrictedWorld, 4);
+            var w = arr.Write(variableWorld);
             w[0] = 1;
             w[1] = 2;
             w[2] = 3;
             w[3] = 4;
             NAssert.AreEqual(2, w[1]);
 
-            arr.Dispose(unrestrictedHeap);
+            arr.Dispose(unrestrictedWorld);
         }
     }
 }

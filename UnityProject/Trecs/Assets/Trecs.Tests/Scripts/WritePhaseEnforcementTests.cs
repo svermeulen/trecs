@@ -35,7 +35,7 @@ namespace Trecs.Tests
     public struct WritePhaseTestSet : IEntitySet<WritePhaseSetTag> { }
 
     /// <summary>
-    /// Class payload for the <see cref="SharedPtr.AllocFrameScoped{T}(HeapAccessor, BlobId, T)"/>
+    /// Class payload for the <see cref="SharedPtr.AllocFrameScoped{T}(WorldAccessor, BlobId, T)"/>
     /// positive-case test. Only needed because that overload constrains <c>T</c> to
     /// <c>class</c>; the body is empty. Marked <c>[Immutable]</c> to satisfy
     /// TRECS125 — the class has no state to mutate, so the contract is
@@ -360,7 +360,7 @@ namespace Trecs.Tests
     //   - FixedRng                → rejected
     //
     // See AssertCanAddInputsSystem / AssertCanMutateHeap in
-    // HeapAccessor and AssertCanWriteComponent / AssertCanMakeStructuralChanges
+    // WorldAccessor and AssertCanWriteComponent / AssertCanMakeStructuralChanges
     // in WorldAccessor for the source-of-truth rules.
 
     [ExecuteIn(SystemPhase.Input)]
@@ -396,7 +396,7 @@ namespace Trecs.Tests
             }
             _hasAllocated = true;
             var _ = InputSharedPtr.Alloc<WritePhaseHeapPayload>(
-                World.Heap,
+                World,
                 BlobIdGenerator.FromKey(1),
                 new WritePhaseHeapPayload()
             );
@@ -411,7 +411,7 @@ namespace Trecs.Tests
             // Persistent (non-frame-scoped) allocation must be rejected from
             // the Input role with the "use the FrameScoped variant" message.
             var _ = SharedPtr.Alloc<WritePhaseHeapPayload>(
-                World.Heap,
+                World,
                 BlobIdGenerator.FromKey(1),
                 new WritePhaseHeapPayload()
             );
@@ -938,7 +938,7 @@ namespace Trecs.Tests
         public void AllocSharedFrameScoped_FromInput_Succeeds()
         {
             // Stand-in for all AllocXxxFrameScoped overloads — they share
-            // the AssertCanAddInputsSystem gate, so one positive test is
+            // the AssertCanAddInputsHeap gate, so one positive test is
             // enough to lock in that Input clears it.
             using var env = CreateEnvWithSystem(new InputAllocSharedFrameScopedSystem());
             NAssert.DoesNotThrow(() => env.World.Tick());

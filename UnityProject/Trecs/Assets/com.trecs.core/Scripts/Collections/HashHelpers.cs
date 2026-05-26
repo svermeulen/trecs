@@ -98,42 +98,42 @@ namespace Trecs.Internal
             for (int i = 0; i < primesLength; i++)
             {
                 int prime = primes[i];
-                if (prime >= min) //pay attention this is >=
+                if (prime >= min)
                     return prime;
             }
 
-            //outside of our predefined table, just leave it as it is
+            // Outside predefined table — use as-is
             return min;
         }
 
         // Returns size of hashtable to grow to.
         public static int Expand(int oldSize)
         {
-            if (oldSize < primes[primes.Length - 1]) //pay attention this is < and NOT <=
+            if (oldSize < primes[primes.Length - 1])
             {
                 var primesLength = primes.Length;
                 for (int i = 0; i < primesLength; i++)
                 {
                     int prime = primes[i];
-                    if (prime > oldSize) //pay attention this is > and NOT >=
+                    if (prime > oldSize)
                         return prime;
                 }
             }
             else
             {
-                if (oldSize < primesHigh[primesHigh.Length - 1]) //pay attention this is < and NOT <=
+                if (oldSize < primesHigh[primesHigh.Length - 1])
                 {
                     var primesLength = primesHigh.Length;
                     for (int i = 0; i < primesLength; i++)
                     {
                         int prime = primesHigh[i];
-                        if (prime > oldSize) //pay attention this is > and NOT >=
+                        if (prime > oldSize)
                             return prime;
                     }
                 }
             }
 
-            //outside of our predefined table, just increase by 50%
+            // Outside predefined tables — grow by 50%
             return (int)(oldSize * 1.5f);
         }
     }

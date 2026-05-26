@@ -1,6 +1,6 @@
 # Dependency Tracking
 
-Trecs tracks which jobs read and write which data and inserts the right `JobHandle` chain for you. You never call `JobHandle.CombineDependencies` or pass handles between jobs — the framework infers them from the types you declare on jobs and the `.Read` / `.Write` properties you use on the main thread.
+Trecs tracks which jobs read and write which data and inserts the right `JobHandle` dependency chain for you. Normally you should not need to call `JobHandle.CombineDependencies` or make use of `JobHandle` values — the framework automatically schedules your job based on the `Read` / `Write` access you use.
 
 ## Why this exists
 
@@ -22,7 +22,7 @@ Granularity is **per (component type, group)**. A job writing `Position` for `Fi
 | Reads `Position` (Fish) | Writes `Position` (Fish) | No — writer waits |
 | Writes `Position` (Fish) | Writes `Position` (Fish) | No — writer waits |
 
-Same rule for [sets](../entity-management/sets.md): `NativeSetRead` / `NativeSetCommandBuffer` are tracked per set type. Deferred set ops on `WorldAccessor` / `NativeWorldAccessor` don't synchronize — they apply at submission, after every job is complete.
+Same rule for [sets](../entity-management/sets.md): `NativeSetRead` / `NativeSetCommandBuffer` are tracked per set type. Note that deferred set ops on `WorldAccessor` / `NativeWorldAccessor` don't need to synchronize — they apply at submission, after every job is complete.
 
 ## How dependencies get declared
 
@@ -36,7 +36,7 @@ The generated `ScheduleParallel`:
 1. Combines the `JobHandle`s of every outstanding conflicting job and passes the result as the new job's input dependency — the new job waits, but the main thread doesn't block.
 2. Registers the new job so subsequent schedules see it as outstanding.
 
-You call only the generated method.
+You call only the generated `ScheduleParallel` method.
 
 ## Main-thread sync
 
@@ -48,10 +48,10 @@ Main-thread access through `WorldAccessor` lazily completes only the conflicting
 ```csharp
 // Completes jobs currently writing Position for this group;
 // jobs that only read Position keep running.
-ref readonly var pos = ref entityIndex.Component<Position>(world).Read;
+ref readonly var pos = ref handle.Component<Position>(world).Read;
 
 // Completes jobs reading OR writing Position for this group.
-ref var posMut = ref entityIndex.Component<Position>(world).Write;
+ref var posMut = ref handle.Component<Position>(world).Write;
 ```
 
 That lazy sync is why you never call `JobHandle.Complete()` yourself — touching the data is the sync point.
@@ -65,7 +65,6 @@ Each of the five [update phases](../core/systems.md#phase-diagram) — `Input`, 
 
 - Fixed-phase jobs finish before any presentation system runs.
 - Within a phase, mix job and main-thread systems freely — the tracker orders them.
-- Cross-phase reads never need manual sync.
 
 ## Summary
 

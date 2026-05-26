@@ -19,12 +19,15 @@ namespace Trecs.Internal
         readonly SimpleSubject _variableUpdateCompletedEvent = new();
         readonly SimpleSubject _inputsAppliedEvent = new();
 
-        readonly DenseDictionary<GroupIndex, SimpleSubject<EntityRange>> _reactiveOnAddedObservers;
-        readonly DenseDictionary<
+        readonly IterableDictionary<
+            GroupIndex,
+            SimpleSubject<EntityRange>
+        > _reactiveOnAddedObservers;
+        readonly IterableDictionary<
             GroupIndex,
             SimpleSubject<GroupIndex, EntityRange>
         > _reactiveOnMovedObservers;
-        readonly DenseDictionary<
+        readonly IterableDictionary<
             GroupIndex,
             SimpleSubject<EntityRange>
         > _reactiveOnRemovedObservers;
@@ -39,15 +42,17 @@ namespace Trecs.Internal
         internal SimpleSubject VariableUpdateCompletedEvent => _variableUpdateCompletedEvent;
         internal SimpleSubject InputsAppliedEvent => _inputsAppliedEvent;
 
-        internal DenseDictionary<GroupIndex, SimpleSubject<EntityRange>> ReactiveOnAddedObservers =>
-            _reactiveOnAddedObservers;
+        internal IterableDictionary<
+            GroupIndex,
+            SimpleSubject<EntityRange>
+        > ReactiveOnAddedObservers => _reactiveOnAddedObservers;
 
-        internal DenseDictionary<
+        internal IterableDictionary<
             GroupIndex,
             SimpleSubject<GroupIndex, EntityRange>
         > ReactiveOnMovedObservers => _reactiveOnMovedObservers;
 
-        internal DenseDictionary<
+        internal IterableDictionary<
             GroupIndex,
             SimpleSubject<EntityRange>
         > ReactiveOnRemovedObservers => _reactiveOnRemovedObservers;

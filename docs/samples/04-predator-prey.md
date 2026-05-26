@@ -118,7 +118,7 @@ Maintains the prey population by spawning replacements.
 
 ### GameObject cleanup
 
-When prey are removed, the shared `RenderableGameObjectManager` (from `Common/`) automatically tears down the companion GameObject. It subscribes once to `OnAdded` / `OnRemoved` for every entity carrying `PrefabId` + `GameObjectId`, so concrete samples don't write their own cleanup observer — see [Sample 16 — Reactive Events](16-reactive-events.md) for the same `OnRemoved` pattern in user code, and [Entity Events](../entity-management/entity-events.md) for the API. Events are preferred over inline destruction in the lifetime system because:
+When prey are removed, the shared `RenderableGameObjectManager` (from `Common/`) automatically tears down the companion GameObject. It subscribes once to `OnAdded` / `OnRemoved` for every entity carrying `PrefabId` + `GameObjectId`, so concrete samples don't write their own cleanup observer — see [Sample 15 — Reactive Events](15-reactive-events.md) for the same `OnRemoved` pattern in user code, and [Entity Events](../entity-management/entity-events.md) for the API. Events are preferred over inline destruction in the lifetime system because:
 
 - **Consistency** — entity removal is deferred, so the entity still exists until submission. Without an event, later systems could read stale data on an about-to-be-removed entity.
 - **Centralized cleanup** — if entities can be removed from multiple places (caught, starved, despawned), the same handler runs regardless of source.

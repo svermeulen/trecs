@@ -121,30 +121,30 @@ namespace Trecs
             _entitySubmitter.QueueRemoveAllInGroup(group, entityCount);
         }
 
-        internal ref EntitySetStorage GetSet(EntitySet entitySet)
+        internal EntitySetStorage GetSet(EntitySet entitySet)
         {
-            return ref GetSet(entitySet.Id);
+            return GetSet(entitySet.Id);
         }
 
-        internal ref EntitySetStorage GetSet(SetId setId)
+        internal EntitySetStorage GetSet(SetId setId)
         {
             TrecsDebugAssert.That(!_isDisposed);
 
             var sets = _sets.EntitySets;
 
-            var success = sets.TryGetIndex(setId, out var index);
+            var found = sets.TryGetValue(setId, out var result);
             TrecsDebugAssert.That(
-                success,
+                found,
                 "Set with ID '{0}' not registered. Add it to the WorldBuilder via AddSet<T>().",
                 setId
             );
 
-            return ref sets.GetValueAtIndexByRef(index);
+            return result;
         }
 
-        internal ref NativeSetDeferredQueues GetDeferredQueues(SetId setId)
+        internal NativeSetDeferredQueues GetDeferredQueues(SetId setId)
         {
-            return ref _setStore.GetDeferredQueues(setId);
+            return _setStore.GetDeferredQueues(setId);
         }
 
         internal NativeWorldAccessor GetNativeWorldAccessor(

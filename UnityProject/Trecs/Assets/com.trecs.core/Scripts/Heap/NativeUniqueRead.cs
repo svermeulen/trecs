@@ -9,14 +9,14 @@ namespace Trecs
 {
     /// <summary>
     /// Read-only safety-checked view over a single <see cref="NativeUniquePtr{T}"/> allocation.
-    /// Obtain via <see cref="HeapAccessor.Read{T}"/> on the main thread, or
-    /// <see cref="NativeUniquePtr{T}.Read(in NativeChunkStoreResolver)"/> in Burst jobs. Both paths fetch the
+    /// Obtain via <see cref="WorldAccessor.Read{T}"/> on the main thread, or
+    /// <see cref="NativeUniquePtr{T}.Read(in NativeHeapResolver)"/> in Burst jobs. Both paths fetch the
     /// underlying <c>AtomicSafetyHandle</c> from the heap's per-allocation pool so that
     /// cross-job conflicts (concurrent read+write or write+write on the same blob) are
     /// detected at schedule time without the walker needing to traverse anything else.
     ///
     /// <para><b>Shipping-build use-after-dispose guard.</b> The wrapper captures the
-    /// slot's <c>NativeChunkStoreEntry.Generation</c> at Open and re-checks on
+    /// slot's <c>NativeHeapEntry.Generation</c> at Open and re-checks on
     /// every access. If the pointer was disposed and its side-table slot recycled,
     /// the check fires (1-byte generation, so ~1/256 chance of coincidental match
     /// after the slot is reused). This check runs unconditionally — closes the
@@ -32,7 +32,7 @@ namespace Trecs
 
         // See class XML doc for the shipping-build use-after-dispose guard.
         [NativeDisableUnsafePtrRestriction]
-        readonly NativeChunkStoreEntry* _slot;
+        readonly NativeHeapEntry* _slot;
         readonly byte _capturedGeneration;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -47,7 +47,7 @@ namespace Trecs
         [EditorBrowsable(EditorBrowsableState.Never)]
         public NativeUniqueRead(
             void* ptr,
-            NativeChunkStoreEntry* slot,
+            NativeHeapEntry* slot,
             byte capturedGeneration,
             AtomicSafetyHandle safety
         )
@@ -63,7 +63,7 @@ namespace Trecs
         }
 #else
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public NativeUniqueRead(void* ptr, NativeChunkStoreEntry* slot, byte capturedGeneration)
+        public NativeUniqueRead(void* ptr, NativeHeapEntry* slot, byte capturedGeneration)
         {
             _ptr = ptr;
             _slot = slot;

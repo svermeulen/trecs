@@ -14,34 +14,26 @@ namespace Trecs
     /// <para>A single chunk-store slot tagged <c>TypeId&lt;TrecsArray&lt;T&gt;&gt;</c>
     /// holds the raw element bytes. <see cref="TrecsArray{T}.Length"/> rides inline on
     /// the handle struct, so <c>Read</c> / <c>Write</c> need only one
-    /// <see cref="NativeChunkStoreResolver.ResolveEntryWithSlotPtr"/> + one TypeId
+    /// <see cref="NativeHeapResolver.ResolveEntryWithSlotPtr"/> + one TypeId
     /// check to open a view. The trade-off is that the handle widens from 4 to 8
     /// bytes — see the <see cref="TrecsArray{T}"/> class doc for the rationale.</para>
     /// </summary>
     public static class TrecsArray
     {
         public static TrecsArray<T> Alloc<T>(
-            HeapAccessor heap,
+            WorldAccessor world,
             int length,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
         )
             where T : unmanaged
         {
-            heap.AssertCanMutateHeap();
-            return Alloc<T>(heap.NativeUniqueChunkStore, length, callerFile, callerLine);
+            world.AssertCanMutateHeap();
+            return Alloc<T>(world.NativeUniqueChunkStore, length, callerFile, callerLine);
         }
 
-        public static TrecsArray<T> Alloc<T>(
-            WorldAccessor world,
-            int length,
-            [CallerFilePath] string callerFile = null,
-            [CallerLineNumber] int callerLine = 0
-        )
-            where T : unmanaged => Alloc<T>(world.Heap, length, callerFile, callerLine);
-
         internal static unsafe TrecsArray<T> Alloc<T>(
-            NativeChunkStore chunkStore,
+            NativeHeap chunkStore,
             int length,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
@@ -94,13 +86,13 @@ namespace Trecs
 
     /// <summary>
     /// A fixed-size array of unmanaged values whose storage is owned by the world's
-    /// shared <see cref="NativeChunkStore"/>. Designed to live on ECS components, so a
+    /// shared <see cref="NativeHeap"/>. Designed to live on ECS components, so a
     /// component can carry a variably-sized buffer (size chosen at allocation time, but
     /// fixed thereafter) without going through <see cref="NativeUniquePtr{T}"/>.
     ///
     /// <para>Use this when the size is known at allocation time and won't change. If
     /// the size needs to grow, use <see cref="TrecsList{T}"/> instead — or
-    /// <see cref="Dispose(HeapAccessor)"/> this array and allocate a new one. For
+    /// <see cref="Dispose(WorldAccessor)"/> this array and allocate a new one. For
     /// small (≤256) compile-time-fixed sizes, prefer <c>FixedArray2..256</c> which
     /// live inline on the component and avoid the chunk-store allocation entirely.</para>
     ///
@@ -143,7 +135,7 @@ namespace Trecs
         public readonly PtrHandle Handle;
 
         /// <summary>
-        /// Element count, fixed at <see cref="TrecsArray.Alloc{T}(HeapAccessor, int, string, int)"/>
+        /// Element count, fixed at <see cref="TrecsArray.Alloc{T}(WorldAccessor, int, string, int)"/>
         /// time and immutable for the array's lifetime. Stored inline on the handle so
         /// <c>Read</c> / <c>Write</c> can skip an extra slot resolve.
         /// </summary>
@@ -167,11 +159,9 @@ namespace Trecs
         // lives on TrecsArrayExtensions as a `this ref TrecsArray<T>` extension method,
         // which requires writable access to the handle struct — the compile-time gate
         // against mutation through an IRead aspect field or an `in` parameter.
-        public readonly void Dispose(HeapAccessor heap) => Dispose(heap.NativeUniqueChunkStore);
+        public readonly void Dispose(WorldAccessor world) => Dispose(world.NativeUniqueChunkStore);
 
-        public readonly void Dispose(WorldAccessor world) => Dispose(world.Heap);
-
-        internal readonly unsafe void Dispose(NativeChunkStore chunkStore)
+        internal readonly unsafe void Dispose(NativeHeap chunkStore)
         {
             // Null-handle Dispose is a no-op (no slot was ever acquired). Lets
             // default(TrecsArray<T>) and Alloc<T>(_, 0) be treated uniformly: both
@@ -196,20 +186,18 @@ namespace Trecs
         /// <summary>
         /// Opens a read view. Works both on the main thread and inside Burst jobs.
         /// </summary>
-        public readonly TrecsArrayRead<T> Read(HeapAccessor heap) =>
-            Read(heap.NativeUniqueChunkStore);
-
-        public readonly TrecsArrayRead<T> Read(WorldAccessor world) => Read(world.Heap);
+        public readonly TrecsArrayRead<T> Read(WorldAccessor world) =>
+            Read(world.NativeUniqueChunkStore);
 
         public readonly TrecsArrayRead<T> Read(in NativeWorldAccessor nativeWorld) =>
             Read(nativeWorld.ChunkStoreResolver);
 
         /// <summary>
         /// Burst-compatible read view. Pass a resolver obtained via
-        /// <see cref="HeapAccessor.NativeChunkStoreResolver"/> or
+        /// <see cref="WorldAccessor.NativeHeapResolver"/> or
         /// <see cref="NativeWorldAccessor.ChunkStoreResolver"/>.
         /// </summary>
-        public readonly unsafe TrecsArrayRead<T> Read(in NativeChunkStoreResolver resolver)
+        public readonly unsafe TrecsArrayRead<T> Read(in NativeHeapResolver resolver)
         {
             ResolveData(in resolver, out var dataPtr, out var entry, out var slot);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -219,7 +207,7 @@ namespace Trecs
 #endif
         }
 
-        internal readonly unsafe TrecsArrayRead<T> Read(NativeChunkStore chunkStore) =>
+        internal readonly unsafe TrecsArrayRead<T> Read(NativeHeap chunkStore) =>
             Read(chunkStore.Resolver);
 
         // Public Write overloads live on TrecsArrayExtensions (this-ref extension
@@ -227,7 +215,7 @@ namespace Trecs
         // readonly` instance methods — extensions delegate to them. The compile-time
         // ref discipline is enforced at the extension's `this ref` receiver.
 
-        internal readonly unsafe TrecsArrayWrite<T> Write(in NativeChunkStoreResolver resolver)
+        internal readonly unsafe TrecsArrayWrite<T> Write(in NativeHeapResolver resolver)
         {
             ResolveData(in resolver, out var dataPtr, out var entry, out var slot);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -237,7 +225,7 @@ namespace Trecs
 #endif
         }
 
-        internal readonly TrecsArrayWrite<T> Write(NativeChunkStore chunkStore) =>
+        internal readonly TrecsArrayWrite<T> Write(NativeHeap chunkStore) =>
             Write(chunkStore.Resolver);
 
         internal readonly TrecsArrayWrite<T> Write(in NativeWorldAccessor nativeWorld) =>
@@ -253,10 +241,10 @@ namespace Trecs
         // resolve is performed: the wrapper carries a null data pointer and a Length
         // of 0, so any indexed access trips the bounds check before dereferencing.
         readonly unsafe void ResolveData(
-            in NativeChunkStoreResolver resolver,
+            in NativeHeapResolver resolver,
             out T* dataPtr,
-            out NativeChunkStoreEntry entry,
-            out NativeChunkStoreEntry* slot
+            out NativeHeapEntry entry,
+            out NativeHeapEntry* slot
         )
         {
             if (Handle.IsNull)
@@ -314,11 +302,8 @@ namespace Trecs
     /// </summary>
     public static class TrecsArrayExtensions
     {
-        public static TrecsArrayWrite<T> Write<T>(this ref TrecsArray<T> array, HeapAccessor heap)
-            where T : unmanaged => array.Write(heap.NativeUniqueChunkStore);
-
         public static TrecsArrayWrite<T> Write<T>(this ref TrecsArray<T> array, WorldAccessor world)
-            where T : unmanaged => array.Write(world.Heap);
+            where T : unmanaged => array.Write(world.NativeUniqueChunkStore);
 
         /// <summary>
         /// Convenience overload that pulls the resolver out of
@@ -331,12 +316,12 @@ namespace Trecs
             where T : unmanaged => array.Write(in nativeWorld);
 
         /// <summary>
-        /// Pass a resolver obtained via <see cref="HeapAccessor.NativeChunkStoreResolver"/>
+        /// Pass a resolver obtained via <see cref="WorldAccessor.NativeHeapResolver"/>
         /// or <see cref="NativeWorldAccessor.ChunkStoreResolver"/>.
         /// </summary>
         public static TrecsArrayWrite<T> Write<T>(
             this ref TrecsArray<T> array,
-            in NativeChunkStoreResolver resolver
+            in NativeHeapResolver resolver
         )
             where T : unmanaged => array.Write(resolver);
     }

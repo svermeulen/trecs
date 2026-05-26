@@ -6,11 +6,10 @@ namespace Trecs.Internal
     /// Stateful collaborator shared by <see cref="BundleRecorder"/> (runtime)
     /// and <see cref="TrecsRewindBuffer"/> (editor) to consolidate the lifecycle
     /// and IO primitives both recorders need: an <see cref="WorldAccessor"/>
-    /// with <see cref="AccessorRole.Unrestricted"/>, a
-    /// <see cref="RecordingChecksumCalculator"/>, two reusable
-    /// <see cref="SerializationBuffer"/>s (one for checksums, one for input-queue
-    /// serialization), the <see cref="OnFixedUpdateCompleted"/> subscription
-    /// helper, and the input-history-locker add/remove pair.
+    /// with <see cref="AccessorRole.Unrestricted"/>, a reusable
+    /// <see cref="SerializationBuffer"/> for input-queue serialization,
+    /// the <see cref="OnFixedUpdateCompleted"/> subscription helper, and the
+    /// input-history-locker add/remove pair.
     ///
     /// Intentionally narrow: capture *cadence* and *policy* (when to anchor,
     /// when to checksum, whether to cap, what
@@ -26,12 +25,10 @@ namespace Trecs.Internal
     internal sealed class RecorderEngine : IDisposable
     {
         readonly World _world;
-        readonly IWorldStateSerializer _stateSerializer;
         readonly SerializerRegistry _serializerRegistry;
         readonly SnapshotSerializer _snapshotSerializer;
 
         readonly WorldAccessor _accessor;
-        readonly SerializationBuffer _checksumBuffer;
 
         // Reused across queue-serialization calls so the backing MemoryStream
         // / writer buffers survive the recorder's lifetime — successive
@@ -42,7 +39,6 @@ namespace Trecs.Internal
 
         public RecorderEngine(
             World world,
-            IWorldStateSerializer stateSerializer,
             SerializerRegistry serializerRegistry,
             SnapshotSerializer snapshotSerializer,
             string accessorLabel
@@ -50,8 +46,6 @@ namespace Trecs.Internal
         {
             if (world == null)
                 throw new ArgumentNullException(nameof(world));
-            if (stateSerializer == null)
-                throw new ArgumentNullException(nameof(stateSerializer));
             if (serializerRegistry == null)
                 throw new ArgumentNullException(nameof(serializerRegistry));
             if (snapshotSerializer == null)
@@ -60,11 +54,9 @@ namespace Trecs.Internal
                 throw new ArgumentNullException(nameof(accessorLabel));
 
             _world = world;
-            _stateSerializer = stateSerializer;
             _serializerRegistry = serializerRegistry;
             _snapshotSerializer = snapshotSerializer;
             _accessor = _world.CreateAccessor(AccessorRole.Unrestricted, accessorLabel);
-            _checksumBuffer = new SerializationBuffer(_serializerRegistry);
             _queueBuffer = new SerializationBuffer(_serializerRegistry);
         }
 
@@ -73,16 +65,14 @@ namespace Trecs.Internal
         public SnapshotSerializer SnapshotSerializer => _snapshotSerializer;
 
         /// <summary>
-        /// Compute the current world-state checksum via the reusable buffer.
+        /// Compute the current world-state checksum. Serializes a full
+        /// snapshot into the internal buffer and hashes the result,
+        /// consistent with checksums produced by
+        /// <see cref="SnapshotSerializer.SaveSnapshot(int, out ReadOnlyMemory{byte}, out ulong, bool)"/>.
         /// </summary>
-        public ulong ComputeChecksum(int version, long flags)
+        public ulong ComputeChecksum(int version)
         {
-            return RecordingChecksumCalculator.Calculate(
-                _stateSerializer,
-                version,
-                _checksumBuffer,
-                flags
-            );
+            return _snapshotSerializer.ComputeChecksum(version);
         }
 
         /// <summary>
@@ -97,17 +87,15 @@ namespace Trecs.Internal
         /// </summary>
         public void CaptureInitialState(
             int version,
-            long checksumFlags,
             out ReadOnlyMemory<byte> payload,
             out ulong checksum
         )
         {
-            _snapshotSerializer.SaveSnapshot(version, out payload, includeTypeChecks: true);
-            checksum = RecordingChecksumCalculator.Calculate(
-                _stateSerializer,
+            _snapshotSerializer.SaveSnapshot(
                 version,
-                _checksumBuffer,
-                checksumFlags
+                out payload,
+                out checksum,
+                includeTypeChecks: true
             );
         }
 
@@ -213,7 +201,6 @@ namespace Trecs.Internal
             if (_disposed)
                 return;
             _disposed = true;
-            _checksumBuffer.Dispose();
             _queueBuffer.Dispose();
             // Accessor + calculator have no IDisposable surface.
         }

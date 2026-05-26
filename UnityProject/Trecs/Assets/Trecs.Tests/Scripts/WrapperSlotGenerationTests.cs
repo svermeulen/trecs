@@ -37,7 +37,7 @@ namespace Trecs.Tests
     [TestFixture]
     public class WrapperSlotGenerationTests
     {
-        static NativeChunkStore CreateStore() => new NativeChunkStore(TrecsLog.Default);
+        static NativeHeap CreateStore() => new NativeHeap(TrecsLog.Default);
 
         // ─── NativeUniquePtr ─────────────────────────────────────
 

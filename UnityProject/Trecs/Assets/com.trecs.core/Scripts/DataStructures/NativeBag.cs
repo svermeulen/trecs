@@ -21,6 +21,18 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public struct NativeBag : IDisposable
     {
+        [NoAlias]
+        [NativeDisableUnsafePtrRestriction]
+        unsafe UnsafeBlob* _queue;
+
+        readonly AllocatorManager.AllocatorHandle _allocator;
+
+        public unsafe NativeBag(AllocatorManager.AllocatorHandle allocator)
+        {
+            _allocator = allocator;
+            _queue = null;
+        }
+
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -51,8 +63,7 @@ namespace Trecs.Internal
         {
             unsafe
             {
-                var bag = new NativeBag();
-                bag._allocator = allocator;
+                var bag = new NativeBag(allocator);
                 var sizeOf = Unsafe.SizeOf<UnsafeBlob>();
                 var listData = (UnsafeBlob*)UnsafeUtility.Malloc(sizeOf, 16, allocator.ToAllocator);
                 UnsafeUtility.MemClear(listData, sizeOf);
@@ -164,16 +175,10 @@ namespace Trecs.Internal
         }
 
         [Conditional("ENABLE_DEBUG_CHECKS")]
-        unsafe void BasicTests()
+        readonly unsafe void BasicTests()
         {
             if (_queue == null)
-                throw new TrecsException("SimpleNativeArray: null-access");
+                throw new TrecsException("NativeBag: null-access");
         }
-
-        [NoAlias]
-        [NativeDisableUnsafePtrRestriction]
-        unsafe UnsafeBlob* _queue;
-
-        AllocatorManager.AllocatorHandle _allocator;
     }
 }

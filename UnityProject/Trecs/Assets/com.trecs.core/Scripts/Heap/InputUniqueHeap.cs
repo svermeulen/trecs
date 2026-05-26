@@ -13,7 +13,7 @@ namespace Trecs
     /// <c>ClearAtOrBeforeFrame</c> O(frames-trimmed × handles-per-frame); per-frame
     /// <see cref="List{}"/>s are pooled to avoid GC churn on high-churn input
     /// workloads. The handle-to-object map is a separate
-    /// <see cref="DenseDictionary{,Entry}"/> for deterministic iteration in
+    /// <see cref="IterableDictionary{,Entry}"/> for deterministic iteration in
     /// <c>ClearAll</c> and serialization paths.</para>
     /// </summary>
     public sealed class InputUniqueHeap
@@ -21,8 +21,8 @@ namespace Trecs
         readonly TrecsLog _log;
         readonly ITrecsPoolManager _poolManager;
 
-        readonly DenseDictionary<uint, Entry> _entries = new();
-        readonly DenseDictionary<int, List<uint>> _handlesByFrame = new();
+        readonly IterableDictionary<uint, Entry> _entries = new();
+        readonly IterableDictionary<int, List<uint>> _handlesByFrame = new();
         readonly Stack<List<uint>> _listPool = new();
         readonly List<int> _frameRemoveBuffer = new();
 

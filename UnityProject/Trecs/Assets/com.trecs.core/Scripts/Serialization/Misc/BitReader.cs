@@ -51,16 +51,24 @@ namespace Trecs.Internal
             }
         }
 
-        public void Reset(BinaryReader reader)
+        public void Reset(MemoryStream stream)
         {
             TrecsDebugAssert.That(!_hasStarted);
             _hasStarted = true;
 
-            _totalBits = reader.ReadInt32();
-            var byteCount = reader.ReadInt32();
+            _totalBits = 0;
+            MemoryBlitter.Read(ref _totalBits, stream);
+            int byteCount = 0;
+            MemoryBlitter.Read(ref byteCount, stream);
             EnsureCapacity(byteCount);
 
-            reader.Read(_bytes, 0, byteCount);
+            int bytesRead = stream.Read(_bytes, 0, byteCount);
+            TrecsDebugAssert.That(
+                bytesRead == byteCount,
+                "Truncated stream: expected {0} bit-field bytes, got {1}",
+                byteCount,
+                bytesRead
+            );
 
             _byteIndex = 0;
             _bitPosition = 0;

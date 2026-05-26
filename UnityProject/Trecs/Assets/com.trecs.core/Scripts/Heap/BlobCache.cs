@@ -186,8 +186,8 @@ namespace Trecs
     {
         readonly TrecsLog _log;
 
-        readonly DenseDictionary<PtrHandle, BlobId> _handles = new();
-        readonly DenseDictionary<BlobId, int> _blobRefCounts = new();
+        readonly IterableDictionary<PtrHandle, BlobId> _handles = new();
+        readonly IterableDictionary<BlobId, int> _blobRefCounts = new();
         readonly BlobCacheSettings _settings;
         readonly List<IBlobStore> _stores;
         readonly IBlobStore _writableStore;
@@ -317,8 +317,7 @@ namespace Trecs
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime))
             {
                 TrecsDebugAssert.That(!manifestEntry.IsNative);
-                TrecsDebugAssert.That(manifestEntry.Type.IsClass);
-                return manifestEntry.Type;
+                return TypeId.ToType(manifestEntry.TypeId);
             }
 
             return null;
@@ -338,7 +337,7 @@ namespace Trecs
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime))
             {
                 TrecsDebugAssert.That(manifestEntry.IsNative);
-                return manifestEntry.Type;
+                return TypeId.ToType(manifestEntry.TypeId);
             }
 
             return null;
@@ -358,7 +357,7 @@ namespace Trecs
         /// O(active blobs); maintained incrementally on every handle create/dispose,
         /// not by walking the full handle table.
         /// </summary>
-        public void GetAllActiveBlobIds(DenseHashSet<BlobId> blobIds)
+        public void GetAllActiveBlobIds(IterableHashSet<BlobId> blobIds)
         {
             AssertMainThreadAndNotDisposed();
 
@@ -387,7 +386,7 @@ namespace Trecs
             // The ref-count dictionary's keyset is the active-blob set: a blob is
             // active iff at least one handle pins it, which is exactly when the
             // dictionary has an entry for it. Wrapping it directly avoids the
-            // O(handles) walk a separate DenseHashSet rebuild would cost on every
+            // O(handles) walk a separate IterableHashSet rebuild would cost on every
             // eviction pass.
             var activeBlobs = new ReadOnlyBlobIdSet(_blobRefCounts);
 
@@ -543,7 +542,8 @@ namespace Trecs
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime: updateAccessTime))
             {
-                return !manifestEntry.IsNative && typeof(T).IsAssignableFrom(manifestEntry.Type);
+                return !manifestEntry.IsNative
+                    && typeof(T).IsAssignableFrom(TypeId.ToType(manifestEntry.TypeId));
             }
 
             return false;
@@ -575,7 +575,7 @@ namespace Trecs
 
             if (TryGetManifestEntry(id, out var manifestEntry, updateAccessTime: updateAccessTime))
             {
-                return manifestEntry.IsNative && manifestEntry.Type == typeof(T);
+                return manifestEntry.IsNative && manifestEntry.TypeId == TypeId<T>.Value;
             }
 
             return false;
@@ -591,11 +591,12 @@ namespace Trecs
             }
 
             TrecsDebugAssert.That(!metadata.IsNative);
+            var storedType = TypeId.ToType(metadata.TypeId);
             TrecsDebugAssert.That(
-                typeof(T).IsAssignableFrom(metadata.Type),
+                typeof(T).IsAssignableFrom(storedType),
                 "Expected blob assignable to type {0}, but found type {1}",
                 typeof(T),
-                metadata.Type
+                storedType
             );
 
             value = (T)valueBase;
@@ -610,7 +611,7 @@ namespace Trecs
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
             TrecsDebugAssert.That(!metadata.IsNative);
-            TrecsDebugAssert.That(typeof(T).IsAssignableFrom(metadata.Type));
+            TrecsDebugAssert.That(typeof(T).IsAssignableFrom(TypeId.ToType(metadata.TypeId)));
 
             return (T)blob;
         }
@@ -744,9 +745,9 @@ namespace Trecs
 
             TrecsDebugAssert.That(metadata.IsNative);
             TrecsDebugAssert.That(
-                metadata.Type == typeof(T),
+                metadata.TypeId == TypeId<T>.Value,
                 "Type mismatch retrieving native blob: stored {0}, requested {1}",
-                metadata.Type,
+                TypeId.ToType(metadata.TypeId),
                 typeof(T)
             );
 
@@ -762,7 +763,7 @@ namespace Trecs
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
-            TrecsDebugAssert.That(TypeId.FromType(metadata.Type).Value == innerTypeId);
+            TrecsDebugAssert.That(metadata.TypeId.Value == innerTypeId);
             TrecsDebugAssert.That(metadata.IsNative);
 
             return ((NativeBlobBox)blob).Ptr;
@@ -775,7 +776,7 @@ namespace Trecs
 
             var blob = GetBlobAndMetadata(id, out var metadata, updateAccessTime);
 
-            TrecsDebugAssert.That(metadata.Type == typeof(T));
+            TrecsDebugAssert.That(metadata.TypeId == TypeId<T>.Value);
             TrecsDebugAssert.That(metadata.IsNative);
 
             return ref UnsafeUtility.AsRef<T>(((NativeBlobBox)blob).Ptr.ToPointer());
@@ -976,7 +977,7 @@ namespace Trecs
         /// The caller must provide the exact allocation size and alignment so the blob
         /// can be freed correctly. This is critical for variable-sized types where the
         /// allocation is larger than sizeof(T).
-        /// See <see cref="NativeUniquePtr.AllocTakingOwnership{T}(HeapAccessor, NativeBlobAllocation, string, int)"/> for the ownership contract.
+        /// See <see cref="NativeUniquePtr.AllocTakingOwnership{T}(WorldAccessor, NativeBlobAllocation, string, int)"/> for the ownership contract.
         /// </summary>
         public NativeBlobPtr<T> AllocNativeBlobTakingOwnership<T>(
             BlobId id,
@@ -1012,14 +1013,14 @@ namespace Trecs
 
             if (_handles.Count > 0)
             {
-                var seenTypes = new HashSet<Type>();
+                var seenTypes = new HashSet<TypeId>();
                 var typeNames = new StringBuilder();
 
                 foreach (var (_, blobId) in _handles)
                 {
                     if (
                         TryGetManifestEntry(blobId, out var manifestEntry, updateAccessTime: false)
-                        && seenTypes.Add(manifestEntry.Type)
+                        && seenTypes.Add(manifestEntry.TypeId)
                     )
                     {
                         if (typeNames.Length > 0)
@@ -1027,7 +1028,7 @@ namespace Trecs
                             typeNames.Append(", ");
                         }
 
-                        typeNames.Append(manifestEntry.Type.GetPrettyName());
+                        typeNames.Append(TypeId.ToType(manifestEntry.TypeId).GetPrettyName());
                     }
                 }
 

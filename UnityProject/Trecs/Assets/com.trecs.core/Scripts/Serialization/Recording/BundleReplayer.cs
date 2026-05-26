@@ -24,9 +24,7 @@ namespace Trecs.Internal
     {
         readonly TrecsLog _log;
 
-        readonly IWorldStateSerializer _worldStateSerializer;
         readonly SnapshotSerializer _snapshotSerializer;
-        readonly SerializationBuffer _checksumBuffer;
 
         // Reused across Start() calls to deserialize the bundle's input-queue
         // payload. Kept as a field rather than `using var` per-call so the
@@ -44,15 +42,12 @@ namespace Trecs.Internal
 
         public BundleReplayer(
             World world,
-            IWorldStateSerializer worldStateSerializer,
             SerializerRegistry registry,
             SnapshotSerializer snapshotSerializer
         )
         {
             if (world == null)
                 throw new ArgumentNullException(nameof(world));
-            if (worldStateSerializer == null)
-                throw new ArgumentNullException(nameof(worldStateSerializer));
             if (registry == null)
                 throw new ArgumentNullException(nameof(registry));
             if (snapshotSerializer == null)
@@ -60,9 +55,7 @@ namespace Trecs.Internal
 
             _log = world.Log;
             _worldOwner = world;
-            _worldStateSerializer = worldStateSerializer;
             _snapshotSerializer = snapshotSerializer;
-            _checksumBuffer = new SerializationBuffer(registry);
             _queueBuffer = new SerializationBuffer(registry);
         }
 
@@ -253,12 +246,7 @@ namespace Trecs.Internal
                 return default;
             }
 
-            var actual = RecordingChecksumCalculator.Calculate(
-                _worldStateSerializer,
-                version: _bundle.Header.Version,
-                _checksumBuffer,
-                SerializationFlags.IsForChecksum
-            );
+            var actual = _snapshotSerializer.ComputeChecksum(_bundle.Header.Version);
             if (expected != actual)
             {
                 _log.Warning(
@@ -312,7 +300,6 @@ namespace Trecs.Internal
                 _state = BundlePlaybackState.Idle;
             }
 
-            _checksumBuffer?.Dispose();
             _queueBuffer?.Dispose();
         }
 
@@ -329,12 +316,7 @@ namespace Trecs.Internal
             {
                 return;
             }
-            var actual = RecordingChecksumCalculator.Calculate(
-                _worldStateSerializer,
-                version: bundle.Header.Version,
-                _checksumBuffer,
-                SerializationFlags.IsForChecksum
-            );
+            var actual = _snapshotSerializer.ComputeChecksum(bundle.Header.Version);
             if (actual != expected)
             {
                 throw new SerializationException(

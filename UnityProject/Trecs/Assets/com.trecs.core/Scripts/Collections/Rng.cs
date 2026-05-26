@@ -162,7 +162,7 @@ namespace Trecs.Collections
 
         public int NextInt()
         {
-            return NextInt(int.MinValue + 1, int.MaxValue - 1);
+            return unchecked((int)NextUint());
         }
     }
 }

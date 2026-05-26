@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Trecs.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Internal
@@ -31,7 +31,7 @@ namespace Trecs.Internal
     public sealed class WorldSafetyManager : IDisposable
     {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-        readonly Dictionary<long, AtomicSafetyHandle> _handles = new();
+        readonly IterableDictionary<long, AtomicSafetyHandle> _handles = new();
 #endif
         bool _disposed;
 
@@ -86,7 +86,7 @@ namespace Trecs.Internal
 
             try
             {
-                foreach (var handle in _handles.Values)
+                foreach (var (_, handle) in _handles)
                 {
                     try
                     {

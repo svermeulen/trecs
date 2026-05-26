@@ -6,7 +6,7 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Internal
 {
-    //Necessary to be sure that the user won't pass random values
+    // Opaque index wrapper so callers can't pass arbitrary ints
     [EditorBrowsable(EditorBrowsableState.Never)]
     public struct UnsafeArrayIndex
     {
@@ -14,11 +14,9 @@ namespace Trecs.Internal
     }
 
     /// <summary>
-    ///     Note: this must work inside burst, so it must follow burst restrictions
-    ///     It's a typeless native queue based on a ring-buffer model. This means that the writing head and the
-    ///     reading head always advance independently. If there is enough space left by dequeued elements,
-    ///     the writing head will wrap around. The writing head cannot ever surpass the reading head.
-    ///
+    /// Burst-compatible typeless ring-buffer queue. Read and write heads advance
+    /// independently; the write head wraps when space freed by dequeues allows it.
+    /// The write head cannot surpass the read head.
     /// </summary>
     struct UnsafeBlob : IDisposable
     {
@@ -30,10 +28,10 @@ namespace Trecs.Internal
         // Set by NativeBag.Create after MemClear, before any Grow / Dispose call.
         internal AllocatorManager.AllocatorHandle _allocator;
 
-        //expressed in bytes
+        // expressed in bytes
         internal uint capacity { get; private set; }
 
-        //expressed in bytes
+        // expressed in bytes
         internal uint size
         {
             get
@@ -48,7 +46,7 @@ namespace Trecs.Internal
             }
         }
 
-        //expressed in bytes
+        // expressed in bytes
         internal uint availableSpace => capacity - size;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -76,12 +74,12 @@ namespace Trecs.Internal
                 {
                     Unsafe.Write(ptr + writeHead, item);
                 }
-                else //copy with wrap, will start to copy and wrap for the remainder
+                else
                 {
+                    // Item wraps around the ring — copy in two parts
                     var byteCountToEnd = capacity - writeHead;
 
                     var localCopyToAvoidGcIssues = item;
-                    //read and copy the first portion of Item until the end of the stream
                     Unsafe.CopyBlock(
                         ptr + writeHead,
                         Unsafe.AsPointer(ref localCopyToAvoidGcIssues),
@@ -90,7 +88,6 @@ namespace Trecs.Internal
 
                     var restCount = structSize - byteCountToEnd;
 
-                    //read and copy the remainder
                     Unsafe.CopyBlock(
                         ptr,
                         (byte*)Unsafe.AsPointer(ref localCopyToAvoidGcIssues) + byteCountToEnd,
@@ -98,16 +95,15 @@ namespace Trecs.Internal
                     );
                 }
 
-                //this is may seems a waste if you are going to use an unsafeBlob just for bytes, but it's necessary for mixed types.
-                //it's still possible to use WriteUnaligned though
+                // Padding is necessary for mixed-type blobs; use WriteUnaligned to bypass
                 uint paddedStructSize = (uint)(structSize + (int)Pad4(structSize));
 
-                _writeIndex += paddedStructSize; //we want _writeIndex to be always aligned by 4
+                _writeIndex += paddedStructSize;
             }
         }
 
+        // Returns an unwrapped index that must be wrapped (% capacity) before use
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //The index returned is the index of the unwrapped ring. It must be wrapped again before to be used
         internal ref T Reserve<T>(out UnsafeArrayIndex index)
             where T : unmanaged
         {
@@ -159,7 +155,7 @@ namespace Trecs.Internal
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
                 var size = _writeIndex - _readIndex;
-                if (size < structSize) //are there enough bytes to read?
+                if (size < structSize)
                     throw new TrecsException("dequeuing empty queue or unexpected type dequeued");
                 if (_readIndex > _writeIndex)
                     throw new TrecsException("unexpected read");
@@ -171,9 +167,7 @@ namespace Trecs.Internal
 
                 if (_readIndex == _writeIndex)
                 {
-                    //resetting the Indices has the benefit to let the Reserve work in more occasions and
-                    //the rapping happening less often. If the _readIndex reached the _writeIndex, it means
-                    //that there is no data left to read, so we can start to write again from the begin of the memory
+                    // Queue fully drained — reset both heads to 0 to reduce wrapping
                     _writeIndex = 0;
                     _readIndex = 0;
                 }
@@ -181,8 +175,7 @@ namespace Trecs.Internal
                 if (readHead + paddedStructSize <= capacity)
                     return Unsafe.Read<T>(ptr + readHead);
 
-                //handle the case the structure wraps around so it must be reconstructed from the part at the
-                //end of the stream and the part starting from the begin.
+                // Item wraps around the ring — reconstruct from two parts
                 T item = default;
                 var byteCountToEnd = capacity - readHead;
                 Unsafe.CopyBlock(Unsafe.AsPointer(ref item), ptr + readHead, byteCountToEnd);
@@ -199,8 +192,8 @@ namespace Trecs.Internal
         }
 
         /// <summary>
-        /// This code unwraps the queue and resizes the array, but doesn't change the unwrapped index of existing elements.
-        /// In this way the previously reserved indices will remain valid
+        /// Grows the backing buffer. Unwrapped indices of existing elements are
+        /// preserved so previously reserved <see cref="UnsafeArrayIndex"/> values stay valid.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void Grow<T>()
@@ -213,24 +206,21 @@ namespace Trecs.Internal
                 var oldCapacity = capacity;
 
                 uint newCapacity = (uint)((oldCapacity + sizeOf) << 1);
-                //be sure it's multiple of 4. Assuming that what we write is aligned to 4, then we will always have aligned wrapped heads
-                //the reading and writing head always increment in multiple of 4
+                // Round up to Alignment so wrapped heads stay aligned
                 newCapacity += Pad4(newCapacity);
 
                 byte* newPointer = (byte*)
                     UnsafeUtility.Malloc(newCapacity, PointerAlignment, _allocator.ToAllocator);
                 UnsafeUtility.MemClear(newPointer, newCapacity);
 
-                //copy wrapped content if there is any
+                // Copy existing content into the new buffer
                 var currentSize = _writeIndex - _readIndex;
                 if (currentSize > 0)
                 {
                     var oldReaderHead = _readIndex % oldCapacity;
                     var oldWriterHead = _writeIndex % oldCapacity;
 
-                    //Remembering that the unwrapped reader cannot ever surpass the unwrapped writer, if the reader is behind the writer
-                    //it means that the writer didn't wrap. It's the natural position so the data can be copied with
-                    //a single memcpy
+                    // Reader behind writer means no wrap — single contiguous copy
                     if (oldReaderHead < oldWriterHead)
                     {
                         var newReaderHead = _readIndex % newCapacity;
@@ -243,31 +233,26 @@ namespace Trecs.Internal
                     }
                     else
                     {
-                        //if the wrapped writer is behind the wrapped reader, it means the writer wrapped. Therefore
-                        //I need to copy the data from the current wrapped reader to the end and then from the
-                        //begin of the array to the current wrapped writer.
-
-                        var byteCountToEnd = oldCapacity - oldReaderHead; //bytes to copy from the reader to the end
+                        // Writer wrapped — copy tail (reader→end) then head (0→writer)
+                        var byteCountToEnd = oldCapacity - oldReaderHead;
                         var newReaderHead = _readIndex % newCapacity;
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
-                        if (newReaderHead + byteCountToEnd + oldWriterHead > newCapacity) //basically the test is the old size must be less than the new capacity.
+                        if (newReaderHead + byteCountToEnd + oldWriterHead > newCapacity)
                             throw new TrecsException(
                                 "something is wrong with my previous assumptions"
                             );
 #endif
-                        //I am leaving on purpose gap at the begin of the new array if there is any, it will be
-                        //anyway used once it's time to wrap.
                         Unsafe.CopyBlock(
                             newPointer + newReaderHead,
                             ptr + oldReaderHead,
                             byteCountToEnd
-                        ); //from the old reader head to the end of the old array
+                        );
                         Unsafe.CopyBlock(
                             newPointer + newReaderHead + byteCountToEnd,
                             ptr + 0,
                             (uint)oldWriterHead
-                        ); //from the begin of the old array to the old writer head (rember the writerHead wrapped)
+                        ); // from start of old array to old writer head (the writer head wrapped)
                     }
                 }
 

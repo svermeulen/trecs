@@ -1582,7 +1582,7 @@ namespace Trecs.SourceGen
             // RegisterJobTimings doc for the buffer layout. Both fields are
             // populated by the generated ScheduleParallel_ method; the Execute
             // shim writes ProfilerUnsafeUtility.Timestamp values into the buffer.
-            sb.AppendLine($"{fieldInd}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine($"{fieldInd}#if SVKJ_IS_PROFILING");
             sb.AppendLine($"{fieldInd}[Unity.Collections.NativeDisableParallelForRestriction]");
             sb.AppendLine(
                 $"{fieldInd}internal Unity.Collections.NativeArray<long> {FromWorldEmitter.JobFieldPrefix}timing;"
@@ -1611,7 +1611,7 @@ namespace Trecs.SourceGen
             string outer = ind + "    ";
 
             // Start-of-batch worker timestamp (one read per Execute call, not per-index).
-            sb.AppendLine($"{outer}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine($"{outer}#if SVKJ_IS_PROFILING");
             sb.AppendLine(
                 $"{outer}var {GenPrefix}t0 = Unity.Profiling.LowLevel.Unsafe.ProfilerUnsafeUtility.Timestamp;"
             );
@@ -1735,7 +1735,7 @@ namespace Trecs.SourceGen
             //   slot[0] = first-seen timestamp on this thread (sentinel 0 if untouched)
             //   slot[1] = last-seen timestamp (last call wins)
             //   slot[2] += delta — accumulates per-batch CPU on this worker
-            sb.AppendLine($"{outer}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine($"{outer}#if SVKJ_IS_PROFILING");
             sb.AppendLine(
                 $"{outer}var {GenPrefix}t1 = Unity.Profiling.LowLevel.Unsafe.ProfilerUnsafeUtility.Timestamp;"
             );
@@ -1961,7 +1961,7 @@ namespace Trecs.SourceGen
 
             // Rent and attach the per-worker timing buffer just before scheduling.
             // Decoded + returned to the pool by RuntimeJobScheduler.CompleteAllOutstanding.
-            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING");
             sb.AppendLine(
                 $"{innerBody}var {GenPrefix}timing = {GenPrefix}scheduler.RentTimingBuffer();"
             );
@@ -1997,7 +1997,7 @@ namespace Trecs.SourceGen
                     $"{innerBody}{GenPrefix}scheduler.TrackJob({GenPrefix}handle, {GenPrefix}jobName);"
                 );
 
-            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING");
             sb.AppendLine(
                 $"{innerBody}{GenPrefix}scheduler.RegisterJobTimings({GenPrefix}handle, {GenPrefix}jobName, {GenPrefix}timing);"
             );
@@ -2138,7 +2138,7 @@ namespace Trecs.SourceGen
             // Rent the timing buffer and attach to the Inner job BEFORE wrapping in
             // the Shim (Shim copies Inner by value). Decoded + returned to the pool
             // by RuntimeJobScheduler.CompleteAllOutstanding.
-            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING");
             sb.AppendLine(
                 $"{innerBody}var {GenPrefix}timing = {GenPrefix}scheduler.RentTimingBuffer();"
             );
@@ -2181,7 +2181,7 @@ namespace Trecs.SourceGen
             // Register worker-execution timing against the user job's handle (not the
             // dispose-handle chained off it) so the recorded timings reflect the actual
             // worker execution window, not the dispose-job tail.
-            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING && ENABLE_PROFILER");
+            sb.AppendLine($"{innerBody}#if SVKJ_IS_PROFILING");
             sb.AppendLine(
                 $"{innerBody}{GenPrefix}scheduler.RegisterJobTimings({GenPrefix}handle, {GenPrefix}jobName, {GenPrefix}timing);"
             );

@@ -35,8 +35,10 @@ namespace Trecs.Internal
         readonly T* _data;
         readonly int _length;
 
-        public NativeBuffer(NativeList<T> array)
-            : this((T*)NativeListUnsafeUtility.GetUnsafePtr(array), array.Length) { }
+        public static NativeBuffer<T> FromNativeList(NativeList<T> list)
+        {
+            return new NativeBuffer<T>((T*)NativeListUnsafeUtility.GetUnsafePtr(list), list.Length);
+        }
 
         public NativeBuffer(T* data, int length)
         {

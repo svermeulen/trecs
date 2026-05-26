@@ -1078,7 +1078,7 @@ namespace Trecs.Tests
             // NativeSharedHeap has its own pending model (independent of the
             // chunk-store-backed heaps); resolver still needs flush.
             heap.FlushPendingOperations();
-            ref readonly int value = ref ptr.Read(heap.Resolver).Value;
+            ref readonly int value = ref heap.Read(in ptr).Value;
             NAssert.AreEqual(42, value);
 
             heap.Dispose();
@@ -1095,6 +1095,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, heap.NumEntries);
 
             heap.DisposeHandle(ptr.Handle);
+            heap.FlushPendingOperations();
             NAssert.AreEqual(0, heap.NumEntries);
 
             heap.Dispose();
@@ -1114,7 +1115,7 @@ namespace Trecs.Tests
             heap.DisposeHandle(ptr.Handle);
 
             heap.FlushPendingOperations();
-            ref readonly int value = ref clone.Read(heap.Resolver).Value;
+            ref readonly int value = ref heap.Read(in clone).Value;
             NAssert.AreEqual(42, value);
 
             heap.Dispose();
@@ -1130,10 +1131,10 @@ namespace Trecs.Tests
             NAssert.AreEqual(1, heap.NumEntries);
 
             heap.DisposeHandle(ptr.Handle);
-            NAssert.AreEqual(0, heap.NumEntries);
 
             // Both pending add and pending remove for the same blob —
             // flush should process adds first so the remove finds the entry
+            heap.FlushPendingOperations();
             NAssert.AreEqual(0, heap.NumEntries);
 
             heap.Dispose();
@@ -1179,9 +1180,11 @@ namespace Trecs.Tests
             NAssert.AreEqual(2, heap.NumEntries);
 
             heap.DisposeHandle(ptr1.Handle);
+            heap.FlushPendingOperations();
             NAssert.AreEqual(1, heap.NumEntries);
 
             heap.DisposeHandle(ptr2.Handle);
+            heap.FlushPendingOperations();
             NAssert.AreEqual(0, heap.NumEntries);
 
             heap.Dispose();
@@ -1192,9 +1195,9 @@ namespace Trecs.Tests
         // GroupIndex 5: NativeUniquePtr Tests (chunk-store-backed)
         // ───────────────────────────────────────────────────────────
 
-        static NativeChunkStore CreateNativeUniqueHeap()
+        static NativeHeap CreateNativeUniqueHeap()
         {
-            return new NativeChunkStore(TrecsLog.Default);
+            return new NativeHeap(TrecsLog.Default);
         }
 
         [Test]

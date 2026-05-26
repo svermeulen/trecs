@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Collections.LowLevel.Unsafe;
 
@@ -13,7 +14,7 @@ namespace Trecs
     /// <c>ref struct</c>, it cannot be stored as a job field — use
     /// <see cref="NativeEntitySetIndices{TSet}"/> for job-compatible access.
     /// </summary>
-    public ref struct EntitySetIndices
+    public readonly ref struct EntitySetIndices
     {
         readonly NativeBuffer<int> _indices;
         readonly int _count;
@@ -23,12 +24,12 @@ namespace Trecs
         // dict struct shares native memory with the source, so
         // reading Count off this copy reflects mutations on the original.
         [NativeDisableContainerSafetyRestriction]
-        readonly NativeDenseDictionary<int, int> _sourceDict;
+        readonly NativeIterableDictionary<int, int> _sourceDict;
 
         public EntitySetIndices(
             NativeBuffer<int> indices,
             int count,
-            in NativeDenseDictionary<int, int> sourceDict
+            in NativeIterableDictionary<int, int> sourceDict
         )
         {
             _indices = indices;
@@ -71,7 +72,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly Enumerator GetEnumerator() => new Enumerator(_indices, _count, _sourceDict);
+        public readonly Enumerator GetEnumerator() => new(_indices, _count, _sourceDict);
 
         public ref struct Enumerator
         {
@@ -79,7 +80,7 @@ namespace Trecs
             readonly int _count;
 
             [NativeDisableContainerSafetyRestriction]
-            readonly NativeDenseDictionary<int, int> _sourceDict;
+            readonly NativeIterableDictionary<int, int> _sourceDict;
 
             int _position;
 
@@ -87,7 +88,7 @@ namespace Trecs
             internal Enumerator(
                 NativeBuffer<int> indices,
                 int count,
-                in NativeDenseDictionary<int, int> sourceDict
+                in NativeIterableDictionary<int, int> sourceDict
             )
             {
                 _indices = indices;
@@ -96,7 +97,7 @@ namespace Trecs
                 _position = -1;
             }
 
-            public int Current
+            public readonly int Current
             {
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
                 get => _indices.IndexAsReadOnly(_position);

@@ -56,7 +56,7 @@ public partial class MovementSystem : ISystem
     [ForEachEntity(typeof(GameTags.Player))]
     void Execute(in PlayerView player)
     {
-        player.Position += player.Velocity * World.FixedDeltaTime;
+        player.Position += player.Velocity * World.DeltaTime;
     }
 }
 ```

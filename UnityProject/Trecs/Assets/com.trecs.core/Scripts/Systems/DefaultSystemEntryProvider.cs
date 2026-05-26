@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using Trecs.Collections;
 
 namespace Trecs.Internal
 {
@@ -25,7 +24,7 @@ namespace Trecs.Internal
             _accessorRegistry = accessorRegistry;
         }
 
-        void AddConstraint(Type before, Type after, DenseDictionary<Type, HashSet<Type>> directDeps)
+        void AddConstraint(Type before, Type after, Dictionary<Type, HashSet<Type>> directDeps)
         {
             if (before == after)
             {
@@ -44,7 +43,7 @@ namespace Trecs.Internal
 
         void AddSystemAttributeContraints(
             ISystem system,
-            DenseDictionary<Type, HashSet<Type>> directDeps
+            Dictionary<Type, HashSet<Type>> directDeps
         )
         {
             _log.Trace("Adding system constraint for system {0}", system.GetType());
@@ -77,11 +76,9 @@ namespace Trecs.Internal
             }
         }
 
-        DenseDictionary<Type, HashSet<Type>> InitializeSystemConstraints(
-            IReadOnlyList<ISystem> systems
-        )
+        Dictionary<Type, HashSet<Type>> InitializeSystemConstraints(IReadOnlyList<ISystem> systems)
         {
-            var directDeps = new DenseDictionary<Type, HashSet<Type>>();
+            var directDeps = new Dictionary<Type, HashSet<Type>>();
 
             foreach (var system in systems)
             {
@@ -120,7 +117,7 @@ namespace Trecs.Internal
 
             var typeToIndexMap = new Dictionary<Type, List<int>>();
 
-            // We assume here there is only ever once instance of each system
+            // We assume here there is only ever one instance of each system
             for (int i = 0; i < systems.Count; i++)
             {
                 var system = systems[i];

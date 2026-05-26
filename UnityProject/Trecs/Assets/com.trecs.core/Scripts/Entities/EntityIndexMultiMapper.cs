@@ -5,15 +5,13 @@ using Trecs.Collections;
 
 namespace Trecs.Internal
 {
-    /// <summary>
-    /// to retrieve an EntityIndexMultiMapper use entitiesQuerier.QueryMappedEntities<T>(groups);
-    /// </summary>
-    /// <typeparam name="T"></typeparam>
     [EditorBrowsable(EditorBrowsableState.Never)]
     public readonly struct EntityIndexMultiMapper<T>
         where T : unmanaged, IEntityComponent
     {
-        internal EntityIndexMultiMapper(DenseDictionary<GroupIndex, IComponentArray<T>> dictionary)
+        internal EntityIndexMultiMapper(
+            IterableDictionary<GroupIndex, IComponentArray<T>> dictionary
+        )
         {
             _dic = dictionary;
         }
@@ -90,6 +88,6 @@ namespace Trecs.Internal
 
         public Type Template => TypeMeta<T>.Type;
 
-        readonly DenseDictionary<GroupIndex, IComponentArray<T>> _dic;
+        readonly IterableDictionary<GroupIndex, IComponentArray<T>> _dic;
     }
 }

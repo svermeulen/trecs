@@ -108,14 +108,9 @@ namespace Trecs.Internal
         }
 
         // Direct-to-buffer writes used by BinarySerializationWriter's blit path.
-        // Bypasses BinaryWriter and Stream — both of those layers have
-        // virtual dispatch (BinaryWriter.Write(byte[], int, int) is virtual,
-        // Stream.Write is virtual, the underlying BufferWriterStream then
-        // dispatches GetSpan/Advance virtually through IBufferWriter). On
-        // IL2CPP each layer is an unkillable indirect call; on the blit
-        // hot path (~tens of thousands of calls per Save at 10k entities)
-        // that's the dominant cost vs editor Mono. Taking the concrete
-        // ArrayBufferWriter<byte> here keeps GetSpan/Advance direct.
+        // Takes the concrete ArrayBufferWriter<byte> so GetSpan/Advance are
+        // direct (non-virtual) calls — important on IL2CPP for the blit hot
+        // path (~tens of thousands of calls per Save at 10k entities).
         public static unsafe void Write<T>(in T value, ArrayBufferWriter<byte> bufferWriter)
             where T : unmanaged
         {

@@ -17,7 +17,7 @@ namespace Trecs
         /// <paramref name="blobCache"/> and returns a pinning
         /// <see cref="BlobPtr{T}"/>. Fails if a blob already exists at this id.
         /// This is the <see cref="BlobCache"/>-layer counterpart to
-        /// <see cref="SharedPtr.Alloc{T}(HeapAccessor, BlobId, T)"/> — use it when the
+        /// <see cref="SharedPtr.Alloc{T}(WorldAccessor, BlobId, T)"/> — use it when the
         /// caller's anchor lifetime is independent of any ECS refcount (e.g. startup
         /// seeders, async preloaders, custom <see cref="IBlobStore"/> backends).
         /// </summary>
@@ -52,7 +52,7 @@ namespace Trecs
     /// <summary>
     /// Lower-level pinning pointer for a managed (class) blob in <see cref="BlobCache"/>.
     /// Most game code should use <see cref="SharedPtr{T}"/> via
-    /// <see cref="SharedPtr.Alloc{T}(HeapAccessor, BlobId, T)"/> — that adds the ECS-side
+    /// <see cref="SharedPtr.Alloc{T}(WorldAccessor, BlobId, T)"/> — that adds the ECS-side
     /// refcount layer on top of the cache. Reach for <see cref="BlobPtr{T}"/> directly
     /// when you need to pin blob bytes outside the ECS refcount lifetime — for example,
     /// startup seeders that anchor blobs before any entity references them, async

@@ -125,6 +125,25 @@ namespace Trecs.Tests
         }
 
         [Test]
+        public void MultiByteUtf8String_SerializeAndDeserialize_ProducesIdenticalValue()
+        {
+            string originalValue = "hello éè 世界 🚀";
+            var flags = 0L;
+
+            _cacheHelper.ClearMemoryStream();
+            _cacheHelper.WriteAllObject(
+                originalValue,
+                TestConstants.Version,
+                includeTypeChecks: true,
+                flags
+            );
+            _cacheHelper.ResetMemoryPosition();
+            var deserializedValue = (string)_cacheHelper.ReadAllObject();
+
+            TrecsDebugAssert.That(deserializedValue == originalValue);
+        }
+
+        [Test]
         public void Float_SerializeAndDeserialize_ProducesIdenticalValue()
         {
             // Arrange

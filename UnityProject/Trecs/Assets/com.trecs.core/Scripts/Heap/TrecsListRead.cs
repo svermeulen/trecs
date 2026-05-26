@@ -7,7 +7,7 @@ namespace Trecs
 {
     /// <summary>
     /// Main-thread read-only view over a <see cref="TrecsList{T}"/>. Obtain via
-    /// <see cref="TrecsList{T}.Read(HeapAccessor)"/> or
+    /// <see cref="TrecsList{T}.Read(WorldAccessor)"/> or
     /// <see cref="TrecsList{T}.Read(WorldAccessor)"/>. For in-job access use the
     /// Burst-safe <see cref="NativeTrecsListRead{T}"/> instead.
     ///
@@ -20,7 +20,7 @@ namespace Trecs
     ///
     /// <para><b>Shipping-build use-after-dispose guard.</b> In addition to the
     /// editor-only <c>AtomicSafetyHandle</c> check, the wrapper captures the
-    /// header slot's <c>NativeChunkStoreEntry.Generation</c> at Open and
+    /// header slot's <c>NativeHeapEntry.Generation</c> at Open and
     /// re-checks it on every Read. If the underlying allocation was freed and
     /// its side-table slot recycled, the check fires (1-byte generation, so
     /// roughly 1/256 chance of coincidental match after the slot is reused).
@@ -38,7 +38,7 @@ namespace Trecs
         // chunk store's lifetime (chunks never move). Used to re-check the
         // slot's Generation byte on every access so stale wrappers fail loudly
         // in shipping builds where AtomicSafetyHandle is compiled out.
-        readonly NativeChunkStoreEntry* _headerSlot;
+        readonly NativeHeapEntry* _headerSlot;
         readonly byte _capturedGeneration;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -50,7 +50,7 @@ namespace Trecs
         public TrecsListRead(
             TrecsListHeader* header,
             T* data,
-            NativeChunkStoreEntry* headerSlot,
+            NativeHeapEntry* headerSlot,
             byte capturedGeneration,
             AtomicSafetyHandle safety
         )
@@ -67,7 +67,7 @@ namespace Trecs
         public TrecsListRead(
             TrecsListHeader* header,
             T* data,
-            NativeChunkStoreEntry* headerSlot,
+            NativeHeapEntry* headerSlot,
             byte capturedGeneration
         )
         {

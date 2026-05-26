@@ -10,7 +10,7 @@ namespace Trecs
     /// <summary>
     /// Burst-safe read-only view over a <see cref="TrecsList{T}"/>. Obtain via
     /// <see cref="TrecsList{T}.Read(in NativeWorldAccessor)"/> or
-    /// <see cref="TrecsList{T}.Read(in NativeChunkStoreResolver)"/> inside a job. Many
+    /// <see cref="TrecsList{T}.Read(in NativeHeapResolver)"/> inside a job. Many
     /// readers may hold this concurrently without conflict because the wrapper is
     /// <c>[NativeContainerIsReadOnly]</c>; a concurrent <see cref="NativeTrecsListWrite{T}"/>
     /// over the same list is rejected at <c>Schedule</c> time.
@@ -35,11 +35,8 @@ namespace Trecs
         [NativeDisableUnsafePtrRestriction]
         readonly T* _data;
 
-        readonly ushort _capturedVersion;
-
-        // See TrecsListRead<T> for the shipping-build use-after-dispose guard.
         [NativeDisableUnsafePtrRestriction]
-        readonly NativeChunkStoreEntry* _headerSlot;
+        readonly NativeHeapEntry* _headerSlot;
         readonly byte _capturedGeneration;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -55,14 +52,13 @@ namespace Trecs
         public NativeTrecsListRead(
             TrecsListHeader* header,
             T* data,
-            NativeChunkStoreEntry* headerSlot,
+            NativeHeapEntry* headerSlot,
             byte capturedGeneration,
             AtomicSafetyHandle safety
         )
         {
             _header = header;
             _data = data;
-            _capturedVersion = header->Version;
             _headerSlot = headerSlot;
             _capturedGeneration = capturedGeneration;
             m_Safety = safety;
@@ -70,21 +66,22 @@ namespace Trecs
                 ref m_Safety,
                 ref s_staticSafetyId.Data
             );
+            CheckSlotAlive();
         }
 #else
         [EditorBrowsable(EditorBrowsableState.Never)]
         public NativeTrecsListRead(
             TrecsListHeader* header,
             T* data,
-            NativeChunkStoreEntry* headerSlot,
+            NativeHeapEntry* headerSlot,
             byte capturedGeneration
         )
         {
             _header = header;
             _data = data;
-            _capturedVersion = header->Version;
             _headerSlot = headerSlot;
             _capturedGeneration = capturedGeneration;
+            CheckSlotAlive();
         }
 #endif
 
@@ -102,18 +99,6 @@ namespace Trecs
             );
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void CheckVersion()
-        {
-            TrecsAssert.That(
-                _header->Version == _capturedVersion,
-                "NativeTrecsListRead is stale: the list's data buffer was reallocated since "
-                    + "this wrapper was opened (captured version {0}, current {1}).",
-                _capturedVersion,
-                _header->Version
-            );
-        }
-
         public int Count
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -122,8 +107,6 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-                CheckSlotAlive();
-                CheckVersion();
                 return _header->Count;
             }
         }
@@ -136,8 +119,6 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-                CheckSlotAlive();
-                CheckVersion();
                 return _header->Capacity;
             }
         }
@@ -150,8 +131,6 @@ namespace Trecs
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
 #endif
-                CheckSlotAlive();
-                CheckVersion();
                 TrecsDebugAssert.That(
                     (uint)index < (uint)_header->Count,
                     "NativeTrecsListRead index {0} out of range (Count={1})",

@@ -29,7 +29,7 @@ namespace Trecs.Internal
         readonly RecorderEngine _core;
         readonly BundleRecorderSettings _settings;
 
-        readonly DenseDictionary<int, ulong> _checksums = new();
+        readonly IterableDictionary<int, ulong> _checksums = new();
         readonly List<WorldSnapshot> _anchors = new();
         readonly List<WorldSnapshot> _bookmarks = new();
 
@@ -44,7 +44,6 @@ namespace Trecs.Internal
 
         public BundleRecorder(
             World world,
-            IWorldStateSerializer stateSerializer,
             SerializerRegistry serializerRegistry,
             BundleRecorderSettings settings,
             SnapshotSerializer snapshotSerializer
@@ -54,21 +53,11 @@ namespace Trecs.Internal
                 throw new ArgumentNullException(nameof(world));
             if (settings == null)
                 throw new ArgumentNullException(nameof(settings));
-            if (settings.ChecksumFrameInterval < 1)
-                throw new ArgumentOutOfRangeException(
-                    nameof(settings) + "." + nameof(BundleRecorderSettings.ChecksumFrameInterval),
-                    settings.ChecksumFrameInterval,
-                    "ChecksumFrameInterval must be >= 1"
-                );
 
             _log = world.Log;
             _settings = settings;
-            // RecorderEngine's constructor validates the rest of the
-            // dependencies (state serializer, serializer registry, snapshot
-            // serializer), so the duplicate checks would be unreachable.
             _core = new RecorderEngine(
                 world,
-                stateSerializer,
                 serializerRegistry,
                 snapshotSerializer,
                 accessorLabel: nameof(BundleRecorder)
@@ -135,7 +124,6 @@ namespace Trecs.Internal
             // ceding ownership is the safe choice.
             _core.CaptureInitialState(
                 _settings.Version,
-                SerializationFlags.IsForChecksum,
                 out _initialSnapshot,
                 out var initialChecksum
             );
@@ -189,7 +177,7 @@ namespace Trecs.Internal
 
             var queueBytes = _core.SerializeEntityInputQueue(_settings.Version);
 
-            var blobs = new DenseHashSet<BlobId>();
+            var blobs = new IterableHashSet<BlobId>();
             _core.World.BlobCache.GetAllActiveBlobIds(blobs);
 
             var bundle = new RecordingBundle
@@ -327,23 +315,6 @@ namespace Trecs.Internal
             }
             var frame = _core.Accessor.FixedFrame;
 
-            // Per-frame checksum cadence — sparse compared to fixed frames,
-            // dense compared to anchors. Catches desyncs close to where they
-            // happen. Skipped in profiling builds (the per-frame hash is
-            // measurable; anchors and inputs are still captured).
-#if !TRECS_IS_PROFILING
-            if ((frame - _startFrame) % _settings.ChecksumFrameInterval == 0)
-            {
-                var checksum = _core.ComputeChecksum(
-                    _settings.Version,
-                    SerializationFlags.IsForChecksum
-                );
-                // Overwrite rather than Add: client-style rollbacks may
-                // re-record the same frame with new state.
-                _checksums[frame] = checksum;
-            }
-#endif
-
             // Anchor cadence — full state snapshot captured at long intervals.
             var fixedDeltaTime = _core.Accessor.GetSystemRunner().FixedDeltaTime;
             var anchorElapsed = (frame - _lastAnchorFrame) * fixedDeltaTime;
@@ -380,11 +351,8 @@ namespace Trecs.Internal
             _core.SnapshotSerializer.SaveSnapshot(
                 _settings.Version,
                 out var payload,
+                out var checksum,
                 includeTypeChecks: true
-            );
-            var checksum = _core.ComputeChecksum(
-                _settings.Version,
-                SerializationFlags.IsForChecksum
             );
             // Single source of truth for every captured frame's checksum.
             // Idempotent with the cadence-driven write in OnFixedUpdateCompleted

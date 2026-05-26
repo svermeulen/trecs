@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Collections;
 
@@ -10,13 +11,13 @@ namespace Trecs
     /// </summary>
     public struct SetGroupEntry
     {
-        internal NativeDenseDictionary<int, int> _entityIdToDenseIndex;
+        internal NativeIterableDictionary<int, int> _entityIdToDenseIndex;
         readonly GroupIndex _group;
 
         internal SetGroupEntry(GroupIndex group)
             : this()
         {
-            _entityIdToDenseIndex = new NativeDenseDictionary<int, int>(1, Allocator.Persistent);
+            _entityIdToDenseIndex = new NativeIterableDictionary<int, int>(1, Allocator.Persistent);
             _group = group;
         }
 
@@ -25,7 +26,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Add(int index)
         {
-            //cannot write in parallel
+            // Not parallel-safe
             return _entityIdToDenseIndex.TryAdd(index, index, out _);
         }
 

@@ -218,7 +218,7 @@ namespace Trecs
             if (_entries == null)
                 return;
 
-            // EXPERIMENT: Struct is now `readonly` so we can't clear _entries after free.
+            // Struct is `readonly` so we can't clear _entries after free.
             // Double-Dispose protection comes from the safety handle's CheckDeallocateAndThrow
             // (in checks-enabled builds). In release builds with no safety checks, double
             // Dispose would double-free — but the source-gen disposal pattern guarantees

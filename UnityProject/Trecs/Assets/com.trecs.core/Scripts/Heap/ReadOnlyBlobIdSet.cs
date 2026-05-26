@@ -8,7 +8,7 @@ namespace Trecs
     /// one or more outstanding handles. Passed to <see cref="IBlobStore.CleanCache"/>
     /// and <see cref="IBlobStore.SumInMemoryInactiveTotals"/> so implementations can
     /// distinguish active (pinned) blobs from inactive (evictable) ones without
-    /// allocating a separate <c>DenseHashSet&lt;BlobId&gt;</c>.
+    /// allocating a separate <c>IterableHashSet&lt;BlobId&gt;</c>.
     /// <para>
     /// Backed directly by <see cref="BlobCache"/>'s ref-count dictionary, whose keyset
     /// <i>is</i> the active set — a blob is active iff at least one handle pins it,
@@ -19,9 +19,9 @@ namespace Trecs
     /// </summary>
     public readonly struct ReadOnlyBlobIdSet
     {
-        readonly DenseDictionary<BlobId, int> _refCounts;
+        readonly IterableDictionary<BlobId, int> _refCounts;
 
-        internal ReadOnlyBlobIdSet(DenseDictionary<BlobId, int> refCounts)
+        internal ReadOnlyBlobIdSet(IterableDictionary<BlobId, int> refCounts)
         {
             TrecsDebugAssert.IsNotNull(refCounts);
             _refCounts = refCounts;
@@ -45,7 +45,7 @@ namespace Trecs
         }
 
         /// <summary>Enumerate the active <see cref="BlobId"/>s.</summary>
-        public DenseDictionaryKeyEnumerator<BlobId> GetEnumerator()
+        public IterableDictionaryKeyEnumerator<BlobId> GetEnumerator()
         {
             return _refCounts.Keys.GetEnumerator();
         }

@@ -42,14 +42,16 @@ namespace Trecs.Internal
 
         /// <summary>
         /// Copy <paramref name="src"/> into a fresh
-        /// <see cref="DenseDictionary{TKey, TValue}"/>. Used to hand a
+        /// <see cref="IterableDictionary{TKey, TValue}"/>. Used to hand a
         /// snapshot of the recorder's per-frame checksums to a
         /// <see cref="RecordingBundle"/> without sharing the recorder's
         /// live dict (the recorder may keep mutating after Stop / Save).
         /// </summary>
-        public static DenseDictionary<int, ulong> CopyChecksums(DenseDictionary<int, ulong> src)
+        public static IterableDictionary<int, ulong> CopyChecksums(
+            IterableDictionary<int, ulong> src
+        )
         {
-            var copy = new DenseDictionary<int, ulong>();
+            var copy = new IterableDictionary<int, ulong>();
             foreach (var (frame, checksum) in src)
             {
                 copy.Add(frame, checksum);

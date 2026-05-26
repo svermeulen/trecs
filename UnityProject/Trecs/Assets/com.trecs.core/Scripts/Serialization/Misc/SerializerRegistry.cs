@@ -10,7 +10,7 @@ namespace Trecs
     /// - Each serializer declares the type it handles via ISerializer&lt;T&gt;.
     ///   During serialization, the type ID is written first, then the serializer is called.
     ///
-    /// - Type IDs are computed by TypeIdProvider (from [SerializationId] attribute or stable hash).
+    /// - Type IDs are computed by <see cref="TypeId.FromType"/> (from [TypeId] attribute or stable hash).
     ///
     /// - The default constructor auto-populates the built-in primitive, math,
     ///   ECS, and recording-metadata serializers; register additional

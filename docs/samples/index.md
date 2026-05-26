@@ -15,14 +15,12 @@ A progressive tutorial series plus full game samples. Each builds on the previou
 | 07 | [Feeding Frenzy](07-feeding-frenzy.md) | Complex simulation, visual smoothing, multiple interacting systems |
 | 08 | [Sets](08-sets.md) | Dynamic entity subsets, overlapping membership |
 | 09 | [Interpolation](09-interpolation.md) | Fixed-to-variable timestep interpolation |
-| 10 | [Pointers](10-pointers.md) | SharedPtr, UniquePtr, managed data on the heap |
-| 13 | [Fixed Array](13-fixed-array.md) | `FixedArray32<T>` stored inline on a component, used as a ring buffer |
-| 14 | [Aspect Interfaces](14-aspect-interfaces.md) | Shared aspect contracts via `partial interface` for reusable cross-species helpers |
-| 15 | [Blob Seed Pattern](15-blob-seed-pattern.md) | Content-pipeline-stable `BlobId`s for shared immutable assets on the heap |
-| 16 | [Reactive Events](16-reactive-events.md) | `OnAdded` / `OnRemoved` observers for cleanup and stat tracking |
-| 17 | [Multiple Worlds](17-multiple-worlds.md) | Two independent `World` instances ticking side-by-side |
-| 18 | [Heightmap Blobs](18-heightmap-blobs.md) | Content-derived `BlobId`s via `UniqueHashGenerator`, plus a `NativeSharedPtr` Burst-job variant |
-| 19 | [Shared Interface](19-shared-interface.md) | `[Immutable]` interface as the read-only face of a mutable concrete behind `SharedPtr<T>` |
+| 10 | [Dynamic Collections](10-pointers.md) | Five trail-storage strategies: UniquePtr Queue, FixedArray, FixedList, TrecsList, TrecsArray |
+| 13 | [Aspect Interfaces](13-aspect-interfaces.md) | Shared aspect contracts via `partial interface` for reusable cross-species helpers |
+| 14 | [Blob Seed Pattern](14-blob-seed-pattern.md) | Content-pipeline-stable `BlobId`s for shared immutable assets on the heap |
+| 15 | [Reactive Events](15-reactive-events.md) | `OnAdded` / `OnRemoved` observers for cleanup and stat tracking |
+| 16 | [Multiple Worlds](16-multiple-worlds.md) | Two independent `World` instances ticking side-by-side |
+| 17 | [Heightmap Blobs](17-heightmap-blobs.md) | Content-derived `BlobId`s via `UniqueHashGenerator`, plus a `NativeSharedPtr` Burst-job variant |
 
 ## Game samples
 

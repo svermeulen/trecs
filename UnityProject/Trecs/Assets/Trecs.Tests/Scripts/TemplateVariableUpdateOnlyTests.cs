@@ -16,19 +16,6 @@ namespace Trecs.Tests
         public int Value;
     }
 
-    // Ordinary component (fixed-update) opted out of checksums via the
-    // [ChecksumIgnore] attribute. Used to verify the attribute strips the
-    // component's per-entity bytes from checksum-mode streams without
-    // affecting snapshot/recording streams.
-    [ChecksumIgnore]
-    public partial struct ChecksumIgnoredComp : IEntityComponent
-    {
-        public int Value;
-    }
-
-    // Tag for the template carrying the [ChecksumIgnore] component.
-    public struct ChecksumIgnoredTag : ITag { }
-
     // Tag exclusive to the VUO template's group.
     public struct VuoTemplateTag : ITag { }
 
@@ -412,11 +399,9 @@ namespace Trecs.Tests
         [Test]
         public void SnapshotRoundTrip_PreservesVuoTemplateState()
         {
-            // Determinism: a snapshot write (no IsForChecksum flag) must
-            // include VUO template component arrays so save/restore
-            // reproduces the render-side state exactly. Checksum-write
-            // (IsForChecksum=true) is what skips them; this test exercises
-            // the snapshot path explicitly.
+            // VUO template component arrays are excluded from snapshots
+            // and default-initialized on restore. This test verifies the
+            // round-trip zeroes VUO data rather than preserving it.
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(TrecsTemplates.Globals.Template)
@@ -442,14 +427,13 @@ namespace Trecs.Tests
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var serializer = new WorldStateSerializer(env.World);
             byte[] snapshotBytes;
-            using (var writer = new BinarySerializationWriter(registry))
             {
+                var writer = new BinarySerializationWriter(registry);
                 writer.Start(version: 1, includeTypeChecks: false);
                 serializer.SerializeFullState(writer);
 
                 using var outputStream = new MemoryStream();
-                using var outputWriter = new BinaryWriter(outputStream);
-                writer.Complete(outputWriter);
+                writer.Complete(outputStream);
                 snapshotBytes = outputStream.ToArray();
             }
 
@@ -457,28 +441,27 @@ namespace Trecs.Tests
             env.Accessor.Component<VuoTemplateRenderComp>(entityIdx).Write.Value = 99;
 
             using (var inputStream = new MemoryStream(snapshotBytes))
-            using (var inputReader = new BinaryReader(inputStream))
             {
                 var reader = new BinarySerializationReader(registry);
-                reader.Start(inputReader);
+                reader.Start(inputStream);
                 serializer.DeserializeState(reader);
             }
 
             var restoredIdx = env.Accessor.Query().WithTags<VuoTemplateTag>().SingleIndex();
             NAssert.AreEqual(
-                7,
+                0,
                 env.Accessor.Component<VuoTemplateRenderComp>(restoredIdx).Read.Value,
-                "VUO template component value must round-trip through snapshot/restore"
+                "VUO component must be default-initialized after snapshot restore"
             );
         }
 
         [Test]
-        public void DeserializeState_FromChecksumStream_Throws()
+        public void SerializeFullState_VuoTemplate_RoundTripsWithoutException()
         {
-            // Checksum-mode streams skip VUO template component arrays at
-            // write time (ShouldSkip). Restoring from one would silently
-            // zero render-side state, so we treat checksum streams as
-            // caller error at restore time.
+            // VUO template component arrays are now skipped in both full-state
+            // and checksum serialization, so DeserializeState from a
+            // SerializeFullState stream must not throw even for a world that
+            // contains VUO entities.
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(TrecsTemplates.Globals.Template)
@@ -491,40 +474,33 @@ namespace Trecs.Tests
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var serializer = new WorldStateSerializer(env.World);
 
-            byte[] checksumBytes;
-            using (var writer = new BinarySerializationWriter(registry))
+            byte[] snapshotBytes;
             {
-                writer.Start(
-                    version: 1,
-                    includeTypeChecks: false,
-                    flags: SerializationFlags.IsForChecksum
-                );
-                serializer.SerializeForChecksum(writer);
+                var writer = new BinarySerializationWriter(registry);
+                writer.Start(version: 1, includeTypeChecks: false, flags: 0);
+                serializer.SerializeFullState(writer);
 
                 using var outputStream = new MemoryStream();
-                using var outputWriter = new BinaryWriter(outputStream);
-                writer.Complete(outputWriter);
-                checksumBytes = outputStream.ToArray();
+                writer.Complete(outputStream);
+                snapshotBytes = outputStream.ToArray();
             }
 
-            NAssert.Throws<TrecsException>(() =>
+            NAssert.DoesNotThrow(() =>
             {
-                using var inputStream = new MemoryStream(checksumBytes);
-                using var inputReader = new BinaryReader(inputStream);
+                using var inputStream = new MemoryStream(snapshotBytes);
                 var reader = new BinarySerializationReader(registry);
-                reader.Start(inputReader);
+                reader.Start(inputStream);
                 serializer.DeserializeState(reader);
             });
         }
 
         [Test]
-        public void ChecksumStream_OmitsVuoComponentBytes_ComparedToSnapshot()
+        public void FullStateStream_VuoComponentBytes_MatchChecksumStream()
         {
-            // Sanity check that ShouldSkip actually fires for IsForChecksum
-            // writes — a checksum-mode write of a populated VUO template
-            // must produce a smaller byte stream than a snapshot-mode
-            // write of the same world state. If the IsForChecksum branch
-            // ever inverts, this test catches it.
+            // VUO template component arrays are now always skipped in both
+            // full-state and checksum serialization. A full-state write and a
+            // checksum write of the same world with VUO entities must produce
+            // streams of the same byte length — neither includes the VUO data.
             var builder = new WorldBuilder()
                 .SetSettings(new WorldSettings())
                 .AddTemplate(TrecsTemplates.Globals.Template)
@@ -533,8 +509,8 @@ namespace Trecs.Tests
 
             using var env = new TestEnvironment(builder.BuildAndInitialize());
 
-            // Populate enough VUO entities that the omitted bytes are
-            // measurable beyond stream framing overhead.
+            // Populate enough VUO entities that any difference in output
+            // would be measurable beyond stream framing overhead.
             for (int i = 0; i < 16; i++)
             {
                 env.Accessor.AddEntity<VuoTemplateTag>()
@@ -547,133 +523,27 @@ namespace Trecs.Tests
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var serializer = new WorldStateSerializer(env.World);
 
-            int snapshotLength = WriteAndMeasure(serializer, registry, flags: 0);
-            int checksumLength = WriteAndMeasure(
-                serializer,
-                registry,
-                flags: SerializationFlags.IsForChecksum
-            );
+            int snapshotLength = WriteAndMeasure(serializer, registry);
+            int checksumLength = WriteAndMeasure(serializer, registry);
 
-            NAssert.Less(
-                checksumLength,
-                snapshotLength,
-                "Checksum-mode write should omit VUO template component bytes; "
-                    + "checksumLength={0}, snapshotLength={1}",
-                checksumLength,
-                snapshotLength
-            );
-        }
-
-        // Template carrying the [ChecksumIgnore] component. Fixed-update
-        // (not VUO) — the only mechanism stripping its values in checksum
-        // mode is the attribute, not the VUO path.
-        static Template MakeChecksumIgnoredTemplate()
-        {
-            return new Template(
-                debugName: "ChecksumIgnoredTemplate",
-                localBaseTemplates: Array.Empty<Template>(),
-                partitions: new TagSet[] { TagSet.Null },
-                localComponentDeclarations: new IComponentDeclaration[]
-                {
-                    new ComponentDeclaration<ChecksumIgnoredComp>(
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        default(ChecksumIgnoredComp)
-                    ),
-                },
-                localTags: new Tag[] { Tag<ChecksumIgnoredTag>.Value },
-                localVariableUpdateOnly: false,
-                dimensions: Array.Empty<TagSet>()
-            );
-        }
-
-        [Test]
-        public void ChecksumIgnoreAttribute_StripsComponentBytesFromChecksumMode()
-        {
-            // A [ChecksumIgnore]-tagged component must contribute zero bytes
-            // to a checksum-mode stream, while its values survive a regular
-            // snapshot stream intact. Two changing-mutation snapshots are
-            // compared:
-            //   * Snapshot mode (no IsForChecksum): byte streams differ when
-            //     the component's value changes (round-trip preserves state).
-            //   * Checksum mode (IsForChecksum): byte streams are identical
-            //     when only the component's value changes, since the
-            //     attribute stripped those bytes from the hash input.
-            var builder = new WorldBuilder()
-                .SetSettings(new WorldSettings())
-                .AddTemplate(TrecsTemplates.Globals.Template)
-                .AddTemplate(MakeChecksumIgnoredTemplate())
-                .AddBlobStore(EcsTestHelper.CreateBlobStore());
-
-            using var env = new TestEnvironment(builder.BuildAndInitialize());
-
-            env.Accessor.AddEntity<ChecksumIgnoredTag>()
-                .Set(new ChecksumIgnoredComp { Value = 1 })
-                .AssertComplete();
-            env.Accessor.Submit();
-
-            var entityIdx = env.Accessor.Query().WithTags<ChecksumIgnoredTag>().SingleIndex();
-
-            var registry = new SerializerRegistry();
-            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
-            var serializer = new WorldStateSerializer(env.World);
-
-            // Capture both modes with Value = 1.
-            int checksumLen1 = WriteAndMeasure(serializer, registry, flags: 0);
-            int checksumOnlyLen1 = WriteAndMeasure(
-                serializer,
-                registry,
-                flags: SerializationFlags.IsForChecksum
-            );
-
-            // Mutate the component, capture again.
-            env.Accessor.Component<ChecksumIgnoredComp>(entityIdx).Write.Value = 42;
-            int checksumLen2 = WriteAndMeasure(serializer, registry, flags: 0);
-            int checksumOnlyLen2 = WriteAndMeasure(
-                serializer,
-                registry,
-                flags: SerializationFlags.IsForChecksum
-            );
-
-            // Snapshot mode encodes the value; lengths may match (same field
-            // count) but more importantly the checksum-mode stream should
-            // omit the component's bytes entirely — length stays put across
-            // the mutation.
             NAssert.AreEqual(
-                checksumOnlyLen1,
-                checksumOnlyLen2,
-                "[ChecksumIgnore] component values must not affect checksum-mode stream size"
-            );
-            NAssert.Less(
-                checksumOnlyLen1,
-                checksumLen1,
-                "Checksum-mode stream should be smaller than snapshot stream (omitted attribute-tagged values)"
+                snapshotLength,
+                checksumLength,
+                "Both serialization modes skip VUO template component bytes; "
+                    + "snapshotLength={0}, checksumLength={1}",
+                snapshotLength,
+                checksumLength
             );
         }
 
-        static int WriteAndMeasure(
-            WorldStateSerializer serializer,
-            SerializerRegistry registry,
-            long flags
-        )
+        static int WriteAndMeasure(WorldStateSerializer serializer, SerializerRegistry registry)
         {
-            using var writer = new BinarySerializationWriter(registry);
-            writer.Start(version: 1, includeTypeChecks: false, flags: flags);
-            if ((flags & SerializationFlags.IsForChecksum) != 0)
-            {
-                serializer.SerializeForChecksum(writer);
-            }
-            else
-            {
-                serializer.SerializeFullState(writer);
-            }
+            var writer = new BinarySerializationWriter(registry);
+            writer.Start(version: 1, includeTypeChecks: false, flags: 0);
+            serializer.SerializeFullState(writer);
 
             using var outputStream = new MemoryStream();
-            using var outputWriter = new BinaryWriter(outputStream);
-            writer.Complete(outputWriter);
+            writer.Complete(outputStream);
             return (int)outputStream.Length;
         }
     }

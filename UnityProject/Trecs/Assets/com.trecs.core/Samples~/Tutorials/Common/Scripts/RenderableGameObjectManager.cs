@@ -29,7 +29,7 @@ namespace Trecs.Samples
             _inactiveParent = new GameObject("RenderablePool").transform;
             _inactiveParent.gameObject.SetActive(false);
 
-            _nextId = NativeUniquePtr.Alloc<int>(World.Heap, 1);
+            _nextId = NativeUniquePtr.Alloc<int>(World, 1);
 
             World
                 .Events.EntitiesWithComponents<GameObjectId, PrefabId>()
@@ -109,7 +109,7 @@ namespace Trecs.Samples
         {
             var go = SpawnGameObject(prefabId);
 
-            ref var nextId = ref _nextId.Write(World.Heap).Value;
+            ref var nextId = ref _nextId.Write(World).Value;
             var id = nextId;
             nextId++;
 

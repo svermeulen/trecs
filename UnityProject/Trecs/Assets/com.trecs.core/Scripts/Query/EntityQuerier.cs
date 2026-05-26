@@ -69,12 +69,10 @@ namespace Trecs.Internal
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityIndexMultiMapper<T> QueryMappedEntities<T>(
-            LocalReadOnlyFastList<GroupIndex> groups
-        )
+        public EntityIndexMultiMapper<T> QueryMappedEntities<T>(ReadOnlyList<GroupIndex> groups)
             where T : unmanaged, IEntityComponent
         {
-            var dictionary = new DenseDictionary<GroupIndex, IComponentArray<T>>(groups.Count);
+            var dictionary = new IterableDictionary<GroupIndex, IComponentArray<T>>(groups.Count);
 
             foreach (var group in groups)
             {
@@ -85,9 +83,6 @@ namespace Trecs.Internal
             return new EntityIndexMultiMapper<T>(dictionary);
         }
 
-        /// <summary>
-        /// determine if component with specific ID exists in group
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Exists<T>(EntityIndex entityGID)
             where T : unmanaged, IEntityComponent
@@ -98,9 +93,6 @@ namespace Trecs.Internal
             return casted != null && entityGID.Index < casted.Count;
         }
 
-        /// <summary>
-        /// determine if component with specific ID exists in group
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Exists<T>(int id, GroupIndex group)
             where T : unmanaged, IEntityComponent
@@ -111,9 +103,6 @@ namespace Trecs.Internal
             return casted != null && id < casted.Count;
         }
 
-        /// <summary>
-        /// count the number of components in a group
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Count<T>(GroupIndex groupStruct)
             where T : unmanaged, IEntityComponent
@@ -296,7 +285,7 @@ namespace Trecs.Internal
         /// <c>Dispose</c> via <c>FreeTracked</c>.
         /// </summary>
         internal unsafe void BuildNativeComponentLookupEntries<T>(
-            LocalReadOnlyFastList<GroupIndex> groups,
+            ReadOnlyList<GroupIndex> groups,
             Allocator allocator,
             out NativeComponentLookupEntry* entries,
             out int count
@@ -371,7 +360,7 @@ namespace Trecs.Internal
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool SafeQueryEntityDictionary<T>(
-            DenseDictionary<TypeId, IComponentArray> entitiesInGroupPerType,
+            IterableDictionary<TypeId, IComponentArray> entitiesInGroupPerType,
             out IComponentArray typeSafeDictionary
         )
             where T : unmanaged, IEntityComponent
@@ -382,7 +371,6 @@ namespace Trecs.Internal
                 return false;
             }
 
-            //return the indexes entities if they exist
             typeSafeDictionary = safeDictionary;
 
             return true;
@@ -515,14 +503,14 @@ namespace Trecs.Internal
         /// </summary>
         public readonly struct TrecsSets
         {
-            internal TrecsSets(NativeDenseDictionary<SetId, EntitySetStorage> entitySets)
+            internal TrecsSets(NativeHashMap<SetId, EntitySetStorage> entitySets)
             {
                 _entitySets = entitySets;
             }
 
-            internal NativeDenseDictionary<SetId, EntitySetStorage> EntitySets => _entitySets;
+            internal NativeHashMap<SetId, EntitySetStorage> EntitySets => _entitySets;
 
-            readonly NativeDenseDictionary<SetId, EntitySetStorage> _entitySets;
+            readonly NativeHashMap<SetId, EntitySetStorage> _entitySets;
         }
     }
 }

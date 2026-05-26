@@ -17,15 +17,13 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     internal static class TagSetCache
     {
-        static readonly Dictionary<int, Tag[]> _tagsBySetId = new()
-        {
-            { TypeIdSet.Null.Id, Array.Empty<Tag>() },
-        };
+        static readonly Dictionary<int, Tag[]> _tagsBySetId = new(
+            new Dictionary<int, Tag[]> { { TypeIdSet.Null.Id, Array.Empty<Tag>() } }
+        );
 
-        static readonly Dictionary<int, string> _displayStringsBySetId = new()
-        {
-            { TypeIdSet.Null.Id, "Null" },
-        };
+        static readonly Dictionary<int, string> _displayStringsBySetId = new(
+            new Dictionary<int, string> { { TypeIdSet.Null.Id, "Null" } }
+        );
 
         public static IReadOnlyList<Tag> GetTags(TypeIdSet set)
         {

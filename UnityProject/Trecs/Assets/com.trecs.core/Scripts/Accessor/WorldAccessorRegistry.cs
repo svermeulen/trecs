@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel;
 using Trecs.Collections;
 
@@ -8,8 +9,8 @@ namespace Trecs.Internal
     {
         readonly TrecsLog _log;
 
-        readonly DenseDictionary<ISystem, WorldAccessor> _executeAccessors = new();
-        readonly DenseDictionary<int, WorldAccessor> _accessorById = new();
+        readonly Dictionary<ISystem, WorldAccessor> _executeAccessors = new();
+        readonly IterableDictionary<int, WorldAccessor> _accessorById = new();
 
         bool _isClosed;
 
@@ -18,12 +19,12 @@ namespace Trecs.Internal
             _log = log;
         }
 
-        public ReadOnlyDenseDictionary<ISystem, WorldAccessor> ExecuteAccessors
+        public Dictionary<ISystem, WorldAccessor> ExecuteAccessors
         {
             get { return _executeAccessors; }
         }
 
-        public ReadOnlyDenseDictionary<int, WorldAccessor> AccessorsById
+        public ReadOnlyIterableDictionary<int, WorldAccessor> AccessorsById
         {
             get { return _accessorById; }
         }

@@ -54,13 +54,12 @@ namespace Trecs.Tests
         byte[] SerializeWorld(World world)
         {
             var serializer = new WorldStateSerializer(world);
-            using var writer = new BinarySerializationWriter(_serializerRegistry);
+            var writer = new BinarySerializationWriter(_serializerRegistry);
             writer.Start(version: 1, includeTypeChecks: false);
             serializer.SerializeFullState(writer);
 
             using var outputStream = new MemoryStream();
-            using var outputWriter = new BinaryWriter(outputStream);
-            writer.Complete(outputWriter);
+            writer.Complete(outputStream);
             return outputStream.ToArray();
         }
 
@@ -68,9 +67,8 @@ namespace Trecs.Tests
         {
             var serializer = new WorldStateSerializer(world);
             using var inputStream = new MemoryStream(data);
-            using var inputReader = new BinaryReader(inputStream);
             var reader = new BinarySerializationReader(_serializerRegistry);
-            reader.Start(inputReader);
+            reader.Start(inputStream);
             serializer.DeserializeState(reader);
         }
 

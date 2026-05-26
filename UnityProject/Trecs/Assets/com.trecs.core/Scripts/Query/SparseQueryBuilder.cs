@@ -303,7 +303,7 @@ namespace Trecs
             return new IndexQueryIterator(_world, groups, _set);
         }
 
-        readonly ReadOnlyFastList<GroupIndex> ResolveGroups()
+        readonly ReadOnlyList<GroupIndex> ResolveGroups()
         {
             var key = new GroupQueryKey(
                 _positiveTags,

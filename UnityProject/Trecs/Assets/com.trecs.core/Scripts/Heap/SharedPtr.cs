@@ -20,79 +20,67 @@ namespace Trecs
         /// <c>Trecs</c>) to obtain one — persistent allocations
         /// always carry caller-chosen identity.
         /// </summary>
-        public static SharedPtr<T> Alloc<T>(HeapAccessor heap, BlobId blobId, T value)
+        public static SharedPtr<T> Alloc<T>(WorldAccessor world, BlobId blobId, T value)
             where T : class
         {
-            heap.AssertCanMutateHeap();
-            return heap.SharedHeap.CreateBlob<T>(blobId, value);
+            world.AssertCanMutateHeap();
+            return world.SharedHeap.CreateBlob<T>(blobId, value);
         }
 
         /// <summary>
         /// Returns a fresh reference-counted handle to the existing blob at
         /// <paramref name="blobId"/>, throwing if no such blob exists. This is
-        /// the lookup-only counterpart to <see cref="Alloc{T}(HeapAccessor, BlobId, T)"/>
+        /// the lookup-only counterpart to <see cref="Alloc{T}(WorldAccessor, BlobId, T)"/>
         /// — it does not allocate new memory, just acquires another refcount
         /// slot on data that has already been seeded.
         /// </summary>
-        public static SharedPtr<T> Acquire<T>(HeapAccessor heap, BlobId blobId)
+        public static SharedPtr<T> Acquire<T>(WorldAccessor world, BlobId blobId)
             where T : class
         {
-            heap.AssertCanMutateHeap();
-            return heap.SharedHeap.GetBlob<T>(blobId);
+            world.AssertCanMutateHeap();
+            return world.SharedHeap.GetBlob<T>(blobId);
         }
-
-        public static SharedPtr<T> Alloc<T>(WorldAccessor world, BlobId blobId, T value)
-            where T : class => Alloc<T>(world.Heap, blobId, value);
-
-        public static SharedPtr<T> Acquire<T>(WorldAccessor world, BlobId blobId)
-            where T : class => Acquire<T>(world.Heap, blobId);
 
         /// <summary>
         /// Returns true and the cached blob if one exists at <paramref name="blobId"/>; otherwise false.
         /// </summary>
-        public static bool TryGet<T>(HeapAccessor heap, BlobId blobId, out SharedPtr<T> ptr)
+        public static bool TryGet<T>(WorldAccessor world, BlobId blobId, out SharedPtr<T> ptr)
             where T : class
         {
-            heap.AssertCanMutateHeap();
-            return heap.SharedHeap.TryGetBlob<T>(blobId, out ptr);
+            world.AssertCanMutateHeap();
+            return world.SharedHeap.TryGetBlob<T>(blobId, out ptr);
         }
-
-        public static bool TryGet<T>(WorldAccessor world, BlobId blobId, out SharedPtr<T> ptr)
-            where T : class => TryGet<T>(world.Heap, blobId, out ptr);
 
         /// <summary>
         /// Returns the existing shared blob at <paramref name="blobId"/> if cached,
         /// otherwise calls <paramref name="factory"/> and stores the result. The factory
         /// is only invoked on cache miss.
-        /// See <see cref="NativeSharedPtr.GetOrAlloc{T}(HeapAccessor, BlobId, Func{T})"/> for
+        /// See <see cref="NativeSharedPtr.GetOrAlloc{T}(WorldAccessor, BlobId, Func{T})"/> for
         /// how to keep <paramref name="factory"/> allocation-free.
         /// </summary>
-        public static SharedPtr<T> GetOrAlloc<T>(HeapAccessor heap, BlobId blobId, Func<T> factory)
-            where T : class
-        {
-            heap.AssertCanMutateHeap();
-            if (heap.SharedHeap.TryGetBlob<T>(blobId, out var ptr))
-            {
-                return ptr;
-            }
-            return heap.SharedHeap.CreateBlob<T>(blobId, factory());
-        }
-
         public static SharedPtr<T> GetOrAlloc<T>(
             WorldAccessor world,
             BlobId blobId,
             Func<T> factory
         )
-            where T : class => GetOrAlloc<T>(world.Heap, blobId, factory);
+            where T : class
+        {
+            world.AssertCanMutateHeap();
+            if (world.SharedHeap.TryGetBlob<T>(blobId, out var ptr))
+            {
+                return ptr;
+            }
+            return world.SharedHeap.CreateBlob<T>(blobId, factory());
+        }
     }
 
     /// <summary>
     /// Reference-counted pointer to a shared managed (class) heap allocation. Multiple entities
     /// can hold a <see cref="SharedPtr{T}"/> referencing the same underlying object, identified
-    /// by a <see cref="BlobId"/>. Seed via <see cref="SharedPtr.Alloc{T}(HeapAccessor, BlobId, T)"/>;
-    /// look up an already-seeded blob via <see cref="SharedPtr.Acquire{T}(HeapAccessor, BlobId)"/>.
+    /// by a <see cref="BlobId"/>. Seed via <see cref="SharedPtr.Alloc{T}(WorldAccessor, BlobId, T)"/>;
+    /// look up an already-seeded blob via <see cref="SharedPtr.Acquire{T}(WorldAccessor, BlobId)"/>.
     /// <para>
-    /// Resolve the value with <see cref="Get(HeapAccessor)"/> or <see cref="Get(WorldAccessor)"/>.
+    /// Resolve the value with <see cref="Get(WorldAccessor)"/>.
     /// Cloning increments the reference count; disposing decrements it and frees when zero.
     /// </para>
     /// <para>
@@ -125,11 +113,11 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly T Get(HeapAccessor heap)
+        public readonly T Get(WorldAccessor world)
         {
             TrecsDebugAssert.That(!IsNull);
 
-            if (heap.SharedHeap.TryGetBlobDirect<T>(Id, Handle, out var result))
+            if (world.SharedHeap.TryGetBlobDirect<T>(Id, Handle, out var result))
             {
                 return result;
             }
@@ -142,10 +130,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly T Get(WorldAccessor world) => Get(world.Heap);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool TryGet(HeapAccessor heap, out T value)
+        public readonly bool TryGet(WorldAccessor world, out T value)
         {
             if (IsNull)
             {
@@ -153,7 +138,7 @@ namespace Trecs
                 return false;
             }
 
-            if (heap.SharedHeap.TryGetBlobDirect<T>(Id, Handle, out value))
+            if (world.SharedHeap.TryGetBlobDirect<T>(Id, Handle, out value))
             {
                 return true;
             }
@@ -162,31 +147,25 @@ namespace Trecs
             return false;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool TryGet(WorldAccessor world, out T value) =>
-            TryGet(world.Heap, out value);
-
-        public readonly bool CanGet(HeapAccessor heap)
+        public readonly bool CanGet(WorldAccessor world)
         {
             if (IsNull)
             {
                 return false;
             }
 
-            return heap.SharedHeap.ContainsBlobDirect(Id, Handle);
+            return world.SharedHeap.ContainsBlobDirect(Id, Handle);
         }
 
-        public readonly bool CanGet(WorldAccessor world) => CanGet(world.Heap);
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly SharedPtr<T> Clone(HeapAccessor heap)
+        public readonly SharedPtr<T> Clone(WorldAccessor world)
         {
-            heap.AssertCanMutateHeap();
+            world.AssertCanMutateHeap();
             if (IsNull)
             {
                 return default;
             }
-            if (!heap.SharedHeap.TryClone<T>(Handle, out var result))
+            if (!world.SharedHeap.TryClone<T>(Handle, out var result))
             {
                 throw TrecsDebugAssert.CreateException(
                     "Failed to clone SharedPtr with id {0} and handle {1}",
@@ -197,24 +176,17 @@ namespace Trecs
             return result;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly SharedPtr<T> Clone(WorldAccessor world) => Clone(world.Heap);
-
-        public readonly BlobId GetBlobId(HeapAccessor heap)
+        public readonly BlobId GetBlobId(WorldAccessor world)
         {
             TrecsDebugAssert.That(!IsNull);
             return Id;
         }
 
-        public readonly BlobId GetBlobId(WorldAccessor world) => GetBlobId(world.Heap);
-
-        public readonly void Dispose(HeapAccessor heap)
+        public readonly void Dispose(WorldAccessor world)
         {
-            heap.AssertCanMutateHeap();
-            heap.SharedHeap.DisposeHandle(Handle);
+            world.AssertCanMutateHeap();
+            world.SharedHeap.DisposeHandle(Handle);
         }
-
-        public readonly void Dispose(WorldAccessor world) => Dispose(world.Heap);
 
         public readonly bool IsNull
         {

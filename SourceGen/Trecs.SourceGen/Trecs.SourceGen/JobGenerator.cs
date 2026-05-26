@@ -1878,6 +1878,15 @@ namespace Trecs.SourceGen
                 hasNativeWorldAccessor: false,
                 needsEntityHandleBuffer: model.NeedsEntityHandleBuffer
             );
+
+            sb.AppendLine($"{ind}#if SVKJ_IS_PROFILING");
+            sb.AppendLine($"{ind}[Unity.Collections.NativeDisableParallelForRestriction]");
+            sb.AppendLine(
+                $"{ind}internal Unity.Collections.NativeArray<long> {FromWorldEmitter.JobFieldPrefix}timing;"
+            );
+            sb.AppendLine($"{ind}[Unity.Collections.LowLevel.Unsafe.NativeSetThreadIndex]");
+            sb.AppendLine($"{ind}internal int {FromWorldEmitter.JobFieldPrefix}threadIndex;");
+            sb.AppendLine($"{ind}#endif");
         }
 
         static void EmitExecuteShim(StringBuilder sb, in JobModel model, string ind)
@@ -1886,6 +1895,12 @@ namespace Trecs.SourceGen
             sb.AppendLine($"{ind}public void Execute(int i)");
             sb.AppendLine($"{ind}{{");
             string body = ind + "    ";
+
+            sb.AppendLine($"{body}#if SVKJ_IS_PROFILING");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}t0 = Unity.Profiling.LowLevel.Unsafe.ProfilerUnsafeUtility.Timestamp;"
+            );
+            sb.AppendLine($"{body}#endif");
 
             if (model.Kind == JobIterationKind.Aspect)
             {
@@ -1951,6 +1966,27 @@ namespace Trecs.SourceGen
                 }
                 sb.AppendLine($"{body}Execute({string.Join(", ", callArgs)});");
             }
+
+            sb.AppendLine($"{body}#if SVKJ_IS_PROFILING");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}t1 = Unity.Profiling.LowLevel.Unsafe.ProfilerUnsafeUtility.Timestamp;"
+            );
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}tbase = {FromWorldEmitter.JobFieldPrefix}threadIndex * 3;"
+            );
+            sb.AppendLine(
+                $"{body}if ({FromWorldEmitter.JobFieldPrefix}timing[{FromWorldEmitter.GenPrefix}tbase] == 0)"
+            );
+            sb.AppendLine(
+                $"{body}    {FromWorldEmitter.JobFieldPrefix}timing[{FromWorldEmitter.GenPrefix}tbase] = {FromWorldEmitter.GenPrefix}t0;"
+            );
+            sb.AppendLine(
+                $"{body}{FromWorldEmitter.JobFieldPrefix}timing[{FromWorldEmitter.GenPrefix}tbase + 1] = {FromWorldEmitter.GenPrefix}t1;"
+            );
+            sb.AppendLine(
+                $"{body}{FromWorldEmitter.JobFieldPrefix}timing[{FromWorldEmitter.GenPrefix}tbase + 2] += {FromWorldEmitter.GenPrefix}t1 - {FromWorldEmitter.GenPrefix}t0;"
+            );
+            sb.AppendLine($"{body}#endif");
 
             sb.AppendLine($"{ind}}}");
         }
@@ -2131,9 +2167,24 @@ namespace Trecs.SourceGen
             FromWorldEmitter.EmitFromWorldFieldAssignments(sb, body, orderedEmits);
             SingleEntityEmitter.EmitFieldAssignment(sb, body, singleEntityTargets);
 
+            sb.AppendLine($"{body}#if SVKJ_IS_PROFILING");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}timing = {FromWorldEmitter.GenPrefix}scheduler.RentTimingBuffer();"
+            );
+            sb.AppendLine(
+                $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.JobFieldPrefix}timing = {FromWorldEmitter.GenPrefix}timing;"
+            );
+            sb.AppendLine($"{body}#endif");
+
             sb.AppendLine(
                 $"{body}var {FromWorldEmitter.GenPrefix}handle = {FromWorldEmitter.GenPrefix}job.ScheduleParallel({FromWorldEmitter.GenPrefix}count, JobsUtil.ChooseBatchSize({FromWorldEmitter.GenPrefix}count), {FromWorldEmitter.GenPrefix}deps);"
             );
+
+            sb.AppendLine($"{body}#if SVKJ_IS_PROFILING");
+            sb.AppendLine(
+                $"{body}{FromWorldEmitter.GenPrefix}scheduler.RegisterJobTimings({FromWorldEmitter.GenPrefix}handle, {FromWorldEmitter.GenPrefix}jobName, {FromWorldEmitter.GenPrefix}timing);"
+            );
+            sb.AppendLine($"{body}#endif");
 
             IterationBufferEmitter.EmitOutputTracking(sb, body, buffers);
             FromWorldEmitter.EmitFromWorldTracking(sb, body, orderedEmits);
@@ -2263,12 +2314,27 @@ namespace Trecs.SourceGen
             FromWorldEmitter.EmitFromWorldFieldAssignments(sb, body, orderedEmits);
             SingleEntityEmitter.EmitFieldAssignment(sb, body, singleEntityTargets);
 
+            sb.AppendLine($"{body}#if SVKJ_IS_PROFILING");
+            sb.AppendLine(
+                $"{body}var {FromWorldEmitter.GenPrefix}timing = {FromWorldEmitter.GenPrefix}scheduler.RentTimingBuffer();"
+            );
+            sb.AppendLine(
+                $"{body}{FromWorldEmitter.GenPrefix}job.{FromWorldEmitter.JobFieldPrefix}timing = {FromWorldEmitter.GenPrefix}timing;"
+            );
+            sb.AppendLine($"{body}#endif");
+
             sb.AppendLine(
                 $"{body}var {FromWorldEmitter.GenPrefix}shim = new {FromWorldEmitter.JobFieldPrefix}SparseShim {{ Inner = {FromWorldEmitter.GenPrefix}job, Indices = {FromWorldEmitter.GenPrefix}indices }};"
             );
             sb.AppendLine(
                 $"{body}var {FromWorldEmitter.GenPrefix}handle = {FromWorldEmitter.GenPrefix}shim.ScheduleParallel({FromWorldEmitter.GenPrefix}count, JobsUtil.ChooseBatchSize({FromWorldEmitter.GenPrefix}count), {FromWorldEmitter.GenPrefix}deps);"
             );
+
+            sb.AppendLine($"{body}#if SVKJ_IS_PROFILING");
+            sb.AppendLine(
+                $"{body}{FromWorldEmitter.GenPrefix}scheduler.RegisterJobTimings({FromWorldEmitter.GenPrefix}handle, {FromWorldEmitter.GenPrefix}jobName, {FromWorldEmitter.GenPrefix}timing);"
+            );
+            sb.AppendLine($"{body}#endif");
 
             IterationBufferEmitter.EmitOutputTracking(sb, body, buffers);
             FromWorldEmitter.EmitFromWorldTracking(sb, body, orderedEmits);

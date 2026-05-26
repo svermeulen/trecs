@@ -24,9 +24,10 @@ namespace Trecs
     /// <code>
     /// Version = 7
     /// Flags = 0
-    /// World.EntityChunkStore.ChunkCount = 12
-    /// World.EntityChunkStore.Chunks[0].SlotIdx = 5
-    /// World.EntityChunkStore.Chunks[0].Position.x = 1.5
+    /// World.RngSeed = 12345
+    /// World.ComponentArrays.Group0.Group._tags = 3
+    /// World.ComponentArrays.Group0.Component0.TypeId._typeIndex = 42
+    /// World.ComponentArrays.Group0.Component0.Count = 5
     /// </code>
     /// </para>
     /// </summary>
@@ -413,6 +414,10 @@ namespace Trecs
             _output.Write(formattedValue);
             _output.Write('\n');
         }
+
+        public void PushScope(string name) => PushName(name);
+
+        public void PopScope() => Pop();
 
         void PushName(string name)
         {

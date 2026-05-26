@@ -18,7 +18,7 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static class ExplicitTypeIdProvider
     {
-        static readonly DenseDictionary<Type, int> _cache = new();
+        static readonly Dictionary<Type, int> _cache = new();
 
         static ExplicitTypeIdProvider()
         {
@@ -63,9 +63,9 @@ namespace Trecs.Internal
             // Generic type definitions
             Register(typeof(List<>), 374829150);
             Register(typeof(Dictionary<,>), 819463257);
-            Register(typeof(DenseDictionary<,>), 518072634);
-            Register(typeof(NativeDenseDictionary<,>), 940316758);
-            Register(typeof(DenseHashSet<>), 682415093);
+            Register(typeof(IterableDictionary<,>), 518072634);
+            Register(typeof(NativeIterableDictionary<,>), 940316758);
+            Register(typeof(IterableHashSet<>), 682415093);
             Register(typeof(NativeArray<>), 357928041);
             Register(typeof(NativeList<>), 395140678);
             Register(typeof(UnsafeList<>), 258393070);
@@ -104,9 +104,8 @@ namespace Trecs.Internal
                 return attr.Id;
             }
 
-            // Throw instead of warning to avoid corrupting save files
             throw TrecsDebugAssert.CreateException(
-                "Type {0} does not have an explicit ID, but TRECS_REQUIRE_EXPLICIT_TYPE_IDS is defined. Either add a [SerializationId] attribute to the type, or remove the TRECS_REQUIRE_EXPLICIT_TYPE_IDS define.",
+                "Type {0} does not have an explicit ID, but TRECS_REQUIRE_EXPLICIT_TYPE_IDS is defined. Either add a [TypeId] attribute to the type, or remove the TRECS_REQUIRE_EXPLICIT_TYPE_IDS define.",
                 type
             );
         }

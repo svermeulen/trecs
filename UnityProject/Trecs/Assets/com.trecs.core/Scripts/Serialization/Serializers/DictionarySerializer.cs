@@ -7,7 +7,7 @@ namespace Trecs.Serialization
     /// Serializer for <see cref="Dictionary{TKey,TValue}"/>. Writes entry count
     /// followed by each (key, value) pair. Managed Dictionary does not
     /// guarantee ordering across runs, so this serializer is unsuitable for
-    /// deterministic snapshots — prefer <see cref="DenseDictionarySerializer{TKey,TValue}"/>.
+    /// deterministic snapshots — prefer <see cref="IterableDictionarySerializer{TKey,TValue}"/>.
     /// </summary>
     public sealed class DictionarySerializer<TKey, TValue> : ISerializer<Dictionary<TKey, TValue>>
     {

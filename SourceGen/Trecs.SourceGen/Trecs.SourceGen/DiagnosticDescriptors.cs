@@ -758,6 +758,37 @@ namespace Trecs.SourceGen
             isEnabledByDefault: true
         );
 
+        // ── Non-deterministic dictionary/hashmap iteration (TRECS128-129) ────
+
+        public static readonly DiagnosticDescriptor DictionaryIteration = new(
+            id: "TRECS128",
+            title: "Iteration over Dictionary/HashSet is non-deterministic",
+            messageFormat: "Iterating over '{0}' produces non-deterministic order — this causes desyncs in Trecs. "
+                + "Use {1} for deterministic iteration, or access elements by key if iteration is not needed.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor NativeHashMapIteration = new(
+            id: "TRECS129",
+            title: "Iteration over NativeHashMap/NativeHashSet is non-deterministic",
+            messageFormat: "Iterating over '{0}' produces non-deterministic order — this causes desyncs in Trecs. "
+                + "Use {1} for deterministic iteration, or access elements by key if iteration is not needed.",
+            category: TrecsCategory,
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
+
+        public static readonly DiagnosticDescriptor NonDeterministicApiInFixedUpdate = new(
+            id: "TRECS130",
+            title: "Non-deterministic API used in fixed-update system",
+            messageFormat: "'{0}' is non-deterministic and must not be used in a fixed-update system — this causes desyncs; {1}",
+            category: TrecsCategory,
+            DiagnosticSeverity.Warning,
+            isEnabledByDefault: true
+        );
+
         // ── [Input] component field-type enforcement (TRECS121-123) ──────────
 
         public static readonly DiagnosticDescriptor InputComponentHasPersistentPtrField = new(

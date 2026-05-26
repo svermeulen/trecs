@@ -27,16 +27,6 @@ namespace Trecs.Internal
         public float ScrubCacheIntervalSeconds = 1f;
 
         /// <summary>
-        /// Capture a checksum every N fixed frames during live recording.
-        /// Persisted into the saved bundle's <c>Checksums</c> dict so
-        /// <see cref="BundleReplayer"/> can detect desyncs close to where they
-        /// happen during playback (rather than only at sparse anchor frames).
-        /// Smaller = catches desyncs earlier; larger = less per-frame cost.
-        /// Must be &gt;= 1. Matches <see cref="BundleRecorderSettings.ChecksumFrameInterval"/>.
-        /// </summary>
-        public int ChecksumFrameInterval = 30;
-
-        /// <summary>
         /// User-defined schema version stamped onto saved bundles. Trecs does
         /// not interpret this; it's surfaced as <see cref="BundleHeader.Version"/>
         /// so callers can decide whether a saved bundle is compatible with the
@@ -57,16 +47,5 @@ namespace Trecs.Internal
         /// holds about a minute of dense scrub points for a typical world.
         /// </summary>
         public long MaxScrubCacheBytes = 64L * 1024 * 1024;
-
-        /// <summary>
-        /// When true and built with DEBUG defined, dump a flat-path text
-        /// snapshot of world state on every anchor capture and every
-        /// playback-frame verification. Pair the two output files via
-        /// <c>diff</c> after the recorder reports a desync — the differing
-        /// lines name the components that drifted. No-op when the runtime
-        /// is built without DEBUG; the supporting code is compiled out
-        /// entirely so release builds carry no cost.
-        /// </summary>
-        public bool EnableDesyncSnapshots = false;
     }
 }

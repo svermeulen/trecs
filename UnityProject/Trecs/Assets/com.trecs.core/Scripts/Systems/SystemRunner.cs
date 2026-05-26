@@ -422,7 +422,7 @@ namespace Trecs.Internal
             // EnforceAllBufferJobsHaveCompletedAndRelease would block on Burst code that
             // still references handles we're about to release.
             _jobScheduler.CompleteAllOutstanding();
-#if SVKJ_IS_PROFILING && ENABLE_PROFILER
+#if TRECS_IS_PROFILING
             _jobScheduler.DisposeTimingBuffers();
 #endif
             _safetyManager.Dispose();
@@ -706,8 +706,6 @@ namespace Trecs.Internal
                     );
                 }
             }
-
-            // _dbg.Text("Fixed Update Ticks", numUpdates);
         }
 
         void ExecuteSystem(int globalIndex)
@@ -795,8 +793,6 @@ namespace Trecs.Internal
         public void Tick()
         {
             TrecsDebugAssert.That(!_hasDisposed);
-            // _dbg.Text("IsPaused: {}", _isPaused);
-            // _dbg.Text("FixedIsPaused: {}", _fixedIsPaused);
 
             if (_isPaused)
             {
@@ -867,9 +863,6 @@ namespace Trecs.Internal
                 }
             }
 
-            // _dbg.Text("CurrentFixedFrameCount: {}", _currentFixedFrameCount);
-            // _dbg.Text("ElapsedFixedTime: {}", _elapsedFixedTime);
-
             if (!_hasRunFirstTick)
             {
                 // Always run a submit just before first frame
@@ -912,8 +905,6 @@ namespace Trecs.Internal
 
                 _isExecutingSystems = false;
             }
-
-            // Any reason to do a submit here or is one in late tick sufficient?/
         }
 
         public void LateTick()

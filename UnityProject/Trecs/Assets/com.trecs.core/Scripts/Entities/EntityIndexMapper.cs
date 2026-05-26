@@ -4,9 +4,6 @@ using System.Runtime.CompilerServices;
 
 namespace Trecs.Internal
 {
-    /// <summary>
-    /// </summary>
-    /// <typeparam name="T"></typeparam>
     [EditorBrowsable(EditorBrowsableState.Never)]
     public readonly struct EntityIndexMapper<T>
         where T : unmanaged, IEntityComponent

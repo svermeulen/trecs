@@ -1,7 +1,7 @@
 using System;
+using System.Buffers.Binary;
 using System.ComponentModel;
 using System.IO;
-using System.Text;
 
 namespace Trecs.Internal
 {
@@ -18,34 +18,47 @@ namespace Trecs.Internal
         //   0: legacy (int version + bool includeTypeChecks)
         //   1: adds long flags between version and includeTypeChecks; prepends
         //      magic bytes ('T','R') + format version byte.
-        public const byte FormatVersion = 1;
+        //   2: data section drops BinaryWriter/BinaryReader intermediary;
+        //      strings use int32 byte-count prefix instead of 7-bit
+        //      variable-length encoding.
+        public const byte FormatVersion = 2;
+
+        // magic0 (1) + magic1 (1) + formatVersion (1) + version (4) + flags (8) + includeTypeChecks (1)
+        const int HeaderSize = 16;
 
         public static void WriteHeader(
-            BinaryWriter writer,
+            Stream stream,
             int version,
             long flags,
             bool includeTypeChecks
         )
         {
-            writer.Write(MagicByte0);
-            writer.Write(MagicByte1);
-            writer.Write(FormatVersion);
-            writer.Write(version);
-            writer.Write(flags);
-            writer.Write(includeTypeChecks);
+            Span<byte> header = stackalloc byte[HeaderSize];
+            header[0] = MagicByte0;
+            header[1] = MagicByte1;
+            header[2] = FormatVersion;
+            BinaryPrimitives.WriteInt32LittleEndian(header.Slice(3), version);
+            BinaryPrimitives.WriteInt64LittleEndian(header.Slice(7), flags);
+            header[15] = includeTypeChecks ? (byte)1 : (byte)0;
+            stream.Write(header);
         }
 
-        public static (int version, long flags, bool includeTypeChecks) ReadHeader(
-            BinaryReader reader
-        )
+        public static (int version, long flags, bool includeTypeChecks) ReadHeader(Stream stream)
         {
+            Span<byte> header = stackalloc byte[HeaderSize];
+            int bytesRead = stream.Read(header);
+
+            if (bytesRead < HeaderSize)
+            {
+                throw new SerializationException(
+                    $"Truncated header — expected {HeaderSize} bytes but got {bytesRead}."
+                );
+            }
+
             // Magic + format-version checks throw SerializationException, not
             // TrecsDebugAssert, because they need to fire in release builds.
-            // Letting a non-Trecs payload silently pass through here would
-            // cause downstream reads to interpret arbitrary bytes as field
-            // values and produce a much more confusing failure mode.
-            var magic0 = reader.ReadByte();
-            var magic1 = reader.ReadByte();
+            var magic0 = header[0];
+            var magic1 = header[1];
             if (magic0 != MagicByte0 || magic1 != MagicByte1)
             {
                 throw new SerializationException(
@@ -55,7 +68,7 @@ namespace Trecs.Internal
                 );
             }
 
-            var formatVersion = reader.ReadByte();
+            var formatVersion = header[2];
             if (formatVersion != FormatVersion)
             {
                 throw new SerializationException(
@@ -65,9 +78,9 @@ namespace Trecs.Internal
                 );
             }
 
-            var version = reader.ReadInt32();
-            var flags = reader.ReadInt64();
-            var includeTypeChecks = reader.ReadBoolean();
+            var version = BinaryPrimitives.ReadInt32LittleEndian(header.Slice(3));
+            var flags = BinaryPrimitives.ReadInt64LittleEndian(header.Slice(7));
+            var includeTypeChecks = header[15] != 0;
             return (version, flags, includeTypeChecks);
         }
     }
@@ -112,9 +125,8 @@ namespace Trecs.Internal
             var startPosition = stream.Position;
             try
             {
-                using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
                 var (version, flags, includeTypeChecks) = SerializationHeaderUtil.ReadHeader(
-                    reader
+                    stream
                 );
                 return new PayloadHeader(version, flags, includeTypeChecks);
             }

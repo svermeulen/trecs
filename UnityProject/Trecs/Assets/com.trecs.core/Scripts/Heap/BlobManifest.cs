@@ -1,4 +1,3 @@
-using System;
 using Trecs.Collections;
 using Trecs.Internal;
 
@@ -17,7 +16,7 @@ namespace Trecs
     [TypeId(378502946)]
     public struct BlobMetadata
     {
-        public Type Type;
+        public TypeId TypeId;
         public long LastAccessTime;
 
         /// <summary>
@@ -35,25 +34,6 @@ namespace Trecs
         public long NativeBytes;
 
         public bool IsNative;
-
-        internal sealed class Serializer : ISerializer<BlobMetadata>
-        {
-            public void Deserialize(ref BlobMetadata value, ISerializationReader reader)
-            {
-                value.Type = reader.Read<Type>("Type");
-                value.LastAccessTime = reader.Read<long>("LastAccessTime");
-                value.NativeBytes = reader.Read<long>("NativeBytes");
-                value.IsNative = reader.Read<bool>("IsNative");
-            }
-
-            public void Serialize(in BlobMetadata value, ISerializationWriter writer)
-            {
-                writer.Write<Type>("Type", value.Type);
-                writer.Write<long>("LastAccessTime", value.LastAccessTime);
-                writer.Write<long>("NativeBytes", value.NativeBytes);
-                writer.Write<bool>("IsNative", value.IsNative);
-            }
-        }
     }
 
     /// <summary>
@@ -63,7 +43,7 @@ namespace Trecs
     [TypeId(767600239)]
     public sealed class BlobManifest
     {
-        public readonly DenseDictionary<BlobId, BlobMetadata> Values = new();
+        public readonly IterableDictionary<BlobId, BlobMetadata> Values = new();
 
         internal sealed class Serializer : ISerializer<BlobManifest>
         {
@@ -76,7 +56,7 @@ namespace Trecs
 
             public void Serialize(in BlobManifest value, ISerializationWriter writer)
             {
-                writer.Write<DenseDictionary<BlobId, BlobMetadata>>("Values", value.Values);
+                writer.Write<IterableDictionary<BlobId, BlobMetadata>>("Values", value.Values);
             }
         }
     }

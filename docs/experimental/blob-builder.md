@@ -24,7 +24,7 @@ If your blob fits inline, prefer the simpler `NativeSharedPtr.Alloc(in value)` f
 ## The pieces
 
 - **`BlobArray<T>`** — 8-byte readonly struct: `int m_OffsetPtr` (delta from `&m_OffsetPtr` to the first element) + `int m_Length`. Lives as a field inside the blob root. Read-only at runtime; the indexer returns by `ref readonly T` so reads stay zero-copy.
-- **`BlobBuilder`** — `IDisposable` struct. Owns a chunked working buffer during construction; reserves space for the root and for each `BlobArray<T>` field; tracks the offset-patches needed to wire them up; finalizes everything into one fresh `Allocator.Persistent` allocation at `Build` time.
+- **`BlobBuilder`** — disposable `ref struct`. Owns a chunked working buffer during construction; reserves space for the root and for each `BlobArray<T>` field; tracks the offset-patches needed to wire them up; finalizes everything into one fresh `Allocator.Persistent` allocation at `Build` time.
 - **`BlobBuilderArray<T>`** — write-side view returned by `Allocate`. Indexer returns by writable `ref T`. Valid until the builder is disposed.
 
 ## A complete example
@@ -64,7 +64,7 @@ using (var builder = new BlobBuilder(Allocator.Temp))
         rooms[i] = new Room { Center = descriptors[i].Center, Radius = descriptors[i].Radius };
     }
 
-    anchor = builder.Build<Level>(world.Heap, blobId);
+    anchor = builder.Build<Level>(world, blobId);
 }
 ```
 
@@ -73,7 +73,7 @@ If you'd rather use a `readonly struct` for the extra type-system "this can't be
 Read it (main thread or Burst job, no difference):
 
 ```csharp
-ref readonly var level = ref anchor.Read(world.Heap).Value;
+ref readonly var level = ref anchor.Read(world).Value;
 int idx = level.LevelIndex;
 float r = level.Rooms[0].Radius;  // BlobArray<T>'s indexer
 ```
@@ -98,7 +98,7 @@ Inside the `using` block:
 2. **Initialize the root's non-array fields.** The cleanest pattern is wholesale assignment via a constructor (as above) — works fine with `readonly struct` root types.
 3. **`Allocate(in root.SomeArray, length)` for each `BlobArray` field.** Reserves the array's storage and records a patch. Returns a `BlobBuilderArray<T>` for filling.
 4. **Fill each array.** Either through the indexer (`arr[i] = ...`) or by writing directly through `arr.GetUnsafePtr()` for bulk fills.
-5. **`Build<T>(heap, blobId)`** to finalize and seed. The builder's working chunks are then disposed automatically by `using`.
+5. **`Build<T>(world, blobId)`** to finalize and seed. The builder's working chunks are then disposed automatically by `using`.
 
 You can interleave `Allocate` calls and array fills freely. The builder's chunked allocator keeps each `BlobBuilderArray<T>`'s data pointer stable across subsequent `Allocate` calls, so a partial fill of one array is still valid after allocating another.
 
@@ -193,11 +193,11 @@ using (var builder = new BlobBuilder(Allocator.Temp))
     ref var meta = ref builder.Allocate(in seg.Meta);
     meta = new SegmentMeta(...);
 
-    anchor = builder.Build<PathSegment>(world.Heap, blobId);
+    anchor = builder.Build<PathSegment>(world, blobId);
 }
 
 // Read side:
-ref readonly var path = ref anchor.Read(world.Heap).Value;
+ref readonly var path = ref anchor.Read(world).Value;
 if (path.Meta.IsValid)
 {
     ref readonly var meta = ref path.Meta.Value;

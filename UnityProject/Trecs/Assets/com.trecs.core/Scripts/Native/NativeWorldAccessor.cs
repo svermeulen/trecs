@@ -74,8 +74,10 @@ namespace Trecs
         readonly EntityHandleMap _entityIds;
         readonly NativeWorldAccessorFlags _flags;
         readonly NativeSharedPtrResolver _sharedPtrResolver;
-        readonly NativeChunkStoreResolver _chunkStoreResolver;
-        readonly NativeDenseDictionary<SetId, NativeSetDeferredQueues> _deferredQueues;
+        readonly NativeHeapResolver _chunkStoreResolver;
+
+        [NativeDisableContainerSafetyRestriction]
+        readonly NativeHashMap<SetId, NativeSetDeferredQueues> _deferredQueues;
 
         // Fast-path AddEntity infrastructure. Build-once-at-world-init, read-only on the
         // hot path. _fastAddBags holds the (thread, group) staging slots that the
@@ -127,15 +129,15 @@ namespace Trecs
         /// Provides read-only shared pointer resolution for use in Burst jobs.
         /// Only resolves entries flushed to the native heap (not pending adds from the current frame).
         /// </summary>
-        public NativeSharedPtrResolver SharedPtrResolver => _sharedPtrResolver;
+        internal NativeSharedPtrResolver SharedPtrResolver => _sharedPtrResolver;
 
         /// <summary>
         /// Job-safe resolver for both <see cref="NativeUniquePtr{T}"/> and
         /// <see cref="TrecsList{T}"/> dereferences. The per-allocation TypeId tag on the
-        /// shared <see cref="NativeChunkStore"/> distinguishes which heap owns each slot,
+        /// shared <see cref="NativeHeap"/> distinguishes which heap owns each slot,
         /// so a single resolver covers every native-heap pointer type.
         /// </summary>
-        public NativeChunkStoreResolver ChunkStoreResolver => _chunkStoreResolver;
+        public NativeHeapResolver ChunkStoreResolver => _chunkStoreResolver;
 
         internal unsafe NativeWorldAccessor(
             AtomicNativeBags moveQueue,
@@ -144,8 +146,8 @@ namespace Trecs
             EntityHandleMap entityIds,
             NativeWorldAccessorFlags flags,
             NativeSharedPtrResolver sharedPtrResolver,
-            NativeChunkStoreResolver chunkStoreResolver,
-            NativeDenseDictionary<SetId, NativeSetDeferredQueues> deferredQueues,
+            NativeHeapResolver chunkStoreResolver,
+            NativeHashMap<SetId, NativeSetDeferredQueues> deferredQueues,
             FastAddNativeInfo fastAdd,
             float deltaTime,
             float elapsedTime
@@ -382,20 +384,25 @@ namespace Trecs
 
         /// <summary>
         /// Burst-side equivalent of <see cref="EntityIndex.SetTag{T}(in NativeWorldAccessor)"/>.
-        /// Enqueues a tag-set with sentinel <c>-2</c>; the submitter resolves the
-        /// destination partition (using the source group's template dimensions) on the
-        /// main thread.
+        /// Enqueues a single NativeTagOp; the submitter resolves the destination
+        /// partition (using the source group's template dimensions) on the main thread.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal readonly void SetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertStructuralChangesAllowed();
-            var bag = _moveQueue.GetBag(_threadIndex);
-            bag.Enqueue(_accessorId);
-            bag.Enqueue(entityIndex);
-            bag.Enqueue((int)-2); // sentinel: SetTag — single tag GUID follows, dim-resolved at submit time
-            bag.Enqueue(TypeId<T>.Value.Value);
+            _moveQueue
+                .GetBag(_threadIndex)
+                .Enqueue(
+                    new NativeTagOp
+                    {
+                        AccessorId = _accessorId,
+                        EntityIndex = entityIndex,
+                        TagId = TypeId<T>.Value.Value,
+                        IsSet = true,
+                    }
+                );
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -404,18 +411,23 @@ namespace Trecs
 
         /// <summary>
         /// Burst-side equivalent of <see cref="EntityIndex.UnsetTag{T}(in NativeWorldAccessor)"/>.
-        /// Sentinel <c>-3</c>; resolved at submit time.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal readonly void UnsetTag<T>(EntityIndex entityIndex)
             where T : struct, ITag
         {
             AssertStructuralChangesAllowed();
-            var bag = _moveQueue.GetBag(_threadIndex);
-            bag.Enqueue(_accessorId);
-            bag.Enqueue(entityIndex);
-            bag.Enqueue((int)-3);
-            bag.Enqueue(TypeId<T>.Value.Value);
+            _moveQueue
+                .GetBag(_threadIndex)
+                .Enqueue(
+                    new NativeTagOp
+                    {
+                        AccessorId = _accessorId,
+                        EntityIndex = entityIndex,
+                        TagId = TypeId<T>.Value.Value,
+                        IsSet = false,
+                    }
+                );
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -471,8 +483,7 @@ namespace Trecs
             // thread is blocked inside the job, so the write is sequenced with
             // surrounding main-thread DeferredAdd calls. See
             // NativeSetDeferredQueues for the full slot-layout invariant.
-            _deferredQueues
-                .GetValueByRef(SetId<TSet>.Value)
+            _deferredQueues[SetId<TSet>.Value]
                 .AddQueue.GetBag(_threadIndex)
                 .Enqueue(entityIndex);
         }
@@ -491,8 +502,7 @@ namespace Trecs
             AssertStructuralChangesAllowed();
             // See DeferredSetAdd above and NativeSetDeferredQueues for the
             // slot-layout invariant that makes shared use of slot 0 safe.
-            _deferredQueues
-                .GetValueByRef(SetId<TSet>.Value)
+            _deferredQueues[SetId<TSet>.Value]
                 .RemoveQueue.GetBag(_threadIndex)
                 .Enqueue(entityIndex);
         }
@@ -509,7 +519,7 @@ namespace Trecs
             where TSet : struct, IEntitySet
         {
             AssertStructuralChangesAllowed();
-            _deferredQueues.GetValueByRef(SetId<TSet>.Value).RequestClear();
+            _deferredQueues[SetId<TSet>.Value].RequestClear();
         }
     }
 }

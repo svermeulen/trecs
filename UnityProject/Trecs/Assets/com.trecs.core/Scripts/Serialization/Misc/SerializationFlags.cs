@@ -29,11 +29,11 @@ namespace Trecs
     public static class SerializationFlags
     {
         /// <summary>
-        /// Set when the serialized bytes will be hashed for desync detection.
-        /// Serializers should skip any non-deterministic state (timing-dependent
-        /// queues, variable-update event buffers, etc.) under this flag.
+        /// When set, heap serializers emit per-allocation entries with
+        /// meaningful scope names instead of raw page blits. Intended for
+        /// the desync-diff text dump path — not for binary snapshots.
         /// </summary>
-        public const long IsForChecksum = 1L << 0;
+        public const long DesyncFriendlyHeaps = 1L << 0;
 
         /// <summary>
         /// First bit available for app-defined flags. Bits below this index are
@@ -53,6 +53,6 @@ namespace Trecs
         /// <see cref="ReservedMask"/> but not in this constant is reserved-but-
         /// unassigned, and user code passing it is almost certainly a mistake.
         /// </summary>
-        public const long AllDefinedMask = IsForChecksum;
+        public const long AllDefinedMask = DesyncFriendlyHeaps;
     }
 }

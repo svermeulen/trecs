@@ -11,7 +11,6 @@ namespace Trecs.Tests
         public static void RegisterTestCollectionSerializers(SerializerRegistry registry)
         {
             // Collection serializers for testing
-            registry.RegisterSerializer<ListSerializer<int>>();
             registry.RegisterSerializer<ListSerializer<string>>();
             registry.RegisterSerializer<DictionarySerializer<string, int>>();
             registry.RegisterSerializer<DictionarySerializer<int, string>>();
@@ -32,19 +31,19 @@ namespace Trecs.Tests
             // Test class serializer for null serialization tests.
             registry.RegisterSerializer(new TestClassSerializer());
 
-            // FastList blit serializers for performance testing
-            registry.RegisterSerializer<FastListSerializer<int>>();
-            registry.RegisterSerializer<FastListSerializer<float>>();
-            registry.RegisterSerializer<FastListSerializer<Vector3>>();
-            registry.RegisterSerializer<FastListSerializer<int2>>();
-            registry.RegisterSerializer<FastListSerializer<byte>>();
+            // List blit serializers for performance testing
+            registry.RegisterSerializer<ListBlitSerializer<int>>();
+            registry.RegisterSerializer<ListBlitSerializer<float>>();
+            registry.RegisterSerializer<ListBlitSerializer<Vector3>>();
+            registry.RegisterSerializer<ListBlitSerializer<int2>>();
+            registry.RegisterSerializer<ListBlitSerializer<byte>>();
 
-            // DenseDictionary serializers for blit performance testing
-            registry.RegisterSerializer<DenseDictionarySerializer<int, float>>();
-            registry.RegisterSerializer<DenseDictionarySerializer<int, int>>();
-            registry.RegisterSerializer<DenseDictionarySerializer<int, Vector3>>();
-            registry.RegisterSerializer<DenseDictionarySerializer<int2, float3>>();
-            registry.RegisterSerializer<DenseDictionarySerializer<int, string>>();
+            // IterableDictionary serializers for blit performance testing
+            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<int, float>>();
+            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<int, int>>();
+            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<int, Vector3>>();
+            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<int2, float3>>();
+            registry.RegisterSerializer<IterableDictionarySerializer<int, string>>();
 
             // UnsafeList serializers for round-trip tests.
             registry.RegisterSerializer<UnsafeListSerializer<float>>();

@@ -94,17 +94,17 @@ namespace Trecs.Internal
 
                 for (int i = 0; i < items.Count; i++)
                 {
-                    if (DetectCycle(i, visited, recursionStack, graph, items))
+                    if (DetectCycle(i, visited, recursionStack, graph, items, out var cycleNodes))
                     {
                         throw new InvalidOperationException(
-                            $"Found a circular dependency in the system graph! Cycle:\n  {GetCycleString(recursionStack.ToList(), items, itemToString)}"
+                            $"Found a circular dependency in the system graph! Cycle:\n  {GetCycleString(cycleNodes, items, itemToString)}"
                         );
                     }
                 }
 
-                // Not sure if this ever happens?
+                // Fallback: cycle detected but no specific nodes identified
                 throw new InvalidOperationException(
-                    "Found a circular dependency in the system graph! (unclear on details beyond that)"
+                    "Found a circular dependency in the system graph (cycle path could not be extracted)"
                 );
             }
 
@@ -116,26 +116,36 @@ namespace Trecs.Internal
             HashSet<int> visited,
             Stack<int> recursionStack,
             Dictionary<int, List<int>> graph,
-            List<T> items
+            List<T> items,
+            out List<int> cycleNodes
         )
         {
             if (recursionStack.Contains(node))
+            {
+                var stackList = recursionStack.ToList();
+                var cycleStart = stackList.IndexOf(node);
+                cycleNodes = stackList.GetRange(0, cycleStart + 1);
                 return true;
+            }
 
             if (visited.Contains(node))
+            {
+                cycleNodes = null;
                 return false;
+            }
 
             visited.Add(node);
             recursionStack.Push(node);
 
             foreach (var neighbor in graph[node])
             {
-                if (DetectCycle(neighbor, visited, recursionStack, graph, items))
+                if (DetectCycle(neighbor, visited, recursionStack, graph, items, out cycleNodes))
                     return true;
             }
 
             var poppedValue = recursionStack.Pop();
             TrecsDebugAssert.IsEqual(node, poppedValue);
+            cycleNodes = null;
             return false;
         }
 

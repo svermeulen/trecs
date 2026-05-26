@@ -70,7 +70,7 @@ namespace Trecs.Internal
                 list.Length,
                 requiredCount
             );
-            typed.ForceSetCount(list.Length);
+            typed.SetCount(list.Length);
         }
     }
 }

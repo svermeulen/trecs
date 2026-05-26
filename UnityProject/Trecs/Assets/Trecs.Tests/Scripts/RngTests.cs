@@ -306,6 +306,28 @@ namespace Trecs.Tests
         #region Edge Cases
 
         [Test]
+        public void TestNextIntNoArgs_CoversFullRange()
+        {
+            // NextInt() should map the full uint range to the full int range
+            // via unchecked cast, so NextInt() == unchecked((int)NextUint())
+            // for the same RNG state
+            var rng1 = new Rng(42);
+            var rng2 = new Rng(42);
+
+            for (int i = 0; i < 1000; i++)
+            {
+                int fromNextInt = rng1.NextInt();
+                int fromCast = unchecked((int)rng2.NextUint());
+
+                NAssert.AreEqual(
+                    fromCast,
+                    fromNextInt,
+                    $"NextInt() should equal unchecked((int)NextUint()) at iteration {i}"
+                );
+            }
+        }
+
+        [Test]
         public void TestNextFloatEdgeCases()
         {
             var rng = new Rng(123);

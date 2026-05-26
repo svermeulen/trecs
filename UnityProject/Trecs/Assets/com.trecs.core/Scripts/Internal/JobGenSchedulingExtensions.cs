@@ -112,7 +112,7 @@ namespace Trecs.Internal
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static NativeComponentLookupRead<T> CreateNativeComponentLookupReadForJob<T>(
             this WorldAccessor world,
-            ReadOnlyFastList<GroupIndex> groups,
+            ReadOnlyList<GroupIndex> groups,
             Allocator allocator
         )
             where T : unmanaged, IEntityComponent =>
@@ -121,7 +121,7 @@ namespace Trecs.Internal
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static NativeComponentLookupWrite<T> CreateNativeComponentLookupWriteForJob<T>(
             this WorldAccessor world,
-            ReadOnlyFastList<GroupIndex> groups,
+            ReadOnlyList<GroupIndex> groups,
             Allocator allocator
         )
             where T : unmanaged, IEntityComponent =>
@@ -164,7 +164,7 @@ namespace Trecs.Internal
         {
             var rid = ResourceId.Set(EntitySet<TSet>.Value.Id);
             var scheduler = world.JobScheduler;
-            ref var collection = ref world.GetSetForJobScheduling<TSet>();
+            var collection = world.GetSetForJobScheduling<TSet>();
             for (int i = 0; i < collection._registeredGroups.Length; i++)
                 deps = scheduler.IncludeWriteDep(deps, rid, collection._registeredGroups[i]);
             return deps;
@@ -179,7 +179,7 @@ namespace Trecs.Internal
         {
             var rid = ResourceId.Set(EntitySet<TSet>.Value.Id);
             var scheduler = world.JobScheduler;
-            ref var collection = ref world.GetSetForJobScheduling<TSet>();
+            var collection = world.GetSetForJobScheduling<TSet>();
 
             var flushJob = new SetFlushJob
             {
@@ -210,7 +210,7 @@ namespace Trecs.Internal
         )
             where TSet : struct, IEntitySet
         {
-            ref var collection = ref world.GetSetForJobScheduling<TSet>();
+            var collection = world.GetSetForJobScheduling<TSet>();
             if (collection.TryGetGroupEntry(group, out var groupEntry))
             {
                 var indices = groupEntry.Indices;
@@ -225,7 +225,7 @@ namespace Trecs.Internal
         public static NativeSetRead<TSet> CreateNativeSetReadForJob<TSet>(this WorldAccessor world)
             where TSet : struct, IEntitySet
         {
-            ref var collection = ref world.GetSetForJobScheduling<TSet>();
+            var collection = world.GetSetForJobScheduling<TSet>();
             return new NativeSetRead<TSet>(collection);
         }
 
@@ -239,7 +239,7 @@ namespace Trecs.Internal
             var setId = EntitySet<TSet>.Value.Id;
             var rid = ResourceId.Set(setId);
             var scheduler = world.JobScheduler;
-            ref var collection = ref world.GetSetForJobScheduling(setId);
+            var collection = world.GetSetForJobScheduling(setId);
             for (int i = 0; i < collection._registeredGroups.Length; i++)
                 deps = scheduler.IncludeReadDep(deps, rid, collection._registeredGroups[i]);
             return deps;
@@ -255,7 +255,7 @@ namespace Trecs.Internal
             var setId = EntitySet<TSet>.Value.Id;
             var rid = ResourceId.Set(setId);
             var scheduler = world.JobScheduler;
-            ref var collection = ref world.GetSetForJobScheduling(setId);
+            var collection = world.GetSetForJobScheduling(setId);
             var name = SetReadName<TSet>.Value;
             for (int i = 0; i < collection._registeredGroups.Length; i++)
                 scheduler.TrackJobRead(handle, rid, collection._registeredGroups[i], name);

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using NUnit.Framework;
 using Trecs.Internal;
 using Trecs.Serialization;
@@ -100,13 +99,12 @@ namespace Trecs.Tests
         byte[] SerializeWorld(World world)
         {
             var serializer = new WorldStateSerializer(world);
-            using var writer = new BinarySerializationWriter(_serializerRegistry);
+            var writer = new BinarySerializationWriter(_serializerRegistry);
             writer.Start(version: 1, includeTypeChecks: false);
             serializer.SerializeFullState(writer);
 
             using var outputStream = new MemoryStream();
-            using var outputWriter = new BinaryWriter(outputStream);
-            writer.Complete(outputWriter);
+            writer.Complete(outputStream);
             return outputStream.ToArray();
         }
 
@@ -114,9 +112,8 @@ namespace Trecs.Tests
         {
             var serializer = new WorldStateSerializer(world);
             using var inputStream = new MemoryStream(data);
-            using var inputReader = new BinaryReader(inputStream);
             var reader = new BinarySerializationReader(_serializerRegistry);
-            reader.Start(inputReader);
+            reader.Start(inputStream);
             serializer.DeserializeState(reader);
         }
 
@@ -376,7 +373,10 @@ namespace Trecs.Tests
         {
             using var world = CreateWorld();
 
-            NAssert.IsEmpty(world.ComponentArraySerializerRegistry.GetRegisteredComponentTypes());
+            NAssert.AreEqual(
+                0,
+                world.ComponentArraySerializerRegistry.GetRegisteredComponentTypes().Count
+            );
 
             world.ComponentArraySerializerRegistry.Register(
                 new InertCustomSerializer<SerTestInt>()
@@ -385,9 +385,11 @@ namespace Trecs.Tests
                 new InertCustomSerializer<SerTestFloat>()
             );
 
-            var types = world
-                .ComponentArraySerializerRegistry.GetRegisteredComponentTypes()
-                .ToList();
+            var keys = world.ComponentArraySerializerRegistry.GetRegisteredComponentTypes();
+            NAssert.AreEqual(2, keys.Count);
+            var types = new List<Type>();
+            foreach (var t in keys)
+                types.Add(t);
             CollectionAssert.AreEquivalent(
                 new[] { typeof(SerTestInt), typeof(SerTestFloat) },
                 types
@@ -395,7 +397,10 @@ namespace Trecs.Tests
 
             world.ComponentArraySerializerRegistry.Unregister<SerTestInt>();
 
-            types = world.ComponentArraySerializerRegistry.GetRegisteredComponentTypes().ToList();
+            keys = world.ComponentArraySerializerRegistry.GetRegisteredComponentTypes();
+            types.Clear();
+            foreach (var t in keys)
+                types.Add(t);
             CollectionAssert.AreEquivalent(new[] { typeof(SerTestFloat) }, types);
         }
 
@@ -802,13 +807,12 @@ namespace Trecs.Tests
             var wsRead = new WorldStateSerializer(world);
 
             byte[] data;
-            using (var writer = new BinarySerializationWriter(_serializerRegistry))
             {
+                var writer = new BinarySerializationWriter(_serializerRegistry);
                 writer.Start(version: 1, includeTypeChecks: false);
                 wsWrite.SerializeFullState(writer);
                 using var outputStream = new MemoryStream();
-                using var outputWriter = new BinaryWriter(outputStream);
-                writer.Complete(outputWriter);
+                writer.Complete(outputStream);
                 data = outputStream.ToArray();
             }
             NAssert.Greater(custom.SerializeCallCount, 0);
@@ -817,10 +821,9 @@ namespace Trecs.Tests
             a.Query().WithTags(PartitionA).SingleHandle().Component<SerTestInt>(a).Write.Value = 0;
 
             using (var inputStream = new MemoryStream(data))
-            using (var inputReader = new BinaryReader(inputStream))
             {
                 var reader = new BinarySerializationReader(_serializerRegistry);
-                reader.Start(inputReader);
+                reader.Start(inputStream);
                 wsRead.DeserializeState(reader);
             }
 
@@ -864,6 +867,50 @@ namespace Trecs.Tests
                     values[i] = v;
                 }
             }
+        }
+
+        /// <summary>
+        /// Edge case: a group whose component slots are materialized but whose
+        /// entity count is 0 (e.g. all entities were removed). Empty groups are
+        /// normalized to numComponents=0 during serialization, so the custom
+        /// serializer is NOT invoked — verify the round-trip still works.
+        /// </summary>
+        [Test]
+        public void RoundTrip_CustomSerializer_HandlesEmptyGroup()
+        {
+            using var world = CreateWorld();
+            var a = world.CreateAccessor(AccessorRole.Unrestricted);
+
+            var custom = new LengthRecordingSerializer();
+            world.ComponentArraySerializerRegistry.Register(custom);
+
+            // Add then remove an entity to materialize PartitionA's component
+            // slots without leaving any entries — Trecs's component arrays are
+            // lazily created on first Add, so we need the Add to even reach
+            // the empty case at all.
+            var handle = a.AddEntity(PartitionA)
+                .Set(new SerTestInt { Value = 1 })
+                .Set(new SerTestFloat { Value = 1f })
+                .AssertComplete()
+                .Handle;
+            a.Submit();
+            a.RemoveEntity(handle);
+            a.Submit();
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
+
+            var data = SerializeWorld(world);
+            NAssert.IsFalse(
+                custom.SerializeLengths.Contains(0),
+                "Empty groups are normalized away — custom serializer should not be invoked."
+            );
+
+            DeserializeWorld(world, data);
+
+            NAssert.IsFalse(
+                custom.DeserializeLengths.Contains(0),
+                "Empty groups are normalized away — custom serializer should not be invoked on deserialize either."
+            );
+            NAssert.AreEqual(0, a.CountEntitiesWithTags(PartitionA));
         }
 
         #endregion

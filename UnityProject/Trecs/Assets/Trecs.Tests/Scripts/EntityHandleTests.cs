@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Unity.Mathematics;
 using NAssert = NUnit.Framework.Assert;
 
 namespace Trecs.Tests
@@ -335,6 +336,33 @@ namespace Trecs.Tests
                 hash2,
                 "First entity ref hash should be deterministic across world instances"
             );
+        }
+
+        [Test]
+        public void EntityRange_GetHashCode_IsDeterministic()
+        {
+            var range = new EntityRange(42, 100);
+
+            // math.hash(new int2(42, 100)) is the deterministic hash used by
+            // EntityHandle and EntityIndex. EntityRange should use the same approach.
+            int expected = unchecked((int)math.hash(new int2(42, 100)));
+
+            NAssert.AreEqual(
+                expected,
+                range.GetHashCode(),
+                "EntityRange.GetHashCode should use deterministic math.hash, not HashCode.Combine"
+            );
+        }
+
+        [Test]
+        public void EntityRange_GetHashCode_DifferentForDifferentRanges()
+        {
+            var range1 = new EntityRange(0, 10);
+            var range2 = new EntityRange(0, 11);
+            var range3 = new EntityRange(1, 10);
+
+            NAssert.AreNotEqual(range1.GetHashCode(), range2.GetHashCode());
+            NAssert.AreNotEqual(range1.GetHashCode(), range3.GetHashCode());
         }
 
         #endregion

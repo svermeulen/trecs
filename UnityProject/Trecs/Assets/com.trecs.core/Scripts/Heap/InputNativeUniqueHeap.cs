@@ -14,20 +14,20 @@ namespace Trecs
     /// and frees each allocation in O(handles-in-frame).
     ///
     /// <para>Public-facing API is via <see cref="InputNativeUniquePtr{T}"/>; this
-    /// class is reachable through <see cref="HeapAccessor"/> for the input
+    /// class is reachable through <see cref="WorldAccessor"/> for the input
     /// pipeline's bookkeeping (allocation, frame-range clear, serialization).</para>
     ///
     /// <para><b>Thread-safety.</b> All mutating entry points (Alloc, ClearAt*,
     /// ClearAll, Dispose, Deserialize) and the main-thread Resolve path are
     /// gated to the main thread. Alloc paths are gated centrally on
-    /// <see cref="HeapAccessor.AssertCanAddInputsSystem"/> (which calls
-    /// <see cref="HeapAccessor.AssertMainThread"/>); lifecycle and direct-read
+    /// <see cref="WorldAccessor.AssertCanAddInputsHeap"/> (which calls
+    /// <see cref="WorldAccessor.AssertHeapMainThread"/>); lifecycle and direct-read
     /// paths assert main-thread in-heap because they don't go through
-    /// HeapAccessor (lifecycle: EntityInputQueue / EcsHeapAllocator; direct
-    /// Resolve: tests and the InputNativeUniquePtr Read(HeapAccessor)
+    /// WorldAccessor (lifecycle: EntityInputQueue / EcsHeapAllocator; direct
+    /// Resolve: tests and the InputNativeUniquePtr Read(WorldAccessor)
     /// implementation). Burst jobs that read through
     /// <see cref="InputNativeUniqueResolver"/> must not run concurrently with any
-    /// mutator on this heap — the underlying <c>NativeDenseDictionary</c> can
+    /// mutator on this heap — the underlying <c>NativeIterableDictionary</c> can
     /// rehash on Add and would dangle pointers held by an in-flight job. The
     /// accessor-role system enforces this by construction: Alloc requires an
     /// Input-role accessor (Input phase, no Burst jobs scheduled yet), while
@@ -50,13 +50,13 @@ namespace Trecs
         // Burst-readable handle→(ptr, size, typeHash) table. Burst jobs read
         // through InputNativeUniqueResolver, which wraps this same dictionary
         // by value.
-        NativeDenseDictionary<InputPtrHandle, InputAllocation> _allocations;
+        NativeHashMap<InputPtrHandle, InputAllocation> _allocations;
         InputNativeUniqueResolver _resolver;
 
-        // (frame → handles allocated for that frame). DenseDictionary gives
+        // (frame → handles allocated for that frame). IterableDictionary gives
         // deterministic iteration order for serialize / trim paths. List<>s are
         // pooled to avoid GC churn under high allocation churn.
-        readonly DenseDictionary<int, List<InputPtrHandle>> _handlesByFrame = new();
+        readonly IterableDictionary<int, List<InputPtrHandle>> _handlesByFrame = new();
         readonly Stack<List<InputPtrHandle>> _listPool = new();
         readonly List<int> _frameRemoveBuffer = new();
 
@@ -68,7 +68,7 @@ namespace Trecs
         internal InputNativeUniqueHeap(TrecsLog log)
         {
             _log = log;
-            _allocations = new NativeDenseDictionary<InputPtrHandle, InputAllocation>(
+            _allocations = new NativeHashMap<InputPtrHandle, InputAllocation>(
                 1,
                 Allocator.Persistent
             );
@@ -110,7 +110,7 @@ namespace Trecs
         internal unsafe InputNativeUniquePtr<T> Alloc<T>(int frame, in T value)
             where T : unmanaged
         {
-            // Main-thread gate lives on HeapAccessor.AssertCanAddInputsSystem,
+            // Main-thread gate lives on WorldAccessor.AssertCanAddInputsHeap,
             // which every public Alloc path (InputNativeUniquePtr.Alloc and
             // friends) calls before reaching here. Lifecycle methods below
             // (ClearAt*, ClearAll, Dispose, Serialize, Deserialize) reach the

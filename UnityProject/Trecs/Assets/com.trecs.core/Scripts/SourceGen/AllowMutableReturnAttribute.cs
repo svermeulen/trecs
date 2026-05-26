@@ -31,7 +31,7 @@ namespace Trecs
     ///     // shared blob through this reference. Shared-mutable by
     ///     // convention; callers must not mutate.
     ///     [Trecs.AllowMutableReturn]
-    ///     DenseDictionary&lt;int, List&lt;short&gt;&gt; GetVisualCaveCellIds();
+    ///     IterableDictionary&lt;int, List&lt;short&gt;&gt; GetVisualCaveCellIds();
     /// }
     /// </code>
     /// </example>

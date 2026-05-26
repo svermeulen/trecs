@@ -19,7 +19,10 @@ namespace Trecs
             IReadOnlyList<TagSet> partitions,
             IReadOnlyList<TagSet> dimensions,
             IReadOnlyList<IResolvedComponentDeclaration> componentDeclarations,
-            ReadOnlyDenseDictionary<Type, IResolvedComponentDeclaration> componentDeclarationMap,
+            ReadOnlyIterableDictionary<
+                RefKey<Type>,
+                IResolvedComponentDeclaration
+            > componentDeclarationMap,
             IComponentBuilder[] componentBuilders,
             TagSet tagset,
             bool variableUpdateOnly
@@ -263,8 +266,8 @@ namespace Trecs
         /// </summary>
         public IComponentBuilder[] ComponentBuilders { get; }
 
-        public ReadOnlyDenseDictionary<
-            Type,
+        public ReadOnlyIterableDictionary<
+            RefKey<Type>,
             IResolvedComponentDeclaration
         > ComponentDeclarationMap { get; }
 

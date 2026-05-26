@@ -4,12 +4,12 @@ Entity events let a service react to structural changes — entities added, remo
 
 ## Anatomy of a subscription
 
-Build a subscription in three parts: pick the **scope** (which groups to watch), the **event** (add / remove / move), and a **handler**:
+Build a subscription in three parts: pick the **scope** (which entities to watch), the **event** (add / remove / move), and a **handler**:
 
 ```csharp
 World.Events
     .EntitiesWithTags<MyTag>()    // 1. scope
-    .OnRemoved(OnEntityRemoved);  // 2. event   (3. handler is the method passed in)
+    .OnRemoved(OnEntityRemoved);  // 2. event   (3. handler)
 ```
 
 ### Scopes
@@ -33,7 +33,36 @@ A scope picks which groups the subscription watches:
 
 ### Handlers
 
-The recommended pattern is to use a `[ForEachEntity]` method as the event handler:
+The recommended pattern is to use a `[ForEachEntity]` method as the event handler. In a system, subscribe in `OnReady` and dispose in `OnShutdown`:
+
+```csharp
+public partial class FishDeathSystem : ISystem
+{
+    IDisposable _onFishRemoved;
+
+    partial void OnReady()
+    {
+        _onFishRemoved = World.Events
+            .EntitiesWithTags<FrenzyTags.Fish>()
+            .OnRemoved(OnFishRemoved);
+    }
+
+    partial void OnShutdown() => _onFishRemoved?.Dispose();
+
+    [ForEachEntity]
+    void OnFishRemoved(in TargetMeal targetMeal)
+    {
+        if (targetMeal.Value.Exists(World))
+            targetMeal.Value.Remove(World);
+    }
+
+    public void Execute() { }
+}
+```
+
+See [OnReady](../core/systems.md#onready-hook) and [OnShutdown](../core/systems.md#onshutdown-hook) for system lifecycle details.
+
+The same pattern works outside systems — any class that has access to a `WorldAccessor` can subscribe. Use a `DisposeCollection` when managing multiple subscriptions:
 
 ```csharp
 public partial class RemoveCleanupHandler : IDisposable
@@ -122,11 +151,11 @@ var sub = World.Events
 sub.Dispose();
 ```
 
-Trecs doesn't ship a `DisposeCollection` type for aggregating subscriptions. The samples define a small helper, but a `List<IDisposable>` walked during cleanup works fine too.
+The `DisposeCollection` used in the examples above is a small helper defined in the samples — Trecs core doesn't ship it. A `List<IDisposable>` walked in `Dispose()` works just as well.
 
 ## Cascading structural changes from callbacks
 
-A callback can itself queue structural changes — e.g. an `OnRemoved` handler that removes a follower, or an `OnAdded` handler that spawns a child. Trecs keeps processing the queue until empty or until `WorldSettings.MaxSubmissionIterations` (default 10) is reached. Hitting the cap throws `"possible circular submission detected"` in `DEBUG` builds — usually a sign that an observer is feeding itself.
+A callback can itself queue structural changes — e.g. an `OnRemoved` handler that removes a follower, or an `OnAdded` handler that spawns a child. Trecs keeps processing the queue until empty or until `WorldSettings.MaxSubmissionIterations` (default 10) is reached. Hitting the cap throws `"possible circular submission detected"` in `DEBUG` builds.
 
 ## Frame events
 

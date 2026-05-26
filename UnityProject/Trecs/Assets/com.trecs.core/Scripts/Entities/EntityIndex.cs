@@ -82,12 +82,10 @@ namespace Trecs
             return other.Index == Index && other.GroupIndex == GroupIndex;
         }
 
-        // Stable hash across sessions.
         /// <inheritdoc/>
         public override int GetHashCode()
         {
-            // we don't want to use HashCode.Combine because
-            // it's not deterministic across restarts.
+            // Deterministic across restarts (HashCode.Combine is not).
             // Uses GroupIndex.GetHashCode() (raw value) so null GroupIndex
             // hashes correctly without throwing.
             return unchecked((int)math.hash(new int2(Index, GroupIndex.GetHashCode())));

@@ -53,15 +53,8 @@ namespace Trecs.Tests
             {
                 Version = Version,
                 AnchorIntervalSeconds = 1000f,
-                ChecksumFrameInterval = 1000,
             };
-            using var recorder = new BundleRecorder(
-                env.World,
-                worldStateSer,
-                registry,
-                settings,
-                snapshots
-            );
+            using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
             recorder.Start();
 
             var bundle = recorder.Stop();
@@ -80,13 +73,7 @@ namespace Trecs.Tests
 
             // Recompute the checksum independently and confirm it matches the
             // value the recorder stored on the bundle.
-            using var checksumBuffer = new SerializationBuffer(registry);
-            var recomputed = RecordingChecksumCalculator.Calculate(
-                worldStateSer,
-                version: Version,
-                checksumBuffer,
-                SerializationFlags.IsForChecksum
-            );
+            var recomputed = snapshots.ComputeChecksum(Version);
             NAssert.AreEqual(
                 storedInitialChecksum,
                 recomputed,
@@ -114,15 +101,8 @@ namespace Trecs.Tests
             {
                 Version = Version,
                 AnchorIntervalSeconds = 1000f,
-                ChecksumFrameInterval = 1000,
             };
-            using var recorder = new BundleRecorder(
-                env.World,
-                worldStateSer,
-                registry,
-                settings,
-                snapshots
-            );
+            using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
 
             var startFrame = env.World.FixedFrame;
             recorder.Start();
@@ -158,15 +138,8 @@ namespace Trecs.Tests
             {
                 Version = Version,
                 AnchorIntervalSeconds = 3f / 60f, // every 3 fixed frames
-                ChecksumFrameInterval = 1000,
             };
-            using var recorder = new BundleRecorder(
-                env.World,
-                worldStateSer,
-                registry,
-                settings,
-                snapshots
-            );
+            using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
             recorder.Start();
 
             // Unlike TrecsRewindBuffer there is no forced first anchor — the
@@ -220,7 +193,7 @@ namespace Trecs.Tests
             DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
             var worldStateSer = new WorldStateSerializer(env.World);
             using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
-            using var replayer = new BundleReplayer(env.World, worldStateSer, registry, snapshots);
+            using var replayer = new BundleReplayer(env.World, registry, snapshots);
             replayer.Initialize();
 
             // Empty payload → reject. ReadOnlyMemory<byte> is a struct with no
@@ -230,7 +203,7 @@ namespace Trecs.Tests
             {
                 Header = MakeHeader(startFrame: 0, endFrame: 10),
                 InputQueue = Array.Empty<byte>(),
-                Checksums = new DenseDictionary<int, ulong>(),
+                Checksums = new IterableDictionary<int, ulong>(),
                 Anchors = Array.Empty<WorldSnapshot>(),
                 Bookmarks = Array.Empty<WorldSnapshot>(),
             };
@@ -241,7 +214,7 @@ namespace Trecs.Tests
                 Header = MakeHeader(startFrame: 0, endFrame: 10),
                 InitialSnapshot = Array.Empty<byte>(),
                 InputQueue = Array.Empty<byte>(),
-                Checksums = new DenseDictionary<int, ulong>(),
+                Checksums = new IterableDictionary<int, ulong>(),
                 Anchors = Array.Empty<WorldSnapshot>(),
                 Bookmarks = Array.Empty<WorldSnapshot>(),
             };
@@ -289,7 +262,6 @@ namespace Trecs.Tests
             {
                 Version = Version,
                 AnchorIntervalSeconds = 1000f,
-                ChecksumFrameInterval = 1000,
             };
 
             // Produce a valid bundle via the recorder so InitialSnapshot is
@@ -297,15 +269,7 @@ namespace Trecs.Tests
             // start-frame checksum has been replaced with a bogus value to
             // drive the failure path inside VerifyPostDeserializationChecksum.
             RecordingBundle goodBundle;
-            using (
-                var recorder = new BundleRecorder(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    settings,
-                    snapshots
-                )
-            )
+            using (var recorder = new BundleRecorder(env.World, registry, settings, snapshots))
             {
                 recorder.Start();
                 goodBundle = recorder.Stop();
@@ -335,7 +299,7 @@ namespace Trecs.Tests
                 Bookmarks = goodBundle.Bookmarks,
             };
 
-            using var replayer = new BundleReplayer(env.World, worldStateSer, registry, snapshots);
+            using var replayer = new BundleReplayer(env.World, registry, snapshots);
             replayer.Initialize();
 
             // Snapshot input-phase enabled state before the failed Start so
@@ -426,9 +390,9 @@ namespace Trecs.Tests
             // !TRECS_IS_PROFILING, so when that define is set the recorder
             // produces only the start-frame checksum. To keep this test
             // exercising the BundleRereplayer.Tick API regardless of build flags,
-            // we capture checksums ourselves during the record phase via the
-            // same RecordingChecksumCalculator the recorder uses, then merge
-            // them into the bundle before playback.
+            // we capture checksums ourselves during the record phase via
+            // SnapshotSerializer.ComputeChecksum (the same path the recorder
+            // uses), then merge them into the bundle before playback.
             byte[] bundleBytes;
             var manualChecksums = new Dictionary<int, ulong>();
 
@@ -447,21 +411,13 @@ namespace Trecs.Tests
                     AnchorIntervalSeconds = 1000f,
                     // Recorder's own cadence is irrelevant — we manually
                     // capture every other frame below.
-                    ChecksumFrameInterval = 1000,
                 };
-                using var recorder = new BundleRecorder(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    settings,
-                    snapshots
-                );
+                using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
                 recorder.Start();
 
                 // Capture checksums every other frame as the simulation runs,
                 // matching the same point in the cycle the recorder would use
                 // (after fixed update completes, before the next step).
-                using var checksumBuffer = new SerializationBuffer(registry);
                 int frameNumber = 0;
                 using var sub = env.Accessor.Events.OnFixedUpdateCompleted(() =>
                 {
@@ -469,12 +425,7 @@ namespace Trecs.Tests
                     if (frameNumber % 2 == 0)
                     {
                         var fixedFrame = env.World.FixedFrame;
-                        manualChecksums[fixedFrame] = RecordingChecksumCalculator.Calculate(
-                            worldStateSer,
-                            version: Version,
-                            checksumBuffer,
-                            SerializationFlags.IsForChecksum
-                        );
+                        manualChecksums[fixedFrame] = snapshots.ComputeChecksum(Version);
                     }
                 });
 
@@ -510,12 +461,7 @@ namespace Trecs.Tests
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);
-                using var replayer = new BundleReplayer(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    snapshots
-                );
+                using var replayer = new BundleReplayer(env.World, registry, snapshots);
                 replayer.Initialize();
 
                 using var stream = new MemoryStream(bundleBytes);
@@ -575,8 +521,8 @@ namespace Trecs.Tests
             // (no recovery, no thrashing).
             //
             // Same workaround as Player_TickReportsChecksumVerifiedOnRecordedFramesOnly:
-            // capture every-frame checksums ourselves so the test exercises
-            // the API regardless of TRECS_IS_PROFILING.
+            // capture every-frame checksums ourselves via SnapshotSerializer.ComputeChecksum
+            // so the test exercises the API regardless of TRECS_IS_PROFILING.
             byte[] bundleBytes;
             var manualChecksums = new Dictionary<int, ulong>();
 
@@ -592,27 +538,14 @@ namespace Trecs.Tests
                 {
                     Version = Version,
                     AnchorIntervalSeconds = 1000f,
-                    ChecksumFrameInterval = 1000,
                 };
-                using var recorder = new BundleRecorder(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    settings,
-                    snapshots
-                );
+                using var recorder = new BundleRecorder(env.World, registry, settings, snapshots);
                 recorder.Start();
 
-                using var checksumBuffer = new SerializationBuffer(registry);
                 using var sub = env.Accessor.Events.OnFixedUpdateCompleted(() =>
                 {
                     var fixedFrame = env.World.FixedFrame;
-                    manualChecksums[fixedFrame] = RecordingChecksumCalculator.Calculate(
-                        worldStateSer,
-                        version: Version,
-                        checksumBuffer,
-                        SerializationFlags.IsForChecksum
-                    );
+                    manualChecksums[fixedFrame] = snapshots.ComputeChecksum(Version);
                 });
 
                 env.StepFixedFrames(8);
@@ -644,12 +577,7 @@ namespace Trecs.Tests
                 var worldStateSer = new WorldStateSerializer(env.World);
                 using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
                 using var bundleSer = new RecordingBundleSerializer(registry);
-                using var replayer = new BundleReplayer(
-                    env.World,
-                    worldStateSer,
-                    registry,
-                    snapshots
-                );
+                using var replayer = new BundleReplayer(env.World, registry, snapshots);
                 replayer.Initialize();
 
                 using var stream = new MemoryStream(bundleBytes);
@@ -717,7 +645,7 @@ namespace Trecs.Tests
                 StartFixedFrame = startFrame,
                 EndFixedFrame = endFrame,
                 FixedDeltaTime = 1f / 60f,
-                BlobIds = new DenseHashSet<BlobId>(),
+                BlobIds = new IterableHashSet<BlobId>(),
             };
         }
 

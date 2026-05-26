@@ -27,7 +27,7 @@ A *seeder* is a long-lived object that allocates each blob once at startup and h
 
 The anchor can be either a **`BlobPtr<T>`** (cache-layer pin) or a **`SharedPtr<T>`** (ECS-layer refcounted handle). Both keep the blob resident; they just live at different layers:
 
-- **`BlobPtr<T>` — cache-layer pin.** The lower-level pinning handle; sits in the `BlobCache` and doesn't participate in the ECS refcount that `SharedPtr<T>` adds on top. Use this when the seeder's only job is to anchor data — it makes the seeder independent of `World`/`HeapAccessor` (takes a `BlobCache` directly) and signals that the anchor is *not* an ECS participant. Best fit for the simple "pin at startup, dispose at shutdown" shape.
+- **`BlobPtr<T>` — cache-layer pin.** The lower-level pinning handle; sits in the `BlobCache` and doesn't participate in the ECS refcount that `SharedPtr<T>` adds on top. Use this when the seeder's only job is to anchor data — it makes the seeder independent of `World`/`WorldAccessor` (takes a `BlobCache` directly) and signals that the anchor is *not* an ECS participant. Best fit for the simple "pin at startup, dispose at shutdown" shape.
 - **`SharedPtr<T>` — ECS-layer refcount.** Bumps the same refcount entity-side handles use. Use this when the seeder doubles as a *provider* that hands out clones to spawners ([Pattern A below](#pattern-a-clone-from-a-provider)) — having the provider live in the same pointer type it hands out keeps `Clone` natural.
 
 A plain `BlobPtr` seeder:
@@ -69,15 +69,15 @@ public class PaletteSeeder
     public void Initialize()
     {
         var world = _world.CreateAccessor(AccessorRole.Unrestricted);
-        _warm = SharedPtr.Alloc(world.Heap, PaletteIds.Warm, BuildWarm());
-        _cool = SharedPtr.Alloc(world.Heap, PaletteIds.Cool, BuildCool());
+        _warm = SharedPtr.Alloc(world, PaletteIds.Warm, BuildWarm());
+        _cool = SharedPtr.Alloc(world, PaletteIds.Cool, BuildCool());
     }
 
     public void Dispose()
     {
         var world = _world.CreateAccessor(AccessorRole.Unrestricted);
-        _warm.Dispose(world.Heap);
-        _cool.Dispose(world.Heap);
+        _warm.Dispose(world);
+        _cool.Dispose(world);
     }
 }
 ```
@@ -88,7 +88,7 @@ Either is enough to keep the blobs alive. The next question is how entity spawne
 
 `SharedPtr<T>` requires `T` to carry `[Trecs.Immutable]` (or be on the implicit built-in allowlist — `string`, `Type`, etc.). Without it, the cache layer can't trust that blob bytes are stable for the lifetime of the blob, and any post-`Alloc` mutation silently desyncs determinism since the `BlobCache` is not snapshotted with game state. The marker is opt-in, and it can apply to two different things — pick whichever fits the type:
 
-- **Class route — `[Immutable] sealed class Foo`.** The class itself is structurally audited by TRECS126: every instance field `readonly`, no public setters, public field/property types are in the "obviously immutable" set, and any non-`object` base class also carries `[Immutable]`. Best fit for **small leaf types built once via a constructor that takes everything** — colour palettes, content descriptors, baked lookup tables. `ColorPalette` from [Sample 15 — Blob Seed Pattern](../samples/15-blob-seed-pattern.md) is the canonical example.
+- **Class route — `[Immutable] sealed class Foo`.** The class itself is structurally audited by TRECS126: every instance field `readonly`, no public setters, public field/property types are in the "obviously immutable" set, and any non-`object` base class also carries `[Immutable]`. Best fit for **small leaf types built once via a constructor that takes everything** — colour palettes, content descriptors, baked lookup tables. `ColorPalette` from [Sample 14 — Blob Seed Pattern](../samples/14-blob-seed-pattern.md) is the canonical example.
 - **Interface route — `[Immutable] interface IReadOnlyFoo { ... }`.** Declare a read-only interface, mark *it* `[Immutable]`, and parameterize the `SharedPtr<T>` on the interface; the (mutable) concrete behind the interface implements the read members. Best fit for **fat retrofit-heavy types whose existing construction lifecycle is incompatible with field-level immutability** — pool-allocated, deserialized in place, populated by a multi-pass builder. The concrete keeps its mutable fields, its Pool, its `ISerializer<T>`; the analyzer only validates the interface's surface. The audit is smaller than for classes — interfaces have no fields and no base — so it only checks: no settable property accessors (`init` is allowed), no events, public property types in the same "safe" set as for classes. Method-return immutability is enforced as a *warning* by TRECS127 (see below).
 
 The lever for the choice is whether the type's construction model can be reshaped around a single constructor call. Greenfield leaf data usually can; pool-managed runtime objects usually can't, and rewriting them just to fit `SharedPtr` is a poor trade.
@@ -152,7 +152,7 @@ public partial struct WorldRegionRef : IEntityComponent
 }
 ```
 
-The seeder still calls `SharedPtr.Alloc(heap, blobId, concrete)` with the mutable `WorldRegion` instance — the heap stores it boxed as the interface, and entity-side reads only see the read-only face. The concrete's existing Pool / `ISerializer<WorldRegion>` keep working unchanged.
+The seeder still calls `SharedPtr.Alloc(world, blobId, concrete)` with the mutable `WorldRegion` instance — the heap stores it boxed as the interface, and entity-side reads only see the read-only face. The concrete's existing Pool / `ISerializer<WorldRegion>` keep working unchanged.
 
 #### `IReadOnlyList<out T>` covariance — the one trick most readers won't know
 
@@ -177,7 +177,7 @@ Public properties on an `[Immutable]` interface must return types from the same 
 - BCL read-only views — `ImmutableArray<T>`, `ImmutableList<T>`, `ReadOnlyMemory<T>`, `ReadOnlySpan<T>`, `ReadOnlyCollection<T>`, `IReadOnlyList<T>`, `IReadOnlyCollection<T>`, `IReadOnlyDictionary<TKey, TValue>`, `IReadOnlySet<T>` (where the target framework supports it);
 - Unity native read-only views — `NativeArray<T>.ReadOnly`, `NativeHashMap<TKey, TValue>.ReadOnly`, `NativeHashSet<T>.ReadOnly`, `NativeParallelHashMap<TKey, TValue>.ReadOnly`, `NativeParallelMultiHashMap<TKey, TValue>.ReadOnly`.
 
-Trecs's `DenseDictionary<TKey, TValue>` projects as `IReadOnlyDictionary<TKey, TValue>` and `DenseHashSet<T>` projects as `IReadOnlyCollection<T>` — hold a `DenseDictionary` privately on the concrete, expose it through one of the matching `IReadOnly*` faces on the interface, and the analyzer is satisfied.
+Trecs's `DenseDictionary<TKey, TValue>` exposes `IReadOnlyDenseDictionary<TKey, TValue>` and `DenseHashSet<T>` implements `IEnumerable<T>`. These are custom Trecs interfaces that avoid the boxing overhead of the BCL `IReadOnlyDictionary` / `IReadOnlyCollection` interfaces. If you need to expose a `DenseDictionary` on an `[Immutable]` interface, expose it through one of the BCL read-only views listed above (e.g. copy into an `ImmutableArray` at construction time) so the analyzer is satisfied.
 
 ### Method-return immutability — TRECS127
 
@@ -207,7 +207,7 @@ public interface IReadOnlyWorldRegion
 Two cases the marker can't enforce, regardless of which adoption path you chose:
 
 - **Aliasing across the constructor boundary.** If the caller keeps a reference to a mutable collection passed into the constructor (class route) or the concrete (interface route), they can mutate the shared blob after construction. Take a `ReadOnlySpan<T>` / `IReadOnlyList<T>` and copy, or use an immutable collection type for the parameter.
-- **Downcast through an `[Immutable]` interface to the mutable concrete.** `(WorldRegion)readOnlyView.Get(heap)` recovers the mutable surface. The interface route trusts the convention "don't downcast"; if it matters, make the concrete `internal` to the assembly that owns construction, or `private` inside a containing factory.
+- **Downcast through an `[Immutable]` interface to the mutable concrete.** `(WorldRegion)readOnlyView.Get(world)` recovers the mutable surface. The interface route trusts the convention "don't downcast"; if it matters, make the concrete `internal` to the assembly that owns construction, or `private` inside a containing factory.
 
 The marker is a determinism guardrail, not a sandbox. Code review still catches the rest.
 
@@ -223,17 +223,17 @@ public class PaletteProvider
 
     public void Initialize(WorldAccessor world)
     {
-        _warm = SharedPtr.Alloc(world.Heap, PaletteIds.Warm, BuildWarm());
-        _cool = SharedPtr.Alloc(world.Heap, PaletteIds.Cool, BuildCool());
+        _warm = SharedPtr.Alloc(world, PaletteIds.Warm, BuildWarm());
+        _cool = SharedPtr.Alloc(world, PaletteIds.Cool, BuildCool());
     }
 
-    public SharedPtr<ColorPalette> NewWarmHandle(WorldAccessor world) => _warm.Clone(world.Heap);
-    public SharedPtr<ColorPalette> NewCoolHandle(WorldAccessor world) => _cool.Clone(world.Heap);
+    public SharedPtr<ColorPalette> NewWarmHandle(WorldAccessor world) => _warm.Clone(world);
+    public SharedPtr<ColorPalette> NewCoolHandle(WorldAccessor world) => _cool.Clone(world);
 
     public void Dispose(WorldAccessor world)
     {
-        _warm.Dispose(world.Heap);
-        _cool.Dispose(world.Heap);
+        _warm.Dispose(world);
+        _cool.Dispose(world);
     }
 }
 ```
@@ -259,11 +259,11 @@ _warm = BlobPtr.Alloc(blobCache, PaletteIds.Warm, BuildWarm());
 world.AddEntity<MyTag>()
     .Set(new PaletteRef
     {
-        Value = SharedPtr.Acquire<ColorPalette>(world.Heap, PaletteIds.Warm),
+        Value = SharedPtr.Acquire<ColorPalette>(world, PaletteIds.Warm),
     });
 ```
 
-`SharedPtr.Acquire<T>(heap, blobId)` finds the existing blob, bumps its refcount, and returns a fresh handle. It's `Clone` addressed by ID instead of by reference. The seeder's `BlobPtr` and each entity's `SharedPtr` pin the same underlying cache entry through independent mechanisms — the blob stays resident as long as either side holds at least one handle. (A `SharedPtr` seeder works here too; using `BlobPtr` just makes "anchor, not consumer" explicit.)
+`SharedPtr.Acquire<T>(world, blobId)` finds the existing blob, bumps its refcount, and returns a fresh handle. It's `Clone` addressed by ID instead of by reference. The seeder's `BlobPtr` and each entity's `SharedPtr` pin the same underlying cache entry through independent mechanisms — the blob stays resident as long as either side holds at least one handle. (A `SharedPtr` seeder works here too; using `BlobPtr` just makes "anchor, not consumer" explicit.)
 
 This pattern is *necessary*, not merely preferable, in two cases:
 
@@ -281,6 +281,6 @@ public static readonly BlobId Warm = new(/* ??? */);
 Practical options:
 
 - **Random 64-bit literals** — `new(0x7f3a9b21d4e6c5a8)`. Generate once at authoring time, paste in, never change. Effectively zero collision risk with anything else in the heap, including IDs from other modules or plugins. The downside is the literal itself isn't human-meaningful — but since you read it through the named constant, that rarely matters in practice. A reasonable default.
-- **Stable string hashes** — `new(StableHash64("warm-palette"))`. Same collision profile as random literals at 64 bits, with the bonus that the value is derivable from the name. Useful when IDs need to round-trip through text (config files, save formats) or when you want the source of truth to be the string rather than the literal.
+- **Stable string hashes** — `BlobIdGenerator.FromBytes(Encoding.UTF8.GetBytes("warm-palette"))`. Same collision profile as random literals at 64 bits, with the bonus that the value is derivable from the name. Useful when IDs need to round-trip through text (config files, save formats) or when you want the source of truth to be the string rather than the literal.
 - **Asset-pipeline IDs** — GUIDs or content hashes the importer already produced, cast or hashed down to `long`. The right answer when the blob originates from a content pipeline; the `BlobId` design is built for this case.
 - **Hand-assigned small ints** — `new(1001)`, `new(1002)`, … Simplest for a single registry in a single codebase. The drawback is brittleness in multi-module setups: if two independent codebases both start their registries at `1001`, they collide on shared blob stores. Fine if you control all the code that mints stable IDs; reach for one of the wider-range options if you don't.

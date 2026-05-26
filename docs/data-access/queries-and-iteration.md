@@ -50,9 +50,13 @@ World.Query().WithoutComponents<Frozen>()
 
 ```csharp
 // Renderable entities that also have a Velocity component (skips static obstacles).
-var query = World.Query()
+foreach (EntityHandle entity in World.Query()
     .WithTags<CommonTags.Renderable>()
-    .WithComponents<Velocity>();
+    .WithComponents<Velocity>()
+    .Handles())
+{
+  // ...
+}
 ```
 
 A query must have at least one filter — terminators assert otherwise.
@@ -60,17 +64,11 @@ A query must have at least one filter — terminators assert otherwise.
 ### Terminators
 
 ```csharp
-// Iterate stable handles — primary path; do entity-targeted ops on the handle
+// Iterate entity handles — primary path
 foreach (EntityHandle entity in World.Query().WithTags<GameTags.Player>().Handles())
 {
     ref Position pos = ref entity.Component<Position>(World).Write;
     pos.Value.y += 1f;
-}
-
-// Iterate transient indices — hot-loop variant, avoids the per-iter handle materialization
-foreach (EntityIndex idx in World.Query().WithTags<GameTags.Enemy>().Indices())
-{
-    // ...
 }
 
 // Count
@@ -133,7 +131,7 @@ When iteration spans multiple groups, `[GlobalIndex] int` gives each entity a un
 
 ```csharp
 [ForEachEntity(typeof(GameTags.Boid))]
-void Execute(in CPosition pos, [GlobalIndex] int globalIndex)
+void Execute(in Position pos, [GlobalIndex] int globalIndex)
 {
     _outputs[globalIndex] = pos.Value;
 }
@@ -146,3 +144,4 @@ For performance-critical loops needing direct buffer access, iterate per group v
 ## Where queries are allowed
 
 The accessor's [role](../advanced/accessor-roles.md) determines which groups a query can resolve — Fixed-role accessors can't iterate `[VariableUpdateOnly]`-only groups, for example. The query asserts at the terminator if it would otherwise return groups the accessor isn't permitted to read.
+

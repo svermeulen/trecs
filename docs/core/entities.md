@@ -54,6 +54,32 @@ EntityHandle handle = World.AddEntity<MyTag>()
 
 Note that `.AssertComplete()` is optional.  This verifies that every non-optional template field has been set. The same check runs at submission; calling it explicitly as part of AddEntity just surfaces the error earlier.
 
+## Creating entities in jobs
+
+Entities can also be created from Burst jobs via [`NativeWorldAccessor`](../performance/jobs-and-burst.md#nativeworldaccessor). There are two forms depending on whether you need the handle afterward.
+
+**Pre-reserved handles** — use when the caller needs to track the entity after the add (subsequent move, remove, or component lookup by handle):
+
+```csharp
+// On the main thread, before scheduling the job:
+using var refs = World.ReserveEntityHandles(count, Allocator.TempJob);
+
+// In the job:
+nativeAccessor.AddEntity<MyTag>(sortKey: (uint)i, refs[i]);
+```
+
+**Fire-and-forget** — use when the caller doesn't need a handle (most particles, projectiles, spawn-and-find-by-tag-later patterns). Skip `ReserveEntityHandles` entirely:
+
+```csharp
+// In the job — no main-thread setup, no NativeArray to thread through:
+nativeAccessor.AddEntity<MyTag>(sortKey: (uint)i)
+    .Set(new MyComponent { Value = 42 });
+```
+
+The submitter claims an `EntityHandle` for each fire-and-forget add on the main thread *after* the deterministic sort runs, so id assignment follows sort-key order rather than bag-thread arrival order. The entity is still addressable by tag / query after [submission](../entity-management/structural-changes.md) — the caller just doesn't get a handle back from the add site. The returned `NativeAnonymousEntityInitializer` exposes only `.Set<T>()` (no `.Handle` property), reflecting the API contract.
+
+The two forms compose freely in the same job — mix them per call site based on whether you need the handle.
+
 ## Removing entities
 
 ```csharp
@@ -81,7 +107,7 @@ partial struct FishView : IAspect, IRead<Velocity>, IWrite<Position> { }
 [ForEachEntity(typeof(FrenzyTags.Fish))]
 void Execute(in FishView fish)
 {
-    fish.Position.Write.Value += fish.Velocity.Read.Value * World.DeltaTime;
+    fish.Position += fish.Velocity * World.DeltaTime;
 }
 ```
 
@@ -89,7 +115,7 @@ See [Aspects](../data-access/aspects.md) for the full reference, including manua
 
 ### Operating on an entity via its handle
 
-When you have an `EntityHandle` (the stable identifier — see [EntityHandle](#entityhandle) above) you can read components and perform structural changes directly on it, taking the `WorldAccessor` as an argument:
+When you have an `EntityHandle` you can read components and perform structural changes directly on it, taking the `WorldAccessor` as an argument:
 
 ```csharp
 // Component access
@@ -109,8 +135,6 @@ handle.UnsetTag<BallTags.Active>(World);   // partition transition (presence/abs
 handle.AddInput<TInput>(World, value);     // queue an input component (only from Input-phase systems)
 ```
 
-These same methods exist on `EntityIndex` and take the same shape — see the [hot-loop note](#entityindex-hot-loop-variant) below.
-
 You can also receive an `EntityHandle` directly as a `[ForEachEntity]` parameter (typically alongside an aspect for the component data), or from a query terminator:
 
 ```csharp
@@ -126,24 +150,6 @@ EntityHandle player = World.Query().WithTags<GameTags.Player>().SingleHandle();
 // Multi-entity iterator yields a handle per match
 foreach (var e in World.Query().WithTags<GameTags.Enemy>().Handles()) { /* ... */ }
 ```
-
-### `EntityIndex` (hot-loop variant)
-
-`EntityIndex` is the transient counterpart to `EntityHandle`. It identifies an entity by its buffer position within a specific group, so it's only valid within the current submission cycle — any structural change can invalidate it. In exchange, it skips the per-call handle-to-index lookup that `EntityHandle.X(world)` does internally.
-
-Every entity-targeted method on `EntityHandle` has a matching overload on `EntityIndex`:
-
-```csharp
-// Amortize one lookup across multiple ops on the same entity
-EntityIndex idx = handle.ToIndex(World);
-idx.SetTag<BallTags.Resting>(World);
-idx.Component<Position>(World).Write = newPos;
-
-// Or get an EntityIndex directly from a query — no handle ever materialized
-foreach (var idx in World.Query().WithTags<GameTags.Active>().Indices()) { /* ... */ }
-```
-
-Prefer `EntityHandle` everywhere else — the stability across submissions is almost always worth more than the lookup cost.
 
 ## Counting entities
 

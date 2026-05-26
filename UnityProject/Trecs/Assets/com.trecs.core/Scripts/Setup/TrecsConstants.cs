@@ -40,6 +40,6 @@ namespace Trecs.Internal
         /// <see cref="SerializationException"/> on mismatch — failing
         /// loudly beats silently misinterpreting an older layout.
         /// </summary>
-        public const byte CurrentBundleFormatVersion = 4;
+        public const byte CurrentBundleFormatVersion = 5;
     }
 }

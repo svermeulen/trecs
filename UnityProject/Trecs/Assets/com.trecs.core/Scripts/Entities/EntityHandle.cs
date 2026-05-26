@@ -38,12 +38,10 @@ namespace Trecs
             return obj1.Id != obj2.Id || obj1.Version != obj2.Version;
         }
 
-        // Stable hash across sessions.
         /// <inheritdoc/>
         public override readonly int GetHashCode()
         {
-            // we don't want to use HashCode.Combine because
-            // it's not deterministic across restarts
+            // Deterministic across restarts (HashCode.Combine is not).
             return unchecked((int)math.hash(new uint2((uint)Id, (uint)Version)));
         }
 

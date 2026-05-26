@@ -11,21 +11,29 @@ namespace Trecs.Internal
     [EditorBrowsable(EditorBrowsableState.Never)]
     internal unsafe struct AtomicNativeBags : IDisposable
     {
-        int _threadsCount;
+        readonly int _threadsCount;
 
         [NoAlias]
         [NativeDisableUnsafePtrRestriction]
         NativeBag* _data;
 
-        AllocatorManager.AllocatorHandle _allocator;
+        readonly AllocatorManager.AllocatorHandle _allocator;
 
-        public int ThreadSlotCount => _threadsCount;
+        public AtomicNativeBags(int threadsCount, AllocatorManager.AllocatorHandle allocator)
+        {
+            _threadsCount = threadsCount;
+            _allocator = allocator;
+            _data = null;
+        }
+
+        public readonly int ThreadSlotCount => _threadsCount;
 
         public static AtomicNativeBags Create(AllocatorManager.AllocatorHandle allocator)
         {
-            var result = new AtomicNativeBags();
-            result._allocator = allocator;
-            result._threadsCount = JobsUtility.MaxJobThreadCount + 1;
+            var result = new AtomicNativeBags(
+                threadsCount: JobsUtility.MaxJobThreadCount + 1,
+                allocator
+            );
 
             var bufferSize = Unsafe.SizeOf<NativeBag>();
             var bufferCount = result._threadsCount;

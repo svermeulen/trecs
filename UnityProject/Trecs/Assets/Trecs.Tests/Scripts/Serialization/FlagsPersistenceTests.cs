@@ -105,20 +105,12 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void TrecsIsForChecksum_Allowed_DoesNotTripReservedAssertion()
+        public void SerializationFlags_DefinedMaskMatchesDesyncFriendlyHeaps()
         {
-            // IsForChecksum lives in the reserved range but is an officially-defined
-            // Trecs flag so passing it must not trip the reserved-bit check.
-            _buffer.ClearMemoryStream();
-            _buffer.WriteAll<int>(
-                0,
-                TestConstants.Version,
-                includeTypeChecks: true,
-                flags: SerializationFlags.IsForChecksum
+            TrecsDebugAssert.IsEqual(
+                SerializationFlags.AllDefinedMask,
+                SerializationFlags.DesyncFriendlyHeaps
             );
-            _buffer.ResetMemoryPosition();
-            var header = _buffer.PeekHeader();
-            TrecsDebugAssert.That(header.HasFlag(SerializationFlags.IsForChecksum));
         }
 
         [Test]
@@ -140,6 +132,7 @@ namespace Trecs.Tests
                 (byte)'T',
                 (byte)'R',
                 0xFF,
+                0,
                 0,
                 0,
                 0,

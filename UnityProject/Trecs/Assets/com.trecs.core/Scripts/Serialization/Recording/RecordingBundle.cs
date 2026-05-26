@@ -39,7 +39,7 @@ namespace Trecs.Internal
         /// detection during playback. Cadence is independent of
         /// <see cref="Anchors"/>.
         /// </summary>
-        public DenseDictionary<int, ulong> Checksums { get; init; }
+        public IterableDictionary<int, ulong> Checksums { get; init; }
 
         /// <summary>
         /// Auto-placed full-state snapshots used as desync-recovery points
@@ -99,7 +99,7 @@ namespace Trecs.Internal
         public float FixedDeltaTime { get; init; }
 
         /// <summary>Heap blob references the bundle's snapshots depend on.</summary>
-        public DenseHashSet<BlobId> BlobIds { get; init; } = new();
+        public IterableHashSet<BlobId> BlobIds { get; init; } = new();
 
         public static void RegisterSerializers(SerializerRegistry registry)
         {
@@ -107,8 +107,8 @@ namespace Trecs.Internal
             // checksum dict and the blob-id set on the header. Registered
             // here rather than in TrecsSerialization's general-purpose set
             // so the bundle is self-contained for users who only need it.
-            registry.RegisterSerializer<DenseDictionarySerializer<int, ulong>>();
-            registry.RegisterSerializer<DenseHashSetSerializer<BlobId>>();
+            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<int, ulong>>();
+            registry.RegisterSerializer<IterableHashSetSerializer<BlobId>>();
             registry.RegisterSerializer(new Serializer());
         }
 
@@ -132,7 +132,7 @@ namespace Trecs.Internal
                 var startFrame = reader.Read<int>("StartFixedFrame");
                 var endFrame = reader.Read<int>("EndFixedFrame");
                 var fixedDeltaTime = reader.Read<float>("FixedDeltaTime");
-                var blobIds = reader.Read<DenseHashSet<BlobId>>("BlobIds");
+                var blobIds = reader.Read<IterableHashSet<BlobId>>("BlobIds");
 
                 value = new BundleHeader
                 {

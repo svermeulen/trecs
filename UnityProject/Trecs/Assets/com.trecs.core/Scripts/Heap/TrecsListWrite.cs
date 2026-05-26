@@ -34,11 +34,11 @@ namespace Trecs
     {
         readonly TrecsListHeader* _header;
         T* _data;
-        readonly NativeChunkStore _store;
+        readonly NativeHeap _store;
         ushort _capturedVersion;
 
         // See TrecsListRead<T> for the shipping-build use-after-dispose guard.
-        readonly NativeChunkStoreEntry* _headerSlot;
+        readonly NativeHeapEntry* _headerSlot;
         readonly byte _capturedGeneration;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -50,8 +50,8 @@ namespace Trecs
         internal TrecsListWrite(
             TrecsListHeader* header,
             T* data,
-            NativeChunkStore store,
-            NativeChunkStoreEntry* headerSlot,
+            NativeHeap store,
+            NativeHeapEntry* headerSlot,
             byte capturedGeneration,
             AtomicSafetyHandle safety
         )
@@ -69,8 +69,8 @@ namespace Trecs
         internal TrecsListWrite(
             TrecsListHeader* header,
             T* data,
-            NativeChunkStore store,
-            NativeChunkStoreEntry* headerSlot,
+            NativeHeap store,
+            NativeHeapEntry* headerSlot,
             byte capturedGeneration
         )
         {

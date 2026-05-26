@@ -359,7 +359,7 @@ namespace Trecs
             var blobCache = new BlobCache(log, _blobStores, _blobCacheSettings, nativeBlobBoxPool);
             var sharedHeap = new SharedHeap(log, blobCache);
             var nativeSharedHeap = new NativeSharedHeap(log, blobCache);
-            var nativeUniqueChunkStore = new NativeChunkStore(log);
+            var nativeUniqueChunkStore = new NativeHeap(log);
             var inputNativeUniqueHeap = new InputNativeUniqueHeap(log);
             var inputNativeSharedHeap = new InputNativeSharedHeap(log, blobCache);
             var inputSharedHeap = new InputSharedHeap(log, blobCache);
@@ -489,7 +489,6 @@ namespace Trecs.Internal
         /// <summary>
         /// Overrides the default system entry provider used for system ordering and accessor resolution.
         /// </summary>
-        // This isn't officially in api yet
         public static WorldBuilder SetSystemEntryProvider(
             this WorldBuilder builder,
             ISystemEntryProvider systemEntryProvider

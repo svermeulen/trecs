@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using Trecs.Internal;
+using Trecs.Collections;
 
 namespace Trecs
 {
@@ -9,7 +9,7 @@ namespace Trecs
     /// </summary>
     public readonly struct SetGroupEntryRead
     {
-        readonly NativeDenseDictionary<int, int> _entityIdToDenseIndex;
+        readonly NativeIterableDictionary<int, int> _entityIdToDenseIndex;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal SetGroupEntryRead(SetGroupEntry entry)

@@ -39,7 +39,7 @@ namespace Trecs
     {
         TrecsLog _log;
 
-        readonly DenseDictionary<BlobId, object> _memoryCache = new();
+        readonly IterableDictionary<BlobId, object> _memoryCache = new();
         readonly BlobManifest _manifest = new();
         readonly BlobStoreCommon _common;
         readonly BlobStoreInMemorySettings _settings;
@@ -71,7 +71,7 @@ namespace Trecs
             get { return false; }
         }
 
-        public ReadOnlyDenseDictionary<BlobId, object> MemoryCache
+        public ReadOnlyIterableDictionary<BlobId, object> MemoryCache
         {
             get { return _memoryCache; }
         }
@@ -150,7 +150,7 @@ namespace Trecs
                     LastAccessTime = _common.NextAccessTime(),
                     NativeBytes = nativeBytes,
                     IsNative = isNative,
-                    Type = metadataType,
+                    TypeId = TypeId.FromType(metadataType),
                 }
             );
         }
@@ -265,7 +265,11 @@ namespace Trecs
             blob = _memoryCache[id];
             TrecsDebugAssert.IsNotNull(blob);
 
-            _log?.Trace("Found blob {0} of type {1} already in memory cache", id, entry.Type);
+            _log?.Trace(
+                "Found blob {0} of type {1} already in memory cache",
+                id,
+                TypeId.ToType(entry.TypeId)
+            );
 
             if (updateAccessTime)
             {

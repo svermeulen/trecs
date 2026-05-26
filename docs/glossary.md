@@ -7,8 +7,8 @@ Trecs uses several similar-sounding terms with distinct meanings. Each entry lin
 | Term | What it is |
 |---|---|
 | **[Entity](core/entities.md)** | An identifier that groups components. Has no data of its own. |
-| **[EntityHandle](core/entities.md#entityhandle)** | A *stable* reference to an entity that survives structural changes. Primary user-facing identifier. Carries `Component<T>(world)` / `Remove(world)` / `SetTag<T>(world)` / `AddInput<T>(world, v)` and the matching `Burst` overloads. |
-| **[EntityIndex](core/entities.md#entityindex-hot-loop-variant)** | A *transient* reference (buffer position within a group). Only valid within the current submission cycle. Same method surface as `EntityHandle` but skips the handle-to-index lookup — use it in hot loops. |
+| **[EntityHandle](core/entities.md#entityhandle)** | A *stable* reference to an entity that survives structural changes. Primary user-facing identifier. Carries `Component<T>(world)` / `TryComponent<T>(world, out)` / `Remove(world)` / `SetTag<T>(world)` / `UnsetTag<T>(world)` / `AddInput<T>(world, v)` and the matching `Burst` overloads. |
+| **[EntityIndex](advanced/entity-index.md)** | (Advanced) A *transient* reference (buffer position within a group). Only valid within the current submission cycle. Same method surface as `EntityHandle` but skips the handle-to-index lookup. Always prefer `EntityHandle` unless profiling identifies the lookup as a bottleneck. |
 
 ## Classifying entities
 

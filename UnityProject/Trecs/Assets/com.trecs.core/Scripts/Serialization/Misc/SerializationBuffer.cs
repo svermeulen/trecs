@@ -1,18 +1,16 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 
 namespace Trecs.Internal
 {
     /// <summary>
-    /// For cases where you are serializing / deserializing multiple times
-    /// you can use this class to re-use the same buffers etc. and avoid allocs
+    /// Reusable buffer for repeated serialization/deserialization to avoid allocations.
     /// </summary>
     public sealed class SerializationBuffer : IDisposable
     {
         readonly MemoryStream _memoryStream;
-        readonly BinaryReader _binaryReader;
         readonly BinarySerializationReader _reader;
-        readonly BinaryWriter _binaryWriter;
         readonly BinarySerializationWriter _writer;
 
         bool _hasDisposed;
@@ -21,9 +19,7 @@ namespace Trecs.Internal
         public SerializationBuffer(SerializerRegistry serializerManager)
         {
             _memoryStream = new MemoryStream(1024);
-            _binaryReader = new BinaryReader(_memoryStream);
             _reader = new BinarySerializationReader(serializerManager);
-            _binaryWriter = new BinaryWriter(_memoryStream);
             _writer = new BinarySerializationWriter(serializerManager);
         }
 
@@ -43,18 +39,6 @@ namespace Trecs.Internal
             }
         }
 
-        // Only allow during idle — once a Start* is in progress, callers
-        // must read/write through the buffer's own methods, not the
-        // underlying BinaryReader.
-        public BinaryReader BinaryReader
-        {
-            get
-            {
-                TrecsDebugAssert.That(_state == State.Idle);
-                return _binaryReader;
-            }
-        }
-
         public BinarySerializationWriter Writer
         {
             get
@@ -70,15 +54,6 @@ namespace Trecs.Internal
             {
                 TrecsDebugAssert.That(_state == State.Reading);
                 return _reader;
-            }
-        }
-
-        public BinaryWriter BinaryWriter
-        {
-            get
-            {
-                TrecsDebugAssert.That(_state == State.Idle);
-                return _binaryWriter;
             }
         }
 
@@ -126,7 +101,7 @@ namespace Trecs.Internal
                     enableMemoryTracking: enableMemoryTracking
                 );
                 _writer.WriteDelta("Value", value, baseValue);
-                _writer.Complete(_binaryWriter);
+                _writer.Complete(_memoryStream);
             }
             catch
             {
@@ -145,7 +120,7 @@ namespace Trecs.Internal
 
             try
             {
-                _reader.Start(_binaryReader);
+                _reader.Start(_memoryStream);
                 var result = _reader.ReadObjectDelta("Value", baseValue);
                 _reader.Stop(verifySentinel: true);
 
@@ -231,7 +206,7 @@ namespace Trecs.Internal
             TrecsDebugAssert.That(MemoryPosition == 0);
 
             _state = State.Reading;
-            _reader.Start(_binaryReader);
+            _reader.Start(_memoryStream);
         }
 
         /// <summary>
@@ -259,7 +234,7 @@ namespace Trecs.Internal
             TrecsDebugAssert.That(_state == State.Writing);
             _state = State.Idle;
 
-            _writer.Complete(_binaryWriter);
+            _writer.Complete(_memoryStream);
 
             var totalBytes = _memoryStream.Position;
             return totalBytes;
@@ -308,7 +283,7 @@ namespace Trecs.Internal
                     enableMemoryTracking: enableMemoryTracking
                 );
                 _writer.Write("Value", value);
-                _writer.Complete(_binaryWriter);
+                _writer.Complete(_memoryStream);
             }
             catch
             {
@@ -327,7 +302,7 @@ namespace Trecs.Internal
 
             try
             {
-                _reader.Start(_binaryReader);
+                _reader.Start(_memoryStream);
                 var result = _reader.ReadObject("Value");
                 _reader.Stop(verifySentinel: true);
                 return result;
@@ -361,7 +336,7 @@ namespace Trecs.Internal
                     enableMemoryTracking: enableMemoryTracking
                 );
                 _writer.WriteObject("Value", value);
-                _writer.Complete(_binaryWriter);
+                _writer.Complete(_memoryStream);
             }
             catch
             {
@@ -402,7 +377,7 @@ namespace Trecs.Internal
 
             try
             {
-                _reader.Start(_binaryReader);
+                _reader.Start(_memoryStream);
                 var result = _reader.Read<T>("Value");
                 _reader.Stop(verifySentinel: true);
 
@@ -423,7 +398,7 @@ namespace Trecs.Internal
 
             try
             {
-                _reader.Start(_binaryReader);
+                _reader.Start(_memoryStream);
                 _reader.Read<T>("Value", ref value);
                 _reader.Stop(verifySentinel: true);
             }
@@ -457,7 +432,7 @@ namespace Trecs.Internal
                     enableMemoryTracking: enableMemoryTracking
                 );
                 _writer.WriteObjectDelta("Value", value, baseValue);
-                _writer.Complete(_binaryWriter);
+                _writer.Complete(_memoryStream);
             }
             catch
             {
@@ -479,7 +454,7 @@ namespace Trecs.Internal
 
             TrecsDebugAssert.That(MemoryIsCleared);
 
-            _binaryWriter.Write(bytes, 0, length);
+            _memoryStream.Write(bytes, 0, length);
         }
 
         public void LoadMemoryStreamFromArraySegment(ArraySegment<byte> segment, int length)
@@ -488,7 +463,7 @@ namespace Trecs.Internal
 
             TrecsDebugAssert.That(MemoryIsCleared);
 
-            _binaryWriter.Write(segment.Array, segment.Offset, length);
+            _memoryStream.Write(segment.Array, segment.Offset, length);
         }
 
         public void LoadMemoryFromFile(string path)
@@ -518,7 +493,7 @@ namespace Trecs.Internal
 
             try
             {
-                _reader.Start(_binaryReader);
+                _reader.Start(_memoryStream);
                 var result = _reader.ReadDelta<T>("Value", baseValue);
                 _reader.Stop(verifySentinel: true);
                 return result;
@@ -541,9 +516,6 @@ namespace Trecs.Internal
             _hasDisposed = true;
 
             _memoryStream.Dispose();
-            _binaryWriter.Dispose();
-            _binaryReader.Dispose();
-            _writer.Dispose();
         }
 
         public void BlitRead<T>(string name, ref T value)
@@ -779,6 +751,52 @@ namespace Trecs.Internal
         {
             TrecsDebugAssert.That(_state == State.Reading);
             _reader.BlitReadRawBytes(name, ptr, numBytes);
+        }
+
+        // Raw primitive read/write for callers that need to write unframed
+        // data directly into the underlying stream (e.g. network message
+        // headers). Only available when the buffer is Idle.
+        public void WriteRawInt32(int value)
+        {
+            TrecsDebugAssert.That(_state == State.Idle);
+            Span<byte> buf = stackalloc byte[sizeof(int)];
+            BinaryPrimitives.WriteInt32LittleEndian(buf, value);
+            _memoryStream.Write(buf);
+        }
+
+        public void WriteRawByte(byte value)
+        {
+            TrecsDebugAssert.That(_state == State.Idle);
+            _memoryStream.WriteByte(value);
+        }
+
+        public void WriteRawBytes(byte[] buffer, int offset, int count)
+        {
+            TrecsDebugAssert.That(_state == State.Idle);
+            _memoryStream.Write(buffer, offset, count);
+        }
+
+        public int ReadRawInt32()
+        {
+            TrecsDebugAssert.That(_state == State.Idle);
+            Span<byte> buf = stackalloc byte[sizeof(int)];
+            int bytesRead = _memoryStream.Read(buf);
+            TrecsAssert.That(bytesRead == sizeof(int));
+            return BinaryPrimitives.ReadInt32LittleEndian(buf);
+        }
+
+        public byte ReadRawByte()
+        {
+            TrecsDebugAssert.That(_state == State.Idle);
+            int b = _memoryStream.ReadByte();
+            TrecsAssert.That(b >= 0);
+            return (byte)b;
+        }
+
+        public int ReadRawBytes(byte[] buffer, int offset, int count)
+        {
+            TrecsDebugAssert.That(_state == State.Idle);
+            return _memoryStream.Read(buffer, offset, count);
         }
 
         public enum State

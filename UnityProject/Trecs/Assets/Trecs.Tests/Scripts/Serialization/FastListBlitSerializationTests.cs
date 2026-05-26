@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using NUnit.Framework;
-using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Mathematics;
 using UnityEngine;
@@ -10,7 +9,7 @@ using Debug = UnityEngine.Debug;
 namespace Trecs.Tests
 {
     [TestFixture]
-    public class FastListBlitSerializationTests
+    public class ListBlitSerializationTests
     {
         private SerializerRegistry _serializerRegistry;
         private SerializationBuffer _cacheHelper;
@@ -32,7 +31,7 @@ namespace Trecs.Tests
         public void SvList_EmptyList_SerializesAndDeserializes()
         {
             // Arrange
-            var originalList = new FastList<int>();
+            var originalList = new List<int>();
             var flags = 0L;
 
             // Act
@@ -44,7 +43,7 @@ namespace Trecs.Tests
                 flags
             );
             _cacheHelper.ResetMemoryPosition();
-            var deserializedList = _cacheHelper.ReadAll<FastList<int>>();
+            var deserializedList = _cacheHelper.ReadAll<List<int>>();
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserializedList);
@@ -55,7 +54,7 @@ namespace Trecs.Tests
         public void SvList_WithIntElements_SerializesAndDeserializes()
         {
             // Arrange
-            var originalList = new FastList<int> { 1, 2, 3, 42, -5, 0, int.MaxValue, int.MinValue };
+            var originalList = new List<int> { 1, 2, 3, 42, -5, 0, int.MaxValue, int.MinValue };
             var flags = 0L;
 
             // Act
@@ -67,7 +66,7 @@ namespace Trecs.Tests
                 flags
             );
             _cacheHelper.ResetMemoryPosition();
-            var deserializedList = _cacheHelper.ReadAll<FastList<int>>();
+            var deserializedList = _cacheHelper.ReadAll<List<int>>();
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserializedList);
@@ -85,7 +84,7 @@ namespace Trecs.Tests
         public void SvList_WithFloatElements_SerializesAndDeserializes()
         {
             // Arrange
-            var originalList = new FastList<float>
+            var originalList = new List<float>
             {
                 1.0f,
                 -2.5f,
@@ -108,7 +107,7 @@ namespace Trecs.Tests
                 flags
             );
             _cacheHelper.ResetMemoryPosition();
-            var deserializedList = _cacheHelper.ReadAll<FastList<float>>();
+            var deserializedList = _cacheHelper.ReadAll<List<float>>();
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserializedList);
@@ -126,7 +125,7 @@ namespace Trecs.Tests
         public void SvList_WithVector3Elements_SerializesAndDeserializes()
         {
             // Arrange
-            var originalList = new FastList<Vector3>
+            var originalList = new List<Vector3>
             {
                 Vector3.zero,
                 Vector3.one,
@@ -147,7 +146,7 @@ namespace Trecs.Tests
                 flags
             );
             _cacheHelper.ResetMemoryPosition();
-            var deserializedList = _cacheHelper.ReadAll<FastList<Vector3>>();
+            var deserializedList = _cacheHelper.ReadAll<List<Vector3>>();
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserializedList);
@@ -165,7 +164,7 @@ namespace Trecs.Tests
         public void SvList_WithMathematicsInt2_SerializesAndDeserializes()
         {
             // Arrange
-            var originalList = new FastList<int2>
+            var originalList = new List<int2>
             {
                 new int2(0, 0),
                 new int2(1, 1),
@@ -184,7 +183,7 @@ namespace Trecs.Tests
                 flags
             );
             _cacheHelper.ResetMemoryPosition();
-            var deserializedList = _cacheHelper.ReadAll<FastList<int2>>();
+            var deserializedList = _cacheHelper.ReadAll<List<int2>>();
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserializedList);
@@ -202,7 +201,7 @@ namespace Trecs.Tests
         public void SvList_LargeList_SerializesAndDeserializes()
         {
             // Arrange
-            var originalList = new FastList<int>();
+            var originalList = new List<int>();
             for (int i = 0; i < 10000; i++)
             {
                 originalList.Add(i * 7 + 13); // Some pseudo-random values
@@ -218,7 +217,7 @@ namespace Trecs.Tests
                 flags
             );
             _cacheHelper.ResetMemoryPosition();
-            var deserializedList = _cacheHelper.ReadAll<FastList<int>>();
+            var deserializedList = _cacheHelper.ReadAll<List<int>>();
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserializedList);
@@ -244,7 +243,7 @@ namespace Trecs.Tests
         public void SvList_SingleElement_SerializesAndDeserializes()
         {
             // Arrange
-            var originalList = new FastList<int> { 42 };
+            var originalList = new List<int> { 42 };
             var flags = 0L;
 
             // Act
@@ -256,7 +255,7 @@ namespace Trecs.Tests
                 flags
             );
             _cacheHelper.ResetMemoryPosition();
-            var deserializedList = _cacheHelper.ReadAll<FastList<int>>();
+            var deserializedList = _cacheHelper.ReadAll<List<int>>();
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserializedList);
@@ -268,7 +267,7 @@ namespace Trecs.Tests
         public void SvList_ByteValues_SerializesAndDeserializes()
         {
             // Arrange
-            var originalList = new FastList<byte>();
+            var originalList = new List<byte>();
             for (byte i = 0; i < 255; i++)
             {
                 originalList.Add(i);
@@ -285,7 +284,7 @@ namespace Trecs.Tests
                 flags
             );
             _cacheHelper.ResetMemoryPosition();
-            var deserializedList = _cacheHelper.ReadAll<FastList<byte>>();
+            var deserializedList = _cacheHelper.ReadAll<List<byte>>();
 
             // Assert
             TrecsDebugAssert.IsNotNull(deserializedList);
@@ -304,7 +303,7 @@ namespace Trecs.Tests
         {
             // Arrange - Test deserializing into a pre-allocated (but empty) list,
             // which the serializer reuses instead of allocating a new one.
-            var originalList = new FastList<int> { 1, 2, 3, 4, 5 };
+            var originalList = new List<int> { 1, 2, 3, 4, 5 };
             var flags = 0L;
 
             _cacheHelper.ClearMemoryStream();
@@ -316,7 +315,7 @@ namespace Trecs.Tests
             );
             _cacheHelper.ResetMemoryPosition();
 
-            var deserializedList = new FastList<int>();
+            var deserializedList = new List<int>();
 
             // Act
             _cacheHelper.ReadAll(ref deserializedList);
@@ -337,28 +336,28 @@ namespace Trecs.Tests
         public void SvList_BlitPerformanceTest_CompareWithRegularList()
         {
             // Arrange - This is more of a performance verification than a strict test
-            var svList = new FastList<int>();
+            var blitList = new List<int>();
             var regularList = new List<int>();
 
             const int elementCount = 1000;
             for (int i = 0; i < elementCount; i++)
             {
                 int value = i * 42;
-                svList.Add(value);
+                blitList.Add(value);
                 regularList.Add(value);
             }
 
             var flags = 0L;
 
             // Act & Assert - Just verify both serialize/deserialize correctly
-            // FastList (blit)
+            // List (blit)
             _cacheHelper.ClearMemoryStream();
             var stopwatch = Stopwatch.StartNew();
-            _cacheHelper.WriteAll(svList, TestConstants.Version, includeTypeChecks: true, flags);
+            _cacheHelper.WriteAll(blitList, TestConstants.Version, includeTypeChecks: true, flags);
             _cacheHelper.ResetMemoryPosition();
-            var deserializedSvList = _cacheHelper.ReadAll<FastList<int>>();
+            var deserializedBlitList = _cacheHelper.ReadAll<List<int>>();
             stopwatch.Stop();
-            var svListTime = stopwatch.ElapsedTicks;
+            var blitListTime = stopwatch.ElapsedTicks;
 
             // Regular List (element-by-element)
             _cacheHelper.ClearMemoryStream();
@@ -375,16 +374,16 @@ namespace Trecs.Tests
             var regularListTime = stopwatch.ElapsedTicks;
 
             // Verify correctness
-            TrecsDebugAssert.That(deserializedSvList.Count == elementCount);
+            TrecsDebugAssert.That(deserializedBlitList.Count == elementCount);
             TrecsDebugAssert.That(deserializedRegularList.Count == elementCount);
             for (int i = 0; i < elementCount; i++)
             {
-                TrecsDebugAssert.That(deserializedSvList[i] == deserializedRegularList[i]);
+                TrecsDebugAssert.That(deserializedBlitList[i] == deserializedRegularList[i]);
             }
 
             // Log performance comparison (not a strict assertion since it can vary)
             Debug.Log(
-                $"FastListSerializer: {svListTime} ticks, Regular ListSerializer: {regularListTime} ticks. Blit ratio: {(float)svListTime / regularListTime:F2}x"
+                $"ListBlitSerializer: {blitListTime} ticks, Regular ListSerializer: {regularListTime} ticks. Blit ratio: {(float)blitListTime / regularListTime:F2}x"
             );
         }
     }

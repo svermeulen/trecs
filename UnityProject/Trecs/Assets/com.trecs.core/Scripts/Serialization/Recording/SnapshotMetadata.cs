@@ -26,7 +26,7 @@ namespace Trecs.Internal
         public int FixedFrame { get; set; }
 
         /// <summary>Heap blob references the snapshot depends on.</summary>
-        public DenseHashSet<BlobId> BlobIds { get; init; } = new();
+        public IterableHashSet<BlobId> BlobIds { get; init; } = new();
 
         public static void RegisterSerializers(SerializerRegistry registry)
         {
@@ -40,7 +40,7 @@ namespace Trecs.Internal
             public void Deserialize(ref SnapshotMetadata value, ISerializationReader reader)
             {
                 var version = reader.Read<int>("Version");
-                var blobIds = reader.Read<DenseHashSet<BlobId>>("BlobIds");
+                var blobIds = reader.Read<IterableHashSet<BlobId>>("BlobIds");
                 var fixedFrame = reader.Read<int>("FixedFrame");
 
                 value = new SnapshotMetadata

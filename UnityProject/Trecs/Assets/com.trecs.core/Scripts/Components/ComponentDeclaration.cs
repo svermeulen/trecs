@@ -202,12 +202,8 @@ namespace Trecs.Internal
                     templateContext
                 );
 
-                // This actually is valid sometimes
-                // In one case - we send camera transform as input, but then we want interpolated values for it which we
-                // use when playing recording
-                // TrecsDebugAssert.That(
-                //     !isInterpolatedChoice,
-                //     "Component type {} cannot be both Input and Interpolated while processing template {}", _componentType, templateContext);
+                // Input + Interpolated is valid (e.g. camera transform sent as input
+                // but interpolated during recording playback)
 
                 TrecsDebugAssert.That(
                     !variableUpdateOnlyChoice,

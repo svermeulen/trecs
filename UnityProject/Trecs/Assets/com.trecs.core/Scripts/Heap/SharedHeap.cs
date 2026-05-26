@@ -8,16 +8,16 @@ namespace Trecs
 {
     /// <summary>
     /// Manages reference-counted managed (class) allocations backing <see cref="SharedPtr{T}"/>.
-    /// Accessed internally through <see cref="HeapAccessor"/>; not typically used directly.
+    /// Accessed internally through <see cref="WorldAccessor"/>; not typically used directly.
     /// </summary>
     public sealed class SharedHeap
     {
         readonly TrecsLog _log;
 
         readonly BlobCache _store;
-        readonly DenseDictionary<BlobId, PtrHandle> _blobCacheHandles = new();
-        readonly DenseDictionary<BlobId, BlobInfo> _activeBlobs = new();
-        readonly DenseDictionary<PtrHandle, BlobId> _activeHandles = new();
+        readonly IterableDictionary<BlobId, PtrHandle> _blobCacheHandles = new();
+        readonly IterableDictionary<BlobId, BlobInfo> _activeBlobs = new();
+        readonly IterableDictionary<PtrHandle, BlobId> _activeHandles = new();
         readonly List<PtrHandle> _tempBuffer1 = new();
 
         // Skip 0 — PtrHandle reserves 0 as the null sentinel.
@@ -30,7 +30,7 @@ namespace Trecs
             _store = store;
         }
 
-        // Exposed so HeapAccessor (which already references SharedHeap) can surface
+        // Exposed so WorldAccessor (which already references SharedHeap) can surface
         // the cache without a separate plumbing path. The same instance is shared
         // with NativeSharedHeap and the frame-scoped heaps.
         internal BlobCache BlobCache => _store;
@@ -326,8 +326,8 @@ namespace Trecs
             ClearAll(warnUndisposed: true);
 
             _nextHandleId = reader.Read<uint>("HandleCounter");
-            reader.ReadInPlace<DenseDictionary<BlobId, BlobInfo>>("_activeBlobs", _activeBlobs);
-            reader.ReadInPlace<DenseDictionary<PtrHandle, BlobId>>(
+            reader.ReadInPlace<IterableDictionary<BlobId, BlobInfo>>("_activeBlobs", _activeBlobs);
+            reader.ReadInPlace<IterableDictionary<PtrHandle, BlobId>>(
                 "_activeHandles",
                 _activeHandles
             );
@@ -341,8 +341,8 @@ namespace Trecs
         public void Serialize(ISerializationWriter writer)
         {
             writer.Write<uint>("HandleCounter", _nextHandleId);
-            writer.Write<DenseDictionary<BlobId, BlobInfo>>("_activeBlobs", _activeBlobs);
-            writer.Write<DenseDictionary<PtrHandle, BlobId>>("_activeHandles", _activeHandles);
+            writer.Write<IterableDictionary<BlobId, BlobInfo>>("_activeBlobs", _activeBlobs);
+            writer.Write<IterableDictionary<PtrHandle, BlobId>>("_activeHandles", _activeHandles);
         }
 
         public struct BlobInfo

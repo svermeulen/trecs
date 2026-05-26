@@ -11,8 +11,8 @@ namespace Trecs
 {
     /// <summary>
     /// Primary API for interacting with the ECS world. Provides entity lifecycle operations,
-    /// component access, queries, event subscriptions, and job scheduling.
-    /// Heap allocations and pointer operations are accessed via <see cref="Heap"/>.
+    /// component access, queries, event subscriptions, job scheduling, and heap pointer
+    /// operations (allocation, read/write, disposal of shared/unique/native pointers).
     /// <para>
     /// <b>Thread Safety:</b> WorldAccessor is <b>main-thread-only</b>. All methods must be called
     /// from the main thread. For job-safe operations, use <see cref="ToNative"/> to obtain a
@@ -37,10 +37,10 @@ namespace Trecs
         readonly string _debugName;
         readonly string _createdAtFile;
         readonly int _createdAtLine;
+        readonly EcsHeapAllocator _heapAllocator;
+        NativeHeapResolver _chunkStoreResolver;
 
         internal IAccessRecorder AccessRecorder;
-
-        public HeapAccessor Heap { get; }
 
         internal WorldAccessor(
             int id,
@@ -77,9 +77,13 @@ namespace Trecs
             _debugName = debugName;
             _createdAtFile = createdAtFile ?? string.Empty;
             _createdAtLine = createdAtLine;
+            _heapAllocator = heapAllocator;
+            _chunkStoreResolver = new NativeHeapResolver(
+                in heapAllocator.NativeHeapResolver,
+                canMutateHeap: role == AccessorRole.Unrestricted || role == AccessorRole.Fixed
+            );
 
             Id = id;
-            Heap = new HeapAccessor(heapAllocator, systemRunnerInfo, role, isInput, debugName);
         }
 
         /// <summary>
@@ -331,8 +335,7 @@ namespace Trecs
         public bool HasOutstandingJobs => JobScheduler.HasOutstandingJobs;
 
         /// <summary>
-        /// Handle for the world's auto-created global entity. Use this to access
-        /// or mutate world-singleton components via <c>EntityAccessor</c>.
+        /// Handle for the world's auto-created global entity.
         /// </summary>
         public EntityHandle GlobalEntityHandle => _world.GlobalEntityHandle;
 
@@ -600,7 +603,7 @@ namespace Trecs
         /// <summary>
         /// NOTE: Get groups list from WorldInfo so that it is cached
         /// </summary>
-        public int CountEntitiesInGroups(LocalReadOnlyFastList<GroupIndex> groups)
+        public int CountEntitiesInGroups(ReadOnlyList<GroupIndex> groups)
         {
             var totalCount = 0;
 
@@ -846,7 +849,7 @@ namespace Trecs
         /// Bundles entity lifecycle operations (add/remove/move), set mutations, entity
         /// reference resolution, and shared pointer resolution. The thread index is managed internally.
         /// <para>
-        /// Structural operations (Add/Remove/MoveTo) and set mutations on the returned
+        /// Structural operations (Add/Remove/SetTag/UnsetTag) and set mutations on the returned
         /// accessor are only allowed from <see cref="AccessorRole.Fixed"/> /
         /// <see cref="AccessorRole.Unrestricted"/> roles, including against
         /// <see cref="VariableUpdateOnlyAttribute"/> templates — VUO templates can
@@ -911,10 +914,10 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ref NativeSetDeferredQueues GetSetDeferredQueues(SetId setId)
+        internal NativeSetDeferredQueues GetSetDeferredQueues(SetId setId)
         {
             AssertCanMakeStructuralChanges();
-            return ref _structuralOps.GetDeferredQueues(setId);
+            return _structuralOps.GetDeferredQueues(setId);
         }
 
         internal void ClearSet(SetId setId)
@@ -1079,8 +1082,7 @@ namespace Trecs
         // touch ECS state. Unrestricted-role accessors and other-system
         // accessors are both rejected — they scramble debug attribution by
         // recording access under the wrong DebugName, and Unrestricted-role
-        // accessors smuggle
-        // non-deterministic state in besides. The SystemRunner tracks the
+        // accessors smuggle in non-deterministic state. The SystemRunner tracks the
         // currently-executing Fixed accessor's id; it leaves the tracker
         // at 0 outside Fixed execute, in which case this assertion is a
         // no-op.
@@ -1263,24 +1265,24 @@ namespace Trecs
 #endif
         }
 
-        internal ref EntitySetStorage GetSetDirect(EntitySet entitySet)
+        internal EntitySetStorage GetSetDirect(EntitySet entitySet)
         {
-            return ref _structuralOps.GetSet(entitySet);
+            return _structuralOps.GetSet(entitySet);
         }
 
         /// <summary>
         /// Returns a set reference for job scheduling (no sync).
         /// Used by generated scheduling code to avoid unnecessary sync points.
         /// </summary>
-        internal ref EntitySetStorage GetSetForJobScheduling<T>()
+        internal EntitySetStorage GetSetForJobScheduling<T>()
             where T : struct, IEntitySet
         {
-            return ref _structuralOps.GetSet(EntitySet<T>.Value);
+            return _structuralOps.GetSet(EntitySet<T>.Value);
         }
 
-        internal ref EntitySetStorage GetSetForJobScheduling(SetId setId)
+        internal EntitySetStorage GetSetForJobScheduling(SetId setId)
         {
-            return ref _structuralOps.GetSet(setId);
+            return _structuralOps.GetSet(setId);
         }
 
         /// <summary>
@@ -1289,7 +1291,7 @@ namespace Trecs
         /// </summary>
         internal void SyncSetForRead(SetId setId)
         {
-            ref var setCollection = ref _structuralOps.GetSet(setId);
+            var setCollection = _structuralOps.GetSet(setId);
 
             if (_systemRunner.JobScheduler.HasOutstandingJobs)
             {
@@ -1311,7 +1313,7 @@ namespace Trecs
         internal void SyncSetForWrite(SetId setId)
         {
             AssertCanMakeStructuralChanges();
-            ref var setCollection = ref _structuralOps.GetSet(setId);
+            var setCollection = _structuralOps.GetSet(setId);
 
             if (_systemRunner.JobScheduler.HasOutstandingJobs)
             {
@@ -1326,9 +1328,9 @@ namespace Trecs
             setCollection.FlushJobWrites();
         }
 
-        internal ref EntitySetStorage GetSetCollection(SetId setId)
+        internal EntitySetStorage GetSetCollection(SetId setId)
         {
-            return ref _structuralOps.GetSet(setId);
+            return _structuralOps.GetSet(setId);
         }
 
         internal EntityHandleMap GetEntityHandleMap()
@@ -1346,7 +1348,7 @@ namespace Trecs
             {
                 return new NativeEntityHandleBuffer(
                     new NativeBuffer<int>(groupList.Ptr, groupList.Length),
-                    new NativeBuffer<EntityHandleMapElement>(handleMap._entityHandleMap)
+                    NativeBuffer<EntityHandleMapElement>.FromNativeList(handleMap._entityHandleMap)
                 );
             }
         }
@@ -1364,7 +1366,7 @@ namespace Trecs
         }
 
         internal unsafe NativeComponentLookupRead<T> CreateNativeComponentLookupRead<T>(
-            ReadOnlyFastList<GroupIndex> groups,
+            ReadOnlyList<GroupIndex> groups,
             Allocator allocator
         )
             where T : unmanaged, IEntityComponent
@@ -1391,7 +1393,7 @@ namespace Trecs
         }
 
         internal unsafe NativeComponentLookupWrite<T> CreateNativeComponentLookupWrite<T>(
-            ReadOnlyFastList<GroupIndex> groups,
+            ReadOnlyList<GroupIndex> groups,
             Allocator allocator
         )
             where T : unmanaged, IEntityComponent
@@ -1488,6 +1490,117 @@ namespace Trecs
             return _systemEnableState.IsSystemEffectivelyEnabled(systemIndex);
         }
 
+        // ── Heap properties ─────────────────────────────────────────
+        // Formerly on HeapAccessor; folded in so pointer types can take
+        // WorldAccessor directly without an intermediate accessor class.
+
+        internal bool CanMutateHeap => IsUnrestricted || IsFixed;
+
+        internal UniqueHeap UniqueHeap => _heapAllocator.UniqueHeap;
+
+        internal SharedHeap SharedHeap => _heapAllocator.SharedHeap;
+
+        /// <summary>
+        /// The world's shared <see cref="Trecs.BlobCache"/>. Most game code reaches the
+        /// cache through <see cref="SharedPtr{T}"/> / <see cref="NativeSharedPtr{T}"/>;
+        /// this accessor is for code that needs to talk to the cache directly — async
+        /// preload, non-ECS anchoring.
+        /// </summary>
+        public BlobCache BlobCache => _heapAllocator.SharedHeap.BlobCache;
+
+        internal NativeSharedHeap NativeSharedHeap => _heapAllocator.NativeSharedHeap;
+
+        internal InputNativeUniqueHeap InputNativeUniqueHeap =>
+            _heapAllocator.InputNativeUniqueHeap;
+
+        internal InputNativeSharedHeap InputNativeSharedHeap =>
+            _heapAllocator.InputNativeSharedHeap;
+
+        internal InputSharedHeap InputSharedHeap => _heapAllocator.InputSharedHeap;
+
+        internal InputUniqueHeap InputUniqueHeap => _heapAllocator.InputUniqueHeap;
+
+        internal NativeHeap NativeUniqueChunkStore => _heapAllocator.NativeUniqueChunkStore;
+
+        /// <summary>
+        /// Job-safe resolver for <see cref="NativeSharedPtr{T}"/> dereferences inside
+        /// Burst-compiled job structs. Copy by-value into the job's fields; the resolver
+        /// stays valid for the duration of the job.
+        /// </summary>
+        internal ref NativeSharedPtrResolver NativeSharedPtrResolver
+        {
+            get { return ref _heapAllocator.NativeSharedHeap.Resolver; }
+        }
+
+        /// <summary>
+        /// Job-safe resolver for <see cref="NativeUniquePtr{T}"/> and
+        /// <see cref="TrecsList{T}"/> dereferences inside Burst-compiled job structs.
+        /// Backed by the shared <see cref="NativeHeap"/>; the per-allocation
+        /// TypeId tag carries which heap owns the slot, so a single resolver covers
+        /// every native-heap pointer type.
+        ///
+        /// <para>Carries this accessor's role: a Variable-role resolver fails fast
+        /// at Write-open time inside Burst jobs (Read access is unaffected).</para>
+        /// </summary>
+        internal ref NativeHeapResolver NativeHeapResolver
+        {
+            get { return ref _chunkStoreResolver; }
+        }
+
+        // ── Heap assertions ────────────────────────────────────────
+        // Centralized main-thread gate for managed heap operations. Every
+        // Alloc / Write-open path on a pointer type routes through
+        // AssertCanAddInputsHeap or AssertCanMutateHeap below, both of which
+        // call into this.
+        [Conditional("DEBUG")]
+        internal void AssertHeapMainThread()
+        {
+            TrecsDebugAssert.That(
+                UnityThreadHelper.IsMainThread,
+                "Heap entry points must be called from the main thread; " + "Accessor {0}",
+                _debugName
+            );
+        }
+
+        [Conditional("DEBUG")]
+        internal void AssertCanMutateHeap()
+        {
+            AssertHeapMainThread();
+
+            if (IsUnrestricted || IsFixed)
+            {
+                return;
+            }
+
+            if (IsInput)
+            {
+                TrecsDebugAssert.That(
+                    false,
+                    "Cannot mutate the persistent heap from input-system accessor {0}. Use an Input pointer type (InputSharedPtr.Alloc, InputNativeSharedPtr.Alloc, InputUniquePtr.Alloc, InputNativeUniquePtr.Alloc) for input-side allocations; mutating persistent heap entries from an input system would land in the deterministic snapshot but not in the input replay log, producing desyncs.",
+                    _debugName
+                );
+            }
+            else
+            {
+                TrecsDebugAssert.That(
+                    false,
+                    "Cannot mutate the heap from Variable-role accessor {0}. The Trecs heap is simulation state — Alloc, Write, Set, Clone, Acquire, Dispose, and EnsureCapacity are only allowed from Fixed-role or Unrestricted-role accessors. Read access is always allowed. See Accessor Roles in the docs.",
+                    _debugName
+                );
+            }
+        }
+
+        [Conditional("DEBUG")]
+        internal void AssertCanAddInputsHeap()
+        {
+            AssertHeapMainThread();
+            TrecsDebugAssert.That(
+                IsUnrestricted || IsInput,
+                "Attempted to use input-only functionality from a non-Input accessor {0}",
+                _debugName
+            );
+        }
+
         [Conditional("DEBUG")]
         void AssertCanAddInputsSystem()
         {
@@ -1528,9 +1641,7 @@ namespace Trecs
         // (the predicate was wrong, not the iteration count). Shared
         // between QueryBuilder and SparseQueryBuilder.
         [Conditional("DEBUG")]
-        internal void AssertNoVariableUpdateOnlyGroupsForFixedRole(
-            ReadOnlyFastList<GroupIndex> groups
-        )
+        internal void AssertNoVariableUpdateOnlyGroupsForFixedRole(ReadOnlyList<GroupIndex> groups)
         {
             if (!IsFixed)
             {
@@ -1593,9 +1704,8 @@ namespace Trecs
         [Conditional("DEBUG")]
         void AssertCanAccessEvents()
         {
-            // Don't allow subscribing to events during execute since this creates
-            // unserializable state
-            // Subscribes should always occur during initialize
+            // Subscriptions must happen during initialize, not execute
+            // (execute-time subscriptions create unserializable state)
             TrecsDebugAssert.That(
                 !_systemRunner.IsExecutingSystems,
                 "Attempted to use event functionality from system execute method {0}",
@@ -1661,6 +1771,12 @@ namespace Trecs.Internal // Unsupported internal APIs
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static class WorldAccessorBaseExtensions
     {
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public static ref NativeHeapResolver GetNativeHeapResolver(this WorldAccessor world)
+        {
+            return ref world.NativeHeapResolver;
+        }
+
         [EditorBrowsable(EditorBrowsableState.Never)]
         public static SystemRunner GetSystemRunner(this WorldAccessor world)
         {

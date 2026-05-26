@@ -166,7 +166,7 @@ Only the **native** variants (`NativeUniquePtr<T>` / `NativeSharedPtr<T>`) work 
 [WrapAsJob]
 static void Execute(ref Trail trail, in NativeWorldAccessor world)
 {
-    ref var trailData = ref trail.Value.Write(world.UniquePtrResolver).Value;
+    ref var trailData = ref trail.Value.Write(world.ChunkStoreResolver).Value;
     // ... mutate trailData ...
 }
 ```
@@ -219,4 +219,4 @@ A few rules the source generator enforces at compile time on `[Input]` template 
 - [Shared Heap Data](shared-heap-data.md) — seeder patterns and `BlobId` strategies for shared blobs.
 - [Input System](../core/input-system.md) — the surrounding model for `[Input]` components, `AddInput`, and recording / replay.
 - [Sample 10 — Pointers](../samples/10-pointers.md) — managed `UniquePtr` per entity.
-- [Sample 15 — Blob Seed Pattern](../samples/15-blob-seed-pattern.md) — the seeder pattern with stable `BlobId` for shared assets.
+- [Sample 14 — Blob Seed Pattern](../samples/14-blob-seed-pattern.md) — the seeder pattern with stable `BlobId` for shared assets.

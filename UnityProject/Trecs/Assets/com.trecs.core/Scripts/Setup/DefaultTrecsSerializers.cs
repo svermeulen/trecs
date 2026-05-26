@@ -43,19 +43,22 @@ namespace Trecs.Internal
 
             // Heap serializers
             registry.RegisterSerializer<
-                DenseDictionarySerializer<BlobId, NativeSharedHeap.BlobInfo>
+                IterableDictionaryUnmanagedSerializer<BlobId, NativeSharedHeap.BlobInfo>
             >();
-            registry.RegisterSerializer<DenseDictionarySerializer<PtrHandle, BlobId>>();
+            registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<PtrHandle, BlobId>>();
             RegisterBlit<PtrHandle>(registry);
             RegisterBlit<NativeSharedHeap.BlobInfo>(registry);
 
-            registry.RegisterSerializer<DenseDictionarySerializer<BlobId, SharedHeap.BlobInfo>>();
+            registry.RegisterSerializer<
+                IterableDictionaryUnmanagedSerializer<BlobId, SharedHeap.BlobInfo>
+            >();
             RegisterBlit<SharedHeap.BlobInfo>(registry);
 
             registry.RegisterSerializer<ListSerializer<object>>();
             registry.RegisterSerializer(new BlobManifest.Serializer());
-            registry.RegisterSerializer<DenseDictionarySerializer<BlobId, BlobMetadata>>();
-            registry.RegisterSerializer(new BlobMetadata.Serializer());
+            registry.RegisterSerializer<
+                IterableDictionaryUnmanagedSerializer<BlobId, BlobMetadata>
+            >();
             RegisterBlit<BlobId>(registry);
 
             // Entity serializers
@@ -66,14 +69,14 @@ namespace Trecs.Internal
             // are written by WorldStateSerializer.WriteSets /
             // WriteSetRoutingIndex unconditionally.
             RegisterBlit<SetId>(registry);
-            registry.RegisterSerializer<NativeDenseDictionarySerializer<int, int>>();
+            registry.RegisterSerializer<NativeIterableDictionarySerializer<int, int>>();
 
             // For EntityInputQueue
-            registry.RegisterSerializer<DenseHashSetSerializer<EntityHandle>>();
+            registry.RegisterSerializer<IterableHashSetSerializer<EntityHandle>>();
 
             registry.RegisterSerializer<RngSerializer>();
 
-            registry.RegisterSerializer<NativeDenseDictionarySerializer<uint, uint>>();
+            registry.RegisterSerializer<NativeIterableDictionarySerializer<uint, uint>>();
             registry.RegisterSerializer<NativeArraySerializer<uint>>();
 
             // Per-group Refs list in WorldStateSerializer's

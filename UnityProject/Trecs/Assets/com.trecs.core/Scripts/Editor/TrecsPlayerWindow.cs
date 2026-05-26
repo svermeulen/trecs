@@ -211,6 +211,9 @@ namespace Trecs.Internal
         // we had captured one). Sticks until the buffer "moves" (Reset, Fork,
         // JumpToFrame, load) so the user has time to notice and inspect.
         Label _desyncBanner;
+#if DEBUG
+        Button _dumpDesyncDiffButton;
+#endif
         VisualElement _timelineRuler;
 
         // Scrub-drag state: while pointer is down on the slider, value changes
@@ -703,6 +706,28 @@ namespace Trecs.Internal
             _desyncBanner.style.whiteSpace = WhiteSpace.Normal;
             _desyncBanner.style.display = DisplayStyle.None;
             panel.Add(_desyncBanner);
+
+#if DEBUG
+            _dumpDesyncDiffButton = new Button(() =>
+            {
+                var recorder = GetController()?.AutoRecorder;
+                if (recorder == null || !recorder.HasDesynced)
+                    return;
+                var result = recorder.DumpDesyncDiff();
+                if (result.HasValue)
+                {
+                    EditorUtility.RevealInFinder(result.Value.recordedPath);
+                }
+            })
+            {
+                text = "Dump Desync Diff",
+                tooltip =
+                    "Write both snapshots as flat-path text files and reveal in Finder. Diff the two files to see which fields diverged.",
+            };
+            _dumpDesyncDiffButton.style.marginTop = 2;
+            _dumpDesyncDiffButton.style.display = DisplayStyle.None;
+            panel.Add(_dumpDesyncDiffButton);
+#endif
 
             return panel;
         }
@@ -1350,6 +1375,9 @@ namespace Trecs.Internal
             _bufferInfoLabel.text = string.Empty;
             _capacityBanner.style.display = DisplayStyle.None;
             _desyncBanner.style.display = DisplayStyle.None;
+#if DEBUG
+            _dumpDesyncDiffButton.style.display = DisplayStyle.None;
+#endif
             _hoverIndicator.style.display = DisplayStyle.None;
             HideHoverTooltip();
             _timelineRuler.Clear();
@@ -1932,18 +1960,18 @@ namespace Trecs.Internal
 
         void RefreshDesyncBanner(TrecsRewindBuffer recorder)
         {
-            if (recorder != null && recorder.HasDesynced)
+            var show = recorder != null && recorder.HasDesynced;
+            if (show)
             {
                 _desyncBanner.text =
                     $"Desync at frame {recorder.DesyncedFrame.Value} — re-running the simulation "
                     + "from an earlier snapshot produced different state than originally "
                     + "captured. Check the editor log for the checksum mismatch.";
-                _desyncBanner.style.display = DisplayStyle.Flex;
             }
-            else
-            {
-                _desyncBanner.style.display = DisplayStyle.None;
-            }
+            _desyncBanner.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+#if DEBUG
+            _dumpDesyncDiffButton.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+#endif
         }
 
         void SetTransportEnabled(bool enabled)

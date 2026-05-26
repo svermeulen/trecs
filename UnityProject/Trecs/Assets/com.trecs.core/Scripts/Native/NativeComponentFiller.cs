@@ -5,7 +5,7 @@ namespace Trecs.Internal
     interface IFiller
     {
         void FillFromByteArray(
-            DenseDictionary<TypeId, IComponentArray> groupDictionary,
+            IterableDictionary<TypeId, IComponentArray> groupDictionary,
             int indexInTransientBuffer,
             NativeBag buffer
         );
@@ -20,7 +20,7 @@ namespace Trecs.Internal
         }
 
         public void FillFromByteArray(
-            DenseDictionary<TypeId, IComponentArray> groupDictionary,
+            IterableDictionary<TypeId, IComponentArray> groupDictionary,
             int indexInTransientBuffer,
             NativeBag buffer
         )
@@ -33,7 +33,7 @@ namespace Trecs.Internal
 
     static class EntityComponentIdMap
     {
-        static readonly DenseDictionary<TypeId, IFiller> _map;
+        static readonly IterableDictionary<TypeId, IFiller> _map;
 
         static EntityComponentIdMap()
         {

@@ -39,7 +39,7 @@ namespace Trecs
         // the Length=0 / null-handle path, _slot is null and CheckSlotAlive is
         // skipped — see TrecsArrayRead<T>.CheckSlotAlive for the rationale.
         [NativeDisableUnsafePtrRestriction]
-        readonly NativeChunkStoreEntry* _slot;
+        readonly NativeHeapEntry* _slot;
         readonly byte _capturedGeneration;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -55,7 +55,7 @@ namespace Trecs
         public TrecsArrayWrite(
             T* data,
             int length,
-            NativeChunkStoreEntry* slot,
+            NativeHeapEntry* slot,
             byte capturedGeneration,
             AtomicSafetyHandle safety
         )
@@ -65,7 +65,6 @@ namespace Trecs
             _slot = slot;
             _capturedGeneration = capturedGeneration;
             m_Safety = safety;
-            // See TrecsArrayRead<T> ctor for the null-slot rationale.
             if (slot != null)
             {
                 CollectionHelper.SetStaticSafetyId<TrecsArrayWrite<T>>(
@@ -73,20 +72,17 @@ namespace Trecs
                     ref s_staticSafetyId.Data
                 );
             }
+            CheckSlotAlive();
         }
 #else
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public TrecsArrayWrite(
-            T* data,
-            int length,
-            NativeChunkStoreEntry* slot,
-            byte capturedGeneration
-        )
+        public TrecsArrayWrite(T* data, int length, NativeHeapEntry* slot, byte capturedGeneration)
         {
             _data = data;
             _length = length;
             _slot = slot;
             _capturedGeneration = capturedGeneration;
+            CheckSlotAlive();
         }
 #endif
 
@@ -115,13 +111,11 @@ namespace Trecs
             get
             {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-                // See TrecsArrayRead<T>.Length for the null-slot rationale.
                 if (_slot != null)
                 {
                     AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
                 }
 #endif
-                CheckSlotAlive();
                 return _length;
             }
         }
@@ -137,7 +131,6 @@ namespace Trecs
                     AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
                 }
 #endif
-                CheckSlotAlive();
                 TrecsDebugAssert.That(
                     (uint)index < (uint)_length,
                     "TrecsArrayWrite index {0} out of range (Length={1})",

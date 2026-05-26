@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using Trecs.Collections;
 
 namespace Trecs.Internal
 {
@@ -29,25 +28,6 @@ namespace Trecs.Internal
 
         void AddEntitiesToDictionary(IComponentArray toDictionary, GroupIndex groupId);
 
-        /// <summary>
-        /// Remove entities at the given indices from the array using swap-back.
-        /// Indices must be sorted in descending order so that swap-back never invalidates
-        /// a future removal index, eliminating chain resolution.
-        /// </summary>
-        void RemoveEntitiesFromArray(FastList<int> sortedDescendingIndices);
-
-        /// <summary>
-        /// Move entities from this array to the destination array using swap-back.
-        /// Each MoveInfo must have resolvedFromIndex pre-set to the entity's current
-        /// position after accounting for prior swap-backs (precomputed by the caller).
-        /// </summary>
-        void SwapEntitiesBetweenDictionaries(
-            FastList<MoveInfoEntry> infosToProcess,
-            GroupIndex fromGroup,
-            GroupIndex toGroup,
-            IComponentArray toComponentsDictionary
-        );
-
         void EnsureCapacity(int size);
         void Clear();
 
@@ -68,5 +48,7 @@ namespace Trecs.Internal
         /// to reflect data movement performed by the job.
         /// </summary>
         void SetCount(int count);
+
+        void ResetToDefaultValuesWithCount(int count);
     }
 }

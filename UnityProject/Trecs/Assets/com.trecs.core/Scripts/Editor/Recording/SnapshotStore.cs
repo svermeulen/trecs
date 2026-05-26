@@ -47,7 +47,7 @@ namespace Trecs.Internal
         // detection in BundleReplayer. Stays empty under TRECS_IS_PROFILING
         // since callers gate the SetChecksum calls — the empty-dict
         // overhead is single-digit bytes per recorder.
-        readonly DenseDictionary<int, ulong> _checksums = new();
+        readonly IterableDictionary<int, ulong> _checksums = new();
 
         long _totalAnchorBytes;
         long _scrubCacheBytes;
@@ -63,7 +63,7 @@ namespace Trecs.Internal
         public IReadOnlyList<WorldSnapshot> Bookmarks => _bookmarks;
         public IReadOnlyList<WorldSnapshot> ScrubCache => _scrubCache;
 
-        public DenseDictionary<int, ulong> Checksums => _checksums;
+        public IterableDictionary<int, ulong> Checksums => _checksums;
 
         public long TotalAnchorBytes => _totalAnchorBytes;
         public long ScrubCacheBytes => _scrubCacheBytes;
@@ -319,7 +319,7 @@ namespace Trecs.Internal
             }
         }
 
-        // DenseDictionary doesn't support remove-during-enumeration, so the
+        // IterableDictionary doesn't support remove-during-enumeration, so the
         // keys to drop are collected first.
         public void TrimChecksumsAfter(int frame)
         {
@@ -373,7 +373,7 @@ namespace Trecs.Internal
 
         public void ClearChecksums() => _checksums.Clear();
 
-        public DenseDictionary<int, ulong> CopyChecksumsForBundle() =>
+        public IterableDictionary<int, ulong> CopyChecksumsForBundle() =>
             WorldSnapshotListUtil.CopyChecksums(_checksums);
 
         /// <summary>

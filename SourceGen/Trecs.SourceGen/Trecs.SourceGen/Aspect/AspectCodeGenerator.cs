@@ -264,7 +264,7 @@ namespace Trecs.SourceGen.Aspect
         /// <summary>
         /// Emits generic <c>SetTag&lt;T&gt;</c> / <c>UnsetTag&lt;T&gt;</c> for both
         /// <c>WorldAccessor</c> and <c>NativeWorldAccessor</c>. The 1-arg <c>Remove</c> and
-        /// <c>MoveTo(TagSet)</c> live in <c>AspectExtensions</c>; only the generic forms
+        /// <c>SetTag(TagSet)</c> / <c>UnsetTag(TagSet)</c> live in <c>AspectExtensions</c>; only the generic forms
         /// need per-aspect emission because C# cannot infer the concrete aspect type through
         /// a generic extension method on the open type parameter. Set membership goes
         /// through <c>World.Set&lt;TSet&gt;()</c>, so the aspect doesn't pre-bake either

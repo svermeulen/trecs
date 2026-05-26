@@ -23,7 +23,8 @@ namespace Trecs
         /// <summary>
         /// Sentinel value representing an empty tag set.
         /// </summary>
-        public static readonly TagSet Null; //must stay here because of Burst
+        // Must be a static field (not const/property) for Burst compatibility
+        public static readonly TagSet Null;
 
         // Internal: external callers should never need to construct from a raw int —
         // use FromTags / CombineWith / TagSet<T...>. The ctor exists for serialization
@@ -83,7 +84,7 @@ namespace Trecs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly int CompareTo(TagSet other)
         {
-            return other._inner.Id.CompareTo(_inner.Id);
+            return _inner.Id.CompareTo(other._inner.Id);
         }
 
         // Routes through TagSetCache, which renders each member's name via

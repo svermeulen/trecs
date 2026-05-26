@@ -141,14 +141,14 @@ class PaletteService
     }
 
     public SharedPtr<ColorPalette> GetWarm() =>
-        SharedPtr.Acquire<ColorPalette>(_world.Heap, AssetIds.WarmPalette);
+        SharedPtr.Acquire<ColorPalette>(_world, AssetIds.WarmPalette);
 }
 
 // ✅ Service takes the accessor in; the calling Fixed system passes its own.
 class PaletteService
 {
     public SharedPtr<ColorPalette> GetWarm(WorldAccessor world) =>
-        SharedPtr.Alloc<ColorPalette>(world.Heap, AssetIds.WarmPalette);
+        SharedPtr.Acquire<ColorPalette>(world, AssetIds.WarmPalette);
 }
 ```
 

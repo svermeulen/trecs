@@ -62,9 +62,9 @@ namespace Trecs.Tests
 
         static ReadOnlyBlobIdSet EmptyActiveSet()
         {
-            // Pass an empty DenseDictionary as the backing — none of the blobs
+            // Pass an empty IterableDictionary as the backing — none of the blobs
             // we just inserted are "active" from CleanCache's perspective.
-            return new ReadOnlyBlobIdSet(new DenseDictionary<BlobId, int>());
+            return new ReadOnlyBlobIdSet(new IterableDictionary<BlobId, int>());
         }
 
         // ───────────────────────────────────────────────────────────
@@ -176,9 +176,9 @@ namespace Trecs.Tests
             }
 
             // Build an active-set that pins every entry. ReadOnlyBlobIdSet is
-            // backed by a DenseDictionary<BlobId, int>, so we mirror what
+            // backed by a IterableDictionary<BlobId, int>, so we mirror what
             // BlobCache itself does: synthesize a ref-count entry per id.
-            var activeRefCounts = new DenseDictionary<BlobId, int>();
+            var activeRefCounts = new IterableDictionary<BlobId, int>();
             for (int i = 1; i <= 10; i++)
             {
                 activeRefCounts.Add(new BlobId(i), 1);

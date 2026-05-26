@@ -26,7 +26,7 @@ namespace Trecs
         // (frame -> list of (BlobId, refcount handle)). BlobId is needed to
         // recreate the refcount handle on Deserialize; the handle itself is
         // used only for Release on frame trim.
-        readonly DenseDictionary<int, List<Entry>> _entriesByFrame = new();
+        readonly IterableDictionary<int, List<Entry>> _entriesByFrame = new();
         readonly Stack<List<Entry>> _listPool = new();
         readonly List<int> _frameRemoveBuffer = new();
 

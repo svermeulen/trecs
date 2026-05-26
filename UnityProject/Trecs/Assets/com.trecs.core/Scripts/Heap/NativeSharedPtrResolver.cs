@@ -1,6 +1,6 @@
 using System;
 using System.ComponentModel;
-using Trecs.Internal;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Internal
@@ -28,22 +28,20 @@ namespace Trecs.Internal
         }
 #endif
     }
-}
 
-namespace Trecs
-{
     /// <summary>
     /// Burst-compatible resolver that maps <see cref="BlobId"/> values to native memory
     /// for <see cref="NativeSharedPtr{T}"/> lookups inside jobs. Obtain via
-    /// <see cref="HeapAccessor.NativeSharedPtrResolver"/> or
+    /// <see cref="WorldAccessor.NativeSharedPtrResolver"/> or
     /// <see cref="NativeWorldAccessor.SharedPtrResolver"/>. Open a typed view via
     /// <see cref="NativeSharedPtr{T}.Read(in NativeSharedPtrResolver)"/>.
     /// </summary>
     public readonly unsafe struct NativeSharedPtrResolver
     {
-        readonly NativeDenseDictionary<BlobId, NativeSharedHeapEntry> _entries;
+        [Unity.Collections.ReadOnly]
+        readonly NativeHashMap<BlobId, NativeSharedHeapEntry> _entries;
 
-        public NativeSharedPtrResolver(NativeDenseDictionary<BlobId, NativeSharedHeapEntry> entries)
+        public NativeSharedPtrResolver(NativeHashMap<BlobId, NativeSharedHeapEntry> entries)
         {
             _entries = entries;
         }
@@ -75,12 +73,6 @@ namespace Trecs
             );
 
             return entry;
-        }
-
-        internal unsafe void* ResolveUnsafePtr<T>(BlobId address)
-            where T : unmanaged
-        {
-            return ResolveEntry<T>(address).Ptr.ToPointer();
         }
     }
 }

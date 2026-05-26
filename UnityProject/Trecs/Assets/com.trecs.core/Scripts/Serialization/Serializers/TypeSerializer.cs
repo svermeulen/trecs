@@ -4,8 +4,7 @@ namespace Trecs.Serialization
 {
     /// <summary>
     /// Serializer for <see cref="Type"/> references. Round-trips via
-    /// <c>TypeIdProvider</c>'s integer ID, so types referenced this way must
-    /// be registered with the same provider on both write and read sides.
+    /// <see cref="TypeId"/>'s integer ID.
     /// </summary>
     public sealed class TypeSerializer : ISerializer<Type>
     {

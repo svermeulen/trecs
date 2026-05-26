@@ -89,7 +89,7 @@ public partial class BoidWrapSystem : ISystem
 }
 ```
 
-### BoidRendererSystem (variable update)
+### BoidPresenter (variable update)
 
 Reads position and velocity, then updates the GameObject transform to face the movement direction.
 

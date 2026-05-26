@@ -46,16 +46,6 @@ namespace Trecs.Internal
             return queue.Count == 0;
         }
 
-        public static bool IsEmpty<K, V>(this Dictionary<K, V> map)
-        {
-            return map.Count == 0;
-        }
-
-        public static bool IsEmpty<K, V>(this IReadOnlyDictionary<K, V> map)
-        {
-            return map.Count == 0;
-        }
-
         public static bool IsEmpty<T>(this IReadOnlyList<T> list)
         {
             return list.Count == 0;

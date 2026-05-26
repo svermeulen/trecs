@@ -10,25 +10,19 @@ namespace Trecs
     /// </summary>
     public static class InputUniquePtr
     {
-        public static InputUniquePtr<T> Alloc<T>(HeapAccessor heap)
-            where T : class
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.InputUniqueHeap.Alloc<T>(heap.FixedFrame);
-        }
-
-        public static InputUniquePtr<T> Alloc<T>(HeapAccessor heap, T value)
-            where T : class
-        {
-            heap.AssertCanAddInputsSystem();
-            return heap.InputUniqueHeap.Alloc<T>(heap.FixedFrame, value);
-        }
-
         public static InputUniquePtr<T> Alloc<T>(WorldAccessor world)
-            where T : class => Alloc<T>(world.Heap);
+            where T : class
+        {
+            world.AssertCanAddInputsHeap();
+            return world.InputUniqueHeap.Alloc<T>(world.FixedFrame);
+        }
 
         public static InputUniquePtr<T> Alloc<T>(WorldAccessor world, T value)
-            where T : class => Alloc<T>(world.Heap, value);
+            where T : class
+        {
+            world.AssertCanAddInputsHeap();
+            return world.InputUniqueHeap.Alloc<T>(world.FixedFrame, value);
+        }
     }
 
     /// <summary>
@@ -59,23 +53,14 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly T Get(HeapAccessor heap) => heap.InputUniqueHeap.ResolveValue<T>(Handle);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly T Get(WorldAccessor world) => Get(world.Heap);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public readonly bool TryGet(HeapAccessor heap, out T value) =>
-            heap.InputUniqueHeap.TryResolveValue<T>(Handle, out value);
+        public readonly T Get(WorldAccessor world) => world.InputUniqueHeap.ResolveValue<T>(Handle);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public readonly bool TryGet(WorldAccessor world, out T value) =>
-            TryGet(world.Heap, out value);
+            world.InputUniqueHeap.TryResolveValue<T>(Handle, out value);
 
-        public readonly bool CanGet(HeapAccessor heap) =>
-            heap.InputUniqueHeap.ContainsEntry(Handle);
-
-        public readonly bool CanGet(WorldAccessor world) => CanGet(world.Heap);
+        public readonly bool CanGet(WorldAccessor world) =>
+            world.InputUniqueHeap.ContainsEntry(Handle);
 
         public readonly bool Equals(InputUniquePtr<T> other) => Handle.Equals(other.Handle);
 

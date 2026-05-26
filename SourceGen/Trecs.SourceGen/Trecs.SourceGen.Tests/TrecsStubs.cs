@@ -147,6 +147,13 @@ internal static class TrecsStubs
                 public TValue this[TKey key] { get { return default!; } set { } }
                 public void Dispose() { }
                 public ReadOnly AsReadOnly() => default;
+                public Enumerator GetEnumerator() => default;
+
+                public struct Enumerator
+                {
+                    public System.Collections.Generic.KeyValuePair<TKey, TValue> Current => default;
+                    public bool MoveNext() => false;
+                }
 
                 public struct ReadOnly
                 {
@@ -161,6 +168,13 @@ internal static class TrecsStubs
             {
                 public void Dispose() { }
                 public ReadOnly AsReadOnly() => default;
+                public Enumerator GetEnumerator() => default;
+
+                public struct Enumerator
+                {
+                    public T Current => default!;
+                    public bool MoveNext() => false;
+                }
 
                 public struct ReadOnly
                 {
@@ -177,6 +191,13 @@ internal static class TrecsStubs
                 public TValue this[TKey key] { get { return default!; } set { } }
                 public void Dispose() { }
                 public ReadOnly AsReadOnly() => default;
+                public Enumerator GetEnumerator() => default;
+
+                public struct Enumerator
+                {
+                    public System.Collections.Generic.KeyValuePair<TKey, TValue> Current => default;
+                    public bool MoveNext() => false;
+                }
 
                 public struct ReadOnly
                 {
@@ -206,6 +227,26 @@ internal static class TrecsStubs
             {
                 public int Length => 0;
                 public T this[int index] { get { return default!; } set { } }
+            }
+        }
+
+        // UnityEngine stubs for DictionaryIterationAnalyzer / FixedUpdateDeterminismAnalyzer tests.
+        // Real types live in UnityEngine.CoreModule.
+        namespace UnityEngine
+        {
+            public static class Time
+            {
+                public static float time => 0f;
+                public static float deltaTime => 0f;
+                public static float unscaledTime => 0f;
+                public static float realtimeSinceStartup => 0f;
+            }
+
+            public static class Random
+            {
+                public static float value => 0f;
+                public static float Range(float min, float max) => 0f;
+                public static int Range(int min, int max) => 0;
             }
         }
 
@@ -473,8 +514,8 @@ internal static class TrecsStubs
             // ----- Aspect / ForEach / RunOnce surface -----
             // Aspects emit substantial machinery that touches a wide slice of the runtime:
             // component buffer indexing, the full QueryBuilder DSL, dense + sparse slice
-            // iteration, NativeFactory for cross-entity Burst lookup, and MoveTo / SetAdd /
-            // SetRemove surface routed through both WorldAccessor and NativeWorldAccessor.
+            // iteration, NativeFactory for cross-entity Burst lookup, and SetTag / UnsetTag /
+            // Set surface routed through both WorldAccessor and NativeWorldAccessor.
             // The stubs below are body-empty / default-returning; they exist to satisfy
             // C# name and shape resolution, not to actually run.
 
@@ -582,6 +623,16 @@ internal static class TrecsStubs
             // com.trecs.core/Scripts/Native/.
             public readonly struct NativeSetRead<T> where T : struct, IEntitySet { }
             public readonly struct NativeSetWrite<T> where T : struct, IEntitySet { }
+
+            // NativeSetCommandBuffer<T> — thread-safe command buffer for queuing
+            // add/remove/clear of entities to/from a set from within parallel jobs.
+            // Real type at com.trecs.core/Scripts/Sets/NativeSetCommandBuffer.cs.
+            public struct NativeSetCommandBuffer<T> where T : struct, IEntitySet { }
+
+            // NativeEntitySetIndices<T> — read-only, job-friendly view onto the
+            // entity indices of a set for one specific group. Real type at
+            // com.trecs.core/Scripts/Sets/NativeEntitySetIndices.cs.
+            public readonly struct NativeEntitySetIndices<T> where T : struct, IEntitySet { }
 
             // Main-thread set accessors. ParameterClassifier recognizes these in
             // [WrapAsJob] methods and emits TRECS098. SetRead is read-only; SetWrite is
@@ -693,7 +744,7 @@ internal static class TrecsStubs
 
             // WorldAccessor — declared as a class so AutoSystemGenerator's emitted
             // `WorldAccessor __world;` field and `WorldAccessor World => __world;` property
-            // resolve. Aspect machinery additionally needs Query/ComponentBuffer/MoveTo/Set;
+            // resolve. Aspect machinery additionally needs Query/ComponentBuffer/SetTag/UnsetTag/Set;
             // job machinery needs the *ForJob accessors that return tuples (the buffer +
             // its current count for jobs that read the count).
             public class WorldAccessor
@@ -701,11 +752,6 @@ internal static class TrecsStubs
                 public QueryBuilder Query() => default;
                 public ComponentBufferAccessor<T> ComponentBuffer<T>(GroupIndex group)
                     where T : unmanaged, IEntityComponent => default;
-
-                public void MoveTo<T1>(EntityIndex entityIndex) where T1 : struct, ITag { }
-                public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
-                public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
-                public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
 
                 // Set gateway: emitted aspect/system code uses `Set<TSet>().DeferredAdd(...)` etc.
                 // Real impl lives at com.trecs.core/Scripts/Sets/SetAccessor.cs.
@@ -747,6 +793,29 @@ internal static class TrecsStubs
                     Unity.Collections.Allocator allocator
                 ) where T : unmanaged, IEntityComponent => default;
 
+                // Set-related job scheduling helpers. Real impls are extension methods in
+                // com.trecs.core/Scripts/Internal/JobGenSchedulingExtensions.cs.
+                public NativeSetCommandBuffer<TSet> CreateNativeSetCommandBufferForJob<TSet>()
+                    where TSet : struct, IEntitySet => default;
+                public Unity.Jobs.JobHandle IncludeNativeSetCommandBufferDepsForJob<TSet>(
+                    Unity.Jobs.JobHandle deps
+                ) where TSet : struct, IEntitySet => default;
+                public void TrackNativeSetCommandBufferDepsForJob<TSet>(
+                    Unity.Jobs.JobHandle handle
+                ) where TSet : struct, IEntitySet { }
+
+                public NativeEntitySetIndices<TSet> GetSetIndicesForJob<TSet>(GroupIndex group)
+                    where TSet : struct, IEntitySet => default;
+
+                public NativeSetRead<TSet> CreateNativeSetReadForJob<TSet>()
+                    where TSet : struct, IEntitySet => default;
+                public Unity.Jobs.JobHandle IncludeNativeSetReadDepsForJob<TSet>(
+                    Unity.Jobs.JobHandle deps
+                ) where TSet : struct, IEntitySet => default;
+                public void TrackNativeSetReadDepsForJob<TSet>(
+                    Unity.Jobs.JobHandle handle
+                ) where TSet : struct, IEntitySet { }
+
                 // WorldInfo gives access to world-level group/tag introspection.
                 public Trecs.WorldInfo WorldInfo => default!;
 
@@ -771,15 +840,10 @@ internal static class TrecsStubs
                     System.Linq.Enumerable.Empty<GroupIndex>();
             }
 
-            // NativeWorldAccessor — Burst-compatible value-type counterpart. Aspect MoveTo /
+            // NativeWorldAccessor — Burst-compatible value-type counterpart. Aspect SetTag/UnsetTag /
             // Set helpers also expose `(in NativeWorldAccessor)` overloads.
             public readonly struct NativeWorldAccessor
             {
-                public void MoveTo<T1>(EntityIndex entityIndex) where T1 : struct, ITag { }
-                public void MoveTo<T1, T2>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag { }
-                public void MoveTo<T1, T2, T3>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag { }
-                public void MoveTo<T1, T2, T3, T4>(EntityIndex entityIndex) where T1 : struct, ITag where T2 : struct, ITag where T3 : struct, ITag where T4 : struct, ITag { }
-
                 // Burst-side set gateway: emitted job code uses `Set<TSet>().DeferredAdd(...)` etc.
                 // Real impl lives at com.trecs.core/Scripts/Native/NativeWorldAccessor.cs.
                 public NativeSetAccessor<TSet> Set<TSet>() where TSet : struct, IEntitySet => default;
@@ -943,11 +1007,12 @@ internal static class TrecsStubs
             }
 
             // System-level attributes emitted on the generated InterpolatorSystem class.
-            public enum SystemPhase { FixedUpdate, Presentation, Input }
+            public enum SystemPhase { Input, Fixed, EarlyPresentation, Presentation, LatePresentation }
             [System.AttributeUsage(System.AttributeTargets.Class)]
             public class ExecuteInAttribute : System.Attribute
             {
-                public ExecuteInAttribute(SystemPhase phase) { }
+                public ExecuteInAttribute(SystemPhase phase) { Phase = phase; }
+                public SystemPhase Phase { get; }
             }
             [System.AttributeUsage(System.AttributeTargets.Class)]
             public class ExecutePriorityAttribute : System.Attribute
@@ -1032,6 +1097,7 @@ internal static class TrecsStubs
             public readonly struct ResourceId
             {
                 public static ResourceId Component(TypeId id) => default;
+                public static ResourceId Set(SetId id) => default;
             }
 
             public readonly struct TypeId { }

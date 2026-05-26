@@ -34,7 +34,7 @@ World.AddEntity<MyTag>()
     .Set(new CCollisionPairBuffer { Value = list });
 ```
 
-The `(world.Heap, initialCapacity)` overload also exists for callers that already hold a `HeapAccessor`.
+A `(world, initialCapacity)` overload taking a `WorldAccessor` is also available.
 
 ### Reading and writing
 

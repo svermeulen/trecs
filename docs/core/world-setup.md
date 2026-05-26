@@ -2,9 +2,6 @@
 
 Every Trecs application starts by building a `World` — the container that owns all entities and components and drives the per-frame system update.
 
-!!! tip "New to Trecs?"
-    Start with [Getting Started](../getting-started.md) for a five-minute walkthrough; come back here for the reference.
-
 ## WorldBuilder
 
 ```csharp
@@ -31,6 +28,9 @@ var world = new WorldBuilder()
 | `SetBlobCacheSettings(...)` | Configure blob caching |
 | `AddSystem(ISystem)` / `AddSystems(...)` | Register [systems](systems.md) |
 | `AddSystemOrderConstraint(params Type[])` | Declare [system ordering](systems.md#system-ordering) |
+| `RegisterSerializer(ISerializer)` / `RegisterSerializer<T>()` | Register a custom [serializer](../experimental/serialization.md) for save/load |
+| `RegisterComponentArraySerializer<T>(...)` | Override per-component-array serialization |
+| `SetPoolManager(ITrecsPoolManager)` | Custom pool manager for internal allocations |
 | `Build()` | Build the world (returns `World`) |
 | `BuildAndInitialize()` | Build and immediately initialize |
 
@@ -80,6 +80,10 @@ var settings = new WorldSettings
 
     // Safety
     MaxSubmissionIterations = 10,               // Prevent circular submission feedback
+    AssertNoTimeInFixedPhase = false,           // true → time properties throw in fixed phase (DeltaTime, ElapsedTime, FixedDeltaTime, FixedElapsedTime)
+
+    // Logging
+    MinLogLevel = LogLevel.Warning,             // Minimum severity for Trecs log messages
 };
 ```
 
@@ -135,5 +139,8 @@ var accessor = world.CreateAccessor(AccessorRole.Unrestricted);
 - **[Events](../entity-management/entity-events.md)** — `Events` builder for entity lifecycle subscriptions
 - **[Time](../advanced/time-and-rng.md)** — `DeltaTime`, `ElapsedTime`, `Frame` (phase-aware)
 - **[RNG](../advanced/time-and-rng.md)** — `Rng`, `FixedRng`, `VariableRng`
-- **[Heap](../experimental/pointers.md)** — `Heap` property (a `HeapAccessor`) for use with `SharedPtr.Alloc` / `UniquePtr.Alloc` / native variants
+- **[Heap](../experimental/pointers.md)** — heap properties (`BlobCache`, `NativeSharedPtrResolver`, `NativeChunkStoreResolver`) for use with `SharedPtr.Alloc` / `UniquePtr.Alloc` / native variants
 - **[Jobs](../performance/jobs-and-burst.md)** — `ToNative()` for job-safe access
+- **Global entity** — `GlobalEntityHandle` returns the `EntityHandle` for the world's singleton global entity, and `GlobalComponent<T>()` gives direct component access to it
+- **System control** — `SetSystemEnabled` / `SetSystemPaused` / `IsSystemEffectivelyEnabled` for toggling systems at runtime
+- **Metadata** — `WorldInfo` for template/group introspection, `Log` for the world's logger

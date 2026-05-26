@@ -18,7 +18,7 @@ namespace Trecs.Internal
         readonly InputUniqueHeap _inputUniqueHeap;
         readonly InputNativeSharedHeap _inputNativeSharedHeap;
         readonly InputNativeUniqueHeap _inputNativeUniqueHeap;
-        readonly DenseDictionary<TypeId, ComponentTypeInfo> _componentTypeHelpers = new();
+        readonly IterableDictionary<TypeId, ComponentTypeInfo> _componentTypeHelpersMap = new();
         readonly List<int> _frameTempRemoveBuffer = new();
         readonly List<EntityHandle> _removeQueueBuffer = new();
 
@@ -86,7 +86,7 @@ namespace Trecs.Internal
         {
             var typeId = TypeId<T>.Value;
 
-            if (!_componentTypeHelpers.TryGetValue(typeId, out var componentInfo))
+            if (!_componentTypeHelpersMap.TryGetValue(typeId, out var componentInfo))
             {
                 return false;
             }
@@ -104,7 +104,7 @@ namespace Trecs.Internal
         {
             var typeHash = TypeId<T>.Value;
 
-            if (_componentTypeHelpers.TryGetValue(typeHash, out var componentInfo))
+            if (_componentTypeHelpersMap.TryGetValue(typeHash, out var componentInfo))
             {
                 var helper = (ComponentTypeHelper<T>)componentInfo.Helper;
 
@@ -127,7 +127,7 @@ namespace Trecs.Internal
         {
             var typeHash = TypeId<T>.Value;
 
-            if (_componentTypeHelpers.TryGetValue(typeHash, out var componentInfo))
+            if (_componentTypeHelpersMap.TryGetValue(typeHash, out var componentInfo))
             {
                 var helper = (ComponentTypeHelper<T>)componentInfo.Helper;
 
@@ -148,11 +148,11 @@ namespace Trecs.Internal
         {
             var typeHash = TypeId<T>.Value;
 
-            if (!_componentTypeHelpers.TryGetValue(typeHash, out var componentInfo))
+            if (!_componentTypeHelpersMap.TryGetValue(typeHash, out var componentInfo))
             {
                 componentInfo = new() { Helper = new ComponentTypeHelper<T>() };
 
-                _componentTypeHelpers.Add(typeHash, componentInfo);
+                _componentTypeHelpersMap.Add(typeHash, componentInfo);
             }
 
             var key = new FrameEntityHandlePair(frame, entityHandle);
@@ -193,8 +193,9 @@ namespace Trecs.Internal
 
         public void ClearFutureInputsAfterOrAt(int frame)
         {
-            foreach (var (_, info) in _componentTypeHelpers)
+            foreach (var pair in _componentTypeHelpersMap)
             {
+                var info = pair.Value;
                 _frameTempRemoveBuffer.Clear();
 
                 foreach (var (candidateFrame, _) in info.FrameEntries)
@@ -230,8 +231,9 @@ namespace Trecs.Internal
         {
             _log.Trace("Clearing all inputs");
 
-            foreach (var (_, info) in _componentTypeHelpers)
+            foreach (var pair in _componentTypeHelpersMap)
             {
+                var info = pair.Value;
                 foreach (var (frame, entityHandleSet) in info.FrameEntries)
                 {
                     foreach (var entityHandle in entityHandleSet)
@@ -252,7 +254,7 @@ namespace Trecs.Internal
             _inputNativeUniqueHeap.ClearAll();
         }
 
-        DenseHashSet<EntityHandle> SpawnEntityHandleValueIdSet(ComponentTypeInfo info)
+        IterableHashSet<EntityHandle> SpawnEntityHandleValueIdSet(ComponentTypeInfo info)
         {
             if (info.EntityHandleSetPool.Count > 0)
             {
@@ -261,15 +263,15 @@ namespace Trecs.Internal
                 return result;
             }
 
-            using (TrecsProfiling.Start("Allocating new DenseHashSet<EntityHandle>"))
+            using (TrecsProfiling.Start("Allocating new IterableHashSet<EntityHandle>"))
             {
-                return new DenseHashSet<EntityHandle>(8);
+                return new IterableHashSet<EntityHandle>(8);
             }
         }
 
         void DespawnEntityHandleSet(
             ComponentTypeInfo info,
-            DenseHashSet<EntityHandle> entityHandleSet
+            IterableHashSet<EntityHandle> entityHandleSet
         )
         {
             TrecsDebugAssert.That(entityHandleSet.IsEmpty);
@@ -280,8 +282,9 @@ namespace Trecs.Internal
         {
             _log.Trace("ClearInputsBeforeOrAt frame {0}", frame);
 
-            foreach (var (_, info) in _componentTypeHelpers)
+            foreach (var pair in _componentTypeHelpersMap)
             {
+                var info = pair.Value;
                 _frameTempRemoveBuffer.Clear();
 
                 foreach (var (candidateFrame, _) in info.FrameEntries)
@@ -320,11 +323,12 @@ namespace Trecs.Internal
         // WorldStateSerializer snapshot.
         public void Serialize(ISerializationWriter writer)
         {
-            writer.Write("NumHelpers", _componentTypeHelpers.Count);
+            writer.Write("NumHelpers", _componentTypeHelpersMap.Count);
             long bytesStart;
 
-            foreach (var (typeHash, info) in _componentTypeHelpers)
+            foreach (var pair in _componentTypeHelpersMap)
             {
+                var info = pair.Value;
                 bytesStart = writer.NumBytesWritten;
                 writer.Write("ComponentType", info.Helper.ComponentType);
                 TrecsDebugAssert.IsNotNull(info.Helper);
@@ -335,7 +339,7 @@ namespace Trecs.Internal
                 foreach (var (frame, entityHandleSet) in info.FrameEntries)
                 {
                     writer.Write("Frame", frame);
-                    writer.Write<DenseHashSet<EntityHandle>>("Erefs", entityHandleSet);
+                    writer.Write<IterableHashSet<EntityHandle>>("Erefs", entityHandleSet);
                 }
 
                 _log.Debug(
@@ -379,14 +383,16 @@ namespace Trecs.Internal
         {
             _log.Trace("Deserializing EntityInputQueue");
 
-            foreach (var (_, info) in _componentTypeHelpers)
+            foreach (var pair in _componentTypeHelpersMap)
             {
-                foreach (var entityHandleSet in info.FrameEntries)
+                var existingInfo = pair.Value;
+                foreach (var entityHandleSet in existingInfo.FrameEntries)
                 {
-                    info.EntityHandleSetPool.Push(entityHandleSet.Value);
+                    entityHandleSet.Value.Clear();
+                    existingInfo.EntityHandleSetPool.Push(entityHandleSet.Value);
                 }
-                info.FrameEntries.Clear();
-                info.Helper.Clear();
+                existingInfo.FrameEntries.Clear();
+                existingInfo.Helper.Clear();
             }
 
             var numHelpers = reader.Read<int>("NumHelpers");
@@ -396,10 +402,10 @@ namespace Trecs.Internal
                 var componentType = reader.Read<Type>("ComponentType");
                 var typeHash = TypeId.FromType(componentType);
 
-                if (!_componentTypeHelpers.TryGetValue(typeHash, out var info))
+                if (!_componentTypeHelpersMap.TryGetValue(typeHash, out var info))
                 {
                     info = new ComponentTypeInfo();
-                    _componentTypeHelpers.Add(typeHash, info);
+                    _componentTypeHelpersMap.Add(typeHash, info);
                 }
 
                 if (info.Helper == null)
@@ -415,7 +421,7 @@ namespace Trecs.Internal
                 {
                     var frame = reader.Read<int>("Frame");
                     var entityHandleSet = SpawnEntityHandleValueIdSet(info);
-                    reader.ReadInPlace<DenseHashSet<EntityHandle>>("Erefs", entityHandleSet);
+                    reader.ReadInPlace<IterableHashSet<EntityHandle>>("Erefs", entityHandleSet);
 
                     info.FrameEntries.Add(frame, entityHandleSet);
                 }
@@ -434,9 +440,9 @@ namespace Trecs.Internal
         }
 
         internal void ApplyInputs<T>(
-            DenseHashSet<EntityHandle> entityHandles,
+            IterableHashSet<EntityHandle> entityHandles,
             int frame,
-            NativeDenseDictionary<FrameEntityHandlePair, T> values
+            NativeIterableDictionary<FrameEntityHandlePair, T> values
         )
             where T : unmanaged, IEntityComponent
         {
@@ -547,8 +553,9 @@ namespace Trecs.Internal
             using (TrecsProfiling.Start("Applying Inputs"))
 #endif
             {
-                foreach (var (_, info) in _componentTypeHelpers)
+                foreach (var pair in _componentTypeHelpersMap)
                 {
+                    var info = pair.Value;
                     if (info.FrameEntries.TryGetValue(currentFixedFrame, out var entityHandles))
                     {
                         info.Helper.ApplyInputs(this, entityHandles, currentFixedFrame);
@@ -567,7 +574,6 @@ namespace Trecs.Internal
 #endif
             {
                 _maxClearFrame = CalculateMaxClearFrame(currentFixedFrame);
-                // _dbg.Text("MaxClearFrame: {}", _maxClearFrame);
 
                 ClearInputsBeforeOrAt(_maxClearFrame);
             }
@@ -577,11 +583,11 @@ namespace Trecs.Internal
 
         public void Dispose()
         {
-            foreach (var (_, info) in _componentTypeHelpers)
+            foreach (var pair in _componentTypeHelpersMap)
             {
-                info.Helper.Dispose();
+                pair.Value.Helper.Dispose();
             }
-            _componentTypeHelpers.Clear();
+            _componentTypeHelpersMap.Clear();
 
             // Note: inputs-applied event is owned by EventsManager, not EntityInputQueue
         }
@@ -643,7 +649,7 @@ namespace Trecs.Internal
 
             void ApplyInputs(
                 EntityInputQueue entityInputQueue,
-                DenseHashSet<EntityHandle> entityHandles,
+                IterableHashSet<EntityHandle> entityHandles,
                 int frame
             );
 
@@ -654,7 +660,7 @@ namespace Trecs.Internal
         internal class ComponentTypeHelper<T> : IComponentTypeHelper
             where T : unmanaged, IEntityComponent
         {
-            public NativeDenseDictionary<FrameEntityHandlePair, T> Values = new(
+            public NativeIterableDictionary<FrameEntityHandlePair, T> Values = new(
                 10,
                 Allocator.Persistent
             );
@@ -682,7 +688,7 @@ namespace Trecs.Internal
 
             public void ApplyInputs(
                 EntityInputQueue entityInputQueue,
-                DenseHashSet<EntityHandle> entityHandles,
+                IterableHashSet<EntityHandle> entityHandles,
                 int frame
             )
             {
@@ -714,8 +720,9 @@ namespace Trecs.Internal
         class ComponentTypeInfo
         {
             public IComponentTypeHelper Helper;
-            public readonly DenseDictionary<int, DenseHashSet<EntityHandle>> FrameEntries = new();
-            public readonly Stack<DenseHashSet<EntityHandle>> EntityHandleSetPool = new();
+            public readonly IterableDictionary<int, IterableHashSet<EntityHandle>> FrameEntries =
+                new();
+            public readonly Stack<IterableHashSet<EntityHandle>> EntityHandleSetPool = new();
         }
     }
 }

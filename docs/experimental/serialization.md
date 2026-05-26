@@ -45,7 +45,7 @@ For common managed collections, Trecs ships generic closed-type serializers in `
 
 Implement `ISerializer<T>` with paired `Serialize` and `Deserialize` methods. The binary format is purely positional — `Deserialize` must call the same readers in the same order as `Serialize` calls writers.
 
-As a concrete example, take a managed class holding a list of waypoints, allocated via `SharedPtr.Alloc(world.Heap, blobId, value)` and stored on a component as `SharedPtr<PatrolRoute>`:
+As a concrete example, take a managed class holding a list of waypoints, allocated via `SharedPtr.Alloc(world, blobId, value)` and stored on a component as `SharedPtr<PatrolRoute>`:
 
 ```csharp
 public class PatrolRoute
@@ -170,14 +170,20 @@ world.ComponentArraySerializerRegistry.Register(
 
 The framework still owns the count; the inner `ISerializer<T>` is called once per entity. This costs one virtual call per entity vs. one per array — fine for snapshots and recordings, but prefer a dedicated `IComponentArraySerializer<T>` (one loop, no inner virtual dispatch) on hot rollback paths over large groups.
 
-### Conditional skipping (checksum-only)
+### Conditional skipping (flag-based)
 
-To exclude a component's values from checksum streams only — while still serializing them normally in snapshots and recordings — check `writer.Flags` inside `Serialize` and write nothing when `IsForChecksum` is set:
+To exclude a component's data from specific serialization contexts — while still serializing them normally in others — define a user flag at `SerializationFlags.FirstUserBitIndex` or higher and branch on `writer.HasFlag(...)`:
 
 ```csharp
+// Define a user flag
+public static class MyAppFlags
+{
+    public const long IsForChecksum = 1L << (SerializationFlags.FirstUserBitIndex + 0);
+}
+
 public void Serialize(NativeList<CMyComponent> values, ISerializationWriter writer)
 {
-    if (writer.HasFlag(SerializationFlags.IsForChecksum))
+    if (writer.HasFlag(MyAppFlags.IsForChecksum))
     {
         return; // skip per-element data; the framework still writes the count
     }
@@ -185,7 +191,7 @@ public void Serialize(NativeList<CMyComponent> values, ISerializationWriter writ
 }
 ```
 
-Checksum streams are never deserialized, so the read side doesn't need a symmetric branch.
+Pass the flag when creating the writer for that context. The read side only needs a symmetric branch if the same flag combination is ever deserialized.
 
 ### Reset on load
 
@@ -269,9 +275,27 @@ public sealed class CollisionGroupSerializer : IComponentArraySerializer<CCollis
 
 The same versioning rules apply as for `ISerializer<T>`: read what you wrote in the same order, branch on `reader.Version` if the layout has changed.
 
+## Explicit type IDs
+
+By default, Trecs derives type identifiers from `BurstRuntime.GetHashCode32(type)` — a hash of the fully qualified type name. Renaming or moving a type to a different namespace changes the hash and silently corrupts saved files that reference the old ID.
+
+For projects that need guaranteed save-file compatibility across refactors, define `TRECS_REQUIRE_EXPLICIT_TYPE_IDS` in your project's scripting define symbols. With this define:
+
+- Every serialized type must carry a `[TypeId(int)]` attribute with a stable integer ID.
+- Common primitives, Unity math types, and Trecs internals are pre-registered.
+- Generic types compose their ID from the definition's ID and each type argument's ID.
+- Types without a `[TypeId]` throw at runtime instead of silently using a name-derived hash.
+
+```csharp
+[TypeId(123456)]
+public class PatrolRoute { /* ... */ }
+```
+
+This makes type identity independent of namespaces and class names — refactors never corrupt save files, and any data-shape changes are handled by versioned custom serializers.
+
 ## See also
 
 - [Pointers](pointers.md) — pointer types and which kinds of data need to live on the heap.
 - [Trecs Player Window](../editor-windows/player.md) — uses the registered serializers to record, scrub, and replay world state.
 - [Sample 10 — Pointers](../samples/10-pointers.md) — `UniquePtr<Queue<Vector3>>` plus the built-in `QueueSerializer<Vector3>` registered against the world so the trail round-trips through snapshots / recording.
-- [Sample 15 — Blob Seed Pattern](../samples/15-blob-seed-pattern.md) — `SharedPtr<ColorPalette>` with stable `BlobId`s (the sample itself doesn't take snapshots, but the same `ISerializer<T>` pattern from Sample 10 would apply).
+- [Sample 14 — Blob Seed Pattern](../samples/14-blob-seed-pattern.md) — `SharedPtr<ColorPalette>` with stable `BlobId`s (the sample itself doesn't take snapshots, but the same `ISerializer<T>` pattern from Sample 10 would apply).

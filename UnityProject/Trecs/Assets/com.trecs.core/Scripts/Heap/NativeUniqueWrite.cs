@@ -21,7 +21,7 @@ namespace Trecs
 
         // See NativeUniqueRead<T> for the shipping-build use-after-dispose guard.
         [NativeDisableUnsafePtrRestriction]
-        readonly NativeChunkStoreEntry* _slot;
+        readonly NativeHeapEntry* _slot;
         readonly byte _capturedGeneration;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -36,7 +36,7 @@ namespace Trecs
         [EditorBrowsable(EditorBrowsableState.Never)]
         public NativeUniqueWrite(
             void* ptr,
-            NativeChunkStoreEntry* slot,
+            NativeHeapEntry* slot,
             byte capturedGeneration,
             AtomicSafetyHandle safety
         )
@@ -52,7 +52,7 @@ namespace Trecs
         }
 #else
         [EditorBrowsable(EditorBrowsableState.Never)]
-        public NativeUniqueWrite(void* ptr, NativeChunkStoreEntry* slot, byte capturedGeneration)
+        public NativeUniqueWrite(void* ptr, NativeHeapEntry* slot, byte capturedGeneration)
         {
             _ptr = ptr;
             _slot = slot;

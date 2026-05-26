@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using Trecs.Collections;
@@ -50,14 +51,14 @@ namespace Trecs
             _systemRunner = systemRunner;
         }
 
-        public EntityEventsSubscription EntitiesInGroups(ReadOnlyFastList<GroupIndex> groups)
+        public EntityEventsSubscription EntitiesInGroups(ReadOnlyList<GroupIndex> groups)
         {
             return new EntityEventsSubscription(_eventsManager, _world, groups);
         }
 
         public EntityEventsSubscription EntitiesInGroup(GroupIndex group)
         {
-            return EntitiesInGroups(new FastList<GroupIndex>(group));
+            return EntitiesInGroups(new List<GroupIndex> { group });
         }
 
         public EntityEventsSubscription EntitiesWithTags(TagSet tagSet)
@@ -226,7 +227,7 @@ namespace Trecs
     {
         readonly EventsManager _eventsManager;
         readonly WorldAccessor _world;
-        readonly ReadOnlyFastList<GroupIndex> _groups;
+        readonly ReadOnlyList<GroupIndex> _groups;
         readonly string _debugName;
 
         IDisposable[] _addedSubscriptions;
@@ -239,7 +240,7 @@ namespace Trecs
         internal EntityEventsSubscription(
             EventsManager eventsManager,
             WorldAccessor world,
-            ReadOnlyFastList<GroupIndex> groups
+            ReadOnlyList<GroupIndex> groups
         )
         {
             _eventsManager = eventsManager;

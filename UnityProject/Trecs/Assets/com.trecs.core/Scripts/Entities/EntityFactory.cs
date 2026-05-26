@@ -6,7 +6,7 @@ namespace Trecs.Internal
     static class EntityFactory
     {
         public static (
-            DenseDictionary<TypeId, IComponentArray> group,
+            IterableDictionary<TypeId, IComponentArray> group,
             int insertionIndex
         ) BuildGroupedEntities(
             GroupIndex groupId,
@@ -20,7 +20,6 @@ namespace Trecs.Internal
         {
             var group = groupEntitiesToAdd.GetOrCreateCurrentComponentsForGroup(groupId);
 
-            //track the number of entities created so far in the group.
             groupEntitiesToAdd.IncrementEntityCount(groupId);
 
             BuildEntitiesAndAddToGroup(group, componentsToBuild
@@ -42,7 +41,7 @@ namespace Trecs.Internal
         }
 
         static void BuildEntitiesAndAddToGroup(
-            DenseDictionary<TypeId, IComponentArray> @group,
+            IterableDictionary<TypeId, IComponentArray> @group,
             IComponentBuilder[] componentBuilders
 #if DEBUG
             ,
@@ -86,7 +85,7 @@ namespace Trecs.Internal
         }
 
         static void AddEntity(
-            DenseDictionary<TypeId, IComponentArray> group,
+            IterableDictionary<TypeId, IComponentArray> group,
             IComponentBuilder componentBuilder
         )
         {
@@ -96,7 +95,6 @@ namespace Trecs.Internal
                 ref componentBuilder
             );
 
-            //   if the safeDictionary hasn't been created yet, it will be created inside this method.
             componentBuilder.BuildEntityAndAddToList(safeDictionary);
         }
     }

@@ -11,7 +11,7 @@ namespace Trecs
     /// Lower-level pinning pointer for a native (unmanaged) blob in <see cref="BlobCache"/>.
     /// Resolves to a <c>ref T</c> for direct access. Most game code should use
     /// <see cref="NativeSharedPtr{T}"/> via
-    /// <see cref="NativeSharedPtr.Alloc{T}(HeapAccessor, BlobId, in T)"/> — that adds the
+    /// <see cref="NativeSharedPtr.Alloc{T}(WorldAccessor, BlobId, in T)"/> — that adds the
     /// ECS-side refcount layer (and Burst-resolvable lookup) on top of the cache. Reach
     /// for <see cref="NativeBlobPtr{T}"/> directly when you need to pin blob bytes
     /// outside the ECS refcount lifetime — for example, async preload from a non-ECS

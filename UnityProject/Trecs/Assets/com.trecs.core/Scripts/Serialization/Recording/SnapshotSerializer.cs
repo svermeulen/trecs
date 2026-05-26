@@ -148,10 +148,9 @@ namespace Trecs.Internal
 
         /// <summary>
         /// Capture the current world state into a pooled payload buffer and
-        /// return an exact-length view over it. The returned
-        /// <see cref="ReadOnlyMemory{T}"/> is sized to the actual payload —
-        /// callers should not look at the underlying buffer's full length,
-        /// which may be larger when a recycled buffer is reused.
+        /// return an exact-length view over it, plus a 64-bit xxHash checksum
+        /// of the payload bytes. The checksum can be used for desync detection
+        /// without a separate serialization pass.
         ///
         /// <para>
         /// When the caller is done with the payload, pass it back via
@@ -159,7 +158,7 @@ namespace Trecs.Internal
         /// recycled instead of GC'd. Forgetting to call
         /// <see cref="ReturnPayloadBuffer"/> is safe (the buffer just doesn't
         /// recycle); calling it twice is a bug (the same buffer enters the
-        /// pool twice and a future <see cref="SaveSnapshot(int, out ReadOnlyMemory{byte}, bool)"/>
+        /// pool twice and a future <see cref="SaveSnapshot(int, out ReadOnlyMemory{byte}, out ulong, bool)"/>
         /// hands it out to two callers).
         /// </para>
         ///
@@ -176,6 +175,7 @@ namespace Trecs.Internal
         public SnapshotMetadata SaveSnapshot(
             int version,
             out ReadOnlyMemory<byte> payload,
+            out ulong checksum,
             bool includeTypeChecks = true
         )
         {
@@ -198,6 +198,8 @@ namespace Trecs.Internal
                 _buffer.ResetForErrorRecovery();
                 throw;
             }
+
+            checksum = _buffer.ComputeChecksum();
 
             var length = (int)_buffer.MemoryStream.Length;
             // Pop a recycled buffer when one fits; allocate fresh otherwise.
@@ -229,6 +231,48 @@ namespace Trecs.Internal
             payload = new ReadOnlyMemory<byte>(buffer, 0, length);
             _log.Trace("Saved snapshot ({0:0.00} kb)", length / 1024f);
             return _metadata;
+        }
+
+        /// <inheritdoc cref="SaveSnapshot(int, out ReadOnlyMemory{byte}, out ulong, bool)"/>
+        public SnapshotMetadata SaveSnapshot(
+            int version,
+            out ReadOnlyMemory<byte> payload,
+            bool includeTypeChecks = true
+        )
+        {
+            return SaveSnapshot(version, out payload, out _, includeTypeChecks);
+        }
+
+        /// <summary>
+        /// Compute the 64-bit xxHash checksum of the current world state
+        /// without producing a retained payload buffer. Serializes into the
+        /// internal buffer (same bytes as <see cref="SaveSnapshot(int, out ReadOnlyMemory{byte}, out ulong, bool)"/>
+        /// would produce) and hashes in place, so the result is
+        /// byte-for-byte consistent with snapshot-derived checksums.
+        /// </summary>
+        public ulong ComputeChecksum(int version, bool includeTypeChecks = true)
+        {
+            ThrowIfDisposed();
+
+            using var _profile = TrecsProfiling.Start("SnapshotSerializer.ComputeChecksum");
+
+            PrepareMetadata(version);
+
+            try
+            {
+                _buffer.ClearMemoryStream();
+                _buffer.StartWrite(version: version, includeTypeChecks: includeTypeChecks);
+                _buffer.Write("Metadata", _metadata);
+                _worldStateSerializer.SerializeFullState(_buffer.Writer);
+                _buffer.EndWrite();
+            }
+            catch
+            {
+                _buffer.ResetForErrorRecovery();
+                throw;
+            }
+
+            return _buffer.ComputeChecksum();
         }
 
         /// <summary>

@@ -1,134 +1,157 @@
-# 10 — Pointers
+# 10 — Dynamic Collections
 
-Heap pointers for managed data (classes, lists, arrays) that can't live in unmanaged components.
+Five ways to attach a dynamic per-entity collection to a Trecs component, compared side by side.
 
-**Source:** `com.trecs.core/Samples~/Tutorials/10_Pointers/`
+**Source:** `com.trecs.core/Samples~/Tutorials/10_DynamicCollections/`
 
 ## What it does
 
-A handful of follower entities trace a figure-8 path, each leaving a fading trail behind it (rendered with a Unity `LineRenderer`). Per-entity trail history is a `Queue<Vector3>` — managed data that can't live in a component — held on the heap behind a `UniquePtr<Queue<Vector3>>`.
+A handful of characters wander around a box on the XZ plane driven by 2D Perlin noise, each leaving a fading trail rendered with a Unity `LineRenderer`. The trail backing is selected at composition time via an inspector enum — pick one of the five variants below and the composition root spawns the matching template variant and trail systems.
+
+## The five trail variants
+
+| Variant | Storage | Inline? | Growable? | Cleanup needed? |
+|---------|---------|---------|-----------|-----------------|
+| **UniquePtr Queue** | Managed `Queue<float3>` behind a `UniquePtr<T>` | No (4-byte handle) | Yes | Yes (`OnRemoved`) |
+| **FixedArray ring buffer** | `FixedArray32<float3>` with `Head`/`Count` | Yes (blittable) | No (fixed capacity) | No |
+| **FixedList append** | `FixedList32<float3>` with `Head` | Yes (blittable) | No (appends until full) | No |
+| **TrecsList append** | `TrecsList<float3>` on the shared native chunk store | No (4-byte handle) | Yes (geometric) | Yes (`OnRemoved`) |
+| **TrecsArray ring buffer** | `TrecsArray<float3>` on the shared native chunk store | No (8-byte handle) | No (length fixed at alloc) | Yes (`OnRemoved`) |
 
 ## Schema
 
-### Components
+Each variant extends a shared `Character` base template and adds its own trail component plus a distinguishing tag:
 
 ```csharp
-// 4-byte handle, stored inline in the component
-public partial struct Trail : IEntityComponent
-{
-    public UniquePtr<Queue<Vector3>> Value;
-}
-
-[Unwrap]
-public partial struct PathPhase : IEntityComponent
-{
-    public float Value;  // current position along the figure-8, in radians
-}
-```
-
-### Template
-
-```csharp
-public partial class PatrolFollowerEntity
+public partial class Character
     : ITemplate,
         IExtends<CommonTemplates.RenderableGameObject>,
-        ITagged<PatrolTags.Follower>
+        ITagged<DynamicCollectionsTags.Character>
 {
     Position Position;
-    PathPhase PathPhase;
-    Trail Trail;
-    PrefabId PrefabId = new(PointersPrefabs.Follower);
+    NoiseOffset NoiseOffset;
+    LastSamplePosition LastSamplePosition;
+    PrefabId PrefabId = new(DynamicCollectionsPrefabs.Character);
+}
+
+// One variant — the other four follow the same pattern
+public partial class CharacterQueue
+    : ITemplate,
+        IExtends<Character>,
+        ITagged<DynamicCollectionsTags.QueueTrail>
+{
+    TrailQueue TrailQueue;
 }
 ```
 
-## Allocation
-
-The scene initializer creates each follower and allocates its own empty `Queue<Vector3>` blob. `UniquePtr.Alloc` returns a 4-byte handle that goes straight onto the component:
+### Trail components (one per variant)
 
 ```csharp
-for (int i = 0; i < _followerCount; i++)
+// Managed Queue behind a UniquePtr — 4-byte handle on the component
+[Unwrap]
+public partial struct TrailQueue : IEntityComponent
 {
-    float phase = (float)i / _followerCount * 2f * math.PI;
-    var trailPtr = UniquePtr.Alloc(_world.Heap, new Queue<Vector3>());
+    public UniquePtr<Queue<float3>> Value;
+}
 
-    _world.AddEntity<PatrolTags.Follower>()
-        .Set(new Position(PatrolMovementSystem.FigureEightAt(phase)))
-        .Set(new PathPhase(phase))
-        .Set(new Trail { Value = trailPtr });
+// Inline FixedArray32 ring buffer — blittable, no heap allocation
+public partial struct TrailFixedArray : IEntityComponent
+{
+    public FixedArray32<float3> Positions;
+    public int Head;
+    public int Count;
+}
+
+// Heap-backed TrecsList — growable, 4-byte handle
+[Unwrap]
+public partial struct TrailTrecsList : IEntityComponent
+{
+    public TrecsList<float3> Value;
 }
 ```
 
-Each entity owns its own trail, so `UniquePtr<T>` is the right type — no refcounting, single owner.
+## Spawning
 
-## Movement system
-
-The system advances each follower along the figure-8 and appends to its trail. `trail.Value.Get(World)` returns the live `Queue<Vector3>` instance — mutating it sticks because we're holding the object reference. We `Enqueue` the new position and `Dequeue` the oldest once the trail hits its cap, both O(1) on `Queue<T>`:
+The scene initializer picks the right spawn path per variant. The UniquePtr and Trecs collection variants allocate their backing storage before setting it on the entity:
 
 ```csharp
-public partial class PatrolMovementSystem : ISystem
-{
-    const float Speed = 1.5f;
-    const int TrailLength = 30;
+// UniquePtr<Queue<float3>> — allocate a managed Queue on the world's UniqueHeap
+var trailPtr = UniquePtr.Alloc(_world, new Queue<float3>());
 
-    [ForEachEntity(MatchByComponents = true)]
-    void Execute(ref Position position, ref PathPhase phase, in Trail trail)
+_world.AddEntity<DynamicCollectionsTags.Character, DynamicCollectionsTags.QueueTrail>()
+    .Set(new Position(initialPosition))
+    .Set(new NoiseOffset(offset))
+    .Set(new LastSamplePosition(initialPosition))
+    .Set(new TrailQueue(trailPtr));
+
+// TrecsList — allocate on the shared native chunk store
+var listHandle = TrecsList.Alloc<float3>(_world, initialCapacity: 16);
+
+_world.AddEntity<DynamicCollectionsTags.Character, DynamicCollectionsTags.TrecsListTrail>()
+    .Set(new Position(initialPosition))
+    .Set(new NoiseOffset(offset))
+    .Set(new LastSamplePosition(initialPosition))
+    .Set(new TrailTrecsList(listHandle));
+```
+
+The inline variants (FixedArray, FixedList) need no heap allocation — `default` is a valid empty state.
+
+## Trail updater (Queue variant)
+
+Each variant has its own updater system. The Queue variant reads through the `UniquePtr` to get the live `Queue<float3>` and uses it as a ring buffer trimmed to the configured trail length:
+
+```csharp
+[ExecuteAfter(typeof(CharacterMover))]
+public partial class QueueTrailUpdater : ISystem
+{
+    readonly SampleSettings _settings;
+
+    [ForEachEntity(
+        typeof(DynamicCollectionsTags.Character),
+        typeof(DynamicCollectionsTags.QueueTrail)
+    )]
+    void Execute(in Character character)
     {
-        phase.Value = (phase.Value + Speed * World.DeltaTime) % (2f * math.PI);
-        position.Value = FigureEightAt(phase.Value);
+        if (math.distance(character.Position, character.LastSamplePosition)
+            < _settings.TrailMinSampleDistance)
+            return;
 
-        var trailQueue = trail.Value.Get(World);
-        trailQueue.Enqueue((Vector3)position.Value);
+        var queue = character.TrailQueue.Get(World);
+        queue.Enqueue(character.Position);
 
-        while (trailQueue.Count > TrailLength)
-            trailQueue.Dequeue();
+        while (queue.Count > _settings.TrailLength)
+            queue.Dequeue();
+
+        character.LastSamplePosition = character.Position;
     }
+
+    partial struct Character
+        : IAspect,
+            IRead<Position, TrailQueue>,
+            IWrite<LastSamplePosition> { }
 }
 ```
-
-Note `in Trail trail` is enough — we're not replacing the pointer, just dereferencing it to mutate the managed object behind it.
 
 ## Cleanup
 
-Pointers stored on components must be disposed when the entity is removed — Trecs does **not** auto-dispose. The standard pattern is an `OnRemoved` observer with a `[ForEachEntity]` handler that receives the component to dispose:
+Heap-backed variants (UniquePtr Queue, TrecsList, TrecsArray) must be disposed when the entity is removed — Trecs does **not** auto-dispose. The inline variants (FixedArray, FixedList) need no cleanup. The scene lifecycle registers `OnRemoved` observers for the heap-backed variants:
 
 ```csharp
-public partial class PatrolFollowerCleanup : IDisposable
+_world.Events.EntitiesWithTags<DynamicCollectionsTags.QueueTrail>()
+    .OnRemoved(OnQueueRemoved)
+    .AddTo(_disposables);
+
+[ForEachEntity]
+void OnQueueRemoved(in TrailQueue trail)
 {
-    readonly DisposeCollection _disposables = new();
-
-    public PatrolFollowerCleanup(World world)
-    {
-        World = world.CreateAccessor(AccessorRole.Fixed);
-
-        World.Events.EntitiesWithTags<PatrolTags.Follower>()
-            .OnRemoved(OnFollowerRemoved)
-            .AddTo(_disposables);
-    }
-
-    WorldAccessor World { get; }
-
-    [ForEachEntity]
-    void OnFollowerRemoved(in Trail trail)
-    {
-        trail.Value.Dispose(World);
-    }
-
-    public void Dispose() => _disposables.Dispose();
+    trail.Value.Dispose(_world);
 }
 ```
 
-In DEBUG builds Trecs reports any pointers still alive at world shutdown — handy for catching missed cleanup paths.
-
-## Snapshot round-trip
-
-`Queue<Vector3>` is a managed collection, so Trecs's blit serializer can't round-trip it through the Trecs Player. Trecs core ships a generic `QueueSerializer<T>` — the sample just registers the closed `QueueSerializer<Vector3>` against `world.SerializerRegistry` at composition time and the snapshot writer / reader handles the rest. See [Serialization](../experimental/serialization.md) for the broader pattern and for authoring your own `ISerializer<T>` when the payload isn't a built-in collection.
-
 ## Concepts introduced
 
-- **`UniquePtr<T>`** — single-owner managed pointer. Stored inline as a 4-byte handle on the component. See [Pointers](../experimental/pointers.md).
-- **`UniquePtr.Alloc(World.Heap, value)`** — static factory; mirrors `UniquePtr.Alloc(World, value)` if you have the `WorldAccessor` handy.
-- **`ptr.Get(World)`** — dereferences to the managed object reference.
-- **`ptr.Dispose(World)`** — returns the slot to the pool.
-- **`OnRemoved` cleanup observer** — the canonical way to release pointers when entities disappear. See [Pointers — cleanup is manual](../experimental/pointers.md#cleanup-is-manual-for-entity-owned-pointers) and [Entity Events](../entity-management/entity-events.md).
-- For sharing the same managed data across many entities, see `SharedPtr<T>` in [Sample 15 — Blob Seed Pattern](15-blob-seed-pattern.md).
-- For Burst-compatible variants used inside jobs, see [Pointers in jobs](../experimental/pointers.md#pointers-in-jobs).
+- **`UniquePtr<T>`** — single-owner managed pointer. See [Pointers](../experimental/pointers.md).
+- **`FixedArray32<T>`** / **`FixedList32<T>`** — inline blittable collections with fixed capacity. See [Fixed Collections](../advanced/fixed-collections.md).
+- **`TrecsList<T>`** / **`TrecsArray<T>`** — heap-backed native collections on the world's shared chunk store. See [Trecs Collections](../experimental/trecs-collections.md).
+- **Per-variant template inheritance** — `IExtends<Character>` plus a per-variant tag and trail component.
+- **`OnRemoved` cleanup observer** — the canonical way to release heap-backed data when entities disappear. See [Entity Events](../entity-management/entity-events.md).

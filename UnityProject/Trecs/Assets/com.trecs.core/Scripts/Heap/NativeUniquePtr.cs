@@ -13,51 +13,36 @@ namespace Trecs
     ///
     /// <para>Each factory takes <c>[CallerFilePath]</c>/<c>[CallerLineNumber]</c> defaults
     /// the compiler fills at the user's call site; those propagate down to
-    /// <see cref="NativeChunkStore.Alloc"/> so the Dispose-time leak warning can
+    /// <see cref="NativeHeap.Alloc"/> so the Dispose-time leak warning can
     /// attribute leaks to the original allocation point.</para>
     /// </summary>
     public static class NativeUniquePtr
     {
         public static NativeUniquePtr<T> Alloc<T>(
-            HeapAccessor heap,
+            WorldAccessor world,
             in T value,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
         )
             where T : unmanaged
         {
-            heap.AssertCanMutateHeap();
-            return Alloc<T>(heap.NativeUniqueChunkStore, in value, callerFile, callerLine);
+            world.AssertCanMutateHeap();
+            return Alloc<T>(world.NativeUniqueChunkStore, in value, callerFile, callerLine);
         }
 
         public static NativeUniquePtr<T> Alloc<T>(
-            HeapAccessor heap,
+            WorldAccessor world,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
         )
             where T : unmanaged
         {
-            heap.AssertCanMutateHeap();
-            return Alloc<T>(heap.NativeUniqueChunkStore, default, callerFile, callerLine);
+            world.AssertCanMutateHeap();
+            return Alloc<T>(world.NativeUniqueChunkStore, default, callerFile, callerLine);
         }
-
-        public static NativeUniquePtr<T> Alloc<T>(
-            WorldAccessor world,
-            in T value,
-            [CallerFilePath] string callerFile = null,
-            [CallerLineNumber] int callerLine = 0
-        )
-            where T : unmanaged => Alloc<T>(world.Heap, in value, callerFile, callerLine);
-
-        public static NativeUniquePtr<T> Alloc<T>(
-            WorldAccessor world,
-            [CallerFilePath] string callerFile = null,
-            [CallerLineNumber] int callerLine = 0
-        )
-            where T : unmanaged => Alloc<T>(world.Heap, callerFile, callerLine);
 
         internal static unsafe NativeUniquePtr<T> Alloc<T>(
-            NativeChunkStore chunkStore,
+            NativeHeap chunkStore,
             in T value,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
@@ -81,33 +66,24 @@ namespace Trecs
         /// See <see cref="NativeUniquePtr{T}"/> docs for the ownership contract.
         /// </summary>
         public static NativeUniquePtr<T> AllocTakingOwnership<T>(
-            HeapAccessor heap,
+            WorldAccessor world,
             NativeBlobAllocation alloc,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
         )
             where T : unmanaged
         {
-            heap.AssertCanMutateHeap();
+            world.AssertCanMutateHeap();
             return AllocTakingOwnership<T>(
-                heap.NativeUniqueChunkStore,
+                world.NativeUniqueChunkStore,
                 alloc,
                 callerFile,
                 callerLine
             );
         }
 
-        public static NativeUniquePtr<T> AllocTakingOwnership<T>(
-            WorldAccessor world,
-            NativeBlobAllocation alloc,
-            [CallerFilePath] string callerFile = null,
-            [CallerLineNumber] int callerLine = 0
-        )
-            where T : unmanaged =>
-            AllocTakingOwnership<T>(world.Heap, alloc, callerFile, callerLine);
-
         internal static NativeUniquePtr<T> AllocTakingOwnership<T>(
-            NativeChunkStore chunkStore,
+            NativeHeap chunkStore,
             NativeBlobAllocation alloc,
             [CallerFilePath] string callerFile = null,
             [CallerLineNumber] int callerLine = 0
@@ -130,13 +106,13 @@ namespace Trecs
     /// <summary>
     /// Exclusive-ownership pointer to a native (unmanaged) heap allocation. Burst-compatible.
     /// <para>
-    /// Allocate via <see cref="NativeUniquePtr.Alloc{T}(HeapAccessor, in T, string, int)"/>.
-    /// Open a safety-checked view with <see cref="Read(HeapAccessor)"/> /
-    /// <see cref="Write(HeapAccessor)"/> on the main thread, or
-    /// <see cref="Read(in NativeChunkStoreResolver)"/> /
-    /// <see cref="Write(in NativeChunkStoreResolver)"/> in Burst jobs. Frame-scoped variants
+    /// Allocate via <see cref="NativeUniquePtr.Alloc{T}(WorldAccessor, in T, string, int)"/>.
+    /// Open a safety-checked view with <see cref="Read(WorldAccessor)"/> /
+    /// <see cref="Write(WorldAccessor)"/> on the main thread, or
+    /// <see cref="Read(in NativeHeapResolver)"/> /
+    /// <see cref="Write(in NativeHeapResolver)"/> in Burst jobs. Frame-scoped variants
     /// are cleaned up automatically; persistent pointers must be disposed explicitly via
-    /// <see cref="Dispose(HeapAccessor)"/>.
+    /// <see cref="Dispose(WorldAccessor)"/>.
     /// </para>
     /// <para>
     /// The persistent struct stores only a <see cref="PtrHandle"/> — it is intentionally cheap
@@ -162,15 +138,13 @@ namespace Trecs
             Handle = handle;
         }
 
-        public readonly void Dispose(HeapAccessor heap)
+        public readonly void Dispose(WorldAccessor world)
         {
-            heap.AssertCanMutateHeap();
-            Dispose(heap.NativeUniqueChunkStore);
+            world.AssertCanMutateHeap();
+            Dispose(world.NativeUniqueChunkStore);
         }
 
-        public readonly void Dispose(WorldAccessor world) => Dispose(world.Heap);
-
-        internal readonly void Dispose(NativeChunkStore chunkStore)
+        internal readonly void Dispose(NativeHeap chunkStore)
         {
             TrecsDebugAssert.That(Handle.Value != 0);
             // Validate TypeId before freeing — catches accidental cross-heap dispose
@@ -183,34 +157,32 @@ namespace Trecs
 
         /// <summary>
         /// Opens a safety-checked read view. Main-thread only; for in-job access use the
-        /// <see cref="Read(in NativeChunkStoreResolver)"/> overload.
+        /// <see cref="Read(in NativeHeapResolver)"/> overload.
         /// </summary>
-        public readonly NativeUniqueRead<T> Read(HeapAccessor heap)
+        public readonly NativeUniqueRead<T> Read(WorldAccessor world)
         {
-            return Read(heap.NativeUniqueChunkStore.Resolver);
+            return Read(world.NativeUniqueChunkStore.Resolver);
         }
-
-        public readonly NativeUniqueRead<T> Read(WorldAccessor world) => Read(world.Heap);
 
         // Public Write overloads live on NativeUniquePtrExtensions as
         // `this ref NativeUniquePtr<T>` extension methods (bottom of file). The
         // implementation here is `internal readonly` — extensions delegate to it,
         // and the compile-time ref discipline is enforced at the extension's
         // `this ref` receiver. Same pattern as TrecsListExtensions.
-        internal readonly NativeUniqueWrite<T> Write(HeapAccessor heap)
+        internal readonly NativeUniqueWrite<T> Write(WorldAccessor world)
         {
-            heap.AssertCanMutateHeap();
+            world.AssertCanMutateHeap();
             // Pass the chunk store's raw (permissive) resolver since the role
             // check happened above; reaching here means we're already authorized.
-            return WriteInternal(heap.NativeUniqueChunkStore.Resolver);
+            return WriteInternal(world.NativeUniqueChunkStore.Resolver);
         }
 
         /// <summary>
         /// Burst-compatible read view. Pass a resolver obtained via
-        /// <see cref="HeapAccessor.NativeChunkStoreResolver"/> or
+        /// <see cref="WorldAccessor.NativeHeapResolver"/> or
         /// <see cref="NativeWorldAccessor.ChunkStoreResolver"/>.
         /// </summary>
-        public readonly unsafe NativeUniqueRead<T> Read(in NativeChunkStoreResolver resolver)
+        public readonly unsafe NativeUniqueRead<T> Read(in NativeHeapResolver resolver)
         {
             var entry = resolver.ResolveEntryWithSlotPtr(Handle, out var slot);
             AssertPersistentTypeHash(entry.TypeHash);
@@ -227,19 +199,19 @@ namespace Trecs
         }
 
         // Internal — public access goes through NativeUniquePtrExtensions.Write(this ref,
-        // in NativeChunkStoreResolver) so the ref discipline applies. Resolver
+        // in NativeHeapResolver) so the ref discipline applies. Resolver
         // carries the originating accessor's role flag, so a Variable-role caller
         // fails fast at Open time.
-        internal readonly NativeUniqueWrite<T> Write(in NativeChunkStoreResolver resolver)
+        internal readonly NativeUniqueWrite<T> Write(in NativeHeapResolver resolver)
         {
             resolver.AssertCanMutateHeap();
             return WriteInternal(resolver);
         }
 
         // Permission-skipping inner Write used by callers that already passed the
-        // role check (e.g. the main-thread Write(HeapAccessor) above, which
+        // role check (e.g. the main-thread Write(WorldAccessor) above, which
         // forwarded the chunk store's raw resolver).
-        readonly unsafe NativeUniqueWrite<T> WriteInternal(in NativeChunkStoreResolver resolver)
+        readonly unsafe NativeUniqueWrite<T> WriteInternal(in NativeHeapResolver resolver)
         {
             var entry = resolver.ResolveEntryWithSlotPtr(Handle, out var slot);
             AssertPersistentTypeHash(entry.TypeHash);
@@ -319,29 +291,23 @@ namespace Trecs
     {
         /// <summary>
         /// Opens a main-thread write view. For in-job access use the
-        /// <see cref="Write{T}(ref NativeUniquePtr{T}, in NativeChunkStoreResolver)"/>
+        /// <see cref="Write{T}(ref NativeUniquePtr{T}, in NativeHeapResolver)"/>
         /// overload.
         /// </summary>
         public static NativeUniqueWrite<T> Write<T>(
             this ref NativeUniquePtr<T> ptr,
-            HeapAccessor heap
-        )
-            where T : unmanaged => ptr.Write(heap);
-
-        public static NativeUniqueWrite<T> Write<T>(
-            this ref NativeUniquePtr<T> ptr,
             WorldAccessor world
         )
-            where T : unmanaged => ptr.Write(world.Heap);
+            where T : unmanaged => ptr.Write(world);
 
         /// <summary>
         /// Burst-compatible write view. Pass a resolver obtained via
-        /// <see cref="HeapAccessor.NativeChunkStoreResolver"/> or
+        /// <see cref="WorldAccessor.NativeHeapResolver"/> or
         /// <see cref="NativeWorldAccessor.ChunkStoreResolver"/>.
         /// </summary>
         public static NativeUniqueWrite<T> Write<T>(
             this ref NativeUniquePtr<T> ptr,
-            in NativeChunkStoreResolver resolver
+            in NativeHeapResolver resolver
         )
             where T : unmanaged => ptr.Write(in resolver);
     }

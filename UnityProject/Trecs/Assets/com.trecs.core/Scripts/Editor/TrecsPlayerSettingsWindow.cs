@@ -24,7 +24,7 @@ namespace Trecs.Internal
             var window = CreateInstance<TrecsPlayerSettingsWindow>();
             window.titleContent = new GUIContent("Trecs Player Settings");
             const float w = 360f;
-            const float h = 260f;
+            const float h = 290f;
             window.minSize = new Vector2(w, h);
             window.maxSize = new Vector2(w * 2, h);
             if (anchor != null)

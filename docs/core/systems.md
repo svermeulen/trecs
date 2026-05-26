@@ -33,7 +33,7 @@ public partial class SpinnerSystem : ISystem
 [ForEachEntity(typeof(GameTags.Enemy))]
 void Execute(in EnemyView enemy)
 {
-    enemy.Position.Write.Value += enemy.Velocity.Read.Value * World.DeltaTime;
+    enemy.Position += enemy.Velocity * World.DeltaTime;
 }
 
 // Using component refs directly
@@ -66,7 +66,6 @@ void Execute(in EnemyView enemy) { ... }
 Beyond component refs or an aspect, a method can also receive any of these:
 
 - **`EntityHandle`** — the stable handle for the iterated entity. Carries the entity-targeted ops (`Component<T>(world)`, `Remove(world)`, `SetTag<T>(world)`, `AddInput<T>(world, v)`, …); store it on another component when you need a long-lived reference.
-- **`EntityIndex`** — the transient hot-loop variant. Same methods as `EntityHandle` but skips the per-call handle-to-index lookup; only valid within the current submission cycle.
 - **`WorldAccessor`** — the system's accessor (main-thread only).
 - **`NativeWorldAccessor`** — job-safe world access (`[WrapAsJob]` only).
 - **`[GlobalIndex] int`** — see [Cross-group index](#cross-group-index).
@@ -179,7 +178,7 @@ Unity LateUpdate()  ──▶  World.LateTick()
           └───────────────┘
 ```
 
-Trecs doesn't hook into Unity's update loop. Drive it from a `MonoBehaviour`:
+Trecs doesn't hook into Unity's update loop automatically. Drive it from a `MonoBehaviour`:
 
 ```csharp
 public class GameLoop : MonoBehaviour

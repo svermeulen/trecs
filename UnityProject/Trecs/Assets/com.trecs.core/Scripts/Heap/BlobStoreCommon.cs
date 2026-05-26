@@ -59,7 +59,7 @@ namespace Trecs.Internal
         /// </summary>
         public void SumInMemoryInactiveTotals(
             ReadOnlyBlobIdSet activeBlobs,
-            DenseDictionary<BlobId, object> cache,
+            IterableDictionary<BlobId, object> cache,
             BlobManifest manifest,
             ref long nativeBytes,
             ref int managedCount
@@ -95,7 +95,7 @@ namespace Trecs.Internal
         /// </summary>
         public BlobStoreStats GetStats(
             ReadOnlyBlobIdSet activeBlobs,
-            DenseDictionary<BlobId, object> cache,
+            IterableDictionary<BlobId, object> cache,
             BlobManifest manifest
         )
         {
@@ -158,7 +158,7 @@ namespace Trecs.Internal
         /// </summary>
         public void CleanMemoryCache(
             ReadOnlyBlobIdSet activeBlobs,
-            DenseDictionary<BlobId, object> cache,
+            IterableDictionary<BlobId, object> cache,
             float maxInactiveNativeBlobsMb,
             int maxInactiveManagedBlobsCount,
             BlobManifest manifest
@@ -224,7 +224,7 @@ namespace Trecs.Internal
         }
 
         void EvictNativeBlobs(
-            DenseDictionary<BlobId, object> cache,
+            IterableDictionary<BlobId, object> cache,
             List<NativeCleanupEntry> queue,
             long inactiveNativeBytes,
             float maxInactiveNativeBlobsMb
@@ -267,7 +267,7 @@ namespace Trecs.Internal
         }
 
         void EvictManagedBlobs(
-            DenseDictionary<BlobId, object> cache,
+            IterableDictionary<BlobId, object> cache,
             List<ManagedCleanupEntry> queue,
             int maxInactiveManagedBlobsCount
         )

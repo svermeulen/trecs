@@ -43,7 +43,7 @@ namespace Trecs.Internal
         internal EntitySetStorage(
             SetId setId,
             int totalGroupCount,
-            DenseHashSet<GroupIndex> validGroups
+            IterableHashSet<GroupIndex> validGroups
         )
         {
             _setId = setId;

@@ -745,7 +745,7 @@ namespace Trecs.SourceGen
             ("System.Collections.Generic", "IReadOnlyDictionary"),
             ("System.Collections.Generic", "IReadOnlySet"),
             ("System.Collections.Generic", "IEnumerable"),
-            ("Trecs.Collections", "IReadOnlyDenseDictionary"),
+            ("Trecs.Collections", "IReadOnlyIterableDictionary"),
             ("Unity.Collections", "NativeArray.ReadOnly"),
             ("Unity.Collections", "NativeHashMap.ReadOnly"),
             ("Unity.Collections", "NativeHashSet.ReadOnly"),
