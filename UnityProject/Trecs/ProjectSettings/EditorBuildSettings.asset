@@ -45,12 +45,6 @@ EditorBuildSettings:
     path: Assets/Samples/Core/12_FeedingFrenzyBenchmark/FeedingFrenzyBenchmark.unity
     guid: 1f78097489b0d47a18e7110cf94c1e32
   - enabled: 1
-    path: Assets/Samples/Serialization/13_SaveGame/SaveGame.unity
-    guid: 1d5a33dbe6384099a166c1941b4c7571
-  - enabled: 1
-    path: Assets/Samples/Core/13_NativePointers/NativePointers.unity
-    guid: 1680bd4fdbe6495cb6c1e6bd9ba26664
-  - enabled: 1
     path: Assets/Samples/Core/13_AspectInterfaces/AspectInterfaces.unity
     guid: 357d8a818fc54fd785c1b21c1913b839
   - enabled: 1
@@ -62,6 +56,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Samples/Core/16_MultipleWorlds/MultipleWorlds.unity
     guid: 2dac7cdfb00842abb39db71fc493766a
+  - enabled: 1
+    path: Assets/Samples/Core/17_HeightmapBlobs/HeightmapBlobs.unity
+    guid: a81e438d1a56f4308bf7f2e9f89f4160
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
