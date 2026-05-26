@@ -179,17 +179,25 @@ namespace Trecs.Internal
                 sb.AppendLine(
                     $"Type IDs: {totalTypeIdBytes} bytes ({GetPercentage(totalTypeIdBytes, totalBytes):F1}%)"
                 );
-                var sortedTypeIds = _typeIdCounts
-                    .Where(kvp => kvp.Value * _typeIdSizes[kvp.Key] > 0)
-                    .OrderByDescending(kvp => kvp.Value * _typeIdSizes[kvp.Key])
-                    .ToList();
+                var sortedTypeIds = new List<(RefKey<string> Key, int Count)>();
+                foreach (var kvp in _typeIdCounts)
+                {
+                    if (kvp.Value * _typeIdSizes[kvp.Key] > 0)
+                    {
+                        sortedTypeIds.Add((kvp.Key, kvp.Value));
+                    }
+                }
+                sortedTypeIds.Sort(
+                    (a, b) =>
+                        (b.Count * _typeIdSizes[b.Key]).CompareTo(a.Count * _typeIdSizes[a.Key])
+                );
 
                 for (int i = 0; i < sortedTypeIds.Count; i++)
                 {
-                    var kvp = sortedTypeIds[i];
-                    var typeBytes = kvp.Value * _typeIdSizes[kvp.Key];
+                    var entry = sortedTypeIds[i];
+                    var typeBytes = entry.Count * _typeIdSizes[entry.Key];
                     var prefix = i == sortedTypeIds.Count - 1 ? "└─" : "├─";
-                    sb.AppendLine($"{prefix} {kvp.Key} ({kvp.Value}x): {typeBytes} bytes");
+                    sb.AppendLine($"{prefix} {entry.Key} ({entry.Count}x): {typeBytes} bytes");
                 }
                 sb.AppendLine();
             }
