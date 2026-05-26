@@ -25,7 +25,7 @@ namespace Trecs.Tests
 
             // Register test-specific serializers
             _serializerRegistry.RegisterSerializer(new ListSerializer<int>());
-            _serializerRegistry.RegisterSerializer(new DictionarySerializer<string, float>());
+            _serializerRegistry.RegisterSerializer(new IterableDictionarySerializer<int, float>());
 
             _writer = new BinarySerializationWriter(_serializerRegistry);
             _memoryStream = new MemoryStream();
@@ -58,11 +58,11 @@ namespace Trecs.Tests
             _writer.Write("Inventory", items);
 
             // Create a dictionary
-            var stats = new Dictionary<string, float>
+            var stats = new IterableDictionary<int, float>
             {
-                { "strength", 10.5f },
-                { "agility", 8.2f },
-                { "intelligence", 12.0f },
+                { 1, 10.5f },
+                { 2, 8.2f },
+                { 3, 12.0f },
             };
             _writer.Write("PlayerStats", stats);
 

@@ -1,11 +1,8 @@
-using System.Collections.Generic;
-using System.Diagnostics;
 using NUnit.Framework;
 using Trecs.Collections;
 using Trecs.Internal;
 using Unity.Mathematics;
 using UnityEngine;
-using Debug = UnityEngine.Debug;
 
 namespace Trecs.Tests
 {
@@ -227,63 +224,6 @@ namespace Trecs.Tests
             {
                 TrecsDebugAssert.That(deserialized[kvp.Key] == kvp.Value);
             }
-        }
-
-        [Test]
-        public void IterableDictionary_BlitPerformanceTest_CompareWithRegularDictionary()
-        {
-            // Arrange
-            var svDict = new IterableDictionary<int, int>();
-            var regularDict = new Dictionary<int, int>();
-
-            const int elementCount = 1000;
-            for (int i = 0; i < elementCount; i++)
-            {
-                int value = i * 42;
-                svDict.Add(i, value);
-                regularDict.Add(i, value);
-            }
-
-            var flags = 0L;
-
-            // Act & Assert - Verify both serialize/deserialize correctly
-            // IterableDictionary (blit path)
-            _cacheHelper.ClearMemoryStream();
-            var stopwatch = Stopwatch.StartNew();
-            _cacheHelper.WriteAll(svDict, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var deserializedSvDict = _cacheHelper.ReadAll<IterableDictionary<int, int>>();
-            stopwatch.Stop();
-            var svDictTime = stopwatch.ElapsedTicks;
-
-            // Regular Dictionary (element-by-element)
-            _cacheHelper.ClearMemoryStream();
-            stopwatch.Restart();
-            _cacheHelper.WriteAll(
-                regularDict,
-                TestConstants.Version,
-                includeTypeChecks: true,
-                flags
-            );
-            _cacheHelper.ResetMemoryPosition();
-            var deserializedRegularDict = _cacheHelper.ReadAll<Dictionary<int, int>>();
-            stopwatch.Stop();
-            var regularDictTime = stopwatch.ElapsedTicks;
-
-            // Verify correctness
-            TrecsDebugAssert.That(deserializedSvDict.Count == elementCount);
-            TrecsDebugAssert.That(deserializedRegularDict.Count == elementCount);
-            for (int i = 0; i < elementCount; i++)
-            {
-                TrecsDebugAssert.That(deserializedSvDict[i] == deserializedRegularDict[i]);
-            }
-
-            // Log performance comparison
-            Debug.Log(
-                $"IterableDictionary (blit): {svDictTime} ticks, "
-                    + $"Regular Dictionary: {regularDictTime} ticks. "
-                    + $"Ratio: {(float)svDictTime / regularDictTime:F2}x"
-            );
         }
     }
 }

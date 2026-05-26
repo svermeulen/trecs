@@ -94,37 +94,6 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Dictionary_NullValues_HandlesCorrectly()
-        {
-            // Arrange
-            var dictWithNulls = new Dictionary<string, string>
-            {
-                { "key1", "value1" },
-                { "key2", null },
-                { "key3", "value3" },
-            };
-            var flags = 0L;
-
-            // Act - Framework now handles null values in dictionary correctly
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(
-                dictWithNulls,
-                TestConstants.Version,
-                includeTypeChecks: true,
-                flags
-            );
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<Dictionary<string, string>>();
-
-            // Assert - Verify null values are preserved
-            TrecsDebugAssert.That(result != null);
-            TrecsDebugAssert.That(result.Count == 3);
-            TrecsDebugAssert.That(result["key1"] == "value1");
-            TrecsDebugAssert.That(result["key2"] == null);
-            TrecsDebugAssert.That(result["key3"] == "value3");
-        }
-
-        [Test]
         public void List_EmptyAfterDeserialization_MaintainsCapacity()
         {
             // Arrange

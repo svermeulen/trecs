@@ -138,44 +138,13 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void TestDictionaryWithNulls()
-        {
-            var dict = new Dictionary<string, string>
-            {
-                { "key1", "value1" },
-                { "key2", null },
-                { "key3", "value3" },
-                { "key4", null },
-            };
-
-            _cacheHelper.StartWrite(1, true);
-            _cacheHelper.Write("Dict", dict);
-            _cacheHelper.EndWrite();
-
-            _cacheHelper.ResetMemoryPosition();
-
-            _cacheHelper.StartRead();
-            Dictionary<string, string> readDict = null;
-            _cacheHelper.Read("Dict", ref readDict);
-            TrecsDebugAssert.That(readDict != null);
-            TrecsDebugAssert.That(readDict.Count == 4);
-            TrecsDebugAssert.That(readDict["key1"] == "value1");
-            TrecsDebugAssert.That(readDict["key2"] == null);
-            TrecsDebugAssert.That(readDict["key3"] == "value3");
-            TrecsDebugAssert.That(readDict["key4"] == null);
-            _cacheHelper.StopRead(true);
-        }
-
-        [Test]
         public void TestNullCompleteCollection()
         {
             List<string> nullList = null;
-            Dictionary<string, string> nullDict = null;
             string[] nullArray = null;
 
             _cacheHelper.StartWrite(1, true);
             _cacheHelper.Write("NullList", nullList);
-            _cacheHelper.Write("NullDict", nullDict);
             _cacheHelper.Write("NullArray", nullArray);
             _cacheHelper.EndWrite();
 
@@ -185,10 +154,6 @@ namespace Trecs.Tests
             List<string> readList = new List<string>();
             _cacheHelper.Read("NullList", ref readList);
             TrecsDebugAssert.That(readList == null);
-
-            Dictionary<string, string> readDict = new Dictionary<string, string>();
-            _cacheHelper.Read("NullDict", ref readDict);
-            TrecsDebugAssert.That(readDict == null);
 
             string[] readArray = new string[0];
             _cacheHelper.Read("NullArray", ref readArray);

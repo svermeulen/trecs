@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
+using Trecs.Collections;
 using Trecs.Internal;
 using UnityEngine;
 using Assert = NUnit.Framework.Assert;
@@ -325,18 +326,10 @@ namespace Trecs.Tests
         public void ComplexObjectSerialization_ManagesMemoryCorrectly()
         {
             // Arrange
-            var complexData = new Dictionary<string, List<int>>
-            {
-                {
-                    "first",
-                    new List<int> { 1, 2, 3 }
-                },
-                {
-                    "second",
-                    new List<int> { 4, 5, 6, 7, 8 }
-                },
-                { "third", new List<int>() },
-            };
+            var complexData = new IterableDictionary<int, string>();
+            complexData.Add(1, "first");
+            complexData.Add(2, "second");
+            complexData.Add(3, "third");
             var flags = 0L;
 
             // Act
@@ -349,14 +342,14 @@ namespace Trecs.Tests
             );
             var memoryUsed = _cacheHelper.MemoryPosition;
             _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<Dictionary<string, List<int>>>();
+            var result = _cacheHelper.ReadAll<IterableDictionary<int, string>>();
 
             // Assert
             Assert.That(memoryUsed > 0);
             Assert.That(result.Count == complexData.Count);
-            Assert.That(result["first"].Count == 3);
-            Assert.That(result["second"].Count == 5);
-            Assert.That(result["third"].Count == 0);
+            Assert.That(result[1] == "first");
+            Assert.That(result[2] == "second");
+            Assert.That(result[3] == "third");
         }
 
         [Test]

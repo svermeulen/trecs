@@ -1,5 +1,3 @@
-#pragma warning disable TRECS128
-
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
@@ -51,19 +49,6 @@ namespace Trecs.Tests
             Assert.AreEqual(expected.Count, actual.Count, "Count mismatch");
             for (int i = 0; i < expected.Count; i++)
                 Assert.AreEqual(expected[i], actual[i], $"Mismatch at index {i}");
-        }
-
-        static void AssertDictionaryEqual<TKey, TValue>(
-            Dictionary<TKey, TValue> expected,
-            Dictionary<TKey, TValue> actual
-        )
-        {
-            Assert.AreEqual(expected.Count, actual.Count, "Count mismatch");
-            foreach (var kvp in expected)
-            {
-                Assert.IsTrue(actual.ContainsKey(kvp.Key), $"Missing key: {kvp.Key}");
-                Assert.AreEqual(kvp.Value, actual[kvp.Key], $"Value mismatch for key {kvp.Key}");
-            }
         }
 
         static void AssertIterableDictionaryEqual<TKey, TValue>(
@@ -217,81 +202,6 @@ namespace Trecs.Tests
         {
             var original = new[] { "hello", "world", "" };
             CollectionAssert.AreEqual(original, RoundTrip(original));
-        }
-
-        // ── Dictionary ─────────────────────────────────────────
-
-        [Test]
-        public void Dictionary_StringInt()
-        {
-            var original = new Dictionary<string, int> { { "a", 1 }, { "b", 2 } };
-            AssertDictionaryEqual(original, RoundTrip(original));
-        }
-
-        [Test]
-        public void Dictionary_IntString()
-        {
-            var original = new Dictionary<int, string> { { 1, "hello" }, { 2, "world" } };
-            AssertDictionaryEqual(original, RoundTrip(original));
-        }
-
-        [Test]
-        public void Dictionary_StringString()
-        {
-            var original = new Dictionary<string, string>
-            {
-                { "key1", "val1" },
-                { "key2", "val2" },
-            };
-            AssertDictionaryEqual(original, RoundTrip(original));
-        }
-
-        [Test]
-        public void Dictionary_IntInt()
-        {
-            var original = new Dictionary<int, int>
-            {
-                { 1, 10 },
-                { 2, 20 },
-                { 3, 30 },
-            };
-            AssertDictionaryEqual(original, RoundTrip(original));
-        }
-
-        [Test]
-        public void Dictionary_StringListInt()
-        {
-            var original = new Dictionary<string, List<int>>
-            {
-                {
-                    "nums",
-                    new List<int> { 1, 2, 3 }
-                },
-                { "empty", new List<int>() },
-            };
-            var result = RoundTrip(original);
-            Assert.AreEqual(original.Count, result.Count);
-            foreach (var kvp in original)
-            {
-                Assert.IsTrue(result.ContainsKey(kvp.Key), $"Missing key: {kvp.Key}");
-                AssertListEqual(kvp.Value, result[kvp.Key]);
-            }
-        }
-
-        // ── HashSet ─────────────────────────────────────────────
-
-        [Test]
-        public void HashSet_Int()
-        {
-            var original = new HashSet<int> { 1, 2, 3, 42 };
-            Assert.IsTrue(RoundTrip(original).SetEquals(original));
-        }
-
-        [Test]
-        public void HashSet_String()
-        {
-            var original = new HashSet<string> { "hello", "world" };
-            Assert.IsTrue(RoundTrip(original).SetEquals(original));
         }
 
         // ── Queue ───────────────────────────────────────────────

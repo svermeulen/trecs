@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
+using Trecs.Collections;
 using Trecs.Internal;
 using UnityEngine;
 using Assert = NUnit.Framework.Assert;
@@ -153,29 +154,6 @@ namespace Trecs.Tests
             Assert.That(result[0] == 1);
             Assert.That(result[1] == 2);
             Assert.That(result[2] == 3);
-        }
-
-        [Test]
-        public void DictionarySerializer_KeyCollisions_HandlesCorrectly()
-        {
-            // Test edge case with custom equality comparer that could cause issues
-            var flags = 0L;
-            var dict = new Dictionary<string, int>
-            {
-                { "key1", 100 },
-                { "key2", 200 },
-                { "KEY1", 300 }, // Different case - should be separate key
-            };
-
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(dict, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var result = _cacheHelper.ReadAll<Dictionary<string, int>>();
-
-            Assert.That(result.Count == 3);
-            Assert.That(result["key1"] == 100);
-            Assert.That(result["key2"] == 200);
-            Assert.That(result["KEY1"] == 300);
         }
 
         [Test]
@@ -367,21 +345,13 @@ namespace Trecs.Tests
             var resultList = _cacheHelper.ReadAll<List<int>>();
             Assert.That(resultList.Count == 0);
 
-            // Empty Dictionary
-            var emptyDict = new Dictionary<string, int>();
+            // Empty IterableDictionary
+            var emptyDict = new IterableDictionary<int, string>();
             _cacheHelper.ClearMemoryStream();
             _cacheHelper.WriteAll(emptyDict, TestConstants.Version, includeTypeChecks: true, flags);
             _cacheHelper.ResetMemoryPosition();
-            var resultDict = _cacheHelper.ReadAll<Dictionary<string, int>>();
+            var resultDict = _cacheHelper.ReadAll<IterableDictionary<int, string>>();
             Assert.That(resultDict.Count == 0);
-
-            // Empty HashSet
-            var emptySet = new HashSet<int>();
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(emptySet, TestConstants.Version, includeTypeChecks: true, flags);
-            _cacheHelper.ResetMemoryPosition();
-            var resultSet = _cacheHelper.ReadAll<HashSet<int>>();
-            Assert.That(resultSet.Count == 0);
         }
     }
 }

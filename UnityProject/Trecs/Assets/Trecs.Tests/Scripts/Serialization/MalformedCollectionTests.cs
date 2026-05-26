@@ -62,42 +62,6 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void Dictionary_MissingValueData_ThrowsException()
-        {
-            var originalDict = new Dictionary<int, string> { { 1, "one" }, { 2, "two" } };
-            var flags = 0L;
-
-            _cacheHelper.ClearMemoryStream();
-            _cacheHelper.WriteAll(
-                originalDict,
-                TestConstants.Version,
-                includeTypeChecks: true,
-                flags
-            );
-            var serializedData = _cacheHelper.MemoryStream.ToArray();
-
-            // Truncate after the keys but before all values are serialized
-            var truncatedData = new byte[serializedData.Length - 8]; // Remove some bytes
-            Array.Copy(serializedData, truncatedData, truncatedData.Length);
-
-            var newCacheHelper = new SerializationBuffer(_serializerRegistry);
-            try
-            {
-                newCacheHelper.LoadMemoryStreamFromArraySegment(
-                    new ArraySegment<byte>(truncatedData),
-                    truncatedData.Length
-                );
-                TrecsDebugAssert.Throws<Exception>(() =>
-                    newCacheHelper.ReadAll<Dictionary<int, string>>()
-                );
-            }
-            finally
-            {
-                newCacheHelper?.Dispose();
-            }
-        }
-
-        [Test]
         public void Collection_ZeroCountWithData_HandlesGracefully()
         {
             var list1 = new List<int>() { 1, 2, 3 };
