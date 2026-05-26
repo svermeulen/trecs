@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using NUnit.Framework;
+using Trecs.Collections;
 using Trecs.Internal;
 using NAssert = NUnit.Framework.Assert;
 
@@ -10,22 +10,24 @@ namespace Trecs.Tests
     [TestFixture]
     public class TopologicalSorterTests
     {
+        static IterableHashSet<int> SetOf(params int[] values)
+        {
+            var set = new IterableHashSet<int>(values.Length);
+            foreach (var v in values)
+                set.Add(v);
+            return set;
+        }
+
         [Test]
         public void LinearChain_ReturnsCorrectOrder()
         {
             var items = new List<string> { "A", "B", "C" };
 
-            var deps = new Dictionary<int, List<int>>
+            var deps = new Dictionary<int, IterableHashSet<int>>
             {
-                { 0, new List<int>() },
-                {
-                    1,
-                    new List<int> { 0 }
-                },
-                {
-                    2,
-                    new List<int> { 1 }
-                },
+                { 0, new IterableHashSet<int>() },
+                { 1, SetOf(0) },
+                { 2, SetOf(1) },
             };
 
             var result = TopologicalSorter.Run(
@@ -42,13 +44,9 @@ namespace Trecs.Tests
         public void NoDependencies_ReturnsSortedBySortKeys()
         {
             var items = new List<string> { "C", "A", "B" };
+            var empty = new IterableHashSet<int>();
 
-            var result = TopologicalSorter.Run(
-                items,
-                _ => Enumerable.Empty<int>(),
-                s => new[] { (int)s[0] },
-                s => s
-            );
+            var result = TopologicalSorter.Run(items, _ => empty, s => new[] { (int)s[0] }, s => s);
 
             NAssert.AreEqual(3, result.Count);
         }
@@ -59,17 +57,11 @@ namespace Trecs.Tests
             // Graph: 0 -> 1 -> 2 -> 1 (cycle between 1 and 2)
             var items = new List<string> { "Root", "NodeA", "NodeB" };
 
-            var deps = new Dictionary<int, List<int>>
+            var deps = new Dictionary<int, IterableHashSet<int>>
             {
-                { 0, new List<int>() },
-                {
-                    1,
-                    new List<int> { 0, 2 }
-                },
-                {
-                    2,
-                    new List<int> { 1 }
-                },
+                { 0, new IterableHashSet<int>() },
+                { 1, SetOf(0, 2) },
+                { 2, SetOf(1) },
             };
 
             var ex = NAssert.Throws<InvalidOperationException>(() =>
@@ -93,13 +85,7 @@ namespace Trecs.Tests
             // Graph: 0 -> 0 (self-loop)
             var items = new List<string> { "SelfLoop" };
 
-            var deps = new Dictionary<int, List<int>>
-            {
-                {
-                    0,
-                    new List<int> { 0 }
-                },
-            };
+            var deps = new Dictionary<int, IterableHashSet<int>> { { 0, SetOf(0) } };
 
             var ex = NAssert.Throws<InvalidOperationException>(() =>
                 TopologicalSorter.Run(items, i => deps[items.IndexOf(i)], _ => new[] { 0 }, s => s)
@@ -117,21 +103,12 @@ namespace Trecs.Tests
             // Graph: 0 -> 1 -> 2 -> 3 -> 1 (cycle: 1->2->3->1, root: 0)
             var items = new List<string> { "Root", "CycA", "CycB", "CycC" };
 
-            var deps = new Dictionary<int, List<int>>
+            var deps = new Dictionary<int, IterableHashSet<int>>
             {
-                { 0, new List<int>() },
-                {
-                    1,
-                    new List<int> { 0, 3 }
-                },
-                {
-                    2,
-                    new List<int> { 1 }
-                },
-                {
-                    3,
-                    new List<int> { 2 }
-                },
+                { 0, new IterableHashSet<int>() },
+                { 1, SetOf(0, 3) },
+                { 2, SetOf(1) },
+                { 3, SetOf(2) },
             };
 
             var ex = NAssert.Throws<InvalidOperationException>(() =>

@@ -1,3 +1,4 @@
+#pragma warning disable TRECS128
 using System.Collections.Generic;
 using NUnit.Framework;
 using Trecs.Internal;

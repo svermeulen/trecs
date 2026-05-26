@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Trecs.Collections;
 
 namespace Trecs.Internal
 {
@@ -11,7 +12,7 @@ namespace Trecs.Internal
         /// </summary>
         public static List<int> Run<T>(
             List<T> items,
-            Func<T, IEnumerable<int>> getDependencies,
+            Func<T, ReadOnlyIterableHashSet<int>> getDependencies,
             Func<T, int[]> getSortKeys,
             Func<T, string> itemToString
         )

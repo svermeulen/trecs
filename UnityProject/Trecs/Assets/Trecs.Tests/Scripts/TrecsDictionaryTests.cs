@@ -552,7 +552,9 @@ namespace Trecs.Tests
             var dict1 = TrecsDictionary.Alloc<int, float>(cs, 4);
             var dict2 = TrecsDictionary.Alloc<int, float>(cs, 4);
 
+#pragma warning disable CS1718
             NAssert.IsTrue(dict1 == dict1);
+#pragma warning restore CS1718
             NAssert.IsFalse(dict1 == dict2);
             NAssert.IsTrue(dict1 != dict2);
             NAssert.AreEqual(dict1.GetHashCode(), dict1.GetHashCode());

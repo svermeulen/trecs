@@ -12,13 +12,6 @@ namespace Trecs.Tests
         {
             // Collection serializers for testing
             registry.RegisterSerializer<ListSerializer<string>>();
-            registry.RegisterSerializer<DictionarySerializer<string, int>>();
-            registry.RegisterSerializer<DictionarySerializer<int, string>>();
-            registry.RegisterSerializer<DictionarySerializer<string, string>>();
-            registry.RegisterSerializer<DictionarySerializer<int, int>>();
-            registry.RegisterSerializer<DictionarySerializer<string, List<int>>>();
-            registry.RegisterSerializer<HashSetSerializer<int>>();
-            registry.RegisterSerializer<HashSetSerializer<string>>();
             registry.RegisterSerializer<QueueSerializer<int>>();
 
             // Array serializers for malformed collection tests

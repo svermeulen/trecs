@@ -1,3 +1,5 @@
+#pragma warning disable TRECS128
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -836,7 +838,7 @@ namespace Trecs
                             Priority = s.ExecutionPriority ?? 0,
                         };
                         var deps = s.SystemDependencies;
-                        if (deps != null)
+                        if (deps.IsValid)
                         {
                             foreach (var dep in deps)
                             {

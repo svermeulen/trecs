@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using Trecs.Collections;
 
 namespace Trecs.Internal
 {
@@ -24,7 +25,11 @@ namespace Trecs.Internal
             _accessorRegistry = accessorRegistry;
         }
 
-        void AddConstraint(Type before, Type after, Dictionary<Type, HashSet<Type>> directDeps)
+        void AddConstraint(
+            Type before,
+            Type after,
+            IterableDictionary<RefKey<Type>, IterableHashSet<RefKey<Type>>> directDeps
+        )
         {
             if (before == after)
             {
@@ -35,7 +40,7 @@ namespace Trecs.Internal
 
             if (!directDeps.ContainsKey(after))
             {
-                directDeps[after] = new HashSet<Type>();
+                directDeps[after] = new();
             }
 
             directDeps[after].Add(before);
@@ -43,7 +48,7 @@ namespace Trecs.Internal
 
         void AddSystemAttributeContraints(
             ISystem system,
-            Dictionary<Type, HashSet<Type>> directDeps
+            IterableDictionary<RefKey<Type>, IterableHashSet<RefKey<Type>>> directDeps
         )
         {
             _log.Trace("Adding system constraint for system {0}", system.GetType());
@@ -76,9 +81,11 @@ namespace Trecs.Internal
             }
         }
 
-        Dictionary<Type, HashSet<Type>> InitializeSystemConstraints(IReadOnlyList<ISystem> systems)
+        IterableDictionary<RefKey<Type>, IterableHashSet<RefKey<Type>>> InitializeSystemConstraints(
+            IReadOnlyList<ISystem> systems
+        )
         {
-            var directDeps = new Dictionary<Type, HashSet<Type>>();
+            var directDeps = new IterableDictionary<RefKey<Type>, IterableHashSet<RefKey<Type>>>();
 
             foreach (var system in systems)
             {
@@ -115,7 +122,7 @@ namespace Trecs.Internal
 
             var result = new List<SystemEntry>();
 
-            var typeToIndexMap = new Dictionary<Type, List<int>>();
+            var typeToIndexMap = new IterableDictionary<RefKey<Type>, List<int>>();
 
             // We assume here there is only ever one instance of each system
             for (int i = 0; i < systems.Count; i++)
@@ -132,18 +139,33 @@ namespace Trecs.Internal
                 indices.Add(i);
             }
 
-            foreach (var systemType in directDeps.Keys)
+            if (TrecsDebugAssert.IsEnabled)
             {
-                // Need to do this because of the logic above that only constrains order to previous
-                // system in a given constraint list
-                // Support base class / interface matching: a constraint referencing a base type
-                // is satisfied if any registered system is assignable to that type
-                TrecsDebugAssert.That(
-                    typeToIndexMap.ContainsKey(systemType)
-                        || typeToIndexMap.Keys.Any(t => systemType.IsAssignableFrom(t)),
-                    "Added system constraint for system {0} which is not in the system list",
-                    systemType
-                );
+                foreach (var systemType in directDeps.Keys)
+                {
+                    // Need to do this because of the logic above that only constrains order to previous
+                    // system in a given constraint list
+                    // Support base class / interface matching: a constraint referencing a base type
+                    // is satisfied if any registered system is assignable to that type
+                    bool found = typeToIndexMap.ContainsKey(systemType);
+                    if (!found)
+                    {
+                        foreach (var t in typeToIndexMap.Keys)
+                        {
+                            if (systemType.Value.IsAssignableFrom(t.Value))
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    TrecsDebugAssert.That(
+                        found,
+                        "Added system constraint for system {0} which is not in the system list",
+                        systemType
+                    );
+                }
             }
 
             for (int i = 0; i < systems.Count; i++)
@@ -153,7 +175,7 @@ namespace Trecs.Internal
 
                 // Gather dependency types from this type and all its base types,
                 // so constraints placed on a base class apply to concrete subclasses
-                var allDirectDepsTypes = new HashSet<Type>();
+                var allDirectDepsTypes = new IterableHashSet<RefKey<Type>>();
                 for (var type = systemType; type != null; type = type.BaseType)
                 {
                     if (directDeps.TryGetValue(type, out var depsForType))
@@ -169,7 +191,17 @@ namespace Trecs.Internal
 #if DEBUG
                     foreach (var type in allDirectDepsTypes)
                     {
-                        if (!typeToIndexMap.Keys.Any(t => type.IsAssignableFrom(t)))
+                        bool depFound = false;
+                        foreach (var t in typeToIndexMap.Keys)
+                        {
+                            if (type.Value.IsAssignableFrom(t.Value))
+                            {
+                                depFound = true;
+                                break;
+                            }
+                        }
+
+                        if (!depFound)
                         {
                             _log.Warning(
                                 "System {0} depends on system {1} which is not in the system list",
@@ -180,16 +212,23 @@ namespace Trecs.Internal
                     }
 #endif
 
-                    // Resolve each dependency type to indices, supporting base class matching:
-                    // a dependency on BaseType matches any registered system that inherits from it
-                    directDepsIndices = allDirectDepsTypes
-                        .SelectMany(depType =>
-                            typeToIndexMap
-                                .Where(kvp => depType.IsAssignableFrom(kvp.Key))
-                                .SelectMany(kvp => kvp.Value)
-                        )
-                        .Distinct()
-                        .ToList();
+                    directDepsIndices = new List<int>();
+                    foreach (var depType in allDirectDepsTypes)
+                    {
+                        foreach (var kvp in typeToIndexMap)
+                        {
+                            if (depType.Value.IsAssignableFrom(kvp.Key.Value))
+                            {
+                                foreach (var idx in kvp.Value)
+                                {
+                                    if (!directDepsIndices.Contains(idx))
+                                    {
+                                        directDepsIndices.Add(idx);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 else
                 {

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using Trecs.Collections;
 using Trecs.Internal;
 
 namespace Trecs
@@ -30,7 +30,7 @@ namespace Trecs
     {
         public SystemEntry(
             ISystem system,
-            IReadOnlyCollection<int> systemDependencies,
+            ReadOnlyList<int> systemDependencies,
             SystemPhase phase,
             WorldAccessor accessor,
             string debugName,
@@ -39,7 +39,6 @@ namespace Trecs
         {
             TrecsDebugAssert.IsNotNull(system);
             TrecsDebugAssert.IsNotNull(debugName);
-            TrecsDebugAssert.IsNotNull(systemDependencies);
 
             System = system;
             SystemDependencies = systemDependencies;
@@ -58,7 +57,7 @@ namespace Trecs
 
         public SystemPhase Phase { get; }
         public ISystem System { get; }
-        public IReadOnlyCollection<int> SystemDependencies { get; }
+        public ReadOnlyList<int> SystemDependencies { get; }
         public string DebugName { get; }
 
         /// <summary>

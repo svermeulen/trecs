@@ -1,3 +1,5 @@
+#pragma warning disable TRECS128
+
 using System;
 using System.Collections.Generic;
 

@@ -23,5 +23,14 @@ namespace Trecs
         /// Default is null (no prefix stripping).
         /// </summary>
         public string? ComponentPrefix { get; set; }
+
+        /// <summary>
+        /// When true, the non-deterministic collection iteration analyzer (TRECS128/129)
+        /// flags iteration over Dictionary, HashSet, IDictionary, IReadOnlyDictionary,
+        /// NativeHashMap, and NativeHashSet in all code, not just inside fixed-update
+        /// ISystem classes.
+        /// Default is false (only flag inside fixed-update systems).
+        /// </summary>
+        public bool GlobalCollectionIterationCheck { get; set; }
     }
 }

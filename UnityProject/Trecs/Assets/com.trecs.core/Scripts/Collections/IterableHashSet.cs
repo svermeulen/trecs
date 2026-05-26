@@ -19,7 +19,7 @@ namespace Trecs.Collections
     public sealed class IterableHashSet<T>
         where T : struct, IEquatable<T>
     {
-        private static readonly HashSetEmptyValue EMPTY_VALUE = new HashSetEmptyValue();
+        private static readonly HashSetEmptyValue EMPTY_VALUE = new();
         private readonly IterableDictionary<T, HashSetEmptyValue> _dictionary;
 
         public IterableHashSet()
@@ -31,6 +31,12 @@ namespace Trecs.Collections
         }
 
         public bool IsEmpty => _dictionary.Count == 0;
+
+        public IterableDictionaryNode<T>[] UnsafeValues
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _dictionary.UnsafeKeys;
+        }
 
         public int Count
         {
@@ -186,7 +192,7 @@ namespace Trecs.Collections
                 return false;
             }
 
-            public T Current => _dictionary.UnsafeKeys[_index].Key;
+            public readonly T Current => _dictionary.UnsafeKeys[_index].Key;
         }
 
         // Empty value struct used as placeholder in the dictionary

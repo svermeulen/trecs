@@ -9,18 +9,22 @@ namespace Trecs.SourceGen.Tests;
 [TestFixture]
 public class Diagnostics_TRECS128_to_129_DictionaryIterationTests
 {
-    // ── TRECS128: Dictionary<K,V> iteration ────────────────────────────
+    const string GlobalCheckPrefix =
+        "using System.Collections.Generic;\n"
+        + "[assembly: Trecs.TrecsSourceGenSettings(GlobalCollectionIterationCheck = true)]\n";
+
+    // ── Default behavior: only fires in fixed-update ISystem ───────────
 
     [Test]
-    public void TRECS128_ForeachOverDictionary_Fires()
+    public void TRECS128_InFixedSystem_Fires()
     {
         const string source = """
             using System.Collections.Generic;
             namespace Sample
             {
-                public class Foo
+                partial class MySystem : Trecs.ISystem
                 {
-                    public void Run()
+                    public void Execute()
                     {
                         var dict = new Dictionary<int, string>();
                         foreach (var kv in dict) { }
@@ -33,106 +37,19 @@ public class Diagnostics_TRECS128_to_129_DictionaryIterationTests
     }
 
     [Test]
-    public void TRECS128_ForeachOverDictionaryKeys_Fires()
+    public void TRECS128_InPresentationSystem_DoesNotFire()
     {
         const string source = """
             using System.Collections.Generic;
             namespace Sample
             {
-                public class Foo
+                [Trecs.ExecuteIn(Trecs.SystemPhase.Presentation)]
+                partial class MySystem : Trecs.ISystem
                 {
-                    public void Run()
+                    public void Execute()
                     {
                         var dict = new Dictionary<int, string>();
-                        foreach (var k in dict.Keys) { }
-                    }
-                }
-            }
-            """;
-
-        AssertFires(source, "TRECS128");
-    }
-
-    [Test]
-    public void TRECS128_ForeachOverDictionaryValues_Fires()
-    {
-        const string source = """
-            using System.Collections.Generic;
-            namespace Sample
-            {
-                public class Foo
-                {
-                    public void Run()
-                    {
-                        var dict = new Dictionary<int, string>();
-                        foreach (var v in dict.Values) { }
-                    }
-                }
-            }
-            """;
-
-        AssertFires(source, "TRECS128");
-    }
-
-    // ── TRECS128: IDictionary / IReadOnlyDictionary iteration ─────────
-
-    [Test]
-    public void TRECS128_ForeachOverIDictionary_Fires()
-    {
-        const string source = """
-            using System.Collections.Generic;
-            namespace Sample
-            {
-                public class Foo
-                {
-                    public void Run()
-                    {
-                        IDictionary<int, string> dict = new Dictionary<int, string>();
                         foreach (var kv in dict) { }
-                    }
-                }
-            }
-            """;
-
-        AssertFires(source, "TRECS128");
-    }
-
-    [Test]
-    public void TRECS128_ForeachOverIReadOnlyDictionary_Fires()
-    {
-        const string source = """
-            using System.Collections.Generic;
-            namespace Sample
-            {
-                public class Foo
-                {
-                    public void Run()
-                    {
-                        IReadOnlyDictionary<int, string> dict = new Dictionary<int, string>();
-                        foreach (var kv in dict) { }
-                    }
-                }
-            }
-            """;
-
-        AssertFires(source, "TRECS128");
-    }
-
-    [Test]
-    public void TRECS128_IDictionaryIndexAccess_DoesNotFire()
-    {
-        const string source = """
-            using System.Collections.Generic;
-            namespace Sample
-            {
-                public class Foo
-                {
-                    public void Run()
-                    {
-                        IDictionary<int, string> dict = new Dictionary<int, string>();
-                        dict[1] = "hello";
-                        var val = dict[1];
-                        dict.ContainsKey(1);
                     }
                 }
             }
@@ -142,7 +59,7 @@ public class Diagnostics_TRECS128_to_129_DictionaryIterationTests
     }
 
     [Test]
-    public void TRECS128_GetEnumeratorOnDictionary_Fires()
+    public void TRECS128_InNonSystem_DoesNotFire_ByDefault()
     {
         const string source = """
             using System.Collections.Generic;
@@ -153,11 +70,145 @@ public class Diagnostics_TRECS128_to_129_DictionaryIterationTests
                     public void Run()
                     {
                         var dict = new Dictionary<int, string>();
-                        var e = dict.GetEnumerator();
+                        foreach (var kv in dict) { }
                     }
                 }
             }
             """;
+
+        AssertDoesNotFire(source, "TRECS128");
+    }
+
+    // ── GlobalCollectionIterationCheck = true ──────────────────────────
+
+    [Test]
+    public void TRECS128_ForeachOverDictionary_Global_Fires()
+    {
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
+                {
+                    public class Foo
+                    {
+                        public void Run()
+                        {
+                            var dict = new System.Collections.Generic.Dictionary<int, string>();
+                            foreach (var kv in dict) { }
+                        }
+                    }
+                }
+                """;
+
+        AssertFires(source, "TRECS128");
+    }
+
+    [Test]
+    public void TRECS128_ForeachOverDictionaryKeys_Global_Fires()
+    {
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
+                {
+                    public class Foo
+                    {
+                        public void Run()
+                        {
+                            var dict = new Dictionary<int, string>();
+                            foreach (var k in dict.Keys) { }
+                        }
+                    }
+                }
+                """;
+
+        AssertFires(source, "TRECS128");
+    }
+
+    [Test]
+    public void TRECS128_ForeachOverDictionaryValues_Global_Fires()
+    {
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
+                {
+                    public class Foo
+                    {
+                        public void Run()
+                        {
+                            var dict = new Dictionary<int, string>();
+                            foreach (var v in dict.Values) { }
+                        }
+                    }
+                }
+                """;
+
+        AssertFires(source, "TRECS128");
+    }
+
+    [Test]
+    public void TRECS128_ForeachOverIDictionary_Global_Fires()
+    {
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
+                {
+                    public class Foo
+                    {
+                        public void Run()
+                        {
+                            IDictionary<int, string> dict = new Dictionary<int, string>();
+                            foreach (var kv in dict) { }
+                        }
+                    }
+                }
+                """;
+
+        AssertFires(source, "TRECS128");
+    }
+
+    [Test]
+    public void TRECS128_ForeachOverIReadOnlyDictionary_Global_Fires()
+    {
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
+                {
+                    public class Foo
+                    {
+                        public void Run()
+                        {
+                            IReadOnlyDictionary<int, string> dict = new Dictionary<int, string>();
+                            foreach (var kv in dict) { }
+                        }
+                    }
+                }
+                """;
+
+        AssertFires(source, "TRECS128");
+    }
+
+    [Test]
+    public void TRECS128_GetEnumeratorOnDictionary_Global_Fires()
+    {
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
+                {
+                    public class Foo
+                    {
+                        public void Run()
+                        {
+                            var dict = new Dictionary<int, string>();
+                            var e = dict.GetEnumerator();
+                        }
+                    }
+                }
+                """;
 
         AssertFires(source, "TRECS128");
     }
@@ -165,23 +216,24 @@ public class Diagnostics_TRECS128_to_129_DictionaryIterationTests
     [Test]
     public void TRECS128_DictionaryIndexAccess_DoesNotFire()
     {
-        const string source = """
-            using System.Collections.Generic;
-            namespace Sample
-            {
-                public class Foo
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
                 {
-                    public void Run()
+                    public class Foo
                     {
-                        var dict = new Dictionary<int, string>();
-                        dict[1] = "hello";
-                        var val = dict[1];
-                        dict.TryGetValue(1, out var x);
-                        dict.ContainsKey(1);
+                        public void Run()
+                        {
+                            var dict = new Dictionary<int, string>();
+                            dict[1] = "hello";
+                            var val = dict[1];
+                            dict.TryGetValue(1, out var x);
+                            dict.ContainsKey(1);
+                        }
                     }
                 }
-            }
-            """;
+                """;
 
         AssertDoesNotFire(source, "TRECS128");
     }
@@ -189,64 +241,45 @@ public class Diagnostics_TRECS128_to_129_DictionaryIterationTests
     [Test]
     public void TRECS128_ForeachOverList_DoesNotFire()
     {
-        const string source = """
-            using System.Collections.Generic;
-            namespace Sample
-            {
-                public class Foo
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
                 {
-                    public void Run()
+                    public class Foo
                     {
-                        var list = new List<int>();
-                        foreach (var x in list) { }
+                        public void Run()
+                        {
+                            var list = new List<int>();
+                            foreach (var x in list) { }
+                        }
                     }
                 }
-            }
-            """;
+                """;
 
         AssertDoesNotFire(source, "TRECS128");
     }
 
-    // ── TRECS128: HashSet<T> iteration ─────────────────────────────────
+    // ── HashSet (global mode) ──────────────────────────────────────────
 
     [Test]
-    public void TRECS128_ForeachOverHashSet_Fires()
+    public void TRECS128_ForeachOverHashSet_Global_Fires()
     {
-        const string source = """
-            using System.Collections.Generic;
-            namespace Sample
-            {
-                public class Foo
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
                 {
-                    public void Run()
+                    public class Foo
                     {
-                        var set = new HashSet<int>();
-                        foreach (var x in set) { }
+                        public void Run()
+                        {
+                            var set = new HashSet<int>();
+                            foreach (var x in set) { }
+                        }
                     }
                 }
-            }
-            """;
-
-        AssertFires(source, "TRECS128");
-    }
-
-    [Test]
-    public void TRECS128_GetEnumeratorOnHashSet_Fires()
-    {
-        const string source = """
-            using System.Collections.Generic;
-            namespace Sample
-            {
-                public class Foo
-                {
-                    public void Run()
-                    {
-                        var set = new HashSet<int>();
-                        var e = set.GetEnumerator();
-                    }
-                }
-            }
-            """;
+                """;
 
         AssertFires(source, "TRECS128");
     }
@@ -254,83 +287,46 @@ public class Diagnostics_TRECS128_to_129_DictionaryIterationTests
     [Test]
     public void TRECS128_HashSetContains_DoesNotFire()
     {
-        const string source = """
-            using System.Collections.Generic;
-            namespace Sample
-            {
-                public class Foo
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
                 {
-                    public void Run()
+                    public class Foo
                     {
-                        var set = new HashSet<int>();
-                        set.Add(1);
-                        var has = set.Contains(1);
+                        public void Run()
+                        {
+                            var set = new HashSet<int>();
+                            set.Add(1);
+                            var has = set.Contains(1);
+                        }
                     }
                 }
-            }
-            """;
+                """;
 
         AssertDoesNotFire(source, "TRECS128");
     }
 
-    // ── TRECS129: NativeHashMap iteration ──────────────────────────────
+    // ── NativeHashMap (global mode) ────────────────────────────────────
 
     [Test]
-    public void TRECS129_ForeachOverNativeHashMap_Fires()
+    public void TRECS129_ForeachOverNativeHashMap_Global_Fires()
     {
-        const string source = """
-            namespace Sample
-            {
-                public class Foo
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
                 {
-                    public void Run()
+                    public class Foo
                     {
-                        var map = new Unity.Collections.NativeHashMap<int, int>();
-                        foreach (var kv in map) { }
+                        public void Run()
+                        {
+                            var map = new Unity.Collections.NativeHashMap<int, int>();
+                            foreach (var kv in map) { }
+                        }
                     }
                 }
-            }
-            """;
-
-        AssertFires(source, "TRECS129");
-    }
-
-    [Test]
-    public void TRECS129_GetEnumeratorOnNativeHashMap_Fires()
-    {
-        const string source = """
-            namespace Sample
-            {
-                public class Foo
-                {
-                    public void Run()
-                    {
-                        var map = new Unity.Collections.NativeHashMap<int, int>();
-                        var e = map.GetEnumerator();
-                    }
-                }
-            }
-            """;
-
-        AssertFires(source, "TRECS129");
-    }
-
-    [Test]
-    public void TRECS129_ForeachOverNativeParallelHashMap_Fires()
-    {
-        const string source = """
-            namespace Sample
-            {
-                public class Foo
-                {
-                    public void Run()
-                    {
-                        var map = new Unity.Collections.NativeParallelHashMap<int, int>();
-                        foreach (var kv in map) { }
-                    }
-                }
-            }
-            """;
+                """;
 
         AssertFires(source, "TRECS129");
     }
@@ -338,65 +334,49 @@ public class Diagnostics_TRECS128_to_129_DictionaryIterationTests
     [Test]
     public void TRECS129_NativeHashMapIndexAccess_DoesNotFire()
     {
-        const string source = """
-            namespace Sample
-            {
-                public class Foo
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
                 {
-                    public void Run()
+                    public class Foo
                     {
-                        var map = new Unity.Collections.NativeHashMap<int, int>();
-                        map[1] = 42;
-                        var val = map[1];
+                        public void Run()
+                        {
+                            var map = new Unity.Collections.NativeHashMap<int, int>();
+                            map[1] = 42;
+                            var val = map[1];
+                        }
                     }
                 }
-            }
-            """;
+                """;
 
         AssertDoesNotFire(source, "TRECS129");
     }
 
-    // ── TRECS129: NativeHashSet iteration ─────────────────────────────
-
     [Test]
-    public void TRECS129_ForeachOverNativeHashSet_Fires()
+    public void TRECS129_ForeachOverNativeHashSet_Global_Fires()
     {
-        const string source = """
-            namespace Sample
-            {
-                public class Foo
+        var source =
+            GlobalCheckPrefix
+            + """
+                namespace Sample
                 {
-                    public void Run()
+                    public class Foo
                     {
-                        var set = new Unity.Collections.NativeHashSet<int>();
-                        foreach (var x in set) { }
+                        public void Run()
+                        {
+                            var set = new Unity.Collections.NativeHashSet<int>();
+                            foreach (var x in set) { }
+                        }
                     }
                 }
-            }
-            """;
+                """;
 
         AssertFires(source, "TRECS129");
     }
 
-    [Test]
-    public void TRECS129_NativeHashSetContains_DoesNotFire()
-    {
-        const string source = """
-            namespace Sample
-            {
-                public class Foo
-                {
-                    public void Run()
-                    {
-                        var set = new Unity.Collections.NativeHashSet<int>();
-                        var has = set.Contains(1);
-                    }
-                }
-            }
-            """;
-
-        AssertDoesNotFire(source, "TRECS129");
-    }
+    // ── Helpers ────────────────────────────────────────────────────────
 
     static void AssertFires(string source, string expectedId)
     {

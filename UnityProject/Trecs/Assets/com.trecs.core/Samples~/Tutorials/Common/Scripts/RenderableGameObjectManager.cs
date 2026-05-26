@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Trecs.Collections;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -10,7 +11,7 @@ namespace Trecs.Samples
         readonly DisposeCollection _subscriptions = new();
         readonly Dictionary<int, Func<GameObject>> _factories = new();
         readonly Dictionary<int, Stack<GameObject>> _pools = new();
-        readonly Dictionary<int, GameObject> _activeById = new();
+        readonly IterableDictionary<int, GameObject> _activeById = new();
         readonly Dictionary<int, int> _goIdToPrefabId = new();
         readonly Transform _activeParent;
         readonly Transform _inactiveParent;
@@ -62,7 +63,7 @@ namespace Trecs.Samples
             Debug.Assert(renderable.GameObjectId.Value > 0);
 
             var go = _activeById[renderable.GameObjectId.Value];
-            var wasRemoved = _activeById.Remove(renderable.GameObjectId.Value);
+            var wasRemoved = _activeById.TryRemove(renderable.GameObjectId.Value);
             Debug.Assert(wasRemoved);
 
             wasRemoved = _goIdToPrefabId.Remove(renderable.GameObjectId.Value);

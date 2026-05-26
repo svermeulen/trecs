@@ -7,6 +7,18 @@ namespace Trecs.Internal
 {
     public static class TrecsDebugAssert
     {
+        public static bool IsEnabled
+        {
+            get
+            {
+#if DEBUG
+                return true;
+#else
+                return false;
+#endif
+            }
+        }
+
         [Conditional("DEBUG")]
         public static void That(bool condition)
         {

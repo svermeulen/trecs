@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
+using Trecs.Collections;
 
 namespace Trecs.Internal
 {
@@ -24,11 +25,11 @@ namespace Trecs.Internal
             IReadOnlyList<SystemEntry> allSystems,
             List<int> phaseSystems,
             List<int> globalToLocalIndexMap,
-            List<HashSet<int>> systemDepsMap,
+            List<IterableHashSet<int>> systemDepsMap,
             SystemPhase phaseToSort
         )
         {
-            var localDepsList = new List<HashSet<int>>(phaseSystems.Count);
+            var localDepsList = new List<IterableHashSet<int>>(phaseSystems.Count);
 
             for (
                 int systemLocalIndex = 0;
@@ -38,7 +39,7 @@ namespace Trecs.Internal
             {
                 var systemGlobalIndex = phaseSystems[systemLocalIndex];
                 var systemInfo = allSystems[systemGlobalIndex];
-                var localDeps = new HashSet<int>();
+                var localDeps = new IterableHashSet<int>();
                 localDepsList.Add(localDeps);
 
                 TrecsDebugAssert.That(systemInfo.Phase == phaseToSort);
@@ -60,9 +61,7 @@ namespace Trecs.Internal
             // should throw if this is not possible
             var sortedLocal = TopologicalSorter.Run(
                 phaseSystems,
-                globalIndex =>
-                    localDepsList[globalToLocalIndexMap[globalIndex]]
-                        .OrderBy(x => allSystems[globalIndex].DeclarationIndex),
+                globalIndex => localDepsList[globalToLocalIndexMap[globalIndex]],
                 globalIndex => GetSystemEntryOrderBy(allSystems[globalIndex]),
                 globalIndex => allSystems[globalIndex].DebugName
             );
@@ -136,7 +135,7 @@ namespace Trecs.Internal
             };
 
             var globalToLocalIndexMap = new List<int>(entries.Count);
-            var systemDepsMap = new List<HashSet<int>>(entries.Count);
+            var systemDepsMap = new List<IterableHashSet<int>>(entries.Count);
 
             if (_log.IsDebugEnabled())
             {
@@ -158,7 +157,12 @@ namespace Trecs.Internal
                 var entry = entries[i];
                 entry.DeclarationIndex = i;
 
-                var depsSet = entry.SystemDependencies.ToHashSet();
+                var depsSet = new IterableHashSet<int>(entry.SystemDependencies.Count);
+
+                foreach (var value in entry.SystemDependencies)
+                {
+                    depsSet.Add(value);
+                }
                 TrecsDebugAssert.That(
                     !depsSet.Contains(i),
                     "System {0} found to depend on itself",

@@ -259,6 +259,14 @@ internal static class TrecsStubs
             public interface IEntitySet { }
             public interface ITemplate { }
 
+            // Assembly-level settings — see Packages/com.trecs.core/Scripts/SourceGen/TrecsSourceGenSettingsAttribute.cs
+            [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = false)]
+            public sealed class TrecsSourceGenSettingsAttribute : System.Attribute
+            {
+                public string? ComponentPrefix { get; set; }
+                public bool GlobalCollectionIterationCheck { get; set; }
+            }
+
             // [NonCopyable] / [Copyable] — picked up by NonCopyableAnalyzer
             // (TRECS118-120) via attribute + IEntityComponent lookup on the target.
             // Real types live at com.trecs.core/Scripts/SourceGen/NonCopyableAttribute.cs

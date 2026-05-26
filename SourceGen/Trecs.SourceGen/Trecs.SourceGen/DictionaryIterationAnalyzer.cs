@@ -1,10 +1,12 @@
 #nullable enable
 
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
+using Trecs.SourceGen.Shared;
 
 namespace Trecs.SourceGen
 {
@@ -27,12 +29,30 @@ namespace Trecs.SourceGen
                 if (!ReferencesTrecs(start.Compilation))
                     return;
 
-                start.RegisterOperationAction(AnalyzeForEach, OperationKind.Loop);
-                start.RegisterOperationAction(AnalyzeInvocation, OperationKind.Invocation);
+                bool globalCheck = ReadGlobalCheckSetting(start.Compilation);
+
+                var systemCache = globalCheck
+                    ? null
+                    : new ConcurrentDictionary<INamedTypeSymbol, bool>(
+                        SymbolEqualityComparer.Default
+                    );
+
+                start.RegisterOperationAction(
+                    ctx => AnalyzeForEach(ctx, globalCheck, systemCache),
+                    OperationKind.Loop
+                );
+                start.RegisterOperationAction(
+                    ctx => AnalyzeInvocation(ctx, globalCheck, systemCache),
+                    OperationKind.Invocation
+                );
             });
         }
 
-        static void AnalyzeForEach(OperationAnalysisContext context)
+        static void AnalyzeForEach(
+            OperationAnalysisContext context,
+            bool globalCheck,
+            ConcurrentDictionary<INamedTypeSymbol, bool>? systemCache
+        )
         {
             if (context.Operation is not IForEachLoopOperation forEach)
                 return;
@@ -44,11 +64,17 @@ namespace Trecs.SourceGen
             ReportIfNonDeterministic(
                 context,
                 collectionType,
-                forEach.Collection.Syntax.GetLocation()
+                forEach.Collection.Syntax.GetLocation(),
+                globalCheck,
+                systemCache
             );
         }
 
-        static void AnalyzeInvocation(OperationAnalysisContext context)
+        static void AnalyzeInvocation(
+            OperationAnalysisContext context,
+            bool globalCheck,
+            ConcurrentDictionary<INamedTypeSymbol, bool>? systemCache
+        )
         {
             var invocation = (IInvocationOperation)context.Operation;
 
@@ -59,13 +85,21 @@ namespace Trecs.SourceGen
             if (receiverType == null)
                 return;
 
-            ReportIfNonDeterministic(context, receiverType, invocation.Syntax.GetLocation());
+            ReportIfNonDeterministic(
+                context,
+                receiverType,
+                invocation.Syntax.GetLocation(),
+                globalCheck,
+                systemCache
+            );
         }
 
         static void ReportIfNonDeterministic(
             OperationAnalysisContext context,
             ITypeSymbol type,
-            Location location
+            Location location,
+            bool globalCheck,
+            ConcurrentDictionary<INamedTypeSymbol, bool>? systemCache
         )
         {
             var named = type as INamedTypeSymbol;
@@ -74,18 +108,15 @@ namespace Trecs.SourceGen
 
             var original = named.OriginalDefinition;
 
-            // Fast short-circuit on type name before any namespace resolution
+            DiagnosticDescriptor? descriptor = null;
+            string? replacement = null;
+
             switch (original.Name)
             {
                 case "Dictionary" when IsInNamespace(original, "System.Collections.Generic"):
-                    Report(
-                        context,
-                        location,
-                        type,
-                        DiagnosticDescriptors.DictionaryIteration,
-                        "IterableDictionary<TKey, TValue>"
-                    );
-                    return;
+                    descriptor = DiagnosticDescriptors.DictionaryIteration;
+                    replacement = "IterableDictionary<TKey, TValue>";
+                    break;
 
                 case "KeyCollection"
                 or "ValueCollection"
@@ -94,68 +125,49 @@ namespace Trecs.SourceGen
                             container.OriginalDefinition,
                             "System.Collections.Generic"
                         ):
-                    Report(
-                        context,
-                        location,
-                        type,
-                        DiagnosticDescriptors.DictionaryIteration,
-                        "IterableDictionary<TKey, TValue>"
-                    );
-                    return;
+                    descriptor = DiagnosticDescriptors.DictionaryIteration;
+                    replacement = "IterableDictionary<TKey, TValue>";
+                    break;
 
                 case "IDictionary"
                 or "IReadOnlyDictionary" when IsInNamespace(original, "System.Collections.Generic"):
-                    Report(
-                        context,
-                        location,
-                        type,
-                        DiagnosticDescriptors.DictionaryIteration,
-                        "IReadOnlyIterableDictionary<TKey, TValue>"
-                    );
-                    return;
+                    descriptor = DiagnosticDescriptors.DictionaryIteration;
+                    replacement = "IReadOnlyIterableDictionary<TKey, TValue>";
+                    break;
 
                 case "HashSet" when IsInNamespace(original, "System.Collections.Generic"):
-                    Report(
-                        context,
-                        location,
-                        type,
-                        DiagnosticDescriptors.DictionaryIteration,
-                        "IterableHashSet<T>"
-                    );
-                    return;
+                    descriptor = DiagnosticDescriptors.DictionaryIteration;
+                    replacement = "IterableHashSet<T>";
+                    break;
 
                 case "NativeHashMap"
                 or "NativeParallelHashMap"
                 or "NativeParallelMultiHashMap" when IsInNamespace(original, "Unity.Collections"):
-                    Report(
-                        context,
-                        location,
-                        type,
-                        DiagnosticDescriptors.NativeHashMapIteration,
-                        "NativeIterableDictionary<TKey, TValue>"
-                    );
-                    return;
+                    descriptor = DiagnosticDescriptors.NativeHashMapIteration;
+                    replacement = "NativeIterableDictionary<TKey, TValue>";
+                    break;
 
                 case "NativeHashSet" when IsInNamespace(original, "Unity.Collections"):
-                    Report(
-                        context,
-                        location,
-                        type,
-                        DiagnosticDescriptors.NativeHashMapIteration,
-                        "NativeIterableDictionary<TKey, TValue> (keys only)"
-                    );
+                    descriptor = DiagnosticDescriptors.NativeHashMapIteration;
+                    replacement = "NativeIterableDictionary<TKey, TValue> (keys only)";
+                    break;
+            }
+
+            if (descriptor == null)
+                return;
+
+            if (!globalCheck)
+            {
+                var containingType = FixedUpdateSystemHelper.GetContainingNamedType(
+                    context.ContainingSymbol
+                );
+                if (containingType == null)
+                    return;
+
+                if (!FixedUpdateSystemHelper.IsFixedUpdateSystem(containingType, systemCache!))
                     return;
             }
-        }
 
-        static void Report(
-            OperationAnalysisContext context,
-            Location location,
-            ITypeSymbol type,
-            DiagnosticDescriptor descriptor,
-            string replacement
-        )
-        {
             context.ReportDiagnostic(
                 Diagnostic.Create(
                     descriptor,
@@ -169,6 +181,29 @@ namespace Trecs.SourceGen
         static bool IsInNamespace(ITypeSymbol type, string expectedNamespace)
         {
             return type.ContainingNamespace?.ToDisplayString() == expectedNamespace;
+        }
+
+        static bool ReadGlobalCheckSetting(Compilation compilation)
+        {
+            foreach (var attr in compilation.Assembly.GetAttributes())
+            {
+                if (attr.AttributeClass?.Name != TrecsAttributeNames.SourceGenSettings)
+                    continue;
+                if (attr.AttributeClass?.ContainingNamespace?.ToDisplayString() != "Trecs")
+                    continue;
+
+                foreach (var namedArg in attr.NamedArguments)
+                {
+                    if (
+                        namedArg.Key == "GlobalCollectionIterationCheck"
+                        && namedArg.Value.Value is bool value
+                    )
+                    {
+                        return value;
+                    }
+                }
+            }
+            return false;
         }
 
         static bool ReferencesTrecs(Compilation compilation)

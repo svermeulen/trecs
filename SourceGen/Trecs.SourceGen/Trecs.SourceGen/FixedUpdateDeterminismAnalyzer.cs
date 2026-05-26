@@ -6,19 +6,13 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
+using Trecs.SourceGen.Shared;
 
 namespace Trecs.SourceGen
 {
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class FixedUpdateDeterminismAnalyzer : DiagnosticAnalyzer
     {
-        const string TrecsNamespace = "Trecs";
-        const string ISystemName = "ISystem";
-        const string ExecuteInAttributeName = "ExecuteInAttribute";
-
-        // SystemPhase.Fixed == 1 in the enum
-        const int FixedPhaseValue = 1;
-
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
             ImmutableArray.Create(DiagnosticDescriptors.NonDeterministicApiInFixedUpdate);
 
@@ -199,11 +193,13 @@ namespace Trecs.SourceGen
             string suggestion
         )
         {
-            var containingType = GetContainingNamedType(context.ContainingSymbol);
+            var containingType = FixedUpdateSystemHelper.GetContainingNamedType(
+                context.ContainingSymbol
+            );
             if (containingType == null)
                 return;
 
-            if (!IsFixedUpdateSystem(containingType, cache))
+            if (!FixedUpdateSystemHelper.IsFixedUpdateSystem(containingType, cache))
                 return;
 
             context.ReportDiagnostic(
@@ -214,74 +210,6 @@ namespace Trecs.SourceGen
                     suggestion
                 )
             );
-        }
-
-        static INamedTypeSymbol? GetContainingNamedType(ISymbol? symbol)
-        {
-            while (symbol != null)
-            {
-                if (symbol is INamedTypeSymbol named)
-                    return named;
-                symbol = symbol.ContainingSymbol;
-            }
-            return null;
-        }
-
-        static bool IsFixedUpdateSystem(
-            INamedTypeSymbol type,
-            ConcurrentDictionary<INamedTypeSymbol, bool> cache
-        )
-        {
-            if (cache.TryGetValue(type, out var cached))
-                return cached;
-
-            var result = ComputeIsFixedUpdateSystem(type);
-            cache[type] = result;
-            return result;
-        }
-
-        static bool ComputeIsFixedUpdateSystem(INamedTypeSymbol type)
-        {
-            if (!ImplementsISystem(type))
-                return false;
-
-            foreach (var attr in type.GetAttributes())
-            {
-                var ac = attr.AttributeClass;
-                if (ac == null)
-                    continue;
-                if (ac.Name != ExecuteInAttributeName)
-                    continue;
-                if (ac.ContainingNamespace?.ToDisplayString() != TrecsNamespace)
-                    continue;
-
-                if (attr.ConstructorArguments.Length > 0)
-                {
-                    var phaseArg = attr.ConstructorArguments[0];
-                    if (phaseArg.Value is int phaseValue && phaseValue != FixedPhaseValue)
-                        return false;
-                }
-
-                return true;
-            }
-
-            // No [ExecuteIn] attribute — default is Fixed
-            return true;
-        }
-
-        static bool ImplementsISystem(INamedTypeSymbol type)
-        {
-            foreach (var iface in type.AllInterfaces)
-            {
-                if (
-                    iface.Name == ISystemName
-                    && iface.ContainingNamespace?.ToDisplayString() == TrecsNamespace
-                )
-                {
-                    return true;
-                }
-            }
-            return false;
         }
 
         static bool ReferencesTrecs(Compilation compilation)

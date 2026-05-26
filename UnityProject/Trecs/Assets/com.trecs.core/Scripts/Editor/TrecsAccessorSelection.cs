@@ -539,7 +539,7 @@ namespace Trecs
             entry.HasPriority = systemInfo.ExecutionPriority.HasValue;
             entry.Priority = systemInfo.ExecutionPriority ?? 0;
             var deps = systemInfo.SystemDependencies;
-            if (deps != null && allSystems != null)
+            if (deps.IsValid && allSystems != null)
             {
                 foreach (var depIdx in deps)
                 {
@@ -564,7 +564,7 @@ namespace Trecs
                 {
                     var other = allSystems[i];
                     var otherDeps = other.SystemDependencies;
-                    if (otherDeps == null)
+                    if (!otherDeps.IsValid)
                         continue;
                     foreach (var idx in otherDeps)
                     {
