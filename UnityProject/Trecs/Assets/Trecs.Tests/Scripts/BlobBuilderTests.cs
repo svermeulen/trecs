@@ -1540,7 +1540,7 @@ namespace Trecs.Tests
                 try
                 {
                     NAssert.IsFalse(anchor.IsNull);
-                    NAssert.AreEqual(blobId, anchor.BlobId);
+                    NAssert.AreEqual(blobId, anchor.GetBlobId(accessor));
 
                     ref readonly var view = ref anchor.Read(accessor).Value;
                     NAssert.AreEqual(0x55AA55AA, view.Header);

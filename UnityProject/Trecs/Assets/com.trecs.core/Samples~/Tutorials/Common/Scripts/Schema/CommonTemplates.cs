@@ -4,7 +4,7 @@ namespace Trecs.Samples
     {
         // `abstract` because every concrete template that needs visuals declares
         // `IExtends<IndirectRenderable>` — this base is never registered directly.
-        // Trying to do so produces TRECS039 at the call site and a runtime throw.
+        // Trying to do so produces TRECS039 at the call site.
         public abstract partial class IndirectRenderable
             : ITemplate,
                 ITagged<CommonTags.IndirectRenderable>

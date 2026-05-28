@@ -14,7 +14,7 @@ EntityHandle handle = World.AddEntity<MyTag>()
     .Set(new Position(float3.zero))
     .Handle;
 
-// From inside an aspect query (extension method)
+// From inside an aspect query (source-generated method)
 EntityHandle preyHandle = prey.Handle(World);
 
 // From a query iterator

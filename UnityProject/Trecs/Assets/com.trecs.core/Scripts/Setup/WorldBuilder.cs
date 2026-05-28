@@ -404,6 +404,7 @@ namespace Trecs
                 settings,
                 entityQuerier,
                 nativeSharedHeap,
+                inputNativeSharedHeap,
                 nativeUniqueChunkStore,
                 jobScheduler
             );

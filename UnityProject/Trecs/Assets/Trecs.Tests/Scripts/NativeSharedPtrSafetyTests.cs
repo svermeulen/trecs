@@ -57,7 +57,6 @@ namespace Trecs.Tests
             var (heap, cache) = CreateHeap();
 
             var ptr = heap.CreateBlob<int>(new BlobId(1), 42);
-            heap.FlushPendingOperations();
 
             using var sinkA = new NativeReference<int>(Allocator.TempJob);
             using var sinkB = new NativeReference<int>(Allocator.TempJob);
@@ -69,7 +68,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(42, sinkA.Value);
             NAssert.AreEqual(42, sinkB.Value);
 
-            heap.DisposeHandle(ptr.Handle);
+            heap.DecrementRef(ptr.Handle);
             heap.Dispose();
             cache.Dispose();
         }
@@ -84,7 +83,6 @@ namespace Trecs.Tests
 
             var ptr = heap.CreateBlob<int>(new BlobId(2), 7);
             heap.TryClone<int>(ptr.Handle, out var clone);
-            heap.FlushPendingOperations();
 
             using var sinkA = new NativeReference<int>(Allocator.TempJob);
             using var sinkB = new NativeReference<int>(Allocator.TempJob);
@@ -96,8 +94,8 @@ namespace Trecs.Tests
             NAssert.AreEqual(7, sinkA.Value);
             NAssert.AreEqual(7, sinkB.Value);
 
-            heap.DisposeHandle(ptr.Handle);
-            heap.DisposeHandle(clone.Handle);
+            heap.DecrementRef(ptr.Handle);
+            heap.DecrementRef(clone.Handle);
             heap.Dispose();
             cache.Dispose();
         }
@@ -108,11 +106,8 @@ namespace Trecs.Tests
             var (heap, cache) = CreateHeap();
 
             var ptr = heap.CreateBlob<int>(new BlobId(3), 99);
-            heap.FlushPendingOperations();
-            heap.DisposeHandle(ptr.Handle);
-            // FlushPendingOperations removes the entry from _allEntries AND
-            // releases the safety handle (via EnforceAllBufferJobsHaveCompletedAndRelease).
-            heap.FlushPendingOperations();
+
+            heap.DecrementRef(ptr.Handle);
 
             NAssert.Throws<TrecsException>(() => heap.Read(in ptr));
 
@@ -128,16 +123,15 @@ namespace Trecs.Tests
             var (heap, cache) = CreateHeap();
 
             var ptr = heap.CreateBlob<int>(new BlobId(4), 99);
-            heap.FlushPendingOperations();
 
             NAssert.Throws<TrecsException>(() =>
             {
-                var bad = new NativeSharedPtr<float>(ptr.Handle, ptr.BlobId);
+                var bad = new NativeSharedPtr<float>(ptr.Handle);
                 heap.Read(in bad);
             });
 
-            heap.DisposeHandle(ptr.Handle);
-            heap.FlushPendingOperations();
+            heap.DecrementRef(ptr.Handle);
+
             heap.Dispose();
             cache.Dispose();
         }
@@ -150,7 +144,6 @@ namespace Trecs.Tests
             var (heap, cache) = CreateHeap();
 
             var ptr = heap.CreateBlob<int>(new BlobId(5), 17);
-            heap.FlushPendingOperations();
 
             var read = heap.Read(in ptr);
             NAssert.AreEqual(17, read.Value); // works while alive

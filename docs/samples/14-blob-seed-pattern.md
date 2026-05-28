@@ -20,35 +20,34 @@ public static class PaletteIds
 }
 ```
 
-For the "allocate and go" pattern where IDs are auto-minted, see [Sample 10 — Pointers](10-pointers.md). This sample is the content-pipeline variant.
+For the "allocate and go" pattern where IDs are auto-minted, see [Sample 10 — Dynamic Collections](10-pointers.md). This sample is the content-pipeline variant.
 
 ## The seeder pattern
 
-A long-lived seeder allocates each blob once at startup under its stable ID and **holds the resulting `SharedPtr<T>` as a member field**. Without that anchor, the refcount would drop to zero between init and the first entity spawn, and the heap would evict the blob.
+A long-lived seeder allocates each blob once at startup under its stable ID and **holds the resulting `BlobPtr<T>` as a member field**. Without that anchor, the cache could evict the blob between init and the first entity spawn.
 
 ```csharp
 public class PaletteSeeder
 {
-    readonly World _world;
-    SharedPtr<ColorPalette> _warm;
-    SharedPtr<ColorPalette> _cool;
+    readonly BlobCache _blobCache;
+    BlobPtr<ColorPalette> _warm;
+    BlobPtr<ColorPalette> _cool;
 
-    public PaletteSeeder(World world) => _world = world;
+    public PaletteSeeder(BlobCache blobCache) => _blobCache = blobCache;
 
     public void Initialize()
     {
-        var world = _world.CreateAccessor(AccessorRole.Unrestricted);
-        // SharedPtr.Alloc(heap, stableId, blob) seeds the blob under a caller-chosen BlobId.
-        // Subsequent SharedPtr.Acquire(heap, stableId) calls return new handles to it.
-        _warm = SharedPtr.Alloc(world, PaletteIds.Warm, BuildWarm());
-        _cool = SharedPtr.Alloc(world, PaletteIds.Cool, BuildCool());
+        // BlobPtr.Alloc(cache, stableId, blob) seeds the blob under a caller-chosen
+        // BlobId and returns a pinning handle. Later SharedPtr.Acquire(heap, stableId)
+        // calls find the seeded blob and hand out ECS-refcounted handles to it.
+        _warm = BlobPtr.Alloc(_blobCache, PaletteIds.Warm, BuildWarm());
+        _cool = BlobPtr.Alloc(_blobCache, PaletteIds.Cool, BuildCool());
     }
 
     public void Dispose()
     {
-        var world = _world.CreateAccessor(AccessorRole.Unrestricted);
-        _warm.Dispose(world);
-        _cool.Dispose(world);
+        _warm.Dispose(_blobCache);
+        _cool.Dispose(_blobCache);
     }
 }
 ```
@@ -98,9 +97,22 @@ Because the blob lives once in the shared heap, all 36 entities pointing at the 
 
 ## Cleanup discipline
 
-Pointers on components must be disposed when the entity is removed — the framework does **not** auto-dispose, because it can't know whether you copied the handle elsewhere. This sample never removes entities, so no cleanup observer is needed.
+Pointers on components must be disposed when the entity is removed — the framework does **not** auto-dispose, because it can't know whether you copied the handle elsewhere. This sample registers an `OnRemoved` observer to dispose each entity's `SharedPtr<ColorPalette>` handle when the entity is removed:
 
-For entities that come and go, register an `OnRemoved` observer as in [Sample 10 — Pointers](10-pointers.md). See also [Pointers — cleanup is manual](../experimental/pointers.md#cleanup-is-manual-for-entity-owned-pointers) and [Shared Heap Data](../experimental/shared-heap-data.md) for the sharing patterns this sample illustrates.
+```csharp
+world
+    .Events.EntitiesWithTags<SampleTags.Swatch>()
+    .OnRemoved(OnSwatchRemoved)
+    .AddTo(_subscriptions);
+
+[ForEachEntity]
+void OnSwatchRemoved(in PaletteRef palette)
+{
+    palette.Value.Dispose(_accessor);
+}
+```
+
+See also [Pointers — cleanup is manual](../experimental/pointers.md#cleanup-is-manual-for-entity-owned-pointers), [Sample 10 — Dynamic Collections](10-pointers.md), and [Shared Heap Data](../experimental/shared-heap-data.md) for the sharing patterns this sample illustrates.
 
 ## When to reach for this
 
@@ -113,6 +125,6 @@ For per-entity managed data that isn't shared, use `UniquePtr<T>` instead ([Samp
 ## Concepts introduced
 
 - **Stable `BlobId`** — caller-authored identifiers that keep the same identity across runs, independent of init-time ordering
-- **Seeder pattern** — a long-lived object allocates shared blobs at startup and anchors their lifetime
-- **`SharedPtr.Alloc(world, id, value)` vs `SharedPtr.Acquire(world, id)`** — seeding (creates the blob) vs lookup (acquires another handle to an already-seeded blob)
+- **Seeder pattern** — a long-lived object allocates shared blobs at startup via `BlobPtr.Alloc(cache, id, value)` and anchors their lifetime
+- **`BlobPtr.Alloc(cache, id, value)` vs `SharedPtr.Acquire(world, id)`** — seeding (creates the blob and returns a pinning handle) vs lookup (acquires an ECS-refcounted handle to an already-seeded blob)
 - **Cleanup ownership** — pointers on components must be disposed explicitly; an `OnRemoved` observer is the canonical place

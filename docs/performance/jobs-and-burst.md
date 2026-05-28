@@ -24,7 +24,7 @@ public partial class ParticleMoveSystem : ISystem
 Two requirements:
 
 - **`static`** — the generated Burst job calls your method directly, with no system instance, so it must be `static`.
-- **Use `NativeWorldAccessor`, not `WorldAccessor`** for any world-level reads (`DeltaTime`, structural ops, set ops) inside the body.
+- **Use `NativeWorldAccessor`, not `WorldAccessor`** for any world-level operations (`DeltaTime`, structural changes, set ops) inside the body.
 
 Trecs schedules the job instead of calling your `Execute()` method directly.
 
@@ -72,7 +72,7 @@ static void Cull(ref Lifetime lifetime, EntityHandle handle, in NativeWorldAcces
 }
 ```
 
-The handle is materialized per iteration from a per-group buffer the source generator wires up automatically. Inside jobs, entity-targeted ops go through `EntityHandle` taking a `NativeWorldAccessor` parameter — the same shape as on the main thread.
+The handle is materialized per iteration from a component buffer the source generator wires up automatically. Inside jobs, entity-targeted ops go through `EntityHandle` taking a `NativeWorldAccessor` parameter — the same `handle.Op(accessor)` pattern as on the main thread (where the accessor is a `WorldAccessor` instead).
 
 ## `NativeWorldAccessor`
 
@@ -91,4 +91,4 @@ entityHandle.UnsetTag<BallTags.Active>(nativeWorld);    // partition transition 
 !!! warning
     `WorldAccessor` is **main-thread only**. Inside jobs always use `NativeWorldAccessor` and the native read/write types — see [Advanced Job Features](../advanced/advanced-jobs.md) for how to wire them via `[FromWorld]`.
 
-For deeper coverage — `[FromWorld]` auto-wiring, cross-group lookup types, native set operations, `[GlobalIndex]`, external job-handle tracking — see [Advanced Job Features](../advanced/advanced-jobs.md). For the parallel iteration pattern itself, see [Queries & Iteration](../data-access/queries-and-iteration.md).
+For deeper coverage — `[FromWorld]` auto-wiring, cross-template lookup types, native set operations, `[GlobalIndex]`, external job-handle tracking — see [Advanced Job Features](../advanced/advanced-jobs.md). For the parallel iteration pattern itself, see [Queries & Iteration](../data-access/queries-and-iteration.md).

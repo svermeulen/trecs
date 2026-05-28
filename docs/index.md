@@ -84,7 +84,7 @@ Inside a system, `World` is a source-generated property that gives access to the
 
     ---
 
-    The terms — Group, Partition, Set, Tag, Aspect, Accessor — and how they relate.
+    The terms — Partition, Set, Tag, Aspect, Accessor — and how they relate.
 
 -   :material-puzzle-outline:{ .lg .middle } **[Samples](samples/index.md)**
 

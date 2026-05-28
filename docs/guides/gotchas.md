@@ -14,35 +14,21 @@ System fields are not serialized. Anything mutable kept on a system silently div
 
 **Fix.** Store dynamic state in components. Constructor parameters for immutable configuration are fine, as is caching data to members in OnReady.
 
-## Registering both a base template and a template that extends it
-
-```csharp
-// ❌ World build throws: "Registered templates must not be base templates of other registered templates."
-new WorldBuilder()
-    .AddTemplate(ShapeEntity.Template)   // base
-    .AddTemplate(BallEntity.Template)    // BallEntity : IExtends<ShapeEntity>, ...
-    .BuildAndInitialize();
-```
-
-`BallEntity`'s tag set contains `ShapeEntity`'s as a subset. Single-group APIs that filter by `ShapeEntity`'s tags alone would match groups from both, with no way to pick one — so Trecs rejects the configuration at build instead of failing at every affected call site.
-
-**Fix.** Register only the derived templates; the base is discovered automatically via `IExtends`. If you genuinely need both a base and a derived concrete group (e.g. `Orc` + `FlyingOrc`), give each a distinct discriminator tag so their tag sets are siblings, not strict subsets. See [Groups: `AddEntity` resolution](../advanced/groups-and-tagsets.md#addentity-which-group-does-the-entity-land-in).
-
 ## Mutating a set while iterating it
 
-Using an immediate `Add` / `Remove` / `Clear` on the same set in the group you're currently iterating throws in DEBUG. In release the assertion is compiled out and iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
+Using an immediate `Add` / `Remove` / `Clear` on the same set you're currently iterating throws exceptions in debug/editor builds. In release the assertion is compiled out, so iteration corrupts silently (entries get skipped, revisited, or read from freed memory).
 
-**Fix.** Use the deferred set ops (the default) for changes-during-iteration, or stage them in a `NativeList<EntityHandle>` and apply after the loop. See [Sets — Immediate](../entity-management/sets.md#immediate).
+**Fix.** Use the deferred set ops for changes-during-iteration, or stage them in a `NativeList<EntityHandle>` and apply after the loop. See [Sets — Immediate](../entity-management/sets.md#immediate).
 
 ## Forgetting to dispose pointers
 
-Pointers must be manually disposed. DEBUG builds catch leaks at world shutdown and report them; release builds leak silently.
+Unique and Shared Pointers must be manually disposed. Debug/Editor builds catch leaks at world shutdown and report them; release builds leak silently.
 
 **Fix.** Dispose entity-owned pointers in an `OnRemoved` handler. See [Cleanup is manual for entity-owned pointers](../experimental/pointers.md#cleanup-is-manual-for-entity-owned-pointers).
 
 ## Cleaning up an entity inline at the `Remove` call site
 
-`Remove` is deferred — the entity stays in its groups until submission at end of fixed step. Any cleanup performed inline beside the `Remove` call (disposing pointers, releasing handles, zeroing fields) happens *before* the entity is actually gone. Systems ordered later in the same step still iterate the entity and read the torn state: disposed pointers, freed native memory, stale references.
+`Remove` is deferred — the entity stays in storage until submission at end of fixed step. Any cleanup performed inline beside the `Remove` call (disposing pointers, releasing handles, zeroing fields) happens *before* the entity is actually gone. Systems ordered later in the same step still iterate the entity and read the torn state.
 
 ```csharp
 // ❌ Cleanup inline, then Remove.
@@ -51,7 +37,7 @@ void Execute(in Trail trail, EntityHandle entity)
 {
     if (!ShouldRemove(entity)) return;
     trail.Value.Dispose(World);   // freed now
-    entity.Remove(World);         // ...but entity stays in its group until submission
+    entity.Remove(World);         // ...but entity stays in storage until submission
 }
 
 // A system ordered later in the same step still matches the entity
@@ -64,19 +50,9 @@ void Execute(in Trail trail, EntityHandle entity)
 
 Component serialization copies the raw struct bytes (the blit fast-path). A `NativeList<T>` / `NativeHashMap<K,V>` value is a pointer to externally-allocated storage plus a length. Round-tripping such a component copies the bytes verbatim — the pointer that comes back on load is the previous session's memory address: no longer mapped, freed, or reassigned. Reading the deserialized collection crashes or returns garbage.
 
-`NativeUniquePtr<NativeList<T>>` avoids the trap: the unique ptr is a heap-key, not a raw memory pointer, and Trecs's serializer walks the inner collection's contents through the heap rather than blitting the struct.
-
-**Fix.** Wrap any native collection that needs to survive serialization in a `NativeUniquePtr` (or `NativeSharedPtr`). See [Storing native collections](../experimental/pointers.md#storing-native-collections).
-
-## `NativeUniquePtr<NativeList<T>>` — inner storage must be disposed first
-
-The wrapped collection's storage is allocated in Unity's allocator, not Trecs's heap. Disposing the `NativeUniquePtr` only frees the heap slot holding the `NativeList` header — the underlying allocation leaks.
-
-**Fix.** Dispose the inner collection, then the unique ptr. See [Storing native collections](../experimental/pointers.md#storing-native-collections).
+**Fix.** See [Dynamic Collections](../experimental/dynamic-collections.md).
 
 ## Mutating a `NativeUniquePtr<T>` needs write access to the owning component
-
-`Write(...)` on `NativeUniquePtr<T>` is a `ref this` instance method, so the call site needs a writeable reference to the pointer struct itself — typically a `.Write`-accessed component field. Calling it through a `ref readonly` (e.g. what `Component<T>(entity).Read` hands back) doesn't compile, because a `ref readonly` field isn't addressable as `ref`.
 
 ```csharp
 // ❌ Won't compile: Read returns ref readonly, so the inner
@@ -89,13 +65,13 @@ ref var buf = ref entity.Component<CScratchBuffer>(World).Write;
 buf.List.Write(World).Value.Add(42);
 ```
 
-This is intentional: it lets the framework's component-level read/write tracking double as locking for the native data behind the pointer. Two systems writing the same component are already serialized; making `Write` on the pointer require component write access gets that serialization for free, with no per-pointer bookkeeping.
+This is intentional: it lets the framework's component-level read/write tracking double as locking for the native data behind the pointer.
 
 **Fix.** Get `.Write` on the owning component (or copy the pointer to a local) before calling `Write` on the pointer.
 
 ## Looking up a fresh `EntityHandle` in the same fixed step
 
-`World.AddEntity<T>()` returns immediately with an `EntityInitializer` whose `Handle` is valid as an identity (stable, will resolve later) — but the entity isn't placed in any group until submission at end of the fixed step. Another system later in the same step that reads components on the handle throws, because the entity doesn't exist anywhere yet.
+`World.AddEntity<T>()` returns an `EntityInitializer` whose `.Handle` property gives you an `EntityHandle` immediately — but the entity isn't actually created until the next submission. So if this `EntityHandle` is stored in a component, and then another system later in the same step attempts to read via this `EntityHandle`, the lookup fails.
 
 ```csharp
 // Fixed system A: spawn a child, store its handle on the parent
@@ -108,25 +84,16 @@ ref readonly var pos = ref parent.ChildRef.Component<Position>(World).Read;  // 
 
 **Fix.** Check `handle.Exists(World)` before dereferencing and skip if false — the handle becomes dereferenceable on the next step, once submission has run.
 
-## Native heap allocations aren't visible to jobs in the same step
-
-Native heap allocations (`NativeUniquePtr` / `NativeSharedPtr`) queue into a pending collection rather than the resolver lookup table Burst jobs read. The queue drains at submission (end of fixed step). A Burst job scheduled in the same step that calls `.Read(...)` / `.Write(...)` on a freshly-allocated native ptr through a resolver won't find it.
-
-Main-thread `.Read(WorldAccessor)` / `.Write(WorldAccessor)` **do** work on freshly-allocated native ptrs — the main-thread path checks the pending queue before the resolver. Managed pointers (`UniquePtr<T>` / `SharedPtr<T>`) aren't deferred either; they have no resolver layer and are main-thread-only by design.
-
-The deferral exists because Burst jobs hold a snapshot of the resolver's allocation table; mutating it mid-job would corrupt in-flight reads.
-
-**Fix.** Wait 1 frame, or if the work doesn't have to be Burst, do it from the main thread instead.
 
 ## Just-spawned entities haven't been fixed-updated when Presentation sees them
 
-An entity spawned in a Fixed system is submitted in time for the same Tick's Presentation, but no fixed-update cycle has run on it yet — Presentation sees the spawn-time initial values, not the post-tick values. The entity renders at its initial state for one frame, then jumps to the correct state on the next tick. Visible as a brief stutter or wrong-position pop on spawn.
+An entity spawned in a Fixed system is submitted in time for the same Tick's Presentation phase, but no fixed-update cycle has run on it yet — Presentation sees the spawn-time initial values, not the post-tick values. The entity renders at its initial state for one frame, then jumps to the correct state on the next tick. Visible as a brief stutter or wrong-position pop on spawn.
 
 **Fix.** Initialize *everything Presentation reads* at spawn time. If impractical, use an enabled flag defaulting to false, then flip it during fixed update.
 
 ## Service-class accessor used during a Fixed system's `Execute`
 
-During a `Fixed`-role system's `Execute`, only that system's own accessor may touch ECS state. Other accessors — including another `Fixed`-role one held by a service, or an `Unrestricted` one — throw if used mid-Fixed-execute. Recording access under the service's `DebugName` instead of the calling system's scrambles debug attribution, and `Unrestricted` accessors risk smuggling non-deterministic state into the simulation.
+During a `Fixed`-role system's `Execute`, only that system's own accessor may touch ECS state. Other accessors — including another `Fixed`-role one held by a service, or even an `Unrestricted` one — throw if used mid-Fixed-execute. Recording access under the service's `DebugName` instead of the calling system's scrambles debug attribution, and `Unrestricted` accessors risk smuggling non-deterministic state into the simulation.
 
 ```csharp
 // ❌ Service holds its own accessor; trips the strict-accessor rule

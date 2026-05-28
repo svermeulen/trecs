@@ -170,7 +170,10 @@ namespace Trecs.Tests
             var data = 42;
             var ptr = NativeSharedPtr.Alloc(world, BlobIdGenerator.FromKey(1), in data);
 
-            NAssert.IsFalse(ptr.BlobId.IsNull, "NativeSharedPtr should have a valid BlobId");
+            NAssert.IsFalse(
+                ptr.GetBlobId(world).IsNull,
+                "NativeSharedPtr should have a valid BlobId"
+            );
         }
 
         [Test]
@@ -183,7 +186,7 @@ namespace Trecs.Tests
             var data = 123;
             var ptr = NativeSharedPtr.Alloc(world, blobId, in data);
 
-            NAssert.AreEqual(blobId, ptr.BlobId);
+            NAssert.AreEqual(blobId, ptr.GetBlobId(world));
         }
 
         #endregion

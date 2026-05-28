@@ -1,6 +1,6 @@
 # Structural Changes
 
-Add, remove, and partition-transition operations are **deferred** — queued during system execution and applied later at a submission boundary. This keeps entity indices stable during iteration and enables safe parallel processing.
+Add, remove, and partition-transition operations are **deferred** — queued during system execution and applied later at a submission boundary. This keeps component buffers and entity indices stable during iteration and enables safe parallel processing.
 
 In the examples below, `World` is the [`WorldAccessor`](../advanced/accessor-roles.md) injected into a system.
 
@@ -8,7 +8,7 @@ In the examples below, `World` is the [`WorldAccessor`](../advanced/accessor-rol
 
 Submission drains the queued operations. The system runner calls it automatically at the end of every fixed update and at the end of `World.LateTick()` — see the [per-frame phase diagram](../core/systems.md#phase-diagram).
 
-Call it manually via `World.Submit()`.
+Call it manually via `World.Submit()` (though note this shouldn't be necessary normally)
 
 ## Deferred operations
 
@@ -20,7 +20,7 @@ World.AddEntity<GameTags.Bullet>()
     .Set(new Velocity(vel));
 ```
 
-The entity is buffered and joins its group on the next submission. Its storage location isn't assigned until then.
+The entity is buffered and placed into storage on the next submission. Its storage location isn't assigned until then.
 
 ### Remove
 
@@ -37,7 +37,7 @@ World.RemoveEntitiesWithTags<GameTags.Bullet>();
 
 ### Partition transition (`SetTag` / `UnsetTag`)
 
-Partition transitions are expressed by mutating one tag at a time on the entity's existing template. The submitter resolves the destination group from the entity's current group plus the new tags — you never name the source or destination group directly.  Component values are copied across unchanged.
+Partition transitions are expressed by mutating one tag at a time on an entity. The submitter resolves the new storage location from the entity's current tags plus the requested changes.  Component values are copied across unchanged.
 
 ```csharp
 // By stable handle
@@ -60,7 +60,7 @@ ball.UnsetTag<BallTags.Active>(World);
     - Multi-variant dim (arity ≥ 2): switches the active variant in that dim. Other dims are preserved.
 - **`UnsetTag<T>`** is valid **only** on presence/absence dims (arity 1). Multi-variant dims have no defined "absent" partition, so calling `UnsetTag` on one throws. To switch a multi-variant dim use `SetTag` for the new variant.
 
-`SetTag<T>` is a no-op (and silently coalesced away) if the entity is already in the destination group.
+`SetTag<T>` is a no-op (and silently coalesced away) if the entity already has the requested tag.
 
 The Burst-side equivalents — `handle.SetTag<T>(nativeWorld)` and `handle.UnsetTag<T>(nativeWorld)` — take a `NativeWorldAccessor` and match the managed signatures otherwise. See [Jobs & Burst](../performance/jobs-and-burst.md#nativeworldaccessor).
 
@@ -72,10 +72,10 @@ Multiple `SetTag` / `UnsetTag` calls on the same entity in a single submission *
 // Two systems both touch the same fish in the same fixed tick.
 fish.SetTag<MoveState.Running>(World);   // dim A: switch to Running
 fish.SetTag<FrenzyTags.Hungry>(World);   // dim B: turn Hungry on
-// → One move at submit time: destination = current group with both tag changes applied.
+// → One move at submit time: both tag changes applied together.
 ```
 
-Distinct partition dimensions stack freely. An entity can change variant in dim A, turn dim B on, and turn dim C off in one submission — all three resolve to a single move into the destination group.
+Distinct partition dimensions stack freely. An entity can change variant in dim A, turn dim B on, and turn dim C off in one submission — all three resolve to a single move.
 
 ## Conflict resolution
 

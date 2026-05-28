@@ -6,9 +6,7 @@ Yes — they're completely independent.  You could run both in the same project 
 
 ## Do I have to maintain determinism and serialization support to use Trecs?
 
-No. Both are opt-in.
-
-You can use `UnityEngine.Random`, `Time.deltaTime`, and even store state in member variables in systems.  The simulation will run fine.  However, you lose the ability to record / scrub / replay or take snapshots, which are very helpful for debugging, testing, and fast development iteration time.
+No. Both are opt-in. You can use `UnityEngine.Random`, `Time.deltaTime`, and store mutable state in system fields — but you lose replay, snapshots, and headless testing. See [Determinism](guides/determinism.md) for the full trade-off and how to keep non-deterministic code out of the simulation.
 
 ## What's the practical entity ceiling?
 
@@ -16,7 +14,7 @@ The included samples are exercised up to ~1M entities ([Sample 12 — Feeding Fr
 
 ## What's the overhead of source generation?
 
-The generator runs per compilation and caches via the Roslyn incremental pipeline. Steady-state runs (one file changed) are sub-100ms for most projects; the first compile after a solution reload is the slow one. Set the `SOURCEGEN_TIMING` environment variable for per-step timings.
+All generators use Roslyn's `IIncrementalGenerator` API with value-based caching — each generator projects syntax into a plain `readonly record struct` model (no Roslyn symbols retained), and the pipeline short-circuits code emission entirely when the model hasn't changed. This means editing a file that doesn't affect any Trecs attribute typically costs zero generation work, and editing one that does only regenerates the affected outputs. In practice, you shouldn't notice any compile-time impact during normal development.
 
 ## Do I have to use `[WrapAsJob]` — can I still write manual jobs?
 
@@ -24,7 +22,12 @@ Yes. `[WrapAsJob]` is a convenience — it wraps a static method into a Burst jo
 
 ## Can I add or remove components from an entity at runtime?
 
-No. Components are locked to the entity's template at creation. This is a deliberate design choice — see [Best Practices: No runtime composition changes](guides/best-practices.md#entities-templates) for the escape hatches (partitions, boolean/enum fields, sets, child entities).
+No. Components are locked to the entity's template at creation. This is a deliberate design choice. Escape hatches:
+
+- **[Partitions](core/templates.md#partitions)** — declared moves between tag combinations of the same template; component data is preserved.
+- **Boolean / enum fields on a component** — simplest for "in state X, ignore field Y", but unused fields still take memory in every state.
+- **[Sets](entity-management/sets.md)** — sparse membership flags, independent of component storage.
+- **Child entity** — when the conditional shape needs *different* components, spawn a separate entity and reference it via an `EntityHandle` on a parent component.
 
 ## Where do I report bugs / request features?
 

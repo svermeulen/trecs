@@ -54,13 +54,13 @@ GameObject destruction is handled separately by `RenderableGameObjectManager` (i
 
 **1. Scope** — `Events.EntitiesWithTags<T>()` picks which entities to observe. Also available: `EntitiesWithComponents<T>()`, `EntitiesWithTagsAndComponents<T>(TagSet)`, `EntitiesInGroup(group)`, and `AllEntities()`.
 
-**2. Handlers** — `OnAdded`, `OnRemoved`, `OnMoved` attach `[ForEachEntity]` methods. The source generator emits per-entity iteration and reads the requested components from the group's buffers. The handler sees one entity at a time.
+**2. Handlers** — `OnAdded`, `OnRemoved`, `OnMoved` attach `[ForEachEntity]` methods. The source generator emits per-entity iteration and reads the requested components from the entity's component buffers. The handler sees one entity at a time.
 
 **3. Lifetime** — the subscription returns an `IDisposable`. `.AddTo(_disposables)` parks it in a collection disposed when the handler class is disposed.
 
 ## Reading components in `OnRemoved`
 
-Events fire during submission, and each entity's component data is still readable — including in `OnRemoved`, because removed entities are parked at the end of the group's backing array (past the active count) until submission completes. Declare the components you need as `in` / `ref` parameters on your `[ForEachEntity]` method and the source generator wires them up:
+Events fire during submission, and each entity's component data is still readable — including in `OnRemoved`, because removed entities are parked at the end of the backing array (past the active count) until submission completes. Declare the components you need as `in` / `ref` parameters on your `[ForEachEntity]` method and the source generator wires them up:
 
 ```csharp
 [ForEachEntity]

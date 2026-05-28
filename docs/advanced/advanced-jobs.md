@@ -35,16 +35,17 @@ partial struct MyJob : IJobFor
 | `NativeComponentLookupRead<T>` | Read-only lookup across multiple groups | Yes |
 | `NativeComponentLookupWrite<T>` | Writable lookup across multiple groups | Yes |
 | `NativeSetRead<TSet>` | Read-only set access | No |
-| `NativeSetCommandBuffer<TSet>` | Writable set access | No |
+| `NativeSetCommandBuffer<TSet>` | Writable set access (deferred) | No |
+| `NativeEntitySetIndices<TSet>` | Per-group entity indices of a set | Yes |
 | `NativeWorldAccessor` | Job-safe world operations | No |
 | `GroupIndex` | Runtime handle for the resolved group | Yes |
 
 ### Tag resolution
 
-Fields that require a tag scope (buffers, lookups, `GroupIndex`) can get their tags two ways:
+Fields that require a tag scope (buffers, lookups, `GroupIndex`, `NativeEntitySetIndices`) can get their tags two ways:
 
-- **Inline** — specify `Tag` or `Tags` on the attribute: `[FromWorld(typeof(GameTags.Player))]`. The tag is baked into the generated code.
-- **At schedule time** — omit `Tag`/`Tags`, and the generated `ScheduleParallel` includes a `TagSet` parameter the caller must provide:
+- **Inline** — pass tag types to the attribute constructor: `[FromWorld(typeof(GameTags.Player))]`, or use the named properties `Tag`/`Tags` for the same effect. The tags are baked into the generated code. When an inline tag is present, the generated schedule method still accepts an optional `TagSet?` parameter for that field, allowing the caller to combine extra tags (e.g., a partition tag) at schedule time.
+- **At schedule time** — omit the tag entirely, and the generated `ScheduleParallel` includes a mandatory `TagSet` parameter the caller must provide:
 
 ```csharp
 [BurstCompile]
@@ -60,9 +61,9 @@ partial struct FlexibleJob : IJobFor
 new FlexibleJob().ScheduleParallel(accessor, TagSet<GameTags.Player>.Value);
 ```
 
-Useful when the tagset isn't known until runtime, or when reusing the same job struct for multiple tag scopes. `ScheduleParallel` gets one parameter per `[FromWorld]` field without an inline tag.
+Useful when the tag set is not known until runtime, or when reusing the same job struct for multiple tag scopes. `ScheduleParallel` gets one `TagSet` parameter per `[FromWorld]` field that lacks an inline tag.
 
-Fields that don't require tags (`NativeSetRead`, `NativeSetCommandBuffer`, `NativeWorldAccessor`) are populated automatically and never generate schedule parameters.
+Fields that do not require tags (`NativeSetRead`, `NativeSetCommandBuffer`, `NativeWorldAccessor`) are populated automatically and never generate schedule parameters.
 
 ## Native component access
 
@@ -121,7 +122,7 @@ To force-complete tracked jobs before main-thread access:
 accessor.SyncMainThread<Position>(group);
 ```
 
-Note that this is very low level operation that shouldn't be necessary in most cases.
+Note that this is a very low-level operation that shouldn't be necessary in most cases.
 
 ## Thread-safety cheat sheet
 
@@ -129,9 +130,9 @@ Note that this is very low level operation that shouldn't be necessary in most c
 |-----------|-------------|------|
 | Read a single component | `handle.Component<T>(world).Read` | `NativeComponentRead<T>` (single entity), `NativeComponentBufferRead<T>` (one group), `NativeComponentLookupRead<T>` (across groups) |
 | Write a single component | `handle.Component<T>(world).Write` | `NativeComponentWrite<T>`, `NativeComponentBufferWrite<T>`, `NativeComponentLookupWrite<T>` |
-| Add / remove / partition-transition entity | `world.AddEntity<T>()` / `handle.Remove(world)` / `handle.SetTag<T>(world)` / `handle.UnsetTag<T>(world)` | `NativeWorldAccessor` (queued until next submission; pass `sortKey` for deterministic ordering) |
+| Add / remove / partition-transition entity | `world.AddEntity<T>()` / `handle.Remove(world)` / `handle.SetTag<T>(world)` / `handle.UnsetTag<T>(world)` | `NativeWorldAccessor` (queued until next submission; `AddEntity` takes a `sortKey` for deterministic ordering) |
 | Read a set | `world.Set<T>().Read` | `NativeSetRead<T>` |
-| Mutate a set | `world.Set<T>().Write` | `NativeSetCommandBuffer<T>` (deferred but only until job completion) |
+| Mutate a set | `world.Set<T>().Write` | `NativeSetCommandBuffer<T>` (deferred; flushed by a `SetFlushJob` after the writer job completes) |
 
 ## See also
 

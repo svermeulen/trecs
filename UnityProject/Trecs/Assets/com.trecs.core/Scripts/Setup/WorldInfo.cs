@@ -77,6 +77,43 @@ namespace Trecs
                 resolvedTemplatesList.Add(ResolveTemplate(template));
             }
 
+            // Discard any explicitly-registered template whose Template object
+            // appears as a base of another registered template.  A base
+            // template's tag set is always a strict subset of its derived
+            // template's, so AddEntity queries expressed in the base's tags
+            // would match groups from both — an ambiguity that can't be
+            // resolved without a discriminator tag.  Rather than forcing users
+            // to remember to register only leaves, we silently prune the
+            // redundant bases here (the derived templates already carry the
+            // base's components, tags, and groups via IExtends).
+            var basesToRemove = new HashSet<ResolvedTemplate>();
+            foreach (var rt in resolvedTemplatesList)
+            {
+                foreach (var other in resolvedTemplatesList)
+                {
+                    if (ReferenceEquals(other, rt))
+                    {
+                        continue;
+                    }
+
+                    if (other.AllBaseTemplates.Contains(rt.Template))
+                    {
+                        basesToRemove.Add(rt);
+                        break;
+                    }
+                }
+            }
+
+            foreach (var rt in basesToRemove)
+            {
+                _log.Warning(
+                    "Template {0} is a base of another registered template and was automatically removed. Register only leaf templates; base templates are discovered via IExtends.",
+                    rt.DebugName
+                );
+            }
+
+            resolvedTemplatesList.RemoveAll(basesToRemove.Contains);
+
             // Pass 1: assign a sequential GroupIndex to each unique TagSet that
             // appears as a group on any resolved template.
             var tagSetToIndex = new IterableDictionary<TagSet, GroupIndex>();
@@ -198,51 +235,7 @@ namespace Trecs
 
                 foreach (var baseType in resolvedTemplate.AllBaseTemplates)
                 {
-                    // A registered template's groups must be addressable
-                    // unambiguously by tag set in single-group APIs
-                    // (AddEntity<...>() and [FromWorld(typeof(Tag))] ->
-                    // GroupIndex / NativeEntitySetIndices<TSet>). If a base
-                    // template B is
-                    // registered alongside a derived template D, every group of
-                    // D contains B's tag set as a subset — so any query
-                    // expressed only in B's tags would match groups from both
-                    // templates.
-                    //
-                    // The resolver (WorldQueryEngine.GetSingleGroupWithTags)
-                    // uses a same-template tiebreaker: when multiple groups
-                    // match, it requires them all to belong to one registered
-                    // template before picking the narrowest. Cross-template
-                    // matches throw ambiguous by design — we never silently
-                    // resolve between unrelated templates with overlapping tag
-                    // sets, because that would turn "I forgot a tag" into a
-                    // misrouted entity instead of an error.
-                    //
-                    // Catching the configuration here at world build is
-                    // friendlier than failing at every AddEntity / [FromWorld]
-                    // call site that touches an affected tag set.
-                    // If a game genuinely wants both a base and a derived
-                    // template to exist concretely (e.g. Orc + FlyingOrc), give
-                    // each template a distinct discriminator tag (e.g.
-                    // ITagged<Grounded> on the base, ITagged<Flying> on the
-                    // derived) so their tag sets become siblings rather than
-                    // strict subsets — then AddEntity queries resolve cleanly
-                    // and this assertion no longer applies.
-                    //
-                    // Alternatives considered and rejected:
-                    //  - Require AddEntity's tag set to exactly equal the
-                    //    target group. Forces every spawner to know all of a
-                    //    template's partition variants, blocking factory
-                    //    patterns that legitimately don't.
-                    //  - Auto-pick the closest match across template
-                    //    boundaries (subset-order regardless of template).
-                    //    Silently resolves real ambiguity, hiding
-                    //    misconfigurations behind plausible-looking spawns.
-                    TrecsDebugAssert.That(
-                        !_resolvedTemplateSet.Contains(baseType),
-                        "Registered templates must not be base templates of other registered templates.  Found {0} as a base template of {1}",
-                        baseType,
-                        resolvedTemplate
-                    );
+                    TrecsDebugAssert.That(!_resolvedTemplateSet.Contains(baseType));
 
                     if (_allTemplatesSet.Add(baseType))
                     {

@@ -52,7 +52,7 @@ wd.HitCount++;
 ref readonly NativeData sd = ref nativeShared.Read(World).Value;
 ```
 
-`NativeSharedRead<T>.Value` returns `ref readonly T`, not `ref T` — `T` is required to be a `readonly struct` by the TRECS124 analyzer, so a `ref readonly` is safe to hand back without the historic defensive-copy footgun. The canonical local-read pattern is just:
+`NativeSharedRead<T>.Value` returns `ref readonly T`. The canonical local-read pattern is:
 
 ```csharp
 ref readonly var collider = ref colliderPtr.Read(World).Value;
@@ -61,8 +61,6 @@ DoSomething(collider.MassProperties);
 // Or, when the getter is used exactly once, fold it inline:
 DoSomething(colliderPtr.Read(World).Value.MassProperties);
 ```
-
-Reach for a `T*` only when you genuinely need one — storing the pointer in a struct field (`ColliderDistanceInput.Collider`), feeding it into an existing `T*`-typed extension API, etc. Refs cannot live inside non-`ref` structs, so a pointer is necessary there. **Do not** launder `ref readonly` through `Unsafe.AsRef` + `UnsafeUtility.AddressOf` to satisfy CS8329 ("cannot pass `ref readonly` as `ref`") at sites that only need to read one or two getters — the `ref readonly` local is enough and avoids the extra `using System.Runtime.CompilerServices;`.
 
 To swap out the payload of a managed `UniquePtr` wholesale (replace the referenced object), call `Set(World, newValue)`.
 
@@ -87,19 +85,9 @@ Mesh mesh = meshRef.Mesh.Get(World);
 
 ### Storing native collections
 
-Native collection types (`NativeList<T>`, `NativeHashMap<K,V>`, `NativeQueue<T>`, etc.) hold a direct pointer to a memory address, so they can't sit directly inside a component. Trecs serializes a component as raw memory and expects it to be self-contained — a bare `NativeList` field would write its pointer bytes, not the elements behind them, and snapshots/recordings would silently drop the contents.
+Native collection types (`NativeList<T>`, `NativeHashMap<K,V>`, etc.) can't sit directly in a component — see [Dynamic Collections](dynamic-collections.md) for why, and for the preferred alternatives (`FixedList<N>`, `TrecsList<T>`).
 
-```csharp
-public partial struct CCollisionPairBuffer : IEntityComponent
-{
-    // Don't do this
-    public NativeList<CollisionPair> Value;
-}
-```
-
-For collections with known bounds, [`FixedList<N>`](../advanced/fixed-collections.md) is usually simpler — it stores data inline in the component and needs no manual disposal.
-
-If you can't use fixed collections because the data has no clear upper bound, or because the worst-case bound wastes too much memory, reach for a [Trecs collection type](trecs-collections.md) (currently just `TrecsList<T>`). These store their backing data on a Trecs-owned heap that snapshots / recordings walk automatically, so the contents round-trip with the component bytes — no `NativeUniquePtr` wrapper or custom serializer needed.
+When you specifically need a Unity `NativeList<T>` (e.g. to share with non-Trecs code), wrap it in a `NativeUniquePtr<NativeList<T>>`.
 
 ### Shared pointers and reference counting
 

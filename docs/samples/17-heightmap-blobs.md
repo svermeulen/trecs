@@ -58,12 +58,13 @@ On restore, the heap must already contain a blob under the captured `BlobId`. Th
 The interesting bit is how the `BlobId` is derived. Define a struct capturing every input that determines the blob's content:
 
 ```csharp
-public partial struct HeightmapDescriptor
+public readonly partial struct HeightmapDescriptor
 {
-    public int Resolution;
-    public float WorldSize;
-    public float MaxHeight;
-    public uint Seed;
+    public int Resolution { get; init; }
+    public float WorldSize { get; init; }
+    public float MaxHeight { get; init; }
+    public uint Seed { get; init; }
+    public float Frequency { get; init; }
 }
 ```
 
@@ -82,11 +83,9 @@ var blobId = new BlobId(_hashGenerator.Generate(descriptor));
 _managedAnchor = SharedPtr.GetOrAlloc(
     world,
     blobId,
-    () => new HeightmapData
-    {
-        Descriptor = descriptor,
-        Heights = HeightmapBuilder.BuildManagedHeights(descriptor),
-    });
+    () => new HeightmapData(
+        descriptor,
+        HeightmapBuilder.BuildManagedHeights(descriptor)));
 ```
 
 `SharedPtr.GetOrAlloc` runs the factory only when the cache misses — same recipe ⇒ same hash ⇒ same `BlobId` ⇒ same cached blob.
@@ -110,10 +109,14 @@ if (!NativeSharedPtr.TryGet(world, blobId, out _nativeLargeAnchor))
     using (var builder = new BlobBuilder(Allocator.Temp))
     {
         ref var root = ref builder.ConstructRoot<NativeHeightmapDataLarge>();
-        root = new NativeHeightmapDataLarge(descriptor);
+        root.Descriptor = descriptor;
 
         var heights = builder.Allocate(in root.Heights, cells);
-        HeightmapBuilder.BuildNativeHeightsLarge(descriptor, heights.GetUnsafePtr());
+        // Fill the heights directly into the builder's reserved region
+        for (int z = 0; z < descriptor.Resolution; z++)
+            for (int x = 0; x < descriptor.Resolution; x++)
+                heights[z * descriptor.Resolution + x] =
+                    HeightmapBuilder.SampleNoise(x, z, descriptor);
 
         _nativeLargeAnchor = builder.Build<NativeHeightmapDataLarge>(world, blobId);
     }
@@ -124,7 +127,7 @@ if (!NativeSharedPtr.TryGet(world, blobId, out _nativeLargeAnchor))
 
 ## Sampling in a Burst job
 
-The native flavor's sampling system is a `[WrapAsJob]` static method that resolves the pointer via the resolver Unity hands the job through `NativeWorldAccessor.SharedPtrResolver`:
+The native flavor's sampling system is a `[WrapAsJob]` static method that resolves the pointer through the `NativeWorldAccessor`:
 
 ```csharp
 [ForEachEntity(typeof(SampleTags.Character), typeof(SampleTags.NativeFollower))]
@@ -134,7 +137,7 @@ static void Execute(
     ref Position position,
     in NativeWorldAccessor world)
 {
-    var data = heightmap.Value.Read(world.SharedPtrResolver).Value;
+    var data = heightmap.Value.Read(world).Value;
     // ... bilinear sample over data.Heights, write to position.Value.y
 }
 ```
@@ -148,7 +151,7 @@ The source generator wraps the static method into a Burst-compiled job struct. P
 - The same blob may be requested by many independent subsystems and you want them to converge on one slot in the cache without coordination.
 - You snapshot or rollback game state and don't want large immutable blobs duplicated into the rollback ring buffer.
 
-For "I know up front this is `Warm` and that one is `Cool`", use hand-authored `BlobId` constants — [Sample 14](14-blob-seed-pattern.md). For per-entity mutable data, use `UniquePtr<T>` — [Sample 10 — Pointers](10-pointers.md).
+For "I know up front this is `Warm` and that one is `Cool`", use hand-authored `BlobId` constants — [Sample 14](14-blob-seed-pattern.md). For per-entity mutable data, use `UniquePtr<T>` — [Sample 10 — Dynamic Collections](10-pointers.md).
 
 ## Cleanup discipline
 
@@ -157,8 +160,8 @@ Same as Sample 14: the scene initializer holds the seeder anchor (`SharedPtr` / 
 ## Concepts introduced
 
 - **Content-derived `BlobId`** — hash the inputs that determine the blob's content via `UniqueHashGenerator.Generate(descriptor)` and feed the result into `new BlobId(hash)`
-- **`SharedPtr.GetOrAlloc(heap, id, factory)`** — cache-miss-only factory invocation; same recipe ⇒ skip the rebuild
-- **`NativeSharedPtr` + `[WrapAsJob]`** — Burst-job sampling of an unmanaged shared blob via `NativeWorldAccessor.SharedPtrResolver`
+- **`SharedPtr.GetOrAlloc(world, id, factory)`** — cache-miss-only factory invocation; same recipe ⇒ skip the rebuild
+- **`NativeSharedPtr` + `[WrapAsJob]`** — Burst-job sampling of an unmanaged shared blob via `NativeWorldAccessor`
 - **`BlobBuilder` + `BlobArray<T>`** — relocatable single-allocation blob layout via relative offsets; seed-site `using` block with no `unsafe` code. See [BlobBuilder](../experimental/blob-builder.md).
 - **`BlitSerializer<T>` + `UniqueHashGenerator`** — the bytes-to-hash pipeline for any blittable typed input
 - **Off-snapshot storage** — immutable shared blobs sit outside the per-frame snapshot path; only the `BlobId` round-trips on snapshot / rollback

@@ -8,29 +8,30 @@ Two independent Trecs `World` instances running side-by-side in one Unity scene.
 
 Two worlds tick every frame:
 
-- **World A** — spawns red spheres around `x = -3`, every 0.5 s, lifetime 3 s.
-- **World B** — spawns blue cubes around `x = +3`, every 0.7 s, lifetime 3 s.
+- **World A** -- spawns red spheres around `x = -3`, every 0.5 s, lifetime 3 s.
+- **World B** -- spawns blue cubes around `x = +3`, every 0.7 s, lifetime 3 s.
 
-Each world has its own `WorldBuilder`, `World`, system instances, and entity store. They share a `Construct()` and `Bootstrap` but otherwise know nothing about each other.
-
-| Key | Action |
-|---|---|
-| 1 | Pause / resume World A |
-| 2 | Pause / resume World B |
-
-The HUD (`OnGUI`) shows each world's pause state and `WorldRegistry.ActiveWorlds.Count`, which reads `2` while the scene is running.
+Each world has its own `WorldBuilder`, `World`, system instances, and entity store. They share a `Construct()` call but otherwise know nothing about each other.
 
 ## Schema
 
-A single template registered with both worlds:
+A globals template and a critter template, both registered with both worlds:
 
 ```csharp
-public struct Critter : ITag { }
+public static class SampleTags
+{
+    public struct Critter : ITag { }
+}
 
 [Unwrap]
 public partial struct Lifetime : IEntityComponent
 {
     public float Value;
+}
+
+public partial class SampleGlobals : ITemplate, IExtends<TrecsTemplates.Globals>
+{
+    SpawnSystem.State SpawnState = default;
 }
 
 public partial class CritterEntity
@@ -51,14 +52,18 @@ public partial class CritterEntity
 Building two worlds in one `Construct()`:
 
 ```csharp
-_worldA = new WorldBuilder()
+var worldA = new WorldBuilder()
     .SetDebugName("World A — Red Spheres")
-    .AddTemplate(SampleTemplates.CritterEntity.Template)
+    .AddTemplates(new[]
+    {
+        SampleTemplates.SampleGlobals.Template,
+        SampleTemplates.CritterEntity.Template,
+    })
     .Build();
 
-var goManagerA = new RenderableGameObjectManager(_worldA);
+var goManagerA = new RenderableGameObjectManager(worldA);
 
-_worldA.AddSystems(new ISystem[]
+worldA.AddSystems(new ISystem[]
 {
     new SpawnSystem(SpawnIntervalA, Lifetime, SpawnRadius,
                     new Vector3(-WorldSeparation, 0, 0)),
@@ -66,14 +71,18 @@ _worldA.AddSystems(new ISystem[]
     new PrimitivePresenter(goManagerA),
 });
 
-_worldB = new WorldBuilder()
+var worldB = new WorldBuilder()
     .SetDebugName("World B — Blue Cubes")
-    .AddTemplate(SampleTemplates.CritterEntity.Template)
+    .AddTemplates(new[]
+    {
+        SampleTemplates.SampleGlobals.Template,
+        SampleTemplates.CritterEntity.Template,
+    })
     .Build();
 
-var goManagerB = new RenderableGameObjectManager(_worldB);
+var goManagerB = new RenderableGameObjectManager(worldB);
 
-_worldB.AddSystems(new ISystem[]
+worldB.AddSystems(new ISystem[]
 {
     new SpawnSystem(SpawnIntervalB, Lifetime, SpawnRadius,
                     new Vector3(WorldSeparation, 0, 0)),
@@ -91,25 +100,28 @@ Both worlds register the *same template type* (`CritterEntity`) — allowed and 
 Two worlds means two of every lifecycle hook:
 
 ```csharp
-initializables = new() { _worldA.Initialize, _worldB.Initialize };
-
-tickables = new()
+initializables = new()
 {
-    ReadInput,                                        // pause toggles
-    () => { if (!_pausedA) _worldA.Tick(); },
-    () => { if (!_pausedB) _worldB.Tick(); },
+    worldA.Initialize,
+    worldB.Initialize,
+    sceneInitA.Initialize,
+    sceneInitB.Initialize,
 };
 
-lateTickables = new()
-{
-    () => { if (!_pausedA) _worldA.LateTick(); },
-    () => { if (!_pausedB) _worldB.LateTick(); },
-};
+tickables = new() { worldA.Tick, worldB.Tick };
 
-disposables = new() { _worldA.Dispose, _worldB.Dispose };
+lateTickables = new() { worldA.LateTick, worldB.LateTick };
+
+disposables = new()
+{
+    goManagerA.Dispose,
+    goManagerB.Dispose,
+    worldA.Dispose,
+    worldB.Dispose,
+};
 ```
 
-Pausing one world while the other ticks is "skip the call." Worlds maintain independent fixed-update accumulators, so a paused world resumes where it left off — it doesn't try to catch up missed simulation time.
+Each world ticks independently. If you wanted to pause one world while the other runs, you would simply skip its `Tick()` call. Worlds maintain independent fixed-update accumulators, so a paused world resumes where it left off -- it doesn't try to catch up missed simulation time.
 
 ## Per-world GameObject managers
 
@@ -118,7 +130,7 @@ Each world gets its own `RenderableGameObjectManager`. The manager subscribes to
 ## What's process-global vs per-world
 
 - **Per-world** — entity store, component arrays, system instances, accessors, RNG, blob cache, event manager, interpolation. Everything holding simulation state.
-- **Process-global** — component / tag / set type IDs (`ComponentTypeId<T>`, `Tag<T>`, `EntitySetId<T>`), plus the `WorldRegistry` listing active worlds. Stable identifiers, not state.
+- **Process-global** — component / tag / set type IDs (`ComponentTypeId<T>`, `Tag<T>`, `EntitySet<T>`), plus the `WorldRegistry` listing active worlds. Stable identifiers, not state.
 
 This split is what lets the same template type register in multiple worlds without conflict.
 

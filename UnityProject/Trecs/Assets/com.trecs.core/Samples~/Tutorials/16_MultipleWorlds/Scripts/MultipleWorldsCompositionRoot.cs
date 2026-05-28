@@ -1,4 +1,4 @@
-// Companion docs: https://svermeulen.github.io/trecs/samples/19-multiple-worlds/
+// Companion docs: https://svermeulen.github.io/trecs/samples/16-multiple-worlds/
 
 using System;
 using System.Collections.Generic;

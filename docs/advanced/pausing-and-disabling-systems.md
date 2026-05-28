@@ -5,7 +5,7 @@ Trecs provides two independent mechanisms for skipping a system's `Execute()` on
 | | Channel disable | Paused |
 |---|---|---|
 | API | `WorldAccessor.SetSystemEnabled(idx, channel, bool)` | `WorldAccessor.SetSystemPaused(idx, bool)` |
-| Caller role | Any (typically a non-system `Unrestricted` accessor) | `Fixed` or `Unrestricted` only |
+| Caller role | `Variable` or `Unrestricted` only (not `Fixed`) | `Fixed` or `Unrestricted` only |
 | Snapshot / replay | **Not** included — ephemeral | **Included** — round-trips through serialization |
 | Intended for | Editor inspector, recording playback, debug menus, kill switches | Game logic that pauses systems as part of game state (UI overlay, cutscenes) |
 
@@ -16,15 +16,16 @@ A system runs on a tick **iff** no channel has it disabled **and** it is not pau
 Each system has an independent disable bit per `EnableChannel`. Different concerns own different channels and can't clobber each other:
 
 ```csharp
+[Flags]
 public enum EnableChannel
 {
-    Editor,    // Trecs Hierarchy inspector toggle
-    Playback,  // Recording playback silences input systems via this channel
-    User,      // Application-side user code
+    Editor   = 1 << 0,  // Trecs Hierarchy inspector toggle
+    Playback = 1 << 1,  // Recording playback silences input systems via this channel
+    User     = 1 << 2,  // Application-side user code
 }
 ```
 
-Game-host / editor code calls these on a `WorldAccessor`:
+Game-host / editor code calls these on a `Variable` or `Unrestricted` `WorldAccessor`:
 
 ```csharp
 accessor.SetSystemEnabled(systemIndex, EnableChannel.User, false);  // disable
@@ -63,9 +64,10 @@ Trecs has no built-in `[SystemGroup]` for bulk pause/unpause. The framework expo
 ```csharp
 IReadOnlyList<SystemEntry> systems = world.GetSystems();
 SystemEntry entry = systems[systemIndex];
-//   entry.System        — the ISystem instance
-//   entry.Phase         — Input / Fixed / Presentation / etc.
-//   entry.DebugName     — human-readable name
+//   entry.System           — the ISystem instance
+//   entry.Phase            — Input / Fixed / EarlyPresentation / Presentation / LatePresentation
+//   entry.DebugName        — human-readable name
+//   entry.DeclarationIndex — stable index for use with SetSystemEnabled / SetSystemPaused
 ```
 
 ## Related

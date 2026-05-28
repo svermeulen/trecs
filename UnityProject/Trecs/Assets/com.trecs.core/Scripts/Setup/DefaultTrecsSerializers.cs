@@ -42,12 +42,8 @@ namespace Trecs.Internal
             RegisterBlit<TypeId>(registry);
 
             // Heap serializers
-            registry.RegisterSerializer<
-                IterableDictionaryUnmanagedSerializer<BlobId, NativeSharedHeap.BlobInfo>
-            >();
             registry.RegisterSerializer<IterableDictionaryUnmanagedSerializer<PtrHandle, BlobId>>();
             RegisterBlit<PtrHandle>(registry);
-            RegisterBlit<NativeSharedHeap.BlobInfo>(registry);
 
             registry.RegisterSerializer<
                 IterableDictionaryUnmanagedSerializer<BlobId, SharedHeap.BlobInfo>

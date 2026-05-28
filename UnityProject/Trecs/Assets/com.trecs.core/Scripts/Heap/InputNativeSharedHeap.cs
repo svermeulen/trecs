@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
 using Trecs.Collections;
 using Trecs.Internal;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs
 {
@@ -13,22 +16,23 @@ namespace Trecs
     /// the handles for that frame are released in bulk and the cache evicts
     /// the blob if its refcount drops to zero.
     ///
-    /// <para>Per-frame bucketing (vs. a flat handle->frame map) makes
-    /// <c>ClearAtOrBeforeFrame</c> O(frames-trimmed × handles-per-frame) and
-    /// avoids the full-table scan the previous frame-scoped heap did. The
-    /// per-frame <see cref="List{PtrHandle}"/>s are pooled to avoid GC churn.</para>
+    /// <para>Provides its own <see cref="InputNativeSharedPtrResolver"/> independent
+    /// from <see cref="NativeSharedHeap"/>. Input allocations happen during the input
+    /// phase (before fixed update); jobs only read during fixed update, so there is
+    /// no concurrent read+write and no pending queue is needed.</para>
     /// </summary>
     public sealed class InputNativeSharedHeap
     {
         readonly TrecsLog _log;
         readonly BlobCache _store;
 
-        // (frame -> list of (BlobId, refcount handle)). BlobId is needed to
-        // recreate the refcount handle on Deserialize; the handle itself is
-        // used only for Release on frame trim.
         readonly IterableDictionary<int, List<Entry>> _entriesByFrame = new();
         readonly Stack<List<Entry>> _listPool = new();
         readonly List<int> _frameRemoveBuffer = new();
+
+        NativeHashMap<BlobId, InputNativeSharedHeapEntry> _resolverEntries;
+        readonly Dictionary<BlobId, int> _blobIdRefCount = new();
+        InputNativeSharedPtrResolver _resolver;
 
         bool _isDisposed;
 
@@ -48,6 +52,11 @@ namespace Trecs
         {
             _log = log;
             _store = store;
+            _resolverEntries = new NativeHashMap<BlobId, InputNativeSharedHeapEntry>(
+                16,
+                Allocator.Persistent
+            );
+            _resolver = new InputNativeSharedPtrResolver(_resolverEntries);
         }
 
         public int NumLiveFrames
@@ -59,6 +68,38 @@ namespace Trecs
             }
         }
 
+        public ref InputNativeSharedPtrResolver Resolver
+        {
+            get
+            {
+                TrecsDebugAssert.That(!_isDisposed);
+                return ref _resolver;
+            }
+        }
+
+        internal InputNativeSharedHeapEntry ResolveEntry<T>(BlobId blobId)
+            where T : unmanaged
+        {
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!blobId.IsNull, "Attempted to resolve null blob address");
+
+            TrecsAssert.That(
+                _resolverEntries.TryGetValue(blobId, out var entry),
+                "InputNativeSharedHeap could not resolve blob {0}",
+                blobId.Value
+            );
+
+            TrecsAssert.That(
+                entry.TypeHash == TypeId<T>.Value.Value,
+                "Type hash mismatch for blob {0}: stored {1} != requested {2}",
+                blobId.Value,
+                entry.TypeHash,
+                TypeId<T>.Value.Value
+            );
+
+            return entry;
+        }
+
         internal InputNativeSharedPtr<T> Alloc<T>(int frame, BlobId blobId, in T value)
             where T : unmanaged
         {
@@ -66,6 +107,7 @@ namespace Trecs
             TrecsDebugAssert.That(frame >= 0);
             var handle = _store.AllocNativeBlob<T>(blobId, in value);
             TrackEntry(frame, handle.BlobId, handle.Handle);
+            AddToResolver<T>(handle.BlobId);
             _log.Trace(
                 "Allocated input native shared type={0} blobId={1} frame={2}",
                 typeof(T),
@@ -86,6 +128,7 @@ namespace Trecs
             }
             var handle = _store.CreateHandle(blobId);
             TrackEntry(frame, blobId, handle);
+            AddToResolver<T>(blobId);
             ptr = new InputNativeSharedPtr<T>(blobId);
             return true;
         }
@@ -101,7 +144,68 @@ namespace Trecs
             );
             var handle = _store.CreateHandle(blobId);
             TrackEntry(frame, blobId, handle);
+            AddToResolver<T>(blobId);
             return new InputNativeSharedPtr<T>(blobId);
+        }
+
+        void AddToResolver<T>(BlobId blobId)
+            where T : unmanaged
+        {
+            if (_blobIdRefCount.TryGetValue(blobId, out var count))
+            {
+                _blobIdRefCount[blobId] = count + 1;
+                return;
+            }
+
+            _blobIdRefCount[blobId] = 1;
+
+            var ptr = _store.GetNativeBlobPtr(blobId, TypeId<T>.Value.Value);
+            var burstTypeHash = TypeId<T>.Value.Value;
+
+            EnsureResolverCapacity(_resolverEntries.Count + 1);
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            var safety = AtomicSafetyHandle.Create();
+            AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(safety, true);
+            _resolverEntries.Add(
+                blobId,
+                new InputNativeSharedHeapEntry(burstTypeHash, ptr, safety)
+            );
+#else
+            _resolverEntries.Add(blobId, new InputNativeSharedHeapEntry(burstTypeHash, ptr));
+#endif
+        }
+
+        void RemoveFromResolver(BlobId blobId)
+        {
+            if (!_blobIdRefCount.TryGetValue(blobId, out var count))
+                return;
+
+            count -= 1;
+            if (count > 0)
+            {
+                _blobIdRefCount[blobId] = count;
+                return;
+            }
+
+            _blobIdRefCount.Remove(blobId);
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (_resolverEntries.TryGetValue(blobId, out var entry))
+            {
+                AtomicSafetyHandle.CheckDeallocateAndThrow(entry.Safety);
+                AtomicSafetyHandle.Release(entry.Safety);
+            }
+#endif
+            _resolverEntries.Remove(blobId);
+        }
+
+        void EnsureResolverCapacity(int needed)
+        {
+            if (_resolverEntries.Capacity >= needed)
+                return;
+            var newCapacity = Math.Max(needed, _resolverEntries.Capacity * 2);
+            _resolverEntries.Capacity = newCapacity;
         }
 
         void TrackEntry(int frame, BlobId blobId, PtrHandle cacheHandle)
@@ -166,6 +270,16 @@ namespace Trecs
                 _listPool.Push(list);
             }
             _entriesByFrame.Clear();
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            foreach (var kvp in _resolverEntries)
+            {
+                AtomicSafetyHandle.CheckDeallocateAndThrow(kvp.Value.Safety);
+                AtomicSafetyHandle.Release(kvp.Value.Safety);
+            }
+#endif
+            _resolverEntries.Clear();
+            _blobIdRefCount.Clear();
         }
 
         void ReleaseFrame(int frame)
@@ -174,17 +288,12 @@ namespace Trecs
             for (int i = 0; i < list.Count; i++)
             {
                 _store.DisposeHandle(list[i].CacheHandle);
+                RemoveFromResolver(list[i].BlobId);
             }
             list.Clear();
             _listPool.Push(list);
         }
 
-        /// <summary>
-        /// Writes (frame -> [BlobId, ...]) pairs. The refcount handle isn't
-        /// serialized — it's re-minted from the BlobId on Deserialize via
-        /// <see cref="BlobCache.CreateHandle"/>, which acquires a fresh refcount
-        /// slot for the same underlying blob.
-        /// </summary>
         internal void Serialize(ISerializationWriter writer)
         {
             TrecsDebugAssert.That(!_isDisposed);
@@ -204,7 +313,6 @@ namespace Trecs
         internal void Deserialize(ISerializationReader reader)
         {
             TrecsDebugAssert.That(!_isDisposed);
-            // Defensive: callers contract is ClearAll() before Deserialize.
             ClearAll();
 
             var numFrames = reader.Read<int>("NumFrames");
@@ -217,6 +325,34 @@ namespace Trecs
                     var blobId = reader.Read<BlobId>("BlobId");
                     var handle = _store.CreateHandle(blobId);
                     TrackEntry(frame, blobId, handle);
+
+                    // Rebuild resolver entries from BlobCache
+                    if (!_blobIdRefCount.ContainsKey(blobId))
+                    {
+                        _blobIdRefCount[blobId] = 1;
+                        var metadata = _store.GetBlobMetadata(blobId);
+                        var ptr = _store.GetNativeBlobPtr(blobId, metadata.TypeId.Value);
+
+                        EnsureResolverCapacity(_resolverEntries.Count + 1);
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                        var safety = AtomicSafetyHandle.Create();
+                        AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(safety, true);
+                        _resolverEntries.Add(
+                            blobId,
+                            new InputNativeSharedHeapEntry(metadata.TypeId.Value, ptr, safety)
+                        );
+#else
+                        _resolverEntries.Add(
+                            blobId,
+                            new InputNativeSharedHeapEntry(metadata.TypeId.Value, ptr)
+                        );
+#endif
+                    }
+                    else
+                    {
+                        _blobIdRefCount[blobId] += 1;
+                    }
                 }
             }
             _log.Debug("Deserialized {0} frames into InputNativeSharedHeap", _entriesByFrame.Count);
@@ -226,6 +362,7 @@ namespace Trecs
         {
             TrecsDebugAssert.That(!_isDisposed);
             ClearAll();
+            _resolverEntries.Dispose();
             _isDisposed = true;
         }
     }

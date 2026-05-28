@@ -26,7 +26,7 @@ Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours,
 
 ## Layer 1: input bridge
 
-An input-phase ECS system reads player input and queues it into the world. Keeping the read on the deterministic side means the same input data flows through both live play and replay:
+An input-phase ECS system reads player input and queues it into the world. Funneling external state through `AddInput` means the framework can record and replay the same input data deterministically:
 
 ```csharp
 [ExecuteIn(SystemPhase.Input)]

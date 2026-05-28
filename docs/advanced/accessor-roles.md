@@ -8,8 +8,8 @@ Every rule below is asserted at the call site. Crossing a role boundary throws a
 
 ## The three roles
 
-- **`Fixed`** — owns the deterministic simulation. Reads/writes simulation state and allocates persistent heap. Render-only state (`[VariableUpdateOnly]`) is off-limits. Default for `[ExecuteIn(SystemPhase.Fixed)]` systems — the implicit default for any `ISystem`.
-- **`Variable`** — drives presentation. Reads simulation state and reads/writes the `[VariableUpdateOnly]` render state. Cannot mutate simulation state. Default for the three presentation phases and for input systems (input systems get extra permissions — see [Input System](../core/input-system.md)).
+- **`Fixed`** — owns the deterministic simulation. Reads and writes simulation state and allocates persistent heap. Render-only state (`[VariableUpdateOnly]`) is off-limits. Default for `[ExecuteIn(SystemPhase.Fixed)]` systems — which is the implicit default for any `ISystem`.
+- **`Variable`** — drives presentation. Reads simulation state and reads/writes the `[VariableUpdateOnly]` render state. Cannot mutate simulation state or the heap. Default for the three presentation phases (`EarlyPresentation`, `Presentation`, `LatePresentation`) and for input systems (input systems get extra permissions — see [Input System](../core/input-system.md)).
 - **`Unrestricted`** — escape hatch for non-system code (lifecycle hooks, event callbacks, networking, debug tooling, scripting bridges). Bypasses all role rules.
 
 ## Capability matrix
@@ -41,7 +41,7 @@ See the [Components attribute reference](../core/components.md#component-field-a
 
 ## Picking a role for a standalone accessor
 
-Non-system code (services, scene initializers, editor inspectors, tests) creates its own accessor via `world.CreateAccessor(AccessorRole)`. Pick the role that matches the work:
+Non-system code (services, scene initializers, editor inspectors, tests) creates its own accessor via `World.CreateAccessor(AccessorRole role)` (called on the Trecs `World` instance). Pick the role that matches the work:
 
 - **`Fixed`** — Service classes for the deterministic simulation. For example, a stats service that subscribes to `OnAdded` / `OnRemoved` for a tag and bumps a global score component — see [Sample 15 — Reactive Events](../samples/15-reactive-events.md).
 - **`Variable`** — UI, camera controllers, rendering services that read both sim and render state.
@@ -58,7 +58,7 @@ System-owned accessors map their `SystemPhase` to a role automatically:
 
 The presentation and input phases collapse into the single `Variable` role because they share the same access rules — only their [execution-order positions](../core/systems.md#phase-diagram) differ.
 
-System code never calls `world.CreateAccessor(AccessorRole.X)` — it gets the role from its `[ExecuteIn(...)]` attribute. Use `CreateAccessor` only for the standalone cases listed above.
+System code never calls `World.CreateAccessor(...)` — it gets the role from its `[ExecuteIn(...)]` attribute. Use `CreateAccessor` only for the standalone cases listed above.
 
 ## Related
 

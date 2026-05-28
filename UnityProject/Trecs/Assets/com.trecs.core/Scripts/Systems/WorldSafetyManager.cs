@@ -72,8 +72,8 @@ namespace Trecs.Internal
 #endif
 
         /// <summary>
-        /// Drain all outstanding jobs that hold any of the pooled handles, then release the
-        /// handles. Must be called before world teardown.
+        /// Release all pooled handles. All outstanding jobs must already be complete
+        /// (SystemRunner.Dispose drains them before calling this).
         /// </summary>
         public void Dispose()
         {
@@ -82,29 +82,18 @@ namespace Trecs.Internal
             _disposed = true;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            Exception firstFailure = null;
-
             try
             {
                 foreach (var (_, handle) in _handles)
                 {
-                    try
-                    {
-                        AtomicSafetyHandle.EnforceAllBufferJobsHaveCompletedAndRelease(handle);
-                    }
-                    catch (Exception e)
-                    {
-                        firstFailure ??= e;
-                    }
+                    AtomicSafetyHandle.CheckDeallocateAndThrow(handle);
+                    AtomicSafetyHandle.Release(handle);
                 }
             }
             finally
             {
                 _handles.Clear();
             }
-
-            if (firstFailure != null)
-                throw firstFailure;
 #endif
         }
 

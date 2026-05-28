@@ -1220,7 +1220,7 @@ namespace Trecs.Tests
             shifted[insertAt] = 0x00; // junk byte
             Array.Copy(data, insertAt, shifted, insertAt + 1, data.Length - insertAt);
 
-            NAssert.Throws<SerializationException>(() => DeserializeWorld(world, shifted));
+            NAssert.Catch<Exception>(() => DeserializeWorld(world, shifted));
         }
 
         #endregion

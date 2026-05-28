@@ -4,7 +4,7 @@ Trecs tracks which jobs read and write which data and inserts the right `JobHand
 
 ## Why this exists
 
-Unity's job system makes dependency wiring your problem: every job needs the right input handle. Get it wrong and you get race conditions, or jobs running in sequence when they could have run in parallel. Trecs reads your access pattern (parameter `in`/`ref` modifiers, the native field types listed in [Jobs & Burst](jobs-and-burst.md#thread-safety-cheat-sheet)) and emits the wiring at schedule time.
+Unity's job system makes dependency wiring your problem: every job needs the right input handle. Get it wrong and you get race conditions, or jobs running in sequence when they could have run in parallel. Trecs reads your access pattern (parameter `in`/`ref` modifiers, the native field types listed in the [thread-safety cheat sheet](../advanced/advanced-jobs.md#thread-safety-cheat-sheet)) and emits the wiring at schedule time.
 
 ## The reader/writer model
 
@@ -22,7 +22,7 @@ Granularity is **per (component type, group)**. A job writing `Position` for `Fi
 | Reads `Position` (Fish) | Writes `Position` (Fish) | No — writer waits |
 | Writes `Position` (Fish) | Writes `Position` (Fish) | No — writer waits |
 
-Same rule for [sets](../entity-management/sets.md): `NativeSetRead` / `NativeSetCommandBuffer` are tracked per set type. Note that deferred set ops on `WorldAccessor` / `NativeWorldAccessor` don't need to synchronize — they apply at submission, after every job is complete.
+Same rule for [sets](../entity-management/sets.md): `NativeSetRead` / `NativeSetCommandBuffer` are tracked per (set type, group), just like components. Note that deferred set ops on `WorldAccessor` / `NativeWorldAccessor` don't need to synchronize — they apply at submission, after all outstanding jobs complete.
 
 ## How dependencies get declared
 
@@ -57,11 +57,11 @@ ref var posMut = ref handle.Component<Position>(world).Write;
 That lazy sync is why you never call `JobHandle.Complete()` yourself — touching the data is the sync point.
 
 !!! tip
-    Main-thread access mid-phase forces the in-flight job to complete and stalls worker threads. Minimize these sync points by pushing main-thread reads/writes into a job, or by running them later in the frame so the job has more time to finish.
+    Main-thread access mid-phase forces conflicting in-flight jobs to complete, blocking the main thread until they finish. Minimize these sync points by pushing main-thread reads/writes into a job, or by running them later in the frame so the job has more time to finish.
 
 ## Phase boundaries
 
-Each of the five [update phases](../core/systems.md#phase-diagram) — `Input`, `Fixed`, `EarlyPresentation`, `Presentation`, `LatePresentation` — ends with a full job fence: every outstanding job completes before the next phase begins. So:
+Each of the five [update phases](../core/systems.md#phase-diagram) — `EarlyPresentation`, `Input`, `Fixed`, `Presentation`, `LatePresentation` — ends with a full job fence: every outstanding job completes before the next phase begins. So:
 
 - Fixed-phase jobs finish before any presentation system runs.
 - Within a phase, mix job and main-thread systems freely — the tracker orders them.

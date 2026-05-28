@@ -39,7 +39,7 @@ var world = new WorldBuilder()
 
 If the type happens to be blittable (no managed fields), you can skip the custom serializer entirely — register the built-in `BlitSerializer<T>` against the registry directly (`world.SerializerRegistry.RegisterSerializer(new BlitSerializer<T>())`). For enums, register `EnumSerializer<T>` the same way. The common primitives (`int`, `float`, `string`, `Vector3`, `quaternion`, …) are pre-registered.
 
-For common managed collections, Trecs ships generic closed-type serializers in `Trecs.Serialization` — `ListSerializer<T>`, `QueueSerializer<T>`, `HashSetSerializer<T>`, `DictionarySerializer<TKey, TValue>`, `FastListSerializer<T>` (and their `Native*` counterparts). Register the closed type once and the registry handles it (e.g. `new ListSerializer<int>()`, `new QueueSerializer<Vector3>()`). Only author your own `ISerializer<T>` when the payload isn't covered by one of these.
+For common managed collections, Trecs ships generic closed-type serializers in `Trecs.Serialization` — `ListSerializer<T>`, `QueueSerializer<T>`, `IterableHashSetSerializer<T>`, `IterableDictionarySerializer<TKey, TValue>`, `ListBlitSerializer<T>` (for blittable element types). Register the closed type once and the registry handles it (e.g. `new ListSerializer<int>()`, `new QueueSerializer<Vector3>()`). Only author your own `ISerializer<T>` when the payload isn't covered by one of these.
 
 ## Authoring a custom serializer
 
@@ -124,7 +124,7 @@ Every `World` exposes a `ComponentArraySerializerRegistry` for this:
 world.ComponentArraySerializerRegistry.Register(new MyPhysicsWorldSerializer());
 ```
 
-The interface hands you a `NativeList<T>` view of the component values for the group being serialized — a familiar, Burst-compatible Unity Collections type. The framework owns the entry count (every component array in a group has the same length, one entry per entity) and writes it for you, so you only deal with per-element data:
+The interface hands you a `NativeList<T>` view of the component values for the partition being serialized — a familiar, Burst-compatible Unity Collections type. The framework owns the entry count (every component array in a partition has the same length, one entry per entity) and writes it for you, so you only deal with per-element data:
 
 ```csharp
 public interface IComponentArraySerializer<T> where T : unmanaged, IEntityComponent
@@ -149,7 +149,7 @@ world.ComponentArraySerializerRegistry.Register(new SkipComponentSerializer<CDeb
 
 Because no value bytes are written, the component contributes nothing of substance to the stream — and therefore nothing to the checksum hash — so determinism checks won't desync on values that vary between runs. This is the simplest way to keep transient per-frame state out of recordings.
 
-The framework still writes the entry **count** (a single `int`) for every component array, and `SkipComponentSerializer<T>` asserts on load that `requiredCount` matches the live array's length. A snapshot taken when the group had _N_ entities must be restored into a live world where the group also has _N_ entities. If the counts diverge — e.g. the user added more entities of that template between save and load — the deserialize throws. Without this check the skipped component array would silently desync from the rest of the group, corrupting entity-component lookups downstream.
+The framework still writes the entry **count** (a single `int`) for every component array, and `SkipComponentSerializer<T>` asserts on load that `requiredCount` matches the live array's length. A snapshot taken when a partition had _N_ entities must be restored into a live world where that partition also has _N_ entities. If the counts diverge — e.g. the user added more entities of that template between save and load — the deserialize throws. Without this check the skipped component array would silently desync from the rest of the partition, corrupting entity-component lookups downstream.
 
 `SkipComponentSerializer<T>` is right for the in-session save/restore case, where the same entities exist on both sides and you want to preserve their runtime state. For fresh-load-from-disk scenarios — where the live world starts empty and the snapshot brings the entities into existence — use `DefaultValueComponentSerializer<T>` instead:
 

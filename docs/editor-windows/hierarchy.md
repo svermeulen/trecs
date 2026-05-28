@@ -26,7 +26,7 @@ The toolbar hosts:
 - A **world dropdown** (multi-world projects — see below).
 - A **search field** with the predicate DSL described in [Search syntax](#search-syntax).
 - A `?` button that toggles an inline help panel (mirrors this page).
-- The Unity-standard kebab (`⋮`) **cog menu** for window options.
+- The Unity-standard kebab (`⋮`) **menu** for window options.
 
 ## World dropdown
 
@@ -161,9 +161,9 @@ Right-clicking a row offers actions tailored to its kind:
 
 Each "Find…" entry pre-fills the search field with the right predicate and kind selector.
 
-## Cog menu
+## Kebab menu
 
-The kebab (`⋮`) at the top-right holds:
+The kebab menu (`⋮`) at the top-right holds:
 
 - **Show Empty Templates** — toggle templates with no live entities.
 - **Show Abstract Templates** — toggle abstract (non-instantiable) templates.

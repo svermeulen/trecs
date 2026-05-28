@@ -152,6 +152,6 @@ void OnQueueRemoved(in TrailQueue trail)
 
 - **`UniquePtr<T>`** — single-owner managed pointer. See [Pointers](../experimental/pointers.md).
 - **`FixedArray32<T>`** / **`FixedList32<T>`** — inline blittable collections with fixed capacity. See [Fixed Collections](../advanced/fixed-collections.md).
-- **`TrecsList<T>`** / **`TrecsArray<T>`** — heap-backed native collections on the world's shared chunk store. See [Trecs Collections](../experimental/trecs-collections.md).
+- **`TrecsList<T>`** / **`TrecsArray<T>`** — heap-backed native collections on the world's shared chunk store. See [Dynamic Collections](../experimental/dynamic-collections.md).
 - **Per-variant template inheritance** — `IExtends<Character>` plus a per-variant tag and trail component.
 - **`OnRemoved` cleanup observer** — the canonical way to release heap-backed data when entities disappear. See [Entity Events](../entity-management/entity-events.md).

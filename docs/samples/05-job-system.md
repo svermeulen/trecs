@@ -12,10 +12,13 @@ Particles spawn, move, and bounce off boundaries. A toggle switches between main
 
 ### Components
 
-`Position`, `Velocity`, `Rotation`, `UniformScale`, `ColorComponent`, `GameObjectId` from Common, plus global components for configuration:
+`Position`, `Rotation`, `UniformScale`, `ColorComponent` from Common (via `IndirectRenderable`), `Velocity` defined locally, plus global components for configuration:
 
 ```csharp
+[Unwrap]
 public partial struct DesiredNumParticles : IEntityComponent { public int Value; }
+
+[Unwrap]
 public partial struct IsJobsEnabled : IEntityComponent { public bool Value; }
 ```
 
@@ -90,7 +93,7 @@ void ExecuteAsJob()
 {
     var job = new ExecuteAsJob_AutoJob();
     // ...
-    // For each matching group: populate buffers, wire up dependencies, schedule
+    // For each matching tag combination: populate buffers, wire up dependencies, schedule
     job.ScheduleParallel(count, batchSize, dependencies);
     // ... track job for dependency system ...
 }

@@ -2,7 +2,6 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Trecs.Internal;
-using Unity.Mathematics;
 
 namespace Trecs
 {
@@ -12,13 +11,6 @@ namespace Trecs
     /// </summary>
     public static class NativeSharedPtr
     {
-        /// <summary>
-        /// Returns a fresh reference-counted handle to the existing native blob at
-        /// <paramref name="blobId"/>, throwing if no such blob exists. This is the
-        /// lookup-only counterpart to <see cref="Alloc{T}(WorldAccessor, BlobId, in T)"/>
-        /// — it does not allocate new memory, just acquires another refcount slot
-        /// on data that has already been seeded.
-        /// </summary>
         public static NativeSharedPtr<T> Acquire<T>(WorldAccessor world, BlobId blobId)
             where T : unmanaged
         {
@@ -33,9 +25,6 @@ namespace Trecs
             return world.NativeSharedHeap.CreateBlob<T>(blobId, in value);
         }
 
-        /// <summary>
-        /// Returns true and the cached blob if one exists at <paramref name="blobId"/>; otherwise false.
-        /// </summary>
         public static bool TryGet<T>(WorldAccessor world, BlobId blobId, out NativeSharedPtr<T> ptr)
             where T : unmanaged
         {
@@ -43,10 +32,6 @@ namespace Trecs
             return world.NativeSharedHeap.TryGetBlob<T>(blobId, out ptr);
         }
 
-        /// <summary>
-        /// Takes ownership of an existing native allocation with an explicit BlobId.
-        /// See <see cref="NativeUniquePtr.AllocTakingOwnership{T}"/> for the ownership contract.
-        /// </summary>
         public static NativeSharedPtr<T> AllocTakingOwnership<T>(
             WorldAccessor world,
             BlobId blobId,
@@ -58,17 +43,6 @@ namespace Trecs
             return world.NativeSharedHeap.CreateBlobTakingOwnership<T>(blobId, alloc);
         }
 
-        /// <summary>
-        /// Returns the existing native-shared blob at <paramref name="blobId"/> if cached,
-        /// otherwise calls <paramref name="factory"/> and stores the result. The factory
-        /// is only invoked on cache miss.
-        /// <para>
-        /// To stay allocation-free, pass <paramref name="factory"/> as either a
-        /// <c>static</c> method group (<c>BuildIt</c>), a <c>static</c> lambda
-        /// (<c>static () =&gt; …</c>, C# 9+), or a cached <c>static readonly Func&lt;T&gt;</c>
-        /// field. Plain lambdas that capture local state allocate a closure on every call.
-        /// </para>
-        /// </summary>
         public static NativeSharedPtr<T> GetOrAlloc<T>(
             WorldAccessor world,
             BlobId blobId,
@@ -84,14 +58,6 @@ namespace Trecs
             return world.NativeSharedHeap.CreateBlob<T>(blobId, factory());
         }
 
-        /// <summary>
-        /// Returns the existing native-shared blob at <paramref name="blobId"/> if cached,
-        /// otherwise calls <paramref name="factory"/> to obtain a native allocation and
-        /// takes ownership of it. The factory is only invoked on cache miss.
-        /// See <see cref="AllocTakingOwnership{T}"/> for the ownership contract
-        /// and <see cref="GetOrAlloc{T}(WorldAccessor, BlobId, Func{T})"/> for how to keep
-        /// <paramref name="factory"/> allocation-free.
-        /// </summary>
         public static NativeSharedPtr<T> GetOrAllocTakingOwnership<T>(
             WorldAccessor world,
             BlobId blobId,
@@ -111,48 +77,36 @@ namespace Trecs
     /// <summary>
     /// Reference-counted pointer to a shared native (unmanaged) heap allocation. Burst-compatible.
     /// Multiple entities can reference the same data via <see cref="BlobId"/>.
+    ///
     /// <para>
     /// Seed via <see cref="NativeSharedPtr.Alloc{T}(WorldAccessor, BlobId, in T)"/>;
     /// look up an already-seeded blob via <see cref="NativeSharedPtr.Acquire{T}(WorldAccessor, BlobId)"/>.
     /// Open a safety-checked view with <see cref="Read(WorldAccessor)"/> on the main thread, or
-    /// <see cref="Read(in NativeSharedPtrResolver)"/> in Burst jobs. <see cref="Clone"/>
+    /// <see cref="Read(in NativeWorldAccessor)"/> in Burst jobs. <see cref="Clone"/>
     /// increments the reference count; <see cref="Dispose(WorldAccessor)"/> decrements it and
     /// frees on zero.
     /// </para>
+    ///
     /// <para>
     /// <b>T must be a <c>readonly struct</c></b> (or a built-in primitive / enum) — enforced by
-    /// the TRECS124 analyzer. Native shared blobs live in the BlobCache, which is not
-    /// snapshotted alongside game-state snapshots, so any post-Alloc mutation silently desyncs
-    /// determinism. The <c>readonly struct</c> requirement also lets <see cref="NativeSharedRead{T}.Value"/>
-    /// return <c>ref readonly T</c> without the defensive-copy footgun a non-readonly receiver
-    /// would introduce.
+    /// the TRECS124 analyzer.
     /// </para>
+    ///
     /// <para>
-    /// Any number of readers can resolve the same blob in parallel without coordination, so
-    /// the API only exposes read-only access. The persistent struct stores only
-    /// (<see cref="PtrHandle"/>, <see cref="BlobId"/>) — 12 bytes, cheap to copy and store on
-    /// components. Per-blob <c>AtomicSafetyHandle</c>s live on the owning heap and are attached
-    /// to the <see cref="NativeSharedRead{T}"/> wrapper at Open time so Unity's job-safety
-    /// walker can detect use-after-free.
+    /// The struct stores a single 4-byte handle encoding a generation (8 bits) and blob slot
+    /// index (24 bits) into a chunked side-table directory. Freshly-allocated blobs are
+    /// immediately visible to Burst jobs — no pending-flush deferral.
     /// </para>
     /// </summary>
-    /// <remarks>
-    /// Packed with <c>LayoutKind.Sequential, Pack = 1</c> to minimize component size (12 bytes).
-    /// </remarks>
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    [StructLayout(LayoutKind.Sequential)]
     public readonly unsafe struct NativeSharedPtr<T> : IEquatable<NativeSharedPtr<T>>
         where T : unmanaged
     {
-        public readonly PtrHandle Handle;
-        public readonly BlobId BlobId;
+        internal readonly uint Handle;
 
-        // Internal so external code can't fabricate a handle from arbitrary values.
-        // Allocation goes through NativeSharedPtr.Alloc / Clone; deserialization
-        // paths live in InternalsVisibleTo-allowed assemblies.
-        internal NativeSharedPtr(PtrHandle handle, BlobId blobId)
+        internal NativeSharedPtr(uint handle)
         {
             Handle = handle;
-            BlobId = blobId;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -166,62 +120,53 @@ namespace Trecs
             if (!world.NativeSharedHeap.TryClone<T>(Handle, out var result))
             {
                 throw TrecsDebugAssert.CreateException(
-                    "Failed to clone NativeSharedPtr with blobId {0} and handle {1}",
-                    BlobId,
+                    "Failed to clone NativeSharedPtr with handle {0}",
                     Handle
                 );
             }
             return result;
         }
 
-        /// <summary>
-        /// Opens a safety-checked read view. Main-thread only; jobs use
-        /// <see cref="Read(in NativeSharedPtrResolver)"/>. Bridges the persistent heap's
-        /// <c>_pendingAdds</c> so freshly-created blobs are readable before the next
-        /// <c>FlushPendingOperations</c>.
-        /// </summary>
         public readonly NativeSharedRead<T> Read(WorldAccessor world)
         {
             return world.NativeSharedHeap.Read(in this);
         }
 
-        /// <summary>
-        /// Burst-compatible read view. Pass a resolver obtained via
-        /// <see cref="WorldAccessor.NativeSharedPtrResolver"/> or
-        /// <see cref="NativeWorldAccessor.SharedPtrResolver"/>.
-        /// </summary>
         public readonly NativeSharedRead<T> Read(in NativeWorldAccessor world)
         {
-            var entry = world.SharedPtrResolver.ResolveEntry<T>(BlobId);
+            var entry = world.SharedPtrResolver.ResolveEntryWithSlotPtr<T>(Handle, out var slotPtr);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            return new NativeSharedRead<T>(entry.Ptr.ToPointer(), entry.Safety);
+            return new NativeSharedRead<T>(
+                entry.Address.ToPointer(),
+                slotPtr,
+                entry.Generation,
+                entry.Safety
+            );
 #else
-            return new NativeSharedRead<T>(entry.Ptr.ToPointer());
+            return new NativeSharedRead<T>(entry.Address.ToPointer(), slotPtr, entry.Generation);
 #endif
         }
 
         public readonly void Dispose(WorldAccessor world)
         {
             world.AssertCanMutateHeap();
-            world.NativeSharedHeap.DisposeHandle(Handle);
+            world.NativeSharedHeap.DecrementRef(Handle);
         }
 
         public readonly bool IsNull
         {
-            get { return BlobId.IsNull; }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return Handle == 0; }
         }
 
-        /// <remarks>
-        /// Equality compares both <see cref="Handle"/> and <see cref="BlobId"/>. Two
-        /// <see cref="NativeSharedPtr{T}"/> instances pointing at the same underlying blob
-        /// (same <see cref="BlobId"/>) but holding different <see cref="PtrHandle"/>s —
-        /// e.g. one cloned from the other — are <i>not</i> equal here, since each handle
-        /// represents a distinct reference-count slot. Compare <see cref="BlobId"/> directly
-        /// when "do these point at the same blob?" is the actual question.
-        /// </remarks>
+        public readonly BlobId GetBlobId(WorldAccessor world)
+        {
+            return world.NativeSharedHeap.GetBlobId(Handle);
+        }
+
         public readonly bool Equals(NativeSharedPtr<T> other)
         {
-            return Handle.Equals(other.Handle) && BlobId.Equals(other.BlobId);
+            return Handle == other.Handle;
         }
 
         public override readonly bool Equals(object obj)
@@ -231,17 +176,17 @@ namespace Trecs
 
         public override readonly int GetHashCode()
         {
-            return unchecked((int)math.hash(new int2(Handle.GetHashCode(), BlobId.GetHashCode())));
+            return (int)Handle;
         }
 
         public static bool operator ==(NativeSharedPtr<T> left, NativeSharedPtr<T> right)
         {
-            return left.Equals(right);
+            return left.Handle == right.Handle;
         }
 
         public static bool operator !=(NativeSharedPtr<T> left, NativeSharedPtr<T> right)
         {
-            return !left.Equals(right);
+            return left.Handle != right.Handle;
         }
     }
 }

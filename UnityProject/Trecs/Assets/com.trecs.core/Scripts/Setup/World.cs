@@ -443,7 +443,10 @@ namespace Trecs
         /// </summary>
         public void RemoveAllEntities()
         {
-            TrecsDebugAssert.That(!_hasRemovedAllEntities);
+            if (_hasRemovedAllEntities)
+            {
+                return;
+            }
             _hasRemovedAllEntities = true;
 
             TrecsDebugAssert.That(

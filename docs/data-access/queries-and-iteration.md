@@ -18,7 +18,7 @@ void Execute(ref Position position, in Velocity velocity) { ... }
 [ForEachEntity(typeof(BallTags.Ball), typeof(BallTags.Active))]
 void Execute(in ActiveBall ball) { ... }
 
-// By components (any group whose template declares these components, regardless of tags)
+// By components (any template that declares these components, regardless of tags)
 [ForEachEntity(MatchByComponents = true)]
 void Execute(ref Position position, in Velocity velocity) { ... }
 
@@ -103,7 +103,7 @@ foreach (var entity in World.Query()
 
 ## Aspect queries
 
-Every [aspect](aspects.md) gets a generated `Query()` method that bundles component access into the iteration variable. Read and write through the aspect's properties instead of `....Component<T>(World)`:
+Every [aspect](aspects.md) gets a generated `Query()` method that bundles component access into the iteration variable. Read and write through the aspect's properties instead of going through `entity.Component<T>(World)`:
 
 ```csharp
 partial struct PlayerView : IAspect, IRead<Position>, IWrite<Health> { }

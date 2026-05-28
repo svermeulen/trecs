@@ -6,7 +6,7 @@ Cross-entity references via `EntityHandle`, with cleanup handlers to prevent dan
 
 ## What it does
 
-Predators (red) chase the nearest prey (green). On contact, the prey is removed and a new one spawns. Predators re-target the nearest available prey.
+Predators (red) chase the nearest prey (cyan). On contact, the prey is removed and a new one spawns. Predators re-target the nearest available prey.
 
 ## Schema
 

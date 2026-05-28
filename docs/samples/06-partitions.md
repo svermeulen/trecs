@@ -13,8 +13,11 @@ Balls bounce under gravity. When a ball's energy drops below a threshold, it mov
 ### Tags
 
 ```csharp
-public struct Ball : ITag { }
-public struct Active : ITag { }
+public static class BallTags
+{
+    public struct Ball : ITag { }
+    public struct Active : ITag { }
+}
 ```
 
 ### Template with partitions
@@ -122,6 +125,6 @@ public partial class BallPresenter : ISystem
 - **`SetTag<T>()` / `UnsetTag<T>()`** — transition entities between partitions by toggling the tag. See [Structural Changes](../entity-management/structural-changes.md).
 - **`Without = typeof(T)`** — query the absent partition.
 - **Partition-filtered iteration** — systems iterate only entities in a specific partition. See [Queries & Iteration](../data-access/queries-and-iteration.md).
-- **Group separation** — Active and Resting balls live in separate contiguous arrays for cache-friendly iteration.
+- **Partition separation** — Active and Resting balls live in separate contiguous arrays for cache-friendly iteration.
 - **Multiple `[ForEachEntity]` methods** — different queries in one system, called from an explicit `Execute()`. See [Systems](../core/systems.md).
 - For dynamic, overlapping membership, see [Sets](08-sets.md).

@@ -34,7 +34,7 @@ Each interpolated field generates three components: `Position`, `Interpolated<Po
 
 ### 2. Define interpolation functions
 
-Write static methods with `[GenerateInterpolatorSystem]` defining how each component type blends. The source generator creates a Burst-compiled job system for each:
+Write static methods with `[GenerateInterpolatorSystem]` defining how each component type blends. The source generator creates a presentation-phase system with a nested Burst-compiled job for each:
 
 ```csharp
 public static class MyInterpolators
@@ -106,7 +106,7 @@ public partial class RenderSystem : ISystem
 
 For each `[GenerateInterpolatorSystem]` method, the source generator produces:
 
-- A **Burst-compiled `IJobFor` system** that runs during variable update, iterating entities with the component and blending previous → current via your function.
+- An **`ISystem` with a nested Burst-compiled job** that runs during the presentation phase, iterating entities with the component and blending previous → current via your function.
 - An **extension method on `WorldBuilder`** (one per group) that registers all `InterpolatedPreviousSaver<T>` instances and interpolator systems in the group.
 
 You write the math; scheduling, dependency tracking, and registration are handled.

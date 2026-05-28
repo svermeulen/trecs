@@ -8,15 +8,23 @@ An aspect is a `partial struct` that bundles related component access into one r
 partial struct Boid : IAspect, IRead<Velocity, Speed>, IWrite<Position> { }
 ```
 
-This generates properties:
+Assuming these components are marked `[Unwrap]` (single-field structs), this generates properties:
 
-- `ref readonly float3 Velocity` (read-only, unwrapped)
-- `ref readonly float Speed` (read-only, unwrapped)
-- `ref float3 Position` (read-write, unwrapped)
+- `ref readonly float3 Velocity` (read-only, unwrapped inner type)
+- `ref readonly float Speed` (read-only, unwrapped inner type)
+- `ref float3 Position` (read-write, unwrapped inner type)
 
-Aspects also pick up entity-level methods that work the same way they do on a raw `EntityHandle`: `aspect.Handle(World)` resolves the iterated entity to a stable `EntityHandle`, and `aspect.Remove(World)` / `aspect.SetTag<T>(World)` / `aspect.UnsetTag<T>(World)` perform structural ops.
+Without `[Unwrap]`, the property returns the wrapping struct itself (`ref Position` instead of `ref float3`).
 
-A component marked `[Unwrap]` (single-field struct) exposes its inner value through the property. Without `[Unwrap]`, the property returns the wrapping struct (`ref Position` instead of `ref float3`).
+Beyond component properties, the source generator emits:
+
+- **`Remove(WorldAccessor)` / `Remove(NativeWorldAccessor)`** — schedules entity removal.
+- **`SetTag<T>(WorldAccessor)` / `SetTag<T>(NativeWorldAccessor)`** — sets a tag on the entity.
+- **`UnsetTag<T>(WorldAccessor)` / `UnsetTag<T>(NativeWorldAccessor)`** — unsets a tag.
+- **`static Query(WorldAccessor)`** — returns a builder for manual iteration (see [below](#manual-aspect-queries)).
+- **`Handle(WorldAccessor)` / `Handle(NativeWorldAccessor)`** — resolves to a stable `EntityHandle`.
+- **`Boid(WorldAccessor, EntityHandle)` / `Boid(WorldAccessor, EntityIndex)`** — constructors for building an aspect view directly
+- **`NativeFactory`** — nested struct for cross-entity aspect lookups in Burst jobs. Declare as a `[FromWorld]` field; call `factory.Create(entityIndex)` to construct the aspect. See [Advanced Jobs](../advanced/advanced-jobs.md).
 
 ## Using an aspect in `[ForEachEntity]`
 
@@ -67,7 +75,7 @@ foreach (var boid in Boid.Query(World).MatchByComponents())
 
 Aspect queries don't auto-filter by the aspect's declared components. **Always supply scope**: `WithTags<…>()`, `MatchByComponents()`, or `InSet<…>()`.
 
-`Single()` / `TrySingle(out ...)` work too:
+`Single()` / `TrySingle(out ...)` / `Count()` work too:
 
 ```csharp
 var player = PlayerView.Query(World).WithTags<GameTags.Player>().Single();

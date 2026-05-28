@@ -238,14 +238,14 @@ namespace Trecs.Tests
             var medium = store.Alloc(256, 8, typeHash: 0);
             var large = store.Alloc(4096, 8, typeHash: 0);
 
-            var es = store.ResolveEntry(small);
-            var em = store.ResolveEntry(medium);
-            var el = store.ResolveEntry(large);
+            var ps = store.ResolvePayload(small);
+            var pm = store.ResolvePayload(medium);
+            var pl = store.ResolvePayload(large);
 
             // Each goes to its own bucket → independent pages.
-            NAssert.AreNotEqual(es.PageId, em.PageId);
-            NAssert.AreNotEqual(em.PageId, el.PageId);
-            NAssert.AreNotEqual(es.PageId, el.PageId);
+            NAssert.AreNotEqual(ps.PageId, pm.PageId);
+            NAssert.AreNotEqual(pm.PageId, pl.PageId);
+            NAssert.AreNotEqual(ps.PageId, pl.PageId);
         }
 
         [Test]
@@ -282,7 +282,7 @@ namespace Trecs.Tests
             var h = store.Alloc(NativeHeap.MaxBucketSlotSize, 16, typeHash: 0);
             NAssert.AreEqual(
                 0,
-                store.ResolveEntry(h).OwnsWholePage,
+                store.ResolvePayload(h).OwnsWholePage,
                 "Alloc at exactly MaxBucketSlotSize must use the bucket path"
             );
         }
@@ -294,7 +294,7 @@ namespace Trecs.Tests
             var h = store.Alloc(NativeHeap.MaxBucketSlotSize + 1, 16, typeHash: 0);
             NAssert.AreEqual(
                 1,
-                store.ResolveEntry(h).OwnsWholePage,
+                store.ResolvePayload(h).OwnsWholePage,
                 "Alloc above MaxBucketSlotSize must take the huge path"
             );
         }
@@ -306,9 +306,9 @@ namespace Trecs.Tests
 
             var huge = store.Alloc(200 * 1024, 16, typeHash: 0); // 200 KB > 64 KB max bucket
 
-            var entry = store.ResolveEntry(huge);
-            NAssert.AreEqual(1, entry.OwnsWholePage, "Huge alloc must own its whole page");
-            NAssert.AreEqual(0, entry.SlotIndex, "Huge alloc occupies a single-slot page");
+            var payload = store.ResolvePayload(huge);
+            NAssert.AreEqual(1, payload.OwnsWholePage, "Huge alloc must own its whole page");
+            NAssert.AreEqual(0, payload.SlotIndex, "Huge alloc occupies a single-slot page");
             NAssert.AreEqual(1, store.NumPages);
         }
 
@@ -467,12 +467,12 @@ namespace Trecs.Tests
         {
             using var store = new NativeHeap(TrecsLog.Default);
             var h = store.Alloc(65536, 16, typeHash: 0);
-            var firstPageId = store.ResolveEntry(h).PageId;
+            var firstPageId = store.ResolvePayload(h).PageId;
             store.Free(h);
             store.ReclaimEmptyPages();
 
             var h2 = store.Alloc(65536, 16, typeHash: 0);
-            var secondPageId = store.ResolveEntry(h2).PageId;
+            var secondPageId = store.ResolvePayload(h2).PageId;
             NAssert.AreEqual(
                 firstPageId,
                 secondPageId,
@@ -706,14 +706,14 @@ namespace Trecs.Tests
                 using var dst = CloneViaSerialize(src);
 
                 NAssert.AreEqual(2, dst.NumLiveAllocations);
-                var hugeEntry = dst.ResolveEntry(hugeHandle);
-                NAssert.AreEqual(1, hugeEntry.OwnsWholePage);
-                NAssert.AreEqual(7, hugeEntry.TypeHash);
+                var hugePayload = dst.ResolvePayload(hugeHandle);
+                NAssert.AreEqual(1, hugePayload.OwnsWholePage);
+                NAssert.AreEqual(7, hugePayload.TypeHash);
 
-                var extEntry = dst.ResolveEntry(extHandle);
-                NAssert.AreEqual(1, extEntry.OwnsWholePage);
-                NAssert.AreEqual(9, extEntry.TypeHash);
-                NAssert.AreEqual(0xCAFE, Marshal.ReadInt32(extEntry.Address));
+                var extPayload = dst.ResolvePayload(extHandle);
+                NAssert.AreEqual(1, extPayload.OwnsWholePage);
+                NAssert.AreEqual(9, extPayload.TypeHash);
+                NAssert.AreEqual(0xCAFE, Marshal.ReadInt32(dst.ResolveEntry(extHandle).Address));
             }
         }
 
@@ -962,12 +962,13 @@ namespace Trecs.Tests
                     "AllocExternal must register the supplied pointer verbatim"
                 );
                 NAssert.AreEqual(7, entry.TypeHash);
+                var payload = store.ResolvePayload(h);
                 NAssert.AreEqual(
                     1,
-                    entry.OwnsWholePage,
+                    payload.OwnsWholePage,
                     "External allocations occupy a dedicated single-slot page"
                 );
-                NAssert.AreEqual(0, entry.SlotIndex);
+                NAssert.AreEqual(0, payload.SlotIndex);
 
                 // Free releases the page (calls AllocatorManager.Free on the registered pointer)
                 // and removes the slot from the live-allocations count.

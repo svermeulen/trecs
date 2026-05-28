@@ -487,20 +487,21 @@ namespace Trecs.Tests
         }
 
         [Test]
-        public void WorldBuild_RegisteringBaseAndDerived_Throws()
+        public void WorldBuild_RegisteringBaseAndDerived_PrunesBase()
         {
-            // ResolverBallEntity declares IExtends<ResolverShapeBase>. If both
-            // are passed to the WorldBuilder, the build-time assert in
-            // WorldInfo catches the configuration up-front rather than letting
-            // every AddEntity / Warmup / [FromWorld] call site fail later.
-            NAssert.Throws<TrecsException>(() =>
-            {
-                using var env = EcsTestHelper.CreateEnvironment(
-                    b => { },
-                    ResolverShapeBase.Template,
-                    ResolverBallEntity.Template
-                );
-            });
+            // ResolverBallEntity declares IExtends<ResolverShapeBase>. When both
+            // are passed to WorldBuilder, the base is automatically pruned so
+            // that AddEntity queries on the base's tags resolve unambiguously to
+            // the derived template's groups.
+            using var env = EcsTestHelper.CreateEnvironment(
+                b => { },
+                ResolverShapeBase.Template,
+                ResolverBallEntity.Template
+            );
+
+            var a = env.Accessor;
+            a.AddEntity<ResolverBall>().Set(new TestInt { Value = 1 }).AssertComplete();
+            a.Submit();
         }
     }
 }

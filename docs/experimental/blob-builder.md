@@ -95,7 +95,7 @@ public partial struct LevelRef : IEntityComponent
 Inside the `using` block:
 
 1. **`ConstructRoot<T>()` first.** Reserves space for the root and returns a writable `ref T`. Call exactly once.
-2. **Initialize the root's non-array fields.** The cleanest pattern is wholesale assignment via a constructor (as above) — works fine with `readonly struct` root types.
+2. **Initialize the root's non-array fields.** Either assign them directly (as in the example above) or use wholesale assignment via a constructor — the latter works naturally with `readonly struct` root types.
 3. **`Allocate(in root.SomeArray, length)` for each `BlobArray` field.** Reserves the array's storage and records a patch. Returns a `BlobBuilderArray<T>` for filling.
 4. **Fill each array.** Either through the indexer (`arr[i] = ...`) or by writing directly through `arr.GetUnsafePtr()` for bulk fills.
 5. **`Build<T>(world, blobId)`** to finalize and seed. The builder's working chunks are then disposed automatically by `using`.
@@ -162,7 +162,7 @@ This same property is what lets a blob round-trip through serialization or asset
 |---|---|---|
 | `NativeSharedPtr.Alloc(in T value)` | T is a fixed-size struct (with or without `FixedArray256<T>` etc. inline). | Simplest. One memcpy of T into the heap. Capped at whatever inline storage T provides. |
 | `BlobBuilder` + `NativeSharedPtr.AllocTakingOwnership` | T contains variable-length data that doesn't fit inline. | This page. Single allocation, type-honest, relocatable. |
-| Separate `TrecsArray<float>` field on the component | Per-entity variable-length data (not shared between entities). | Outside the shared-blob story entirely. See [Trecs Collections](trecs-collections.md). |
+| Separate `TrecsArray<float>` field on the component | Per-entity variable-length data (not shared between entities). | Outside the shared-blob story entirely. See [Dynamic Collections](dynamic-collections.md). |
 
 ## `BlobRef<T>` — single-T relative pointer
 

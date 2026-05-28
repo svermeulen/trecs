@@ -88,11 +88,11 @@ public partial class PlayerEntity : ITemplate, ITagged<PlayerTag>
 | Attribute | Effect |
 |-----------|--------|
 | `[Interpolated]` | Generates interpolation companion components for smooth rendering. See [Interpolation](../advanced/interpolation.md). |
-| `[VariableUpdateOnly]` | Only phases that run with the `Variable` accessor role (Input and the three Presentation phases) may read or write it. Fixed-update systems cannot touch it. Asserted at the access site — see [Accessor Roles](../advanced/accessor-roles.md#capability-matrix). |
+| `[VariableUpdateOnly]` | Variable, Input, and Unrestricted accessors may read and write it freely. Fixed-update systems cannot touch it. Asserted at the access site — see [Accessor Roles](../advanced/accessor-roles.md#capability-matrix). |
 | `[Constant]` | Immutable after entity creation. Asserted at the write site. |
 | `[Input(...)]` | Marks the component as input data. See [Input System](input-system.md). |
 
-A component with no attribute is **simulation state**: any phase may read it; only `Fixed` systems may write it.
+A component with no attribute is **simulation state**: any phase may read it; only `Fixed` and `Unrestricted` accessors may write it.
 
 ## Global entity
 

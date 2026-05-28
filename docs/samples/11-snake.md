@@ -86,23 +86,24 @@ Every N fixed frames (controlled by `MoveTickCounter`):
 3. Advances the head one cell in the current direction
 4. Wraps around grid edges
 
-`[SingleEntity]` is a per-parameter attribute that finds the one entity matching the given tag and binds it to the aspect parameter. Global state is read via `World.GlobalComponent<T>()`, and `World.Frame` stamps each segment with its creation frame:
+`[SingleEntity]` is a per-parameter attribute that finds the one entity matching the given tag and binds it to the aspect parameter. Both the global entity and the snake head are bound this way. `World.Frame` stamps each segment with its creation frame:
 
 ```csharp
-void Execute([SingleEntity(typeof(SnakeTags.SnakeHead))] in SnakeHead head)
+void Execute(
+    [SingleEntity(typeof(TrecsTags.Globals))] in Globals globals,
+    [SingleEntity(typeof(SnakeTags.SnakeHead))] in SnakeHead head
+)
 {
-    ref var counter = ref World.GlobalComponent<MoveTickCounter>().Write;
-
-    if (counter.FramesUntilNextMove > 0)
+    if (globals.MoveTickCounter > 0)
     {
-        counter.FramesUntilNextMove--;
+        globals.MoveTickCounter--;
         return;
     }
 
-    counter.FramesUntilNextMove = _settings.FramesPerMove - 1;
+    globals.MoveTickCounter = _settings.FramesPerMove - 1;
 
     // Read input from global entity, apply turn (reject 180° reversals)
-    var requested = World.GlobalComponent<MoveInput>().Read.RequestedDirection;
+    var requested = globals.MoveInput;
     // ... apply turn ...
 
     // Spawn segment at head's current position, tagged with creation frame
@@ -119,6 +120,8 @@ void Execute([SingleEntity(typeof(SnakeTags.SnakeHead))] in SnakeHead head)
 }
 
 partial struct SnakeHead : IAspect, IWrite<Direction, GridPos> { }
+
+partial struct Globals : IAspect, IWrite<MoveTickCounter>, IRead<MoveInput> { }
 ```
 
 ### 3. FoodConsumeSystem
@@ -133,7 +136,7 @@ When segment count exceeds `SnakeLength - 1`, removes the oldest segment (by `Se
 
 Spawns food up to a maximum count at random unoccupied grid cells using `World.Rng`.
 
-### 6. SnakeRendererSystem (`[ExecuteIn(SystemPhase.Presentation)]`)
+### 6. SnakePresenter (`[ExecuteIn(SystemPhase.Presentation)]`)
 
 Maps `GridPos` to world coordinates for rendering.
 

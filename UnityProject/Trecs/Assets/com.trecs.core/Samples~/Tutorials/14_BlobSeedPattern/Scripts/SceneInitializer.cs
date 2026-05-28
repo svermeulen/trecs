@@ -69,7 +69,12 @@ namespace Trecs.Samples.BlobSeedPattern
                 .OnRemoved(OnSwatchRemoved)
                 .AddTo(_subscriptions);
 
-            world.Events.OnShutdown(() => _subscriptions.Dispose()).AddTo(_subscriptions);
+            world.Events.OnShutdown(OnShutdown).AddTo(_subscriptions);
+        }
+
+        void OnShutdown()
+        {
+            _subscriptions.Dispose();
         }
 
         [ForEachEntity]

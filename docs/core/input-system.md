@@ -7,7 +7,7 @@ Despite the name, "input" isn't limited to user input — it covers **any non-de
 The mechanics:
 
 - Mark template fields with `[Input]`.
-- Inside an `[ExecuteIn(SystemPhase.Input)]` system, call `entity.AddInput<T>(World, value)`. Input systems run just before each fixed step, in lockstep with the simulation — see the [phase diagram](../core/systems.md#phase-diagram).
+- Inside an `[ExecuteIn(SystemPhase.Input)]` system, call `handle.AddInput<T>(World, value)`. Input systems run just before each fixed step, in lockstep with the simulation — see the [phase diagram](../core/systems.md#phase-diagram).
 - The queued value is applied to the target entity at the start of the upcoming fixed step.
 
 When the [Trecs Player window](../editor-windows/player.md) records, every `AddInput` call is captured alongside its target frame. During scrub or replay, Input-phase systems are disabled and recorded inputs are replayed onto the exact frames they originally targeted, so the simulation sees byte-identical input on every playback.
@@ -84,7 +84,7 @@ public partial class SnakeInputSystem : ISystem
 }
 ```
 
-Call `handle.AddInput<T>(World, value)` (or the matching method on aspect) to target a specific entity.
+Call `handle.AddInput<T>(World, value)` on any `EntityHandle` or `EntityIndex` to target a specific entity.
 
 ## Reading input
 
@@ -101,7 +101,7 @@ public partial class ProcessInputSystem : ISystem
 }
 ```
 
-`[Input]` components are read-only everywhere — including inside Input systems themselves. The only way a value reaches an `[Input]` field is via `entity.AddInput<T>(world, value)`, which is gated to `[ExecuteIn(SystemPhase.Input)]` systems. A direct `.Write` on the component throws in DEBUG builds regardless of which phase the caller is in.
+`[Input]` components are read-only everywhere — including inside Input systems themselves. The only way a value reaches an `[Input]` field is via `handle.AddInput<T>(world, value)`, which is gated to `[ExecuteIn(SystemPhase.Input)]` systems. A direct `.Write` on the component asserts in debug/editor builds. Unrestricted-role accessors bypass this guard.
 
 ## Variable-sized input payloads
 

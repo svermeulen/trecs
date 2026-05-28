@@ -25,13 +25,13 @@ new WorldBuilder()
 
 ## Adding, removing, and clearing
 
-All set mutations go through `World.Set<T>()`, which exposes three timing modes:
+All set access goes through `World.Set<T>()`, which exposes three timing modes:
 
-| Call shape | Timing | When applied |
+| Call shape | Timing | Description |
 |---|---|---|
-| `.DeferredAdd` / `.DeferredRemove` / `.DeferredClear` | Submission-deferred | Next call to `Submit()` |
-| `.Write` | Synchronous | Immediately (main thread, syncs outstanding jobs) |
-| `.Read`  | Synchronous | Immediately (main thread, syncs outstanding writers) |
+| `.DeferredAdd` / `.DeferredRemove` / `.DeferredClear` | Submission-deferred | Queued; applied at the next `Submit()` |
+| `.Write` | Synchronous | Read+write view (main thread, syncs outstanding jobs) |
+| `.Read`  | Synchronous | Read-only view (main thread, syncs outstanding writers) |
 
 ### Deferred
 
@@ -52,19 +52,24 @@ From a Burst job, `NativeWorldAccessor.Set<T>()` returns a `NativeSetAccessor<T>
 `Set<T>().Write` returns a synced view; its `Add` / `Remove` / `Clear` take effect right away. The sync runs once at acquisition, so cache the view for tight loops.
 
 ```csharp
-// Main thread
+// Main thread — via SetWrite<T>
 var highlighted = World.Set<HighlightedParticle>().Write;
 highlighted.Add(handle);
 highlighted.Remove(handle);
 highlighted.Clear();
+```
 
-// In a Burst job, via a NativeSetCommandBuffer captured as a job field
-highlighted.Add(handle, world);
-highlighted.Remove(handle, world);
+In a Burst job, use a `NativeSetCommandBuffer<T>` captured as a job field:
+
+```csharp
+// In a Burst job
+highlightedBuffer.Add(handle, world);
+highlightedBuffer.Remove(handle, world);
+highlightedBuffer.Clear();
 ```
 
 !!! warning "Don't mutate a set while iterating it"
-    An immediate `Add` / `Remove` / `Clear` on the **same set in the same group** you're iterating throws in debug builds. In release builds iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
+    An immediate `Add` / `Remove` / `Clear` on the **same set you're currently iterating** throws in debug builds. In release builds iteration corrupts silently — entries get skipped, revisited, or (when an `Add` grows the buffer) read from freed memory.
 
     To mutate a set you're iterating, prefer the deferred APIs — or stage the changes in a `NativeList<EntityHandle>` and apply them after the loop.
 

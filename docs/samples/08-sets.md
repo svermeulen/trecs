@@ -33,17 +33,18 @@ public struct WaveX : IEntitySet { }
 public struct WaveZ : IEntitySet { }
 ```
 
-Sets define sparse entity subsets. Membership is managed at runtime via `Set<T>().DeferredAdd` / `DeferredRemove`.
+Sets define sparse entity subsets. Membership is managed at runtime via `World.Set<T>().Write`, which exposes `.Add()` / `.Remove()` (or `.Clear()` for bulk reset).
 
 ### Registration
 
 Register sets with the world builder:
 
 ```csharp
-new WorldBuilder()
+var world = new WorldBuilder()
+    .AddTemplate(SampleTemplates.ParticleEntity.Template)
     .AddSet<SampleSets.WaveX>()
     .AddSet<SampleSets.WaveZ>()
-    // ...
+    .Build();
 ```
 
 ## Systems
@@ -58,6 +59,12 @@ public void Execute()
     float waveCenterX = math.sin(World.ElapsedTime * _settings.WaveXSpeed) * _gridExtent;
     float waveCenterZ = math.cos(World.ElapsedTime * _settings.WaveZSpeed) * _gridExtent;
 
+    var waveXSet = World.Set<SampleSets.WaveX>().Write;
+    waveXSet.Clear();
+
+    var waveZSet = World.Set<SampleSets.WaveZ>().Write;
+    waveZSet.Clear();
+
     foreach (var particle in ParticleView.Query(World).WithTags<SampleTags.Particle>())
     {
         // Reset intensities — downstream effect systems will overwrite
@@ -71,14 +78,10 @@ public void Execute()
         var handle = particle.Handle(World);
 
         if (distX < _settings.WaveBandWidth)
-            World.Set<SampleSets.WaveX>().DeferredAdd(handle);
-        else
-            World.Set<SampleSets.WaveX>().DeferredRemove(handle);
+            waveXSet.Add(handle);
 
         if (distZ < _settings.WaveBandWidth)
-            World.Set<SampleSets.WaveZ>().DeferredAdd(handle);
-        else
-            World.Set<SampleSets.WaveZ>().DeferredRemove(handle);
+            waveZSet.Add(handle);
     }
 }
 ```
@@ -102,7 +105,7 @@ void Execute(in WaveXView view)
 
 Same pattern, scoped to `WaveZ` set.
 
-### ParticleRendererSystem
+### ParticlePresenter
 
 Composites final color from warm and cool intensities. A particle in both waves blends both effects.
 
@@ -117,7 +120,7 @@ The trade-off: sets are sparse and may iterate slower than partitions due to wea
 ## Concepts introduced
 
 - **`IEntitySet`** — sparse entity subset. See [Sets](../entity-management/sets.md).
-- **`Set<T>().DeferredAdd` / `DeferredRemove`** — deferred membership changes. See [Structural Changes](../entity-management/structural-changes.md).
+- **`World.Set<T>().Write`** with `.Clear()`, `.Add()`, `.Remove()` — direct membership management. See [Structural Changes](../entity-management/structural-changes.md).
 - **`[ForEachEntity(Set = typeof(...))]`** — iterate only set members. See [Queries & Iteration](../data-access/queries-and-iteration.md).
 - **Overlapping membership** — entities can be in multiple sets at once.
 - **Sets vs Partitions** — see [Partitions](06-partitions.md) for the mutually-exclusive alternative, and [Entity Subset Patterns](../guides/entity-subset-patterns.md) for guidance.

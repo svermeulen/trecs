@@ -45,18 +45,10 @@ namespace Trecs
 
     /// <summary>
     /// Reference-counted pointer to an unmanaged shared blob, allocated through
-    /// the input pipeline. The blob lives in the shared <see cref="BlobCache"/>;
-    /// the lifetime of <i>this</i> reference is tied to the allocating input
-    /// frame. When the frame is trimmed, the input heap releases its refcount,
-    /// and the cache evicts the blob if no other reference exists.
-    ///
-    /// <para>Distinct from <see cref="NativeSharedPtr{T}"/>: the type-level
-    /// split encodes the lifetime contract — input pointers can only be
-    /// allocated from input-role accessors, cannot be manually disposed, and
-    /// source-gen rejects them in <c>[Input(MissingInputBehavior.Retain)]</c>
-    /// fields. The struct stores only a <see cref="BlobId"/> (8 bytes); reads
-    /// go through the same <see cref="NativeSharedPtrResolver"/> as persistent
-    /// shared pointers since the underlying data is shared.</para>
+    /// the input pipeline. The struct stores a <see cref="BlobId"/> (8 bytes); reads
+    /// go through <see cref="InputNativeSharedPtrResolver"/> which is a separate
+    /// BlobId-keyed map independent from the simulation-state
+    /// <see cref="NativeSharedPtrResolver"/>.
     /// </summary>
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public readonly unsafe struct InputNativeSharedPtr<T> : IEquatable<InputNativeSharedPtr<T>>
@@ -77,21 +69,39 @@ namespace Trecs
 
         public readonly NativeSharedRead<T> Read(WorldAccessor world)
         {
-            var entry = world.NativeSharedHeap.ResolveEntry<T>(BlobId);
+            var entry = world.InputNativeSharedHeap.ResolveEntry<T>(BlobId);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            return new NativeSharedRead<T>(entry.Ptr.ToPointer(), entry.Safety);
+            return new NativeSharedRead<T>(
+                entry.Ptr.ToPointer(),
+                slot: null,
+                capturedGeneration: 0,
+                entry.Safety
+            );
 #else
-            return new NativeSharedRead<T>(entry.Ptr.ToPointer());
+            return new NativeSharedRead<T>(
+                entry.Ptr.ToPointer(),
+                slot: null,
+                capturedGeneration: 0
+            );
 #endif
         }
 
         public readonly NativeSharedRead<T> Read(in NativeWorldAccessor world)
         {
-            var entry = world.SharedPtrResolver.ResolveEntry<T>(BlobId);
+            var entry = world.InputSharedPtrResolver.ResolveEntry<T>(BlobId);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            return new NativeSharedRead<T>(entry.Ptr.ToPointer(), entry.Safety);
+            return new NativeSharedRead<T>(
+                entry.Ptr.ToPointer(),
+                slot: null,
+                capturedGeneration: 0,
+                entry.Safety
+            );
 #else
-            return new NativeSharedRead<T>(entry.Ptr.ToPointer());
+            return new NativeSharedRead<T>(
+                entry.Ptr.ToPointer(),
+                slot: null,
+                capturedGeneration: 0
+            );
 #endif
         }
 

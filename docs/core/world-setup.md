@@ -77,7 +77,7 @@ var settings = new WorldSettings
 
     // Safety
     MaxSubmissionIterations = 10,               // Prevent circular submission feedback
-    AssertNoTimeInFixedPhase = false,           // true → time properties throw in fixed phase (DeltaTime, ElapsedTime, FixedDeltaTime, FixedElapsedTime)
+    AssertNoTimeInFixedPhase = false,           // true → time properties throw in fixed phase; use FixedFrame as a discrete tick counter instead
 
     // Logging
     MinLogLevel = LogLevel.Warning,             // Minimum severity for Trecs log messages
@@ -95,7 +95,7 @@ var world = new WorldBuilder()
 // 2. (Optional) Add systems
 world.AddSystem(new FooSystem());
 
-// 3. Initialize — allocates groups, locks system list, builds the global
+// 3. Initialize — allocates storage, locks system list, builds the global
 //    entity, then runs OnReady hooks
 world.Initialize();
 
@@ -109,7 +109,8 @@ while (running)
     world.LateTick();   // LatePresentation
 }
 
-// 6. Cleanup — runs OnShutdown hooks (reverse of OnReady), then tears down state
+// 6. Cleanup — removes all entities, runs OnShutdown hooks (reverse of OnReady),
+//    then tears down state
 world.Dispose();
 ```
 
@@ -130,14 +131,14 @@ var accessor = world.CreateAccessor(AccessorRole.Unrestricted);
 `WorldAccessor` exposes:
 
 - **[Entity operations](../entity-management/structural-changes.md)** — `AddEntity`, `RemoveEntity`, `SetTag` / `UnsetTag` (partition transitions)
-- **[Component access](components.md)** — `Component<T>`, `GlobalComponent<T>`, `ComponentBuffer<T>`
+- **[Component access](components.md)** — `GlobalComponent<T>`, `ComponentBuffer<T>` (per-entity access is via `EntityHandle.Component<T>(WorldAccessor)` — see [Components](components.md))
 - **[Queries](../data-access/queries-and-iteration.md)** — `Query()`, `CountEntitiesWithTags<T>()`
-- **[Sets](../entity-management/sets.md)** — `Set<T>()` gateway with `Defer` / `Read` / `Write` views
+- **[Sets](../entity-management/sets.md)** — `Set<T>()` gateway with `DeferredAdd` / `DeferredRemove` / `DeferredClear`, `Read`, and `Write` views
 - **[Events](../entity-management/entity-events.md)** — `Events` builder for entity lifecycle subscriptions
 - **[Time](../advanced/time-and-rng.md)** — `DeltaTime`, `ElapsedTime`, `Frame` (phase-aware)
 - **[RNG](../advanced/time-and-rng.md)** — `Rng`, `FixedRng`, `VariableRng`
-- **[Heap](../experimental/pointers.md)** — heap properties (`BlobCache`, `NativeSharedPtrResolver`, `NativeChunkStoreResolver`) for use with `SharedPtr.Alloc` / `UniquePtr.Alloc` / native variants
+- **[Heap](../experimental/pointers.md)** — `BlobCache` and heap allocation APIs for use with `SharedPtr.Alloc` / `UniquePtr.Alloc` / native variants
 - **[Jobs](../performance/jobs-and-burst.md)** — `ToNative()` for job-safe access
 - **Global entity** — `GlobalEntityHandle` returns the `EntityHandle` for the world's singleton global entity, and `GlobalComponent<T>()` gives direct component access to it
 - **System control** — `SetSystemEnabled` / `SetSystemPaused` / `IsSystemEffectivelyEnabled` for toggling systems at runtime
-- **Metadata** — `WorldInfo` for template/group introspection, `Log` for the world's logger
+- **Metadata** — `WorldInfo` for template and storage introspection

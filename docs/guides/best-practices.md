@@ -1,27 +1,22 @@
 # Best Practices
 
-Recommended practices for building with Trecs. Assumes determinism is a required property — may not apply to all games.
+Recommended practices for building with Trecs.
 
 ## Systems
 
 - **Declare system dependencies explicitly.** Use [`[ExecuteAfter]` / `[ExecuteBefore]`](../core/systems.md#system-ordering) instead of relying on registration order.
 - **Pick the right [phase](../core/systems.md#update-phases).** `Fixed` for simulation, `Input` for queueing inputs, `EarlyPresentation` / `Presentation` / `LatePresentation` for rendering and transform sync. The phase determines which [Accessor Role](../advanced/accessor-roles.md) you get and what you're allowed to do in it.
-- **Keep fixed-update objects stateless.** Includes systems and service classes used by fixed-update systems. Constructor parameters for immutable configuration are fine. Mutable state belongs in components, where it's serialized, deterministic, and visible to tooling. Otherwise state diverges between record and replay. Applies less strongly to variable-update systems (desyncs aren't possible there), but storing state in components — via [`[VariableUpdateOnly]`](../advanced/accessor-roles.md#vuo-field-vs-vuo-template) entities/components — is still often best for the same reasons.
+- **Keep fixed-update objects stateless.** Includes systems and service classes used by fixed-update systems. Constructor parameters with immutable configuration are fine. Mutable state belongs in components or [heap pointers](../experimental/pointers.md), where it's serialized, deterministic, and visible to tooling. Otherwise state diverges between record and replay. Variable-update systems don't have this constraint (desyncs aren't possible there), though it's still convenient to use components to co-locate data with entities.
 
 ## Components
 
 - **Data only, no logic.** Components are unmanaged structs with fields. Put logic in systems.
-- **Keep components small and focused.** Prefer `Health { Current, Max }` over a 20-field `CharacterStats`. Many components hold a single field — use [`[Unwrap]`](../core/components.md#the-unwrap-shorthand) so call sites read like the data, not the struct.
+- **Keep components small and focused.** Prefer `Health { Current, Max }` over a 20-field `CharacterStats`. Many components often hold just a single field — use [`[Unwrap]`](../core/components.md#the-unwrap-shorthand) with Aspects to skip the outer struct.
 - **Unmanaged only.** No classes, strings, arrays, or reference types. Use [heap pointers](../experimental/pointers.md) for managed/dynamically-sized data and [`FixedList<N>`](../advanced/fixed-collections.md) for inline lists.
 
 ## Entities & Templates
 
 - **Templates describe design concepts.** `Bullet`, `Player`, `Enemy` — not `EntityWithHealthAndPosition`.
-- **No runtime composition changes.** A template's component set is fixed at compile time. Escape hatches:
-    - **[Partitions](../core/templates.md#partitions)** — declared moves between tag combinations of the same template; component data is preserved.
-    - **Boolean / enum fields on a component** — simplest for "in state X, ignore field Y", but unused fields still take memory in every state.
-    - **[Sets](../entity-management/sets.md)** — sparse membership flags, independent of component storage.
-    - **Child entity** — when the conditional shape needs *different* components, spawn a separate entity and reference it via an `EntityHandle` on a parent component.
 
 ## General
 

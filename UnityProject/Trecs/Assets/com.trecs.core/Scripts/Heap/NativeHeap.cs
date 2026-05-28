@@ -455,9 +455,6 @@ namespace Trecs.Internal
                 TypeHash = typeHash,
                 Generation = nextGen,
                 InUse = 1,
-                OwnsWholePage = (byte)(ownsWholePage ? 1 : 0),
-                PageId = pageId,
-                SlotIndex = slotIdx,
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 Safety = safety,
 #endif
@@ -572,6 +569,7 @@ namespace Trecs.Internal
                 idx,
                 _densePayloads.Length
             );
+            var payload = _densePayloads[denseIdx];
             var lastDense = _densePayloads.Length - 1;
             if (denseIdx != lastDense)
             {
@@ -587,7 +585,7 @@ namespace Trecs.Internal
             entry.Address = IntPtr.Zero;
             SetEntry(idx, entry);
 
-            ReturnSlot(entry.PageId, entry.SlotIndex, entry.OwnsWholePage != 0);
+            ReturnSlot(payload.PageId, payload.SlotIndex, payload.OwnsWholePage != 0);
             _freeSideTableSlots.Push(idx);
             _liveCount--;
 #if DEBUG
@@ -611,6 +609,22 @@ namespace Trecs.Internal
             );
 
             return _resolver.ResolveEntry(handle);
+        }
+
+        internal NativeHeapEntryPayload ResolvePayload(PtrHandle handle)
+        {
+            TrecsDebugAssert.That(!_isDisposed);
+            TrecsDebugAssert.That(!handle.IsNull, "Attempted to resolve null PtrHandle");
+            NativeHeapResolver.DecodeHandle(handle, out var idxU, out _);
+            var idx = (int)idxU;
+            var denseIdx = _sparseToDense[idx];
+            TrecsDebugAssert.That(
+                denseIdx >= 0 && denseIdx < _densePayloads.Length,
+                "ResolvePayload: dense index {0} for side-table slot {1} out of range",
+                denseIdx,
+                idx
+            );
+            return _densePayloads[denseIdx];
         }
 
         /// <summary>
@@ -662,7 +676,8 @@ namespace Trecs.Internal
             for (int n = 0; n < _denseSlotIndices.Length; n++)
             {
                 var entry = GetEntry(_denseSlotIndices[n]);
-                AtomicSafetyHandle.EnforceAllBufferJobsHaveCompletedAndRelease(entry.Safety);
+                AtomicSafetyHandle.CheckDeallocateAndThrow(entry.Safety);
+                AtomicSafetyHandle.Release(entry.Safety);
             }
 #endif
 #if DEBUG
@@ -1080,10 +1095,11 @@ namespace Trecs.Internal
                         sideTableLength
                     );
                     var entry = GetEntry(slotIdx);
+                    var payload = _densePayloads[n];
                     TrecsDebugAssert.That(
                         entry.Address != IntPtr.Zero,
                         "Deserialize: live entry references reclaimed page {0}",
-                        entry.PageId
+                        payload.PageId
                     );
                     entry.Safety = AtomicSafetyHandle.Create();
                     AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(entry.Safety, true);
@@ -1166,7 +1182,8 @@ namespace Trecs.Internal
                 for (int n = 0; n < _denseSlotIndices.Length; n++)
                 {
                     var entry = GetEntry(_denseSlotIndices[n]);
-                    AtomicSafetyHandle.EnforceAllBufferJobsHaveCompletedAndRelease(entry.Safety);
+                    AtomicSafetyHandle.CheckDeallocateAndThrow(entry.Safety);
+                    AtomicSafetyHandle.Release(entry.Safety);
                 }
             }
 #endif
@@ -1644,11 +1661,6 @@ namespace Trecs.Internal
                 TypeHash = typeHash,
                 Generation = nextGen,
                 InUse = 1,
-                // External pages are single-slot pages owned by this allocation; Free
-                // releases the whole page via the same code path huge allocs use.
-                OwnsWholePage = 1,
-                PageId = pageId,
-                SlotIndex = 0,
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 Safety = safety,
 #endif
@@ -1963,10 +1975,6 @@ namespace Trecs.Internal
                     TypeHash = payload.TypeHash,
                     Generation = payload.Generation,
                     InUse = payload.InUse,
-                    OwnsWholePage = payload.OwnsWholePage,
-                    _padding = 0,
-                    PageId = payload.PageId,
-                    SlotIndex = payload.SlotIndex,
                 };
 
                 var chunkIdx = slotIdx >> NativeHeapResolver.ChunkSizeBits;

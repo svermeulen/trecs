@@ -28,15 +28,15 @@ Use sets for dynamic, sparse membership. Sets must be registered with the world 
 ```csharp
 public struct DeadEnemies : IEntitySet { }
 
-// Add to set
-World.Set<DeadEnemies>().DeferredAdd(entity.Handle);
+// Add to set (from inside a [ForEachEntity] method)
+World.Set<DeadEnemies>().DeferredAdd(entityHandle);
 
 // Iterate set members
 [ForEachEntity(Set = typeof(DeadEnemies))]
 void Execute(in DeadEnemy enemy) { ... }
 ```
 
-**Pros:** No data movement. Unlimited dimensions without group explosion. Fast add/remove.
+**Pros:** No data movement. Unlimited dimensions without storage fragmentation. Fast add/remove.
 **Cons:** Sparse iteration (indexed access, less cache-friendly than dense).
 
 ## Approach C: template [partitions](../core/templates.md#partitions)
@@ -67,7 +67,7 @@ void Execute(in DeadEnemy enemy) { ... }
 
 **Pros:** Dense iteration — only matching entities are visited. Cache-friendly.
 
-**Cons:** Moving between groups copies component data. Adding dimensions multiplies the number of groups.
+**Cons:** Partition transitions copy component data. Adding dimensions multiplies the number of partitions.
 
 ## Decision guide
 
@@ -79,14 +79,14 @@ void Execute(in DeadEnemy enemy) { ... }
 | **Setup** | None | Set struct + registration | Template + tags |
 | **Change cost** | None (just data) | Index add/remove | Component copy |
 | **Iteration** | Visits every entity the query matches (then branches) | Sparse (indexed lookup per member) | Dense (only matching entities visited) |
-| **Group count** | No increase | No increase | 2^N per dimension |
+| **Partition count** | No increase | No increase | 2^N per dimension |
 | **Best for** | The default — gameplay code where the condition is local to the component data | Dynamic membership, many dimensions, or any subset that's itself a first-class concept | Hot iteration over very large populations where cache locality dominates the cost |
 
 ## Combinatorial explosion
 
-With template partitions, each dimension doubles the number of groups:
+With template partitions, each dimension doubles the number of partitions:
 
-| Dimensions | Groups |
+| Dimensions | Partitions |
 |-----------|--------|
 | 1 (Alive/Dead) | 2 |
 | 2 (Alive/Dead × Visible/Hidden) | 4 |

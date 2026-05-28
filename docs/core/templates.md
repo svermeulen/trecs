@@ -195,7 +195,7 @@ public partial class Enemy : ITemplate,
 ```
 
 !!! warning "Mind the explosion"
-    Each declared dimension multiplies the partition count. Every partition is a distinct group with its own contiguous component buffer per component:
+    Each declared dimension multiplies the partition count. Every partition gets its own contiguous component buffer per component:
 
     | Dimensions  | Partitions |
     |-------------|------------|

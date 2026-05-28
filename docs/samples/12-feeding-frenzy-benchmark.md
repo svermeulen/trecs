@@ -37,18 +37,18 @@ Uses `IEntitySet` for membership tracking. Systems filter by set:
 void IdleBob(in Fish fish) { ... }
 ```
 
-**Trade-off:** Visits only relevant entities. No group changes on membership flips. Sparse iteration.
+**Trade-off:** Visits only relevant entities. No data movement on membership flips. Sparse iteration.
 
 ### Partitions
 
-Uses `IPartitionedBy` for group separation:
+Uses `IPartitionedBy` for partition separation:
 
 ```csharp
 [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.NotEating))]
 void IdleBob(in Fish fish) { ... }
 ```
 
-**Trade-off:** Dense, cache-friendly iteration. Partition changes copy component data between groups.
+**Trade-off:** Dense, cache-friendly iteration. Partition changes copy component data to the new partition's buffers.
 
 ## Nine iteration styles
 
@@ -97,7 +97,7 @@ Fish ↔ Meal pairing uses `EntityHandle` cross-references with cleanup handlers
 ## Concepts introduced
 
 - **Partitions are fastest for dense iteration** — entities are contiguous in memory
-- **Sets avoid group explosion** — no combinatorial blowup across dimensions
+- **Sets avoid storage fragmentation** — no combinatorial blowup across dimensions
 - **Branching is simplest but slowest** — iterates everything, branches per entity
 - **Jobs provide the biggest speedup** — Burst + parallel iteration scales with core count
 - **Source generation produces efficient code** — `[ForEachEntity]` and `[WrapAsJob]` generate tight loops comparable to hand-written jobs

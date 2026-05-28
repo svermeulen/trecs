@@ -83,6 +83,7 @@ namespace Trecs.Internal
         internal readonly SetStore _setStore;
 
         readonly NativeSharedHeap _nativeSharedHeap;
+        readonly InputNativeSharedHeap _inputNativeSharedHeap;
         readonly NativeHeap _nativeUniqueChunkStore;
 
         readonly RuntimeJobScheduler _jobScheduler;
@@ -173,6 +174,7 @@ namespace Trecs.Internal
             WorldSettings trecsSettings,
             EntityQuerier entitiesQuerier,
             NativeSharedHeap nativeSharedHeap,
+            InputNativeSharedHeap inputNativeSharedHeap,
             NativeHeap nativeUniqueChunkStore,
             RuntimeJobScheduler jobScheduler
         )
@@ -182,6 +184,7 @@ namespace Trecs.Internal
 
             _jobScheduler = jobScheduler;
             _nativeSharedHeap = nativeSharedHeap;
+            _inputNativeSharedHeap = inputNativeSharedHeap;
             _nativeUniqueChunkStore = nativeUniqueChunkStore;
             _cachedRangeOfSubmittedIndices = new List<EntityRange>();
             _transientEntityIDsAffectedByRemoveAtSwapBack = new IterableDictionary<int, int>();
@@ -260,11 +263,6 @@ namespace Trecs.Internal
                 "FlushAllDeferredOps called while jobs are still outstanding. "
                     + "Call scheduler.CompleteAllOutstanding() first."
             );
-
-            // NativeSharedHeap still has its own pending model independent of the chunk
-            // store; the chunk-store-backed heaps (unique / frame-scoped / TrecsList)
-            // now do allocs and frees immediately, so no flush is needed for them.
-            _nativeSharedHeap.FlushPendingOperations();
 
             using (TrecsProfiling.Start("Deferred Set Operations"))
             {
@@ -1618,6 +1616,7 @@ namespace Trecs.Internal
                 _entitiesQuerier._entityLocator,
                 flags,
                 _nativeSharedHeap.Resolver,
+                _inputNativeSharedHeap.Resolver,
                 chunkStoreResolver,
                 _setStore.DeferredQueues,
                 fastAdd,

@@ -96,13 +96,22 @@ world.AddSystems(new ISystem[]
 });
 ```
 
-A separate scene initializer creates the entity once during the init phase. Init code lives outside any system, so it uses `AccessorRole.Unrestricted`:
+A separate scene initializer creates the entity once during the init phase. The accessor is created up front with `AccessorRole.Unrestricted`, since init code lives outside any system:
 
 ```csharp
-public void Initialize()
+public class SceneInitializer
 {
-    var world = _world.CreateAccessor(AccessorRole.Unrestricted);
-    world.AddEntity<SampleTags.Spinner>();
+    readonly WorldAccessor _world;
+
+    public SceneInitializer(World world)
+    {
+        _world = world.CreateAccessor(AccessorRole.Unrestricted);
+    }
+
+    public void Initialize()
+    {
+        _world.AddEntity<SampleTags.Spinner>();
+    }
 }
 ```
 

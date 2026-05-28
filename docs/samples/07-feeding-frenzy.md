@@ -13,15 +13,15 @@ Fish swim toward meals. On contact a fish consumes the meal, grows, and looks fo
 ### Components
 
 ```csharp
-public partial struct SimPosition : IEntityComponent { public float3 Value; }
-public partial struct SimRotation : IEntityComponent { public quaternion Value; }
-public partial struct TargetMeal : IEntityComponent { public EntityHandle Value; }
-public partial struct ApproachingFish : IEntityComponent { public EntityHandle Value; }
-public partial struct DestinationPosition : IEntityComponent { public float3 Value; }
-public partial struct MealNutrition : IEntityComponent { public float Value; }
+[Unwrap] public partial struct SimPosition : IEntityComponent { public float3 Value; }
+[Unwrap] public partial struct SimRotation : IEntityComponent { public quaternion Value; }
+[Unwrap] public partial struct TargetMeal : IEntityComponent { public EntityHandle Value; }
+[Unwrap] public partial struct ApproachingFish : IEntityComponent { public EntityHandle Value; }
+[Unwrap] public partial struct DestinationPosition : IEntityComponent { public float3 Value; }
+[Unwrap] public partial struct MealNutrition : IEntityComponent { public float Value; }
 ```
 
-Plus `Position`, `Rotation`, `Velocity`, `Speed`, `UniformScale`, `ColorComponent` from Common.
+Plus `Velocity` and `Speed` defined locally, and `Position`, `Rotation`, `UniformScale`, `ColorComponent` from Common.
 
 ### Templates with partitions
 
@@ -61,7 +61,7 @@ Pairs idle fish with available meals via nested aspect queries. Sets velocity to
 
 Checks whether eating fish have reached their meal. On contact: removes the meal, grows the fish, moves the fish back to NotEating.
 
-Shows accessing a *different* group inside a `[WrapAsJob]` method — `[FromWorld]` on `mealFactory` lets the job look up meal data by `EntityHandle`:
+Shows accessing a *different* entity type inside a `[WrapAsJob]` method — `[FromWorld]` on `mealFactory` lets the job look up meal data by `EntityHandle`:
 
 ```csharp
 [ForEachEntity(typeof(FrenzyTags.Fish), typeof(FrenzyTags.Eating))]

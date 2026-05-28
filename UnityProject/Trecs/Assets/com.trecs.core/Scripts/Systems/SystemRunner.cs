@@ -418,9 +418,7 @@ namespace Trecs.Internal
             TrecsDebugAssert.That(!_hasDisposed);
             _hasDisposed = true;
 
-            // Drain any remaining tracked jobs before releasing the safety pool, otherwise
-            // EnforceAllBufferJobsHaveCompletedAndRelease would block on Burst code that
-            // still references handles we're about to release.
+            // Drain any remaining tracked jobs before releasing the safety pool.
             _jobScheduler.CompleteAllOutstanding();
 #if TRECS_IS_PROFILING
             _jobScheduler.DisposeTimingBuffers();

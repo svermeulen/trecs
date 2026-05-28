@@ -259,16 +259,16 @@ namespace Trecs.Tests
         [Test]
         public void NativeSharedPtr_WithValues_IsNotNull()
         {
-            var ptr = new NativeSharedPtr<int>(new PtrHandle(1), new BlobId(10));
+            var ptr = new NativeSharedPtr<int>(1);
             NAssert.IsFalse(ptr.IsNull);
         }
 
         [Test]
         public void NativeSharedPtr_Equality()
         {
-            var a = new NativeSharedPtr<int>(new PtrHandle(1), new BlobId(10));
-            var b = new NativeSharedPtr<int>(new PtrHandle(1), new BlobId(10));
-            var c = new NativeSharedPtr<int>(new PtrHandle(2), new BlobId(10));
+            var a = new NativeSharedPtr<int>(1);
+            var b = new NativeSharedPtr<int>(1);
+            var c = new NativeSharedPtr<int>(2);
 
             NAssert.IsTrue(a.Equals(b));
             NAssert.IsFalse(a.Equals(c));
@@ -279,8 +279,8 @@ namespace Trecs.Tests
         [Test]
         public void NativeSharedPtr_HashCode()
         {
-            var a = new NativeSharedPtr<int>(new PtrHandle(1), new BlobId(10));
-            var b = new NativeSharedPtr<int>(new PtrHandle(1), new BlobId(10));
+            var a = new NativeSharedPtr<int>(1);
+            var b = new NativeSharedPtr<int>(1);
             NAssert.AreEqual(a.GetHashCode(), b.GetHashCode());
         }
 
@@ -1061,8 +1061,8 @@ namespace Trecs.Tests
             var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
 
             NAssert.IsFalse(ptr.IsNull);
-            NAssert.IsFalse(ptr.Handle.IsNull);
-            NAssert.IsFalse(ptr.BlobId.IsNull);
+            NAssert.AreNotEqual(0u, ptr.Handle);
+            NAssert.IsFalse(heap.GetBlobId(ptr.Handle).IsNull);
 
             heap.Dispose();
             blobCache.Dispose();
@@ -1075,9 +1075,6 @@ namespace Trecs.Tests
 
             var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
 
-            // NativeSharedHeap has its own pending model (independent of the
-            // chunk-store-backed heaps); resolver still needs flush.
-            heap.FlushPendingOperations();
             ref readonly int value = ref heap.Read(in ptr).Value;
             NAssert.AreEqual(42, value);
 
@@ -1094,8 +1091,8 @@ namespace Trecs.Tests
 
             NAssert.AreEqual(1, heap.NumEntries);
 
-            heap.DisposeHandle(ptr.Handle);
-            heap.FlushPendingOperations();
+            heap.DecrementRef(ptr.Handle);
+
             NAssert.AreEqual(0, heap.NumEntries);
 
             heap.Dispose();
@@ -1112,9 +1109,8 @@ namespace Trecs.Tests
             heap.TryClone<int>(ptr.Handle, out var clone);
             NAssert.IsFalse(clone.IsNull);
 
-            heap.DisposeHandle(ptr.Handle);
+            heap.DecrementRef(ptr.Handle);
 
-            heap.FlushPendingOperations();
             ref readonly int value = ref heap.Read(in clone).Value;
             NAssert.AreEqual(42, value);
 
@@ -1130,11 +1126,7 @@ namespace Trecs.Tests
             var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
             NAssert.AreEqual(1, heap.NumEntries);
 
-            heap.DisposeHandle(ptr.Handle);
-
-            // Both pending add and pending remove for the same blob —
-            // flush should process adds first so the remove finds the entry
-            heap.FlushPendingOperations();
+            heap.DecrementRef(ptr.Handle);
             NAssert.AreEqual(0, heap.NumEntries);
 
             heap.Dispose();
@@ -1146,7 +1138,7 @@ namespace Trecs.Tests
         {
             var (heap, blobCache) = CreateNativeSharedHeap();
 
-            NAssert.Throws<TrecsException>(() => heap.DisposeHandle(new PtrHandle(12345)));
+            NAssert.Throws<TrecsException>(() => heap.DecrementRef(12345));
 
             heap.Dispose();
             blobCache.Dispose();
@@ -1158,9 +1150,9 @@ namespace Trecs.Tests
             var (heap, blobCache) = CreateNativeSharedHeap();
 
             var ptr = heap.CreateBlob<int>(new BlobId(42), 42);
-            heap.DisposeHandle(ptr.Handle);
+            heap.DecrementRef(ptr.Handle);
 
-            NAssert.Throws<TrecsException>(() => heap.DisposeHandle(ptr.Handle));
+            NAssert.Throws<TrecsException>(() => heap.DecrementRef(ptr.Handle));
 
             heap.Dispose();
             blobCache.Dispose();
@@ -1179,12 +1171,12 @@ namespace Trecs.Tests
             var ptr2 = heap.CreateBlob<int>(new BlobId(20), 20);
             NAssert.AreEqual(2, heap.NumEntries);
 
-            heap.DisposeHandle(ptr1.Handle);
-            heap.FlushPendingOperations();
+            heap.DecrementRef(ptr1.Handle);
+
             NAssert.AreEqual(1, heap.NumEntries);
 
-            heap.DisposeHandle(ptr2.Handle);
-            heap.FlushPendingOperations();
+            heap.DecrementRef(ptr2.Handle);
+
             NAssert.AreEqual(0, heap.NumEntries);
 
             heap.Dispose();

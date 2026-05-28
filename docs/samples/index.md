@@ -11,7 +11,7 @@ A progressive tutorial series plus full game samples. Each builds on the previou
 | 03 | [Aspects](03-aspects.md) | Bundled component access for clean iteration |
 | 04 | [Predator Prey](04-predator-prey.md) | Cross-entity references, template inheritance, event cleanup |
 | 05 | [Job System](05-job-system.md) | Burst compilation, parallel jobs, WrapAsJob |
-| 06 | [Partitions](06-partitions.md) | Template partitions, partition transitions, group-based iteration |
+| 06 | [Partitions](06-partitions.md) | Template partitions, partition transitions, partition-filtered iteration |
 | 07 | [Feeding Frenzy](07-feeding-frenzy.md) | Complex simulation, visual smoothing, multiple interacting systems |
 | 08 | [Sets](08-sets.md) | Dynamic entity subsets, overlapping membership |
 | 09 | [Interpolation](09-interpolation.md) | Fixed-to-variable timestep interpolation |
@@ -31,7 +31,7 @@ A progressive tutorial series plus full game samples. Each builds on the previou
 
 ## Running the samples
 
-Open `UnityProject/Trecs/Assets/Samples/Main.unity` in Unity 6000.3+ and press Play. A `SampleCycler` lets you switch between samples at runtime. Each sample has its own composition root.
+Open `Assets/Samples/Core/Main.unity` in Unity 6000.3+ and press Play. A `SampleCycler` lets you switch between samples at runtime. Each sample has its own composition root.
 
 ## Sample architecture: Bootstrap & CompositionRoot
 

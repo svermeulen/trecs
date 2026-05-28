@@ -77,11 +77,11 @@ Without the aspect interface, this helper would either take four individual comp
 
 ## Cross-species rendering
 
-The other half of the pattern: a `HitFlashRenderer` that iterates **by components, not tags**, rendering any entity with the required shape regardless of species:
+The other half of the pattern: a `HitFlashPresenter` that iterates **by components, not tags**, rendering any entity with the required shape regardless of species:
 
 ```csharp
 [ExecuteIn(SystemPhase.Presentation)]
-public partial class HitFlashRenderer : ISystem
+public partial class HitFlashPresenter : ISystem
 {
     [ForEachEntity(MatchByComponents = true)]
     void Execute(

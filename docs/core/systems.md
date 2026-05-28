@@ -52,7 +52,7 @@ The attribute properties below control *which* entities the method iterates over
 
 - **`typeof(A), typeof(B)`** — entities must have all listed tags.
 - **`Without = typeof(T)`** / **`Withouts = new[] { ... }`** — exclude entities tagged with the given tag(s).
-- **`MatchByComponents = true`** — match every group whose template declares the component parameters.  When set, providing a tag is optional.
+- **`MatchByComponents = true`** — match every template that declares the component parameters, regardless of tags.  When set, providing a tag is optional.
 - **`Set = typeof(MySet)`** — restrict iteration to members of a set. See [Sets](../entity-management/sets.md).
 
 ```csharp
@@ -68,7 +68,7 @@ Beyond component refs or an aspect, a method can also receive any of these:
 - **`EntityHandle`** — the stable handle for the iterated entity. Carries the entity-targeted ops (`Component<T>(world)`, `Remove(world)`, `SetTag<T>(world)`, `AddInput<T>(world, v)`, …); store it on another component when you need a long-lived reference.
 - **`WorldAccessor`** — the system's accessor (main-thread only).
 - **`NativeWorldAccessor`** — job-safe world access (`[WrapAsJob]` only).
-- **`[GlobalIndex] int`** — see [Cross-group index](#cross-group-index).
+- **`[GlobalIndex] int`** — see [Cross-partition index](#cross-group-index).
 - **`[PassThroughArgument]`** — a value the caller forwards in. See [PassThroughArgument](#passthroughargument).
 - **`[SingleEntity]`** — a singleton entity hoisted out of the loop. See [SingleEntity](#singleentity).
 
@@ -359,9 +359,9 @@ Tags must be hardcoded in the attribute (e.g. `[SingleEntity(typeof(MyTag))]`). 
 
 For a complete `[SingleEntity]` example tracking a single head entity, see [Sample 11 — Snake](../samples/11-snake.md).
 
-## Cross-group index
+## Cross-partition index
 
-Mark an `int` parameter with `[GlobalIndex]` to receive a unique index spanning every group iterated by the call. The first entity gets `0`, the next `1`, and so on through `total − 1`, even across multiple groups.
+Mark an `int` parameter with `[GlobalIndex]` to receive a unique index spanning every partition iterated by the call. The first entity gets `0`, the next `1`, and so on through `total − 1`, even across multiple partitions.
 
 ```csharp
 [ForEachEntity]
@@ -371,7 +371,7 @@ public void Execute(in Position position, [GlobalIndex] int globalIndex)
 }
 ```
 
-Useful when filling a contiguous output buffer across groups — e.g. packed data for instanced rendering. The per-group iteration index resets per group; `[GlobalIndex]` doesn't.
+Useful when filling a contiguous output buffer that spans multiple partitions — e.g. packed data for instanced rendering. The per-partition iteration index resets at each partition boundary; `[GlobalIndex]` doesn't.
 
 ## Entity operations from inside a system
 

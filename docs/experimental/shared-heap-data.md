@@ -177,8 +177,6 @@ Public properties on an `[Immutable]` interface must return types from the same 
 - BCL read-only views — `ImmutableArray<T>`, `ImmutableList<T>`, `ReadOnlyMemory<T>`, `ReadOnlySpan<T>`, `ReadOnlyCollection<T>`, `IReadOnlyList<T>`, `IReadOnlyCollection<T>`, `IReadOnlyDictionary<TKey, TValue>`, `IReadOnlySet<T>` (where the target framework supports it);
 - Unity native read-only views — `NativeArray<T>.ReadOnly`, `NativeHashMap<TKey, TValue>.ReadOnly`, `NativeHashSet<T>.ReadOnly`, `NativeParallelHashMap<TKey, TValue>.ReadOnly`, `NativeParallelMultiHashMap<TKey, TValue>.ReadOnly`.
 
-Trecs's `DenseDictionary<TKey, TValue>` exposes `IReadOnlyDenseDictionary<TKey, TValue>` and `DenseHashSet<T>` implements `IEnumerable<T>`. These are custom Trecs interfaces that avoid the boxing overhead of the BCL `IReadOnlyDictionary` / `IReadOnlyCollection` interfaces. If you need to expose a `DenseDictionary` on an `[Immutable]` interface, expose it through one of the BCL read-only views listed above (e.g. copy into an `ImmutableArray` at construction time) so the analyzer is satisfied.
-
 ### Method-return immutability — TRECS127
 
 Method-return types on `[Immutable]` interfaces are validated as a *warning* by TRECS127: a method whose return type isn't in the safe set above fires unless the method is annotated with `[Trecs.AllowMutableReturn]`. The exemption exists because interface methods can legitimately mean "live alias", "fresh defensive copy", "computed transformation", or "subset view" — the analyzer cannot tell which from a signature alone — but surfacing the choice as a warning makes the reviewer look.
@@ -196,7 +194,7 @@ public interface IReadOnlyWorldRegion
     // blob through this reference. Dict is shared-mutable by convention;
     // presenter callers only read.
     [Trecs.AllowMutableReturn]
-    DenseDictionary<int, List<short>> GetCellLookup();
+    Dictionary<int, List<short>> GetCellLookup();
 }
 ```
 

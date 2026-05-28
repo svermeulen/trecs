@@ -74,6 +74,7 @@ namespace Trecs
         readonly EntityHandleMap _entityIds;
         readonly NativeWorldAccessorFlags _flags;
         readonly NativeSharedPtrResolver _sharedPtrResolver;
+        readonly InputNativeSharedPtrResolver _inputSharedPtrResolver;
         readonly NativeHeapResolver _chunkStoreResolver;
 
         [NativeDisableContainerSafetyRestriction]
@@ -131,6 +132,8 @@ namespace Trecs
         /// </summary>
         internal NativeSharedPtrResolver SharedPtrResolver => _sharedPtrResolver;
 
+        internal InputNativeSharedPtrResolver InputSharedPtrResolver => _inputSharedPtrResolver;
+
         /// <summary>
         /// Job-safe resolver for both <see cref="NativeUniquePtr{T}"/> and
         /// <see cref="TrecsList{T}"/> dereferences. The per-allocation TypeId tag on the
@@ -146,6 +149,7 @@ namespace Trecs
             EntityHandleMap entityIds,
             NativeWorldAccessorFlags flags,
             NativeSharedPtrResolver sharedPtrResolver,
+            InputNativeSharedPtrResolver inputSharedPtrResolver,
             NativeHeapResolver chunkStoreResolver,
             NativeHashMap<SetId, NativeSetDeferredQueues> deferredQueues,
             FastAddNativeInfo fastAdd,
@@ -159,6 +163,7 @@ namespace Trecs
             _entityIds = entityIds;
             _flags = flags;
             _sharedPtrResolver = sharedPtrResolver;
+            _inputSharedPtrResolver = inputSharedPtrResolver;
             _chunkStoreResolver = chunkStoreResolver;
             _deferredQueues = deferredQueues;
             _fastAddBags = fastAdd.Bags;

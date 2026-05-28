@@ -65,7 +65,7 @@ Fork the RNG for independent sub-sequences:
 
 ```csharp
 var forked = World.Rng.Fork();
-// forked produces an independent stream; the call itself advances the parent by one step
+// forked produces an independent stream; the call itself advances the parent
 ```
 
 Set the seed for reproducible results:

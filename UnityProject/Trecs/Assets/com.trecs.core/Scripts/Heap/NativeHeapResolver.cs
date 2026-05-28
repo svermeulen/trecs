@@ -11,6 +11,11 @@ namespace Trecs.Internal
     /// Side-table entry for a single chunk-store allocation. One entry per <see cref="PtrHandle"/>
     /// the store has handed out; recycled when the handle is freed. The <see cref="Generation"/>
     /// field plus the handle's encoded generation detect stale-handle access after slot reuse.
+    ///
+    /// <para>Only fields needed by Burst jobs live here (Address, TypeHash, Generation, InUse,
+    /// Safety). Main-thread-only bookkeeping (OwnsWholePage, PageId, SlotIndex) lives in the
+    /// dense <see cref="NativeHeapEntryPayload"/> list — keeping the entry at 16 bytes improves
+    /// cache utilisation during job resolution.</para>
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -32,20 +37,8 @@ namespace Trecs.Internal
         /// <summary>1 if this slot currently backs a live allocation; 0 otherwise.</summary>
         public byte InUse;
 
-        /// <summary>
-        /// 1 if this allocation owns its backing page outright (a single-slot huge-alloc page
-        /// or an externally-supplied page registered via <c>AllocExternal</c>). On Free, the page
-        /// is released wholesale rather than returning the slot to a bucket freelist.
-        /// </summary>
-        public byte OwnsWholePage;
-
-        public byte _padding;
-
-        /// <summary>Index into the chunk store's page list. Used at free time to return the slot.</summary>
-        public int PageId;
-
-        /// <summary>Slot index within the page.</summary>
-        public int SlotIndex;
+        public byte _pad0;
+        public byte _pad1;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
         /// <summary>
@@ -58,12 +51,13 @@ namespace Trecs.Internal
     }
 
     /// <summary>
-    /// Wire-format twin of <see cref="NativeHeapEntry"/> with process-local fields
-    /// (<c>Address</c>, <c>AtomicSafetyHandle</c>) stripped. Used as the on-disk shape
-    /// for each live side-table entry in <see cref="NativeHeap"/>'s direct serialization
-    /// path — keeping the layout independent of <c>ENABLE_UNITY_COLLECTIONS_CHECKS</c>
-    /// means the byte stream is identical between editor and release builds, and avoids
-    /// leaking non-deterministic pointer / safety-handle byte patterns into snapshots.
+    /// Dense-list twin of <see cref="NativeHeapEntry"/> carrying the full set of per-slot
+    /// metadata. Main-thread-only bookkeeping fields (<c>OwnsWholePage</c>, <c>PageId</c>,
+    /// <c>SlotIndex</c>) live here rather than in the side-table entry, keeping the entry
+    /// at 16 bytes for better cache utilisation during job resolution. Also serves as the
+    /// on-disk serialization shape — process-local fields (<c>Address</c>,
+    /// <c>AtomicSafetyHandle</c>) are excluded, so the byte stream is identical between
+    /// editor and release builds.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     internal struct NativeHeapEntryPayload
