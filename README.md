@@ -96,8 +96,6 @@ Or add the scoped registry to `Packages/manifest.json` manually:
 }
 ```
 
-`com.trecs.core` includes the ECS runtime, deterministic binary serialization, snapshot / recording / playback, and the Trecs Player editor window — no separate serialization package is required.
-
 ### Via Git URL
 
 In **Window → Package Manager**, click **+ → Add package from git URL** and enter:
