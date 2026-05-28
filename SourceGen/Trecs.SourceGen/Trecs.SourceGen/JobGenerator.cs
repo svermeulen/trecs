@@ -1283,7 +1283,9 @@ namespace Trecs.SourceGen
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
                     {
-                        var name = IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString());
+                        var name = IterationCriteriaParser.ExtractAttributeName(
+                            attr.Name.ToString()
+                        );
                         return name == TrecsAttributeNames.FromSingleEntity
                             || name == TrecsAttributeNames.FromGlobalEntity;
                     });
@@ -1462,7 +1464,9 @@ namespace Trecs.SourceGen
                     .AttributeLists.SelectMany(al => al.Attributes)
                     .Any(attr =>
                     {
-                        var name = IterationCriteriaParser.ExtractAttributeName(attr.Name.ToString());
+                        var name = IterationCriteriaParser.ExtractAttributeName(
+                            attr.Name.ToString()
+                        );
                         return name == TrecsAttributeNames.FromSingleEntity
                             || name == TrecsAttributeNames.FromGlobalEntity;
                     });
@@ -1728,7 +1732,9 @@ namespace Trecs.SourceGen
                 .ToArray();
 
             var fromEntityModels = info
-                .FromSingleEntityFields.Select(f => ProjectFromSingleEntityField(f, globalNamespaceName))
+                .FromSingleEntityFields.Select(f =>
+                    ProjectFromSingleEntityField(f, globalNamespaceName)
+                )
                 .ToArray();
 
             string attributeChain = string.Empty;
@@ -1756,7 +1762,9 @@ namespace Trecs.SourceGen
                 AspectIteration: aspectIteration,
                 ComponentsIteration: componentsIteration,
                 FromWorldFields: new EquatableArray<FromWorldFieldEmitModel>(fromWorldEmits),
-                FromSingleEntityFields: new EquatableArray<FromSingleEntityFieldModel>(fromEntityModels),
+                FromSingleEntityFields: new EquatableArray<FromSingleEntityFieldModel>(
+                    fromEntityModels
+                ),
                 AttributeCriteriaChain: attributeChain,
                 HasBurstCompile: HasBurstCompile(symbol),
                 IsValid: true,

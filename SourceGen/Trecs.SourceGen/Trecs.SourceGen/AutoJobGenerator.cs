@@ -394,7 +394,8 @@ namespace Trecs.SourceGen
                 // get the param silently classified as a NativeWorldAccessor with the
                 // [FromSingleEntity] attribute dropped on the floor. Forbidden classifications
                 // (WorldAccessor, SetAccessor) still error out as before.
-                bool paramHasFromSingleEntity = IterationAttributeRouting.HasFromSingleEntityAttribute(param);
+                bool paramHasFromSingleEntity =
+                    IterationAttributeRouting.HasFromSingleEntityAttribute(param);
 
                 // Check for WorldAccessor (forbidden on [WrapAsJob]).
                 if (SymbolAnalyzer.IsExactType(paramType, "WorldAccessor", TrecsNamespaces.Trecs))
@@ -1344,7 +1345,8 @@ namespace Trecs.SourceGen
                 AutoJobParamRole.NativeSetCommandBuffer =>
                     AutoJobParamRoleKind.NativeSetCommandBuffer,
                 AutoJobParamRole.FromWorld => AutoJobParamRoleKind.FromWorld,
-                AutoJobParamRole.FromSingleEntityAspect => AutoJobParamRoleKind.FromSingleEntityAspect,
+                AutoJobParamRole.FromSingleEntityAspect =>
+                    AutoJobParamRoleKind.FromSingleEntityAspect,
                 AutoJobParamRole.FromSingleEntityComponentRead =>
                     AutoJobParamRoleKind.FromSingleEntityComponentRead,
                 AutoJobParamRole.FromSingleEntityComponentWrite =>
