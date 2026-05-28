@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 using Trecs.Collections;
 using Unity.Collections;
@@ -14,6 +15,16 @@ namespace Trecs.Internal
 
         internal EntityHandleMap _entityLocator;
 
+        // During OnRemoved callbacks, removed entities sit in the tail of each
+        // group's component arrays at indices [newCount, originalCount). Normal
+        // bounds checks reject those indices because ComponentArray.Count has
+        // already been shrunk to newCount. This array stores the pre-removal
+        // count (originalCount) per group so that dynamic component lookups
+        // (EntityIndex.Component<T>) succeed for removed entities during the
+        // callback window. Liveness checks (Exists, EntityIndexExists) are
+        // intentionally unchanged. Zero means "no extension active".
+        int[] _removalExtendedCounts;
+
         internal EntityQuerier(
             TrecsLog log,
             ComponentStore componentStore,
@@ -22,10 +33,23 @@ namespace Trecs.Internal
         )
         {
             _entityLocator.InitEntityHandleMap(groupCount);
+            _removalExtendedCounts = new int[groupCount];
 
             _log = log;
             _componentStore = componentStore;
             _setStore = setStore;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void SetRemovalExtendedCount(GroupIndex group, int originalCount)
+        {
+            _removalExtendedCounts[group.Index] = originalCount;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void ClearRemovalExtendedCounts()
+        {
+            Array.Clear(_removalExtendedCounts, 0, _removalExtendedCounts.Length);
         }
 
         // ── Entity ID resolution ────────────────────────────────────────
@@ -55,33 +79,6 @@ namespace Trecs.Internal
         }
 
         // ── Component queries ───────────────────────────────────────────
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityIndexMapper<T> QueryMappedEntities<T>(GroupIndex groupStructId)
-            where T : unmanaged, IEntityComponent
-        {
-            if (!SafeQueryEntityDictionary<T>(groupStructId, out var typeSafeDictionary))
-                throw new TrecsException(
-                    $"entity group {groupStructId} not used for component type {typeof(T)}"
-                );
-
-            return (typeSafeDictionary as IComponentArray<T>).ToEntityIndexMapper(groupStructId);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public EntityIndexMultiMapper<T> QueryMappedEntities<T>(ReadOnlyList<GroupIndex> groups)
-            where T : unmanaged, IEntityComponent
-        {
-            var dictionary = new IterableDictionary<GroupIndex, IComponentArray<T>>(groups.Count);
-
-            foreach (var group in groups)
-            {
-                QueryOrCreateEntityDictionary<T>(group, out var typeSafeDictionary);
-                dictionary.Add(group, typeSafeDictionary as IComponentArray<T>);
-            }
-
-            return new EntityIndexMultiMapper<T>(dictionary);
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Exists<T>(EntityIndex entityGID)
@@ -242,11 +239,10 @@ namespace Trecs.Internal
             if (failReason == QueryFailReason.IndexOutOfRange)
             {
                 return $"{baseMsg}: index is out of range. "
-                    + "If you are accessing this data from within an OnRemoved callback, note that "
-                    + "removed entities are moved past the active array count during submission and "
-                    + "cannot be accessed via normal component queries. Use [ForEachEntity] on the "
-                    + "callback method instead, which generates code that correctly accesses removed "
-                    + "entity data.";
+                    + "If you are accessing this data outside an OnRemoved callback, note that "
+                    + "removed entities cannot be accessed after submission completes. Inside an "
+                    + "OnRemoved callback, EntityIndex.Component<T>() and [ForEachEntity] parameters "
+                    + "both support accessing removed entity data.";
             }
 
             return $"{baseMsg} not found!";
@@ -395,28 +391,6 @@ namespace Trecs.Internal
             return true;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void QueryOrCreateEntityDictionary<T>(
-            GroupIndex group,
-            out IComponentArray typeSafeDictionary
-        )
-            where T : unmanaged, IEntityComponent
-        {
-            // Outer array is pre-populated at ComponentStore ctor; every GroupIndex
-            // has an inner dict (initially empty).
-            var entitiesInGroupPerType = _componentStore.GroupEntityComponentsDB[group.Index];
-
-            var componentId = TypeId<T>.Value;
-
-            if (!entitiesInGroupPerType.TryGetValue(componentId, out typeSafeDictionary))
-            {
-                TrecsDebugAssert.That(!_componentStore.ConfigurationFrozen);
-
-                typeSafeDictionary = new ComponentArray<T>(0);
-                entitiesInGroupPerType.Add(componentId, typeSafeDictionary);
-            }
-        }
-
         internal NativeBuffer<T> QuerySingleBuffer<T>(GroupIndex group)
             where T : unmanaged, IEntityComponent
         {
@@ -468,8 +442,12 @@ namespace Trecs.Internal
 
             if (index >= safeDictionary.Count)
             {
-                failReason = QueryFailReason.IndexOutOfRange;
-                return false;
+                var extCount = _removalExtendedCounts[entityGID.GroupIndex.Index];
+                if (extCount == 0 || index >= extCount)
+                {
+                    failReason = QueryFailReason.IndexOutOfRange;
+                    return false;
+                }
             }
 
             buffer = (safeDictionary as IComponentArray<T>).GetValues(out _);

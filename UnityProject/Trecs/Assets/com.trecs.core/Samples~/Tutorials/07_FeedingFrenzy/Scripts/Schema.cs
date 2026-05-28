@@ -155,7 +155,7 @@ namespace Trecs.Samples.FeedingFrenzy101
         /// </summary>
         public partial class Globals : ITemplate, IExtends<TrecsTemplates.Globals>
         {
-            DesiredFishCount DesiredFishCount = new() { Value = 1000 };
+            DesiredFishCount DesiredFishCount = new() { Value = 500 };
             DesiredMealCount DesiredMealCount = default;
 
             [Input(MissingInputBehavior.Reset)]

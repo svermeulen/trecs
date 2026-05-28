@@ -112,11 +112,20 @@ namespace Trecs.Internal
         readonly HashSet<JobHandle> _completedThisCall = new();
 
         int _outstandingJobCount;
+        bool _isSubmitting;
 
         public bool HasOutstandingJobs
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => _outstandingJobCount > 0;
+        }
+
+        internal bool IsSubmitting
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _isSubmitting;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            set => _isSubmitting = value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -131,6 +140,20 @@ namespace Trecs.Internal
             TrecsDebugAssert.That(
                 UnityThreadHelper.IsMainThread,
                 "RuntimeJobScheduler is main-thread only"
+            );
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void AssertNotSubmitting()
+        {
+            TrecsAssert.That(
+                !_isSubmitting,
+                "Jobs cannot be scheduled during entity submission (e.g. from "
+                    + "an OnAdded/OnRemoved/OnMoved observer callback). Observer "
+                    + "callbacks run while the submission pipeline is actively "
+                    + "modifying component buffers, so a concurrent job would race "
+                    + "against those structural changes. Move the job scheduling "
+                    + "into a system's Execute() method instead."
             );
         }
 
@@ -198,6 +221,7 @@ namespace Trecs.Internal
         )
         {
             AssertMainThread();
+            AssertNotSubmitting();
             var key = MakeKey(resourceType, group);
 
             if (!_readers.TryGetValue(key, out var readerList))
@@ -223,6 +247,7 @@ namespace Trecs.Internal
         )
         {
             AssertMainThread();
+            AssertNotSubmitting();
             var key = MakeKey(resourceType, group);
 
             if (_readers.TryGetValue(key, out var readerList))
@@ -308,6 +333,7 @@ namespace Trecs.Internal
         public void TrackJob(JobHandle handle, string name = null)
         {
             AssertMainThread();
+            AssertNotSubmitting();
             _untrackedJobs.Add(new JobEntry(handle, name));
             _outstandingJobCount++;
         }

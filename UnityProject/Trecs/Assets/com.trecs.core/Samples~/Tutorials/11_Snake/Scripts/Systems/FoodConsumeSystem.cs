@@ -9,8 +9,8 @@ namespace Trecs.Samples.Snake
     public partial class FoodConsumeSystem : ISystem
     {
         void Execute(
-            [SingleEntity(typeof(TrecsTags.Globals))] in Globals globals,
-            [SingleEntity(typeof(SnakeTags.SnakeHead))] in Head head
+            [FromGlobalEntity] in Globals globals,
+            [FromSingleEntity(typeof(SnakeTags.SnakeHead))] in Head head
         )
         {
             foreach (var food in Food.Query(World).WithTags<SnakeTags.SnakeFood>())

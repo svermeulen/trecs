@@ -11,8 +11,8 @@ namespace Trecs.Samples.AspectInterfaces
             _settings = settings;
         }
 
-        // [ForEachEntity] (not [SingleEntity]) so the system is a no-op
-        // after the boss dies — [SingleEntity] would assert on zero matches.
+        // [ForEachEntity] (not [FromSingleEntity]) so the system is a no-op
+        // after the boss dies — [FromSingleEntity] would assert on zero matches.
         [ForEachEntity(typeof(SampleTags.Boss))]
         void Execute(in BossView boss)
         {

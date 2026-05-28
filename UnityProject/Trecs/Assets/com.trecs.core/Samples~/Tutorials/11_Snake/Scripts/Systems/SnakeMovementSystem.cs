@@ -17,8 +17,8 @@ namespace Trecs.Samples.Snake
         }
 
         void Execute(
-            [SingleEntity(typeof(TrecsTags.Globals))] in Globals globals,
-            [SingleEntity(typeof(SnakeTags.SnakeHead))] in SnakeHead head
+            [FromGlobalEntity] in Globals globals,
+            [FromSingleEntity(typeof(SnakeTags.SnakeHead))] in SnakeHead head
         )
         {
             if (globals.MoveTickCounter > 0)

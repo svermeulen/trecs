@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using NAssert = NUnit.Framework.Assert;
 
@@ -302,6 +303,89 @@ namespace Trecs.Tests
             NAssert.AreEqual(400, a.Component<TestInt>(handles[4]).Read.Value);
             NAssert.AreEqual(500, a.Component<TestInt>(handles[5]).Read.Value);
             NAssert.AreEqual(700, a.Component<TestInt>(handles[7]).Read.Value);
+
+            subscription.Dispose();
+        }
+
+        #endregion
+
+        #region Dynamic component access during OnRemoved callbacks
+
+        [Test]
+        public void RemoveCallback_DynamicComponentAccess_ReadsRemovedEntityData()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            var handle = a.AddEntity(TestTags.Alpha)
+                .Set(new TestInt { Value = 42 })
+                .AssertComplete()
+                .Handle;
+            a.Submit();
+
+            int capturedValue = -1;
+
+            var subscription = a
+                .Events.EntitiesWithTags(TestTags.Alpha)
+                .OnRemoved(
+                    (group, indices) =>
+                    {
+                        for (int i = indices.Start; i < indices.End; i++)
+                        {
+                            var entityIndex = new EntityIndex(i, group);
+                            capturedValue = entityIndex.Component<TestInt>(a).Read.Value;
+                        }
+                    }
+                );
+
+            a.RemoveEntity(handle);
+            a.Submit();
+
+            NAssert.AreEqual(42, capturedValue, "Should read TestInt from removed entity");
+            NAssert.IsFalse(handle.Exists(a));
+
+            subscription.Dispose();
+        }
+
+        [Test]
+        public void RemoveCallback_DynamicComponentAccess_MultipleEntities()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            var handles = new EntityHandle[4];
+            for (int i = 0; i < 4; i++)
+            {
+                handles[i] = a.AddEntity(TestTags.Alpha)
+                    .Set(new TestInt { Value = (i + 1) * 10 })
+                    .AssertComplete()
+                    .Handle;
+            }
+            a.Submit();
+
+            var capturedValues = new List<int>();
+
+            var subscription = a
+                .Events.EntitiesWithTags(TestTags.Alpha)
+                .OnRemoved(
+                    (group, indices) =>
+                    {
+                        for (int i = indices.Start; i < indices.End; i++)
+                        {
+                            var entityIndex = new EntityIndex(i, group);
+                            capturedValues.Add(entityIndex.Component<TestInt>(a).Read.Value);
+                        }
+                    }
+                );
+
+            a.RemoveEntity(handles[1]);
+            a.RemoveEntity(handles[3]);
+            a.Submit();
+
+            NAssert.AreEqual(2, capturedValues.Count);
+            NAssert.That(capturedValues, Has.Member(20), "Should capture entity 1's value");
+            NAssert.That(capturedValues, Has.Member(40), "Should capture entity 3's value");
+            NAssert.AreEqual(2, a.CountEntitiesWithTags(TestTags.Alpha));
 
             subscription.Dispose();
         }

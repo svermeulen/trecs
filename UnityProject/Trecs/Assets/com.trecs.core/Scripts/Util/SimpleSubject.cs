@@ -1,8 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 
 namespace Trecs.Internal
 {
+    static class ObserverExceptionHelper
+    {
+        public static void Rethrow(List<Exception> exceptions)
+        {
+            if (exceptions == null || exceptions.Count == 0)
+                return;
+            if (exceptions.Count == 1)
+                ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
+            throw new AggregateException(exceptions);
+        }
+    }
+
     // Lightweight observable — subscriptions as disposables, no streams or LINQ
 
     public sealed class SimpleSubject : ISimpleObservable
@@ -106,11 +119,21 @@ namespace Trecs.Internal
             _isInvoking = true;
             try
             {
+                List<Exception> exceptions = null;
                 var numObservers = _observers.Count;
                 for (int i = 0; i < numObservers; i++)
                 {
-                    _observers[i]();
+                    try
+                    {
+                        _observers[i]();
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions ??= new List<Exception>();
+                        exceptions.Add(ex);
+                    }
                 }
+                ObserverExceptionHelper.Rethrow(exceptions);
             }
             finally
             {
@@ -247,11 +270,21 @@ namespace Trecs.Internal
             _isInvoking = true;
             try
             {
+                List<Exception> exceptions = null;
                 var numObservers = _observers.Count;
                 for (int i = 0; i < numObservers; i++)
                 {
-                    _observers[i](arg1);
+                    try
+                    {
+                        _observers[i](arg1);
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions ??= new List<Exception>();
+                        exceptions.Add(ex);
+                    }
                 }
+                ObserverExceptionHelper.Rethrow(exceptions);
             }
             finally
             {
@@ -393,11 +426,21 @@ namespace Trecs.Internal
             _isInvoking = true;
             try
             {
+                List<Exception> exceptions = null;
                 var numObservers = _observers.Count;
                 for (int i = 0; i < numObservers; i++)
                 {
-                    _observers[i](arg1, arg2);
+                    try
+                    {
+                        _observers[i](arg1, arg2);
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions ??= new List<Exception>();
+                        exceptions.Add(ex);
+                    }
                 }
+                ObserverExceptionHelper.Rethrow(exceptions);
             }
             finally
             {

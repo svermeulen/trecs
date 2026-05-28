@@ -9,7 +9,7 @@ namespace Trecs.Samples.Snake
     [ExecuteAfter(typeof(FoodConsumeSystem))]
     public partial class SegmentTrimSystem : ISystem
     {
-        void Execute([SingleEntity(typeof(TrecsTags.Globals))] in Globals globals)
+        void Execute([FromGlobalEntity] in Globals globals)
         {
             int targetSegmentCount = globals.SnakeLength - 1;
             int currentCount = World.CountEntitiesWithTags<SnakeTags.SnakeSegment>();

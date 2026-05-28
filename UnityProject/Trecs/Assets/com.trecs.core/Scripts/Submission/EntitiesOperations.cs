@@ -395,52 +395,57 @@ namespace Trecs.Internal
         {
             (_thisSubmissionInfo, _lastSubmittedInfo) = (_lastSubmittedInfo, _thisSubmissionInfo);
 
-            foreach (var (group, caller) in _lastSubmittedInfo._groupsToRemove)
-                try
-                {
-                    removeGroup(group, ecsRoot);
-                }
-                catch
-                {
-                    var str = $"Crash while removing a whole group on {group} from : {caller}";
-
-                    _log.Error(str);
-
-                    throw;
-                }
-
-            foreach (var (fromGroup, toGroup, caller) in _lastSubmittedInfo._groupsToMove)
-                try
-                {
-                    swapGroup(fromGroup, toGroup, ecsRoot);
-                }
-                catch
-                {
-                    var str =
-                        $"Crash while swapping a whole group on {fromGroup} {toGroup} from : {caller}";
-
-                    _log.Error(str);
-
-                    throw;
-                }
-
-            if (_lastSubmittedInfo._entitiesMoved.Count > 0)
+            try
             {
-                moveEntities(
-                    _lastSubmittedInfo._currentSwapEntitiesOperations,
-                    _lastSubmittedInfo._entitiesMoved,
-                    ecsRoot
-                );
+                foreach (var (group, caller) in _lastSubmittedInfo._groupsToRemove)
+                    try
+                    {
+                        removeGroup(group, ecsRoot);
+                    }
+                    catch
+                    {
+                        var str = $"Crash while removing a whole group on {group} from : {caller}";
+
+                        _log.Error(str);
+
+                        throw;
+                    }
+
+                foreach (var (fromGroup, toGroup, caller) in _lastSubmittedInfo._groupsToMove)
+                    try
+                    {
+                        swapGroup(fromGroup, toGroup, ecsRoot);
+                    }
+                    catch
+                    {
+                        var str =
+                            $"Crash while swapping a whole group on {fromGroup} {toGroup} from : {caller}";
+
+                        _log.Error(str);
+
+                        throw;
+                    }
+
+                if (_lastSubmittedInfo._entitiesMoved.Count > 0)
+                {
+                    moveEntities(
+                        _lastSubmittedInfo._currentSwapEntitiesOperations,
+                        _lastSubmittedInfo._entitiesMoved,
+                        ecsRoot
+                    );
+                }
+
+                if (_lastSubmittedInfo._removeCount > 0)
+                {
+                    removeEntities(_lastSubmittedInfo._currentRemoveEntitiesOperations, ecsRoot);
+                }
             }
-
-            if (_lastSubmittedInfo._removeCount > 0)
+            finally
             {
-                removeEntities(_lastSubmittedInfo._currentRemoveEntitiesOperations, ecsRoot);
-            }
-
-            using (TrecsProfiling.Start("Clear Submitted Info"))
-            {
-                _lastSubmittedInfo.Clear();
+                using (TrecsProfiling.Start("Clear Submitted Info"))
+                {
+                    _lastSubmittedInfo.Clear();
+                }
             }
         }
 

@@ -32,7 +32,7 @@ namespace Trecs.Samples.FeedingFrenzyBenchmark
             _presets = presets;
         }
 
-        void Execute([SingleEntity(typeof(TrecsTags.Globals))] in GlobalsView globals)
+        void Execute([FromGlobalEntity] in GlobalsView globals)
         {
             int presetIndex = globals.DesiredPreset;
 

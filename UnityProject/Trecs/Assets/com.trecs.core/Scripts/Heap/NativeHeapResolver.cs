@@ -37,9 +37,6 @@ namespace Trecs.Internal
         /// <summary>1 if this slot currently backs a live allocation; 0 otherwise.</summary>
         public byte InUse;
 
-        public byte _pad0;
-        public byte _pad1;
-
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
         /// <summary>
         /// Per-allocation safety handle. Stable across the lifetime of this allocation:

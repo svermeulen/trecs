@@ -6,20 +6,6 @@ using Unity.Collections.LowLevel.Unsafe;
 
 namespace Trecs.Internal
 {
-    static class ComponentArrayUtilities
-    {
-        internal static EntityIndexMapper<T> ToEntityIndexMapper<T>(
-            this IComponentArray<T> dic,
-            GroupIndex groupStructId
-        )
-            where T : unmanaged, IEntityComponent
-        {
-            var mapper = new EntityIndexMapper<T>(groupStructId, dic);
-
-            return mapper;
-        }
-    }
-
     [EditorBrowsable(EditorBrowsableState.Never)]
     public sealed class ComponentArray<TValue> : IComponentArray<TValue>
         where TValue : unmanaged, IEntityComponent

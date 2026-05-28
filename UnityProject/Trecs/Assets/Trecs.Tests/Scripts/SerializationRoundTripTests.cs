@@ -376,6 +376,99 @@ namespace Trecs.Tests
             NAssert.AreEqual(33, read[2]);
         }
 
+        [Test]
+        public void Snapshot_PreservesTrecsDictionaryHandleAndContents()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            var dict = TrecsDictionary.Alloc<int, float>(a, 8);
+            var w = dict.Write(a);
+            w.Add(100, 1.5f);
+            w.Add(200, 2.5f);
+            w.Add(300, 3.5f);
+            a.Submit();
+            var savedHandle = dict.Handle;
+
+            var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
+            var worldStateSer = new WorldStateSerializer(env.World);
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+
+            using var stream = new MemoryStream();
+            snapshots.SaveSnapshot(version: 1, stream: stream);
+
+            // Mutate after save.
+            dict.Dispose(a);
+            a.Submit();
+
+            stream.Position = 0;
+            snapshots.LoadSnapshot(stream);
+
+            var restored = new TrecsDictionary<int, float>(savedHandle);
+            var read = restored.Read(a);
+            NAssert.AreEqual(3, read.Count);
+
+            // Verify keys findable and values correct
+            NAssert.IsTrue(read.TryGetValue(100, out var v1));
+            NAssert.AreEqual(1.5f, v1);
+            NAssert.IsTrue(read.TryGetValue(200, out var v2));
+            NAssert.AreEqual(2.5f, v2);
+            NAssert.IsTrue(read.TryGetValue(300, out var v3));
+            NAssert.AreEqual(3.5f, v3);
+            NAssert.IsFalse(read.ContainsKey(999));
+
+            // Verify iteration order preserved
+            int idx = 0;
+            int[] expectedKeys = { 100, 200, 300 };
+            float[] expectedValues = { 1.5f, 2.5f, 3.5f };
+            foreach (var (key, value) in read)
+            {
+                NAssert.AreEqual(expectedKeys[idx], key);
+                NAssert.AreEqual(expectedValues[idx], value);
+                idx++;
+            }
+            NAssert.AreEqual(3, idx);
+        }
+
+        [Test]
+        public void Snapshot_PreservesEmptyTrecsDictionary()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            var dict = TrecsDictionary.Alloc<int, float>(a);
+            a.Submit();
+            var savedHandle = dict.Handle;
+
+            var registry = new SerializerRegistry();
+            DefaultTrecsSerializers.RegisterCommonTrecsSerializers(registry);
+            var worldStateSer = new WorldStateSerializer(env.World);
+            using var snapshots = new SnapshotSerializer(worldStateSer, registry, env.World);
+
+            using var stream = new MemoryStream();
+            snapshots.SaveSnapshot(version: 1, stream: stream);
+
+            dict.Dispose(a);
+            a.Submit();
+
+            stream.Position = 0;
+            snapshots.LoadSnapshot(stream);
+
+            var restored = new TrecsDictionary<int, float>(savedHandle);
+            var read = restored.Read(a);
+            NAssert.AreEqual(0, read.Count);
+
+            // Sanity: a follow-up EnsureCapacity + Add still works against the restored
+            // empty dictionary (no stale data pointer hangover).
+            restored.EnsureCapacity(a, 4);
+            var rw = restored.Write(a);
+            rw.Add(42, 99.0f);
+            NAssert.AreEqual(99.0f, restored.Read(a)[42]);
+
+            restored.Dispose(a);
+        }
+
         struct CustomMarker
         {
             public int Tag;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using Trecs.Collections;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -307,6 +308,7 @@ namespace Trecs.Internal
                 "A submission started while the previous one was still flushing"
             );
             _isRunningSubmit = true;
+            _jobScheduler.IsSubmitting = true;
 
             try
             {
@@ -332,6 +334,13 @@ namespace Trecs.Internal
                     if (iterations == _trecsSettings.MaxSubmissionIterations)
                         throw new TrecsException("possible circular submission detected");
 #endif
+
+                    // Structural changes are settled — safe to schedule jobs
+                    // again. Clear before NotifyOnSubmissionCompleted so that
+                    // handlers can schedule work that will complete at the next
+                    // SyncJobsAndFlushWrites call.
+                    _jobScheduler.IsSubmitting = false;
+
                     if (hasEverSubmitted)
                     {
                         using (TrecsProfiling.Start("NotifyOnSubmissionCompleted"))
@@ -343,12 +352,13 @@ namespace Trecs.Internal
             }
             finally
             {
-                // Always clear the in-flight flag so an observer exception
+                // Always clear the in-flight flags so an observer exception
                 // (or any other mid-submission throw) does not wedge the
                 // submitter for the rest of the World's lifetime via the
                 // "A submission started while the previous one was still
                 // flushing" assert on the next Submit() call.
                 _isRunningSubmit = false;
+                _jobScheduler.IsSubmitting = false;
             }
         }
 
@@ -629,6 +639,7 @@ namespace Trecs.Internal
                     // That would leak one handle slot per never-finalized
                     // entity and leave any caller-resolved EntityHandle
                     // permanently Exists()==true.
+                    ecsRoot._entitiesQuerier.ClearRemovalExtendedCounts();
                     FinalizeDeferredHandleFrees(ecsRoot);
                 }
             }
@@ -764,6 +775,7 @@ namespace Trecs.Internal
 
                 var entityIndicesRange = new EntityRange(newCount, originalCount);
                 ecsRoot._cachedRangeOfSubmittedIndices.Add(entityIndicesRange);
+                ecsRoot._entitiesQuerier.SetRemovalExtendedCount(fromGroup, originalCount);
 
                 arrayPtrs.Dispose();
                 elemSizes.Dispose();
@@ -935,6 +947,7 @@ namespace Trecs.Internal
         static void FireRemoveCallbacks(List<int>[] removeOperations, EntitySubmitter ecsRoot)
         {
             var rangeEnumerator = ecsRoot._cachedRangeOfSubmittedIndices.GetEnumerator();
+            List<Exception> callbackExceptions = null;
 
             // Why observers can read the entities they're being told were
             // just removed: during R2/R3 in ExecuteRemoveForGroup, the
@@ -995,10 +1008,20 @@ namespace Trecs.Internal
                         )
                     )
                     {
-                        groupRemovedSubject.Invoke(rangeEnumerator.Current);
+                        try
+                        {
+                            groupRemovedSubject.Invoke(rangeEnumerator.Current);
+                        }
+                        catch (Exception ex)
+                        {
+                            callbackExceptions ??= new List<Exception>();
+                            callbackExceptions.Add(ex);
+                        }
                     }
                 }
             }
+
+            ObserverExceptionHelper.Rethrow(callbackExceptions);
         }
 
         /// <summary>
@@ -1021,6 +1044,8 @@ namespace Trecs.Internal
             EntitySubmitter ecsRoot
         )
         {
+            List<Exception> callbackExceptions = null;
+
             using (TrecsProfiling.Start("Swap entities between groups"))
             {
                 for (
@@ -1093,7 +1118,15 @@ namespace Trecs.Internal
                     var postMoveCount = GetGroupEntityCount(fromGroupDictionary);
                     ecsRoot._entitiesQuerier._entityLocator.TrimGroupList(fromGroup, postMoveCount);
 
-                    FireMoveCallbacks(fromGroup, toGroupMoveInfos, ecsRoot);
+                    try
+                    {
+                        FireMoveCallbacks(fromGroup, toGroupMoveInfos, ecsRoot);
+                    }
+                    catch (Exception ex)
+                    {
+                        callbackExceptions ??= new List<Exception>();
+                        callbackExceptions.Add(ex);
+                    }
 
 #if TRECS_INTERNAL_CHECKS && DEBUG
                     ecsRoot._entitiesQuerier._entityLocator.ValidateGroupConsistency(
@@ -1103,6 +1136,8 @@ namespace Trecs.Internal
 #endif
                 }
             }
+
+            ObserverExceptionHelper.Rethrow(callbackExceptions);
         }
 
         /// <summary>
@@ -1334,6 +1369,7 @@ namespace Trecs.Internal
         )
         {
             var rangeEnumerator = ecsRoot._cachedRangeOfSubmittedIndices.GetEnumerator();
+            List<Exception> callbackExceptions = null;
 
             using (TrecsProfiling.Start("Execute Swap Callbacks Fast"))
             {
@@ -1352,10 +1388,20 @@ namespace Trecs.Internal
                         )
                     )
                     {
-                        groupSwappedSubject.Invoke(fromGroup, rangeEnumerator.Current);
+                        try
+                        {
+                            groupSwappedSubject.Invoke(fromGroup, rangeEnumerator.Current);
+                        }
+                        catch (Exception ex)
+                        {
+                            callbackExceptions ??= new List<Exception>();
+                            callbackExceptions.Add(ex);
+                        }
                     }
                 }
             }
+
+            ObserverExceptionHelper.Rethrow(callbackExceptions);
         }
 
         void AddEntities()
@@ -1443,6 +1489,7 @@ namespace Trecs.Internal
                         }
 
                         var enumerator = _cachedRangeOfSubmittedIndices.GetEnumerator();
+                        List<Exception> callbackExceptions = null;
 
                         using (TrecsProfiling.Start("Add entities to systems"))
                         {
@@ -1466,10 +1513,20 @@ namespace Trecs.Internal
                                     )
                                 )
                                 {
-                                    groupAddedSubject.Invoke(enumerator.Current);
+                                    try
+                                    {
+                                        groupAddedSubject.Invoke(enumerator.Current);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        callbackExceptions ??= new List<Exception>();
+                                        callbackExceptions.Add(ex);
+                                    }
                                 }
                             }
                         }
+
+                        ObserverExceptionHelper.Rethrow(callbackExceptions);
                     }
                     finally
                     {
@@ -1502,6 +1559,8 @@ namespace Trecs.Internal
         {
             _entitiesQuerier._entityLocator.RemoveAllGroupReferenceLocators(groupId);
 
+            ExceptionDispatchInfo callbackException = null;
+
             if (
                 _eventsManager.ReactiveOnRemovedObservers.TryGetValue(
                     groupId,
@@ -1510,7 +1569,14 @@ namespace Trecs.Internal
             )
             {
                 var count = _entitiesQuerier.CountEntitiesInGroup(groupId);
-                groupRemovedSubject.Invoke(new EntityRange(0, count));
+                try
+                {
+                    groupRemovedSubject.Invoke(new EntityRange(0, count));
+                }
+                catch (Exception ex)
+                {
+                    callbackException = ExceptionDispatchInfo.Capture(ex);
+                }
             }
 
             var dictionariesOfEntities = _componentStore.GroupEntityComponentsDB[groupId.Index];
@@ -1518,6 +1584,8 @@ namespace Trecs.Internal
             {
                 dictionaryOfEntities.Value.Clear();
             }
+
+            callbackException?.Throw();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1543,6 +1611,8 @@ namespace Trecs.Internal
                 fromDictionary.AddEntitiesToDictionary(toDictionary, toGroupId);
             }
 
+            ExceptionDispatchInfo callbackException = null;
+
             if (
                 _eventsManager.ReactiveOnMovedObservers.TryGetValue(
                     toGroupId,
@@ -1551,13 +1621,22 @@ namespace Trecs.Internal
             )
             {
                 var count = _entitiesQuerier.CountEntitiesInGroup(fromGroupId);
-                groupSwappedSubject.Invoke(fromGroupId, new EntityRange(0, count));
+                try
+                {
+                    groupSwappedSubject.Invoke(fromGroupId, new EntityRange(0, count));
+                }
+                catch (Exception ex)
+                {
+                    callbackException = ExceptionDispatchInfo.Capture(ex);
+                }
             }
 
             foreach (var dictionaryOfEntities in fromGroup)
             {
                 dictionaryOfEntities.Value.Clear();
             }
+
+            callbackException?.Throw();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -28,7 +28,7 @@ namespace Trecs
         AllowMultiple = false,
         Inherited = false
     )]
-    public sealed class SingleEntityAttribute : Attribute
+    public sealed class FromSingleEntityAttribute : Attribute
     {
         /// <summary>
         /// Tag types to scope the singleton query. Use for multiple tags; use
@@ -42,18 +42,18 @@ namespace Trecs
         /// </summary>
         public Type Tag { get; set; }
 
-        public SingleEntityAttribute()
+        public FromSingleEntityAttribute()
         {
             Tags = Array.Empty<Type>();
         }
 
         /// <summary>
-        /// Shorthand: <c>[SingleEntity(typeof(MyTag))]</c> /
-        /// <c>[SingleEntity(typeof(A), typeof(B))]</c>. Equivalent to setting
+        /// Shorthand: <c>[FromSingleEntity(typeof(MyTag))]</c> /
+        /// <c>[FromSingleEntity(typeof(A), typeof(B))]</c>. Equivalent to setting
         /// <see cref="Tags"/>. Cannot be combined with the named <see cref="Tag"/>
         /// / <see cref="Tags"/> properties.
         /// </summary>
-        public SingleEntityAttribute(params Type[] tags)
+        public FromSingleEntityAttribute(params Type[] tags)
         {
             Tags = tags ?? Array.Empty<Type>();
         }

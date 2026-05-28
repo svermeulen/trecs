@@ -85,7 +85,7 @@ namespace Trecs
             get => _entries != null;
         }
 
-        internal ref readonly T this[EntityIndex entityIndex]
+        public ref readonly T this[EntityIndex entityIndex]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -121,7 +121,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool TryGet(EntityIndex entityIndex, out T value)
+        public bool TryGet(EntityIndex entityIndex, out T value)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
@@ -141,7 +141,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool Exists(EntityIndex entityIndex)
+        public bool Exists(EntityIndex entityIndex)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckReadAndThrow(m_Safety);
@@ -280,7 +280,7 @@ namespace Trecs
             get => _entries != null;
         }
 
-        internal ref T this[EntityIndex entityIndex]
+        public ref T this[EntityIndex entityIndex]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
@@ -316,7 +316,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool TryGet(EntityIndex entityIndex, out T value)
+        public bool TryGet(EntityIndex entityIndex, out T value)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
@@ -336,7 +336,7 @@ namespace Trecs
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal bool Exists(EntityIndex entityIndex)
+        public bool Exists(EntityIndex entityIndex)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);

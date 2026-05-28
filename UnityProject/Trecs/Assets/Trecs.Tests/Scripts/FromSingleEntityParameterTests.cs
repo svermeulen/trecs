@@ -9,7 +9,7 @@ namespace Trecs.Tests
     partial struct SETestBView : IAspect, IRead<TestInt> { }
 
     /// <summary>
-    /// Integration tests for the per-parameter <c>[SingleEntity]</c> attribute. Covers:
+    /// Integration tests for the per-parameter <c>[FromSingleEntity]</c> attribute. Covers:
     /// <list type="bullet">
     ///   <item>Run-once methods (no <c>[ForEachEntity]</c>): the framework hoists the
     ///     singleton aspect/component before the user method body.</item>
@@ -18,7 +18,7 @@ namespace Trecs.Tests
     /// </list>
     /// </summary>
     [TestFixture]
-    public partial class SingleEntityParameterTests
+    public partial class FromSingleEntityParameterTests
     {
         TestEnvironment CreateEnv() =>
             EcsTestHelper.CreateEnvironment(QTestEntityA.Template, QTestEntityB.Template);
@@ -27,7 +27,7 @@ namespace Trecs.Tests
 
         int _runOnceAspectSeen;
 
-        void RunOnceAspect([SingleEntity(Tag = typeof(QId3))] in SETestBView singleton)
+        void RunOnceAspect([FromSingleEntity(Tag = typeof(QId3))] in SETestBView singleton)
         {
             _runOnceAspectSeen = singleton.TestInt.Value;
         }
@@ -52,8 +52,8 @@ namespace Trecs.Tests
         int _twoSingletonsSum;
 
         void RunOnceTwoSingletons(
-            [SingleEntity(Tag = typeof(QId1))] in SETestAView a1,
-            [SingleEntity(Tag = typeof(QId3))] in SETestBView a2
+            [FromSingleEntity(Tag = typeof(QId1))] in SETestAView a1,
+            [FromSingleEntity(Tag = typeof(QId3))] in SETestBView a2
         )
         {
             _twoSingletonsSum = a1.TestInt.Value + a2.TestInt.Value;
@@ -78,14 +78,14 @@ namespace Trecs.Tests
             NAssert.AreEqual(42, _twoSingletonsSum);
         }
 
-        // ─── 3. [ForEachEntity] aspect iteration mixed with [SingleEntity] aspect
+        // ─── 3. [ForEachEntity] aspect iteration mixed with [FromSingleEntity] aspect
 
         readonly List<int> _mixedAspectResults = new();
 
         [ForEachEntity(Tag = typeof(QId1))]
         void IterateWithAspectSingleton(
             in SETestAView entity,
-            [SingleEntity(Tag = typeof(QId3))] in SETestBView singleton
+            [FromSingleEntity(Tag = typeof(QId3))] in SETestBView singleton
         )
         {
             _mixedAspectResults.Add(entity.TestInt.Value + singleton.TestInt.Value);
@@ -114,14 +114,14 @@ namespace Trecs.Tests
             NAssert.AreEqual(103, _mixedAspectResults[2]);
         }
 
-        // ─── 4. [ForEachEntity] component iteration mixed with [SingleEntity] component
+        // ─── 4. [ForEachEntity] component iteration mixed with [FromSingleEntity] component
 
         readonly List<int> _mixedComponentResults = new();
 
         [ForEachEntity(Tag = typeof(QId1))]
         void IterateWithComponentSingleton(
             in TestInt value,
-            [SingleEntity(Tag = typeof(QId3))] in TestInt singletonValue
+            [FromSingleEntity(Tag = typeof(QId3))] in TestInt singletonValue
         )
         {
             _mixedComponentResults.Add(value.Value + singletonValue.Value);
@@ -154,7 +154,7 @@ namespace Trecs.Tests
 
         int _runOnceComponentSeen;
 
-        void RunOnceComponent([SingleEntity(Tag = typeof(QId1))] in TestInt value)
+        void RunOnceComponent([FromSingleEntity(Tag = typeof(QId1))] in TestInt value)
         {
             _runOnceComponentSeen = value.Value;
         }
@@ -185,7 +185,7 @@ namespace Trecs.Tests
         // (which has both); QTestEntityA has QCatA but not QId2, so it must not
         // be picked up.
         void RunOnceMultiTag(
-            [SingleEntity(Tags = new[] { typeof(QId2), typeof(QCatA) })] in TestInt value
+            [FromSingleEntity(Tags = new[] { typeof(QId2), typeof(QCatA) })] in TestInt value
         )
         {
             _multiTagSeen = value.Value;
@@ -220,10 +220,10 @@ namespace Trecs.Tests
 
         // ─── Gap 2: write-component singleton ────────────────────────────────────
 
-        // ref TestInt value with [SingleEntity] resolves through the same
+        // ref TestInt value with [FromSingleEntity] resolves through the same
         // hoist-then-bind path as a read singleton, but binds a writable alias
         // so mutations land back in the component buffer.
-        void RunOnceComponentWrite([SingleEntity(Tag = typeof(QId3))] ref TestInt value)
+        void RunOnceComponentWrite([FromSingleEntity(Tag = typeof(QId3))] ref TestInt value)
         {
             value.Value += 1000;
         }
@@ -244,7 +244,7 @@ namespace Trecs.Tests
             NAssert.AreEqual(1042, buf[0].Value);
         }
 
-        // ─── Gap 3: RunOnce method that mixes [SingleEntity] with [PassThroughArgument] ─
+        // ─── Gap 3: RunOnce method that mixes [FromSingleEntity] with [PassThroughArgument] ─
 
         int _passThroughSeen;
 
@@ -252,7 +252,7 @@ namespace Trecs.Tests
         // [PassThroughArgument] params and forwards them after hoisting the
         // singleton. Caller invocation: RunOncePassThrough(a, 17).
         void RunOncePassThrough(
-            [SingleEntity(Tag = typeof(QId3))] in TestInt singleton,
+            [FromSingleEntity(Tag = typeof(QId3))] in TestInt singleton,
             [PassThroughArgument] int multiplier
         )
         {
@@ -275,20 +275,20 @@ namespace Trecs.Tests
         }
     }
 
-    // ─── 6. [WrapAsJob] with [SingleEntity] aspect parameter ─────────────────
+    // ─── 6. [WrapAsJob] with [FromSingleEntity] aspect parameter ─────────────────
     //
     // The job iterates QId1 entities (each with TestInt) and adds the singleton
     // QId3-tagged entity's TestInt.Value into theirs. Aspect singleton becomes
     // a hidden NativeFactory + EntityIndex pair on the generated job; Execute(int)
     // materializes the aspect via factory.Create(index) before calling the user
     // method. Reuses the SETestBView aspect declared at the top of this file.
-    partial class SingleEntityWrapAsJobAspectSystem : ISystem
+    partial class FromSingleEntityWrapAsJobAspectSystem : ISystem
     {
         [ForEachEntity(Tag = typeof(QId1))]
         [WrapAsJob]
         static void Increment(
             ref TestInt value,
-            [SingleEntity(Tag = typeof(QId3))] in SETestBView singleton
+            [FromSingleEntity(Tag = typeof(QId3))] in SETestBView singleton
         )
         {
             value.Value += singleton.TestInt.Value;
@@ -300,14 +300,14 @@ namespace Trecs.Tests
         }
     }
 
-    // ─── 7. [WrapAsJob] with [SingleEntity] component parameter (read) ───────
-    partial class SingleEntityWrapAsJobComponentSystem : ISystem
+    // ─── 7. [WrapAsJob] with [FromSingleEntity] component parameter (read) ───────
+    partial class FromSingleEntityWrapAsJobComponentSystem : ISystem
     {
         [ForEachEntity(Tag = typeof(QId1))]
         [WrapAsJob]
         static void Increment(
             ref TestInt value,
-            [SingleEntity(Tag = typeof(QId3))] in TestInt singletonValue
+            [FromSingleEntity(Tag = typeof(QId3))] in TestInt singletonValue
         )
         {
             value.Value += singletonValue.Value;
@@ -319,15 +319,15 @@ namespace Trecs.Tests
         }
     }
 
-    // ─── 8. [SingleEntity] on hand-written job struct fields ────────────────
+    // ─── 8. [FromSingleEntity] on hand-written job struct fields ────────────────
     //
     // The struct iterates QId1 entities and reads a singleton QId3-tagged entity
-    // via a [SingleEntity] aspect field. The generator emits a hidden hoist of
+    // via a [FromSingleEntity] aspect field. The generator emits a hidden hoist of
     // SingleIndex() before the per-group foreach, and assigns the field on
     // each per-group job instance from buffers fetched from the singleton's group.
-    partial struct SingleEntityFieldAspectJob
+    partial struct FromSingleEntityFieldAspectJob
     {
-        [SingleEntity(Tag = typeof(QId3))]
+        [FromSingleEntity(Tag = typeof(QId3))]
         public SETestBView Singleton;
 
         [ForEachEntity(Tag = typeof(QId1))]
@@ -337,11 +337,11 @@ namespace Trecs.Tests
         }
     }
 
-    // Component-typed [SingleEntity] field. The field type is the wrapper
+    // Component-typed [FromSingleEntity] field. The field type is the wrapper
     // (NativeComponentRead<T>); access goes through .Value.
-    partial struct SingleEntityFieldComponentJob
+    partial struct FromSingleEntityFieldComponentJob
     {
-        [SingleEntity(Tag = typeof(QId3))]
+        [FromSingleEntity(Tag = typeof(QId3))]
         public NativeComponentRead<TestInt> SingletonValue;
 
         [ForEachEntity(Tag = typeof(QId1))]
@@ -352,7 +352,7 @@ namespace Trecs.Tests
     }
 
     [TestFixture]
-    public class SingleEntityFieldOnJobStructTests
+    public class FromSingleEntityFieldOnJobStructTests
     {
         [Test]
         public void JobStruct_AspectField_ResolvesAndApplies()
@@ -370,7 +370,7 @@ namespace Trecs.Tests
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 100 }).AssertComplete();
             a.Submit();
 
-            var handle = new SingleEntityFieldAspectJob().ScheduleParallel(a);
+            var handle = new FromSingleEntityFieldAspectJob().ScheduleParallel(a);
             handle.Complete();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
@@ -396,7 +396,7 @@ namespace Trecs.Tests
             a.AddEntity(Tag<QId3>.Value).Set(new TestInt { Value = 1000 }).AssertComplete();
             a.Submit();
 
-            var handle = new SingleEntityFieldComponentJob().ScheduleParallel(a);
+            var handle = new FromSingleEntityFieldComponentJob().ScheduleParallel(a);
             handle.Complete();
 
             var group = a.WorldInfo.GetSingleGroupWithTags(Tag<QId1>.Value);
@@ -408,12 +408,12 @@ namespace Trecs.Tests
     }
 
     [TestFixture]
-    public class SingleEntityWrapAsJobTests
+    public class FromSingleEntityWrapAsJobTests
     {
         [Test]
         public void WrapAsJob_AspectSingleton_AppliedToEachIteratedEntity()
         {
-            var system = new SingleEntityWrapAsJobAspectSystem();
+            var system = new FromSingleEntityWrapAsJobAspectSystem();
             using var env = EcsTestHelper.CreateEnvironment(
                 b => b.AddSystem(system),
                 QTestEntityA.Template,
@@ -441,7 +441,7 @@ namespace Trecs.Tests
         [Test]
         public void WrapAsJob_ComponentSingleton_AppliedToEachIteratedEntity()
         {
-            var system = new SingleEntityWrapAsJobComponentSystem();
+            var system = new FromSingleEntityWrapAsJobComponentSystem();
             using var env = EcsTestHelper.CreateEnvironment(
                 b => b.AddSystem(system),
                 QTestEntityA.Template,

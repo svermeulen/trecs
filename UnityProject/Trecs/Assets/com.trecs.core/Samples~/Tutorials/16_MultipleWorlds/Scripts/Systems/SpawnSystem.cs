@@ -23,7 +23,7 @@ namespace Trecs.Samples.MultipleWorlds
             _origin = origin;
         }
 
-        void Execute([SingleEntity(typeof(TrecsTags.Globals))] ref State state)
+        void Execute([FromGlobalEntity] ref State state)
         {
             state.Timer += World.DeltaTime;
 
