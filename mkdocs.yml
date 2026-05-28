@@ -59,7 +59,6 @@ nav:
       - Gotchas: guides/gotchas.md
       - OOP Integration: guides/oop-integration.md
       - Entity Subset Patterns: guides/entity-subset-patterns.md
-      - Determinism: guides/determinism.md
       - Trecs vs Unity ECS: guides/trecs-vs-unity-ecs.md
   - Advanced:
       - Accessor Roles: advanced/accessor-roles.md
@@ -102,7 +101,7 @@ nav:
       - 15 - Reactive Events: samples/15-reactive-events.md
       - 16 - Multiple Worlds: samples/16-multiple-worlds.md
       - 17 - Heightmap Blobs: samples/17-heightmap-blobs.md
-  - FAQ: faq.md
+  - FAQ: guides/faq.md
   - Changelog: changelog.md
 
 markdown_extensions:
