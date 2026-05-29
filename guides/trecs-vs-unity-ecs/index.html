@@ -1,0 +1,3498 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A high-performance Entity Component System framework for Unity">
+      
+      
+      
+      
+        <link rel="prev" href="../entity-subset-patterns/">
+      
+      
+        <link rel="next" href="../../advanced/accessor-roles/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Trecs vs Unity ECS - Trecs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-orange">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#trecs-vs-unity-ecs" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Trecs" class="md-header__button md-logo" aria-label="Trecs" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Trecs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Trecs vs Unity ECS
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/svermeulen/trecs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    svermeulen/trecs
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Trecs" class="md-nav__button md-logo" aria-label="Trecs" data-md-component="logo">
+      
+  <img src="../../assets/logo.png" alt="logo">
+
+    </a>
+    Trecs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/svermeulen/trecs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    svermeulen/trecs
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/components/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/tags/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/entities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Entities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/systems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Systems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/world-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    World Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../core/input-system/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Input System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Access
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Access
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../data-access/queries-and-iteration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Queries & Iteration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../data-access/aspects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aspects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Entity Management
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Entity Management
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../entity-management/structural-changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Structural Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../entity-management/sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../entity-management/entity-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Entity Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Performance
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/jobs-and-burst/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Jobs & Burst
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../performance/dependency-tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dependency Tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gotchas/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gotchas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../oop-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OOP Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../entity-subset-patterns/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Entity Subset Patterns
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trecs vs Unity ECS
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trecs vs Unity ECS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tag-based-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tag-based identity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-layout-flat-buffers-vs-chunks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory layout: flat buffers vs chunks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature comparison
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Feature comparison">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#systems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Systems
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#determinism-networking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Determinism &amp; networking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#editor-tooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editor tooling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#physics-rendering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physics &amp; rendering
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/accessor-roles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Accessor Roles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/time-and-rng/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Time & RNG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interpolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/fixed-collections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fixed Collections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/aspect-interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aspect Interfaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/pausing-and-disabling-systems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pausing & Disabling Systems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/groups-and-tagsets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Groups, GroupIndex & TagSets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/advanced-jobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Job Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../advanced/entity-index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    EntityIndex
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../editor-windows/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Editor Windows
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_10" id="__nav_10_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Editor Windows
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../editor-windows/hierarchy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hierarchy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../editor-windows/player/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Player
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../editor-windows/saves/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Saves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../experimental/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experimental
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_11" id="__nav_11_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Experimental
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../experimental/pointers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pointers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../experimental/shared-heap-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shared Heap Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../experimental/serialization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../experimental/blob-builder/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BlobBuilder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../experimental/dynamic-collections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamic Collections
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../samples/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Samples
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_12" id="__nav_12_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Samples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/01-hello-entity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 - Hello Entity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/02-spawn-and-destroy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02 - Spawn & Destroy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/03-aspects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 - Aspects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/04-predator-prey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 - Predator Prey
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/05-job-system/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 - Job System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/06-partitions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 - Partitions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/07-feeding-frenzy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 - Feeding Frenzy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/08-sets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 - Sets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/09-interpolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 - Interpolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/10-pointers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 - Pointers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/11-snake/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11 - Snake
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/12-feeding-frenzy-benchmark/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12 - Feeding Frenzy Benchmark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/13-aspect-interfaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13 - Aspect Interfaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/14-blob-seed-pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14 - Blob Seed Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/15-reactive-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15 - Reactive Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/16-multiple-worlds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16 - Multiple Worlds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../samples/17-heightmap-blobs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17 - Heightmap Blobs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tag-based-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tag-based identity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-layout-flat-buffers-vs-chunks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory layout: flat buffers vs chunks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feature-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature comparison
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Feature comparison">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#systems" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Systems
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Queries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#determinism-networking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Determinism &amp; networking
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serialization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#editor-tooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editor tooling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#physics-rendering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Physics &amp; rendering
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../best-practices/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Guides
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/svermeulen/trecs/edit/main/docs/guides/trecs-vs-unity-ecs.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="trecs-vs-unity-ecs">Trecs vs Unity ECS<a class="headerlink" href="#trecs-vs-unity-ecs" title="Permanent link">&para;</a></h1>
+<p>For developers familiar with Unity's built-in ECS (the Entities package, 1.x line).</p>
+<p>Trecs keeps a deliberately small API surface — a handful of high-level concepts, with source generation handling the low-level work. Two design choices drive most of the differences from Unity ECS: <strong>how entities are identified</strong> (tags, not just component sets) and <strong>how they're stored in memory</strong> (flat buffers, not chunks). Read those two sections first; the rest of the page is a feature-by-feature reference you can skim as needed.</p>
+<h2 id="tag-based-identity">Tag-based identity<a class="headerlink" href="#tag-based-identity" title="Permanent link">&para;</a></h2>
+<p>In Unity ECS an entity's identity is <em>emergent</em>: two entities with the same component set are indistinguishable in queries. Trecs adds a second axis — entities carry <strong>tags</strong> that queries filter on, independent of their components.</p>
+<p>Tags come from <strong>templates</strong>: compile-time blueprints describing an entity's component layout and its identity tags. A tag may map 1:1 to one template (<code>GameTags.Spinner</code> on <code>SpinnerEntity</code>) or name an abstract role shared by many (<code>GameTags.Enemy</code>). You spawn by <em>tag</em>, not template — <code>AddEntity&lt;GameTags.Enemy&gt;()</code> — and the world resolves the registered template. Systems refer to entities by tag (or by component schema), never by template class, which decouples gameplay code from concrete entity definitions.</p>
+<p>Both query styles are first-class:</p>
+<div class="language-csharp highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1">// By tag</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="na">[ForEachEntity(typeof(GameTags.Enemy), typeof(GameTags.Alive))]</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">void</span><span class="w"> </span><span class="nf">Execute</span><span class="p">(</span><span class="k">ref</span><span class="w"> </span><span class="n">Health</span><span class="w"> </span><span class="n">health</span><span class="p">,</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">Position</span><span class="w"> </span><span class="n">pos</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1">// By component schema (Unity-ECS style)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="na">[ForEachEntity(MatchByComponents = true)]</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="k">void</span><span class="w"> </span><span class="nf">Execute</span><span class="p">(</span><span class="k">ref</span><span class="w"> </span><span class="n">Position</span><span class="w"> </span><span class="n">pos</span><span class="p">,</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">Velocity</span><span class="w"> </span><span class="n">vel</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+</span></code></pre></div>
+<p>Use tags when the subset is a design-level concept ("enemies"). Use <code>MatchByComponents</code> for cross-cutting systems (rendering, physics sync, debug overlays) that only care about component shape.</p>
+<p>Why the extra axis is worth it:</p>
+<ul>
+<li><strong>Queries read like the design.</strong> <code>[ForEachEntity(typeof(GameTags.Enemy))]</code> says what it means; "things with <code>Health</code> + <code>Position</code> + <code>AIState</code>" is a brittle stand-in for "enemies".</li>
+<li><strong>Loud failures on mismatches.</strong> A tag-scoped query requesting a component its template doesn't declare is an error. Component-only matching silently skips the entity — a classic "why isn't my system running on this entity?" bug.</li>
+<li><strong>One source of truth.</strong> Layout, defaults, tags, and partitions for "an Enemy" live in one template; spawn sites can't drift.</li>
+<li><strong>Safer refactoring.</strong> Change template definition in one place instead of from each spawn site</li>
+<li><strong>Meaningful names in tools.</strong> Logs, recordings, and inspectors name entities by what they are, not by an opaque component-set fingerprint.</li>
+</ul>
+<p>The tradeoff: you define templates up front — no "attach a component and see what happens" path. For deliberately-designed simulations that's usually straightforward, and <code>MatchByComponents</code> covers the systems that don't care about identity.</p>
+<h2 id="memory-layout-flat-buffers-vs-chunks">Memory layout: flat buffers vs chunks<a class="headerlink" href="#memory-layout-flat-buffers-vs-chunks" title="Permanent link">&para;</a></h2>
+<p>Unity ECS splits each archetype across many fixed-size 16 KB chunks, and iteration walks them in order. Trecs uses structure-of-arrays: each group owns one flat, contiguous buffer per component, and an entity sits at the same index across all of them.</p>
+<p>What that means in practice:</p>
+<ul>
+<li><strong>Iteration is a plain array walk.</strong> <code>ForEachEntity</code> over a group is <code>for (int i = 0; i &lt; count; i++)</code> against contiguous memory — no per-chunk bookkeeping or lookups.</li>
+<li><strong>Memory is sized to actual use.</strong> A 16 KB chunk holding a handful of entities wastes space when rare archetypes proliferate; Trecs grows each group's buffers as entities are added.</li>
+<li><strong>Structural changes cost less — and can't happen by accident.</strong> In Unity ECS, adding/removing a component moves the entity to another archetype, so reaching for "add a zero-sized tag as a cheap boolean" is secretly a full structural change (enableable components exist to dodge this). In Trecs the operations that copy memory between groups — <a href="../../core/templates/#partitions">partition</a> transitions — are explicit, so they're hard to trigger accidentally. And for dynamic state that needn't move data at all, Trecs offers cheaper approaches such as <a href="../../entity-management/sets/">sets</a>, which track membership without touching component storage.</li>
+<li><strong>Different parallelism shape.</strong> Both use Unity's job system. Unity ECS gives a chunk per worker; Trecs slices matching entities across <code>IJobParallelFor</code> batches. Throughput is comparable on large workloads.</li>
+</ul>
+<p>The chunk model's advantage is per-chunk metadata: change-filter version numbers and chunk components let a parallel job skip an unchanged chunk wholesale. Flat buffers have no analog. On dense workloads throughput is otherwise comparable.</p>
+<h2 id="feature-comparison">Feature comparison<a class="headerlink" href="#feature-comparison" title="Permanent link">&para;</a></h2>
+<h3 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Unity ECS</th>
+<th>Trecs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Storage</strong></td>
+<td>Archetype-based (entities grouped by component set)</td>
+<td>Group-based (entities grouped by tag combination)</td>
+</tr>
+<tr>
+<td><strong>Memory layout</strong></td>
+<td>Fixed-size 16 KB chunks per archetype; entities split across many chunks</td>
+<td>Structure-of-arrays: one contiguous buffer per component per group, indexed by the entity's position in the group</td>
+</tr>
+<tr>
+<td><strong>Entity identity</strong></td>
+<td><code>Entity</code> (stable, wraps index + version)</td>
+<td><code>EntityHandle</code> (stable, wraps index + version)</td>
+</tr>
+<tr>
+<td><strong>Definition</strong></td>
+<td>No explicit templates (archetype emerges from components)</td>
+<td><a href="../../core/templates/">Templates</a> (<code>ITemplate</code> + <code>ITagged</code>)</td>
+</tr>
+<tr>
+<td><strong>Structural changes</strong></td>
+<td><code>EntityManager</code> calls are synchronous (a sync point). For deferral, opt into an <code>EntityCommandBuffer</code>; ECBs play back automatically at built-in command-buffer systems (e.g. <code>EndSimulationEntityCommandBufferSystem</code>), or manually via <code>Playback()</code>.</td>
+<td>Structural changes are deferred — <a href="../../entity-management/structural-changes/">submission</a> runs automatically at the end of every fixed step.  Alternatively can run synchronously via <code>World.Submit()</code></td>
+</tr>
+<tr>
+<td><strong>Multi-world</strong></td>
+<td>Multiple <code>World</code> instances; default world auto-created. NetCode for Entities (separate package) adds explicit Client / Server / ThinClient world roles on top.</td>
+<td>Multiple <code>World</code> instances; no built-in roles or cross-world bridging</td>
+</tr>
+</tbody>
+</table>
+<h3 id="components">Components<a class="headerlink" href="#components" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Unity ECS</th>
+<th>Trecs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Plain unmanaged data</strong></td>
+<td><code>IComponentData</code> (unmanaged struct)</td>
+<td><code>IEntityComponent</code> (unmanaged struct)</td>
+</tr>
+<tr>
+<td><strong>Managed data on an entity</strong></td>
+<td><code>class IComponentData</code> (managed component)</td>
+<td>No managed components — use a <a href="../../experimental/pointers/">heap pointer</a> (<code>UniquePtr&lt;T&gt;</code> / <code>SharedPtr&lt;T&gt;</code>) referenced from a component</td>
+</tr>
+<tr>
+<td><strong>Per-entity dynamic collections</strong></td>
+<td><code>IBufferElementData</code> / <code>DynamicBuffer&lt;T&gt;</code> (unbounded, separately allocated)</td>
+<td><a href="../../advanced/fixed-collections/"><code>FixedList&lt;N&gt;</code></a> (compile-time bounded, inline) for bounded cases; <a href="../../experimental/dynamic-collections/"><code>TrecsList&lt;T&gt;</code> / <code>TrecsArray&lt;T&gt;</code> / <code>TrecsDictionary&lt;TKey, TValue&gt;</code></a> (unbounded, snapshot-safe) for growable storage; or a <a href="../../experimental/pointers/">heap pointer</a> (<code>UniquePtr&lt;T&gt;</code>) for managed data</td>
+</tr>
+<tr>
+<td><strong>Tags / markers</strong></td>
+<td>Zero-field <code>IComponentData</code> acts as a tag</td>
+<td>Dedicated <a href="../../core/tags/"><code>ITag</code></a> marker structs (separate from components)</td>
+</tr>
+<tr>
+<td><strong>Singletons / global state</strong></td>
+<td><code>SystemAPI.GetSingleton&lt;T&gt;()</code></td>
+<td><code>World.GlobalComponent&lt;T&gt;()</code> on a <a href="../../core/templates/#global-entity-template"><code>Globals</code> template</a></td>
+</tr>
+<tr>
+<td><strong>Single-field component shorthand</strong></td>
+<td>None</td>
+<td><a href="../../core/components/#the-unwrap-shorthand"><code>[Unwrap]</code></a> — exposes the inner value through aspect properties (e.g. <code>boid.Position</code> is a <code>float3</code>, not a <code>Position</code> wrapper)</td>
+</tr>
+<tr>
+<td><strong>Runtime add / remove of components</strong></td>
+<td>Yes (<code>AddComponent</code> / <code>RemoveComponent</code>; causes archetype move)</td>
+<td>No — a template's component set is fixed at compile time. Use <a href="../../core/templates/#partitions">partitions</a>, boolean / enum fields, <a href="../../entity-management/sets/">sets</a>, or child entities for the equivalents</td>
+</tr>
+<tr>
+<td><strong>Components shared across many entities</strong></td>
+<td><code>ISharedComponentData</code></td>
+<td>No equivalent; share by reference via a <a href="../../experimental/pointers/">heap pointer</a></td>
+</tr>
+<tr>
+<td><strong>Cleanup-after-destroy components</strong></td>
+<td><code>ICleanupComponentData</code> — persists past entity destruction so a system can finalize and explicitly remove them</td>
+<td>None — use <a href="../../entity-management/entity-events/"><code>OnRemoved</code></a> observer events for finalization</td>
+</tr>
+<tr>
+<td><strong>Per-chunk shared data</strong></td>
+<td>Chunk components — one value attached per chunk (a 16 KB block of entities in the same archetype)</td>
+<td>None — Trecs uses flat per-group buffers without sub-chunks; share via a <a href="../../experimental/pointers/">heap pointer</a> or a <code>Globals</code> component</td>
+</tr>
+<tr>
+<td><strong>Shared immutable blob assets</strong></td>
+<td><code>BlobAssetReference&lt;T&gt;</code> — structured immutable blobs shared across entities, baked into subscenes by a stable hash</td>
+<td><a href="../../experimental/pointers/"><code>SharedPtr&lt;T&gt;</code> / <code>NativeSharedPtr&lt;T&gt;</code></a> with <a href="../../experimental/shared-heap-data/#pattern-b-look-up-by-stable-blobid">stable <code>BlobId</code>s</a> for cross-run identity</td>
+</tr>
+</tbody>
+</table>
+<h3 id="systems">Systems<a class="headerlink" href="#systems" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Unity ECS</th>
+<th>Trecs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>System base type</strong></td>
+<td><code>ISystem</code> (struct, Burst-friendly) with <code>OnUpdate()</code>, or <code>SystemBase</code> (managed class, with <code>Entities.ForEach</code> lambda support)</td>
+<td><a href="../../core/systems/"><code>ISystem</code></a> (managed class) with <code>Execute()</code></td>
+</tr>
+<tr>
+<td><strong>One-time setup / teardown</strong></td>
+<td><code>OnCreate(ref SystemState)</code> / <code>OnDestroy(ref SystemState)</code></td>
+<td><a href="../../core/systems/#onready-hook"><code>partial void OnReady()</code></a> / <a href="../../core/systems/#onshutdown-hook"><code>partial void OnShutdown()</code></a> — both source-generated <code>partial</code> hooks; <code>OnShutdown</code> runs in reverse of <code>OnReady</code> order</td>
+</tr>
+<tr>
+<td><strong>Per-role access enforcement</strong></td>
+<td>None — any system can call <code>EntityManager</code> for any operation</td>
+<td><a href="../../advanced/accessor-roles/">Accessor roles</a> (<code>Fixed</code> / <code>Variable</code> / <code>Unrestricted</code>) — phase-derived permissions for component reads / writes, structural changes, RNG streams, and heap allocation</td>
+</tr>
+<tr>
+<td><strong>System ordering</strong></td>
+<td><code>[UpdateAfter]</code> / <code>[UpdateBefore]</code></td>
+<td><a href="../../core/systems/#system-ordering"><code>[ExecuteAfter]</code> / <code>[ExecuteBefore]</code></a></td>
+</tr>
+<tr>
+<td><strong>Phase / group structure</strong></td>
+<td>System groups (<code>InitializationSystemGroup</code>, etc.)</td>
+<td><a href="../../core/systems/#phase-diagram">Five phases</a> — EarlyPresentation, Input, Fixed, Presentation, LatePresentation</td>
+</tr>
+<tr>
+<td><strong>Phase-aware time / frame counters</strong></td>
+<td>Separate <code>Time.deltaTime</code> / <code>Time.fixedDeltaTime</code> properties; you pick the right one</td>
+<td><code>World.DeltaTime</code>, <code>World.Frame</code>, etc. resolve automatically to fixed or variable values based on the current phase</td>
+</tr>
+<tr>
+<td><strong>Construction</strong></td>
+<td>Framework discovers and instantiates systems via reflection</td>
+<td>User instantiates systems explicitly and registers them</td>
+</tr>
+<tr>
+<td><strong>System pause / disable</strong></td>
+<td>Ad-hoc; no built-in mechanism</td>
+<td><a href="../../advanced/pausing-and-disabling-systems/"><code>SetSystemPaused</code></a> (deterministic, replay-stable) and <code>SetSystemEnabled(channel, ...)</code> (non-deterministic, multi-source)</td>
+</tr>
+<tr>
+<td><strong>Burst on the system itself</strong></td>
+<td>Struct <code>ISystem</code> can be Burst-compiled wholesale</td>
+<td>Systems are managed classes; Burst is opt-in per job via <a href="../../performance/jobs-and-burst/"><code>[WrapAsJob]</code></a></td>
+</tr>
+<tr>
+<td><strong>Fixed → variable timestep smoothing</strong></td>
+<td>Not built-in</td>
+<td>Built-in <a href="../../advanced/interpolation/">interpolation</a> framework</td>
+</tr>
+</tbody>
+</table>
+<h3 id="queries">Queries<a class="headerlink" href="#queries" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Unity ECS</th>
+<th>Trecs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Building a query</strong></td>
+<td><code>SystemAPI.Query&lt;T&gt;()</code>, <code>EntityQuery</code> via <code>GetEntityQuery()</code></td>
+<td><a href="../../data-access/queries-and-iteration/"><code>World.Query()</code></a> builder (chain <code>WithTags&lt;T&gt;</code> / <code>WithComponents&lt;T&gt;</code> / <code>InSet&lt;T&gt;</code>), <code>MyAspect.Query(World)</code> for typed aspect iteration, or <a href="../../core/systems/#foreachentity"><code>[ForEachEntity]</code></a> method</td>
+</tr>
+<tr>
+<td><strong>Bundled component access</strong></td>
+<td>Aspects (<code>IAspect</code> + <code>RefRO</code>/<code>RefRW</code>) — <em>deprecated in Entities 1.x</em></td>
+<td><a href="../../data-access/aspects/">Aspects</a> (<code>IAspect</code> + <code>IRead</code>/<code>IWrite</code>)</td>
+</tr>
+<tr>
+<td><strong>Iterating in a job</strong></td>
+<td><code>IJobEntity</code> filtered by <code>Execute</code> parameter types and <code>[WithAll]</code> / <code>[WithAny]</code> / <code>[WithNone]</code> attributes</td>
+<td><code>[ForEachEntity]</code> method on <code>IJobFor</code>, or <a href="../../performance/jobs-and-burst/"><code>[WrapAsJob]</code></a></td>
+</tr>
+<tr>
+<td><strong>Sparse / dynamic membership</strong></td>
+<td>Enableable components (toggle without structural change)</td>
+<td><a href="../../entity-management/sets/">Sets</a> — independent membership index, doesn't touch component storage</td>
+</tr>
+<tr>
+<td><strong>Reactive lifecycle</strong></td>
+<td>Change filters or <code>EntityCommandBuffer</code> patterns</td>
+<td>First-class <a href="../../entity-management/entity-events/"><code>OnAdded</code> / <code>OnRemoved</code> / <code>OnMoved</code></a> subscriptions</td>
+</tr>
+<tr>
+<td><strong>Detect component modifications</strong></td>
+<td>Built-in change filters</td>
+<td>None built-in</td>
+</tr>
+<tr>
+<td><strong>Polymorphic aspect helpers</strong></td>
+<td>None built-in</td>
+<td><a href="../../advanced/aspect-interfaces/">Aspect interfaces</a> — <code>partial interface : IAspect</code> declares a contract that multiple aspects with matching component shapes can satisfy, enabling generic helpers without boxing or virtual dispatch</td>
+</tr>
+</tbody>
+</table>
+<h3 id="jobs">Jobs<a class="headerlink" href="#jobs" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Unity ECS</th>
+<th>Trecs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Entity-iterating job</strong></td>
+<td><code>IJobEntity</code></td>
+<td><a href="../../performance/jobs-and-burst/"><code>[WrapAsJob]</code></a> / <code>IJobFor</code> + <code>[ForEachEntity]</code></td>
+</tr>
+<tr>
+<td><strong>Component lookup wiring</strong></td>
+<td>Manual <code>GetComponentLookup</code></td>
+<td><a href="../../advanced/advanced-jobs/#fromworld-auto-wiring-job-fields"><code>[FromWorld]</code></a> auto-wiring</td>
+</tr>
+<tr>
+<td><strong><code>JobHandle</code> dependency wiring</strong></td>
+<td>Auto-tracked per-system via <code>state.Dependency</code> (framework threads input/output based on declared component access). Within a single system, multiple schedules are still hand-threaded through <code>state.Dependency</code>, and fan-in across handles uses <code>JobHandle.CombineDependencies</code>. Granularity is per component type globally.</td>
+<td>Auto-wired per-job from declared component access — the <a href="../../performance/dependency-tracking/">dependency tracker</a> infers the right input handle at every <code>ScheduleParallel</code>, including across multiple schedules in one system. Granularity is per <code>(component, group)</code>, so jobs touching the same component on different groups run in parallel.</td>
+</tr>
+<tr>
+<td><strong>Structural ops from a job</strong></td>
+<td><code>EntityCommandBuffer.ParallelWriter</code></td>
+<td><a href="../../performance/jobs-and-burst/#nativeworldaccessor"><code>NativeWorldAccessor</code></a> for structural ops</td>
+</tr>
+<tr>
+<td><strong>Deterministic ordering of parallel ops</strong></td>
+<td><code>sortKey</code> on <code>EntityCommandBuffer</code></td>
+<td><a href="../../entity-management/structural-changes/#deterministic-submission">Sort keys</a> for deterministic ordering</td>
+</tr>
+</tbody>
+</table>
+<h3 id="determinism-networking">Determinism &amp; networking<a class="headerlink" href="#determinism-networking" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Unity ECS</th>
+<th>Trecs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Stance toward determinism</strong></td>
+<td>Nice-to-have, not enforced</td>
+<td>Core design goal, enforced via API</td>
+</tr>
+<tr>
+<td><strong>Recording / playback with desync detection</strong></td>
+<td>Not built-in</td>
+<td>Built-in via the <a href="../../editor-windows/player/">Trecs Player editor window</a> — scrub back, replay forward, fork the timeline</td>
+</tr>
+<tr>
+<td><strong>Deterministic RNG</strong></td>
+<td>None built-in</td>
+<td>Framework-level <a href="../../advanced/time-and-rng/"><code>World.Rng</code></a> with fork support</td>
+</tr>
+<tr>
+<td><strong>Frame-isolated input for replay</strong></td>
+<td>Not built-in (NetCode for Entities provides one)</td>
+<td><a href="../../core/input-system/">Input system</a> with frame isolation</td>
+</tr>
+<tr>
+<td><strong>Networking</strong></td>
+<td>NetCode for Entities (separate package) — Client / Server / ThinClient world roles</td>
+<td>No direct equivalent</td>
+</tr>
+</tbody>
+</table>
+<h3 id="serialization">Serialization<a class="headerlink" href="#serialization" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Unity ECS</th>
+<th>Trecs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Edit-time authoring → entities</strong></td>
+<td>Subscene baking — designers author with <code>MonoBehaviour</code>s, baked at edit/build time</td>
+<td>No direct equivalent (yet)</td>
+</tr>
+<tr>
+<td><strong>Runtime save/load of full world state</strong></td>
+<td>Limited runtime serialization</td>
+<td>Built-in via the <a href="../../editor-windows/player/">Trecs Player editor window</a> — capture, restore, and label full-state snapshots</td>
+</tr>
+<tr>
+<td><strong>Incremental scene streaming</strong></td>
+<td>Subscenes load incrementally (open-world / large-scale streaming)</td>
+<td>None built-in — full snapshots only</td>
+</tr>
+<tr>
+<td><strong>Custom type serializers</strong></td>
+<td>None built-in for ECS save/load; managed/non-blittable types need bespoke save/load code</td>
+<td>Register an <a href="../../experimental/serialization/"><code>ISerializer&lt;T&gt;</code></a> for any managed type stored on the heap; pure unmanaged components round-trip automatically</td>
+</tr>
+<tr>
+<td><strong>Per-save versioning</strong></td>
+<td>Handled outside the engine</td>
+<td><code>Reader.Version</code> / <code>Writer.Version</code> for evolving custom serializers across save-format revisions</td>
+</tr>
+</tbody>
+</table>
+<h3 id="editor-tooling">Editor tooling<a class="headerlink" href="#editor-tooling" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Unity ECS</th>
+<th>Trecs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Entity inspector</strong></td>
+<td>Entity Debugger, Hierarchy window</td>
+<td><a href="../../editor-windows/hierarchy/">Hierarchy inspector</a></td>
+</tr>
+<tr>
+<td><strong>Live editing of running entities</strong></td>
+<td>Live baking — edits to subscene <code>MonoBehaviour</code> authoring sources are re-baked and flowed into the running entity world</td>
+<td><a href="../../editor-windows/hierarchy/">Hierarchy window</a> — per-entity component inspector mutates running entities directly</td>
+</tr>
+<tr>
+<td><strong>Record / scrub / fork timeline</strong></td>
+<td>None built-in</td>
+<td><a href="../../editor-windows/player/">Player window</a> — record a session, scrub back through earlier frames, fork the timeline</td>
+</tr>
+</tbody>
+</table>
+<h3 id="physics-rendering">Physics &amp; rendering<a class="headerlink" href="#physics-rendering" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Unity ECS</th>
+<th>Trecs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Physics</strong></td>
+<td>com.unity.physics</td>
+<td>None</td>
+</tr>
+<tr>
+<td><strong>Rendering</strong></td>
+<td>Entities Graphics package</td>
+<td>User-owned — DIY. Samples provide some common approaches</td>
+</tr>
+<tr>
+<td><strong>Transform hierarchy</strong></td>
+<td>Built-in <code>LocalTransform</code> + <code>Parent</code> / <code>Child</code> system maintaining <code>LocalToWorld</code></td>
+<td>None built-in — define your own components</td>
+</tr>
+<tr>
+<td><strong>GameObject ↔ Entity hybrid</strong></td>
+<td>Companion Components — an entity can carry a managed Unity <code>GameObject</code> "shadow" maintained by the framework</td>
+<td>User-owned. Samples provide some common approaches</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../entity-subset-patterns/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Entity Subset Patterns">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Entity Subset Patterns
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../advanced/accessor-roles/" class="md-footer__link md-footer__link--next" aria-label="Next: Accessor Roles">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Accessor Roles
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.indexes", "navigation.path", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.action.edit", "content.tooltips"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
