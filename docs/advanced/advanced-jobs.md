@@ -35,7 +35,7 @@ partial struct MyJob : IJobFor
 | `NativeComponentLookupRead<T>` | Read-only lookup across multiple groups | Yes |
 | `NativeComponentLookupWrite<T>` | Writable lookup across multiple groups | Yes |
 | `NativeSetRead<TSet>` | Read-only set access | No |
-| `NativeSetCommandBuffer<TSet>` | Writable set access (deferred) | No |
+| `NativeSetCommandBuffer<TSet>` | Writable set access (deferred until job completion) | No |
 | `NativeEntitySetIndices<TSet>` | Per-group entity indices of a set | Yes |
 | `NativeWorldAccessor` | Job-safe world operations | No |
 | `GroupIndex` | Runtime handle for the resolved group | Yes |

@@ -10,9 +10,9 @@ These four terms are related but distinct — the docs and source are careful ab
 
 | Term | What it is | Example |
 |---|---|---|
-| **Group** | Storage bucket. One per unique tag combination; holds the contiguous component arrays for entities with that exact tag set. | `{Player, VIP}` is a different group from `{Player}`. |
+| **Group** | Storage bucket. One per unique tag combination; holds the contiguous component arrays for entities with that exact tag set. | `{Player, VIP}` is a different group from `{Player, Guest}`. |
 | **Partition** | A group that an entity *moves between* at runtime to represent state, via `SetTag<T>()` / `UnsetTag<T>()` on a tag declared in `IPartitionedBy<…>`. "Partition" is the **role** a group plays — the storage is still a group. | An `Active` ball moves to the `Resting` partition via `ball.UnsetTag<Active>(World)`, without losing its components. |
-| **TagSet** | Stable identity for a tag combination — a 32-bit ID derived from the tag type hashes. Portable across runs and serializable. | `TagSet<GameTags.Player>.Value` resolves to the same value every run. |
+| **TagSet** | Stable identity for a set of tags — a 32-bit ID derived from the tag type hashes. Portable across runs and serializable. | `TagSet<GameTags.Player>.Value` resolves to the same value every run. |
 | **Set** | Dynamic, per-frame entity subset — membership is toggled at runtime by code, independent of tags or groups. See [Sets](../entity-management/sets.md). | A `Highlighted` set holding entities currently under the cursor. |
 
 ## Groups
@@ -38,30 +38,6 @@ Groups are the foundation of Trecs' performance model:
 - **Cache efficiency** — entities with the same tags are packed together, so iteration is fast.
 - **Targeted iteration** — systems iterate over specific groups by tag, skipping irrelevant entities.
 - **Partitions** — template [partitions](../core/templates.md#partitions) use groups to separate entities by state, so each partition iterates independently.
-
-## `AddEntity`: which group does the entity land in?
-
-The tags you pass to `AddEntity<...>()` are a **filter**, not a label. Trecs picks the registered group whose tag set contains every tag you passed:
-
-- **One group matches** → that's the target.
-- **Several match, all from different partitions on the same template** → the one with the fewest tags wins, as long as it's a unique minimum.
-- **Matches span multiple templates, or several tie at the smallest size** → throws ambiguous.
-
-```csharp
-// Given the two templates above ({Player, Character} and {Enemy, Character}):
-
-accessor.AddEntity<GameTags.Player>();
-// → {Player, Character}. Only this group contains Player.
-
-accessor.AddEntity<GameTags.Enemy, GameTags.Character>();
-// → {Enemy, Character}. Only this group contains Enemy.
-
-accessor.AddEntity<GameTags.Character>();
-// → throws. Both groups contain Character, and they belong to different
-//   templates — the resolver never picks across template boundaries.
-```
-
-`AddEntity<Player>()` works because `Player` narrows to one group. `AddEntity<Character>()` doesn't — `Character` alone matches both `PlayerEntity` and `EnemyEntity`, so you have to add `Player` or `Enemy` to disambiguate.
 
 ## GroupSlices
 
@@ -123,7 +99,7 @@ TagSet combined = playerTags.CombineWith(TagSet<GameTags.Active>.Value);
 
 ## GroupIndex
 
-`GroupIndex` is the runtime handle the core ECS plumbing uses to index into per-group storage (component buffers, sets, events). It's a `ushort` internally, 1-based with a `GroupIndex.Null` sentinel.
+`GroupIndex` is the runtime handle the core ECS plumbing uses to index into per-group storage (component buffers, sets, events). It's a `ushort` internally.
 
 ```csharp
 // Resolve a TagSet to its GroupIndex (main-thread world queries)
@@ -153,3 +129,27 @@ For runtime tag operations, use the `Tag<T>` cache:
 ```csharp
 Tag playerTag = Tag<GameTags.Player>.Value;
 ```
+
+## `AddEntity`: which group does the entity land in?
+
+The tags you pass to `AddEntity<...>()` are a **filter**, not a label. Trecs picks the registered group whose tag set contains every tag you passed:
+
+- **One group matches** → that's the target.
+- **Several match, all from different partitions on the same template** → the one with the fewest tags wins, as long as it's a unique minimum.
+- **Matches span multiple templates, or several tie at the smallest size** → throws ambiguous.
+
+```csharp
+// Given the two templates above ({Player, Character} and {Enemy, Character}):
+
+accessor.AddEntity<GameTags.Player>();
+// → {Player, Character}. Only this group contains Player.
+
+accessor.AddEntity<GameTags.Enemy, GameTags.Character>();
+// → {Enemy, Character}. Only this group contains Enemy.
+
+accessor.AddEntity<GameTags.Character>();
+// → throws. Both groups contain Character, and they belong to different
+//   templates — the resolver never picks across template boundaries.
+```
+
+`AddEntity<Player>()` works because `Player` narrows to one group. `AddEntity<Character>()` doesn't — `Character` alone matches both `PlayerEntity` and `EnemyEntity`, so you have to add `Player` or `Enemy` to disambiguate.

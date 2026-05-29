@@ -3,9 +3,29 @@
 !!! warning "Experimental"
     The pointer types on this page are experimental — including `SharedPtr`, `UniquePtr`, their `Native*` and `Input*` siblings, and the surrounding heap allocation API. Shapes and names may change in future 0.x releases.
 
-Components are unmanaged structs, so they can't hold classes, arrays, or other managed references directly. The **heap** stores data that needs to be reached by reference — managed objects, native collections, shared blobs. **Pointers** are small handle structs you put on a component to refer to a heap allocation. For sharing patterns and seeders, see [Shared Heap Data](shared-heap-data.md).
+## What pointers are for
+
+A Trecs component is an unmanaged struct, so it can hold numbers, `float3`s, and other fixed-size value data — but **not** a `class`, an array, a `string`, or a Unity object like a `Mesh`. So how does an entity "own" a mesh, an AI blackboard object, or a growable buffer?
+
+Through the **heap** — a separate store Trecs manages for data that lives outside the component buffer. You allocate the object on the heap once and get back a **pointer**: a tiny handle struct (a few bytes) that *is* unmanaged, so it fits in a component. The component carries the lightweight handle; the handle resolves to the real object whenever you ask.
+
+```csharp
+UniquePtr<AiBrain> brain = UniquePtr.Alloc(World, new AiBrain());  // 1. put the object on the heap
+enemy.Component<CEnemy>(World).Write.Brain = brain;                // 2. store the handle on a component
+AiBrain b = brain.Get(World);                                      // 3. resolve it back when needed
+brain.Dispose(World);                                              // 4. free it yourself — Trecs never auto-frees
+```
+
+The rest of this page is the detail behind those four steps. For cross-entity sharing and stable IDs, see [Shared Heap Data](shared-heap-data.md).
 
 ## Persistent pointer types
+
+Two questions pick the type you need:
+
+1. **Managed or unmanaged data?** A `class` (or anything holding managed references) is *managed*. A pure `struct` of blittable fields is *unmanaged* — only unmanaged data can be touched inside Burst jobs, and those types carry the `Native` prefix.
+2. **One owner, or shared?** A **`Unique`** pointer has a single owner and is freely mutable. A **`Shared`** pointer is reference-counted — many handles to one allocation — and immutable, ideal for read-only data reused across many entities (meshes, lookup tables, blobs).
+
+The two axes give four types:
 
 | Type | Ownership | Mutability | Data type | Burst-safe |
 |------|-----------|------------|-----------|------------|
@@ -114,7 +134,7 @@ first.Dispose(World);  // refcount = 0, blob freed
 
 `SharedPtr.Acquire(World, blobId)` is `Clone` addressed by ID instead of by reference — it finds the existing blob, bumps the refcount, and returns a handle. See [Shared Heap Data — Pattern B](shared-heap-data.md#pattern-b-look-up-by-stable-blobid).
 
-### Disposing
+### Disposing { #cleanup-is-manual-for-entity-owned-pointers }
 
 Pointers must be manually disposed — Trecs does **not** auto-dispose:
 

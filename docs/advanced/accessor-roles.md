@@ -65,4 +65,4 @@ System code never calls `World.CreateAccessor(...)` — it gets the role from it
 - [Shared Heap Data](../experimental/shared-heap-data.md) — the heap-specific subset of these rules, plus deterministic ID minting and the seeder / provider patterns for shared blobs.
 - [Input System](../core/input-system.md) — how `[Input]` components and `AddInput<T>` work with input systems.
 - [Time & RNG](time-and-rng.md) — `FixedRng` vs `VariableRng` deterministic streams.
-- [Pausing & Disabling Systems](pausing-and-disabling-systems.md) — when to use `SetSystemPaused` vs `EnableChannel`.
+- [Pausing & Disabling Systems](pausing-and-disabling-systems.md) — when to use `SetSystemPaused` vs `SetSystemEnabled`.

@@ -28,7 +28,7 @@ public static class PaletteIds
 
 See [Choosing `BlobId` values](#choosing-blobid-values) for how to pick the numeric value.
 
-## Seeding — allocating shared data
+## Seeding — allocating shared data { #the-seeder }
 
 A *seeder* allocates each blob once at startup and holds a pinning handle to keep it alive. Without that anchor, the cache evicts the blob before any entity references it.
 
@@ -91,7 +91,7 @@ public class PaletteSeeder
 
 Either keeps the blobs alive. The next question is how spawners get handles to them — see [Pattern A](#pattern-a-clone-from-a-provider) and [Pattern B](#pattern-b-look-up-by-stable-blobid) below.
 
-## `[Immutable]` requirement
+## `[Immutable]` requirement { #two-adoption-paths-for-immutable }
 
 `SharedPtr<T>` requires `T` to carry `[Trecs.Immutable]` (or be on the built-in allowlist — `string`, `Type`, etc.). Without it, post-`Alloc` mutation silently desyncs determinism since the `BlobCache` is not snapshotted with game state.
 

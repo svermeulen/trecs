@@ -6,9 +6,9 @@ Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours,
 
 ```
 ┌─────────────────────────────────────────┐
-│  Layer 1: Non-ECS → ECS (Input)         │
+│  Layer 1: external state → ECS          │
 │  MonoBehaviours, services, Unity APIs   │
-│  → Queues input into ECS                │
+│  → Funnel external state via AddInput   │
 └─────────────┬───────────────────────────┘
               │ AddInput()
 ┌─────────────▼───────────────────────────┐
@@ -24,27 +24,33 @@ Trecs is a pure ECS framework, but Unity games need GameObjects, MonoBehaviours,
 └─────────────────────────────────────────┘
 ```
 
-## Layer 1: input bridge
+## Layer 1: external state → ECS
 
-An input-phase ECS system reads player input and queues it into the world. Funneling external state through `AddInput` means the framework can record and replay the same input data deterministically:
+The simulation must never read non-deterministic external state directly — that breaks record/replay, because a replayed run would re-sample different values. Instead, an `Input`-phase system captures that state each frame and funnels it through [`AddInput`](../core/input-system.md). The framework records whatever is funneled in, so replay feeds the simulation identical values.
+
+This applies to *any* external, non-deterministic source — not just button presses: the cursor's world position, a network message, a sensor reading, or the transform of a GameObject driven by non-ECS code. For example, projecting the cursor onto the ground each frame (which depends on the camera and screen — state the simulation can't see) and handing the player that world point as an aim target:
 
 ```csharp
 [ExecuteIn(SystemPhase.Input)]
-public partial class PlayerInputSystem : ISystem
+public partial class AimInputSystem : ISystem
 {
-    readonly EntityHandle _player;
+    readonly Camera _camera;
 
-    public PlayerInputSystem(EntityHandle player) => _player = player;
+    public AimInputSystem(Camera camera) => _camera = camera;
 
     public void Execute()
     {
-        var dir = new float2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-        _player.AddInput(World, new MoveInput { Direction = dir });
+        if (!World.Query().WithTags<GameTags.Player>().TrySingleHandle(out var player))
+            return;
+
+        var ray = _camera.ScreenPointToRay(UnityEngine.Input.mousePosition);
+        new Plane(Vector3.up, 0f).Raycast(ray, out var dist);
+        player.AddInput(World, new AimInput { Target = (float3)ray.GetPoint(dist) });
     }
 }
 ```
 
-`Input`-phase systems are the only place [`AddInput`](../core/input-system.md) is allowed; they run just-in-time before each fixed step so the simulation reads a stable input snapshot.
+`Input`-phase systems are the only place `AddInput` is allowed; they run just-in-time before each fixed step, so the simulation reads a stable input snapshot.
 
 ## Layer 2: pure ECS
 
@@ -86,7 +92,7 @@ public partial class GameObjectSyncSystem : ISystem
 }
 ```
 
-`RenderableGameObjectManager` and `GameObjectId` aren't part of Trecs — they're sample-side helpers under `Common/`. Use them, copy them, or roll your own; Trecs only cares that components are unmanaged.
+Note that `RenderableGameObjectManager` and `GameObjectId` aren't part of Trecs — they're sample-side helpers under `Common/`. You can copy them into your project, or roll your own similar way of mapping ECS entities to non ECS entities.
 
 ### Spawning and despawning GameObjects
 
@@ -121,7 +127,7 @@ public partial class EnemyGameObjectManager : IDisposable
 }
 ```
 
-The `Common/RenderableGameObjectManager.cs` in the samples is exactly this pattern, generalized over `PrefabId` so a single observer can spawn and pool GameObjects for every template that adds the `RenderableGameObject` base — no per-entity wiring required.
+The `Common/RenderableGameObjectManager.cs` in the samples is exactly this pattern, generalized over `PrefabId` so a single observer can spawn and pool GameObjects for every template that adds the `RenderableGameObject` base — no per-entity wiring required. (`DisposeCollection` and the `.AddTo` helper used above are likewise sample-side, under `Common/`.)
 
 ## Why this separation matters
 

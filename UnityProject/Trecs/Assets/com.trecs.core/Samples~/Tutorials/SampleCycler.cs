@@ -1,4 +1,6 @@
+using System;
 using System.Linq;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -24,7 +26,7 @@ namespace Trecs.Samples
     {
 #if UNITY_EDITOR
         [SerializeField]
-        UnityEditor.SceneAsset[] _sceneAssets;
+        SceneAsset[] _sceneAssets;
 #endif
 
         [SerializeField, HideInInspector]
@@ -56,7 +58,7 @@ namespace Trecs.Samples
         {
             _sceneNames =
                 _sceneAssets?.Where(s => s != null).Select(s => s.name).ToArray()
-                ?? System.Array.Empty<string>();
+                ?? Array.Empty<string>();
         }
 #endif
 

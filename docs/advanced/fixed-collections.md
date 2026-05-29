@@ -94,7 +94,7 @@ The type name picks the footprint. A `FixedArray256<float4x4>` is **16 KB** per 
 
 ## When to reach for something else
 
-- **The upper bound varies widely across entities, or usually sits far below the cap.** A `FixedArray256<T>` that's typically empty wastes storage on every entity in the template. Use a [heap pointer](../experimental/pointers.md) to an external `NativeList<T>` or managed `List<T>` instead.
+- **The upper bound varies widely across entities, or usually sits far below the cap.** A `FixedArray256<T>` that's typically empty wastes storage on every entity in the template. Use a [dynamic collection](../experimental/dynamic-collections.md) (`TrecsList<T>` / `TrecsArray<T>` / `TrecsDictionary<TKey, TValue>`) instead — the component holds a small inline handle and the elements grow on the world's heap, snapshot-safe.
 
 ## Relation to Unity's `FixedList*Bytes`
 
