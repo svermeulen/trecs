@@ -26,7 +26,7 @@ namespace Trecs.SourceGen.Performance
         /// <summary>
         /// Gets cached display string for a symbol, computing it only once.
         /// </summary>
-        public static string GetDisplayString(ISymbol symbol)
+        public static string GetDisplayString(ISymbol? symbol)
         {
             if (symbol == null)
                 return string.Empty;
