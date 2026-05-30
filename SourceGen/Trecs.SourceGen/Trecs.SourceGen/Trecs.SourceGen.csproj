@@ -18,6 +18,9 @@
          changing them requires re-running build_and_install.sh and committing the DLL. -->
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
+    <!-- Don't embed the build-time git SHA into AssemblyInformationalVersion;
+         it would change every commit and break the committed-DLL CI verification. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <!-- <DefineConstants>$(DefineConstants);SOURCEGEN_DUMP</DefineConstants> -->
   </PropertyGroup>
 
