@@ -6,14 +6,15 @@ namespace Trecs.Tests.PlayMode
 {
     // Regression guard for issue #10 (`Tag<T>.Value cannot be burst compiled`).
     //
-    // The EditMode JobSystemTests cover the managed value, but in batch-mode
-    // EditMode Burst falls back to managed execution when a job fails to compile,
-    // so a BC1040 regression there is silent. Burst only AOT-compiles (and hard-
-    // fails on BC1040) when building a Player — which is exactly what running this
-    // assembly under `--platform standalone-osx` does. The [WrapAsJob] method below
-    // loads Tag<BurstTagMarker>.Value from inside the Burst body, so if Tag<T> ever
-    // regresses to caching its value in a mutable static field the AOT player build
-    // fails outright.
+    // The EditMode JobSystemTests cover the managed value, but in-editor Burst
+    // JIT-compiles lazily and falls back to managed execution when a job fails to
+    // compile, so a BC1040 regression there is silent. Burst only AOT-compiles (and
+    // hard-fails on BC1040) when building a Player. The durable gate is the
+    // `standalone-test` CI job (StandaloneLinux64 IL2CPP, see .github/workflows/unity.yml);
+    // it reproduces locally via sv-unity-runner `--platform standalone-osx`. The
+    // [WrapAsJob] method below loads Tag<BurstTagMarker>.Value from inside the Burst body,
+    // so if Tag<T> ever regresses to caching its value in a mutable static field, the AOT
+    // player build fails outright.
 
     public struct BurstTagMarker : ITag { }
 
