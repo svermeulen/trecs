@@ -106,27 +106,27 @@ https://github.com/svermeulen/trecs.git?path=UnityProject/Trecs/Assets/com.trecs
 
 ## Samples
 
-The project includes 17 samples covering everything from basic entity creation to complex simulations with Burst jobs. To try them, clone the repo, open `UnityProject/Trecs` in Unity 6000.3+, and run `Assets/Samples/Main.unity`.
+The project includes 17 samples covering everything from basic entity creation to complex simulations with Burst jobs. To try them, clone the repo, open `UnityProject/Trecs` in Unity 6000.3+, and run `Assets/Samples/Core/Main.unity`. See the [samples docs](https://svermeulen.github.io/trecs/samples/) for details.
 
 | Sample | Concepts |
 |--------|----------|
-| 01 Hello Entity | Components, tags, templates, systems |
-| 02 Spawn & Destroy | Entity lifecycle, dynamic spawning |
+| 01 Hello Entity | Components, tags, templates, systems, world setup |
+| 02 Spawn & Destroy | Entity lifecycle, dynamic spawning, timed destruction |
 | 03 Aspects | Bundled component access for clean iteration |
-| 04 Predator Prey | Cross-entity references, template inheritance |
-| 05 Job System | Burst compilation, parallel jobs |
-| 06 Partitions | Template partitions, partition transitions |
-| 07 Feeding Frenzy | Complex multi-system simulation |
-| 08 Sets | Dynamic entity subsets, sparse iteration, overlapping membership |
-| 09 Interpolation | Fixed-to-variable timestep smoothing |
-| 10 Pointers | Storing memory outside of components |
-| 11 Snake | Complete game with recording/playback |
-| 12 Feeding Frenzy Benchmark | Exhaustive examples of the many Trecs patterns available |
-| 13 Native Pointers | `NativeSharedPtr` and `NativeUniquePtr` read and mutated inside a Burst job |
-| 14 Aspect Interfaces | Reusing aspect logic across templates via interface composition |
-| 15 Blob Storage | `BlobStore` for sharing immutable data across many entities |
-| 16 Reactive Events | Subscribing to entity add / remove / move events |
-| 17 Multiple Worlds | Running multiple `World` instances side by side in one scene |
+| 04 Predator Prey | Cross-entity references, template inheritance, event cleanup |
+| 05 Job System | Burst compilation, parallel jobs, WrapAsJob |
+| 06 Partitions | Template partitions, partition transitions, partition-filtered iteration |
+| 07 Feeding Frenzy | Complex simulation, visual smoothing, multiple interacting systems |
+| 08 Sets | Dynamic entity subsets, overlapping membership |
+| 09 Interpolation | Fixed-to-variable timestep interpolation |
+| 10 Dynamic Collections | Five trail-storage strategies: UniquePtr Queue, FixedArray, FixedList, TrecsList, TrecsArray |
+| 11 Snake | Complete grid-based game with input handling and recording/playback |
+| 12 Feeding Frenzy Benchmark | Performance benchmark comparing partition approaches and iteration styles |
+| 13 Aspect Interfaces | Shared aspect contracts via `partial interface` for reusable cross-species helpers |
+| 14 Blob Seed Pattern | Content-pipeline-stable `BlobId`s for shared immutable assets on the heap |
+| 15 Reactive Events | `OnAdded` / `OnRemoved` observers for cleanup and stat tracking |
+| 16 Multiple Worlds | Two independent `World` instances ticking side by side |
+| 17 Heightmap Blobs | Content-derived `BlobId`s via `UniqueHashGenerator`, plus a `NativeSharedPtr` Burst-job variant |
 
 ## Acknowledgments
 

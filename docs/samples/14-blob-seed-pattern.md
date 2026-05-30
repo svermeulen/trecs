@@ -20,7 +20,7 @@ public static class PaletteIds
 }
 ```
 
-For the "allocate and go" pattern where IDs are auto-minted, see [Sample 10 — Dynamic Collections](10-pointers.md). This sample is the content-pipeline variant.
+For the "allocate and go" pattern where IDs are auto-minted, see [Sample 10 — Dynamic Collections](10-dynamic-collections.md). This sample is the content-pipeline variant.
 
 ## The seeder pattern
 
@@ -112,7 +112,7 @@ void OnSwatchRemoved(in PaletteRef palette)
 }
 ```
 
-See also [Pointers — cleanup is manual](../experimental/pointers.md#cleanup-is-manual-for-entity-owned-pointers), [Sample 10 — Dynamic Collections](10-pointers.md), and [Shared Heap Data](../experimental/shared-heap-data.md) for the sharing patterns this sample illustrates.
+See also [Pointers — cleanup is manual](../experimental/pointers.md#cleanup-is-manual-for-entity-owned-pointers), [Sample 10 — Dynamic Collections](10-dynamic-collections.md), and [Shared Heap Data](../experimental/shared-heap-data.md) for the sharing patterns this sample illustrates.
 
 ## When to reach for this
 
@@ -120,7 +120,7 @@ See also [Pointers — cleanup is manual](../experimental/pointers.md#cleanup-is
 - Content pipelines where the blob's identity must survive across runs, recordings, or snapshots — auto-minted IDs would drift.
 - Data too big or too managed (lists, dictionaries) to copy into each entity's component.
 
-For per-entity managed data that isn't shared, use `UniquePtr<T>` instead ([Sample 10](10-pointers.md)).
+For per-entity managed data that isn't shared, use `UniquePtr<T>` instead ([Sample 10](10-dynamic-collections.md)).
 
 ## Concepts introduced
 

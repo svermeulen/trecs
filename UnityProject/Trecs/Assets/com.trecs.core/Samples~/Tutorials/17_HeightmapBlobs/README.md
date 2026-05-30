@@ -98,7 +98,7 @@ characters slide over the bumps of the surface they're walking on.
 For "I know up front this is `Warm` and that one is `Cool`", use
 hand-authored `BlobId` constants — [Sample 15](../15_BlobSeedPattern/README.md).
 For per-entity mutable data, use `UniquePtr<T>` —
-[Sample 10 — Pointers](../10_Pointers/README.md).
+[Sample 10 — Dynamic Collections](../10_DynamicCollections/README.md).
 
 ## Cleanup discipline
 
@@ -106,7 +106,7 @@ Same as Sample 15: the scene initializer holds the seeder anchor as a
 member and disposes it explicitly. Entity-owned handles aren't disposed
 in this sample because no entities are removed during play; if you adapt
 the pattern, register an `OnRemoved` observer to dispose each entity's
-handle as in [Sample 10](../10_Pointers/README.md).
+handle as in [Sample 10](../10_DynamicCollections/README.md).
 
 ## Setup (manual)
 

@@ -297,5 +297,5 @@ This makes type identity independent of namespaces and class names — refactors
 
 - [Pointers](pointers.md) — pointer types and which kinds of data need to live on the heap.
 - [Trecs Player Window](../editor-windows/player.md) — uses the registered serializers to record, scrub, and replay world state.
-- [Sample 10 — Pointers](../samples/10-pointers.md) — `UniquePtr<Queue<Vector3>>` plus the built-in `QueueSerializer<Vector3>` registered against the world so the trail round-trips through snapshots / recording.
+- [Sample 10 — Dynamic Collections](../samples/10-dynamic-collections.md) — `UniquePtr<Queue<Vector3>>` plus the built-in `QueueSerializer<Vector3>` registered against the world so the trail round-trips through snapshots / recording.
 - [Sample 14 — Blob Seed Pattern](../samples/14-blob-seed-pattern.md) — `SharedPtr<ColorPalette>` with stable `BlobId`s (the sample itself doesn't take snapshots, but the same `ISerializer<T>` pattern from Sample 10 would apply).

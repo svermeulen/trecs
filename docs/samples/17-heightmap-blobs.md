@@ -151,11 +151,11 @@ The source generator wraps the static method into a Burst-compiled job struct. P
 - The same blob may be requested by many independent subsystems and you want them to converge on one slot in the cache without coordination.
 - You snapshot or rollback game state and don't want large immutable blobs duplicated into the rollback ring buffer.
 
-For "I know up front this is `Warm` and that one is `Cool`", use hand-authored `BlobId` constants — [Sample 14](14-blob-seed-pattern.md). For per-entity mutable data, use `UniquePtr<T>` — [Sample 10 — Dynamic Collections](10-pointers.md).
+For "I know up front this is `Warm` and that one is `Cool`", use hand-authored `BlobId` constants — [Sample 14](14-blob-seed-pattern.md). For per-entity mutable data, use `UniquePtr<T>` — [Sample 10 — Dynamic Collections](10-dynamic-collections.md).
 
 ## Cleanup discipline
 
-Same as Sample 14: the scene initializer holds the seeder anchor (`SharedPtr` / `NativeSharedPtr`) as a member and disposes it explicitly. Entity-owned handles aren't disposed in this sample because no entities are removed during play; if you adapt the pattern to entities that come and go, register an `OnRemoved` observer to dispose each entity's handle as in [Sample 10](10-pointers.md).
+Same as Sample 14: the scene initializer holds the seeder anchor (`SharedPtr` / `NativeSharedPtr`) as a member and disposes it explicitly. Entity-owned handles aren't disposed in this sample because no entities are removed during play; if you adapt the pattern to entities that come and go, register an `OnRemoved` observer to dispose each entity's handle as in [Sample 10](10-dynamic-collections.md).
 
 ## Concepts introduced
 

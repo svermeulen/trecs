@@ -93,7 +93,7 @@ nav:
       - 07 - Feeding Frenzy: samples/07-feeding-frenzy.md
       - 08 - Sets: samples/08-sets.md
       - 09 - Interpolation: samples/09-interpolation.md
-      - 10 - Pointers: samples/10-pointers.md
+      - 10 - Dynamic Collections: samples/10-dynamic-collections.md
       - 11 - Snake: samples/11-snake.md
       - 12 - Feeding Frenzy Benchmark: samples/12-feeding-frenzy-benchmark.md
       - 13 - Aspect Interfaces: samples/13-aspect-interfaces.md

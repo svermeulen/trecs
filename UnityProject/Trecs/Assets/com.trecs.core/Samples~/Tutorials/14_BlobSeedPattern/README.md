@@ -7,7 +7,7 @@ regardless of how many entities point at it, and survives across recordings /
 snapshots because the IDs are caller-supplied rather than runtime-generated.
 
 For the simpler "allocate-and-go" `SharedPtr<T>` story (no stable IDs, IDs
-auto-minted), see [Sample 10 — Pointers](../10_Pointers/README.md). This
+auto-minted), see [Sample 10 — Dynamic Collections](../10_DynamicCollections/README.md). This
 sample is the content-pipeline variant.
 
 ## Why stable BlobIds
@@ -94,7 +94,7 @@ Pointers stored on components must be disposed when the entity is removed —
 the framework does **not** auto-dispose. This sample doesn't remove entities
 once spawned, so an `OnRemoved` cleanup observer isn't needed in the example
 code. If you adapt the pattern to entities that come and go, register one as
-shown in [Sample 10 — Pointers](../10_Pointers/README.md) or follow the
+shown in [Sample 10 — Dynamic Collections](../10_DynamicCollections/README.md) or follow the
 template documented in
 [Shared Heap Data](../../../../docs/advanced/shared-heap-data.md).
 

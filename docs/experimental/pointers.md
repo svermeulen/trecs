@@ -172,7 +172,7 @@ public partial class TrailCleanup : IDisposable
 }
 ```
 
-See [Sample 10 — Pointers](../samples/10-pointers.md) for a runnable example and [Entity Events](../entity-management/entity-events.md) for the full observer API.
+See [Sample 10 — Dynamic Collections](../samples/10-dynamic-collections.md) for a runnable example and [Entity Events](../entity-management/entity-events.md) for the full observer API.
 
 !!! warning
     Forgetting to dispose pointers causes memory leaks. Trecs reports leaks at world shutdown in debug builds.
@@ -238,5 +238,5 @@ The source generator enforces these rules at compile time on `[Input]` component
 
 - [Shared Heap Data](shared-heap-data.md) — seeder patterns and `BlobId` strategies for shared blobs.
 - [Input System](../core/input-system.md) — the surrounding model for `[Input]` components, `AddInput`, and recording / replay.
-- [Sample 10 — Pointers](../samples/10-pointers.md) — managed `UniquePtr` per entity.
+- [Sample 10 — Dynamic Collections](../samples/10-dynamic-collections.md) — managed `UniquePtr` per entity.
 - [Sample 14 — Blob Seed Pattern](../samples/14-blob-seed-pattern.md) — the seeder pattern with stable `BlobId` for shared assets.
