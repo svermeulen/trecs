@@ -1,4 +1,4 @@
-# 18 — Heightmap Blobs (Content-Derived BlobIds)
+# 17 — Heightmap Blobs (Content-Derived BlobIds)
 
 Demonstrates the **content-derived `BlobId`** pattern: hash a descriptor of
 what you want to compute, look it up in the world's blob cache, and only
@@ -8,7 +8,7 @@ and two `NativeSharedPtr<T>` variants sampled inside a Burst-compiled
 `[WrapAsJob]` static method.
 
 For the simpler hand-authored-BlobId story (palette assets keyed by
-`new BlobId(1001)`), see [Sample 15 — Blob Seed Pattern](../15_BlobSeedPattern/README.md).
+`new BlobId(1001)`), see [Sample 14 — Blob Seed Pattern](../14_BlobSeedPattern/README.md).
 This sample is the content-recipe variant: instead of choosing an ID up
 front, you derive one from the inputs that produced the data.
 
@@ -96,7 +96,7 @@ characters slide over the bumps of the surface they're walking on.
   want them to converge on one slot in the cache without coordination.
 
 For "I know up front this is `Warm` and that one is `Cool`", use
-hand-authored `BlobId` constants — [Sample 15](../15_BlobSeedPattern/README.md).
+hand-authored `BlobId` constants — [Sample 14](../14_BlobSeedPattern/README.md).
 For per-entity mutable data, use `UniquePtr<T>` —
 [Sample 10 — Dynamic Collections](../10_DynamicCollections/README.md).
 
@@ -118,4 +118,4 @@ handle as in [Sample 10](../10_DynamicCollections/README.md).
 4. Press Play. The surface mesh appears under the spheres; the spheres
    wander across it, hugging the height.
 
-Documentation: https://svermeulen.github.io/trecs/samples/18-heightmap-blobs/
+Documentation: https://svermeulen.github.io/trecs/samples/17-heightmap-blobs/

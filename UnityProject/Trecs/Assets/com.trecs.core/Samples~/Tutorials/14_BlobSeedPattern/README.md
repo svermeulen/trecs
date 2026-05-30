@@ -1,4 +1,4 @@
-# 15 — Blob Seed Pattern
+# 14 — Blob Seed Pattern
 
 Shows how to seed large, immutable, shared data into the world's shared heap
 under stable, content-pipeline-controlled `BlobId`s, and then reference it
@@ -106,4 +106,4 @@ template documented in
 3. Press Play. You should see two interleaved groups of cubes slowly shifting
    through warm and cool palettes on independent cycles.
 
-Documentation: https://svermeulen.github.io/trecs/samples/15-blob-seed-pattern/
+Documentation: https://svermeulen.github.io/trecs/samples/14-blob-seed-pattern/

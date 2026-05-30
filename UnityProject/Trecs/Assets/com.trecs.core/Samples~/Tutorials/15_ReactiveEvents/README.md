@@ -1,4 +1,4 @@
-# 16 — Reactive Events
+# 15 — Reactive Events
 
 Shows how to subscribe to entity lifecycle events with
 `WorldAccessor.Events`. Observers let you run side-effects (logging, spawning
@@ -72,4 +72,4 @@ removal.
    Drag ReactiveEventsCompositionRoot into Bootstrap's `CompositionRoot`.
 3. Press Play. Bubbles spawn and pop; the Console logs each event.
 
-Documentation: https://svermeulen.github.io/trecs/samples/16-reactive-events/
+Documentation: https://svermeulen.github.io/trecs/samples/15-reactive-events/
