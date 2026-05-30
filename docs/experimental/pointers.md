@@ -60,36 +60,39 @@ NativeSharedPtr<NativeData> nPtr = NativeSharedPtr.GetOrAlloc(World, MyBlobs.Bar
 
 ### Reading and writing
 
-Managed pointers use `Get`; native pointers use `Read` / `Write` wrappers that integrate with Unity's job-safety system:
+How you reach the payload depends on whether it's managed or native.
+
+**Managed (`UniquePtr` / `SharedPtr`)** — the payload is a `class`, so `Get` simply hands you the object reference:
 
 ```csharp
-// Managed — Get returns the object reference
 MyData data = unique.Get(World);
-MyData shared_data = shared.Get(World);
+MyData sharedData = shared.Get(World);
 
-if (shared.TryGet(World, out MyData maybe)) { /* … */ }
-bool alive = shared.CanGet(World); // check without resolving
+// Shared blobs can be freed elsewhere, so they also offer liveness checks:
+if (shared.TryGet(World, out MyData maybe)) { /* resolved */ }
+bool alive = shared.CanGet(World);   // check without resolving
+```
 
-// Native — Read / Write hand back a safety-checked wrapper exposing .Value
-ref readonly NativeData rd = ref nativeUnique.Read(World).Value;
-ref NativeData wd = ref nativeUnique.Write(World).Value;
-wd.HitCount++;
+**Native (`NativeUniquePtr` / `NativeSharedPtr`)** — the payload is a `struct` sitting in the heap buffer, so you don't want a copy. `Read` / `Write` hand back a small job-safety-checked wrapper, and the struct itself is its `.Value`, returned **by ref** — so you read or mutate it in place:
 
-// NativeSharedPtr is read-only (immutable shared data) — no Write wrapper.
+```csharp
+ref readonly NativeData rd = ref nativeUnique.Read(World).Value;   // read-only view
+ref NativeData wd = ref nativeUnique.Write(World).Value;           // writable view
+wd.HitCount++;                                                     // writes straight to the heap data
+
+// NativeSharedPtr is immutable shared data — Read only, no Write:
 ref readonly NativeData sd = ref nativeShared.Read(World).Value;
 ```
 
-`NativeSharedRead<T>.Value` returns `ref readonly T`:
+Because `.Value` is a `ref`, you can skip the local and use it inline when you only need it once:
 
 ```csharp
-ref readonly var collider = ref colliderPtr.Read(World).Value;
-DoSomething(collider.MassProperties);
-
-// When used once, fold inline:
 DoSomething(colliderPtr.Read(World).Value.MassProperties);
 ```
 
-To replace the referenced object of a managed `UniquePtr`, call `Set`. This is an extension method taking `this ref`, so the caller must have a writable reference to the pointer struct:
+Inside a Burst job, resolve through the `NativeWorldAccessor` instead of `World` — see [Pointers in jobs](#pointers-in-jobs).
+
+**Replacing a managed object.** `Get` reads the current object; to repoint a `UniquePtr` at a *different* object, call `Set`. It's a `this ref` extension, so the call site needs a writable reference to the pointer struct — i.e. the owning component's `.Write`:
 
 ```csharp
 ref var comp = ref entity.Component<CMyComp>(World).Write;
