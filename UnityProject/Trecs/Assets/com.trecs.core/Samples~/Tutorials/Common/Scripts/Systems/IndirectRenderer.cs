@@ -32,7 +32,10 @@ namespace Trecs.Samples
 
         public IndirectRenderer()
         {
-            _supportsIndirect = !SampleRenderingPath.UseFallback;
+            // Headless forces the fallback (NativeArray) path: GraphicsBuffer allocation
+            // needs a graphics device, whereas the fallback path stages instance data in
+            // CPU memory and only the final draw call touches the GPU (skipped below).
+            _supportsIndirect = !SampleRenderingPath.UseFallback && !SampleRenderingPath.IsHeadless;
 
             if (_supportsIndirect)
             {
@@ -229,6 +232,11 @@ namespace Trecs.Samples
             {
                 combined.Complete();
             }
+
+            // The BuildInstanceData job above still runs headless (CPU work, Burst-
+            // compiled) — only the GPU submission is skipped, since there's no device.
+            if (SampleRenderingPath.IsHeadless)
+                return;
 
             using (TrecsProfiling.Start("Graphics.RenderMeshInstanced"))
             {

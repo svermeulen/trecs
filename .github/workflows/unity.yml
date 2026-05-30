@@ -82,10 +82,12 @@ jobs:
           unityVersion: 6000.3.10f1
           # IL2CPP StandaloneLinux64 needs the linux-il2cpp module image, not -base-.
           customImage: unityci/editor:ubuntu-6000.3.10f1-linux-il2cpp-3
-          # Run ONLY the Burst AOT regression test. The rest of the PlayMode suite is
-          # the sample-scene smoke tests, which call Graphics.RenderMeshInstanced and so
-          # can't run in a headless player. The filter is applied at build time and only
-          # narrows which tests EXECUTE — BuildOptions.IncludeTestAssemblies still compiles
-          # every test assembly into the player, so Burst AOT (BC1040) coverage is intact.
-          customParameters: -testFilter "Trecs.Tests.PlayMode.BurstTagValuePlayModeTests" -assemblyNames Trecs.Tests.PlayMode
+          # Run the whole Trecs.Tests.PlayMode assembly under AOT: the Burst regression
+          # test plus the sample-scene smoke tests. The samples are headless-safe — the
+          # simulation ticks and its Burst jobs run; only the GPU draw submission is skipped
+          # when there's no graphics device (see SampleRenderingPath.IsHeadless). This
+          # exercises a broad slice of generated Burst + generic code under IL2CPP at
+          # runtime, not just at compile time. -assemblyNames keeps vendor/package PlayMode
+          # tests (e.g. render-pipeline tests that need a GPU) out of the run.
+          customParameters: -assemblyNames Trecs.Tests.PlayMode
           githubToken: ${{ secrets.GITHUB_TOKEN }}
