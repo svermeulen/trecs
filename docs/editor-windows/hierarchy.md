@@ -30,13 +30,6 @@ The toolbar hosts:
 
 ## World dropdown
 
-<!-- When captured, delete the admonition above and uncomment this block:
-<figure markdown>
-  ![Toolbar with the world dropdown open showing live and cached entries](../images/hierarchy-world-dropdown.png){ width="480" }
-  <figcaption>Live worlds appear by name; cached snapshots are suffixed with <code>(cached)</code>.</figcaption>
-</figure>
--->
-
 When at least one Trecs world is alive, the dropdown lists each by name. Picking one binds the tree to that world.
 
 With no live world, the dropdown falls back to **cached snapshots** from `Library/com.trecs/inspector_schema/`. Cached entries are suffixed with `(cached)`. Cache mode is read-only — toggles like the system-enable switch are disabled, since there's no running world to mutate.

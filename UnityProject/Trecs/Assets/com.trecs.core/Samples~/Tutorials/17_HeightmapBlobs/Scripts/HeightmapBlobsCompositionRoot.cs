@@ -1,4 +1,4 @@
-// Companion docs: https://svermeulen.github.io/trecs/samples/18-heightmap-blobs/
+// Companion docs: https://svermeulen.github.io/trecs/samples/17-heightmap-blobs/
 
 using System;
 using System.Collections.Generic;

@@ -1,4 +1,4 @@
-// Companion docs: https://svermeulen.github.io/trecs/samples/15-blob-seed-pattern/
+// Companion docs: https://svermeulen.github.io/trecs/samples/14-blob-seed-pattern/
 
 using System;
 using System.Collections.Generic;

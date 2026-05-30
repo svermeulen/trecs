@@ -1,4 +1,4 @@
-// Companion docs: https://svermeulen.github.io/trecs/samples/18-reactive-events/
+// Companion docs: https://svermeulen.github.io/trecs/samples/15-reactive-events/
 
 using System;
 using System.Collections.Generic;

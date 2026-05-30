@@ -3,6 +3,11 @@
   "version": "0.2.0",
   "displayName": "Trecs",
   "description": "A high-performance, deterministic Entity Component System framework for Unity",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/svermeulen/trecs.git"
+  },
   "unity": "6000.3",
   "unityRelease": "10f1",
   "keywords": [

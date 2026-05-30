@@ -1,4 +1,4 @@
-// Companion docs: https://svermeulen.github.io/trecs/samples/15-aspect-interfaces/
+// Companion docs: https://svermeulen.github.io/trecs/samples/13-aspect-interfaces/
 
 using System;
 using UnityEngine;

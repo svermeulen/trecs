@@ -16,7 +16,9 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: |
+            8.0.x
+            9.0.x
 
       - name: Restore dependencies
         run: dotnet restore SourceGen/Trecs.SourceGen/Trecs.SourceGen.sln
@@ -26,6 +28,27 @@ jobs:
 
       - name: Test
         run: dotnet test SourceGen/Trecs.SourceGen/Trecs.SourceGen.sln -c Release --no-build --logger "console;verbosity=normal"
+
+      # The shipped Trecs.SourceGen.dll is hand-committed into the Unity project via
+      # build_and_install.sh. Verify the committed copy is semantically identical to a
+      # fresh build of the current source, so a stale DLL can never ship undetected.
+      # We compare decompiled IL rather than raw bytes so the check is immune to the
+      # MVID / timestamp differences that vary build-to-build.
+      - name: Verify committed source generator DLL is up to date
+        run: |
+          set -euo pipefail
+          BUILT="SourceGen/Trecs.SourceGen/Trecs.SourceGen/bin/Release/netstandard2.0/Trecs.SourceGen.dll"
+          COMMITTED="UnityProject/Trecs/Assets/com.trecs.core/Scripts/SourceGen/Trecs.SourceGen.dll"
+          dotnet tool install -g ilspycmd --version 9.0.0.7889
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          ilspycmd "$BUILT" > /tmp/built.cs
+          ilspycmd "$COMMITTED" > /tmp/committed.cs
+          if ! diff -u /tmp/committed.cs /tmp/built.cs; then
+            echo "::error::The committed Trecs.SourceGen.dll is out of date with the generator source."
+            echo "Run 'cd SourceGen/Trecs.SourceGen && ./build_and_install.sh' and commit the updated DLL."
+            exit 1
+          fi
+          echo "Committed source generator DLL matches the current source."
 
   format-check:
     name: Check Formatting

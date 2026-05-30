@@ -11,6 +11,13 @@
     <IncludeSymbols>false</IncludeSymbols>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <Deterministic>true</Deterministic>
+    <!-- The shipped DLL is committed to the Unity project and verified byte-for-byte
+         in CI (see .github/workflows/sourcegen.yml). DebugType=none drops the
+         debug directory / PDB-path block, the only machine-dependent bytes, so a
+         deterministic build is reproducible across machines. Keep these in sync:
+         changing them requires re-running build_and_install.sh and committing the DLL. -->
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
     <!-- <DefineConstants>$(DefineConstants);SOURCEGEN_DUMP</DefineConstants> -->
   </PropertyGroup>
 
