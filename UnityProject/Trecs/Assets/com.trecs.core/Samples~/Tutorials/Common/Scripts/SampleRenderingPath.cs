@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -14,6 +15,12 @@ namespace Trecs.Samples
         public static bool ForceFallback;
 
         public static bool UseFallback => ForceFallback || !SystemInfo.supportsComputeShaders;
+
+        // True when running without a graphics device (e.g. a -batchmode -nographics
+        // player, as built for the standalone CI test job). The simulation still ticks
+        // and its Burst jobs still run; only the GPU submission calls must be skipped,
+        // since Graphics.RenderMesh* / GraphicsBuffer have no device to talk to.
+        public static bool IsHeadless => SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null;
 
 #if UNITY_EDITOR
         const string MenuPath = "Tools/Trecs/Force Fallback Rendering";
