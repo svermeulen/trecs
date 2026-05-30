@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - Unreleased
+
+### Fixed
+
+- **`Tag<T>.Value` is now safe to read from Burst AOT code (issue #10).** It was a mutable cached static field, which trips Burst error BC1040 under AOT (Standalone / IL2CPP). In-editor Burst JITs lazily and silently falls back to managed code on such errors, so CI stayed green while shipped AOT builds failed. `Tag<T>.Value` is now a thin wrapper over `TypeId<T>.Value` (a `readonly` Burst constant in default mode, a `SharedStatic` in strict mode).
+- **Samples install cleanly into a fresh project.** `SampleCycler` no longer depends on project build settings, and sample rendering is headless-safe.
+- **Sample / docs link drift.** Corrected off-by-N tutorial companion-doc slugs, the stale "Pointers" naming for sample 10 (now "Dynamic Collections"), a 404 FAQ link, and a broken docs image reference.
+- **`package.json` metadata.** Added the missing `license` (MIT) and `repository` fields required by UPM / OpenUPM.
+
+### Changed
+
+- Sample 10 renamed from **Pointers** to **Dynamic Collections** (doc page `samples/10-dynamic-collections`).
+- IL2CPP / Standalone player build settings adjusted for the AOT test path.
+
+### Added
+
+- AOT Burst regression coverage: a Standalone (IL2CPP) PlayMode test that reads `Tag<T>.Value` from inside a Burst job, plus a dedicated standalone-build CI job so Burst AOT errors (e.g. BC1040) fail CI.
+- CI check that the committed `Trecs.SourceGen.dll` matches a fresh build of the generator source (semantic decompile comparison), preventing a stale generator DLL from shipping.
+
 ## [0.2.0] - 2026-05-07
 
 Large redesign pass covering package consolidation, accessor permissions, heap-backed collections, source-gen diagnostics, native pointer internals, and editor tooling. All breaking changes are mechanical text-level migrations unless otherwise noted.
