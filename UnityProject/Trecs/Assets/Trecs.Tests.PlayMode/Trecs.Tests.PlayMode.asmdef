@@ -6,11 +6,14 @@
         "GUID:0acc523941302664db1f4e527237feb3",
         "GUID:281cd1989f6948c4aeefd4731e3a1aec",
         "GUID:ca113807f121449999e1498c70dd263b",
-        "GUID:76a9879f957c4510908f4305e5d030be"
+        "GUID:76a9879f957c4510908f4305e5d030be",
+        "GUID:2665a8d13d1b3f18800f46e256720795",
+        "GUID:e0cd26848372d4e5c891c569017e11f1",
+        "GUID:d8b63aba1907145bea998dd612889d6b"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
-    "allowUnsafeCode": false,
+    "allowUnsafeCode": true,
     "overrideReferences": true,
     "precompiledReferences": [
         "nunit.framework.dll"
