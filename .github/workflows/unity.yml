@@ -15,7 +15,7 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           lfs: true
 
@@ -24,7 +24,7 @@ jobs:
         with:
           tool-cache: false
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: UnityProject/Trecs/Library
           key: Library-${{ hashFiles('UnityProject/Trecs/Packages/manifest.json', 'UnityProject/Trecs/Packages/packages-lock.json') }}
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           lfs: true
 
@@ -64,7 +64,7 @@ jobs:
         with:
           tool-cache: false
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: UnityProject/Trecs/Library
           key: Library-standalone-${{ hashFiles('UnityProject/Trecs/Packages/manifest.json', 'UnityProject/Trecs/Packages/packages-lock.json') }}
