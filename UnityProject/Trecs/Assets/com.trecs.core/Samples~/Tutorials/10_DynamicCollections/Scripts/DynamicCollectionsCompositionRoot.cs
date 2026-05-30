@@ -7,29 +7,6 @@ using Unity.Mathematics;
 
 namespace Trecs.Samples.DynamicCollections
 {
-    /// <summary>
-    /// Five ways to attach a dynamic per-entity collection to a Trecs
-    /// component, side by side:
-    ///
-    /// <list type="bullet">
-    /// <item><see cref="TrailCollectionType.UniquePtrQueue"/> — managed
-    ///   <c>Queue&lt;Vector3&gt;</c> behind a <see cref="UniquePtr{T}"/>,
-    ///   trimmed to <c>SampleSettings.TrailLength</c> every frame.</item>
-    /// <item><see cref="TrailCollectionType.FixedArrayRingBuffer"/> — inline
-    ///   <see cref="Trecs.Collections.FixedArray32{T}"/> ring buffer, blittable.</item>
-    /// <item><see cref="TrailCollectionType.FixedListAppend"/> — inline
-    ///   <see cref="Trecs.Collections.FixedList256{T}"/> appended until full.</item>
-    /// <item><see cref="TrailCollectionType.TrecsListAppend"/> — heap-backed
-    ///   <see cref="TrecsList{T}"/> that grows geometrically without bound.</item>
-    /// <item><see cref="TrailCollectionType.TrecsArrayRingBuffer"/> — heap-backed
-    ///   <see cref="TrecsArray{T}"/> used as a ring buffer; length chosen at
-    ///   allocation time (<c>SampleSettings.TrailLength</c>) and fixed thereafter.</item>
-    /// </list>
-    ///
-    /// Pick the variant via the <c>CollectionType</c> field on the scene
-    /// inspector. The composition root spawns one Character template
-    /// variant and registers one trail-updater + presenter pair to match.
-    /// </summary>
     public class DynamicCollectionsCompositionRoot : CompositionRootBase
     {
         // Test hook — when non-null, replaces Settings.CollectionType for the
