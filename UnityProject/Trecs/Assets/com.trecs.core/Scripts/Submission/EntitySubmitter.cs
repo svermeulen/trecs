@@ -1535,8 +1535,7 @@ namespace Trecs.Internal
         internal unsafe NativeWorldAccessor ProvideNativeWorldAccessor(
             int accessorId,
             bool canMutateSimulation,
-            float deltaTime,
-            float elapsedTime
+            NativeWorldTickInfo tickInfo
         )
         {
             var flags = NativeWorldAccessorFlags.None;
@@ -1576,8 +1575,7 @@ namespace Trecs.Internal
                 chunkStoreResolver,
                 _setStore.DeferredQueues,
                 fastAdd,
-                deltaTime,
-                elapsedTime
+                tickInfo
             );
         }
 

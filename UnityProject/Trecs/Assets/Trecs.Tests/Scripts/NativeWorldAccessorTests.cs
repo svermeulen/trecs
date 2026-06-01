@@ -380,5 +380,39 @@ namespace Trecs.Tests
         }
 
         #endregion
+
+        #region World info (frame counts / pause / global entity)
+
+        [Test]
+        public void NativeAccessor_FixedFrame_MatchesWorldAccessor()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            // Fresh world starts at fixed frame 0.
+            NAssert.AreEqual(a.FixedFrame, a.ToNative().FixedFrame);
+
+            env.StepFixedFrames(3);
+
+            // The snapshot is taken at ToNative() time, so re-fetch after stepping.
+            NAssert.AreEqual(a.FixedFrame, a.ToNative().FixedFrame);
+        }
+
+        [Test]
+        public void NativeAccessor_Frame_FallsBackToFixedFrameOutsideSystemPhase()
+        {
+            using var env = EcsTestHelper.CreateEnvironment(TestTemplates.SimpleAlpha);
+            var a = env.Accessor;
+
+            env.StepFixedFrames(2);
+
+            // The test accessor is Unrestricted (no phase context), so the phase-aware
+            // Frame mirrors the deterministic FixedFrame rather than the variable counter.
+            var nativeEcs = a.ToNative();
+            NAssert.AreEqual(a.FixedFrame, nativeEcs.Frame);
+            NAssert.AreEqual(nativeEcs.FixedFrame, nativeEcs.Frame);
+        }
+
+        #endregion
     }
 }

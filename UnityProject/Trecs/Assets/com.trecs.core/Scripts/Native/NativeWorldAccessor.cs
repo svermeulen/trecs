@@ -49,6 +49,27 @@ namespace Trecs
         }
     }
 
+    // Snapshot of per-tick world state — phase-aware time and frame counters —
+    // captured on the main thread in WorldAccessor.ToNative so Burst jobs can read
+    // them without bouncing back to managed SystemRunner state. Constructor-only
+    // passthrough; NativeWorldAccessor copies the values into its own public
+    // readonly fields.
+    internal readonly struct NativeWorldTickInfo
+    {
+        public readonly float DeltaTime;
+        public readonly float ElapsedTime;
+        public readonly int Frame;
+        public readonly int FixedFrame;
+
+        public NativeWorldTickInfo(float deltaTime, float elapsedTime, int frame, int fixedFrame)
+        {
+            DeltaTime = deltaTime;
+            ElapsedTime = elapsedTime;
+            Frame = frame;
+            FixedFrame = fixedFrame;
+        }
+    }
+
     /// <summary>
     /// Burst-compatible struct providing all non-generic ECS operations for use in parallel jobs.
     /// This is the native counterpart to <see cref="WorldAccessor"/> — obtain one via
@@ -121,6 +142,24 @@ namespace Trecs
         /// </summary>
         public readonly float ElapsedTime;
 
+        /// <summary>
+        /// The frame count for the phase this accessor was created in —
+        /// <see cref="FixedFrame"/> for jobs scheduled from a fixed-update system,
+        /// or the variable-update frame count for jobs scheduled from a
+        /// variable-update system. Mirrors the phase-aware <see cref="WorldAccessor.Frame"/>.
+        /// For accessors created outside system execution (no phase context) this
+        /// falls back to <see cref="FixedFrame"/>.
+        /// </summary>
+        public readonly int Frame;
+
+        /// <summary>
+        /// Number of fixed-update frames the simulation has executed. Deterministic
+        /// across record/replay; safe to read regardless of the scheduling phase, so
+        /// use this as a stable time axis inside jobs. Mirrors
+        /// <see cref="WorldAccessor.FixedFrame"/>.
+        /// </summary>
+        public readonly int FixedFrame;
+
 #pragma warning disable 649
         [NativeSetThreadIndex]
         int _threadIndex;
@@ -153,8 +192,7 @@ namespace Trecs
             NativeHeapResolver chunkStoreResolver,
             NativeHashMap<SetId, NativeSetDeferredQueues> deferredQueues,
             FastAddNativeInfo fastAdd,
-            float deltaTime,
-            float elapsedTime
+            NativeWorldTickInfo tickInfo
         )
         {
             _moveQueue = moveQueue;
@@ -172,8 +210,10 @@ namespace Trecs
             _layoutEntriesPtr = fastAdd.LayoutEntriesPtr;
             _typeIdToCi = fastAdd.TypeIdToCi;
             _threadIndex = 0;
-            DeltaTime = deltaTime;
-            ElapsedTime = elapsedTime;
+            DeltaTime = tickInfo.DeltaTime;
+            ElapsedTime = tickInfo.ElapsedTime;
+            Frame = tickInfo.Frame;
+            FixedFrame = tickInfo.FixedFrame;
         }
 
         // ── Entity Add ──────────────────────────────────────────────

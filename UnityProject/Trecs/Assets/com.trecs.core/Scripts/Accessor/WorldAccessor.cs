@@ -883,7 +883,24 @@ namespace Trecs
                     : 0f;
             }
 
-            return _structuralOps.GetNativeWorldAccessor(Id, CanMutateSimulation, dt, et);
+            // Frame mirrors the phase-aware WorldAccessor.Frame: VariableFrame only
+            // crosses into a job scheduled from the variable phase. Fixed-phase and
+            // phase-less (Unrestricted) accessors get the deterministic FixedFrame so
+            // a job never reads the non-deterministic variable counter behind a Fixed
+            // accessor's back. FixedFrame is always exposed since it has no phase gate.
+            var frame =
+                phase == PhaseDefault.Variable
+                    ? _systemRunner.VariableFrame
+                    : _systemRunner.FixedFrame;
+
+            var tickInfo = new NativeWorldTickInfo(
+                deltaTime: dt,
+                elapsedTime: et,
+                frame: frame,
+                fixedFrame: _systemRunner.FixedFrame
+            );
+
+            return _structuralOps.GetNativeWorldAccessor(Id, CanMutateSimulation, tickInfo);
         }
 
         /// <summary>

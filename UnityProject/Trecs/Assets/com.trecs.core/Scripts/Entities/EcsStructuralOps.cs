@@ -150,16 +150,14 @@ namespace Trecs
         internal NativeWorldAccessor GetNativeWorldAccessor(
             int accessorId,
             bool canMutateSimulation,
-            float deltaTime,
-            float elapsedTime
+            NativeWorldTickInfo tickInfo
         )
         {
             TrecsDebugAssert.That(!_isDisposed);
             return _entitySubmitter.ProvideNativeWorldAccessor(
                 accessorId,
                 canMutateSimulation,
-                deltaTime,
-                elapsedTime
+                tickInfo
             );
         }
 
